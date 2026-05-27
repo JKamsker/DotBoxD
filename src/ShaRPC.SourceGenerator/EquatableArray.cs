@@ -56,12 +56,17 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnu
 
     public override int GetHashCode()
     {
-        if (_array.IsDefault)
+        // Default and empty must hash the same so that two values that compare equal cannot
+        // disagree on their hash, even though Equals also treats them as DIFFERENT from each
+        // other (default vs empty is observable elsewhere via IsDefault). Returning 0 for
+        // both is safe: it weakens distribution by exactly one bucket but never violates
+        // the equals/hashcode contract.
+        if (_array.IsDefaultOrEmpty)
         {
             return 0;
         }
 
-        // Manual FNV-1a-style aggregation to avoid taking a dependency on Microsoft.Bcl.HashCode.
+        // Manual FNV-style aggregation to avoid taking a dependency on Microsoft.Bcl.HashCode.
         unchecked
         {
             int hash = 17;
