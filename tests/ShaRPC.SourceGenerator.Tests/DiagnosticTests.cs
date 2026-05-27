@@ -108,6 +108,9 @@ public class DiagnosticTests
 
         diagnostic.Location.Should().NotBe(Location.None);
         diagnostic.Location.GetLineSpan().StartLinePosition.Line.Should().BeGreaterThan(0);
+        GetDiagnosticLine(source, diagnostic)
+            .Substring(diagnostic.Location.GetLineSpan().StartLinePosition.Character)
+            .Should().StartWith("value");
     }
 
     [Fact]
@@ -132,5 +135,14 @@ public class DiagnosticTests
 
         diagnostic.Location.Should().NotBe(Location.None);
         diagnostic.Location.GetLineSpan().StartLinePosition.Line.Should().BeGreaterThan(0);
+        GetDiagnosticLine(source, diagnostic)
+            .Substring(diagnostic.Location.GetLineSpan().StartLinePosition.Character)
+            .Should().StartWith("Count");
+    }
+
+    private static string GetDiagnosticLine(string source, Diagnostic diagnostic)
+    {
+        var line = diagnostic.Location.GetLineSpan().StartLinePosition.Line;
+        return source.Replace("\r\n", "\n").Split('\n')[line];
     }
 }

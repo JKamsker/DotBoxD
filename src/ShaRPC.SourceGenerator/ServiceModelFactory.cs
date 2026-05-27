@@ -8,13 +8,7 @@ namespace ShaRPC.SourceGenerator;
 
 internal static class ServiceModelFactory
 {
-    private const string ShaRpcMethodAttributeName = "ShaRPC.Core.Attributes.ShaRpcMethodAttribute";
     private const string CancellationTokenFullName = "System.Threading.CancellationToken";
-
-    private static readonly SymbolDisplayFormat s_qualifiedFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
 
     public static ServiceResult GetServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
@@ -46,7 +40,7 @@ internal static class ServiceModelFactory
         }
 
         var displayName = interfaceSymbol.ToDisplayString();
-        var serviceLocation = GetSymbolLocation(interfaceSymbol);
+        var serviceLocation = DiagnosticLocationFactory.FromSymbol(interfaceSymbol);
 
         if (interfaceSymbol.IsGenericType)
         {
@@ -72,10 +66,13 @@ internal static class ServiceModelFactory
                 serviceLocation);
         }
 
-        var unsupportedMemberReason = ServiceShapeValidator.GetUnsupportedMemberReason(interfaceSymbol);
-        if (unsupportedMemberReason is not null)
+        var unsupportedMemberDiagnostic = ServiceShapeValidator.GetUnsupportedMemberDiagnostic(interfaceSymbol);
+        if (unsupportedMemberDiagnostic is not null)
         {
-            return RejectedService(displayName, unsupportedMemberReason, serviceLocation);
+            return RejectedService(
+                displayName,
+                unsupportedMemberDiagnostic.Value.Reason,
+                unsupportedMemberDiagnostic.Value.Location);
         }
 
         var generatedTypeCollision = GeneratedTypeCollisionValidator.GetCollisionReason(
@@ -108,14 +105,14 @@ internal static class ServiceModelFactory
                     return RejectedService(
                         displayName,
                         $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
-                        GetSymbolLocation(methodSymbol));
+                        DiagnosticLocationFactory.FromSymbol(methodSymbol));
                 }
 
                 continue;
             }
             seenSignatures[sigKey] = methodSymbol;
 
-            var method = BuildMethodModel(
+            var method = MethodModelFactory.Build(
                 displayName,
                 methodSymbol,
                 cancellationTokenSymbol,
@@ -193,135 +190,7 @@ internal static class ServiceModelFactory
         }
     }
 
-    private static MethodModel BuildMethodModel(
-        string displayName,
-        IMethodSymbol methodSymbol,
-        INamedTypeSymbol? cancellationTokenSymbol,
-        List<MethodDiagnostic> methodDiagnostics,
-        out DiagnosticLocation methodLocation)
-    {
-        var returnType = methodSymbol.ReturnType;
-        var returnKind = ReturnTypeClassifier.Classify(returnType, out var unwrappedReturnType, out var subService);
-        var typeParameterList = MethodSignatureFormatter.GetTypeParameterList(methodSymbol);
-        var constraintClauses = MethodSignatureFormatter.GetConstraintClauses(methodSymbol);
-        string? unsupportedReason = ReturnTypeClassifier.GetUnsupportedServiceReturnReason(returnType);
-        unsupportedReason ??= RpcTypeValidator.GetUnsupportedTypeReason(returnType, "return type");
-        methodLocation = GetSymbolLocation(methodSymbol);
-
-        var parameters = new List<ParameterModel>();
-        var hasCancellationToken = false;
-        var cancellationTokenCount = 0;
-        if (methodSymbol.IsGenericMethod)
-        {
-            unsupportedReason ??= "generic service methods are not supported; expose a non-generic RPC method instead";
-        }
-
-        if (methodSymbol.RefKind != RefKind.None)
-        {
-            unsupportedReason ??= $"return value uses an unsupported pass-by-reference kind '{methodSymbol.RefKind.ToString().ToLowerInvariant()}'";
-        }
-
-        foreach (var param in methodSymbol.Parameters)
-        {
-            var isCancellationToken = cancellationTokenSymbol is not null &&
-                SymbolEqualityComparer.Default.Equals(param.Type, cancellationTokenSymbol);
-
-            if (isCancellationToken)
-            {
-                cancellationTokenCount++;
-                hasCancellationToken = true;
-            }
-
-            if (param.RefKind != RefKind.None)
-            {
-                unsupportedReason ??=
-                    $"parameter '{param.Name}' uses an unsupported pass-by-reference kind '{param.RefKind.ToString().ToLowerInvariant()}'";
-            }
-
-            unsupportedReason ??= RpcTypeValidator.GetUnsupportedTypeReason(
-                param.Type,
-                $"parameter '{param.Name}'");
-
-            parameters.Add(new ParameterModel(
-                IdentifierHelpers.EscapeIdentifier(param.Name),
-                param.Type.ToDisplayString(s_qualifiedFormat),
-                RefKindKeyword(param.RefKind),
-                isCancellationToken,
-                param.HasExplicitDefaultValue));
-        }
-
-        if (cancellationTokenCount > 1)
-        {
-            unsupportedReason ??= "multiple CancellationToken parameters are not supported";
-        }
-
-        if (unsupportedReason is not null)
-        {
-            methodDiagnostics.Add(new MethodDiagnostic(
-                displayName,
-                methodSymbol.Name,
-                unsupportedReason,
-                methodLocation));
-        }
-
-        return new MethodModel(
-            Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
-            RpcName: LiteralHelpers.EscapeStringLiteral(GetConfiguredMethodName(methodSymbol) ?? methodSymbol.Name),
-            ReturnKind: returnKind,
-            UnwrappedReturnType: unwrappedReturnType,
-            ReturnRefKindKeyword: RefKindKeyword(methodSymbol.RefKind),
-            HasCancellationToken: hasCancellationToken,
-            Parameters: parameters.ToEquatableArray(),
-            TypeParameterList: typeParameterList,
-            ConstraintClauses: constraintClauses,
-            UnsupportedReason: unsupportedReason,
-            SubService: subService);
-    }
-
-    private static string? GetConfiguredMethodName(IMethodSymbol methodSymbol)
-    {
-        foreach (var attr in methodSymbol.GetAttributes())
-        {
-            if (attr.AttributeClass?.ToDisplayString() != ShaRpcMethodAttributeName)
-            {
-                continue;
-            }
-
-            foreach (var namedArg in attr.NamedArguments)
-            {
-                if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
-                {
-                    return s;
-                }
-            }
-        }
-
-        return null;
-    }
-
     private static bool HasSameReturnShape(IMethodSymbol left, IMethodSymbol right) =>
         left.RefKind == right.RefKind &&
         SymbolEqualityComparer.Default.Equals(left.ReturnType, right.ReturnType);
-
-    private static string RefKindKeyword(RefKind kind) => kind switch
-    {
-        RefKind.Ref => "ref ",
-        RefKind.In => "in ",
-        RefKind.Out => "out ",
-        _ => string.Empty,
-    };
-
-    private static DiagnosticLocation GetSymbolLocation(ISymbol symbol)
-    {
-        foreach (var location in symbol.Locations)
-        {
-            if (location.IsInSource)
-            {
-                return DiagnosticLocation.FromLocation(location);
-            }
-        }
-
-        return default;
-    }
-
 }

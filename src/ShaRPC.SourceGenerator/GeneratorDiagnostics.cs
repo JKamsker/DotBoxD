@@ -12,6 +12,10 @@ internal readonly record struct ServiceResult(
 
 internal readonly record struct GeneratorError(string Where, string Message);
 
+internal readonly record struct UnsupportedMemberDiagnostic(
+    string Reason,
+    DiagnosticLocation Location);
+
 internal readonly record struct DiagnosticLocation(
     string FilePath,
     int Start,

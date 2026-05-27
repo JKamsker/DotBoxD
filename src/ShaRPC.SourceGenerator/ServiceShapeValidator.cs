@@ -5,18 +5,22 @@ namespace ShaRPC.SourceGenerator;
 
 internal static class ServiceShapeValidator
 {
-    public static string? GetUnsupportedMemberReason(INamedTypeSymbol interfaceSymbol)
+    public static UnsupportedMemberDiagnostic? GetUnsupportedMemberDiagnostic(INamedTypeSymbol interfaceSymbol)
     {
         foreach (var member in EnumerateInterfaceMembers(interfaceSymbol))
         {
             if (member is IPropertySymbol property)
             {
-                return $"interface property '{property.Name}' is not supported; ShaRPC services may declare methods only";
+                return CreateDiagnostic(
+                    property,
+                    $"interface property '{property.Name}' is not supported; ShaRPC services may declare methods only");
             }
 
             if (member is IEventSymbol eventSymbol)
             {
-                return $"interface event '{eventSymbol.Name}' is not supported; ShaRPC services may declare methods only";
+                return CreateDiagnostic(
+                    eventSymbol,
+                    $"interface event '{eventSymbol.Name}' is not supported; ShaRPC services may declare methods only");
             }
 
             if (member is IMethodSymbol method)
@@ -24,18 +28,24 @@ internal static class ServiceShapeValidator
                 if (method.MethodKind == MethodKind.Ordinary &&
                     method.DeclaredAccessibility != Accessibility.Public)
                 {
-                    return $"non-public interface method '{method.Name}' is not supported; ShaRPC services may declare public instance methods only";
+                    return CreateDiagnostic(
+                        method,
+                        $"non-public interface method '{method.Name}' is not supported; ShaRPC services may declare public instance methods only");
                 }
 
                 if (method.MethodKind == MethodKind.Ordinary && method.IsStatic)
                 {
-                    return $"static interface method '{method.Name}' is not supported; ShaRPC services may declare instance methods only";
+                    return CreateDiagnostic(
+                        method,
+                        $"static interface method '{method.Name}' is not supported; ShaRPC services may declare instance methods only");
                 }
 
                 if (method.MethodKind is not MethodKind.Ordinary and not MethodKind.PropertyGet
                     and not MethodKind.PropertySet and not MethodKind.EventAdd and not MethodKind.EventRemove)
                 {
-                    return $"interface member '{method.Name}' has unsupported method kind '{method.MethodKind}'";
+                    return CreateDiagnostic(
+                        method,
+                        $"interface member '{method.Name}' has unsupported method kind '{method.MethodKind}'");
                 }
             }
         }
@@ -58,4 +68,7 @@ internal static class ServiceShapeValidator
             }
         }
     }
+
+    private static UnsupportedMemberDiagnostic CreateDiagnostic(ISymbol symbol, string reason) =>
+        new(reason, DiagnosticLocationFactory.FromSymbol(symbol));
 }
