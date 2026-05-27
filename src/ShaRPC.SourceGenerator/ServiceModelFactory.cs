@@ -77,6 +77,14 @@ internal static class ServiceModelFactory
             return RejectedService(displayName, unsupportedMemberReason, serviceLocation);
         }
 
+        var generatedTypeCollision = GeneratedTypeCollisionValidator.GetCollisionReason(
+            interfaceSymbol,
+            context.SemanticModel.Compilation);
+        if (generatedTypeCollision is not null)
+        {
+            return RejectedService(displayName, generatedTypeCollision, serviceLocation);
+        }
+
         ct.ThrowIfCancellationRequested();
 
         var serviceName = GetConfiguredServiceName(context) ?? interfaceSymbol.Name;

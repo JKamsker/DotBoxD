@@ -300,6 +300,36 @@ public class CodegenRegressionTests
     }
 
     [Fact]
+    public void ExistingAsyncSiblingType_ProducesSHARPC003_AndServiceIsSkipped()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Regress.GeneratedTypeCollision
+            {
+                public interface IFooAsync
+                {
+                }
+
+                [ShaRpcService]
+                public interface IFoo
+                {
+                    int Bar();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("generated async sibling interface 'IFooAsync' would collide"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IFoo."));
+    }
+
+    [Fact]
     public void NonPublicServiceInterface_ProducesSHARPC003_AndIsSkipped()
     {
         const string source = """
