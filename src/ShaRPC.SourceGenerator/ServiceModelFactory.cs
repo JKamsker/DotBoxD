@@ -210,7 +210,7 @@ internal static class ServiceModelFactory
             }
 
             parameters.Add(new ParameterModel(
-                EscapeIdentifier(param.Name),
+                IdentifierHelpers.EscapeIdentifier(param.Name),
                 param.Type.ToDisplayString(s_qualifiedFormat),
                 RefKindKeyword(param.RefKind),
                 isCancellationToken,
@@ -232,7 +232,7 @@ internal static class ServiceModelFactory
         }
 
         return new MethodModel(
-            Name: EscapeIdentifier(methodSymbol.Name),
+            Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
             RpcName: LiteralHelpers.EscapeStringLiteral(GetConfiguredMethodName(methodSymbol) ?? methodSymbol.Name),
             ReturnKind: returnKind,
             UnwrappedReturnType: unwrappedReturnType,
@@ -286,9 +286,4 @@ internal static class ServiceModelFactory
         return default;
     }
 
-    private static string EscapeIdentifier(string name)
-    {
-        var kind = Microsoft.CodeAnalysis.CSharp.SyntaxFacts.GetKeywordKind(name);
-        return kind == Microsoft.CodeAnalysis.CSharp.SyntaxKind.None ? name : "@" + name;
-    }
 }

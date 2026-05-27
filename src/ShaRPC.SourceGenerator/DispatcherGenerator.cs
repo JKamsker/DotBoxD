@@ -30,7 +30,7 @@ internal static class DispatcherGenerator
 
         if (!string.IsNullOrEmpty(service.Namespace))
         {
-            sb.AppendLine($"namespace {service.Namespace}");
+            sb.AppendLine($"namespace {IdentifierHelpers.EscapeNamespace(service.Namespace)}");
             sb.AppendLine("{");
         }
 
@@ -62,9 +62,7 @@ internal static class DispatcherGenerator
     }
 
     private static string QualifyServiceType(ServiceModel service, string typeName) =>
-        string.IsNullOrEmpty(service.Namespace)
-            ? "global::" + typeName
-            : $"global::{service.Namespace}.{typeName}";
+        IdentifierHelpers.QualifyTypeName(service.Namespace, typeName);
 
     /// <summary>
     /// Emits either <c>DispatchAsync</c> (singleton case) or <c>DispatchOnInstanceAsync</c>

@@ -326,6 +326,38 @@ public class CodegenRegressionTests
     }
 
     [Fact]
+    public void EscapedKeywordServiceInterfaceName_CompilesGeneratedOutput()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.KeywordType
+            {
+                [ShaRpcService]
+                public interface @event
+                {
+                    Task<int> CountAsync();
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        var proxy = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.KeywordType", "event", GeneratorTestHelper.GeneratedKind.Proxy))
+            .SourceText.ToString();
+        proxy.Should().Contain("global::Regress.KeywordType.@event");
+
+        var extensions = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName == "ShaRpcExtensions.g.cs")
+            .SourceText.ToString();
+        extensions.Should().Contain("global::Regress.KeywordType.@event");
+    }
+
+    [Fact]
     public void GlobalNamespaceService_CompilesAndDoesNotEmitEmptyNamespace()
     {
         // Regression for the global-namespace branch: emitting a stray `namespace { ... }`

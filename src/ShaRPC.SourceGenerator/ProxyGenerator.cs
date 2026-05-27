@@ -36,7 +36,7 @@ internal static class ProxyGenerator
 
         if (!string.IsNullOrEmpty(service.Namespace))
         {
-            sb.AppendLine($"namespace {service.Namespace}");
+            sb.AppendLine($"namespace {IdentifierHelpers.EscapeNamespace(service.Namespace)}");
             sb.AppendLine("{");
         }
 
@@ -97,9 +97,7 @@ internal static class ProxyGenerator
 
     /// <summary>Builds a <c>global::Namespace.InterfaceName</c> reference.</summary>
     private static string QualifyServiceType(ServiceModel service, string typeName) =>
-        string.IsNullOrEmpty(service.Namespace)
-            ? "global::" + typeName
-            : $"global::{service.Namespace}.{typeName}";
+        IdentifierHelpers.QualifyTypeName(service.Namespace, typeName);
 
     private static void GenerateProxyMethod(StringBuilder sb, ServiceModel service, MethodModel method)
     {

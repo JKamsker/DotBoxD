@@ -27,7 +27,7 @@ internal static class AsyncInterfaceGenerator
 
         if (!string.IsNullOrEmpty(service.Namespace))
         {
-            sb.AppendLine($"namespace {service.Namespace}");
+            sb.AppendLine($"namespace {IdentifierHelpers.EscapeNamespace(service.Namespace)}");
             sb.AppendLine("{");
         }
 
@@ -35,7 +35,7 @@ internal static class AsyncInterfaceGenerator
         sb.AppendLine($"    /// Auto-generated async sibling of <see cref=\"{service.InterfaceName}\"/>. Use this");
         sb.AppendLine($"    /// interface from callers that must not block on RPC calls.");
         sb.AppendLine("    /// </summary>");
-        sb.AppendLine($"    public interface {siblingName}");
+        sb.AppendLine($"    public interface {IdentifierHelpers.EscapeIdentifier(siblingName)}");
         sb.AppendLine("    {");
 
         var first = true;

@@ -41,15 +41,9 @@ internal static class ExtensionsGenerator
                 : serviceName;
             var proxyName = serviceName + "Proxy";
             var dispatcherName = serviceName + "Dispatcher";
-            var fullInterfaceName = "global::" + (string.IsNullOrEmpty(service.Namespace)
-                ? service.InterfaceName
-                : $"{service.Namespace}.{service.InterfaceName}");
-            var fullProxyName = "global::" + (string.IsNullOrEmpty(service.Namespace)
-                ? proxyName
-                : $"{service.Namespace}.{proxyName}");
-            var fullDispatcherName = "global::" + (string.IsNullOrEmpty(service.Namespace)
-                ? dispatcherName
-                : $"{service.Namespace}.{dispatcherName}");
+            var fullInterfaceName = IdentifierHelpers.QualifyTypeName(service.Namespace, service.InterfaceName);
+            var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, proxyName);
+            var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, dispatcherName);
 
             sb.AppendLine();
             sb.AppendLine("        /// <summary>");
