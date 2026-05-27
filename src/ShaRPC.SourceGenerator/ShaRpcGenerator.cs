@@ -334,6 +334,16 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                     "service interfaces must be public because generated proxy, dispatcher, and extension APIs are public"));
         }
 
+        var unsupportedMemberReason = GetUnsupportedMemberReason(interfaceSymbol);
+        if (unsupportedMemberReason is not null)
+        {
+            return new ServiceResult(
+                Model: null,
+                Error: null,
+                MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
+                ServiceDiagnostic: new ServiceDiagnostic(displayName, unsupportedMemberReason));
+        }
+
         ct.ThrowIfCancellationRequested();
 
         // Pick the service attribute (already guaranteed to be present by ForAttributeWithMetadataName).
@@ -496,6 +506,54 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             ServiceDiagnostic: null);
+    }
+
+    private static string? GetUnsupportedMemberReason(INamedTypeSymbol interfaceSymbol)
+    {
+        foreach (var member in EnumerateInterfaceMembers(interfaceSymbol))
+        {
+            if (member is IPropertySymbol property)
+            {
+                return $"interface property '{property.Name}' is not supported; ShaRPC services may declare methods only";
+            }
+
+            if (member is IEventSymbol eventSymbol)
+            {
+                return $"interface event '{eventSymbol.Name}' is not supported; ShaRPC services may declare methods only";
+            }
+
+            if (member is IMethodSymbol method)
+            {
+                if (method.MethodKind == MethodKind.Ordinary && method.IsStatic)
+                {
+                    return $"static interface method '{method.Name}' is not supported; ShaRPC services may declare instance methods only";
+                }
+
+                if (method.MethodKind is not MethodKind.Ordinary and not MethodKind.PropertyGet
+                    and not MethodKind.PropertySet and not MethodKind.EventAdd and not MethodKind.EventRemove)
+                {
+                    return $"interface member '{method.Name}' has unsupported method kind '{method.MethodKind}'";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<ISymbol> EnumerateInterfaceMembers(INamedTypeSymbol interfaceSymbol)
+    {
+        foreach (var member in interfaceSymbol.GetMembers())
+        {
+            yield return member;
+        }
+
+        foreach (var baseInterface in interfaceSymbol.AllInterfaces)
+        {
+            foreach (var member in baseInterface.GetMembers())
+            {
+                yield return member;
+            }
+        }
     }
 
     private static string GetTypeParameterList(IMethodSymbol method)

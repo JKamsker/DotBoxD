@@ -218,6 +218,91 @@ public class CodegenRegressionTests
     }
 
     [Fact]
+    public void ServiceInterfaceWithProperty_ProducesSHARPC003_AndIsSkipped()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.PropertyMember
+            {
+                [ShaRpcService]
+                public interface IWithProperty
+                {
+                    int Count { get; }
+                    Task<int> CountAsync();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("interface property 'Count' is not supported"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IWithProperty"));
+    }
+
+    [Fact]
+    public void ServiceInterfaceWithEvent_ProducesSHARPC003_AndIsSkipped()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System;
+            using System.Threading.Tasks;
+
+            namespace Regress.EventMember
+            {
+                [ShaRpcService]
+                public interface IWithEvent
+                {
+                    event EventHandler Changed;
+                    Task<int> CountAsync();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("interface event 'Changed' is not supported"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IWithEvent"));
+    }
+
+    [Fact]
+    public void ServiceInterfaceWithStaticAbstractMethod_ProducesSHARPC003_AndIsSkipped()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.StaticMember
+            {
+                [ShaRpcService]
+                public interface IWithStatic
+                {
+                    static abstract Task<int> CountAsync();
+                    Task<int> InstanceCountAsync();
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("static interface method 'CountAsync' is not supported"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IWithStatic"));
+    }
+
+    [Fact]
     public void ReservedKeywordParameterNames_AreEscaped()
     {
         // Regression for H1: a parameter named `default` (or any C# keyword) must be
