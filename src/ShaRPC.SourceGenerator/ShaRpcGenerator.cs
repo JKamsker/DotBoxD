@@ -312,6 +312,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             : interfaceSymbol.ContainingNamespace.ToDisplayString();
         var interfaceName = interfaceSymbol.Name;
         var serviceName = customName ?? interfaceName;
+        var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
 
         var methods = new List<MethodModel>();
         var methodDiagnostics = new List<MethodDiagnostic>();
@@ -347,8 +348,8 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
 
             // De-duplicate in case a derived interface re-declares (via `new`) a base method
             // with the same signature shape.
-            var sigKey = methodSymbol.Name + "(" +
-                string.Join(",", methodSymbol.Parameters.Select(p => p.Type.ToDisplayString())) + ")";
+            var sigKey = methodSymbol.Name + "`" + methodSymbol.Arity + "(" +
+                string.Join(",", methodSymbol.Parameters.Select(p => p.RefKind + ":" + p.Type.ToDisplayString())) + ")";
             if (!seenSignatures.Add(sigKey))
             {
                 continue;
@@ -372,34 +373,42 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             var returnType = methodSymbol.ReturnType;
             var returnKind = ClassifyReturnType(returnType, out var unwrappedReturnType, out var subService);
 
-            // SHARPC002 — ref/in/out parameters cannot be marshalled across an RPC
-            // boundary. We can't simply drop the method (the proxy still has to implement
-            // the user's interface or compilation fails with CS0535), so we emit a
-            // throwing stub and surface a diagnostic.
-            var unsupportedRefKindParam = methodSymbol.Parameters.FirstOrDefault(
-                p => p.RefKind != RefKind.None && p.Type.ToDisplayString() != CancellationTokenFullName);
-
             var parameters = new List<ParameterModel>();
             var hasCancellationToken = false;
+            var cancellationTokenCount = 0;
+            string? unsupportedReason = null;
             foreach (var param in methodSymbol.Parameters)
             {
-                if (param.Type.ToDisplayString() == CancellationTokenFullName)
+                var isCancellationToken = cancellationTokenSymbol is not null &&
+                    SymbolEqualityComparer.Default.Equals(param.Type, cancellationTokenSymbol);
+
+                if (isCancellationToken)
                 {
+                    cancellationTokenCount++;
                     hasCancellationToken = true;
-                    continue;
+                }
+
+                if (param.RefKind != RefKind.None)
+                {
+                    unsupportedReason ??=
+                        $"parameter '{param.Name}' uses an unsupported pass-by-reference kind '{param.RefKind.ToString().ToLowerInvariant()}'";
                 }
 
                 parameters.Add(new ParameterModel(
                     EscapeIdentifier(param.Name),
                     param.Type.ToDisplayString(s_qualifiedFormat),
-                    RefKindKeyword(param.RefKind)));
+                    RefKindKeyword(param.RefKind),
+                    isCancellationToken,
+                    param.HasExplicitDefaultValue));
             }
 
-            string? unsupportedReason = null;
-            if (unsupportedRefKindParam is not null)
+            if (cancellationTokenCount > 1)
             {
-                unsupportedReason =
-                    $"parameter '{unsupportedRefKindParam.Name}' uses an unsupported pass-by-reference kind '{unsupportedRefKindParam.RefKind.ToString().ToLowerInvariant()}'";
+                unsupportedReason ??= "multiple CancellationToken parameters are not supported";
+            }
+
+            if (unsupportedReason is not null)
+            {
                 methodDiagnostics.Add(new MethodDiagnostic(
                     displayName,
                     methodSymbol.Name,
@@ -585,9 +594,10 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             string siblingName = NamingHelpers.IsAsync(m.ReturnKind)
                 ? m.Name
                 : NamingHelpers.AsyncSiblingMethodName(m.Name);
+            var siblingParameters = BuildAsyncSiblingParameters(m);
 
             var key = siblingName + "(" +
-                string.Join(",", m.Parameters.Array.Select(p => p.Type)) + ")";
+                string.Join(",", siblingParameters.Array.Select(p => p.RefKindKeyword + p.Type)) + ")";
 
             if (seen.TryGetValue(key, out var clash))
             {
@@ -611,16 +621,61 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             };
 
             // True iff the proxy would need an extra method to satisfy the sibling
-            // interface. A second method is unnecessary when name AND signature already
-            // match (same name on both, already async, already has CT parameter).
+            // interface. A second method is unnecessary when name AND full signature
+            // already match (same name on both, already async, already has CT parameter).
             var siblingNameMatches = siblingName == m.Name;
-            var alreadyHasCt = m.HasCancellationToken;
-            var requiresExtra = !(siblingNameMatches && alreadyHasCt && NamingHelpers.IsAsync(m.ReturnKind));
+            var signatureMatches = ParametersEqual(m.Parameters, siblingParameters);
+            var requiresExtra = !(siblingNameMatches && signatureMatches && NamingHelpers.IsAsync(m.ReturnKind));
 
-            rows.Add(new AsyncSiblingMethod(siblingName, m, siblingReturnKind, requiresExtra));
+            rows.Add(new AsyncSiblingMethod(siblingName, m, siblingReturnKind, siblingParameters, requiresExtra));
         }
 
         return (rows.ToEquatableArray(), collisions.ToEquatableArray());
+    }
+
+    private static EquatableArray<ParameterModel> BuildAsyncSiblingParameters(MethodModel method)
+    {
+        if (NamingHelpers.IsAsync(method.ReturnKind) && method.HasCancellationToken)
+        {
+            return method.Parameters;
+        }
+
+        var parameters = new List<ParameterModel>();
+        foreach (var parameter in method.Parameters.Array)
+        {
+            if (!parameter.IsCancellationToken)
+            {
+                parameters.Add(parameter);
+            }
+        }
+
+        parameters.Add(new ParameterModel(
+            "ct",
+            "global::System.Threading.CancellationToken",
+            IsCancellationToken: true,
+            HasDefaultValue: true));
+
+        return parameters.ToEquatableArray();
+    }
+
+    private static bool ParametersEqual(
+        EquatableArray<ParameterModel> left,
+        EquatableArray<ParameterModel> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (left[i] != right[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

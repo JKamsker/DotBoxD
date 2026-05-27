@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace ShaRPC.SourceGenerator;
@@ -127,33 +128,44 @@ internal static class DispatcherGenerator
         sb.AppendLine($"                case \"{method.RpcName}\":");
         sb.AppendLine("                {");
 
-        var argList = new StringBuilder();
-        if (method.Parameters.Count == 1)
+        var requestParameters = GetRequestParameters(method.Parameters);
+        if (requestParameters.Count == 1)
         {
-            sb.AppendLine($"                    var arg = serializer.Deserialize<{method.Parameters[0].Type}>(payload);");
-            argList.Append("arg");
+            sb.AppendLine($"                    var arg = serializer.Deserialize<{requestParameters[0].Type}>(payload);");
         }
-        else if (method.Parameters.Count > 1)
+        else if (requestParameters.Count > 1)
         {
             var tupleTypes = new StringBuilder();
-            for (var i = 0; i < method.Parameters.Count; i++)
+            for (var i = 0; i < requestParameters.Count; i++)
             {
                 if (i > 0) tupleTypes.Append(", ");
-                tupleTypes.Append(method.Parameters[i].Type);
+                tupleTypes.Append(requestParameters[i].Type);
             }
 
             sb.AppendLine($"                    var args = serializer.Deserialize<({tupleTypes})>(payload);");
-            for (var i = 0; i < method.Parameters.Count; i++)
-            {
-                if (i > 0) argList.Append(", ");
-                argList.Append("args.Item").Append(i + 1);
-            }
         }
 
-        if (method.HasCancellationToken)
+        var argList = new StringBuilder();
+        var requestIndex = 0;
+        for (var i = 0; i < method.Parameters.Count; i++)
         {
-            if (argList.Length > 0) argList.Append(", ");
-            argList.Append("ct");
+            if (i > 0) argList.Append(", ");
+
+            var parameter = method.Parameters[i];
+            if (parameter.IsCancellationToken)
+            {
+                argList.Append("ct");
+            }
+            else if (requestParameters.Count == 1)
+            {
+                argList.Append("arg");
+                requestIndex++;
+            }
+            else
+            {
+                requestIndex++;
+                argList.Append("args.Item").Append(requestIndex);
+            }
         }
 
         var call = $"{receiver}.{method.Name}({argList})";
@@ -197,5 +209,19 @@ internal static class DispatcherGenerator
         }
 
         sb.AppendLine("                }");
+    }
+
+    private static List<ParameterModel> GetRequestParameters(EquatableArray<ParameterModel> parameters)
+    {
+        var requestParameters = new List<ParameterModel>();
+        foreach (var p in parameters.Array)
+        {
+            if (!p.IsCancellationToken)
+            {
+                requestParameters.Add(p);
+            }
+        }
+
+        return requestParameters;
     }
 }

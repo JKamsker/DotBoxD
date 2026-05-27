@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace ShaRPC.SourceGenerator;
@@ -98,17 +99,7 @@ internal static class ProxyGenerator
     private static void GenerateProxyMethod(StringBuilder sb, ServiceModel service, MethodModel method)
     {
         var paramList = new StringBuilder();
-        for (var i = 0; i < method.Parameters.Count; i++)
-        {
-            if (i > 0) paramList.Append(", ");
-            var p = method.Parameters[i];
-            paramList.Append(p.RefKindKeyword).Append(p.Type).Append(' ').Append(p.Name);
-        }
-        if (method.HasCancellationToken)
-        {
-            if (paramList.Length > 0) paramList.Append(", ");
-            paramList.Append("global::System.Threading.CancellationToken ct = default");
-        }
+        AppendParameterList(paramList, method.Parameters);
 
         var declaredReturn = NamingHelpers.GetDeclaredReturnTypeText(method.ReturnKind, method.UnwrappedReturnType);
         var isAsync = NamingHelpers.IsAsync(method.ReturnKind);
@@ -117,7 +108,7 @@ internal static class ProxyGenerator
         // NOT add `async` for stubs — the throw must take the synchronous exit path so
         // out-parameters are considered definitely assigned by the C# compiler.
         var asyncKeyword = (isAsync && method.UnsupportedReason is null) ? "async " : string.Empty;
-        var ctArg = method.HasCancellationToken ? "ct" : "default";
+        var ctArg = GetCancellationTokenArgument(method.Parameters);
 
         sb.AppendLine($"        public {asyncKeyword}{declaredReturn} {method.Name}({paramList})");
         sb.AppendLine("        {");
@@ -149,6 +140,7 @@ internal static class ProxyGenerator
         var returnType = isSubServiceReturn
             ? "global::ShaRPC.Core.Protocol.ServiceHandle"
             : method.UnwrappedReturnType;
+        var requestParameters = GetRequestParameters(method.Parameters);
         var svc = service.ServiceName;
         var rpc = method.RpcName;
 
@@ -158,7 +150,7 @@ internal static class ProxyGenerator
         string callArgs;        // arguments after (service, method) for the singleton overload
         string callArgsInst;    // arguments after (service, instanceId, method) for instance
 
-        if (method.Parameters.Count == 0)
+        if (requestParameters.Count == 0)
         {
             if (hasReturn)
             {
@@ -173,9 +165,9 @@ internal static class ProxyGenerator
                 callArgsInst = $"\"{svc}\", _instanceId, \"{rpc}\", new object(), {ctArg}";
             }
         }
-        else if (method.Parameters.Count == 1)
+        else if (requestParameters.Count == 1)
         {
-            var p = method.Parameters[0];
+            var p = requestParameters[0];
             typeArgs = hasReturn ? $"<{p.Type}, {returnType}>" : $"<{p.Type}>";
             callArgs = $"\"{svc}\", \"{rpc}\", {p.Name}, {ctArg}";
             callArgsInst = $"\"{svc}\", _instanceId, \"{rpc}\", {p.Name}, {ctArg}";
@@ -184,15 +176,15 @@ internal static class ProxyGenerator
         {
             var tupleTypes = new StringBuilder();
             var tupleValues = new StringBuilder();
-            for (var i = 0; i < method.Parameters.Count; i++)
+            for (var i = 0; i < requestParameters.Count; i++)
             {
                 if (i > 0)
                 {
                     tupleTypes.Append(", ");
                     tupleValues.Append(", ");
                 }
-                tupleTypes.Append(method.Parameters[i].Type);
-                tupleValues.Append(method.Parameters[i].Name);
+                tupleTypes.Append(requestParameters[i].Type);
+                tupleValues.Append(requestParameters[i].Name);
             }
 
             typeArgs = hasReturn ? $"<({tupleTypes}), {returnType}>" : $"<({tupleTypes})>";
@@ -211,14 +203,7 @@ internal static class ProxyGenerator
     private static void GenerateAsyncSiblingMethod(StringBuilder sb, ServiceModel service, AsyncSiblingMethod s)
     {
         var paramList = new StringBuilder();
-        for (var i = 0; i < s.Source.Parameters.Count; i++)
-        {
-            if (i > 0) paramList.Append(", ");
-            var p = s.Source.Parameters[i];
-            paramList.Append(p.RefKindKeyword).Append(p.Type).Append(' ').Append(p.Name);
-        }
-        if (paramList.Length > 0) paramList.Append(", ");
-        paramList.Append("global::System.Threading.CancellationToken ct = default");
+        AppendParameterList(paramList, s.Parameters);
 
         var declaredReturn = NamingHelpers.GetDeclaredReturnTypeText(
             s.SiblingReturnKind, s.Source.UnwrappedReturnType);
@@ -232,11 +217,53 @@ internal static class ProxyGenerator
         {
             HasCancellationToken = true,
             ReturnKind = s.SiblingReturnKind,
+            Parameters = s.Parameters,
         };
-        var invocation = BuildClientInvocation(service, virtualSource, "ct");
+        var invocation = BuildClientInvocation(service, virtualSource, GetCancellationTokenArgument(s.Parameters));
         EmitInvocation(sb, virtualSource, invocation);
 
         sb.AppendLine("        }");
+    }
+
+    private static void AppendParameterList(StringBuilder sb, EquatableArray<ParameterModel> parameters)
+    {
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            var p = parameters[i];
+            sb.Append(p.RefKindKeyword).Append(p.Type).Append(' ').Append(p.Name);
+            if (p.IsCancellationToken && p.HasDefaultValue)
+            {
+                sb.Append(" = default");
+            }
+        }
+    }
+
+    private static string GetCancellationTokenArgument(EquatableArray<ParameterModel> parameters)
+    {
+        foreach (var p in parameters.Array)
+        {
+            if (p.IsCancellationToken)
+            {
+                return p.Name;
+            }
+        }
+
+        return "default";
+    }
+
+    private static List<ParameterModel> GetRequestParameters(EquatableArray<ParameterModel> parameters)
+    {
+        var requestParameters = new List<ParameterModel>();
+        foreach (var p in parameters.Array)
+        {
+            if (!p.IsCancellationToken)
+            {
+                requestParameters.Add(p);
+            }
+        }
+
+        return requestParameters;
     }
 
     private static void EmitInvocation(StringBuilder sb, MethodModel method, string invocation)

@@ -64,14 +64,16 @@ internal static class AsyncInterfaceGenerator
         var returnText = NamingHelpers.GetDeclaredReturnTypeText(s.SiblingReturnKind, s.Source.UnwrappedReturnType);
 
         var paramList = new StringBuilder();
-        for (var i = 0; i < s.Source.Parameters.Count; i++)
+        for (var i = 0; i < s.Parameters.Count; i++)
         {
             if (i > 0) paramList.Append(", ");
-            var p = s.Source.Parameters[i];
+            var p = s.Parameters[i];
             paramList.Append(p.RefKindKeyword).Append(p.Type).Append(' ').Append(p.Name);
+            if (p.IsCancellationToken && p.HasDefaultValue)
+            {
+                paramList.Append(" = default");
+            }
         }
-        if (paramList.Length > 0) paramList.Append(", ");
-        paramList.Append("global::System.Threading.CancellationToken ct = default");
 
         sb.AppendLine($"        {returnText} {s.Name}({paramList});");
     }

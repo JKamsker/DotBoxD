@@ -587,6 +587,51 @@ public class CodegenRegressionTests
     }
 
     /// <summary>
+    /// Regression: <see cref="System.Threading.CancellationToken"/> parameters can be
+    /// written through aliases and can appear before later payload parameters. The
+    /// proxy must preserve the user's signature while excluding the token from the
+    /// serialized request tuple, and the dispatcher must pass the runtime token back in
+    /// the original argument position.
+    /// </summary>
+    [Fact]
+    public void CancellationTokenAliasInMiddle_PreservesSignatureAndIsNotSerialized()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+            using CT = System.Threading.CancellationToken;
+
+            namespace Regress.CtOrder
+            {
+                [ShaRpcService]
+                public interface ICtOrder
+                {
+                    Task<int> SumAsync(int a, CT cancellationToken, int b);
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        var generated = runResult.Results.Single().GeneratedSources;
+        var proxy = generated
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.CtOrder", "ICtOrder", GeneratorTestHelper.GeneratedKind.Proxy))
+            .SourceText.ToString();
+        proxy.Should().Contain(
+            "SumAsync(int a, global::System.Threading.CancellationToken cancellationToken, int b)");
+        proxy.Should().Contain(
+            "InvokeAsync<(int, int), int>(\"ICtOrder\", \"SumAsync\", (a, b), cancellationToken)");
+
+        var dispatcher = generated
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.CtOrder", "ICtOrder", GeneratorTestHelper.GeneratedKind.Dispatcher))
+            .SourceText.ToString();
+        dispatcher.Should().Contain("_service.SumAsync(args.Item1, ct, args.Item2)");
+    }
+
+    /// <summary>
     /// Behavioral test: a <see cref="ValueTask{TResult}"/>-returning proxy method must
     /// await correctly and surface the awaited value at runtime.
     /// </summary>

@@ -56,13 +56,18 @@ internal sealed record MethodModel(
     SubServiceInfo? SubService = null);
 
 /// <summary>
-/// Immutable, value-equatable representation of a method parameter (excluding any
-/// <see cref="System.Threading.CancellationToken"/>, which is tracked separately on the method).
+/// Immutable, value-equatable representation of a method parameter.
+/// <see cref="IsCancellationToken"/> marks parameters that are part of the user's
+/// signature but are not serialized into the RPC payload.
 /// <see cref="RefKindKeyword"/> holds the C# modifier text (<c>""</c>, <c>"ref "</c>,
-/// <c>"in "</c>, or <c>"out "</c>) — non-empty values appear only on parameters of
-/// unsupported methods, which are emitted as throwing stubs.
+/// <c>"in "</c>, or <c>"out "</c>).
 /// </summary>
-internal sealed record ParameterModel(string Name, string Type, string RefKindKeyword = "");
+internal sealed record ParameterModel(
+    string Name,
+    string Type,
+    string RefKindKeyword = "",
+    bool IsCancellationToken = false,
+    bool HasDefaultValue = false);
 
 /// <summary>
 /// A <see cref="ServiceModel"/> paired with its computed async-sibling projection. Lives
@@ -95,6 +100,8 @@ internal sealed record AsyncSiblingMethod(
     /// sync methods are projected onto <see cref="MethodReturnKind.Task"/> or
     /// <see cref="MethodReturnKind.TaskOf"/> depending on whether they carry a payload.</summary>
     MethodReturnKind SiblingReturnKind,
+    /// <summary>Parameter list emitted on the sibling interface.</summary>
+    EquatableArray<ParameterModel> Parameters,
     /// <summary>True when this row materially differs from <see cref="Source"/> — i.e.
     /// the proxy needs an extra method to satisfy the sibling interface. False when one
     /// physical method on the proxy satisfies both interfaces (already-async methods
