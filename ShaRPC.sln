@@ -13,11 +13,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShaRPC.Transports.Tcp", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShaRPC.Serializers.MessagePack", "src\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj", "{0644CFA7-3B4F-408C-ACBA-502914AE7053}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "samples\Shared\Shared.csproj", "{BBB78EE7-4E26-4CE5-A8CF-31C1EF600FE2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "samples\GameService\Shared\Shared.csproj", "{BBB78EE7-4E26-4CE5-A8CF-31C1EF600FE2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "samples\Server\Server.csproj", "{303A90A8-EBCF-4793-AEA2-9DE75689C014}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "samples\GameService\Server\Server.csproj", "{303A90A8-EBCF-4793-AEA2-9DE75689C014}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "samples\Client\Client.csproj", "{8D8F3A4D-CB28-46AA-9EF6-F8DDDF1C00D3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "samples\GameService\Client\Client.csproj", "{8D8F3A4D-CB28-46AA-9EF6-F8DDDF1C00D3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShaRPC.Tests", "tests\ShaRPC.Tests\ShaRPC.Tests.csproj", "{AEDB37E6-F0E1-44FB-829F-536542272713}"
 EndProject
