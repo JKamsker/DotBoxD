@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -19,33 +17,79 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
 {
     private const string ShaRpcServiceAttributeName = "ShaRPC.Core.Attributes.ShaRpcServiceAttribute";
     private const string ShaRpcMethodAttributeName = "ShaRPC.Core.Attributes.ShaRpcMethodAttribute";
+    private const string CancellationTokenFullName = "System.Threading.CancellationToken";
+
+    private static readonly DiagnosticDescriptor s_generatorErrorRule = new(
+        id: "SHARPC001",
+        title: "ShaRPC source generator error",
+        messageFormat: "ShaRPC failed to generate for '{0}': {1}",
+        category: "ShaRPC.SourceGenerator",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal readonly record struct ServiceResult(ServiceModel? Model, GeneratorError? Error);
+
+    internal readonly record struct GeneratorError(string Where, string Message);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Find all interface declarations with [ShaRpcService] attribute
-        var serviceInterfaces = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                predicate: static (s, _) => IsInterfaceWithAttribute(s),
-                transform: static (ctx, ct) => GetServiceInfo(ctx, ct))
-            .Where(static s => s is not null)
-            .Select(static (s, _) => s!);
+        var results = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                ShaRpcServiceAttributeName,
+                predicate: static (node, _) => node is InterfaceDeclarationSyntax,
+                transform: static (ctx, ct) => GetServiceResult(ctx, ct))
+            .WithTrackingName("ServiceResults");
 
-        // Register source output
-        context.RegisterSourceOutput(serviceInterfaces, static (spc, service) =>
+        var errors = results
+            .Where(static r => r.Error is not null)
+            .Select(static (r, _) => r.Error!.Value)
+            .WithTrackingName("ServiceErrors");
+
+        context.RegisterSourceOutput(errors, static (spc, error) =>
+            spc.ReportDiagnostic(Diagnostic.Create(
+                s_generatorErrorRule,
+                Location.None,
+                error.Where,
+                error.Message)));
+
+        var models = results
+            .Where(static r => r.Model is not null)
+            .Select(static (r, _) => r.Model!)
+            .WithTrackingName("Services");
+
+        context.RegisterSourceOutput(models, static (spc, model) =>
         {
-            // Generate proxy
-            var proxySource = ProxyGenerator.Generate(service);
-            var proxyFileName = $"{service.InterfaceName}.ShaRpcProxy.g.cs";
-            spc.AddSource(proxyFileName, SourceText.From(proxySource, Encoding.UTF8));
+            try
+            {
+                var proxySource = ProxyGenerator.Generate(model);
+                spc.AddSource(
+                    $"{model.InterfaceName}.ShaRpcProxy.g.cs",
+                    SourceText.From(proxySource, Encoding.UTF8));
 
-            // Generate dispatcher
-            var dispatcherSource = DispatcherGenerator.Generate(service);
-            var dispatcherFileName = $"{service.InterfaceName}.ShaRpcDispatcher.g.cs";
-            spc.AddSource(dispatcherFileName, SourceText.From(dispatcherSource, Encoding.UTF8));
+                var dispatcherSource = DispatcherGenerator.Generate(model);
+                spc.AddSource(
+                    $"{model.InterfaceName}.ShaRpcDispatcher.g.cs",
+                    SourceText.From(dispatcherSource, Encoding.UTF8));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                spc.ReportDiagnostic(Diagnostic.Create(
+                    s_generatorErrorRule,
+                    Location.None,
+                    model.InterfaceName,
+                    ex.ToString()));
+            }
         });
 
-        // Collect all services and generate extensions
-        var allServices = serviceInterfaces.Collect();
+        var allServices = models
+            .Collect()
+            .Select(static (arr, _) => arr.ToEquatableArray())
+            .WithTrackingName("AllServices");
+
         context.RegisterSourceOutput(allServices, static (spc, services) =>
         {
             if (services.IsEmpty)
@@ -53,142 +97,163 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 return;
             }
 
-            var extensionsSource = GenerateExtensions(services);
-            spc.AddSource("ShaRpcExtensions.g.cs", SourceText.From(extensionsSource, Encoding.UTF8));
+            try
+            {
+                var extensionsSource = GenerateExtensions(services);
+                spc.AddSource(
+                    "ShaRpcExtensions.g.cs",
+                    SourceText.From(extensionsSource, Encoding.UTF8));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                spc.ReportDiagnostic(Diagnostic.Create(
+                    s_generatorErrorRule,
+                    Location.None,
+                    "ShaRpcExtensions",
+                    ex.ToString()));
+            }
         });
     }
 
-    private static bool IsInterfaceWithAttribute(SyntaxNode node)
+    private static ServiceResult GetServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
-        return node is InterfaceDeclarationSyntax interfaceDeclaration
-            && interfaceDeclaration.AttributeLists.Count > 0;
+        try
+        {
+            var model = BuildServiceModel(context, ct);
+            return new ServiceResult(model, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var name = context.TargetSymbol?.ToDisplayString() ?? "<unknown>";
+            return new ServiceResult(null, new GeneratorError(name, ex.ToString()));
+        }
     }
 
-    private static ServiceInfo? GetServiceInfo(GeneratorSyntaxContext context, CancellationToken ct)
+    private static ServiceModel? BuildServiceModel(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
-        var interfaceDeclaration = (InterfaceDeclarationSyntax)context.Node;
-
-        // Check if it has the ShaRpcService attribute
-        var symbol = context.SemanticModel.GetDeclaredSymbol(interfaceDeclaration, ct);
-        if (symbol is not INamedTypeSymbol interfaceSymbol)
+        if (context.TargetSymbol is not INamedTypeSymbol interfaceSymbol)
         {
             return null;
         }
 
-        var hasShaRpcAttribute = interfaceSymbol.GetAttributes()
-            .Any(a => a.AttributeClass?.ToDisplayString() == ShaRpcServiceAttributeName);
+        ct.ThrowIfCancellationRequested();
 
-        if (!hasShaRpcAttribute)
-        {
-            return null;
-        }
-
-        // Get custom service name if specified
-        var attr = interfaceSymbol.GetAttributes()
-            .First(a => a.AttributeClass?.ToDisplayString() == ShaRpcServiceAttributeName);
-
+        // Pick the service attribute (already guaranteed to be present by ForAttributeWithMetadataName).
         string? customName = null;
-        foreach (var namedArg in attr.NamedArguments)
+        foreach (var attr in context.Attributes)
         {
-            if (namedArg.Key == "Name" && namedArg.Value.Value is string name)
+            foreach (var namedArg in attr.NamedArguments)
             {
-                customName = name;
+                if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
+                {
+                    customName = s;
+                }
             }
         }
 
-        var service = new ServiceInfo
-        {
-            Namespace = interfaceSymbol.ContainingNamespace.IsGlobalNamespace
-                ? string.Empty
-                : interfaceSymbol.ContainingNamespace.ToDisplayString(),
-            InterfaceName = interfaceSymbol.Name,
-            ServiceName = customName ?? interfaceSymbol.Name
-        };
+        var ns = interfaceSymbol.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : interfaceSymbol.ContainingNamespace.ToDisplayString();
+        var interfaceName = interfaceSymbol.Name;
+        var serviceName = customName ?? interfaceName;
 
-        // Get all methods
+        var methods = new List<MethodModel>();
+
         foreach (var member in interfaceSymbol.GetMembers())
         {
-            if (member is IMethodSymbol methodSymbol && methodSymbol.MethodKind == MethodKind.Ordinary)
-            {
-                // Check for custom method name
-                string? customMethodName = null;
-                var methodAttr = methodSymbol.GetAttributes()
-                    .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == ShaRpcMethodAttributeName);
+            ct.ThrowIfCancellationRequested();
 
-                if (methodAttr != null)
+            if (member is not IMethodSymbol methodSymbol || methodSymbol.MethodKind != MethodKind.Ordinary)
+            {
+                continue;
+            }
+
+            string? customMethodName = null;
+            foreach (var attr in methodSymbol.GetAttributes())
+            {
+                if (attr.AttributeClass?.ToDisplayString() == ShaRpcMethodAttributeName)
                 {
-                    foreach (var namedArg in methodAttr.NamedArguments)
+                    foreach (var namedArg in attr.NamedArguments)
                     {
-                        if (namedArg.Key == "Name" && namedArg.Value.Value is string name)
+                        if (namedArg.Key == "Name" && namedArg.Value.Value is string s)
                         {
-                            customMethodName = name;
+                            customMethodName = s;
                         }
                     }
                 }
-
-                var returnType = methodSymbol.ReturnType;
-                var returnsTask = returnType.Name == "Task" ||
-                    (returnType is INamedTypeSymbol namedReturn && namedReturn.ConstructedFrom?.Name == "Task");
-
-                string returnTypeStr;
-                string? unwrappedReturnType = null;
-                bool returnsVoid = false;
-
-                if (returnType is INamedTypeSymbol namedType && namedType.IsGenericType && namedType.Name == "Task")
-                {
-                    // Task<T>
-                    unwrappedReturnType = namedType.TypeArguments[0].ToDisplayString();
-                    returnTypeStr = $"Task<{unwrappedReturnType}>";
-                }
-                else if (returnType.Name == "Task")
-                {
-                    // Task (void)
-                    returnTypeStr = "Task";
-                    returnsVoid = true;
-                }
-                else
-                {
-                    // Sync method - wrap in Task
-                    returnTypeStr = returnType.SpecialType == SpecialType.System_Void
-                        ? "Task"
-                        : $"Task<{returnType.ToDisplayString()}>";
-                    unwrappedReturnType = returnType.SpecialType == SpecialType.System_Void
-                        ? null
-                        : returnType.ToDisplayString();
-                    returnsVoid = returnType.SpecialType == SpecialType.System_Void;
-                }
-
-                var method = new MethodInfo
-                {
-                    Name = methodSymbol.Name,
-                    RpcName = customMethodName ?? methodSymbol.Name,
-                    ReturnType = returnTypeStr,
-                    UnwrappedReturnType = unwrappedReturnType,
-                    ReturnsTask = returnsTask,
-                    ReturnsVoid = returnsVoid
-                };
-
-                // Get parameters (excluding CancellationToken)
-                foreach (var param in methodSymbol.Parameters)
-                {
-                    if (param.Type.ToDisplayString() != "System.Threading.CancellationToken")
-                    {
-                        method.Parameters.Add(new ParameterInfo
-                        {
-                            Name = param.Name,
-                            Type = param.Type.ToDisplayString()
-                        });
-                    }
-                }
-
-                service.Methods.Add(method);
             }
+
+            var returnType = methodSymbol.ReturnType;
+            var returnsTask = returnType.Name == "Task" ||
+                (returnType is INamedTypeSymbol namedReturn && namedReturn.ConstructedFrom?.Name == "Task");
+
+            string returnTypeStr;
+            string? unwrappedReturnType;
+            bool returnsVoid;
+
+            if (returnType is INamedTypeSymbol namedType && namedType.IsGenericType && namedType.Name == "Task")
+            {
+                unwrappedReturnType = namedType.TypeArguments[0].ToDisplayString();
+                returnTypeStr = $"Task<{unwrappedReturnType}>";
+                returnsVoid = false;
+            }
+            else if (returnType.Name == "Task")
+            {
+                returnTypeStr = "Task";
+                unwrappedReturnType = null;
+                returnsVoid = true;
+            }
+            else if (returnType.SpecialType == SpecialType.System_Void)
+            {
+                returnTypeStr = "Task";
+                unwrappedReturnType = null;
+                returnsVoid = true;
+            }
+            else
+            {
+                unwrappedReturnType = returnType.ToDisplayString();
+                returnTypeStr = $"Task<{unwrappedReturnType}>";
+                returnsVoid = false;
+            }
+
+            var parameters = new List<ParameterModel>();
+            foreach (var param in methodSymbol.Parameters)
+            {
+                var paramTypeStr = param.Type.ToDisplayString();
+                if (paramTypeStr == CancellationTokenFullName)
+                {
+                    continue;
+                }
+
+                parameters.Add(new ParameterModel(param.Name, paramTypeStr));
+            }
+
+            methods.Add(new MethodModel(
+                Name: methodSymbol.Name,
+                RpcName: customMethodName ?? methodSymbol.Name,
+                ReturnType: returnTypeStr,
+                UnwrappedReturnType: unwrappedReturnType,
+                ReturnsTask: returnsTask,
+                ReturnsVoid: returnsVoid,
+                Parameters: parameters.ToEquatableArray()));
         }
 
-        return service;
+        return new ServiceModel(
+            Namespace: ns,
+            InterfaceName: interfaceName,
+            ServiceName: serviceName,
+            Methods: methods.ToEquatableArray());
     }
 
-    private static string GenerateExtensions(ImmutableArray<ServiceInfo> services)
+    private static string GenerateExtensions(EquatableArray<ServiceModel> services)
     {
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated />");
@@ -208,7 +273,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
 
         foreach (var service in services)
         {
-            var serviceName = service.InterfaceName.StartsWith("I")
+            var serviceName = service.InterfaceName.StartsWith("I", StringComparison.Ordinal)
                 ? service.InterfaceName.Substring(1)
                 : service.InterfaceName;
             var proxyName = serviceName + "Proxy";
@@ -223,19 +288,17 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 ? dispatcherName
                 : $"{service.Namespace}.{dispatcherName}";
 
-            // Create proxy extension
             sb.AppendLine();
-            sb.AppendLine($"        /// <summary>");
+            sb.AppendLine("        /// <summary>");
             sb.AppendLine($"        /// Creates a proxy for {service.InterfaceName}.");
-            sb.AppendLine($"        /// </summary>");
+            sb.AppendLine("        /// </summary>");
             sb.AppendLine($"        public static {fullInterfaceName} Create{serviceName}Proxy(this IShaRpcClient client)");
             sb.AppendLine($"            => new {fullProxyName}(client);");
 
-            // Add service extension for builder
             sb.AppendLine();
-            sb.AppendLine($"        /// <summary>");
+            sb.AppendLine("        /// <summary>");
             sb.AppendLine($"        /// Registers {service.InterfaceName} with the server.");
-            sb.AppendLine($"        /// </summary>");
+            sb.AppendLine("        /// </summary>");
             sb.AppendLine($"        public static ShaRpcServerBuilder Add{serviceName}(this ShaRpcServerBuilder builder, {fullInterfaceName} implementation)");
             sb.AppendLine($"            => builder.AddDispatcher(new {fullDispatcherName}(implementation));");
         }

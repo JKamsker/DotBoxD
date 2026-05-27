@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Text;
 
 namespace ShaRPC.SourceGenerator;
@@ -7,10 +9,10 @@ namespace ShaRPC.SourceGenerator;
 /// </summary>
 internal static class ProxyGenerator
 {
-    public static string Generate(ServiceInfo service)
+    public static string Generate(ServiceModel service)
     {
         var sb = new StringBuilder();
-        var proxyName = service.InterfaceName.StartsWith("I")
+        var proxyName = service.InterfaceName.StartsWith("I", StringComparison.Ordinal)
             ? service.InterfaceName.Substring(1) + "Proxy"
             : service.InterfaceName + "Proxy";
 
@@ -29,9 +31,9 @@ internal static class ProxyGenerator
             sb.AppendLine("{");
         }
 
-        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine("    /// <summary>");
         sb.AppendLine($"    /// Client proxy for {service.InterfaceName}.");
-        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine("    /// </summary>");
         sb.AppendLine($"    public sealed class {proxyName} : {service.InterfaceName}");
         sb.AppendLine("    {");
         sb.AppendLine("        private readonly IShaRpcClient _client;");
@@ -57,9 +59,9 @@ internal static class ProxyGenerator
         return sb.ToString();
     }
 
-    private static void GenerateProxyMethod(StringBuilder sb, ServiceInfo service, MethodInfo method)
+    private static void GenerateProxyMethod(StringBuilder sb, ServiceModel service, MethodModel method)
     {
-        var parameters = string.Join(", ", method.Parameters.ConvertAll(p => $"{p.Type} {p.Name}"));
+        var parameters = string.Join(", ", method.Parameters.Select(p => $"{p.Type} {p.Name}"));
         var ctParam = method.Parameters.Count > 0 ? ", CancellationToken ct = default" : "CancellationToken ct = default";
 
         sb.AppendLine($"        public async {method.ReturnType} {method.Name}({parameters}{ctParam})");
@@ -67,7 +69,6 @@ internal static class ProxyGenerator
 
         if (method.Parameters.Count == 0)
         {
-            // No parameters
             if (method.ReturnsVoid)
             {
                 sb.AppendLine($"            await _client.InvokeAsync<object>(\"{service.ServiceName}\", \"{method.RpcName}\", new object(), ct);");
@@ -79,7 +80,6 @@ internal static class ProxyGenerator
         }
         else if (method.Parameters.Count == 1)
         {
-            // Single parameter
             var param = method.Parameters[0];
             if (method.ReturnsVoid)
             {
@@ -92,9 +92,8 @@ internal static class ProxyGenerator
         }
         else
         {
-            // Multiple parameters - wrap in tuple
-            var tupleTypes = string.Join(", ", method.Parameters.ConvertAll(p => p.Type));
-            var tupleValues = string.Join(", ", method.Parameters.ConvertAll(p => p.Name));
+            var tupleTypes = string.Join(", ", method.Parameters.Select(p => p.Type));
+            var tupleValues = string.Join(", ", method.Parameters.Select(p => p.Name));
 
             if (method.ReturnsVoid)
             {

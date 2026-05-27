@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace ShaRPC.SourceGenerator;
@@ -7,10 +9,10 @@ namespace ShaRPC.SourceGenerator;
 /// </summary>
 internal static class DispatcherGenerator
 {
-    public static string Generate(ServiceInfo service)
+    public static string Generate(ServiceModel service)
     {
         var sb = new StringBuilder();
-        var dispatcherName = service.InterfaceName.StartsWith("I")
+        var dispatcherName = service.InterfaceName.StartsWith("I", System.StringComparison.Ordinal)
             ? service.InterfaceName.Substring(1) + "Dispatcher"
             : service.InterfaceName + "Dispatcher";
 
@@ -31,9 +33,9 @@ internal static class DispatcherGenerator
             sb.AppendLine("{");
         }
 
-        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine("    /// <summary>");
         sb.AppendLine($"    /// Server dispatcher for {service.InterfaceName}.");
-        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine("    /// </summary>");
         sb.AppendLine($"    public sealed class {dispatcherName} : IServiceDispatcher");
         sb.AppendLine("    {");
         sb.AppendLine($"        private readonly {service.InterfaceName} _service;");
@@ -69,14 +71,13 @@ internal static class DispatcherGenerator
         return sb.ToString();
     }
 
-    private static void GenerateDispatchCase(StringBuilder sb, MethodInfo method)
+    private static void GenerateDispatchCase(StringBuilder sb, MethodModel method)
     {
         sb.AppendLine($"                case \"{method.RpcName}\":");
         sb.AppendLine("                {");
 
         if (method.Parameters.Count == 0)
         {
-            // No parameters
             if (method.ReturnsVoid)
             {
                 sb.AppendLine($"                    await _service.{method.Name}(ct);");
@@ -90,7 +91,6 @@ internal static class DispatcherGenerator
         }
         else if (method.Parameters.Count == 1)
         {
-            // Single parameter
             var param = method.Parameters[0];
             sb.AppendLine($"                    var arg = serializer.Deserialize<{param.Type}>(payload);");
 
@@ -107,11 +107,10 @@ internal static class DispatcherGenerator
         }
         else
         {
-            // Multiple parameters - unwrap from tuple
-            var tupleTypes = string.Join(", ", method.Parameters.ConvertAll(p => p.Type));
+            var tupleTypes = string.Join(", ", method.Parameters.Select(p => p.Type));
             sb.AppendLine($"                    var args = serializer.Deserialize<({tupleTypes})>(payload);");
 
-            var argList = new System.Collections.Generic.List<string>();
+            var argList = new List<string>();
             for (int i = 0; i < method.Parameters.Count; i++)
             {
                 argList.Add($"args.Item{i + 1}");
