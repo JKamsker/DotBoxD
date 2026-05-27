@@ -85,4 +85,52 @@ public class DiagnosticTests
             "the generator should still emit a proxy hint for IBroken so consumers see something");
         hints.Should().Contain("Diag_Broken_IBroken.ShaRpcDispatcher.g.cs");
     }
+
+    [Fact]
+    public void MethodDiagnostics_ReportSourceLocation()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Diag.Location
+            {
+                [ShaRpcService]
+                public interface IRefParam
+                {
+                    void Bad(ref int value);
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var diagnostic = driver.GetRunResult().Diagnostics.Single(d => d.Id == "SHARPC002");
+
+        diagnostic.Location.Should().NotBe(Location.None);
+        diagnostic.Location.GetLineSpan().StartLinePosition.Line.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void ServiceDiagnostics_ReportSourceLocation()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Diag.Location
+            {
+                [ShaRpcService]
+                public interface IWithProperty
+                {
+                    int Count { get; }
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var diagnostic = driver.GetRunResult().Diagnostics.Single(d => d.Id == "SHARPC003");
+
+        diagnostic.Location.Should().NotBe(Location.None);
+        diagnostic.Location.GetLineSpan().StartLinePosition.Line.Should().BeGreaterThan(0);
+    }
 }

@@ -1,6 +1,7 @@
 ﻿{
   Diagnostics: [
     {
+      Location: : (8,13)-(8,19),
       Message: ShaRPC cannot generate code for 'Snap.RefOut.IRefOutSnap.BadOut': parameter 'x' uses an unsupported pass-by-reference kind 'out',
       Severity: Error,
       Descriptor: {

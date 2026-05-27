@@ -64,11 +64,61 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
 
     internal readonly record struct GeneratorError(string Where, string Message);
 
+    internal readonly record struct DiagnosticLocation(
+        string FilePath,
+        int Start,
+        int Length,
+        int StartLine,
+        int StartCharacter,
+        int EndLine,
+        int EndCharacter)
+    {
+        public static DiagnosticLocation FromLocation(Location? location)
+        {
+            if (location is null || !location.IsInSource)
+            {
+                return default;
+            }
+
+            var lineSpan = location.GetLineSpan();
+            return new DiagnosticLocation(
+                lineSpan.Path,
+                location.SourceSpan.Start,
+                location.SourceSpan.Length,
+                lineSpan.StartLinePosition.Line,
+                lineSpan.StartLinePosition.Character,
+                lineSpan.EndLinePosition.Line,
+                lineSpan.EndLinePosition.Character);
+        }
+
+        public Location ToLocation()
+        {
+            if (Length <= 0)
+            {
+                return Location.None;
+            }
+
+            return Location.Create(
+                FilePath,
+                new TextSpan(Start, Length),
+                new LinePositionSpan(
+                    new LinePosition(StartLine, StartCharacter),
+                    new LinePosition(EndLine, EndCharacter)));
+        }
+    }
+
     /// <summary>Diagnostic about one method (SHARPC002) — emitted while still producing the rest of the service.</summary>
-    internal readonly record struct MethodDiagnostic(string InterfaceName, string MethodName, string Reason);
+    internal readonly record struct MethodDiagnostic(
+        string InterfaceName,
+        string MethodName,
+        string Reason,
+        DiagnosticLocation Location = default);
 
     /// <summary>Diagnostic about the service as a whole (SHARPC003) — service is skipped entirely.</summary>
-    internal readonly record struct ServiceDiagnostic(string InterfaceName, string Reason);
+    internal readonly record struct ServiceDiagnostic(
+        string InterfaceName,
+        string Reason,
+        DiagnosticLocation Location = default);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -99,7 +149,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(methodDiagnostics, static (spc, d) =>
             spc.ReportDiagnostic(Diagnostic.Create(
                 s_unsupportedMethodRule,
-                Location.None,
+                d.Location.ToLocation(),
                 d.InterfaceName,
                 d.MethodName,
                 d.Reason)));
@@ -113,7 +163,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(serviceDiagnostics, static (spc, d) =>
             spc.ReportDiagnostic(Diagnostic.Create(
                 s_unsupportedServiceRule,
-                Location.None,
+                d.Location.ToLocation(),
                 d.InterfaceName,
                 d.Reason)));
 
@@ -146,7 +196,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(siblingCollisions, static (spc, d) =>
             spc.ReportDiagnostic(Diagnostic.Create(
                 s_asyncSiblingCollisionRule,
-                Location.None,
+                d.Location.ToLocation(),
                 d.InterfaceName,
                 d.MethodName,
                 d.Reason)));
@@ -298,6 +348,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         }
 
         var displayName = interfaceSymbol.ToDisplayString();
+        var serviceLocation = GetSymbolLocation(interfaceSymbol);
 
         // SHARPC003 — reject generic service interfaces. The generated proxy/dispatcher
         // would need matching type parameters; supporting this fully is non-trivial and
@@ -311,7 +362,8 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
                 ServiceDiagnostic: new ServiceDiagnostic(
                     displayName,
-                    "generic service interfaces are not supported; declare a non-generic interface and forward to a generic helper if needed"));
+                    "generic service interfaces are not supported; declare a non-generic interface and forward to a generic helper if needed",
+                    serviceLocation));
         }
 
         // SHARPC003 — reject nested service interfaces (declared inside another type). The
@@ -325,7 +377,8 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
                 ServiceDiagnostic: new ServiceDiagnostic(
                     displayName,
-                    "nested service interfaces are not supported; declare the interface at namespace scope"));
+                    "nested service interfaces are not supported; declare the interface at namespace scope",
+                    serviceLocation));
         }
 
         if (interfaceSymbol.DeclaredAccessibility != Accessibility.Public)
@@ -336,7 +389,8 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
                 ServiceDiagnostic: new ServiceDiagnostic(
                     displayName,
-                    "service interfaces must be public because generated proxy, dispatcher, and extension APIs are public"));
+                    "service interfaces must be public because generated proxy, dispatcher, and extension APIs are public",
+                    serviceLocation));
         }
 
         var unsupportedMemberReason = GetUnsupportedMemberReason(interfaceSymbol);
@@ -346,7 +400,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 Model: null,
                 Error: null,
                 MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
-                ServiceDiagnostic: new ServiceDiagnostic(displayName, unsupportedMemberReason));
+                ServiceDiagnostic: new ServiceDiagnostic(displayName, unsupportedMemberReason, serviceLocation));
         }
 
         ct.ThrowIfCancellationRequested();
@@ -372,6 +426,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
 
         var methods = new List<MethodModel>();
+        var methodLocations = new List<DiagnosticLocation>();
         var methodDiagnostics = new List<MethodDiagnostic>();
         var seenSignatures = new HashSet<string>(StringComparer.Ordinal);
 
@@ -432,6 +487,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             var typeParameterList = GetTypeParameterList(methodSymbol);
             var constraintClauses = GetConstraintClauses(methodSymbol);
             string? unsupportedReason = GetUnsupportedServiceReturnReason(returnType);
+            var methodLocation = GetSymbolLocation(methodSymbol);
 
             var parameters = new List<ParameterModel>();
             var hasCancellationToken = false;
@@ -476,7 +532,8 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 methodDiagnostics.Add(new MethodDiagnostic(
                     displayName,
                     methodSymbol.Name,
-                    unsupportedReason));
+                    unsupportedReason,
+                    methodLocation));
             }
 
             methods.Add(new MethodModel(
@@ -490,9 +547,10 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 ConstraintClauses: constraintClauses,
                 UnsupportedReason: unsupportedReason,
                 SubService: subService));
+            methodLocations.Add(methodLocation);
         }
 
-        MarkDuplicateWireNames(displayName, methods, methodDiagnostics);
+        MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics);
 
         static string RefKindKeyword(RefKind kind) => kind switch
         {
@@ -511,6 +569,19 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             ServiceDiagnostic: null);
+    }
+
+    private static DiagnosticLocation GetSymbolLocation(ISymbol symbol)
+    {
+        foreach (var location in symbol.Locations)
+        {
+            if (location.IsInSource)
+            {
+                return DiagnosticLocation.FromLocation(location);
+            }
+        }
+
+        return default;
     }
 
     private static string? GetUnsupportedMemberReason(INamedTypeSymbol interfaceSymbol)
@@ -687,6 +758,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
     private static void MarkDuplicateWireNames(
         string interfaceName,
         List<MethodModel> methods,
+        List<DiagnosticLocation> methodLocations,
         List<MethodDiagnostic> methodDiagnostics)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -714,7 +786,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             var reason =
                 $"wire method name '{method.RpcName}' is used by multiple service methods; give each overload a distinct [ShaRpcMethod(Name = ...)] value";
             methods[i] = method with { UnsupportedReason = reason };
-            methodDiagnostics.Add(new MethodDiagnostic(interfaceName, method.Name, reason));
+            methodDiagnostics.Add(new MethodDiagnostic(interfaceName, method.Name, reason, methodLocations[i]));
         }
     }
 
