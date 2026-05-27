@@ -81,7 +81,7 @@ internal static class ServiceModelFactory
         var methods = new List<MethodModel>();
         var methodLocations = new List<DiagnosticLocation>();
         var methodDiagnostics = new List<MethodDiagnostic>();
-        var seenSignatures = new HashSet<string>(StringComparer.Ordinal);
+        var seenSignatures = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
 
         foreach (var methodSymbol in EnumerateMethods(interfaceSymbol))
         {
@@ -89,10 +89,19 @@ internal static class ServiceModelFactory
 
             var sigKey = methodSymbol.Name + "`" + methodSymbol.Arity + "(" +
                 string.Join(",", methodSymbol.Parameters.Select(p => p.RefKind + ":" + p.Type.ToDisplayString())) + ")";
-            if (!seenSignatures.Add(sigKey))
+            if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
             {
+                if (!HasSameReturnShape(existingMethod, methodSymbol))
+                {
+                    return RejectedService(
+                        displayName,
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
+                        GetSymbolLocation(methodSymbol));
+                }
+
                 continue;
             }
+            seenSignatures[sigKey] = methodSymbol;
 
             var method = BuildMethodModel(
                 displayName,
@@ -270,6 +279,10 @@ internal static class ServiceModelFactory
 
         return null;
     }
+
+    private static bool HasSameReturnShape(IMethodSymbol left, IMethodSymbol right) =>
+        left.RefKind == right.RefKind &&
+        SymbolEqualityComparer.Default.Equals(left.ReturnType, right.ReturnType);
 
     private static string RefKindKeyword(RefKind kind) => kind switch
     {

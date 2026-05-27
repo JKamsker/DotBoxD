@@ -75,6 +75,41 @@ public class CodegenRegressionTests
     }
 
     [Fact]
+    public void InheritedSameSignatureMethods_WithDifferentReturns_ProduceSHARPC003()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Regress.InheritConflict
+            {
+                public interface IA
+                {
+                    int M();
+                }
+
+                public interface IB
+                {
+                    string M();
+                }
+
+                [ShaRpcService]
+                public interface IC : IA, IB
+                {
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+        var runResult = driver.GetRunResult();
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("same signature as another method but an incompatible return type"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IC."));
+    }
+
+    [Fact]
     public void ValueTaskReturnTypes_AreSupported()
     {
         // Regression for H3: ValueTask/ValueTask<T> must not be classified as a sync return.
