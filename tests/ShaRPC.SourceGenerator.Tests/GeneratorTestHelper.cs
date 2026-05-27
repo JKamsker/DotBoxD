@@ -90,13 +90,14 @@ internal static class GeneratorTestHelper
 
     private static string NamespaceIdentifierPrefix(string namespaceName)
     {
-        var flattened = namespaceName.Replace('.', '_');
-        if (!namespaceName.Contains('_'))
+        var normalized = namespaceName.Replace("@", "");
+        var flattened = normalized.Replace('.', '_');
+        if (!normalized.Contains('_'))
         {
             return flattened;
         }
 
-        return flattened + "__" + StableHash(namespaceName);
+        return flattened + "__" + StableHash(normalized);
     }
 
     private static string StableHash(string value)
