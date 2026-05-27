@@ -16,6 +16,9 @@ env:
   # Tag pushes use the tag (vX.Y.Z -> X.Y.Z); every other run gets a CI prerelease
   # version. The actual computation happens in the `version` step below.
   CONFIGURATION: Release
+  # Opt into Node 24 ahead of the June 2026 deprecation cutoff for the runner's
+  # default. Removes the "Node 20 is deprecated" warning on every step.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-test-pack:
