@@ -1044,6 +1044,40 @@ public class CodegenRegressionTests
         dispatcher.Should().Contain("case \"GetByName\":");
     }
 
+    [Fact]
+    public void DistinctMethods_WithSameCustomWireName_AreDiagnosedAndOmittedFromDispatcher()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.CustomWireCollision
+            {
+                [ShaRpcService]
+                public interface ILookup
+                {
+                    [ShaRpcMethod(Name = "lookup")]
+                    Task<int> GetByIdAsync(int id);
+
+                    [ShaRpcMethod(Name = "lookup")]
+                    Task<string> GetByNameAsync(string name);
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        runResult.Diagnostics.Where(d => d.Id == "SHARPC002")
+            .Should().HaveCount(2, "both methods share the same explicit wire name");
+
+        var dispatcher = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.CustomWireCollision", "ILookup", GeneratorTestHelper.GeneratedKind.Dispatcher))
+            .SourceText.ToString();
+        dispatcher.Should().NotContain("case \"lookup\":");
+    }
+
     /// <summary>
     /// Generic service methods are not routable by ShaRPC's current method-name based
     /// protocol. The proxy still has to implement the user interface, so it emits a
