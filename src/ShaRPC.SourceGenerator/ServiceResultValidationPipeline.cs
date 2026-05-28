@@ -51,14 +51,16 @@ internal static class ServiceResultValidationPipeline
             CreateRejectedServices(results, "RejectedServiceInputs", "RejectedServices"),
             "SubServiceValidatedServiceResults");
 
-        var asyncValidated = ApplyAsyncSiblingTypeCollisions(
-            subServiceResults,
-            existingTypes,
-            "AsyncSiblingTypeValidatedServiceResults");
+        var finalRejectedServices = subServiceResults
+            .Collect()
+            .Combine(existingTypes)
+            .Select(static (pair, ct) =>
+                FinalRejectedServiceResolver.Resolve(pair.Left, pair.Right, ct))
+            .WithTrackingName("FinalRejectedServices");
 
         results = ApplySubServiceAvailability(
             subServiceResults,
-            CreateRejectedServices(asyncValidated, "FinalRejectedServiceInputs", "FinalRejectedServices"),
+            finalRejectedServices,
             "FinalSubServiceValidatedServiceResults");
 
         return ApplyAsyncSiblingTypeCollisions(results, existingTypes, "ServiceResults");
