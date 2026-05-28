@@ -133,6 +133,39 @@ public class InheritedTupleElementNameTests
     }
 
     [Fact]
+    public void DuplicateInheritedMethodsWithUnnamedLargeTupleAndValueTupleParameters_Deduplicate()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Regress.DuplicateInheritedLargeTupleAndValueTuple
+            {
+                public interface ILeft
+                {
+                    int Echo((int, int, int, int, int, int, int, int, int) value);
+                }
+
+                public interface IRight
+                {
+                    int Echo(System.ValueTuple<int, int, int, int, int, int, int, System.ValueTuple<int, int>> value);
+                }
+
+                [ShaRpcService]
+                public interface IFoo : ILeft, IRight
+                {
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "SHARPC003");
+        GetProxy(runResult).Should().Contain(
+            "public int Echo((int, int, int, int, int, int, int, int, int) value)");
+    }
+
+    [Fact]
     public void DuplicateInheritedMethodsWithDifferentTupleReturnNames_RejectService()
     {
         const string source = """
