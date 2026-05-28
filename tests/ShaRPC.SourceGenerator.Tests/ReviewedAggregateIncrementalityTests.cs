@@ -118,6 +118,45 @@ public class ReviewedAggregateIncrementalityTests
         AssertStableSourceExistsAndSomeSourceOutputCached(result);
     }
 
+    [Fact]
+    public void FinalRejectedSubServiceChange_KeepsStableServiceCached()
+    {
+        var original = CSharpSyntaxTree.ParseText("""
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+            namespace Reviewed.IncrementalFinalRejected
+            {
+                [ShaRpcService] public interface ISub { int Count(); }
+                [ShaRpcService] public interface IRoot { Task<ISub> OpenAsync(); }
+                [ShaRpcService] public interface IStable { int S(); }
+            }
+            """);
+        var compilation = GeneratorTestHelper.CreateCompilation().AddSyntaxTrees(original);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+
+        var rejected = CSharpSyntaxTree.ParseText("""
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+            namespace Reviewed.IncrementalFinalRejected
+            {
+                public interface ISubAsync { }
+                [ShaRpcService] public interface ISub { int Count(); }
+                [ShaRpcService] public interface IRoot { Task<ISub> OpenAsync(); }
+                [ShaRpcService] public interface IStable { int S(); }
+            }
+            """);
+
+        driver = driver.RunGenerators(compilation.ReplaceSyntaxTree(original, rejected));
+        var result = driver.GetRunResult();
+
+        StepReasons(result, "FinalRejectedServices").Should().Contain(r => IsChanged(r));
+        StepReasons(result, "FinalSubServiceValidatedServiceResults").Should()
+            .Contain(r => IsChanged(r));
+        AssertInterfaceOutputCached(result, "Services", "IStable");
+        AssertInterfaceOutputCached(result, "ServiceBundles", "IStable");
+        AssertStableSourceExistsAndSomeSourceOutputCached(result);
+    }
+
     private static IncrementalStepRunReason[] StepReasons(
         GeneratorDriverRunResult result,
         string trackingName) =>

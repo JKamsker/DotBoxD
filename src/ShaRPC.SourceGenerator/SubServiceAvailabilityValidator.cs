@@ -21,7 +21,17 @@ internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInte
             return string.Compare(left, right, System.StringComparison.Ordinal);
         });
 
-        return new RejectedServiceIndex(names.ToEquatableArray());
+        var uniqueNames = new List<string>(names.Count);
+        foreach (var name in names)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (uniqueNames.Count == 0 || uniqueNames[uniqueNames.Count - 1] != name)
+            {
+                uniqueNames.Add(name);
+            }
+        }
+
+        return new RejectedServiceIndex(uniqueNames.ToEquatableArray());
     }
 
     public bool Contains(string qualifiedInterfaceName, CancellationToken ct)

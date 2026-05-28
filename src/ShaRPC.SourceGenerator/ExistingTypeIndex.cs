@@ -202,10 +202,21 @@ internal sealed record ExistingTypeLocationIndex(EquatableArray<ExistingTypeDecl
             var key = ExistingTypeKeyComparer.Instance.Compare(left.Key, right.Key);
             return key != 0
                 ? key
-                : left.Location.Start.CompareTo(right.Location.Start);
+                : CompareLocations(left.Location, right.Location);
         });
 
-        return new ExistingTypeLocationIndex(ordered.ToEquatableArray());
+        var unique = new List<ExistingTypeDeclaration>(ordered.Count);
+        foreach (var type in ordered)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (unique.Count == 0 ||
+                ExistingTypeKeyComparer.Instance.Compare(unique[unique.Count - 1].Key, type.Key) != 0)
+            {
+                unique.Add(type);
+            }
+        }
+
+        return new ExistingTypeLocationIndex(unique.ToEquatableArray());
     }
 
     public DiagnosticLocation Find(ExistingTypeKey target, CancellationToken ct)
@@ -234,6 +245,20 @@ internal sealed record ExistingTypeLocationIndex(EquatableArray<ExistingTypeDecl
         }
 
         return default;
+    }
+
+    private static int CompareLocations(DiagnosticLocation left, DiagnosticLocation right)
+    {
+        var filePath = string.Compare(left.FilePath, right.FilePath, System.StringComparison.Ordinal);
+        if (filePath != 0)
+        {
+            return filePath;
+        }
+
+        var start = left.Start.CompareTo(right.Start);
+        return start != 0
+            ? start
+            : left.Length.CompareTo(right.Length);
     }
 }
 
