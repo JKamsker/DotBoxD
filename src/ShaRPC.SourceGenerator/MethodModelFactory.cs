@@ -43,6 +43,11 @@ internal static class MethodModelFactory
             ref unsupportedLocation,
             RpcTypeValidator.GetUnsupportedTypeReason(returnType, "return type", ct),
             methodLocation);
+        SetUnsupported(
+            ref unsupportedReason,
+            ref unsupportedLocation,
+            RpcTypeValidator.GetUnsupportedSubServicePayloadReason(returnType, returnKind, "return type", ct),
+            methodLocation);
 
         var parameters = new List<ParameterModel>();
         var hasCancellationToken = false;
@@ -101,6 +106,11 @@ internal static class MethodModelFactory
                 ref unsupportedReason,
                 ref unsupportedLocation,
                 RpcTypeValidator.GetUnsupportedTypeReason(param.Type, $"parameter '{param.Name}'", ct),
+                parameterLocation);
+            SetUnsupported(
+                ref unsupportedReason,
+                ref unsupportedLocation,
+                RpcTypeValidator.GetUnsupportedSubServicePayloadReason(param.Type, $"parameter '{param.Name}'", ct),
                 parameterLocation);
 
             parameters.Add(new ParameterModel(
