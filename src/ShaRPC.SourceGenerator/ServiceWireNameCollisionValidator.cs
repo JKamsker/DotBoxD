@@ -1,27 +1,21 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 
 namespace ShaRPC.SourceGenerator;
 
 internal sealed record ServiceWireNameIndex(EquatableArray<ServiceWireNameEntry> DuplicateEntries)
 {
-    public static ServiceWireNameIndex Create(ImmutableArray<ServiceResult> results, CancellationToken ct)
+    public static ServiceWireNameIndex Create(ImmutableArray<ServiceIdentity> services, CancellationToken ct)
     {
         var entries = ImmutableArray.CreateBuilder<ServiceWireNameEntry>();
-        foreach (var result in results)
+        foreach (var service in services)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (result.Model is null)
-            {
-                continue;
-            }
-
             entries.Add(new ServiceWireNameEntry(
-                result.Model.ServiceName,
-                result.QualifiedInterfaceName));
+                service.ServiceName,
+                service.QualifiedInterfaceName));
         }
 
         return new ServiceWireNameIndex(GetDuplicates(entries.ToImmutable(), ct));
@@ -57,17 +51,21 @@ internal sealed record ServiceWireNameIndex(EquatableArray<ServiceWireNameEntry>
         ImmutableArray<ServiceWireNameEntry> entries,
         CancellationToken ct)
     {
-        var ordered = entries
-            .OrderBy(static entry => entry, ServiceWireNameEntryComparer.Instance)
-            .ToArray();
+        var ordered = new List<ServiceWireNameEntry>(entries);
+        ordered.Sort((left, right) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return ServiceWireNameEntryComparer.Instance.Compare(left, right);
+        });
+
         var duplicates = new List<ServiceWireNameEntry>();
-        for (var i = 0; i < ordered.Length;)
+        for (var i = 0; i < ordered.Count;)
         {
             ct.ThrowIfCancellationRequested();
 
             var start = i;
             i++;
-            while (i < ordered.Length && ordered[i].ServiceName == ordered[start].ServiceName)
+            while (i < ordered.Count && ordered[i].ServiceName == ordered[start].ServiceName)
             {
                 ct.ThrowIfCancellationRequested();
                 i++;

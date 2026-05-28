@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Immutable;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -71,13 +69,23 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             .Select(static (types, ct) => ExistingTypeIndex.Create(types, ct))
             .WithTrackingName("ExistingTypes");
 
+        var existingTypeLocations = existingTypeDeclarations
+            .Collect()
+            .Select(static (types, ct) => ExistingTypeLocationIndex.Create(types, ct))
+            .WithTrackingName("ExistingTypeLocations");
+
         results = results
             .Combine(existingTypes)
             .Select(static (pair, ct) =>
                 GeneratedTypeCollisionValidator.Apply(pair.Left, pair.Right, ct))
             .WithTrackingName("ExistingTypeValidatedServiceResults");
 
-        var generatedServiceNames = results
+        var activeServiceIdentities = results
+            .Where(static r => r.Model is not null)
+            .Select(static (r, _) => ServiceIdentity.From(r))
+            .WithTrackingName("GeneratedServiceNameInputs");
+
+        var generatedServiceNames = activeServiceIdentities
             .Collect()
             .Select(static (arr, ct) => GeneratedServiceNameIndex.Create(arr, ct))
             .WithTrackingName("GeneratedServiceNames");
@@ -88,7 +96,12 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 GeneratedServiceCollisionValidator.Apply(pair.Left, pair.Right, ct))
             .WithTrackingName("GeneratedServiceValidatedServiceResults");
 
-        var wireServiceNames = results
+        activeServiceIdentities = results
+            .Where(static r => r.Model is not null)
+            .Select(static (r, _) => ServiceIdentity.From(r))
+            .WithTrackingName("WireServiceNameInputs");
+
+        var wireServiceNames = activeServiceIdentities
             .Collect()
             .Select(static (arr, ct) => ServiceWireNameIndex.Create(arr, ct))
             .WithTrackingName("WireServiceNames");
@@ -99,7 +112,13 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 ServiceWireNameCollisionValidator.Apply(pair.Left, pair.Right, ct))
             .WithTrackingName("WireNameValidatedServiceResults");
 
-        var rejectedServices = results
+        var rejectedServiceIdentities = results
+            .Select(static (r, _) => RejectedServiceIdentity.From(r))
+            .Where(static rejected => rejected is not null)
+            .Select(static (rejected, _) => rejected!.Value)
+            .WithTrackingName("RejectedServiceInputs");
+
+        var rejectedServices = rejectedServiceIdentities
             .Collect()
             .Select(static (arr, ct) => RejectedServiceIndex.Create(arr, ct))
             .WithTrackingName("RejectedServices");
@@ -148,40 +167,52 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 d.InterfaceName,
                 d.Reason)));
 
+        var existingTypeDiagnostics = results
+            .Where(static r => r.ExistingTypeCollision is not null)
+            .Select(static (r, _) => r.ExistingTypeCollision!.Value)
+            .Combine(existingTypeLocations)
+            .Select(static (pair, ct) => new ServiceDiagnostic(
+                pair.Left.InterfaceName,
+                pair.Left.Reason,
+                pair.Right.Find(pair.Left.ExistingType, ct)))
+            .WithTrackingName("ExistingTypeDiagnostics");
+
+        context.RegisterSourceOutput(existingTypeDiagnostics, static (spc, d) =>
+            spc.ReportDiagnostic(Diagnostic.Create(
+                s_unsupportedServiceRule,
+                d.Location.ToLocation(),
+                d.InterfaceName,
+                d.Reason)));
+
         var models = results
             .Where(static r => r.Model is not null)
             .Select(static (r, _) => r.Model!)
             .WithTrackingName("Services");
 
-        // Bundle each model with its async-sibling projection so every generated source
-        // output flows through one value-equatable record.
-        var bundles = models
-            .Select(static (m, ct) =>
-            {
-                if (!NamingHelpers.CanGenerateAsyncSiblingInterface(m.InterfaceName))
-                {
-                    return ServiceBundle.Empty(m);
-                }
-
-                var (siblings, _) = AsyncSiblingProjector.Compute(m, ct);
-                return new ServiceBundle(m, siblings);
-            })
-            .WithTrackingName("ServiceBundles");
-
-        // SHARPC004 — async-sibling naming collision warnings.
-        var siblingCollisions = results
+        var projections = results
             .Where(static r => r.Model is not null)
-            .SelectMany(static (r, ct) =>
+            .Select(static (r, ct) =>
             {
                 var model = r.Model!;
                 if (!NamingHelpers.CanGenerateAsyncSiblingInterface(model.InterfaceName))
                 {
-                    return EquatableArray<MethodDiagnostic>.Empty.Array;
+                    return new ServiceProjection(
+                        ServiceBundle.Empty(model),
+                        EquatableArray<MethodDiagnostic>.Empty);
                 }
 
-                var (_, collisions) = AsyncSiblingProjector.Compute(model, r.MethodLocations, ct);
-                return collisions.Array;
+                var (siblings, collisions) = AsyncSiblingProjector.Compute(model, r.MethodLocations, ct);
+                return new ServiceProjection(new ServiceBundle(model, siblings), collisions);
             })
+            .WithTrackingName("ServiceProjections");
+
+        var bundles = projections
+            .Select(static (projection, _) => projection.Bundle)
+            .WithTrackingName("ServiceBundles");
+
+        // SHARPC004 — async-sibling naming collision warnings.
+        var siblingCollisions = projections
+            .SelectMany(static (projection, _) => projection.SiblingCollisions.Array)
             .WithTrackingName("SiblingCollisions");
 
         context.RegisterSourceOutput(siblingCollisions, static (spc, d) =>
@@ -232,7 +263,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
 
         var allServices = models
             .Collect()
-            .Select(static (arr, ct) => SortServices(arr, ct))
+            .Select(static (arr, ct) => ServiceModelOrdering.Sort(arr, ct))
             .WithTrackingName("AllServices");
 
         context.RegisterSourceOutput(allServices, static (spc, services) =>
@@ -264,27 +295,4 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
         });
     }
 
-    private static EquatableArray<ServiceModel> SortServices(
-        ImmutableArray<ServiceModel> services,
-        CancellationToken ct)
-    {
-        var ordered = services.ToList();
-        ordered.Sort((left, right) =>
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var ns = string.Compare(left.Namespace, right.Namespace, StringComparison.Ordinal);
-            if (ns != 0)
-            {
-                return ns;
-            }
-
-            var interfaceName = string.Compare(left.InterfaceName, right.InterfaceName, StringComparison.Ordinal);
-            return interfaceName != 0
-                ? interfaceName
-                : string.Compare(left.ServiceName, right.ServiceName, StringComparison.Ordinal);
-        });
-
-        return ordered.ToEquatableArray();
-    }
 }

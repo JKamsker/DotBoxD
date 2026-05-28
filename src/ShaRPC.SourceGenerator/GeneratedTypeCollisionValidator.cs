@@ -15,45 +15,45 @@ internal static class GeneratedTypeCollisionValidator
         var serviceName = NamingHelpers.StripInterfacePrefix(model.InterfaceName);
 
         var proxyName = serviceName + "Proxy";
-        var proxy = existingTypes.Find(model.Namespace, proxyName, ct);
-        if (proxy is not null)
+        var proxy = new ExistingTypeKey(model.Namespace, proxyName);
+        if (existingTypes.Contains(proxy, ct))
         {
             return RejectedService(
                 model,
                 $"generated proxy type '{proxyName}' would collide with an existing type",
-                proxy.Value.Location);
+                proxy);
         }
 
         var dispatcherName = serviceName + "Dispatcher";
-        var dispatcher = existingTypes.Find(model.Namespace, dispatcherName, ct);
-        if (dispatcher is not null)
+        var dispatcher = new ExistingTypeKey(model.Namespace, dispatcherName);
+        if (existingTypes.Contains(dispatcher, ct))
         {
             return RejectedService(
                 model,
                 $"generated dispatcher type '{dispatcherName}' would collide with an existing type",
-                dispatcher.Value.Location);
+                dispatcher);
         }
 
         if (NamingHelpers.CanGenerateAsyncSiblingInterface(model.InterfaceName))
         {
             var siblingName = NamingHelpers.AsyncSiblingInterfaceName(model.InterfaceName);
-            var sibling = existingTypes.Find(model.Namespace, siblingName, ct);
-            if (sibling is not null)
+            var sibling = new ExistingTypeKey(model.Namespace, siblingName);
+            if (existingTypes.Contains(sibling, ct))
             {
                 return RejectedService(
                     model,
                     $"generated async sibling interface '{siblingName}' would collide with an existing type",
-                    sibling.Value.Location);
+                    sibling);
             }
         }
 
-        var extensions = existingTypes.Find("ShaRPC.Generated", "ShaRpcGeneratedExtensions", ct);
-        if (extensions is not null)
+        var extensions = new ExistingTypeKey("ShaRPC.Generated", "ShaRpcGeneratedExtensions");
+        if (existingTypes.Contains(extensions, ct))
         {
             return RejectedService(
                 model,
                 "generated extension type 'ShaRPC.Generated.ShaRpcGeneratedExtensions' would collide with an existing type",
-                extensions.Value.Location);
+                extensions);
         }
 
         return result;
@@ -62,15 +62,19 @@ internal static class GeneratedTypeCollisionValidator
     private static ServiceResult RejectedService(
         ServiceModel model,
         string reason,
-        DiagnosticLocation location) =>
+        ExistingTypeKey existingType) =>
         new(
             Model: null,
             Error: null,
             MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
             MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
-            ServiceLocation: location,
+            ServiceLocation: default,
             QualifiedInterfaceName: IdentifierHelpers.QualifyTypeName(model.Namespace, model.InterfaceName),
-            ServiceDiagnostic: new ServiceDiagnostic(GetDisplayName(model), reason, location));
+            ServiceDiagnostic: null,
+            ExistingTypeCollision: new ExistingTypeCollisionDiagnostic(
+                GetDisplayName(model),
+                reason,
+                existingType));
 
     private static string GetDisplayName(ServiceModel model) =>
         string.IsNullOrEmpty(model.Namespace)

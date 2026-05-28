@@ -88,6 +88,10 @@ internal sealed record ServiceBundle(
             EquatableArray<AsyncSiblingMethod>.Empty);
 }
 
+internal sealed record ServiceProjection(
+    ServiceBundle Bundle,
+    EquatableArray<MethodDiagnostic> SiblingCollisions);
+
 /// <summary>
 /// Shape of one method as it should appear on the auto-generated async sibling interface.
 /// </summary>

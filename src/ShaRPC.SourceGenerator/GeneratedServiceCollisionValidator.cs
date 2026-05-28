@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 
 namespace ShaRPC.SourceGenerator;
@@ -8,23 +7,18 @@ namespace ShaRPC.SourceGenerator;
 internal sealed record GeneratedServiceNameIndex(EquatableArray<GeneratedServiceNameEntry> DuplicateEntries)
 {
     public static GeneratedServiceNameIndex Create(
-        ImmutableArray<ServiceResult> results,
+        ImmutableArray<ServiceIdentity> services,
         CancellationToken ct)
     {
         var entries = ImmutableArray.CreateBuilder<GeneratedServiceNameEntry>();
-        foreach (var result in results)
+        foreach (var service in services)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (result.Model is null)
-            {
-                continue;
-            }
-
             entries.Add(new GeneratedServiceNameEntry(
-                result.Model.Namespace,
-                result.Model.InterfaceName,
-                NamingHelpers.StripInterfacePrefix(result.Model.InterfaceName)));
+                service.Namespace,
+                service.InterfaceName,
+                NamingHelpers.StripInterfacePrefix(service.InterfaceName)));
         }
 
         return new GeneratedServiceNameIndex(GetDuplicates(entries.ToImmutable(), ct));
@@ -60,17 +54,21 @@ internal sealed record GeneratedServiceNameIndex(EquatableArray<GeneratedService
         ImmutableArray<GeneratedServiceNameEntry> entries,
         CancellationToken ct)
     {
-        var ordered = entries
-            .OrderBy(static entry => entry, GeneratedServiceNameEntryComparer.Instance)
-            .ToArray();
+        var ordered = new List<GeneratedServiceNameEntry>(entries);
+        ordered.Sort((left, right) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return GeneratedServiceNameEntryComparer.Instance.Compare(left, right);
+        });
+
         var duplicates = new List<GeneratedServiceNameEntry>();
-        for (var i = 0; i < ordered.Length;)
+        for (var i = 0; i < ordered.Count;)
         {
             ct.ThrowIfCancellationRequested();
 
             var start = i;
             i++;
-            while (i < ordered.Length &&
+            while (i < ordered.Count &&
                 GeneratedServiceNameEntryComparer.CompareKey(ordered[start], ordered[i]) == 0)
             {
                 ct.ThrowIfCancellationRequested();

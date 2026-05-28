@@ -10,7 +10,8 @@ internal readonly record struct ServiceResult(
     EquatableArray<DiagnosticLocation> MethodLocations,
     DiagnosticLocation ServiceLocation,
     string QualifiedInterfaceName,
-    ServiceDiagnostic? ServiceDiagnostic);
+    ServiceDiagnostic? ServiceDiagnostic,
+    ExistingTypeCollisionDiagnostic? ExistingTypeCollision = null);
 
 internal readonly record struct GeneratorError(string Where, string Message);
 
@@ -73,3 +74,37 @@ internal readonly record struct ServiceDiagnostic(
     string InterfaceName,
     string Reason,
     DiagnosticLocation Location = default);
+
+internal readonly record struct ExistingTypeCollisionDiagnostic(
+    string InterfaceName,
+    string Reason,
+    ExistingTypeKey ExistingType);
+
+internal readonly record struct ServiceIdentity(
+    string Namespace,
+    string InterfaceName,
+    string ServiceName,
+    string QualifiedInterfaceName)
+{
+    public static ServiceIdentity From(ServiceResult result) =>
+        new(
+            result.Model!.Namespace,
+            result.Model.InterfaceName,
+            result.Model.ServiceName,
+            result.QualifiedInterfaceName);
+}
+
+internal readonly record struct RejectedServiceIdentity(string QualifiedInterfaceName)
+{
+    public static RejectedServiceIdentity? From(ServiceResult result)
+    {
+        if (result.Model is null &&
+            (result.ServiceDiagnostic is not null || result.ExistingTypeCollision is not null) &&
+            !string.IsNullOrEmpty(result.QualifiedInterfaceName))
+        {
+            return new RejectedServiceIdentity(result.QualifiedInterfaceName);
+        }
+
+        return null;
+    }
+}

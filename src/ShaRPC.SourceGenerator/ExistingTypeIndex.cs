@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,19 +7,28 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ShaRPC.SourceGenerator;
 
-internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeInfo> Types)
+internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeKey> Types)
 {
-    public static ExistingTypeIndex Create(ImmutableArray<ExistingTypeInfo> types, CancellationToken ct)
+    public static ExistingTypeIndex Create(ImmutableArray<ExistingTypeDeclaration> declarations, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        return new ExistingTypeIndex(types
-            .OrderBy(static type => type, ExistingTypeInfoComparer.Instance)
-            .ToEquatableArray());
+        var types = new List<ExistingTypeKey>(declarations.Length);
+        foreach (var declaration in declarations)
+        {
+            ct.ThrowIfCancellationRequested();
+            types.Add(declaration.Key);
+        }
+
+        types.Sort((left, right) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return ExistingTypeKeyComparer.Instance.Compare(left, right);
+        });
+
+        return new ExistingTypeIndex(types.ToEquatableArray());
     }
 
-    public ExistingTypeInfo? Find(string @namespace, string name, CancellationToken ct)
+    public bool Contains(ExistingTypeKey target, CancellationToken ct)
     {
-        var target = new ExistingTypeInfo(@namespace, name, default);
         var low = 0;
         var high = Types.Count - 1;
         while (low <= high)
@@ -28,10 +36,10 @@ internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeInfo> Types)
             ct.ThrowIfCancellationRequested();
 
             var mid = low + ((high - low) / 2);
-            var comparison = ExistingTypeInfoComparer.Instance.Compare(Types[mid], target);
+            var comparison = ExistingTypeKeyComparer.Instance.Compare(Types[mid], target);
             if (comparison == 0)
             {
-                return Types[mid];
+                return true;
             }
 
             if (comparison < 0)
@@ -44,21 +52,31 @@ internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeInfo> Types)
             }
         }
 
-        return null;
+        return false;
     }
 
-    public static ExistingTypeInfo? FromDeclaration(SyntaxNode node)
+    public static ExistingTypeDeclaration? FromDeclaration(SyntaxNode node)
     {
         if (!TryGetTypeName(node, out var name) || IsNestedInType(node) || IsFileLocal(node))
         {
             return null;
         }
 
-        return new ExistingTypeInfo(
-            GetNamespace(node),
-            name,
+        if (!CanCollideWithGeneratedType(name))
+        {
+            return null;
+        }
+
+        return new ExistingTypeDeclaration(
+            new ExistingTypeKey(GetNamespace(node), name),
             DiagnosticLocation.FromLocation(GetNameLocation(node)));
     }
+
+    private static bool CanCollideWithGeneratedType(string name) =>
+        name.EndsWith("Proxy", System.StringComparison.Ordinal) ||
+        name.EndsWith("Dispatcher", System.StringComparison.Ordinal) ||
+        name.EndsWith("Async", System.StringComparison.Ordinal) ||
+        name == "ShaRpcGeneratedExtensions";
 
     private static bool TryGetTypeName(SyntaxNode node, out string name)
     {
@@ -133,16 +151,68 @@ internal sealed record ExistingTypeIndex(EquatableArray<ExistingTypeInfo> Types)
     }
 }
 
-internal readonly record struct ExistingTypeInfo(
-    string Namespace,
-    string Name,
+internal sealed record ExistingTypeLocationIndex(EquatableArray<ExistingTypeDeclaration> Types)
+{
+    public static ExistingTypeLocationIndex Create(
+        ImmutableArray<ExistingTypeDeclaration> declarations,
+        CancellationToken ct)
+    {
+        var ordered = new List<ExistingTypeDeclaration>(declarations);
+        ordered.Sort((left, right) =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var key = ExistingTypeKeyComparer.Instance.Compare(left.Key, right.Key);
+            return key != 0
+                ? key
+                : left.Location.Start.CompareTo(right.Location.Start);
+        });
+
+        return new ExistingTypeLocationIndex(ordered.ToEquatableArray());
+    }
+
+    public DiagnosticLocation Find(ExistingTypeKey target, CancellationToken ct)
+    {
+        var low = 0;
+        var high = Types.Count - 1;
+        while (low <= high)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var mid = low + ((high - low) / 2);
+            var comparison = ExistingTypeKeyComparer.Instance.Compare(Types[mid].Key, target);
+            if (comparison == 0)
+            {
+                return Types[mid].Location;
+            }
+
+            if (comparison < 0)
+            {
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        return default;
+    }
+}
+
+internal readonly record struct ExistingTypeDeclaration(
+    ExistingTypeKey Key,
     DiagnosticLocation Location);
 
-internal sealed class ExistingTypeInfoComparer : IComparer<ExistingTypeInfo>
-{
-    public static ExistingTypeInfoComparer Instance { get; } = new();
+internal readonly record struct ExistingTypeKey(
+    string Namespace,
+    string Name);
 
-    public int Compare(ExistingTypeInfo left, ExistingTypeInfo right)
+internal sealed class ExistingTypeKeyComparer : IComparer<ExistingTypeKey>
+{
+    public static ExistingTypeKeyComparer Instance { get; } = new();
+
+    public int Compare(ExistingTypeKey left, ExistingTypeKey right)
     {
         var ns = string.Compare(left.Namespace, right.Namespace, System.StringComparison.Ordinal);
         return ns != 0

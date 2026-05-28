@@ -1,31 +1,27 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 
 namespace ShaRPC.SourceGenerator;
 
 internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInterfaceNames)
 {
-    public static RejectedServiceIndex Create(ImmutableArray<ServiceResult> results, CancellationToken ct)
+    public static RejectedServiceIndex Create(ImmutableArray<RejectedServiceIdentity> services, CancellationToken ct)
     {
-        var names = ImmutableArray.CreateBuilder<string>();
-        foreach (var result in results)
+        var names = new List<string>(services.Length);
+        foreach (var service in services)
         {
             ct.ThrowIfCancellationRequested();
-
-            if (result.Model is null &&
-                result.ServiceDiagnostic is not null &&
-                !string.IsNullOrEmpty(result.QualifiedInterfaceName))
-            {
-                names.Add(result.QualifiedInterfaceName);
-            }
+            names.Add(service.QualifiedInterfaceName);
         }
 
-        return new RejectedServiceIndex(names
-            .ToImmutable()
-            .OrderBy(static name => name, System.StringComparer.Ordinal)
-            .ToEquatableArray());
+        names.Sort((left, right) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return string.Compare(left, right, System.StringComparison.Ordinal);
+        });
+
+        return new RejectedServiceIndex(names.ToEquatableArray());
     }
 
     public bool Contains(string qualifiedInterfaceName, CancellationToken ct)
