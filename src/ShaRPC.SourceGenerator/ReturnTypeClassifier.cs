@@ -14,6 +14,11 @@ internal static class ReturnTypeClassifier
             SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
+    private static readonly SymbolDisplayFormat s_qualifiedIdentityFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+
     public static string? GetUnsupportedServiceReturnReason(ITypeSymbol returnType, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -193,7 +198,7 @@ internal static class ReturnTypeClassifier
         }
 
         info = new SubServiceInfo(
-            QualifiedInterfaceName: named.ToDisplayString(s_qualifiedFormat),
+            QualifiedInterfaceName: named.ToDisplayString(s_qualifiedIdentityFormat),
             ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName));
         return true;
     }
