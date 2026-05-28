@@ -119,6 +119,50 @@ public class CanonicalSignatureTests
     }
 
     [Fact]
+    public void InheritedGenericMethods_WithEquivalentConstraintsInDifferentOrder_Deduplicate()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+
+            namespace Regress.CanonicalOrderedConstraintSignatures
+            {
+                public interface IA
+                {
+                }
+
+                public interface IB
+                {
+                }
+
+                public interface ILeft
+                {
+                    void Echo<T>(T value) where T : IA, IB;
+                }
+
+                public interface IRight
+                {
+                    void Echo<U>(U value) where U : IB, IA;
+                }
+
+                [ShaRpcService]
+                public interface ICombined : ILeft, IRight
+                {
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "SHARPC003");
+        runResult.Diagnostics.Where(d => d.Id == "SHARPC002").Should().ContainSingle();
+        var proxy = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName.EndsWith("ICombined.ShaRpcProxy.g.cs"))
+            .SourceText.ToString();
+        CountOccurrences(proxy, "Echo<T>").Should().Be(1);
+    }
+
+    [Fact]
     public void AsyncSiblingProjection_IgnoresTupleElementNamesForCollisionKeys()
     {
         const string source = """

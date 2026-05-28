@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 
 namespace ShaRPC.SourceGenerator;
@@ -28,6 +29,97 @@ internal static class InheritedMethodDeduplicator
 
         return true;
     }
+
+    public static bool HasSameNullableAnnotations(
+        IMethodSymbol left,
+        IMethodSymbol right,
+        CancellationToken ct)
+    {
+        if (GetNullableTypeKey(left.ReturnType, left, ct) !=
+            GetNullableTypeKey(right.ReturnType, right, ct) ||
+            left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (GetNullableTypeKey(left.Parameters[i].Type, left, ct) !=
+                GetNullableTypeKey(right.Parameters[i].Type, right, ct))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string GetNullableTypeKey(
+        ITypeSymbol type,
+        IMethodSymbol method,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (type is ITypeParameterSymbol typeParameter &&
+            typeParameter.TypeParameterKind == TypeParameterKind.Method)
+        {
+            return "!!" + typeParameter.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                NullableSuffix(typeParameter.NullableAnnotation);
+        }
+
+        if (type.TypeKind == TypeKind.Dynamic)
+        {
+            return "global::System.Object" + NullableSuffix(type.NullableAnnotation);
+        }
+
+        if (type is IArrayTypeSymbol array)
+        {
+            return GetNullableTypeKey(array.ElementType, method, ct) +
+                "[" + new string(',', array.Rank - 1) + "]" +
+                NullableSuffix(array.NullableAnnotation);
+        }
+
+        if (type is INamedTypeSymbol named)
+        {
+            return GetNullableNamedTypeKey(named, method, ct);
+        }
+
+        return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+            NullableSuffix(type.NullableAnnotation);
+    }
+
+    private static string GetNullableNamedTypeKey(
+        INamedTypeSymbol type,
+        IMethodSymbol method,
+        CancellationToken ct)
+    {
+        var name = type.ContainingType is null
+            ? GetNamespacePrefix(type) + type.MetadataName
+            : GetNullableNamedTypeKey(type.ContainingType, method, ct) + "." + type.MetadataName;
+        name += NullableSuffix(type.NullableAnnotation);
+        if (type.TypeArguments.Length == 0)
+        {
+            return name;
+        }
+
+        var args = new List<string>();
+        foreach (var arg in type.TypeArguments)
+        {
+            ct.ThrowIfCancellationRequested();
+            args.Add(GetNullableTypeKey(arg, method, ct));
+        }
+
+        return name + "<" + string.Join(",", args) + ">";
+    }
+
+    private static string GetNamespacePrefix(INamedTypeSymbol type) =>
+        type.ContainingNamespace.IsGlobalNamespace
+            ? "global::"
+            : "global::" + type.ContainingNamespace.ToDisplayString() + ".";
+
+    private static string NullableSuffix(NullableAnnotation annotation) =>
+        annotation == NullableAnnotation.Annotated ? "?" : string.Empty;
 
     public static bool HasSameEffectiveWireName(IMethodSymbol left, IMethodSymbol right) =>
         GetEffectiveWireName(left) == GetEffectiveWireName(right);

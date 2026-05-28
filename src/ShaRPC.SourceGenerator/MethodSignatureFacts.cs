@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -124,18 +125,35 @@ internal static class MethodSignatureFacts
             return false;
         }
 
-        for (var i = 0; i < left.ConstraintTypes.Length; i++)
+        var leftConstraints = GetCanonicalConstraintTypes(left.ConstraintTypes, leftMethod, ct);
+        var rightConstraints = GetCanonicalConstraintTypes(right.ConstraintTypes, rightMethod, ct);
+        for (var i = 0; i < leftConstraints.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (GetCanonicalType(left.ConstraintTypes[i], leftMethod, ct) !=
-                GetCanonicalType(right.ConstraintTypes[i], rightMethod, ct))
+            if (leftConstraints[i] != rightConstraints[i])
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static List<string> GetCanonicalConstraintTypes(
+        ImmutableArray<ITypeSymbol> constraintTypes,
+        IMethodSymbol method,
+        CancellationToken ct)
+    {
+        var constraints = new List<string>(constraintTypes.Length);
+        foreach (var constraintType in constraintTypes)
+        {
+            ct.ThrowIfCancellationRequested();
+            constraints.Add(GetCanonicalType(constraintType, method, ct));
+        }
+
+        constraints.Sort(System.StringComparer.Ordinal);
+        return constraints;
     }
 
     private static string GetCanonicalNamedType(

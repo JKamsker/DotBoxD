@@ -175,6 +175,47 @@ public class InheritedExplicitProxyTests
         GetProxy(runResult).Should().Contain("public int Get()");
     }
 
+    [Fact]
+    public void DuplicateInheritedMethodsWithDifferentNullableAnnotations_RejectService()
+    {
+        const string source = """
+            #nullable enable
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.DuplicateInheritedNullableAnnotations
+            {
+                [ShaRpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                public interface ILeft
+                {
+                    Task<ISub> OpenAsync();
+                }
+
+                public interface IRight
+                {
+                    Task<ISub?> OpenAsync();
+                }
+
+                [ShaRpcService]
+                public interface IFoo : ILeft, IRight
+                {
+                }
+            }
+            """;
+
+        var (_, runResult) = Run(source);
+
+        runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC003" &&
+            d.GetMessage().Contains("incompatible nullable annotations"));
+        runResult.Results.Single().GeneratedSources
+            .Should().NotContain(g => g.HintName.Contains("IFoo."));
+    }
+
     private static string GetProxy(GeneratorDriverRunResult runResult) =>
         runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName.EndsWith("IFoo.ShaRpcProxy.g.cs"))
