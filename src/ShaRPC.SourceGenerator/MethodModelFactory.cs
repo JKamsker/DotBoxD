@@ -11,7 +11,8 @@ internal static class MethodModelFactory
     private static readonly SymbolDisplayFormat s_qualifiedFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
             SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static MethodModel Build(
         string displayName,
