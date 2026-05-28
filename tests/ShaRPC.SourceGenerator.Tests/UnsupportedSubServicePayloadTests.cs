@@ -98,6 +98,146 @@ public class UnsupportedSubServicePayloadTests
         AssertUnsupportedStub(runResult, "GetAsync");
     }
 
+    [Fact]
+    public void DtoContainingSubServiceParameter_BecomesUnsupportedStub()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedSubPayload
+            {
+                public sealed record Request(ISub Inner);
+
+                [ShaRpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                [ShaRpcService]
+                public interface IRoot
+                {
+                    Task SendAsync(Request request);
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        AssertUnsupportedStub(runResult, "SendAsync");
+    }
+
+    [Fact]
+    public void NestedDtoPublicFieldContainingSubService_BecomesUnsupportedStub()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedSubPayload
+            {
+                public sealed class Inner
+                {
+                    public ISub? Sub;
+                }
+
+                public sealed record Outer(Inner Inner);
+
+                [ShaRpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                [ShaRpcService]
+                public interface IRoot
+                {
+                    Task<Outer> GetAsync();
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        AssertUnsupportedStub(runResult, "GetAsync");
+    }
+
+    [Fact]
+    public void InheritedDtoMemberContainingSubService_BecomesUnsupportedStub()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedSubPayload
+            {
+                public class BaseRequest
+                {
+                    public ISub? Sub { get; init; }
+                }
+
+                public sealed class Request : BaseRequest
+                {
+                    public int Id { get; init; }
+                }
+
+                [ShaRpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                [ShaRpcService]
+                public interface IRoot
+                {
+                    Task SendAsync(Request request);
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        AssertUnsupportedStub(runResult, "SendAsync");
+    }
+
+    [Fact]
+    public void RecursiveGenericDtoContainingSubService_BecomesUnsupportedStub()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedSubPayload
+            {
+                public sealed class Node<T>
+                {
+                    public Node<ISub> SubNode { get; init; } = null!;
+                }
+
+                [ShaRpcService]
+                public interface ISub
+                {
+                    Task<int> CountAsync();
+                }
+
+                [ShaRpcService]
+                public interface IRoot
+                {
+                    Task<Node<int>> GetAsync();
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        AssertUnsupportedStub(runResult, "GetAsync");
+    }
+
     private static void AssertUnsupportedStub(GeneratorDriverRunResult runResult, string methodName)
     {
         runResult.Diagnostics.Should().Contain(d => d.Id == "SHARPC002" &&
