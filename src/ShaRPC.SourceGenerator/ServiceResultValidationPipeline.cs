@@ -52,7 +52,7 @@ internal static class ServiceResultValidationPipeline
             "SubServiceValidatedServiceResults");
 
         var finalRejectionInputs = subServiceResults
-            .Select(static (r, _) => FinalRejectionInput.From(r))
+            .Select(static (r, ct) => FinalRejectionInput.From(r, ct))
             .WithTrackingName("FinalRejectionInputs");
 
         var finalRejectedServices = finalRejectionInputs
@@ -60,7 +60,7 @@ internal static class ServiceResultValidationPipeline
             .Combine(existingTypes)
             .Select(static (pair, ct) =>
                 FinalRejectedServiceResolver.Resolve(
-                    FinalRejectionInputs.ToServiceResults(pair.Left, ct),
+                    pair.Left,
                     pair.Right,
                     ct))
             .WithTrackingName("FinalRejectedServices");

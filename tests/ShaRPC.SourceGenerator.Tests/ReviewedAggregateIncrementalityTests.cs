@@ -157,6 +157,41 @@ public class ReviewedAggregateIncrementalityTests
         AssertStableSourceExistsAndSomeSourceOutputCached(result);
     }
 
+    [Fact]
+    public void WireNameOnlyEdit_DoesNotInvalidateFinalRejectedServices()
+    {
+        var original = CSharpSyntaxTree.ParseText("""
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+            namespace Reviewed.IncrementalFinalRejectedShape
+            {
+                [ShaRpcService] public interface ISub { int Count(); }
+                [ShaRpcService] public interface IRoot { Task<ISub> OpenAsync(); }
+                [ShaRpcService] public interface IStable { int S(); }
+            }
+            """);
+        var compilation = GeneratorTestHelper.CreateCompilation().AddSyntaxTrees(original);
+        var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
+
+        var renamedWireMethod = CSharpSyntaxTree.ParseText("""
+            using ShaRPC.Core.Attributes;
+            using System.Threading.Tasks;
+            namespace Reviewed.IncrementalFinalRejectedShape
+            {
+                [ShaRpcService] public interface ISub { int Count(); }
+                [ShaRpcService] public interface IRoot { Task<ISub> OpenAsync(); }
+                [ShaRpcService] public interface IStable { [ShaRpcMethod(Name = "Stable")] int S(); }
+            }
+            """);
+
+        driver = driver.RunGenerators(compilation.ReplaceSyntaxTree(original, renamedWireMethod));
+        var result = driver.GetRunResult();
+
+        StepReasons(result, "FinalRejectedServices").Should().OnlyContain(r => IsCachedOrUnchanged(r));
+        AssertInterfaceOutputCached(result, "Services", "IRoot");
+        AssertInterfaceOutputCached(result, "ServiceBundles", "IRoot");
+    }
+
     private static IncrementalStepRunReason[] StepReasons(
         GeneratorDriverRunResult result,
         string trackingName) =>

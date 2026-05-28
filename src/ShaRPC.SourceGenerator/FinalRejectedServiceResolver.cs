@@ -7,7 +7,7 @@ namespace ShaRPC.SourceGenerator;
 internal static class FinalRejectedServiceResolver
 {
     public static RejectedServiceIndex Resolve(
-        ImmutableArray<ServiceResult> baseResults,
+        ImmutableArray<FinalRejectionInput> baseResults,
         ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
@@ -38,44 +38,120 @@ internal static class FinalRejectedServiceResolver
     }
 
     private static RejectedServiceIndex ComputeNext(
-        ImmutableArray<ServiceResult> baseResults,
+        ImmutableArray<FinalRejectionInput> baseResults,
         RejectedServiceIndex rejected,
         ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
-        var builder = ImmutableArray.CreateBuilder<ServiceResult>(baseResults.Length);
-        foreach (var result in baseResults)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var withSubServiceStubs = SubServiceAvailabilityValidator.Apply(result, rejected, ct);
-            builder.Add(GeneratedTypeCollisionValidator.ApplyAsyncSibling(
-                withSubServiceStubs,
-                existingTypes,
-                ct));
-        }
-
-        return CreateRejectedServices(builder.ToImmutable(), ct);
-    }
-
-    private static RejectedServiceIndex CreateRejectedServices(
-        ImmutableArray<ServiceResult> results,
-        CancellationToken ct)
-    {
         var builder = ImmutableArray.CreateBuilder<RejectedServiceIdentity>();
-        foreach (var result in results)
+        foreach (var input in baseResults)
         {
             ct.ThrowIfCancellationRequested();
 
-            var rejected = RejectedServiceIdentity.From(result);
-            if (rejected is not null)
+            if (IsRejectedAfterAsyncSiblingCollision(input, rejected, existingTypes, ct))
             {
-                builder.Add(rejected.Value);
+                builder.Add(new RejectedServiceIdentity(input.QualifiedInterfaceName));
             }
         }
 
         return RejectedServiceIndex.Create(builder.ToImmutable(), ct);
     }
+
+    private static RejectedServiceIndex CreateRejectedServices(
+        ImmutableArray<FinalRejectionInput> results,
+        CancellationToken ct)
+    {
+        var builder = ImmutableArray.CreateBuilder<RejectedServiceIdentity>();
+        foreach (var input in results)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (input.IsRejected)
+            {
+                builder.Add(new RejectedServiceIdentity(input.QualifiedInterfaceName));
+            }
+        }
+
+        return RejectedServiceIndex.Create(builder.ToImmutable(), ct);
+    }
+
+    private static bool IsRejectedAfterAsyncSiblingCollision(
+        FinalRejectionInput input,
+        RejectedServiceIndex rejected,
+        ExistingTypeIndex existingTypes,
+        CancellationToken ct)
+    {
+        if (input.IsRejected || !NamingHelpers.CanGenerateAsyncSiblingInterface(input.InterfaceName))
+        {
+            return input.IsRejected;
+        }
+
+        var siblingName = NamingHelpers.AsyncSiblingInterfaceName(input.InterfaceName);
+        var sibling = new ExistingTypeKey(input.Namespace, siblingName, 0);
+        return existingTypes.Contains(sibling, ct) && WillGenerateAsyncSiblingInterface(input, rejected, ct);
+    }
+
+    private static bool WillGenerateAsyncSiblingInterface(
+        FinalRejectionInput input,
+        RejectedServiceIndex rejected,
+        CancellationToken ct)
+    {
+        var blockedSignatures = new HashSet<string>(System.StringComparer.Ordinal);
+        var originalSignatures = new HashSet<string>(System.StringComparer.Ordinal);
+        foreach (var method in input.Methods.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            originalSignatures.Add(method.OriginalSignatureKey);
+            if (IsUnsupported(method, rejected, ct))
+            {
+                blockedSignatures.Add(method.OriginalSignatureKey);
+            }
+        }
+
+        var candidateCounts = new Dictionary<string, int>(System.StringComparer.Ordinal);
+        var candidateHasReusableOriginal = new Dictionary<string, bool>(System.StringComparer.Ordinal);
+        foreach (var method in input.Methods.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (IsUnsupported(method, rejected, ct) ||
+                method.RequiresExtraProxyMethod &&
+                (blockedSignatures.Contains(method.CandidateSignatureKey) ||
+                    originalSignatures.Contains(method.CandidateSignatureKey)))
+            {
+                continue;
+            }
+
+            candidateCounts.TryGetValue(method.CandidateSignatureKey, out var count);
+            candidateCounts[method.CandidateSignatureKey] = count + 1;
+            candidateHasReusableOriginal[method.CandidateSignatureKey] =
+                candidateHasReusableOriginal.TryGetValue(method.CandidateSignatureKey, out var hasReusable) &&
+                hasReusable ||
+                !method.RequiresExtraProxyMethod;
+        }
+
+        foreach (var entry in candidateCounts)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (entry.Value == 1 ||
+                candidateHasReusableOriginal.TryGetValue(entry.Key, out var hasReusable) && hasReusable)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsUnsupported(
+        FinalRejectionMethod method,
+        RejectedServiceIndex rejected,
+        CancellationToken ct) =>
+        method.IsUnsupported ||
+        method.SubServiceQualifiedInterfaceName is not null &&
+        rejected.Contains(method.SubServiceQualifiedInterfaceName, ct);
 
     private static int IndexOf(
         List<RejectedServiceIndex> seen,

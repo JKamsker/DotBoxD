@@ -1,47 +1,71 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 
 namespace ShaRPC.SourceGenerator;
 
 internal readonly record struct FinalRejectionInput(
-    ServiceModel? Model,
+    string Namespace,
+    string InterfaceName,
     string QualifiedInterfaceName,
-    ServiceDiagnostic? ServiceDiagnostic,
-    ExistingTypeCollisionDiagnostic? ExistingTypeCollision)
+    bool IsRejected,
+    EquatableArray<FinalRejectionMethod> Methods)
 {
-    public static FinalRejectionInput From(ServiceResult result) =>
-        new(
-            result.Model,
-            result.QualifiedInterfaceName,
-            result.ServiceDiagnostic,
-            result.ExistingTypeCollision);
-
-    public static ServiceResult ToServiceResult(FinalRejectionInput input) =>
-        new(
-            input.Model,
-            Error: null,
-            MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
-            MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
-            ServiceLocation: default,
-            input.QualifiedInterfaceName,
-            input.ServiceDiagnostic,
-            input.ExistingTypeCollision);
-}
-
-internal static class FinalRejectionInputs
-{
-    public static ImmutableArray<ServiceResult> ToServiceResults(
-        ImmutableArray<FinalRejectionInput> inputs,
-        CancellationToken ct)
+    public static FinalRejectionInput From(ServiceResult result, CancellationToken ct)
     {
-        var builder = ImmutableArray.CreateBuilder<ServiceResult>(inputs.Length);
-        foreach (var input in inputs)
+        if (result.Model is null)
         {
-            ct.ThrowIfCancellationRequested();
-            builder.Add(FinalRejectionInput.ToServiceResult(input));
+            return new FinalRejectionInput(
+                string.Empty,
+                string.Empty,
+                result.QualifiedInterfaceName,
+                IsRejected: RejectedServiceIdentity.From(result) is not null,
+                EquatableArray<FinalRejectionMethod>.Empty);
         }
 
-        return builder.ToImmutable();
+        var methods = new FinalRejectionMethod[result.Model.Methods.Count];
+        for (var i = 0; i < result.Model.Methods.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            methods[i] = FinalRejectionMethod.From(result.Model.Methods[i], ct);
+        }
+
+        return new FinalRejectionInput(
+            result.Model.Namespace,
+            result.Model.InterfaceName,
+            result.QualifiedInterfaceName,
+            IsRejected: false,
+            methods.ToEquatableArray());
+    }
+}
+
+internal readonly record struct FinalRejectionMethod(
+    string OriginalSignatureKey,
+    string CandidateSignatureKey,
+    bool RequiresExtraProxyMethod,
+    bool IsUnsupported,
+    string? SubServiceQualifiedInterfaceName)
+{
+    public static FinalRejectionMethod From(MethodModel method, CancellationToken ct)
+    {
+        var originalKey = MethodSignatureFacts.GetSignatureKey(
+            method.Name,
+            method.TypeParameterCount,
+            method.Parameters,
+            ct);
+        var candidateName = NamingHelpers.IsAsync(method.ReturnKind)
+            ? method.Name
+            : NamingHelpers.AsyncSiblingMethodName(method.Name);
+        var candidateKey = MethodSignatureFacts.GetSignatureKey(
+            candidateName,
+            method.TypeParameterCount,
+            FinalRejectionMethodParameters.Build(method, ct),
+            ct);
+
+        return new FinalRejectionMethod(
+            originalKey,
+            candidateKey,
+            RequiresExtraProxyMethod: !(NamingHelpers.IsAsync(method.ReturnKind) &&
+                method.HasCancellationToken),
+            IsUnsupported: method.UnsupportedReason is not null,
+            method.SubService?.QualifiedInterfaceName);
     }
 }
