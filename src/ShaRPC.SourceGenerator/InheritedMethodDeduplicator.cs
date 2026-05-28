@@ -54,6 +54,28 @@ internal static class InheritedMethodDeduplicator
         return true;
     }
 
+    public static bool HasSameTupleElementNames(
+        IMethodSymbol left,
+        IMethodSymbol right,
+        CancellationToken ct)
+    {
+        if (!HasSameTupleElementNames(left.ReturnType, right.ReturnType, ct) ||
+            left.Parameters.Length != right.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Parameters.Length; i++)
+        {
+            if (!HasSameTupleElementNames(left.Parameters[i].Type, right.Parameters[i].Type, ct))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static string GetNullableTypeKey(
         ITypeSymbol type,
         IMethodSymbol method,
@@ -111,6 +133,86 @@ internal static class InheritedMethodDeduplicator
         }
 
         return name + "<" + string.Join(",", args) + ">";
+    }
+
+    private static bool HasSameTupleElementNames(
+        ITypeSymbol left,
+        ITypeSymbol right,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (left is IArrayTypeSymbol leftArray && right is IArrayTypeSymbol rightArray)
+        {
+            return leftArray.Rank == rightArray.Rank &&
+                HasSameTupleElementNames(leftArray.ElementType, rightArray.ElementType, ct);
+        }
+
+        if (left is INamedTypeSymbol leftNamed && right is INamedTypeSymbol rightNamed)
+        {
+            return HasSameTupleElementNames(leftNamed, rightNamed, ct);
+        }
+
+        return true;
+    }
+
+    private static bool HasSameTupleElementNames(
+        INamedTypeSymbol left,
+        INamedTypeSymbol right,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (left.IsTupleType || right.IsTupleType)
+        {
+            return left.IsTupleType &&
+                right.IsTupleType &&
+                HasSameTupleFields(left, right, ct);
+        }
+
+        if (left.TypeArguments.Length != right.TypeArguments.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.TypeArguments.Length; i++)
+        {
+            if (!HasSameTupleElementNames(left.TypeArguments[i], right.TypeArguments[i], ct))
+            {
+                return false;
+            }
+        }
+
+        if (left.ContainingType is null || right.ContainingType is null)
+        {
+            return left.ContainingType is null && right.ContainingType is null;
+        }
+
+        return HasSameTupleElementNames(left.ContainingType, right.ContainingType, ct);
+    }
+
+    private static bool HasSameTupleFields(
+        INamedTypeSymbol left,
+        INamedTypeSymbol right,
+        CancellationToken ct)
+    {
+        if (left.TupleElements.Length != right.TupleElements.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.TupleElements.Length; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (left.TupleElements[i].Name != right.TupleElements[i].Name ||
+                !HasSameTupleElementNames(left.TupleElements[i].Type, right.TupleElements[i].Type, ct))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string GetNamespacePrefix(INamedTypeSymbol type) =>

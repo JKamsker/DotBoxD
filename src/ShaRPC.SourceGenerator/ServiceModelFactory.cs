@@ -138,6 +138,15 @@ internal static class ServiceModelFactory
                         qualifiedInterfaceName);
                 }
 
+                if (!InheritedMethodDeduplicator.HasSameTupleElementNames(existingMethod, methodSymbol, ct))
+                {
+                    return RejectedService(
+                        displayName,
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible tuple element names",
+                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
+                        qualifiedInterfaceName);
+                }
+
                 if (!InheritedMethodDeduplicator.HasSameEffectiveWireName(existingMethod, methodSymbol))
                 {
                     return RejectedService(
