@@ -78,6 +78,17 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 GeneratedServiceCollisionValidator.Apply(pair.Left, pair.Right, ct))
             .WithTrackingName("GeneratedServiceValidatedServiceResults");
 
+        var wireServiceNames = results
+            .Collect()
+            .Select(static (arr, ct) => ServiceWireNameIndex.Create(arr, ct))
+            .WithTrackingName("WireServiceNames");
+
+        results = results
+            .Combine(wireServiceNames)
+            .Select(static (pair, ct) =>
+                ServiceWireNameCollisionValidator.Apply(pair.Left, pair.Right, ct))
+            .WithTrackingName("WireNameValidatedServiceResults");
+
         var rejectedServices = results
             .Collect()
             .Select(static (arr, ct) => RejectedServiceIndex.Create(arr, ct))

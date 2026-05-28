@@ -810,7 +810,7 @@ public class CodegenRegressionTests
 
             namespace Regress.HintA
             {
-                [ShaRpcService]
+                [ShaRpcService(Name = "HintA.IFoo")]
                 public interface IFoo
                 {
                     Task<int> AAsync();
@@ -818,7 +818,7 @@ public class CodegenRegressionTests
             }
             namespace Regress.HintB
             {
-                [ShaRpcService]
+                [ShaRpcService(Name = "HintB.IFoo")]
                 public interface IFoo
                 {
                     Task<int> BAsync();
@@ -858,7 +858,7 @@ public class CodegenRegressionTests
 
             namespace Regress.Flat
             {
-                [ShaRpcService]
+                [ShaRpcService(Name = "Dotted.IFoo")]
                 public interface IFoo
                 {
                     Task<int> FromDottedAsync();
@@ -867,7 +867,7 @@ public class CodegenRegressionTests
 
             namespace Regress_Flat
             {
-                [ShaRpcService]
+                [ShaRpcService(Name = "Underscore.IFoo")]
                 public interface IFoo
                 {
                     Task<int> FromUnderscoreAsync();
