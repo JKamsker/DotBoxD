@@ -8,7 +8,6 @@ internal static class FinalRejectedServiceResolver
 {
     public static RejectedServiceIndex Resolve(
         ImmutableArray<FinalRejectionInput> baseResults,
-        ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
         var rejected = CreateRejectedServices(baseResults, ct);
@@ -25,7 +24,7 @@ internal static class FinalRejectedServiceResolver
             }
 
             seen.Add(rejected);
-            var next = ComputeNext(baseResults, rejected, existingTypes, ct);
+            var next = ComputeNext(baseResults, rejected, ct);
             if (SameRejectedServices(rejected, next, ct))
             {
                 return next;
@@ -40,7 +39,6 @@ internal static class FinalRejectedServiceResolver
     private static RejectedServiceIndex ComputeNext(
         ImmutableArray<FinalRejectionInput> baseResults,
         RejectedServiceIndex rejected,
-        ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
         var builder = ImmutableArray.CreateBuilder<RejectedServiceIdentity>();
@@ -48,7 +46,7 @@ internal static class FinalRejectedServiceResolver
         {
             ct.ThrowIfCancellationRequested();
 
-            if (IsRejectedAfterAsyncSiblingCollision(input, rejected, existingTypes, ct))
+            if (IsRejectedAfterAsyncSiblingCollision(input, rejected, ct))
             {
                 builder.Add(new RejectedServiceIdentity(input.QualifiedInterfaceName));
             }
@@ -78,17 +76,14 @@ internal static class FinalRejectedServiceResolver
     private static bool IsRejectedAfterAsyncSiblingCollision(
         FinalRejectionInput input,
         RejectedServiceIndex rejected,
-        ExistingTypeIndex existingTypes,
         CancellationToken ct)
     {
-        if (input.IsRejected || !NamingHelpers.CanGenerateAsyncSiblingInterface(input.InterfaceName))
+        if (input.IsRejected || input.Methods.IsEmpty)
         {
             return input.IsRejected;
         }
 
-        var siblingName = NamingHelpers.AsyncSiblingInterfaceName(input.InterfaceName);
-        var sibling = new ExistingTypeKey(input.Namespace, siblingName, 0);
-        return existingTypes.Contains(sibling, ct) && WillGenerateAsyncSiblingInterface(input, rejected, ct);
+        return WillGenerateAsyncSiblingInterface(input, rejected, ct);
     }
 
     private static bool WillGenerateAsyncSiblingInterface(

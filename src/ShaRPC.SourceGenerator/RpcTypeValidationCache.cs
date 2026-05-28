@@ -7,8 +7,8 @@ namespace ShaRPC.SourceGenerator;
 internal sealed class RpcTypeValidationCache
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, bool> _subServicePayloadResults =
-        new(System.StringComparer.Ordinal);
+    private readonly Dictionary<ITypeSymbol, bool> _subServicePayloadResults =
+        new(SymbolEqualityComparer.Default);
 
     public bool ContainsShaRpcServiceInterface(ITypeSymbol type, CancellationToken ct) =>
         SubServicePayloadInspector.ContainsShaRpcServiceInterface(
@@ -16,7 +16,7 @@ internal sealed class RpcTypeValidationCache
             ct,
             this);
 
-    public bool TryGetSubServicePayloadResult(string key, out bool result)
+    public bool TryGetSubServicePayloadResult(ITypeSymbol key, out bool result)
     {
         lock (_gate)
         {
@@ -24,7 +24,7 @@ internal sealed class RpcTypeValidationCache
         }
     }
 
-    public void SetSubServicePayloadResult(string key, bool result)
+    public void SetSubServicePayloadResult(ITypeSymbol key, bool result)
     {
         lock (_gate)
         {

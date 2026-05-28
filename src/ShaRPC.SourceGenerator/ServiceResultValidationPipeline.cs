@@ -52,17 +52,13 @@ internal static class ServiceResultValidationPipeline
             "SubServiceValidatedServiceResults");
 
         var finalRejectionInputs = subServiceResults
-            .Select(static (r, ct) => FinalRejectionInput.From(r, ct))
+            .Combine(existingTypes)
+            .Select(static (pair, ct) => FinalRejectionInput.From(pair.Left, pair.Right, ct))
             .WithTrackingName("FinalRejectionInputs");
 
         var finalRejectedServices = finalRejectionInputs
             .Collect()
-            .Combine(existingTypes)
-            .Select(static (pair, ct) =>
-                FinalRejectedServiceResolver.Resolve(
-                    pair.Left,
-                    pair.Right,
-                    ct))
+            .Select(static (inputs, ct) => FinalRejectedServiceResolver.Resolve(inputs, ct))
             .WithTrackingName("FinalRejectedServices");
 
         results = ApplySubServiceAvailability(

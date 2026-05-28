@@ -8,16 +8,11 @@ internal static class SubServicePayloadInspector
 {
     private const string ShaRpcServiceAttributeName = "ShaRPC.Core.Attributes.ShaRpcServiceAttribute";
 
-    private static readonly SymbolDisplayFormat s_cacheKeyFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-
     public static bool ContainsShaRpcServiceInterface(ITypeSymbol type, CancellationToken ct) =>
         ContainsShaRpcServiceInterface(
             type,
             ct,
-            new HashSet<string>(System.StringComparer.Ordinal),
+            new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
             cache: null);
 
     public static bool ContainsShaRpcServiceInterface(
@@ -27,13 +22,13 @@ internal static class SubServicePayloadInspector
         ContainsShaRpcServiceInterface(
             type,
             ct,
-            new HashSet<string>(System.StringComparer.Ordinal),
+            new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default),
             cache);
 
     private static bool ContainsShaRpcServiceInterface(
         ITypeSymbol type,
         CancellationToken ct,
-        HashSet<string> visitedOriginalDefinitions,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         RpcTypeValidationCache? cache)
     {
         ct.ThrowIfCancellationRequested();
@@ -54,7 +49,7 @@ internal static class SubServicePayloadInspector
     private static bool ContainsShaRpcServiceInterface(
         INamedTypeSymbol named,
         CancellationToken ct,
-        HashSet<string> visitedOriginalDefinitions,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         RpcTypeValidationCache? cache)
     {
         ct.ThrowIfCancellationRequested();
@@ -64,8 +59,7 @@ internal static class SubServicePayloadInspector
             return true;
         }
 
-        var cacheKey = named.ToDisplayString(s_cacheKeyFormat);
-        if (cache is not null && cache.TryGetSubServicePayloadResult(cacheKey, out var cached))
+        if (cache is not null && cache.TryGetSubServicePayloadResult(named, out var cached))
         {
             return cached;
         }
@@ -78,25 +72,24 @@ internal static class SubServicePayloadInspector
             {
                 if (cache is not null)
                 {
-                    cache.SetSubServicePayloadResult(cacheKey, result: true);
+                    cache.SetSubServicePayloadResult(named, result: true);
                 }
 
                 return true;
             }
         }
 
-        var originalDefinitionKey = named.OriginalDefinition.ToDisplayString(s_cacheKeyFormat);
-        if (!visitedOriginalDefinitions.Add(originalDefinitionKey))
+        if (!visitedOriginalDefinitions.Add(named.OriginalDefinition))
         {
             return false;
         }
 
         var contains = CanInspectDtoMembers(named) &&
             DtoMembersContainShaRpcServiceInterface(named, ct, visitedOriginalDefinitions, cache);
-        visitedOriginalDefinitions.Remove(originalDefinitionKey);
+        visitedOriginalDefinitions.Remove(named.OriginalDefinition);
         if (cache is not null)
         {
-            cache.SetSubServicePayloadResult(cacheKey, contains);
+            cache.SetSubServicePayloadResult(named, contains);
         }
 
         return contains;
@@ -105,7 +98,7 @@ internal static class SubServicePayloadInspector
     private static bool DtoMembersContainShaRpcServiceInterface(
         INamedTypeSymbol type,
         CancellationToken ct,
-        HashSet<string> visitedOriginalDefinitions,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
         RpcTypeValidationCache? cache)
     {
         foreach (var member in type.GetMembers())
