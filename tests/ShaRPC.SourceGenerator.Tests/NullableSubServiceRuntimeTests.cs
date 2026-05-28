@@ -16,7 +16,7 @@ namespace ShaRPC.SourceGenerator.Tests;
 
 public class NullableSubServiceRuntimeTests
 {
-    private const string Source = """
+    private const string TaskSource = """
         #nullable enable
         using ShaRPC.Core.Attributes;
         using System.Threading.Tasks;
@@ -37,24 +37,49 @@ public class NullableSubServiceRuntimeTests
         }
         """;
 
-    [Fact]
-    public async Task Proxy_ReturnsNull_WhenNullableSubServiceHandleIsNull()
+    private const string ValueTaskSource = """
+        #nullable enable
+        using ShaRPC.Core.Attributes;
+        using System.Threading.Tasks;
+
+        namespace Regress.NullableSubRuntime
+        {
+            [ShaRpcService]
+            public interface ISub
+            {
+                Task<int> CountAsync();
+            }
+
+            [ShaRpcService]
+            public interface IRoot
+            {
+                ValueTask<ISub?> OpenAsync();
+            }
+        }
+        """;
+
+    [Theory]
+    [InlineData(TaskSource)]
+    [InlineData(ValueTaskSource)]
+    public async Task Proxy_ReturnsNull_WhenNullableSubServiceHandleIsNull(string source)
     {
-        var assembly = Compile();
+        var assembly = Compile(source);
         var proxy = Activator.CreateInstance(
             assembly.GetType("Regress.NullableSubRuntime.RootProxy")!,
             new NullHandleClient())!;
 
         var open = proxy.GetType().GetMethod("OpenAsync", Type.EmptyTypes)!;
-        var sub = await AwaitObjectTask(open.Invoke(proxy, Array.Empty<object>())!);
+        var sub = await AwaitObject(open.Invoke(proxy, Array.Empty<object>())!);
 
         sub.Should().BeNull();
     }
 
-    [Fact]
-    public async Task Dispatcher_SerializesNullHandle_WhenNullableSubServiceIsNull()
+    [Theory]
+    [InlineData(TaskSource)]
+    [InlineData(ValueTaskSource)]
+    public async Task Dispatcher_SerializesNullHandle_WhenNullableSubServiceIsNull(string source)
     {
-        var assembly = Compile();
+        var assembly = Compile(source);
         var rootInterface = assembly.GetType("Regress.NullableSubRuntime.IRoot")!;
         var root = RootFactory.Create(rootInterface);
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(
@@ -72,9 +97,9 @@ public class NullableSubServiceRuntimeTests
         serializer.Deserialize<ServiceHandle?>(bytes).Should().BeNull();
     }
 
-    private static Assembly Compile()
+    private static Assembly Compile(string source)
     {
-        var compilation = GeneratorTestHelper.CreateCompilation(Source);
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         var final = ((CSharpCompilation)compilation).AddSyntaxTrees(driver.GetRunResult().GeneratedTrees);
 
@@ -88,10 +113,20 @@ public class NullableSubServiceRuntimeTests
         return Assembly.Load(ms.ToArray());
     }
 
-    private static async Task<object?> AwaitObjectTask(object task)
+    private static async Task<object?> AwaitObject(object taskLike)
     {
-        await (Task)task;
-        return task.GetType().GetProperty("Result")!.GetValue(task);
+        if (taskLike is Task task)
+        {
+            await task;
+        }
+        else
+        {
+            var asTask = (Task)taskLike.GetType().GetMethod("AsTask")!
+                .Invoke(taskLike, Array.Empty<object>())!;
+            await asTask;
+        }
+
+        return taskLike.GetType().GetProperty("Result")!.GetValue(taskLike);
     }
 
     private sealed class NullHandleClient : IShaRpcClient
@@ -143,9 +178,15 @@ public class NullableSubServiceRuntimeTests
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             var resultType = targetMethod!.ReturnType.GetGenericArguments()[0];
-            return typeof(Task).GetMethod(nameof(Task.FromResult))!
+            var task = typeof(Task).GetMethod(nameof(Task.FromResult))!
                 .MakeGenericMethod(resultType)
                 .Invoke(null, new object?[] { null });
+            if (targetMethod.ReturnType.Name == "ValueTask`1")
+            {
+                return Activator.CreateInstance(targetMethod.ReturnType, task);
+            }
+
+            return task;
         }
     }
 
