@@ -140,6 +140,26 @@ public class SnapshotTests
         }
         """;
 
+    private const string NestedService = """
+        using ShaRPC.Core.Attributes;
+        using System.Threading.Tasks;
+
+        namespace Snap.Nested
+        {
+            [ShaRpcService]
+            public interface ISubSnap
+            {
+                Task<int> CountAsync();
+            }
+
+            [ShaRpcService]
+            public interface IRootSnap
+            {
+                Task<ISubSnap> GetSubAsync(string label);
+            }
+        }
+        """;
+
     [Fact]
     public Task SingleMethod() => RunVerify(SingleMethodService);
 
@@ -163,6 +183,9 @@ public class SnapshotTests
 
     [Fact]
     public Task KeywordEscapedParameters() => RunVerify(KeywordEscapedParamsService);
+
+    [Fact]
+    public Task NestedServiceReturn() => RunVerify(NestedService);
 
     private static Task RunVerify(string source)
     {
