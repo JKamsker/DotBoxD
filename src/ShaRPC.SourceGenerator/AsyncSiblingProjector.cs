@@ -46,7 +46,7 @@ internal static class AsyncSiblingProjector
             var siblingNameMatches = siblingName == m.Name;
             var signatureMatches = ParametersEqual(m.Parameters, siblingParameters, ct);
             var requiresExtra = !(siblingNameMatches && signatureMatches && NamingHelpers.IsAsync(m.ReturnKind));
-            var candidateKey = SignatureKey(siblingName, m.TypeParameterList, siblingParameters, ct);
+            var candidateKey = SignatureKey(siblingName, m.TypeParameterCount, siblingParameters, ct);
             if (requiresExtra && blockedSignatures.TryGetValue(candidateKey, out var blockerName))
             {
                 collisions.Add(new MethodDiagnostic(
@@ -80,7 +80,7 @@ internal static class AsyncSiblingProjector
         foreach (var candidate in candidates)
         {
             ct.ThrowIfCancellationRequested();
-            var key = SignatureKey(candidate.Name, candidate.Source.TypeParameterList, candidate.Parameters, ct);
+            var key = SignatureKey(candidate.Name, candidate.Source.TypeParameterCount, candidate.Parameters, ct);
             if (!groups.TryGetValue(key, out var group))
             {
                 group = new List<AsyncSiblingMethod>();
@@ -94,7 +94,7 @@ internal static class AsyncSiblingProjector
         foreach (var candidate in candidates)
         {
             ct.ThrowIfCancellationRequested();
-            var key = SignatureKey(candidate.Name, candidate.Source.TypeParameterList, candidate.Parameters, ct);
+            var key = SignatureKey(candidate.Name, candidate.Source.TypeParameterCount, candidate.Parameters, ct);
             if (!handledKeys.Add(key))
             {
                 continue;
@@ -157,7 +157,7 @@ internal static class AsyncSiblingProjector
 
             if (method.UnsupportedReason is not null)
             {
-                signatures[SignatureKey(method.Name, method.TypeParameterList, method.Parameters, ct)] = method.Name;
+                signatures[SignatureKey(method.Name, method.TypeParameterCount, method.Parameters, ct)] = method.Name;
             }
         }
 
@@ -173,7 +173,7 @@ internal static class AsyncSiblingProjector
         {
             ct.ThrowIfCancellationRequested();
 
-            signatures[SignatureKey(method.Name, method.TypeParameterList, method.Parameters, ct)] = method.Name;
+            signatures[SignatureKey(method.Name, method.TypeParameterCount, method.Parameters, ct)] = method.Name;
         }
 
         return signatures;
@@ -181,30 +181,10 @@ internal static class AsyncSiblingProjector
 
     private static string SignatureKey(
         string methodName,
-        string typeParameterList,
+        int arity,
         EquatableArray<ParameterModel> parameters,
-        CancellationToken ct)
-    {
-        var sb = new StringBuilder(IdentifierHelpers.UnescapeIdentifier(methodName));
-        sb.Append(typeParameterList);
-        sb.Append('(');
-        for (var i = 0; i < parameters.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (i > 0)
-            {
-                sb.Append(',');
-            }
-
-            var parameter = parameters[i];
-            sb.Append(parameter.RefKindKeyword);
-            sb.Append(parameter.Type);
-        }
-
-        sb.Append(')');
-        return sb.ToString();
-    }
+        CancellationToken ct) =>
+        MethodSignatureFacts.GetSignatureKey(methodName, arity, parameters, ct);
 
     private static EquatableArray<ParameterModel> BuildAsyncSiblingParameters(
         MethodModel method,
@@ -228,6 +208,7 @@ internal static class AsyncSiblingProjector
 
         parameters.Add(new ParameterModel(
             UniqueParameterName(method.Parameters, "ct", ct),
+            "global::System.Threading.CancellationToken",
             "global::System.Threading.CancellationToken",
             IsCancellationToken: true,
             HasDefaultValue: true));

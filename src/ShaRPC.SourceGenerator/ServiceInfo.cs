@@ -54,6 +54,7 @@ internal sealed record MethodModel(
     bool HasCancellationToken,
     EquatableArray<ParameterModel> Parameters,
     bool RequiresUnsafeSignature = false,
+    int TypeParameterCount = 0,
     string TypeParameterList = "",
     string ConstraintClauses = "",
     string? UnsupportedReason = null,
@@ -69,6 +70,7 @@ internal sealed record MethodModel(
 internal sealed record ParameterModel(
     string Name,
     string Type,
+    string SignatureType,
     string RefKindKeyword = "",
     bool IsCancellationToken = false,
     bool HasDefaultValue = false);

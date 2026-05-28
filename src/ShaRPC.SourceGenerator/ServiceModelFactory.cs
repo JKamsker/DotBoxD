@@ -98,7 +98,7 @@ internal static class ServiceModelFactory
         {
             ct.ThrowIfCancellationRequested();
 
-            var sigKey = GetSignatureKey(methodSymbol, ct);
+            var sigKey = MethodSignatureFacts.GetSignatureKey(methodSymbol, ct);
             if (seenSignatures.TryGetValue(sigKey, out var existingMethod))
             {
                 if (!HasSameReturnShape(existingMethod, methodSymbol))
@@ -106,6 +106,15 @@ internal static class ServiceModelFactory
                     return RejectedService(
                         displayName,
                         $"inherited method '{methodSymbol.Name}' has the same signature as another method but an incompatible return type",
+                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
+                        qualifiedInterfaceName);
+                }
+
+                if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
+                {
+                    return RejectedService(
+                        displayName,
+                        $"inherited generic method '{methodSymbol.Name}' has the same signature as another method but incompatible generic constraints",
                         DiagnosticLocationFactory.FromSymbol(methodSymbol),
                         qualifiedInterfaceName);
                 }
@@ -227,15 +236,4 @@ internal static class ServiceModelFactory
         left.RefKind == right.RefKind &&
         SymbolEqualityComparer.Default.Equals(left.ReturnType, right.ReturnType);
 
-    private static string GetSignatureKey(IMethodSymbol methodSymbol, CancellationToken ct)
-    {
-        var parts = new List<string>();
-        foreach (var parameter in methodSymbol.Parameters)
-        {
-            ct.ThrowIfCancellationRequested();
-            parts.Add(parameter.RefKind + ":" + parameter.Type.ToDisplayString());
-        }
-
-        return methodSymbol.Name + "`" + methodSymbol.Arity + "(" + string.Join(",", parts) + ")";
-    }
 }

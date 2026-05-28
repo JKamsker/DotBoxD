@@ -116,6 +116,7 @@ internal static class MethodModelFactory
             parameters.Add(new ParameterModel(
                 IdentifierHelpers.EscapeIdentifier(param.Name),
                 param.Type.ToDisplayString(s_qualifiedFormat),
+                MethodSignatureFacts.GetCanonicalType(param.Type, methodSymbol, ct),
                 ParameterRefKindKeyword(param.RefKind),
                 isCancellationToken,
                 param.HasExplicitDefaultValue));
@@ -139,6 +140,7 @@ internal static class MethodModelFactory
             HasCancellationToken: hasCancellationToken,
             Parameters: parameters.ToEquatableArray(),
             RequiresUnsafeSignature: requiresUnsafeSignature,
+            TypeParameterCount: methodSymbol.Arity,
             TypeParameterList: typeParameterList,
             ConstraintClauses: constraintClauses,
             UnsupportedReason: unsupportedReason,
