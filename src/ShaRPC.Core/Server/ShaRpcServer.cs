@@ -170,7 +170,7 @@ public sealed class ShaRpcServer : IShaRpcServer
     /// method, instance not found, or a user exception) the half-built frame is discarded and a fresh
     /// error frame is returned instead. The caller owns the returned <see cref="Payload"/>.
     /// </summary>
-    private async Task<Payload> BuildResponseFrameAsync(
+    private async ValueTask<Payload> BuildResponseFrameAsync(
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> payload,
