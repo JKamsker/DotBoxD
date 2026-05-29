@@ -37,6 +37,15 @@ public interface IShaRpcClient : IAsyncDisposable
         CancellationToken ct = default);
 
     /// <summary>
+    /// Invokes an RPC method with neither a request nor a response body. Sends an empty
+    /// payload rather than serializing a placeholder argument.
+    /// </summary>
+    Task InvokeAsync(
+        string service,
+        string method,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Invokes a method on a specific server-side sub-service instance previously
     /// obtained via a root call. Mirrors <see cref="InvokeAsync{TRequest,TResponse}(string,string,TRequest,CancellationToken)"/>
     /// but threads the opaque <paramref name="instanceId"/> issued by the server's
@@ -66,6 +75,16 @@ public interface IShaRpcClient : IAsyncDisposable
         string instanceId,
         string method,
         TRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Invokes an instance-scoped RPC method with neither a request nor a response body.
+    /// Sends an empty payload rather than serializing a placeholder argument.
+    /// </summary>
+    Task InvokeOnInstanceAsync(
+        string service,
+        string instanceId,
+        string method,
         CancellationToken ct = default);
 
     /// <summary>

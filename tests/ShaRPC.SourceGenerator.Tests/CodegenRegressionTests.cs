@@ -986,9 +986,11 @@ public class CodegenRegressionTests
     }
 
     /// <summary>
-    /// Behavioral test for M1: confirms at runtime that the dummy-request InvokeAsync
-    /// overload is the one selected for zero-parameter void methods, rather than the
-    /// no-request Task&lt;TResponse&gt; overload (which would corrupt server-side serialization).
+    /// Behavioral test: confirms at runtime that the zero-parameter void path selects the
+    /// parameterless <c>Task InvokeAsync(service, method, ct)</c> overload — sending no request
+    /// and expecting no response — rather than the with-request overload (which used to send a
+    /// throwaway <c>new object()</c>) or the no-request <c>Task&lt;TResponse&gt;</c> overload
+    /// (which would corrupt server-side serialization).
     /// </summary>
     [Fact]
     public void ZeroParamVoid_AtRuntime_SelectsNoResponseOverload()
@@ -1025,7 +1027,9 @@ public class CodegenRegressionTests
         proxyType.GetMethod("Ping")!.Invoke(proxy, Array.Empty<object>());
 
         client.NoRequestNoResponseOverloadCalls.Should().Be(1,
-            "the zero-parameter void path must use Task InvokeAsync<TRequest>(...) so the dispatcher receives no payload to deserialize a response from");
+            "the zero-parameter void path must use the parameterless Task InvokeAsync(service, method, ct) overload so no dummy request is serialized and the dispatcher receives no payload");
+        client.WithRequestNoResponseOverloadCalls.Should().Be(0,
+            "the void path must no longer route through the with-request overload that previously sent a throwaway new object()");
         client.WithResponseOverloadCalls.Should().Be(0,
             "Task<TResponse> InvokeAsync<TResponse>(...) is wrong for void — it would force the serializer to deserialize an empty response body");
     }
@@ -1038,6 +1042,7 @@ public class CodegenRegressionTests
         public Task<TR> InvokeAsync<TQ, TR>(string s, string m, TQ q, System.Threading.CancellationToken ct = default) => Task.FromResult(default(TR)!);
         public Task<TR> InvokeAsync<TR>(string s, string m, System.Threading.CancellationToken ct = default) => Task.FromResult(default(TR)!);
         public Task InvokeAsync<TQ>(string s, string m, TQ q, System.Threading.CancellationToken ct = default) => Task.CompletedTask;
+        public Task InvokeAsync(string s, string m, System.Threading.CancellationToken ct = default) => Task.CompletedTask;
         public System.Threading.Tasks.ValueTask DisposeAsync() => default;
 
         // Feature-2 instance overloads forward to the singleton ones so the existing
@@ -1048,6 +1053,8 @@ public class CodegenRegressionTests
             => InvokeAsync<TR>(s, m, ct);
         public Task InvokeOnInstanceAsync<TQ>(string s, string id, string m, TQ q, System.Threading.CancellationToken ct = default)
             => InvokeAsync<TQ>(s, m, q, ct);
+        public Task InvokeOnInstanceAsync(string s, string id, string m, System.Threading.CancellationToken ct = default)
+            => InvokeAsync(s, m, ct);
     }
 
     /// <summary>
@@ -1459,6 +1466,8 @@ public class CodegenRegressionTests
             => Task.FromResult((TR)NextResult!);
         public Task InvokeAsync<TQ>(string s, string m, TQ q, System.Threading.CancellationToken ct = default)
             => Task.CompletedTask;
+        public Task InvokeAsync(string s, string m, System.Threading.CancellationToken ct = default)
+            => Task.CompletedTask;
         public System.Threading.Tasks.ValueTask DisposeAsync() => default;
 
         // Feature-2 instance overloads forward to the singleton ones so the existing
@@ -1469,6 +1478,8 @@ public class CodegenRegressionTests
             => InvokeAsync<TR>(s, m, ct);
         public Task InvokeOnInstanceAsync<TQ>(string s, string id, string m, TQ q, System.Threading.CancellationToken ct = default)
             => InvokeAsync<TQ>(s, m, q, ct);
+        public Task InvokeOnInstanceAsync(string s, string id, string m, System.Threading.CancellationToken ct = default)
+            => InvokeAsync(s, m, ct);
     }
 
     /// <summary>An IShaRpcClient that records which overload was actually called.</summary>
@@ -1476,6 +1487,7 @@ public class CodegenRegressionTests
     {
         public int WithRequestWithResponseOverloadCalls;
         public int WithResponseOverloadCalls;
+        public int WithRequestNoResponseOverloadCalls;
         public int NoRequestNoResponseOverloadCalls;
 
         public bool IsConnected => true;
@@ -1493,6 +1505,11 @@ public class CodegenRegressionTests
         }
         public Task InvokeAsync<TQ>(string s, string m, TQ q, System.Threading.CancellationToken ct = default)
         {
+            WithRequestNoResponseOverloadCalls++;
+            return Task.CompletedTask;
+        }
+        public Task InvokeAsync(string s, string m, System.Threading.CancellationToken ct = default)
+        {
             NoRequestNoResponseOverloadCalls++;
             return Task.CompletedTask;
         }
@@ -1506,5 +1523,7 @@ public class CodegenRegressionTests
             => InvokeAsync<TR>(s, m, ct);
         public Task InvokeOnInstanceAsync<TQ>(string s, string id, string m, TQ q, System.Threading.CancellationToken ct = default)
             => InvokeAsync<TQ>(s, m, q, ct);
+        public Task InvokeOnInstanceAsync(string s, string id, string m, System.Threading.CancellationToken ct = default)
+            => InvokeAsync(s, m, ct);
     }
 }

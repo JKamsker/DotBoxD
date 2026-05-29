@@ -440,6 +440,12 @@ public class AsyncSiblingTests
             LastMethod = method;
             return Task.CompletedTask;
         }
+        public Task InvokeAsync(string svc, string method, CancellationToken ct = default)
+        {
+            LastService = svc;
+            LastMethod = method;
+            return Task.CompletedTask;
+        }
         public ValueTask DisposeAsync() => default;
 
         // The Feature-2 sub-service overloads aren't exercised by these tests, but the
@@ -451,6 +457,8 @@ public class AsyncSiblingTests
             => InvokeAsync<TR>(svc, method, ct);
         public Task InvokeOnInstanceAsync<TQ>(string svc, string id, string method, TQ req, CancellationToken ct = default)
             => InvokeAsync(svc, method, req, ct);
+        public Task InvokeOnInstanceAsync(string svc, string id, string method, CancellationToken ct = default)
+            => InvokeAsync(svc, method, ct);
     }
 
     /// <summary>
@@ -477,6 +485,8 @@ public class AsyncSiblingTests
         }
         public Task InvokeAsync<TQ>(string svc, string method, TQ req, CancellationToken ct = default) =>
             _gate;
+        public Task InvokeAsync(string svc, string method, CancellationToken ct = default) =>
+            _gate;
         public ValueTask DisposeAsync() => default;
 
         // The Feature-2 sub-service overloads aren't exercised by these tests, but the
@@ -488,5 +498,7 @@ public class AsyncSiblingTests
             => InvokeAsync<TR>(svc, method, ct);
         public Task InvokeOnInstanceAsync<TQ>(string svc, string id, string method, TQ req, CancellationToken ct = default)
             => InvokeAsync(svc, method, req, ct);
+        public Task InvokeOnInstanceAsync(string svc, string id, string method, CancellationToken ct = default)
+            => InvokeAsync(svc, method, ct);
     }
 }

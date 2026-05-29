@@ -43,7 +43,7 @@ namespace Snap.Mixed
 
         public void SyncPing()
         {
-            (this._instanceId is null ? this._client.InvokeAsync<object>("IMix", "SyncPing", new object(), default) : this._client.InvokeOnInstanceAsync<object>("IMix", this._instanceId!, "SyncPing", new object(), default)).GetAwaiter().GetResult();
+            (this._instanceId is null ? this._client.InvokeAsync("IMix", "SyncPing", default) : this._client.InvokeOnInstanceAsync("IMix", this._instanceId!, "SyncPing", default)).GetAwaiter().GetResult();
         }
 
         public async global::System.Threading.Tasks.Task<string> GetNameAsync(global::System.Threading.CancellationToken ct = default)
@@ -63,7 +63,7 @@ namespace Snap.Mixed
 
         public async global::System.Threading.Tasks.Task SyncPingAsync(global::System.Threading.CancellationToken ct = default)
         {
-            await (this._instanceId is null ? this._client.InvokeAsync<object>("IMix", "SyncPing", new object(), ct) : this._client.InvokeOnInstanceAsync<object>("IMix", this._instanceId!, "SyncPing", new object(), ct));
+            await (this._instanceId is null ? this._client.InvokeAsync("IMix", "SyncPing", ct) : this._client.InvokeOnInstanceAsync("IMix", this._instanceId!, "SyncPing", ct));
         }
     }
 }

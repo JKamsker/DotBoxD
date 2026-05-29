@@ -535,6 +535,11 @@ public class GeneratedRoundTripTests
             using var reply = await Resolve(service).DispatchToPayloadAsync(method, p.Memory, _serializer, _registry, ct);
         }
 
+        public async Task InvokeAsync(string service, string method, CancellationToken ct = default)
+        {
+            using var reply = await Resolve(service).DispatchToPayloadAsync(method, System.ReadOnlyMemory<byte>.Empty, _serializer, _registry, ct);
+        }
+
         public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
         {
             using var p = _serializer.SerializeToPayload(request);
@@ -552,6 +557,11 @@ public class GeneratedRoundTripTests
         {
             using var p = _serializer.SerializeToPayload(request);
             using var reply = await Resolve(service).DispatchOnInstanceToPayloadAsync(instanceId, method, p.Memory, _serializer, _registry, ct);
+        }
+
+        public async Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)
+        {
+            using var reply = await Resolve(service).DispatchOnInstanceToPayloadAsync(instanceId, method, System.ReadOnlyMemory<byte>.Empty, _serializer, _registry, ct);
         }
     }
 }

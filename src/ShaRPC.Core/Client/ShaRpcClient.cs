@@ -65,6 +65,14 @@ public sealed class ShaRpcClient : IShaRpcClient
         using var received = await SendRequestAsync(service, method, request, instanceId: null, ct);
     }
 
+    public async Task InvokeAsync(
+        string service,
+        string method,
+        CancellationToken ct = default)
+    {
+        using var received = await SendRequestAsync(service, method, instanceId: null, ct);
+    }
+
     public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(
         string service,
         string instanceId,
@@ -94,6 +102,15 @@ public sealed class ShaRpcClient : IShaRpcClient
         CancellationToken ct = default)
     {
         using var received = await SendRequestAsync(service, method, request, instanceId, ct);
+    }
+
+    public async Task InvokeOnInstanceAsync(
+        string service,
+        string instanceId,
+        string method,
+        CancellationToken ct = default)
+    {
+        using var received = await SendRequestAsync(service, method, instanceId, ct);
     }
 
     private Task<ReceivedResponse> SendRequestAsync<TRequest>(

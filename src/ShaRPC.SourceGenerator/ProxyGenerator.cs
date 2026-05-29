@@ -184,9 +184,9 @@ internal static class ProxyGenerator
             }
             else
             {
-                typeArgs = "<object>";
-                callArgs = $"\"{svc}\", \"{rpc}\", new object(), {ctArg}";
-                callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", new object(), {ctArg}";
+                typeArgs = string.Empty;
+                callArgs = $"\"{svc}\", \"{rpc}\", {ctArg}";
+                callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {ctArg}";
             }
         }
         else if (requestParameters.Count == 1)

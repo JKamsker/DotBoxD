@@ -173,6 +173,9 @@ public class ReviewedNestedValueTaskRuntimeTests
         public Task InvokeAsync<TQ>(string svc, string method, TQ req, CancellationToken ct = default) =>
             Task.CompletedTask;
 
+        public Task InvokeAsync(string svc, string method, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
         public Task<TR> InvokeOnInstanceAsync<TQ, TR>(
             string svc,
             string id,
@@ -194,6 +197,9 @@ public class ReviewedNestedValueTaskRuntimeTests
             string method,
             TQ req,
             CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task InvokeOnInstanceAsync(string svc, string id, string method, CancellationToken ct = default) =>
             Task.CompletedTask;
     }
 

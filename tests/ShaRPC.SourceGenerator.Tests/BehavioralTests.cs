@@ -297,6 +297,14 @@ public class BehavioralTests
             return Task.CompletedTask;
         }
 
+        public Task InvokeAsync(string service, string method, CancellationToken ct = default)
+        {
+            LastService = service;
+            LastMethod = method;
+            LastCancellationToken = ct;
+            return Task.CompletedTask;
+        }
+
         public ValueTask DisposeAsync() => default;
 
         // Forward Feature-2 instance overloads to the singleton recorders so the existing
@@ -307,6 +315,8 @@ public class BehavioralTests
             => InvokeAsync<TResponse>(service, method, ct);
         public Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
             => InvokeAsync(service, method, request, ct);
+        public Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)
+            => InvokeAsync(service, method, ct);
     }
 
     // Implementation of the in-memory IMath service. We can't statically reference the type

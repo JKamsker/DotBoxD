@@ -303,6 +303,8 @@ public class NestedServiceTests
             => Task.FromResult(default(TR)!);
         public Task InvokeAsync<TQ>(string svc, string method, TQ req, CancellationToken ct = default)
             => Task.CompletedTask;
+        public Task InvokeAsync(string svc, string method, CancellationToken ct = default)
+            => Task.CompletedTask;
 
         public Task<TR> InvokeOnInstanceAsync<TQ, TR>(string svc, string id, string method, TQ req, CancellationToken ct = default)
         {
@@ -321,6 +323,12 @@ public class NestedServiceTests
         {
             LastInstanceCallService = svc; LastInstanceCallId = id; LastInstanceCallMethod = method;
             LastInstanceRequest = req;
+            LastInstanceCancellationToken = ct;
+            return Task.CompletedTask;
+        }
+        public Task InvokeOnInstanceAsync(string svc, string id, string method, CancellationToken ct = default)
+        {
+            LastInstanceCallService = svc; LastInstanceCallId = id; LastInstanceCallMethod = method;
             LastInstanceCancellationToken = ct;
             return Task.CompletedTask;
         }

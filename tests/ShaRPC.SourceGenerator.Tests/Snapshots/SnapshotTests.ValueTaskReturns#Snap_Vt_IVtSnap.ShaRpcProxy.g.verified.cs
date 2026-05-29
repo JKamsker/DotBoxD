@@ -33,7 +33,7 @@ namespace Snap.Vt
 
         public async global::System.Threading.Tasks.ValueTask PingAsync()
         {
-            await (this._instanceId is null ? this._client.InvokeAsync<object>("IVtSnap", "PingAsync", new object(), default) : this._client.InvokeOnInstanceAsync<object>("IVtSnap", this._instanceId!, "PingAsync", new object(), default));
+            await (this._instanceId is null ? this._client.InvokeAsync("IVtSnap", "PingAsync", default) : this._client.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", default));
         }
 
         public async global::System.Threading.Tasks.ValueTask<int> AddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
@@ -43,7 +43,7 @@ namespace Snap.Vt
 
         public async global::System.Threading.Tasks.ValueTask PingAsync(global::System.Threading.CancellationToken ct = default)
         {
-            await (this._instanceId is null ? this._client.InvokeAsync<object>("IVtSnap", "PingAsync", new object(), ct) : this._client.InvokeOnInstanceAsync<object>("IVtSnap", this._instanceId!, "PingAsync", new object(), ct));
+            await (this._instanceId is null ? this._client.InvokeAsync("IVtSnap", "PingAsync", ct) : this._client.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", ct));
         }
     }
 }
