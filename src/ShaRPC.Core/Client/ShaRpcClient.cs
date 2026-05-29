@@ -136,34 +136,44 @@ public sealed class ShaRpcClient : IShaRpcClient
                 await _transport.Connection.SendAsync(frame.Memory, ct);
             }
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            // A linked source is only needed when the caller's token can actually fire; otherwise a
+            // plain source carrying just the timeout avoids the linking overhead.
+            using var timeoutCts = ct.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+                : new CancellationTokenSource();
             timeoutCts.CancelAfter(_timeout);
 
-            try
+            ReceivedResponse received;
+            // Completing the pending TCS from the token registration—rather than racing tcs.Task
+            // against Task.Delay through Task.WhenAny—avoids allocating the delay task, its timer,
+            // and the WhenAny array on every call. The static callback plus state argument keeps the
+            // registration closure-free.
+            using (timeoutCts.Token.Register(
+                static state => ((TaskCompletionSource<ReceivedResponse>)state!).TrySetCanceled(),
+                tcs))
             {
-                var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(_timeout, timeoutCts.Token));
-
-                if (completedTask != tcs.Task)
+                try
                 {
+                    received = await tcs.Task;
+                }
+                catch (OperationCanceledException)
+                {
+                    // The linked token fires for both the caller's cancellation and the timeout;
+                    // re-throw the former as-is and map the latter to a timeout.
+                    ct.ThrowIfCancellationRequested();
                     throw new ShaRpcTimeoutException($"Request to {service}.{method} timed out.");
                 }
-
-                var received = await tcs.Task;
-
-                if (!received.Response.IsSuccess)
-                {
-                    throw new ShaRpcRemoteException(
-                        received.Response.ErrorMessage ?? "Unknown error",
-                        received.Response.ErrorType ?? "Unknown");
-                }
-
-                consumed = true;
-                return received;
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+
+            if (!received.Response.IsSuccess)
             {
-                throw new ShaRpcTimeoutException($"Request to {service}.{method} timed out.");
+                throw new ShaRpcRemoteException(
+                    received.Response.ErrorMessage ?? "Unknown error",
+                    received.Response.ErrorType ?? "Unknown");
             }
+
+            consumed = true;
+            return received;
         }
         finally
         {
