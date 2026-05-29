@@ -2,6 +2,8 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
+using ShaRPC.Core.Buffers;
+using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Transports.Tcp;
@@ -45,7 +47,7 @@ public sealed class TcpConnection : IConnection
         }
     }
 
-    public async Task<Memory<byte>> ReceiveAsync(CancellationToken ct = default)
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
         if (_disposed)
         {
@@ -59,29 +61,38 @@ public sealed class TcpConnection : IConnection
             var bytesRead = await ReadExactAsync(_stream, lengthBuffer.AsMemory(0, 4), ct);
             if (bytesRead < 4)
             {
-                return Memory<byte>.Empty; // Connection closed
+                return Payload.Empty; // Connection closed
             }
 
             var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.AsSpan(0, 4));
-            if (totalLength <= 0 || totalLength > 16 * 1024 * 1024) // Max 16MB
+            if (totalLength <= 0 || totalLength > MessageFramer.MaxMessageSize)
             {
                 throw new InvalidOperationException($"Invalid message length: {totalLength}");
             }
 
-            // Read the full message (including the length we already read as part of the frame)
-            var messageBuffer = new byte[totalLength];
-            BinaryPrimitives.WriteInt32LittleEndian(messageBuffer.AsSpan(0, 4), totalLength);
+            // Rent the full frame buffer and write back the length prefix we already consumed.
+            var payload = Payload.Rent(totalLength);
+            BinaryPrimitives.WriteInt32LittleEndian(payload.Memory.Span.Slice(0, 4), totalLength);
 
             if (totalLength > 4)
             {
-                bytesRead = await ReadExactAsync(_stream, messageBuffer.AsMemory(4), ct);
-                if (bytesRead < totalLength - 4)
+                try
                 {
-                    return Memory<byte>.Empty; // Connection closed
+                    bytesRead = await ReadExactAsync(_stream, payload.Memory.Slice(4), ct);
+                    if (bytesRead < totalLength - 4)
+                    {
+                        payload.Dispose();
+                        return Payload.Empty; // Connection closed
+                    }
+                }
+                catch
+                {
+                    payload.Dispose();
+                    throw;
                 }
             }
 
-            return messageBuffer;
+            return payload;
         }
         finally
         {

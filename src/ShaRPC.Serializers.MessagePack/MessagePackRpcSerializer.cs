@@ -48,18 +48,18 @@ public sealed class MessagePackRpcSerializer : ISerializer
             .WithSecurity(MessagePackSecurity.UntrustedData);
     }
 
-    public byte[] Serialize<T>(T value)
+    public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
-        return MessagePackSerializer.Serialize(value, _options);
+        MessagePackSerializer.Serialize(writer, value, _options);
     }
 
-    public T Deserialize<T>(ReadOnlySpan<byte> data)
+    public T Deserialize<T>(ReadOnlyMemory<byte> data)
     {
-        return MessagePackSerializer.Deserialize<T>(data.ToArray(), _options);
+        return MessagePackSerializer.Deserialize<T>(data, _options);
     }
 
-    public object? Deserialize(ReadOnlySpan<byte> data, Type type)
+    public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
     {
-        return MessagePackSerializer.Deserialize(type, data.ToArray(), _options);
+        return MessagePackSerializer.Deserialize(type, data, _options);
     }
 }

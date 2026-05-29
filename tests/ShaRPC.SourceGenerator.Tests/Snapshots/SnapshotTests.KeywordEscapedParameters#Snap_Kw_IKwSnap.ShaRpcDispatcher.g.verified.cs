@@ -19,7 +19,7 @@ namespace Snap.Kw
         public string ServiceName => "IKwSnap";
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task<byte[]> DispatchAsync(string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             switch (method)
@@ -28,7 +28,7 @@ namespace Snap.Kw
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
                     var result = await _service.DoAsync(args.Item1, args.Item2);
-                    return serializer.Serialize(result);
+                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);
                 }
                 default:
                     throw new global::ShaRPC.Core.Exceptions.ShaRpcNotFoundException("Method '" + method + "' not found on service 'IKwSnap'.");
@@ -36,7 +36,7 @@ namespace Snap.Kw
         }
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task<byte[]> DispatchOnInstanceAsync(string instanceId, string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             if (!registry.TryGet("IKwSnap", instanceId, out var __obj) || __obj is not global::Snap.Kw.IKwSnap __inst)
@@ -49,7 +49,7 @@ namespace Snap.Kw
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
                     var result = await __inst.DoAsync(args.Item1, args.Item2);
-                    return serializer.Serialize(result);
+                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);
                 }
                 default:
                     throw new global::ShaRPC.Core.Exceptions.ShaRpcNotFoundException("Method '" + method + "' not found on service 'IKwSnap'.");

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
+using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Tests;
@@ -99,7 +100,7 @@ internal sealed class PipeConnection : IConnection
         }
     }
 
-    public async Task<Memory<byte>> ReceiveAsync(CancellationToken ct = default)
+    public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
         if (_disposed)
         {
@@ -122,7 +123,7 @@ internal sealed class PipeConnection : IConnection
                 // Peer finished and there is no complete frame left — mirror TcpConnection's
                 // "connection closed" signal so the server/client receive loops exit cleanly.
                 _inbound.AdvanceTo(buffer.Start, buffer.End);
-                return Memory<byte>.Empty;
+                return Payload.Empty;
             }
 
             // Not enough bytes yet: consume nothing, mark everything examined so the next
@@ -133,12 +134,12 @@ internal sealed class PipeConnection : IConnection
 
     /// <summary>
     /// A frame is <c>[4-byte little-endian total length][payload...]</c>; the length counts the
-    /// prefix itself. Returns the full frame (prefix included) so the core
-    /// <c>MessageFramer.ReadMessageAsync</c> can re-parse the 9-byte header from it.
+    /// prefix itself. Copies the full frame (prefix included) into a pooled <see cref="Payload"/> so
+    /// the core <c>MessageFramer</c> can re-parse the 9-byte header from it; the caller owns the result.
     /// </summary>
-    private static bool TryReadFrame(in ReadOnlySequence<byte> buffer, out Memory<byte> frame, out SequencePosition consumed)
+    private static bool TryReadFrame(in ReadOnlySequence<byte> buffer, out Payload frame, out SequencePosition consumed)
     {
-        frame = default;
+        frame = Payload.Empty;
         consumed = buffer.Start;
 
         if (buffer.Length < 4)
@@ -161,7 +162,9 @@ internal sealed class PipeConnection : IConnection
         }
 
         var frameSlice = buffer.Slice(0, totalLength);
-        frame = frameSlice.ToArray();
+        var payload = Payload.Rent(totalLength);
+        frameSlice.CopyTo(payload.Memory.Span);
+        frame = payload;
         consumed = frameSlice.End;
         return true;
     }

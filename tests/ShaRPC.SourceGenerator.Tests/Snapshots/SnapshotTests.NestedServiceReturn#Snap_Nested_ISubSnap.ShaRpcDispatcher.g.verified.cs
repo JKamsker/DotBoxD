@@ -19,7 +19,7 @@ namespace Snap.Nested
         public string ServiceName => "ISubSnap";
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task<byte[]> DispatchAsync(string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             switch (method)
@@ -27,7 +27,7 @@ namespace Snap.Nested
                 case "CountAsync":
                 {
                     var result = await _service.CountAsync();
-                    return serializer.Serialize(result);
+                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);
                 }
                 default:
                     throw new global::ShaRPC.Core.Exceptions.ShaRpcNotFoundException("Method '" + method + "' not found on service 'ISubSnap'.");
@@ -35,7 +35,7 @@ namespace Snap.Nested
         }
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task<byte[]> DispatchOnInstanceAsync(string instanceId, string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             if (!registry.TryGet("ISubSnap", instanceId, out var __obj) || __obj is not global::Snap.Nested.ISubSnap __inst)
@@ -47,7 +47,7 @@ namespace Snap.Nested
                 case "CountAsync":
                 {
                     var result = await __inst.CountAsync();
-                    return serializer.Serialize(result);
+                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);
                 }
                 default:
                     throw new global::ShaRPC.Core.Exceptions.ShaRpcNotFoundException("Method '" + method + "' not found on service 'ISubSnap'.");

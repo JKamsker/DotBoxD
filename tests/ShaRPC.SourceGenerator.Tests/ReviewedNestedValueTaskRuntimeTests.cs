@@ -77,20 +77,21 @@ public class ReviewedNestedValueTaskRuntimeTests
         var rootInterface = assembly.GetType("Reviewed.NestedValueTask.IRoot")!;
         var sub = SubFactory.Create(subInterface);
         var root = RootFactory.Create(rootInterface, sub);
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
         var registry = new InstanceRegistry();
 
         using var rootCts = new CancellationTokenSource();
         var rootDispatcher = (IServiceDispatcher)Activator.CreateInstance(
             assembly.GetType("Reviewed.NestedValueTask.RootDispatcher")!,
             root)!;
-        var handleBytes = await rootDispatcher.DispatchAsync(
+        using var openPayload = serializer.SerializeToPayload("alpha");
+        using var handleReply = await rootDispatcher.DispatchAsync(
             "OpenAsync",
-            serializer.Serialize("alpha"),
+            openPayload.Memory,
             serializer,
             registry,
             rootCts.Token);
-        var handle = serializer.Deserialize<ServiceHandle>(handleBytes);
+        var handle = serializer.Deserialize<ServiceHandle>(handleReply.Memory);
 
         registry.TryGet("ISub", handle.InstanceId, out var stored).Should().BeTrue();
         stored.Should().BeSameAs(sub);
@@ -100,15 +101,16 @@ public class ReviewedNestedValueTaskRuntimeTests
         var subDispatcher = (IServiceDispatcher)Activator.CreateInstance(
             assembly.GetType("Reviewed.NestedValueTask.SubDispatcher")!,
             sub)!;
-        var countBytes = await subDispatcher.DispatchOnInstanceAsync(
+        using var countPayload = serializer.SerializeToPayload(9);
+        using var countReply = await subDispatcher.DispatchOnInstanceAsync(
             handle.InstanceId,
             "CountAsync",
-            serializer.Serialize(9),
+            countPayload.Memory,
             serializer,
             registry,
             subCts.Token);
 
-        serializer.Deserialize<int>(countBytes).Should().Be(10);
+        serializer.Deserialize<int>(countReply.Memory).Should().Be(10);
         ((SubStub)sub).LastValue.Should().Be(9);
         ((SubStub)sub).LastCancellationToken.Should().Be(subCts.Token);
     }
@@ -244,13 +246,4 @@ public class ReviewedNestedValueTaskRuntimeTests
         }
     }
 
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        private static readonly System.Text.Json.JsonSerializerOptions s_options = new() { IncludeFields = true };
-        public byte[] Serialize<T>(T value) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value, s_options);
-        public T Deserialize<T>(ReadOnlySpan<byte> data) =>
-            System.Text.Json.JsonSerializer.Deserialize<T>(data, s_options)!;
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) =>
-            System.Text.Json.JsonSerializer.Deserialize(data, type, s_options);
-    }
 }

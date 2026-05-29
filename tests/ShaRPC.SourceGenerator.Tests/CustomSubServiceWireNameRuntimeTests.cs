@@ -74,19 +74,19 @@ public class CustomSubServiceWireNameRuntimeTests
         var rootInterface = assembly.GetType("Reviewed.CustomSubWire.IRoot")!;
         var sub = SubFactory.Create(subInterface);
         var root = RootFactory.Create(rootInterface, sub);
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
         var registry = new InstanceRegistry();
 
         var rootDispatcher = (IServiceDispatcher)Activator.CreateInstance(
             assembly.GetType("Reviewed.CustomSubWire.RootDispatcher")!,
             root)!;
-        var handleBytes = await rootDispatcher.DispatchAsync(
+        using var handleReply = await rootDispatcher.DispatchAsync(
             "OpenAsync",
-            Array.Empty<byte>(),
+            System.ReadOnlyMemory<byte>.Empty,
             serializer,
             registry,
             CancellationToken.None);
-        var handle = serializer.Deserialize<ServiceHandle>(handleBytes);
+        var handle = serializer.Deserialize<ServiceHandle>(handleReply.Memory);
 
         handle.ServiceName.Should().Be("sub-custom");
         registry.TryGet("sub-custom", handle.InstanceId, out var stored).Should().BeTrue();
@@ -95,15 +95,16 @@ public class CustomSubServiceWireNameRuntimeTests
         var subDispatcher = (IServiceDispatcher)Activator.CreateInstance(
             assembly.GetType("Reviewed.CustomSubWire.SubDispatcher")!,
             sub)!;
-        var countBytes = await subDispatcher.DispatchOnInstanceAsync(
+        using var countPayload = serializer.SerializeToPayload(9);
+        using var countReply = await subDispatcher.DispatchOnInstanceAsync(
             handle.InstanceId,
             "CountAsync",
-            serializer.Serialize(9),
+            countPayload.Memory,
             serializer,
             registry,
             CancellationToken.None);
 
-        serializer.Deserialize<int>(countBytes).Should().Be(10);
+        serializer.Deserialize<int>(countReply.Memory).Should().Be(10);
     }
 
     private static Assembly Compile(string source)
@@ -219,13 +220,4 @@ public class CustomSubServiceWireNameRuntimeTests
             Task.FromResult((int)args![0]! + 1);
     }
 
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        private static readonly System.Text.Json.JsonSerializerOptions s_options = new() { IncludeFields = true };
-        public byte[] Serialize<T>(T value) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value, s_options);
-        public T Deserialize<T>(ReadOnlySpan<byte> data) =>
-            System.Text.Json.JsonSerializer.Deserialize<T>(data, s_options)!;
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) =>
-            System.Text.Json.JsonSerializer.Deserialize(data, type, s_options);
-    }
 }

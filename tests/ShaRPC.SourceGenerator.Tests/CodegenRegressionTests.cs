@@ -710,7 +710,7 @@ public class CodegenRegressionTests
                 "Regress.SyncSubService", "IRoot", GeneratorTestHelper.GeneratedKind.Dispatcher))
             .SourceText.ToString();
         dispatcher.Should().NotContain("case \"GetSub\":");
-        dispatcher.Should().NotContain("serializer.Serialize(result)");
+        dispatcher.Should().NotContain("SerializeToPayload");
     }
 
     [Fact]

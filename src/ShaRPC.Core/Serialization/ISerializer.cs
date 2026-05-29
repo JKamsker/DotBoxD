@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace ShaRPC.Core.Serialization;
 
 /// <summary>
@@ -6,17 +8,17 @@ namespace ShaRPC.Core.Serialization;
 public interface ISerializer
 {
     /// <summary>
-    /// Serializes a value to a byte array.
+    /// Serializes a value into the supplied buffer writer.
     /// </summary>
-    byte[] Serialize<T>(T value);
+    void Serialize<T>(IBufferWriter<byte> writer, T value);
 
     /// <summary>
-    /// Deserializes a value from a byte span.
+    /// Deserializes a value from a read-only memory region.
     /// </summary>
-    T Deserialize<T>(ReadOnlySpan<byte> data);
+    T Deserialize<T>(ReadOnlyMemory<byte> data);
 
     /// <summary>
-    /// Deserializes a value from a byte span to a specified type.
+    /// Deserializes a value from a read-only memory region to a specified type.
     /// </summary>
-    object? Deserialize(ReadOnlySpan<byte> data, Type type);
+    object? Deserialize(ReadOnlyMemory<byte> data, Type type);
 }

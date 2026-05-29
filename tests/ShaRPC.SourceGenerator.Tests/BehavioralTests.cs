@@ -85,26 +85,26 @@ public class BehavioralTests
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(dispatcherType!, implProxy)!;
         dispatcher.ServiceName.Should().Be("IMath");
 
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
 
         // Two-arg method goes through tuple deserialization.
-        var payload = serializer.Serialize<ValueTuple<int, int>>(new ValueTuple<int, int>(7, 5));
+        using var payload = serializer.SerializeToPayload<ValueTuple<int, int>>(new ValueTuple<int, int>(7, 5));
         using var dispatcherCts = new CancellationTokenSource();
-        var bytes = await dispatcher.DispatchAsync("AddAsync", payload, serializer, new InstanceRegistry(), dispatcherCts.Token);
-        var sum = serializer.Deserialize<int>(bytes);
+        using var reply = await dispatcher.DispatchAsync("AddAsync", payload.Memory, serializer, new InstanceRegistry(), dispatcherCts.Token);
+        var sum = serializer.Deserialize<int>(reply.Memory);
         sum.Should().Be(12);
         impl.LastCall.Should().Be("Add(7,5)");
         impl.LastCancellationToken.Should().Be(dispatcherCts.Token);
 
         // One-arg method goes through single deserialization.
-        var single = serializer.Serialize<int>(6);
-        var bytes2 = await dispatcher.DispatchAsync("SquareAsync", single, serializer, new InstanceRegistry(), CancellationToken.None);
-        var sq = serializer.Deserialize<int>(bytes2);
+        using var single = serializer.SerializeToPayload<int>(6);
+        using var reply2 = await dispatcher.DispatchAsync("SquareAsync", single.Memory, serializer, new InstanceRegistry(), CancellationToken.None);
+        var sq = serializer.Deserialize<int>(reply2.Memory);
         sq.Should().Be(36);
 
         // Zero-arg, void-returning method returns empty payload.
-        var pingBytes = await dispatcher.DispatchAsync("PingAsync", Array.Empty<byte>(), serializer, new InstanceRegistry(), CancellationToken.None);
-        pingBytes.Should().BeEmpty();
+        using var pingReply = await dispatcher.DispatchAsync("PingAsync", System.ReadOnlyMemory<byte>.Empty, serializer, new InstanceRegistry(), CancellationToken.None);
+        pingReply.Length.Should().Be(0);
         impl.PingCount.Should().Be(1);
     }
 
@@ -192,17 +192,18 @@ public class BehavioralTests
         var syncImpl = new SyncImpl();
         var implProxy = DispatchTargetFactory.CreateProxyForInterface(interfaceType, syncImpl);
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(dispatcherType, implProxy)!;
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
 
-        var bytes = await dispatcher.DispatchAsync(
+        using var addPayload = serializer.SerializeToPayload<ValueTuple<int, int>>(new ValueTuple<int, int>(4, 5));
+        using var reply = await dispatcher.DispatchAsync(
             "Add",
-            serializer.Serialize<ValueTuple<int, int>>(new ValueTuple<int, int>(4, 5)),
+            addPayload.Memory,
             serializer,
             new InstanceRegistry(), CancellationToken.None);
-        serializer.Deserialize<int>(bytes).Should().Be(9);
+        serializer.Deserialize<int>(reply.Memory).Should().Be(9);
 
-        var pingBytes = await dispatcher.DispatchAsync("Ping", Array.Empty<byte>(), serializer, new InstanceRegistry(), CancellationToken.None);
-        pingBytes.Should().BeEmpty();
+        using var pingReply = await dispatcher.DispatchAsync("Ping", System.ReadOnlyMemory<byte>.Empty, serializer, new InstanceRegistry(), CancellationToken.None);
+        pingReply.Length.Should().Be(0);
         syncImpl.PingCalls.Should().Be(1);
     }
 
@@ -306,17 +307,6 @@ public class BehavioralTests
             => InvokeAsync<TResponse>(service, method, ct);
         public Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
             => InvokeAsync(service, method, request, ct);
-    }
-
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        private static readonly JsonSerializerOptions s_options = new() { IncludeFields = true };
-
-        public byte[] Serialize<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, s_options);
-
-        public T Deserialize<T>(ReadOnlySpan<byte> data) => JsonSerializer.Deserialize<T>(data, s_options)!;
-
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) => JsonSerializer.Deserialize(data, type, s_options);
     }
 
     // Implementation of the in-memory IMath service. We can't statically reference the type

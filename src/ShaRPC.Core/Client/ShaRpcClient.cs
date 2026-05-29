@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
@@ -42,8 +43,8 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        var requestPayload = _serializer.Serialize(request);
-        var response = await SendRequestAsync(service, method, requestPayload, instanceId: null, ct);
+        using var requestPayload = _serializer.SerializeToPayload(request);
+        var response = await SendRequestAsync(service, method, requestPayload.Memory, instanceId: null, ct);
         return _serializer.Deserialize<TResponse>(response.Payload);
     }
 
@@ -52,7 +53,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        var response = await SendRequestAsync(service, method, Array.Empty<byte>(), instanceId: null, ct);
+        var response = await SendRequestAsync(service, method, ReadOnlyMemory<byte>.Empty, instanceId: null, ct);
         return _serializer.Deserialize<TResponse>(response.Payload);
     }
 
@@ -62,8 +63,8 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        var requestPayload = _serializer.Serialize(request);
-        await SendRequestAsync(service, method, requestPayload, instanceId: null, ct);
+        using var requestPayload = _serializer.SerializeToPayload(request);
+        await SendRequestAsync(service, method, requestPayload.Memory, instanceId: null, ct);
     }
 
     public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(
@@ -73,8 +74,8 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        var requestPayload = _serializer.Serialize(request);
-        var response = await SendRequestAsync(service, method, requestPayload, instanceId, ct);
+        using var requestPayload = _serializer.SerializeToPayload(request);
+        var response = await SendRequestAsync(service, method, requestPayload.Memory, instanceId, ct);
         return _serializer.Deserialize<TResponse>(response.Payload);
     }
 
@@ -84,7 +85,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        var response = await SendRequestAsync(service, method, Array.Empty<byte>(), instanceId, ct);
+        var response = await SendRequestAsync(service, method, ReadOnlyMemory<byte>.Empty, instanceId, ct);
         return _serializer.Deserialize<TResponse>(response.Payload);
     }
 
@@ -95,14 +96,14 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        var requestPayload = _serializer.Serialize(request);
-        await SendRequestAsync(service, method, requestPayload, instanceId, ct);
+        using var requestPayload = _serializer.SerializeToPayload(request);
+        await SendRequestAsync(service, method, requestPayload.Memory, instanceId, ct);
     }
 
     private async Task<RpcResponse> SendRequestAsync(
         string service,
         string method,
-        byte[] payload,
+        ReadOnlyMemory<byte> payload,
         string? instanceId,
         CancellationToken ct)
     {
@@ -126,9 +127,10 @@ public sealed class ShaRpcClient : IShaRpcClient
 
         try
         {
-            var requestBytes = _serializer.Serialize(request);
-            var frame = MessageFramer.Frame(messageId, MessageType.Request, requestBytes);
-            await _transport.Connection.SendAsync(frame, ct);
+            using (var frame = MessageFramer.FrameMessage(_serializer, messageId, MessageType.Request, request))
+            {
+                await _transport.Connection.SendAsync(frame.Memory, ct);
+            }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(_timeout);
@@ -176,25 +178,26 @@ public sealed class ShaRpcClient : IShaRpcClient
                     break;
                 }
 
-                var data = await connection.ReceiveAsync(ct);
-                if (data.Length == 0)
+                using var frame = await connection.ReceiveAsync(ct);
+                if (frame.Length == 0)
                 {
                     break;
                 }
 
-                using var stream = new MemoryStream(data.ToArray());
-                var message = await MessageFramer.ReadMessageAsync(stream, ct);
-
-                if (message == null)
+                if (!MessageFramer.TryReadFrame(frame.Memory, out var messageId, out var messageType, out var envelope))
                 {
                     continue;
                 }
 
-                var (messageId, messageType, payload) = message.Value;
-
                 if (messageType == MessageType.Response || messageType == MessageType.Error)
                 {
-                    var response = _serializer.Deserialize<RpcResponse>(payload);
+                    // Safety invariant: under MessagePackSecurity.UntrustedData the serializer copies
+                    // the nested RpcResponse.Payload into a fresh heap array rather than aliasing
+                    // `envelope`. That makes `response.Payload` outlive `frame`, so the rented frame
+                    // can be disposed at the end of this loop iteration even though the awaiting caller
+                    // deserializes response.Payload later on another thread. Do NOT switch the inner
+                    // payload to a zero-copy slice of `frame` without extending the frame's lifetime.
+                    var response = _serializer.Deserialize<RpcResponse>(envelope);
                     if (_pendingRequests.TryGetValue(messageId, out var tcs))
                     {
                         tcs.TrySetResult(response);

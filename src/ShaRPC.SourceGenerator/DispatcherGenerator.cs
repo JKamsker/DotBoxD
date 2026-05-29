@@ -82,11 +82,11 @@ internal static class DispatcherGenerator
         sb.AppendLine("#pragma warning disable CS1998");
         if (isInstanceScoped)
         {
-            sb.AppendLine("        public async global::System.Threading.Tasks.Task<byte[]> DispatchOnInstanceAsync(string instanceId, string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)");
+            sb.AppendLine("        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)");
         }
         else
         {
-            sb.AppendLine("        public async global::System.Threading.Tasks.Task<byte[]> DispatchAsync(string method, byte[] payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)");
+            sb.AppendLine("        public async global::System.Threading.Tasks.Task<global::ShaRPC.Core.Buffers.Payload> DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Threading.CancellationToken ct = default)");
         }
         sb.AppendLine("#pragma warning restore CS1998");
         sb.AppendLine("        {");
@@ -192,24 +192,24 @@ internal static class DispatcherGenerator
         {
             case MethodReturnKind.Void:
                 sb.AppendLine($"                    {call};");
-                sb.AppendLine("                    return global::System.Array.Empty<byte>();");
+                sb.AppendLine("                    return global::ShaRPC.Core.Buffers.Payload.Empty;");
                 break;
 
             case MethodReturnKind.Sync:
                 sb.AppendLine($"                    var result = {call};");
-                sb.AppendLine("                    return serializer.Serialize(result);");
+                sb.AppendLine("                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);");
                 break;
 
             case MethodReturnKind.Task:
             case MethodReturnKind.ValueTask:
                 sb.AppendLine($"                    await {call};");
-                sb.AppendLine("                    return global::System.Array.Empty<byte>();");
+                sb.AppendLine("                    return global::ShaRPC.Core.Buffers.Payload.Empty;");
                 break;
 
             case MethodReturnKind.TaskOf:
             case MethodReturnKind.ValueTaskOf:
                 sb.AppendLine($"                    var result = await {call};");
-                sb.AppendLine("                    return serializer.Serialize(result);");
+                sb.AppendLine("                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, result);");
                 break;
 
             case MethodReturnKind.TaskOfSubService:
@@ -224,11 +224,11 @@ internal static class DispatcherGenerator
                 {
                     sb.AppendLine("                    if (__sub is null)");
                     sb.AppendLine("                    {");
-                    sb.AppendLine("                        return serializer.Serialize<global::ShaRPC.Core.Protocol.ServiceHandle?>(null);");
+                    sb.AppendLine("                        return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload<global::ShaRPC.Core.Protocol.ServiceHandle?>(serializer, null);");
                     sb.AppendLine("                    }");
                 }
                 sb.AppendLine($"                    var __subId = registry.Register(\"{info.ServiceName}\", __sub);");
-                sb.AppendLine($"                    return serializer.Serialize(new global::ShaRPC.Core.Protocol.ServiceHandle {{ ServiceName = \"{info.ServiceName}\", InstanceId = __subId }});");
+                sb.AppendLine($"                    return global::ShaRPC.Core.Serialization.SerializerExtensions.SerializeToPayload(serializer, new global::ShaRPC.Core.Protocol.ServiceHandle {{ ServiceName = \"{info.ServiceName}\", InstanceId = __subId }});");
                 break;
             }
         }

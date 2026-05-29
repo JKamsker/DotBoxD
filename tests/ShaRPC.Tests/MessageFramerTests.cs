@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using ShaRPC.Core.Protocol;
 using Xunit;
 
@@ -14,24 +15,25 @@ public class MessageFramerTests
         var payload = new byte[] { 1, 2, 3, 4, 5 };
 
         // Act
-        var frame = MessageFramer.Frame(messageId, type, payload);
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
+        var span = frame.Span;
 
         // Assert
         Assert.Equal(MessageFramer.HeaderSize + payload.Length, frame.Length);
 
         // Check total length (first 4 bytes)
-        var totalLength = BitConverter.ToInt32(frame, 0);
+        var totalLength = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(0, 4));
         Assert.Equal(frame.Length, totalLength);
 
         // Check message ID (next 4 bytes)
-        var extractedMessageId = BitConverter.ToInt32(frame, 4);
+        var extractedMessageId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(4, 4));
         Assert.Equal(messageId, extractedMessageId);
 
         // Check message type (next 1 byte)
-        Assert.Equal((byte)type, frame[8]);
+        Assert.Equal((byte)type, span[8]);
 
         // Check payload
-        Assert.Equal(payload, frame.Skip(MessageFramer.HeaderSize).ToArray());
+        Assert.Equal(payload, frame.Memory.Slice(MessageFramer.HeaderSize).ToArray());
     }
 
     [Fact]
@@ -43,10 +45,29 @@ public class MessageFramerTests
         var payload = Array.Empty<byte>();
 
         // Act
-        var frame = MessageFramer.Frame(messageId, type, payload);
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
 
         // Assert
         Assert.Equal(MessageFramer.HeaderSize, frame.Length);
+    }
+
+    [Fact]
+    public void TryReadFrame_ShouldRoundTripFrameToPayload()
+    {
+        // Arrange
+        var messageId = 7;
+        var type = MessageType.Response;
+        var payload = new byte[] { 9, 8, 7, 6 };
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
+
+        // Act
+        var ok = MessageFramer.TryReadFrame(frame.Memory, out var extractedId, out var extractedType, out var extractedPayload);
+
+        // Assert
+        Assert.True(ok);
+        Assert.Equal(messageId, extractedId);
+        Assert.Equal(type, extractedType);
+        Assert.Equal(payload, extractedPayload.ToArray());
     }
 
     [Fact]
@@ -56,17 +77,25 @@ public class MessageFramerTests
         var messageId = 123;
         var type = MessageType.Request;
         var payload = new byte[] { 10, 20, 30 };
-        var frame = MessageFramer.Frame(messageId, type, payload);
-        using var stream = new MemoryStream(frame);
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
+        using var stream = new MemoryStream(frame.Memory.ToArray());
 
         // Act
         var result = await MessageFramer.ReadMessageAsync(stream);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(messageId, result.Value.MessageId);
-        Assert.Equal(type, result.Value.Type);
-        Assert.Equal(payload, result.Value.Payload);
+        var msg = result.Value;
+        try
+        {
+            Assert.Equal(messageId, msg.MessageId);
+            Assert.Equal(type, msg.Type);
+            Assert.Equal(payload, msg.Payload.Memory.ToArray());
+        }
+        finally
+        {
+            msg.Payload.Dispose();
+        }
     }
 
     [Fact]
@@ -98,9 +127,17 @@ public class MessageFramerTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(messageId, result.Value.MessageId);
-        Assert.Equal(type, result.Value.Type);
-        Assert.Equal(payload, result.Value.Payload);
+        var msg = result.Value;
+        try
+        {
+            Assert.Equal(messageId, msg.MessageId);
+            Assert.Equal(type, msg.Type);
+            Assert.Equal(payload, msg.Payload.Memory.ToArray());
+        }
+        finally
+        {
+            msg.Payload.Dispose();
+        }
     }
 
     [Theory]
@@ -113,15 +150,23 @@ public class MessageFramerTests
         // Arrange
         var messageId = 789;
         var payload = new byte[] { 1 };
-        var frame = MessageFramer.Frame(messageId, type, payload);
-        using var stream = new MemoryStream(frame);
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
+        using var stream = new MemoryStream(frame.Memory.ToArray());
 
         // Act
         var result = await MessageFramer.ReadMessageAsync(stream);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(type, result.Value.Type);
+        var msg = result.Value;
+        try
+        {
+            Assert.Equal(type, msg.Type);
+        }
+        finally
+        {
+            msg.Payload.Dispose();
+        }
     }
 
     [Fact]
@@ -132,14 +177,22 @@ public class MessageFramerTests
         var type = MessageType.Request;
         var payload = new byte[10000];
         new Random(42).NextBytes(payload);
-        var frame = MessageFramer.Frame(messageId, type, payload);
-        using var stream = new MemoryStream(frame);
+        using var frame = MessageFramer.FrameToPayload(messageId, type, payload);
+        using var stream = new MemoryStream(frame.Memory.ToArray());
 
         // Act
         var result = await MessageFramer.ReadMessageAsync(stream);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(payload, result.Value.Payload);
+        var msg = result.Value;
+        try
+        {
+            Assert.Equal(payload, msg.Payload.Memory.ToArray());
+        }
+        finally
+        {
+            msg.Payload.Dispose();
+        }
     }
 }

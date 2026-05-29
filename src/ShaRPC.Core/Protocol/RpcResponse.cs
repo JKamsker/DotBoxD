@@ -18,7 +18,7 @@ public sealed class RpcResponse
     /// <summary>
     /// Serialized return value (if successful).
     /// </summary>
-    public byte[] Payload { get; set; } = Array.Empty<byte>();
+    public ReadOnlyMemory<byte> Payload { get; set; } = ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
     /// Error message (if not successful).

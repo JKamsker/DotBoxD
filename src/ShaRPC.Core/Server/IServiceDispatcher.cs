@@ -1,3 +1,4 @@
+using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Serialization;
 
@@ -21,9 +22,9 @@ public interface IServiceDispatcher
     /// in which case they register the returned instance and serialize a
     /// <see cref="ShaRPC.Core.Protocol.ServiceHandle"/>.
     /// </summary>
-    Task<byte[]> DispatchAsync(
+    Task<Payload> DispatchAsync(
         string method,
-        byte[] payload,
+        ReadOnlyMemory<byte> payload,
         ISerializer serializer,
         IInstanceRegistry registry,
         CancellationToken ct = default);
@@ -34,10 +35,10 @@ public interface IServiceDispatcher
     /// generator only emits an override for service dispatchers that may be reached as
     /// sub-services.
     /// </summary>
-    Task<byte[]> DispatchOnInstanceAsync(
+    Task<Payload> DispatchOnInstanceAsync(
         string instanceId,
         string method,
-        byte[] payload,
+        ReadOnlyMemory<byte> payload,
         ISerializer serializer,
         IInstanceRegistry registry,
         CancellationToken ct = default) =>

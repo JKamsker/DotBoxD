@@ -1,3 +1,5 @@
+using ShaRPC.Core.Buffers;
+
 namespace ShaRPC.Core.Transport;
 
 /// <summary>
@@ -11,9 +13,11 @@ public interface IConnection : IAsyncDisposable
     Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default);
 
     /// <summary>
-    /// Receives data from the connection.
+    /// Receives a framed message from the connection. The caller owns the returned
+    /// <see cref="Payload"/> and must dispose it. A payload with <see cref="Payload.Length"/>
+    /// of 0 (e.g. <see cref="Payload.Empty"/>) signals the connection was closed.
     /// </summary>
-    Task<Memory<byte>> ReceiveAsync(CancellationToken ct = default);
+    Task<Payload> ReceiveAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Gets whether the connection is currently connected.

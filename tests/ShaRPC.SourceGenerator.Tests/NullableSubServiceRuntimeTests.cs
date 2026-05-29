@@ -85,16 +85,16 @@ public class NullableSubServiceRuntimeTests
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(
             assembly.GetType("Regress.NullableSubRuntime.RootDispatcher")!,
             root)!;
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
 
-        var bytes = await dispatcher.DispatchAsync(
+        using var reply = await dispatcher.DispatchAsync(
             "OpenAsync",
-            Array.Empty<byte>(),
+            System.ReadOnlyMemory<byte>.Empty,
             serializer,
             new InstanceRegistry(),
             CancellationToken.None);
 
-        serializer.Deserialize<ServiceHandle?>(bytes).Should().BeNull();
+        serializer.Deserialize<ServiceHandle?>(reply.Memory).Should().BeNull();
     }
 
     private static Assembly Compile(string source)
@@ -190,14 +190,4 @@ public class NullableSubServiceRuntimeTests
         }
     }
 
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        private static readonly System.Text.Json.JsonSerializerOptions s_options = new() { IncludeFields = true };
-        public byte[] Serialize<T>(T value) =>
-            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value, s_options);
-        public T Deserialize<T>(ReadOnlySpan<byte> data) =>
-            System.Text.Json.JsonSerializer.Deserialize<T>(data, s_options)!;
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) =>
-            System.Text.Json.JsonSerializer.Deserialize(data, type, s_options);
-    }
 }

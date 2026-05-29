@@ -122,11 +122,11 @@ public class NestedServiceTests
 
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(dispatcherType, rootImpl)!;
         var registry = new InstanceRegistry();
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
 
-        var labelPayload = serializer.Serialize<string>("hello");
-        var bytes = await dispatcher.DispatchAsync("GetSubAsync", labelPayload, serializer, registry, CancellationToken.None);
-        var handle = serializer.Deserialize<ServiceHandle>(bytes);
+        using var labelPayload = serializer.SerializeToPayload<string>("hello");
+        using var reply = await dispatcher.DispatchAsync("GetSubAsync", labelPayload.Memory, serializer, registry, CancellationToken.None);
+        var handle = serializer.Deserialize<ServiceHandle>(reply.Memory);
 
         handle.ServiceName.Should().Be("ISubService");
         handle.InstanceId.Should().NotBeNullOrEmpty();
@@ -153,15 +153,15 @@ public class NestedServiceTests
         // Construct a dispatcher with a placeholder _service (any impl satisfies the
         // ctor — instance-scoped dispatch ignores it).
         var dispatcher = (IServiceDispatcher)Activator.CreateInstance(dispatcherType, constructorSubImpl)!;
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
 
-        var bytes = await dispatcher.DispatchOnInstanceAsync(id, "CountAsync", Array.Empty<byte>(), serializer, registry, CancellationToken.None);
-        serializer.Deserialize<int>(bytes).Should().Be(7,
+        using var reply = await dispatcher.DispatchOnInstanceAsync(id, "CountAsync", System.ReadOnlyMemory<byte>.Empty, serializer, registry, CancellationToken.None);
+        serializer.Deserialize<int>(reply.Memory).Should().Be(7,
             "instance-scoped dispatch must invoke the registry-resolved service, not the constructor service");
 
         // An unknown instance id must fail loudly with the framework's NotFound exception.
         await Assert.ThrowsAsync<ShaRPC.Core.Exceptions.ShaRpcNotFoundException>(async () =>
-            await dispatcher.DispatchOnInstanceAsync("does-not-exist", "CountAsync", Array.Empty<byte>(), serializer, registry, CancellationToken.None));
+            await dispatcher.DispatchOnInstanceAsync("does-not-exist", "CountAsync", System.ReadOnlyMemory<byte>.Empty, serializer, registry, CancellationToken.None));
     }
 
     [Fact]
@@ -385,11 +385,4 @@ public class NestedServiceTests
         }
     }
 
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        private static readonly System.Text.Json.JsonSerializerOptions s_opts = new() { IncludeFields = true };
-        public byte[] Serialize<T>(T value) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value, s_opts);
-        public T Deserialize<T>(ReadOnlySpan<byte> data) => System.Text.Json.JsonSerializer.Deserialize<T>(data, s_opts)!;
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) => System.Text.Json.JsonSerializer.Deserialize(data, type, s_opts);
-    }
 }

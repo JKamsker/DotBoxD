@@ -227,7 +227,7 @@ public class GeneratedRoundTripTests
 
         var ex = await Assert.ThrowsAsync<ShaRPC.Core.Exceptions.ShaRpcNotFoundException>(async () =>
             await h.Dispatcher.DispatchAsync(
-                "NoSuchMethod", Array.Empty<byte>(), h.Serializer, new InstanceRegistry(), CancellationToken.None));
+                "NoSuchMethod", System.ReadOnlyMemory<byte>.Empty, h.Serializer, new InstanceRegistry(), CancellationToken.None));
 
         ex.Message.Should().Contain("NoSuchMethod",
             "the default switch branch must name the missing method");
@@ -270,7 +270,7 @@ public class GeneratedRoundTripTests
             """;
 
         var asm = CompileAndLoad(source);
-        var serializer = new JsonSerializerWrapper();
+        var serializer = new TestJsonSerializer();
         var registry = new InstanceRegistry();
         var client = new LoopbackClient(serializer, registry);
 
@@ -350,7 +350,7 @@ public class GeneratedRoundTripTests
         public static Harness Build(string source, string interfaceFqn, string implFqn)
         {
             var asm = CompileAndLoad(source);
-            var serializer = new JsonSerializerWrapper();
+            var serializer = new TestJsonSerializer();
             var registry = new InstanceRegistry();
             var client = new LoopbackClient(serializer, registry);
             return Attach(asm, client, interfaceFqn, implFqn, serializer, registry);
@@ -518,49 +518,40 @@ public class GeneratedRoundTripTests
 
         public async Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default)
         {
-            var reply = await Resolve(service).DispatchAsync(method, _serializer.Serialize(request), _serializer, _registry, ct);
-            return _serializer.Deserialize<TResponse>(reply);
+            using var p = _serializer.SerializeToPayload(request);
+            using var reply = await Resolve(service).DispatchAsync(method, p.Memory, _serializer, _registry, ct);
+            return _serializer.Deserialize<TResponse>(reply.Memory);
         }
 
         public async Task<TResponse> InvokeAsync<TResponse>(string service, string method, CancellationToken ct = default)
         {
-            var reply = await Resolve(service).DispatchAsync(method, Array.Empty<byte>(), _serializer, _registry, ct);
-            return _serializer.Deserialize<TResponse>(reply);
+            using var reply = await Resolve(service).DispatchAsync(method, System.ReadOnlyMemory<byte>.Empty, _serializer, _registry, ct);
+            return _serializer.Deserialize<TResponse>(reply.Memory);
         }
 
         public async Task InvokeAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default)
         {
-            await Resolve(service).DispatchAsync(method, _serializer.Serialize(request), _serializer, _registry, ct);
+            using var p = _serializer.SerializeToPayload(request);
+            using var reply = await Resolve(service).DispatchAsync(method, p.Memory, _serializer, _registry, ct);
         }
 
         public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
         {
-            var reply = await Resolve(service).DispatchOnInstanceAsync(instanceId, method, _serializer.Serialize(request), _serializer, _registry, ct);
-            return _serializer.Deserialize<TResponse>(reply);
+            using var p = _serializer.SerializeToPayload(request);
+            using var reply = await Resolve(service).DispatchOnInstanceAsync(instanceId, method, p.Memory, _serializer, _registry, ct);
+            return _serializer.Deserialize<TResponse>(reply.Memory);
         }
 
         public async Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default)
         {
-            var reply = await Resolve(service).DispatchOnInstanceAsync(instanceId, method, Array.Empty<byte>(), _serializer, _registry, ct);
-            return _serializer.Deserialize<TResponse>(reply);
+            using var reply = await Resolve(service).DispatchOnInstanceAsync(instanceId, method, System.ReadOnlyMemory<byte>.Empty, _serializer, _registry, ct);
+            return _serializer.Deserialize<TResponse>(reply.Memory);
         }
 
         public async Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
         {
-            await Resolve(service).DispatchOnInstanceAsync(instanceId, method, _serializer.Serialize(request), _serializer, _registry, ct);
+            using var p = _serializer.SerializeToPayload(request);
+            using var reply = await Resolve(service).DispatchOnInstanceAsync(instanceId, method, p.Memory, _serializer, _registry, ct);
         }
-    }
-
-    private sealed class JsonSerializerWrapper : ISerializer
-    {
-        // IncludeFields lets System.Text.Json serialize ValueTuple (Item1/Item2/...), which the
-        // multi-argument wire format relies on.
-        private static readonly JsonSerializerOptions s_options = new() { IncludeFields = true };
-
-        public byte[] Serialize<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, s_options);
-
-        public T Deserialize<T>(ReadOnlySpan<byte> data) => JsonSerializer.Deserialize<T>(data, s_options)!;
-
-        public object? Deserialize(ReadOnlySpan<byte> data, Type type) => JsonSerializer.Deserialize(data, type, s_options);
     }
 }

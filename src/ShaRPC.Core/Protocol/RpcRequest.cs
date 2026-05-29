@@ -23,7 +23,7 @@ public sealed class RpcRequest
     /// <summary>
     /// Serialized method arguments.
     /// </summary>
-    public byte[] Payload { get; set; } = Array.Empty<byte>();
+    public ReadOnlyMemory<byte> Payload { get; set; } = ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
     /// Per-connection opaque identifier of the server-side instance this call targets.

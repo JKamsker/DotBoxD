@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using ShaRPC.Core.Buffers;
+using ShaRPC.Core.Serialization;
 
 namespace ShaRPC.Core.Protocol;
 
@@ -20,29 +22,109 @@ public static class MessageFramer
     public const int MaxMessageSize = 16 * 1024 * 1024;
 
     /// <summary>
-    /// Frames a message with header information.
+    /// A framed message read from a stream. The caller owns <see cref="Payload"/> and must dispose it.
     /// </summary>
-    public static byte[] Frame(int messageId, MessageType type, ReadOnlySpan<byte> payload)
+    public readonly record struct FramedMessage(int MessageId, MessageType Type, Payload Payload);
+
+    /// <summary>
+    /// Writes a complete frame (header + payload) into the supplied buffer writer.
+    /// </summary>
+    public static void WriteFrame(IBufferWriter<byte> writer, int messageId, MessageType type, ReadOnlySpan<byte> payload)
     {
         var totalLength = HeaderSize + payload.Length;
-        var buffer = new byte[totalLength];
+        var span = writer.GetSpan(totalLength);
 
-        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), totalLength);
-        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(4, 4), messageId);
-        buffer[8] = (byte)type;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(0, 4), totalLength);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(4, 4), messageId);
+        span[8] = (byte)type;
 
         if (payload.Length > 0)
         {
-            payload.CopyTo(buffer.AsSpan(HeaderSize));
+            payload.CopyTo(span.Slice(HeaderSize));
         }
 
-        return buffer;
+        writer.Advance(totalLength);
     }
 
     /// <summary>
-    /// Reads a framed message from a stream.
+    /// Frames a message into an exact-size rented <see cref="Payload"/>. The caller owns the result.
     /// </summary>
-    public static async Task<(int MessageId, MessageType Type, byte[] Payload)?> ReadMessageAsync(
+    public static Payload FrameToPayload(int messageId, MessageType type, ReadOnlySpan<byte> payload)
+    {
+        var totalLength = HeaderSize + payload.Length;
+        var result = Payload.Rent(totalLength);
+        var span = result.Memory.Span;
+
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(0, 4), totalLength);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(4, 4), messageId);
+        span[8] = (byte)type;
+
+        if (payload.Length > 0)
+        {
+            payload.CopyTo(span.Slice(HeaderSize));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Serializes <paramref name="body"/> directly behind a frame header into a single pooled
+    /// buffer, then patches the total length. The caller owns the returned <see cref="Payload"/>.
+    /// </summary>
+    public static Payload FrameMessage<T>(ISerializer serializer, int messageId, MessageType type, T body)
+    {
+        using var writer = new PooledBufferWriter(HeaderSize);
+
+        // Reserve the header; the total-length field is patched in after the body is serialized.
+        var header = writer.GetSpan(HeaderSize);
+        BinaryPrimitives.WriteInt32LittleEndian(header.Slice(4, 4), messageId);
+        header[8] = (byte)type;
+        writer.Advance(HeaderSize);
+
+        serializer.Serialize(writer, body);
+
+        var payload = writer.DetachPayload();
+        BinaryPrimitives.WriteInt32LittleEndian(payload.Memory.Span.Slice(0, 4), payload.Length);
+        return payload;
+    }
+
+    /// <summary>
+    /// Parses a frame out of an in-memory buffer without copying. <paramref name="payload"/> is a
+    /// slice of <paramref name="source"/> and shares its lifetime.
+    /// </summary>
+    public static bool TryReadFrame(
+        ReadOnlyMemory<byte> source,
+        out int messageId,
+        out MessageType type,
+        out ReadOnlyMemory<byte> payload)
+    {
+        messageId = 0;
+        type = default;
+        payload = ReadOnlyMemory<byte>.Empty;
+
+        if (source.Length < HeaderSize)
+        {
+            return false;
+        }
+
+        var span = source.Span;
+        var totalLength = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(0, 4));
+        if (totalLength < HeaderSize || totalLength > source.Length)
+        {
+            return false;
+        }
+
+        messageId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(4, 4));
+        type = (MessageType)span[8];
+        payload = source.Slice(HeaderSize, totalLength - HeaderSize);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a framed message from a stream. Returns <c>null</c> when the connection is closed.
+    /// The caller owns the returned <see cref="FramedMessage.Payload"/> and must dispose it.
+    /// </summary>
+    public static async Task<FramedMessage?> ReadMessageAsync(
         Stream stream,
         CancellationToken ct = default)
     {
@@ -65,18 +147,27 @@ public static class MessageFramer
             var messageType = (MessageType)headerBuffer[8];
 
             var payloadLength = totalLength - HeaderSize;
-            var payload = new byte[payloadLength];
+            var payload = Payload.Rent(payloadLength);
 
             if (payloadLength > 0)
             {
-                bytesRead = await ReadExactAsync(stream, payload.AsMemory(), ct);
-                if (bytesRead < payloadLength)
+                try
                 {
-                    return null; // Connection closed
+                    bytesRead = await ReadExactAsync(stream, payload.Memory, ct);
+                    if (bytesRead < payloadLength)
+                    {
+                        payload.Dispose();
+                        return null; // Connection closed
+                    }
+                }
+                catch
+                {
+                    payload.Dispose();
+                    throw;
                 }
             }
 
-            return (messageId, messageType, payload);
+            return new FramedMessage(messageId, messageType, payload);
         }
         finally
         {
@@ -94,8 +185,9 @@ public static class MessageFramer
         ReadOnlyMemory<byte> payload,
         CancellationToken ct = default)
     {
-        var frame = Frame(messageId, type, payload.Span);
-        await stream.WriteAsync(frame, ct);
+        using var writer = new PooledBufferWriter(HeaderSize + payload.Length);
+        WriteFrame(writer, messageId, type, payload.Span);
+        await stream.WriteAsync(writer.WrittenMemory, ct);
         await stream.FlushAsync(ct);
     }
 

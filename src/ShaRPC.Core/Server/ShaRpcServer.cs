@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
@@ -114,7 +115,7 @@ public sealed class ShaRpcServer : IShaRpcServer
         {
             while (connection.IsConnected && !ct.IsCancellationRequested)
             {
-                var data = await connection.ReceiveAsync(ct);
+                using var data = await connection.ReceiveAsync(ct);
                 if (data.Length == 0)
                 {
                     break; // Connection closed
@@ -140,25 +141,24 @@ public sealed class ShaRpcServer : IShaRpcServer
         }
     }
 
-    private async Task ProcessMessageAsync(IConnection connection, IInstanceRegistry registry, Memory<byte> data, CancellationToken ct)
+    private async Task ProcessMessageAsync(IConnection connection, IInstanceRegistry registry, Payload data, CancellationToken ct)
     {
-        using var stream = new MemoryStream(data.ToArray());
-        var message = await MessageFramer.ReadMessageAsync(stream, ct);
-
-        if (message == null)
+        if (!MessageFramer.TryReadFrame(data.Memory, out var messageId, out var messageType, out var envelope))
         {
             return;
         }
-
-        var (messageId, messageType, payload) = message.Value;
 
         if (messageType != MessageType.Request)
         {
             return; // Server only handles requests
         }
 
-        var request = _serializer.Deserialize<RpcRequest>(payload);
+        // Safety invariant: under MessagePackSecurity.UntrustedData the serializer copies the
+        // nested RpcRequest.Payload into a fresh heap array rather than aliasing `envelope`, so
+        // `request.Payload` stays valid after the frame buffer (`data`) is disposed by the caller.
+        var request = _serializer.Deserialize<RpcRequest>(envelope);
         RpcResponse response;
+        Payload? resultPayload = null;
 
         try
         {
@@ -176,7 +176,7 @@ public sealed class ShaRpcServer : IShaRpcServer
             {
                 // Route by instance: a non-null InstanceId means the call targets a
                 // server-side sub-service that the client got a handle to earlier.
-                var result = request.InstanceId is null
+                resultPayload = request.InstanceId is null
                     ? await dispatcher.DispatchAsync(request.MethodName, request.Payload, _serializer, registry, ct)
                     : await dispatcher.DispatchOnInstanceAsync(request.InstanceId, request.MethodName, request.Payload, _serializer, registry, ct);
 
@@ -184,7 +184,7 @@ public sealed class ShaRpcServer : IShaRpcServer
                 {
                     MessageId = messageId,
                     IsSuccess = true,
-                    Payload = result
+                    Payload = resultPayload.Memory
                 };
             }
         }
@@ -199,10 +199,18 @@ public sealed class ShaRpcServer : IShaRpcServer
             };
         }
 
-        var responsePayload = _serializer.Serialize(response);
-        var responseType = response.IsSuccess ? MessageType.Response : MessageType.Error;
-        var frame = MessageFramer.Frame(messageId, responseType, responsePayload);
-        await connection.SendAsync(frame, ct);
+        try
+        {
+            var responseType = response.IsSuccess ? MessageType.Response : MessageType.Error;
+            // FrameMessage serializes `response` (copying resultPayload's bytes into the frame)
+            // before resultPayload is disposed in the finally below.
+            using var responseFrame = MessageFramer.FrameMessage(_serializer, messageId, responseType, response);
+            await connection.SendAsync(responseFrame.Memory, ct);
+        }
+        finally
+        {
+            resultPayload?.Dispose();
+        }
     }
 
     public async ValueTask DisposeAsync()
