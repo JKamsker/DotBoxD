@@ -1,31 +1,10 @@
-using ShaRPC.Core.Buffers;
-
 namespace ShaRPC.Core.Transport;
 
 /// <summary>
-/// Represents a bidirectional connection for sending and receiving data.
+/// Represents a bidirectional connection for sending and receiving data. This is the
+/// legacy spelling of <see cref="IRpcChannel"/> and adds no members of its own — every
+/// connection is already a channel, so it can back an <see cref="ShaRPC.Core.RpcPeer"/>.
 /// </summary>
-public interface IConnection : IAsyncDisposable
+public interface IConnection : IRpcChannel
 {
-    /// <summary>
-    /// Sends data over the connection.
-    /// </summary>
-    Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default);
-
-    /// <summary>
-    /// Receives a framed message from the connection. The caller owns the returned
-    /// <see cref="Payload"/> and must dispose it. A payload with <see cref="Payload.Length"/>
-    /// of 0 (e.g. <see cref="Payload.Empty"/>) signals the connection was closed.
-    /// </summary>
-    Task<Payload> ReceiveAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets whether the connection is currently connected.
-    /// </summary>
-    bool IsConnected { get; }
-
-    /// <summary>
-    /// Gets a string representation of the remote endpoint.
-    /// </summary>
-    string RemoteEndpoint { get; }
 }

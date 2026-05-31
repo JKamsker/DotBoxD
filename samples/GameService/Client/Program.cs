@@ -1,5 +1,5 @@
 using Shared;
-using ShaRPC.Core.Client;
+using ShaRPC.Core;
 using ShaRPC.Generated;
 using ShaRPC.Serializers.MessagePack;
 using ShaRPC.Transports.Tcp;
@@ -7,27 +7,28 @@ using ShaRPC.Transports.Tcp;
 const string Host = "localhost";
 const int Port = 5050;
 
-Console.WriteLine("ShaRPC Client Example");
-Console.WriteLine("=====================");
+Console.WriteLine("ShaRPC Peer (caller side) Example");
+Console.WriteLine("=================================");
 Console.WriteLine();
 
-var transport = new TcpTransport(Host, Port);
 var serializer = new MessagePackRpcSerializer();
-
-var client = new ShaRpcClientBuilder()
-    .UseTransport(transport)
-    .UseSerializer(serializer)
-    .WithTimeout(TimeSpan.FromSeconds(10))
-    .Build();
+var transport = new TcpTransport(Host, Port);
 
 try
 {
     Console.WriteLine($"Connecting to {Host}:{Port}...");
-    await client.ConnectAsync();
+    await transport.ConnectAsync();
     Console.WriteLine("Connected!");
     Console.WriteLine();
 
-    var gameService = client.CreateGameServiceProxy();
+    // The caller provides a callback the other peer can push notifications to, and gets a
+    // proxy to call the game service — both over the one connection.
+    await using var peer = RpcPeer
+        .Over(transport.Connection!, serializer, new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(10) })
+        .Provide<IPlayerNotifications>(new ConsoleNotifications())
+        .Start();
+
+    var gameService = peer.GetGameService();
 
     Console.WriteLine("Getting server status...");
     var status = await gameService.GetServerStatusAsync();
@@ -73,11 +74,8 @@ try
     Console.WriteLine($"  Message: {actionResult.Message}");
     Console.WriteLine();
 
-    // Get final server status
-    Console.WriteLine("Final server status...");
-    status = await gameService.GetServerStatusAsync();
-    Console.WriteLine($"  Players online: {status.PlayerCount}");
-    Console.WriteLine();
+    // Give the server a moment to push its welcome callback.
+    await Task.Delay(200);
 
     Console.WriteLine("All RPC calls completed successfully!");
 }
@@ -88,6 +86,18 @@ catch (Exception ex)
 }
 finally
 {
-    await client.DisposeAsync();
+    await transport.DisposeAsync();
     Console.WriteLine("\nClient disconnected.");
+}
+
+/// <summary>Caller-side callback the server peer can push notifications to.</summary>
+internal sealed class ConsoleNotifications : IPlayerNotifications
+{
+    public Task NotifyAsync(string message, CancellationToken ct = default)
+    {
+        Console.WriteLine($"  [server push] {message}");
+        return Task.CompletedTask;
+    }
+
+    public Task<string> WhoAmIAsync(CancellationToken ct = default) => Task.FromResult("TestPlayer");
 }

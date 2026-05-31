@@ -21,5 +21,17 @@ namespace ShaRPC.Generated
         /// </summary>
         public static global::ShaRPC.Core.Server.ShaRpcServerBuilder AddHello(this global::ShaRPC.Core.Server.ShaRpcServerBuilder builder, global::Snap.Renamed.IHello implementation)
             => builder.AddDispatcher(new global::Snap.Renamed.HelloDispatcher(implementation));
+
+        /// <summary>
+        /// Provides a IHello implementation for the other peer to call.
+        /// </summary>
+        public static global::ShaRPC.Core.RpcPeer ProvideHello(this global::ShaRPC.Core.RpcPeer peer, global::Snap.Renamed.IHello implementation)
+            => peer.Provide((global::ShaRPC.Core.Server.IServiceDispatcher)new global::Snap.Renamed.HelloDispatcher(implementation));
+
+        /// <summary>
+        /// Gets a proxy to call IHello on the other peer.
+        /// </summary>
+        public static global::Snap.Renamed.IHello GetHello(this global::ShaRPC.Core.RpcPeer peer)
+            => new global::Snap.Renamed.HelloProxy(peer);
     }
 }

@@ -9,18 +9,18 @@ namespace Snap.Two
     /// </summary>
     public sealed class TwoProxy : global::Snap.Two.ITwo, global::Snap.Two.ITwoAsync
     {
-        private readonly global::ShaRPC.Core.Client.IShaRpcClient _client;
+        private readonly global::ShaRPC.Core.IRpcInvoker _client;
         /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>
         private readonly string? _instanceId;
 
-        public TwoProxy(global::ShaRPC.Core.Client.IShaRpcClient client)
+        public TwoProxy(global::ShaRPC.Core.IRpcInvoker client)
         {
             this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = null;
         }
 
         /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>
-        public TwoProxy(global::ShaRPC.Core.Client.IShaRpcClient client, string instanceId)
+        public TwoProxy(global::ShaRPC.Core.IRpcInvoker client, string instanceId)
         {
             this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));

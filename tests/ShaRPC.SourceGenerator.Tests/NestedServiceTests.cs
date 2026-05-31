@@ -56,12 +56,12 @@ public class NestedServiceTests
         proxyType.Should().NotBeNull();
         iRoot.IsAssignableFrom(proxyType).Should().BeTrue();
 
-        // Verify the SUB proxy exists and accepts (IShaRpcClient, string).
+        // Verify the SUB proxy exists and accepts (IRpcInvoker, string).
         var subProxyType = asm.GetType("Nested.Demo.SubServiceProxy")!;
         subProxyType.Should().NotBeNull();
         subProxyType.GetConstructors().Should().Contain(c =>
             c.GetParameters().Length == 2
-            && c.GetParameters()[0].ParameterType == typeof(IShaRpcClient)
+            && c.GetParameters()[0].ParameterType == typeof(global::ShaRPC.Core.IRpcInvoker)
             && c.GetParameters()[1].ParameterType == typeof(string));
 
         // Verify the proxy method's return type matches the interface (Task<ISubService>).

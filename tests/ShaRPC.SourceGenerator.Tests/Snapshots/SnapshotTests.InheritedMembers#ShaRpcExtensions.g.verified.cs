@@ -21,5 +21,17 @@ namespace ShaRPC.Generated
         /// </summary>
         public static global::ShaRPC.Core.Server.ShaRpcServerBuilder AddDerived(this global::ShaRPC.Core.Server.ShaRpcServerBuilder builder, global::Snap.Inherit.IDerived implementation)
             => builder.AddDispatcher(new global::Snap.Inherit.DerivedDispatcher(implementation));
+
+        /// <summary>
+        /// Provides a IDerived implementation for the other peer to call.
+        /// </summary>
+        public static global::ShaRPC.Core.RpcPeer ProvideDerived(this global::ShaRPC.Core.RpcPeer peer, global::Snap.Inherit.IDerived implementation)
+            => peer.Provide((global::ShaRPC.Core.Server.IServiceDispatcher)new global::Snap.Inherit.DerivedDispatcher(implementation));
+
+        /// <summary>
+        /// Gets a proxy to call IDerived on the other peer.
+        /// </summary>
+        public static global::Snap.Inherit.IDerived GetDerived(this global::ShaRPC.Core.RpcPeer peer)
+            => new global::Snap.Inherit.DerivedProxy(peer);
     }
 }

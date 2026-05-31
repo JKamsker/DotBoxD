@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using ShaRPC.Core.Client;
 using ShaRPC.Core.Server;
 
 namespace ShaRPC.Core.Generated;
@@ -16,7 +15,7 @@ public static class ShaRpcServiceRegistry
     /// Registers generated factories for a service interface.
     /// </summary>
     public static void Register<TService>(
-        Func<IShaRpcClient, TService> proxyFactory,
+        Func<IRpcInvoker, TService> proxyFactory,
         Func<object, IServiceDispatcher> dispatcherFactory)
         where TService : class =>
         Register(
@@ -32,7 +31,7 @@ public static class ShaRpcServiceRegistry
     /// Registers generated factories and generated service metadata for a service interface.
     /// </summary>
     public static void Register<TService>(
-        Func<IShaRpcClient, TService> proxyFactory,
+        Func<IRpcInvoker, TService> proxyFactory,
         Func<object, IServiceDispatcher> dispatcherFactory,
         ShaRpcGeneratedService service)
         where TService : class
@@ -50,7 +49,7 @@ public static class ShaRpcServiceRegistry
         ValidateService<TService>(service);
 
         s_services[typeof(TService)] = new RegisteredService(
-            client => proxyFactory(client)!,
+            invoker => proxyFactory(invoker)!,
             dispatcherFactory,
             service);
     }
@@ -163,21 +162,21 @@ public static class ShaRpcServiceRegistry
     /// <summary>
     /// Creates the generated client proxy for <typeparamref name="TService"/>.
     /// </summary>
-    public static TService CreateProxy<TService>(IShaRpcClient client)
+    public static TService CreateProxy<TService>(IRpcInvoker invoker)
         where TService : class =>
-        (TService)CreateProxy(typeof(TService), client);
+        (TService)CreateProxy(typeof(TService), invoker);
 
     /// <summary>
     /// Creates the generated client proxy for <paramref name="serviceInterface"/>.
     /// </summary>
-    public static object CreateProxy(Type serviceInterface, IShaRpcClient client)
+    public static object CreateProxy(Type serviceInterface, IRpcInvoker invoker)
     {
-        if (client is null)
+        if (invoker is null)
         {
-            throw new ArgumentNullException(nameof(client));
+            throw new ArgumentNullException(nameof(invoker));
         }
         var registration = Resolve(serviceInterface);
-        return registration.CreateProxy(client);
+        return registration.CreateProxy(invoker);
     }
 
     /// <summary>
@@ -274,7 +273,7 @@ public static class ShaRpcServiceRegistry
     private sealed class RegisteredService
     {
         public RegisteredService(
-            Func<IShaRpcClient, object> proxyFactory,
+            Func<IRpcInvoker, object> proxyFactory,
             Func<object, IServiceDispatcher> dispatcherFactory,
             ShaRpcGeneratedService service)
         {
@@ -283,7 +282,7 @@ public static class ShaRpcServiceRegistry
             Service = service;
         }
 
-        public Func<IShaRpcClient, object> CreateProxy { get; }
+        public Func<IRpcInvoker, object> CreateProxy { get; }
 
         public Func<object, IServiceDispatcher> CreateDispatcher { get; }
 

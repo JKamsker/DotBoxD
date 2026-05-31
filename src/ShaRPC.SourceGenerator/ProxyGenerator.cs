@@ -6,7 +6,7 @@ namespace ShaRPC.SourceGenerator;
 /// <summary>
 /// Generates client proxy classes for ShaRPC services. The generated proxy implements
 /// the user's interface exactly — same return types, same parameter list, only adding
-/// a forwarding body to <see cref="ShaRPC.Core.Client.IShaRpcClient"/>. All emitted
+/// a forwarding body to <see cref="ShaRPC.Core.IRpcInvoker"/>. All emitted
 /// type references are fully qualified with <c>global::</c> so the generated file
 /// never depends on the user's <c>using</c> set.
 /// </summary>
@@ -45,18 +45,18 @@ internal static class ProxyGenerator
         sb.AppendLine("    /// </summary>");
         sb.AppendLine($"    public sealed class {proxyName} : {baseList}");
         sb.AppendLine("    {");
-        sb.AppendLine("        private readonly global::ShaRPC.Core.Client.IShaRpcClient _client;");
+        sb.AppendLine("        private readonly global::ShaRPC.Core.IRpcInvoker _client;");
         sb.AppendLine("        /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>");
         sb.AppendLine("        private readonly string? _instanceId;");
         sb.AppendLine();
-        sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.Client.IShaRpcClient client)");
+        sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.IRpcInvoker client)");
         sb.AppendLine("        {");
         sb.AppendLine("            this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));");
         sb.AppendLine("            this._instanceId = null;");
         sb.AppendLine("        }");
         sb.AppendLine();
         sb.AppendLine($"        /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>");
-        sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.Client.IShaRpcClient client, string instanceId)");
+        sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.IRpcInvoker client, string instanceId)");
         sb.AppendLine("        {");
         sb.AppendLine("            this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));");
         sb.AppendLine("            this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));");

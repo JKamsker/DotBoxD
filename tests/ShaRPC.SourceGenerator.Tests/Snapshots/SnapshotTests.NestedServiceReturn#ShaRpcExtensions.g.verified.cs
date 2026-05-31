@@ -23,6 +23,18 @@ namespace ShaRPC.Generated
             => builder.AddDispatcher(new global::Snap.Nested.RootSnapDispatcher(implementation));
 
         /// <summary>
+        /// Provides a IRootSnap implementation for the other peer to call.
+        /// </summary>
+        public static global::ShaRPC.Core.RpcPeer ProvideRootSnap(this global::ShaRPC.Core.RpcPeer peer, global::Snap.Nested.IRootSnap implementation)
+            => peer.Provide((global::ShaRPC.Core.Server.IServiceDispatcher)new global::Snap.Nested.RootSnapDispatcher(implementation));
+
+        /// <summary>
+        /// Gets a proxy to call IRootSnap on the other peer.
+        /// </summary>
+        public static global::Snap.Nested.IRootSnap GetRootSnap(this global::ShaRPC.Core.RpcPeer peer)
+            => new global::Snap.Nested.RootSnapProxy(peer);
+
+        /// <summary>
         /// Creates a proxy for ISubSnap.
         /// </summary>
         public static global::Snap.Nested.ISubSnap CreateSubSnapProxy(this global::ShaRPC.Core.Client.IShaRpcClient client)
@@ -33,5 +45,17 @@ namespace ShaRPC.Generated
         /// </summary>
         public static global::ShaRPC.Core.Server.ShaRpcServerBuilder AddSubSnap(this global::ShaRPC.Core.Server.ShaRpcServerBuilder builder, global::Snap.Nested.ISubSnap implementation)
             => builder.AddDispatcher(new global::Snap.Nested.SubSnapDispatcher(implementation));
+
+        /// <summary>
+        /// Provides a ISubSnap implementation for the other peer to call.
+        /// </summary>
+        public static global::ShaRPC.Core.RpcPeer ProvideSubSnap(this global::ShaRPC.Core.RpcPeer peer, global::Snap.Nested.ISubSnap implementation)
+            => peer.Provide((global::ShaRPC.Core.Server.IServiceDispatcher)new global::Snap.Nested.SubSnapDispatcher(implementation));
+
+        /// <summary>
+        /// Gets a proxy to call ISubSnap on the other peer.
+        /// </summary>
+        public static global::Snap.Nested.ISubSnap GetSubSnap(this global::ShaRPC.Core.RpcPeer peer)
+            => new global::Snap.Nested.SubSnapProxy(peer);
     }
 }
