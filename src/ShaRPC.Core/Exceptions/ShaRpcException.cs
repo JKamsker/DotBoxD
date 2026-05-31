@@ -68,3 +68,13 @@ public class ShaRpcNotFoundException : ShaRpcException
     {
     }
 }
+
+/// <summary>
+/// Exception thrown when an inbound ShaRPC frame is malformed or cannot be decoded.
+/// </summary>
+public class ShaRpcProtocolException : ShaRpcException
+{
+    public ShaRpcProtocolException(string message) : base(message)
+    {
+    }
+}

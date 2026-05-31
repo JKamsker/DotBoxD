@@ -19,6 +19,7 @@ public sealed class RpcPeerOptions
     /// When <see langword="true"/>, inbound request frames are answered with an explicit
     /// "this peer does not accept inbound calls" error rather than a "service not found"
     /// error. Use it to make a get-only ("client") peer's one-directional intent explicit.
+    /// This is not an authentication or authorization boundary.
     /// </summary>
     public bool RejectInboundCalls { get; set; }
 

@@ -117,7 +117,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     // observability
     public event EventHandler<RpcDisconnectedEventArgs>? Disconnected;
-    public event Action<Exception>? ReadError;
+    public event EventHandler<RpcReadErrorEventArgs>? ReadError;
 }
 ```
 
@@ -143,7 +143,8 @@ public sealed class RpcPeerOptions
 
     // When true, inbound Request frames are answered with a clear "this peer accepts no
     // inbound calls" error. Makes a get-only ("client") peer's one-directional intent
-    // explicit instead of returning "service not found".
+    // explicit instead of returning "service not found". This is an intent signal, not
+    // an authentication or authorization boundary.
     public bool RejectInboundCalls { get; set; }
 
     // Backpressure for inbound dispatch.
@@ -172,8 +173,8 @@ public sealed class RpcHost : IAsyncDisposable
     public Task StopAsync(CancellationToken ct = default);
     public ValueTask DisposeAsync();
 
-    public event Action<RpcPeer>? PeerConnected;
-    public event Action<RpcPeer>? PeerDisconnected;
+    public event EventHandler<RpcPeerEventArgs>? PeerConnected;
+    public event EventHandler<RpcPeerEventArgs>? PeerDisconnected;
 }
 ```
 

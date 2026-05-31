@@ -107,7 +107,11 @@ public class PeerTests
         await using var host = RpcHost
             .Listen(new SingleConnectionServerTransport(serverChannel), NewSerializer())
             .ForEachPeer(peer => peer.Provide<IGameService>(new TestGameService()));
-        host.PeerConnected += peer => { hostPeer = peer; connected.TrySetResult(peer); };
+        host.PeerConnected += (_, args) =>
+        {
+            hostPeer = args.Peer;
+            connected.TrySetResult(args.Peer);
+        };
         await host.StartAsync();
 
         var notifications = new RecordingNotifications("host-client");
@@ -137,7 +141,7 @@ public class PeerTests
             .ForEachPeer(peer =>
             {
                 peer.Provide<IGameService>(new TestGameService());
-                peer.ReadError += ex => serverReadError = ex;
+                peer.ReadError += (_, args) => serverReadError = args.Error;
             });
         await host.StartAsync();
 
@@ -145,7 +149,7 @@ public class PeerTests
         await transport.ConnectAsync();
         await using var client = RpcPeer.Over(transport.Connection!, NewSerializer(),
             new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) });
-        client.ReadError += ex => clientReadError = ex;
+        client.ReadError += (_, args) => clientReadError = args.Error;
         client.Start();
 
         var game = client.GetGameService();
@@ -171,7 +175,7 @@ public class PeerTests
         await using var host = RpcHost
             .Listen(new ShaRPC.Transports.Tcp.TcpServerTransport(port), NewSerializer())
             .ForEachPeer(peer => peer.ProvideGameService(new TestGameService()));
-        host.PeerConnected += peer => _ = GreetAsync(peer, greeted);
+        host.PeerConnected += (_, args) => _ = GreetAsync(args.Peer, greeted);
         await host.StartAsync();
 
         var transport = new ShaRPC.Transports.Tcp.TcpTransport("localhost", port);

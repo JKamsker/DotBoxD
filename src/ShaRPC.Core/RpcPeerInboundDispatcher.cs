@@ -85,11 +85,18 @@ internal sealed class RpcPeerInboundDispatcher
         int messageId,
         CancellationToken loopCt)
     {
-        if (Volatile.Read(ref _stopped) != 0 ||
-            !TryCreateInboundRequest(frame, messageId, loopCt, out var inbound))
+        if (Volatile.Read(ref _stopped) != 0)
         {
             return false;
         }
+
+        if (!TryCreateInboundRequest(frame, messageId, loopCt, out var inbound, out var protocolError))
+        {
+            using var errorFrame = _responseBuilder.BuildProtocolErrorFrame(messageId, protocolError);
+            await _sendAsync(errorFrame.Memory, loopCt).ConfigureAwait(false);
+            return false;
+        }
+
         if (_queue is null)
         {
             StartRequest(inbound);
@@ -163,20 +170,16 @@ internal sealed class RpcPeerInboundDispatcher
         Payload frame,
         int messageId,
         CancellationToken loopCt,
-        out RpcPeerInboundRequest inbound)
+        out RpcPeerInboundRequest inbound,
+        out string protocolError)
     {
         inbound = default;
-        if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out var payload))
-        {
-            return false;
-        }
-
-        RpcRequest request;
-        try
-        {
-            request = _serializer.Deserialize<RpcRequest>(envelope);
-        }
-        catch
+        if (!RpcPeerInboundRequestReader.TryRead(
+            frame,
+            _serializer,
+            out var request,
+            out var payload,
+            out protocolError))
         {
             return false;
         }

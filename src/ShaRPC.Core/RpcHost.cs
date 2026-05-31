@@ -54,10 +54,10 @@ public sealed class RpcHost : IAsyncDisposable
     }
 
     /// <summary>Raised after a connection is accepted and configured.</summary>
-    public event Action<RpcPeer>? PeerConnected;
+    public event EventHandler<RpcPeerEventArgs>? PeerConnected;
 
     /// <summary>Raised when an accepted peer's read loop ends.</summary>
-    public event Action<RpcPeer>? PeerDisconnected;
+    public event EventHandler<RpcPeerEventArgs>? PeerDisconnected;
 
     public async Task StartAsync(CancellationToken ct = default)
     {
@@ -143,7 +143,7 @@ public sealed class RpcHost : IAsyncDisposable
         _peers.TryAdd(peer, 0);
         peer.Disconnected += OnPeerDisconnected;
         peer.Start();
-        PeerConnected?.Invoke(peer);
+        RpcEventHandlerInvoker.Raise(PeerConnected, this, new RpcPeerEventArgs(peer));
     }
 
     private void OnPeerDisconnected(object? sender, RpcDisconnectedEventArgs args)
@@ -154,7 +154,7 @@ public sealed class RpcHost : IAsyncDisposable
         }
 
         _peers.TryRemove(peer, out _);
-        PeerDisconnected?.Invoke(peer);
+        RpcEventHandlerInvoker.Raise(PeerDisconnected, this, new RpcPeerEventArgs(peer));
 
         // Dispose off the read-loop callback so DisposeAsync can await the now-completing loop
         // without deadlocking on itself.
@@ -179,7 +179,6 @@ public sealed class RpcHost : IAsyncDisposable
         }
 
         await StopAsync().ConfigureAwait(false);
-        await ClosePeersAsync().ConfigureAwait(false);
         await _listener.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -199,4 +198,5 @@ public sealed class RpcHost : IAsyncDisposable
 
         _peers.Clear();
     }
+
 }

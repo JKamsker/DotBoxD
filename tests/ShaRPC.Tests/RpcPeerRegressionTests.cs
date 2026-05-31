@@ -1,6 +1,8 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using ShaRPC.Core;
 using ShaRPC.Core.Exceptions;
+using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Server;
 using ShaRPC.Core.Transport;
@@ -45,7 +47,7 @@ public class RpcPeerRegressionTests
         await using var host = RpcHost
             .Listen(new SingleConnectionServerTransport(serverConnection), NewSerializer())
             .ForEachPeer(peer => peer.Provide<IGameService>(new TestGameService()));
-        host.PeerConnected += peer => connected.TrySetResult(peer);
+        host.PeerConnected += (_, args) => connected.TrySetResult(args.Peer);
         await host.StartAsync();
 
         await using var client = RpcPeer
@@ -148,6 +150,65 @@ public class RpcPeerRegressionTests
         Assert.InRange(successes, 1, 2);
         Assert.InRange(timeouts, 1, 2);
         Assert.Equal(3, successes + timeouts);
+    }
+
+    [Fact]
+    public async Task MalformedInboundRequest_ReturnsProtocolErrorResponse()
+    {
+        var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        var serializer = NewSerializer();
+
+        await using var server = RpcPeer
+            .Over(serverConnection, serializer, new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
+            .Start();
+
+        var body = new byte[MessageFramer.EnvelopeLengthSize + 1];
+        BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(0, MessageFramer.EnvelopeLengthSize), 1);
+        body[MessageFramer.EnvelopeLengthSize] = 0xc1;
+
+        using var requestFrame = MessageFramer.FrameToPayload(42, MessageType.Request, body);
+        await clientConnection.SendAsync(requestFrame.Memory);
+
+        using var responseFrame = await clientConnection.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(MessageFramer.TryReadFrame(
+            responseFrame.Memory,
+            out var messageId,
+            out var messageType,
+            out var envelope,
+            out var payload));
+
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+
+        Assert.Equal(42, messageId);
+        Assert.Equal(MessageType.Error, messageType);
+        Assert.Equal(0, payload.Length);
+        Assert.False(response.IsSuccess);
+        Assert.Equal("ShaRpcProtocolException", response.ErrorType);
+        Assert.Contains("Malformed request envelope", response.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task DisconnectedHandlers_AreIsolated_WhenOneHandlerThrows()
+    {
+        var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        var firstHandlerCalled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondHandlerCalled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var server = RpcPeer
+            .Over(serverConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
+            .Start();
+
+        server.Disconnected += (_, _) =>
+        {
+            firstHandlerCalled.TrySetResult(true);
+            throw new InvalidOperationException("Handler failure.");
+        };
+        server.Disconnected += (_, _) => secondHandlerCalled.TrySetResult(true);
+
+        await clientConnection.DisposeAsync();
+
+        await firstHandlerCalled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await secondHandlerCalled.Task.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
     private static async Task<Exception?> CaptureExceptionAsync(Task task)

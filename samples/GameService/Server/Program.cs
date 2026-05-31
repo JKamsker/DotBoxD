@@ -20,10 +20,11 @@ await using var host = RpcHost
     .Listen(new TcpServerTransport(Port), serializer)
     .ForEachPeer(peer => peer.ProvideGameService(gameService));
 
-host.PeerConnected += peer =>
+host.PeerConnected += (_, args) =>
 {
+    var peer = args.Peer;
     Console.WriteLine($"  [peer connected] {peer.RemoteEndpoint}");
-    peer.ReadError += ex => Console.WriteLine($"  [peer read error] {ex.Message}");
+    peer.ReadError += (_, readArgs) => Console.WriteLine($"  [peer read error] {readArgs.Error.Message}");
     _ = GreetAsync(peer);
 };
 

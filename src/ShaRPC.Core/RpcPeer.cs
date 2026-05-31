@@ -65,7 +65,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     public event EventHandler<RpcDisconnectedEventArgs>? Disconnected;
 
     /// <summary>Raised when the read loop fails with a non-cancellation exception.</summary>
-    public event Action<Exception>? ReadError;
+    public event EventHandler<RpcReadErrorEventArgs>? ReadError;
 
     /// <summary>Provides a local implementation of <typeparamref name="TService"/> for the other
     /// side to call.</summary>
@@ -116,7 +116,8 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             throw new ShaRpcConnectionException("Connection closed.");
         }
 
-        if (Interlocked.Exchange(ref _started, 1) != 0)
+        if (Volatile.Read(ref _started) != 0 ||
+            Interlocked.Exchange(ref _started, 1) != 0)
         {
             return;
         }
@@ -125,9 +126,6 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         _inbound.Start(_cts.Token);
         _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
     }
-
-    // ---------------- outbound calls (IRpcInvoker) ----------------
-
     public Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeAsync<TRequest, TResponse>(service, method, request, ct);
 
@@ -169,9 +167,6 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             _sendLock.Release();
         }
     }
-
-    // ---------------- read loop + inbound dispatch ----------------
-
     private async Task ReadLoopAsync(CancellationToken ct)
     {
         Exception? readError = null;
@@ -247,15 +242,23 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
                 if (readError is not null)
                 {
-                    ReadError?.Invoke(readError);
+                    RpcEventHandlerInvoker.Raise(
+                        ReadError,
+                        this,
+                        new RpcReadErrorEventArgs(_channel.RemoteEndpoint, readError));
                 }
 
-                Disconnected?.Invoke(this, new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, readError));
+                RpcEventHandlerInvoker.Raise(
+                    Disconnected,
+                    this,
+                    new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, readError));
             }
         }
     }
 
-    /// <summary>Closes the peer and its channel. Idempotent.</summary>
+    /// <summary>
+    /// Closes the peer and its channel by disposing it. Idempotent; the peer cannot be restarted.
+    /// </summary>
     public Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

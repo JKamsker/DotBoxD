@@ -66,6 +66,9 @@ internal sealed class RpcPeerResponseBuilder
         return MessageFramer.FinishFrame(writer, envelopeLength);
     }
 
+    public Payload BuildProtocolErrorFrame(int messageId, string errorMessage) =>
+        BuildErrorFrame(messageId, errorMessage, nameof(ShaRpcProtocolException));
+
     private Payload BuildErrorFrame(int messageId, string errorMessage, string errorType) =>
         MessageFramer.FrameMessage(
             _serializer,

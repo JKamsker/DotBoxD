@@ -170,12 +170,16 @@ var remote = peer.CreateProxy<IRemoteService>();
 | `Disconnected` | Raised when the remote connection closes |
 | `ConnectionClosed` | Raised when the shared read loop ends, with endpoint and exception details |
 | `FrameDropped` | Raised when a bounded duplex queue drops or rejects a routed frame |
-| `CloseAsync()` / `DisposeAsync()` | Idempotently closes the peer and underlying connection |
+| `CloseAsync()` / `DisposeAsync()` | Idempotently disposes the peer and underlying connection; closed peers cannot be restarted |
 
 `ShaRpcPeerOptions.InboundQueueCapacity` and `QueueFullMode` can bound the internal request/response queues used by the duplex splitter.
 Client-side cancellation sends a ShaRPC cancel frame for the in-flight request. The server
 continues reading the connection while dispatch runs and cancels the matching dispatcher token
 when that frame arrives.
+
+`RpcPeerOptions.RejectInboundCalls` returns an explicit remote error for inbound requests,
+but it is not an authentication or authorization boundary. Any connected peer can still send
+request frames; secure transports or application-level checks should enforce trust.
 
 ---
 
