@@ -104,6 +104,56 @@ public class GeneratedFactoryRegistryTests
         Assert.Same(services, ShaRpcServiceRegistry.GetServices(assembly));
     }
 
+    [Fact]
+    public void Registry_ReadsLegacyGeneratedServicesCatalog()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using ShaRPC.Core.Generated;
+
+            namespace Legacy.Sample
+            {
+                public interface ILegacyService
+                {
+                }
+
+                public sealed class LegacyServiceProxy : ILegacyService
+                {
+                }
+
+                public sealed class LegacyServiceDispatcher
+                {
+                }
+            }
+
+            namespace ShaRPC.Generated
+            {
+                public static class ShaRpcGenerated
+                {
+                    private static readonly ShaRpcGeneratedService[] s_services =
+                    {
+                        new ShaRpcGeneratedService(
+                            typeof(global::Legacy.Sample.ILegacyService),
+                            typeof(global::Legacy.Sample.LegacyServiceProxy),
+                            typeof(global::Legacy.Sample.LegacyServiceDispatcher),
+                            "ILegacyService"),
+                    };
+
+                    public static IReadOnlyList<ShaRpcGeneratedService> Services => s_services;
+                }
+            }
+            """;
+
+        var assembly = CompileAndLoad(source);
+
+        var services = ShaRpcServiceRegistry.GetServices(assembly);
+
+        var service = Assert.Single(services);
+        Assert.Equal("ILegacyService", service.ServiceName);
+        Assert.Equal("LegacyServiceProxy", service.ProxyType.Name);
+        Assert.Same(services, ShaRpcServiceRegistry.GetServices(assembly));
+    }
+
     private interface INotGeneratedService
     {
     }

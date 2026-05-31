@@ -92,13 +92,10 @@ public static class ShaRpcServiceRegistry
     public static void RegisterServices(Assembly assembly, IReadOnlyList<ShaRpcGeneratedService> services)
     {
         if (assembly is null)
-        {
             throw new ArgumentNullException(nameof(assembly));
-        }
+
         if (services is null)
-        {
             throw new ArgumentNullException(nameof(services));
-        }
 
         s_serviceCatalogs[assembly] = services;
     }
@@ -237,6 +234,13 @@ public static class ShaRpcServiceRegistry
         if (s_serviceCatalogs.TryGetValue(assembly, out var services))
         {
             return services;
+        }
+
+        var property = generatedType.GetProperty("Services", BindingFlags.Public | BindingFlags.Static);
+        if (property?.GetValue(null) is IReadOnlyList<ShaRpcGeneratedService> legacyServices)
+        {
+            s_serviceCatalogs[assembly] = legacyServices;
+            return legacyServices;
         }
 
         throw new InvalidOperationException(
