@@ -97,6 +97,7 @@ public sealed class RpcHost : IAsyncDisposable
         }
 
         await _listener.StopAsync(ct).ConfigureAwait(false);
+        await ClosePeersAsync().ConfigureAwait(false);
         _cts.Dispose();
         _cts = null;
     }
@@ -178,7 +179,12 @@ public sealed class RpcHost : IAsyncDisposable
         }
 
         await StopAsync().ConfigureAwait(false);
+        await ClosePeersAsync().ConfigureAwait(false);
+        await _listener.DisposeAsync().ConfigureAwait(false);
+    }
 
+    private async Task ClosePeersAsync()
+    {
         foreach (var peer in _peers.Keys)
         {
             try
@@ -192,6 +198,5 @@ public sealed class RpcHost : IAsyncDisposable
         }
 
         _peers.Clear();
-        await _listener.DisposeAsync().ConfigureAwait(false);
     }
 }

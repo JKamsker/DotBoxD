@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using ShaRPC.Core.Buffers;
-using ShaRPC.Core.Client;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Generated;
 using ShaRPC.Core.Protocol;
@@ -21,27 +19,20 @@ namespace ShaRPC.Core;
 public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 {
     private readonly IRpcChannel _channel;
-    private readonly ISerializer _serializer;
-    private readonly TimeSpan _timeout;
-    private readonly bool _rejectInboundCalls;
-    private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
-    private readonly ShaRpcPendingRequests _pending = new();
-    private readonly InstanceRegistry _registry = new();
-    private readonly ConcurrentDictionary<int, CancellationTokenSource> _activeInbound = new();
-    private readonly ConcurrentDictionary<int, Task> _activeTasks = new();
+    private readonly RpcPeerInboundDispatcher _inbound;
+    private readonly RpcPeerOutboundInvoker _outbound;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private int _messageIdCounter;
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
     private int _started;
+    private int _closed;
     private int _disposed;
 
     private RpcPeer(IRpcChannel channel, ISerializer serializer, RpcPeerOptions options)
     {
         _channel = channel;
-        _serializer = serializer;
-        _timeout = options.RequestTimeout;
-        _rejectInboundCalls = options.RejectInboundCalls;
+        _inbound = new RpcPeerInboundDispatcher(serializer, options, SendRawAsync);
+        _outbound = new RpcPeerOutboundInvoker(serializer, options.RequestTimeout, EnsureStarted, SendRawAsync);
     }
 
     /// <summary>Creates a peer over <paramref name="channel"/>. Call <see cref="Start"/> to begin
@@ -62,7 +53,10 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     }
 
     /// <summary>Gets whether the underlying channel is still connected.</summary>
-    public bool IsConnected => Volatile.Read(ref _disposed) == 0 && _channel.IsConnected;
+    public bool IsConnected =>
+        Volatile.Read(ref _disposed) == 0 &&
+        Volatile.Read(ref _closed) == 0 &&
+        _channel.IsConnected;
 
     /// <summary>The remote endpoint string of the underlying channel.</summary>
     public string RemoteEndpoint => _channel.RemoteEndpoint;
@@ -94,11 +88,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             throw new ArgumentNullException(nameof(dispatcher));
         }
 
-        if (!_dispatchers.TryAdd(dispatcher.ServiceName, dispatcher))
-        {
-            throw new InvalidOperationException($"Service '{dispatcher.ServiceName}' is already provided.");
-        }
-
+        _inbound.AddDispatcher(dispatcher);
         return this;
     }
 
@@ -121,169 +111,57 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             throw new ObjectDisposedException(nameof(RpcPeer));
         }
 
+        if (Volatile.Read(ref _closed) != 0)
+        {
+            throw new ShaRpcConnectionException("Connection closed.");
+        }
+
         if (Interlocked.Exchange(ref _started, 1) != 0)
         {
             return;
         }
 
         _cts = new CancellationTokenSource();
+        _inbound.Start(_cts.Token);
         _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
     }
 
     // ---------------- outbound calls (IRpcInvoker) ----------------
 
-    public async Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default)
-    {
-        using var received = await SendRequestAsync(service, method, request, instanceId: null, ct).ConfigureAwait(false);
-        return _serializer.Deserialize<TResponse>(received.Payload);
-    }
+    public Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default) =>
+        _outbound.InvokeAsync<TRequest, TResponse>(service, method, request, ct);
 
-    public async Task<TResponse> InvokeAsync<TResponse>(string service, string method, CancellationToken ct = default)
-    {
-        using var received = await SendRequestAsync(service, method, instanceId: null, ct).ConfigureAwait(false);
-        return _serializer.Deserialize<TResponse>(received.Payload);
-    }
+    public Task<TResponse> InvokeAsync<TResponse>(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsync<TResponse>(service, method, ct);
 
-    public async Task InvokeAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default)
-    {
-        using var _ = await SendRequestAsync(service, method, request, instanceId: null, ct).ConfigureAwait(false);
-    }
+    public Task InvokeAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>
+        _outbound.InvokeAsync(service, method, request, ct);
 
-    public async Task InvokeAsync(string service, string method, CancellationToken ct = default)
-    {
-        using var _ = await SendRequestAsync(service, method, instanceId: null, ct).ConfigureAwait(false);
-    }
+    public Task InvokeAsync(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsync(service, method, ct);
 
-    public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
-    {
-        using var received = await SendRequestAsync(service, method, request, instanceId, ct).ConfigureAwait(false);
-        return _serializer.Deserialize<TResponse>(received.Payload);
-    }
+    public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync<TRequest, TResponse>(service, instanceId, method, request, ct);
 
-    public async Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default)
-    {
-        using var received = await SendRequestAsync(service, method, instanceId, ct).ConfigureAwait(false);
-        return _serializer.Deserialize<TResponse>(received.Payload);
-    }
+    public Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync<TResponse>(service, instanceId, method, ct);
 
-    public async Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)
-    {
-        using var _ = await SendRequestAsync(service, method, request, instanceId, ct).ConfigureAwait(false);
-    }
+    public Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync(service, instanceId, method, request, ct);
 
-    public async Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)
-    {
-        using var _ = await SendRequestAsync(service, method, instanceId, ct).ConfigureAwait(false);
-    }
-
-    private Task<ReceivedResponse> SendRequestAsync<TRequest>(string service, string method, TRequest request, string? instanceId, CancellationToken ct)
-    {
-        EnsureStarted();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
-        var frame = MessageFramer.FrameRequest(_serializer, messageId, MessageType.Request, envelope, request);
-        return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
-    }
-
-    private Task<ReceivedResponse> SendRequestAsync(string service, string method, string? instanceId, CancellationToken ct)
-    {
-        EnsureStarted();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
-        var frame = MessageFramer.FrameMessage(_serializer, messageId, MessageType.Request, envelope, ReadOnlySpan<byte>.Empty);
-        return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
-    }
-
-    private static RpcRequest CreateEnvelope(int messageId, string service, string method, string? instanceId) =>
-        new()
-        {
-            MessageId = messageId,
-            ServiceName = service,
-            MethodName = method,
-            InstanceId = instanceId,
-        };
-
-    private async Task<ReceivedResponse> SendFrameAndAwaitAsync(int messageId, Payload frame, string service, string method, CancellationToken ct)
-    {
-        TaskCompletionSource<ReceivedResponse>? tcs = null;
-        var consumed = false;
-        var requestSent = false;
-        try
-        {
-            tcs = _pending.Add(messageId);
-            using (frame)
-            {
-                await SendRawAsync(frame.Memory, ct).ConfigureAwait(false);
-                requestSent = true;
-            }
-
-            using var timeoutCts = ct.CanBeCanceled
-                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
-                : new CancellationTokenSource();
-            timeoutCts.CancelAfter(_timeout);
-
-            ReceivedResponse received;
-            using (timeoutCts.Token.Register(
-                static state => ((TaskCompletionSource<ReceivedResponse>)state!).TrySetCanceled(),
-                tcs))
-            {
-                try
-                {
-                    received = await tcs.Task.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-                {
-                    if (requestSent)
-                    {
-                        _ = SendCancelFrameAsync(messageId);
-                    }
-
-                    ct.ThrowIfCancellationRequested();
-                    throw new ShaRpcTimeoutException($"Request to {service}.{method} timed out.");
-                }
-            }
-
-            if (!received.Response.IsSuccess)
-            {
-                throw new ShaRpcRemoteException(
-                    received.Response.ErrorMessage ?? "Unknown error",
-                    received.Response.ErrorType ?? "Unknown");
-            }
-
-            consumed = true;
-            return received;
-        }
-        finally
-        {
-            if (tcs is null)
-            {
-                frame.Dispose();
-            }
-            else
-            {
-                _pending.Remove(messageId, tcs.Task, consumed);
-            }
-        }
-    }
-
-    private async Task SendCancelFrameAsync(int messageId)
-    {
-        try
-        {
-            using var frame = MessageFramer.FrameToPayload(messageId, MessageType.Cancel, ReadOnlySpan<byte>.Empty);
-            await SendRawAsync(frame.Memory, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Cancellation is best-effort.
-        }
-    }
+    public Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync(service, instanceId, method, ct);
 
     private async Task SendRawAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
         await _sendLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (Volatile.Read(ref _closed) != 0)
+            {
+                throw new ShaRpcConnectionException("Connection closed.");
+            }
+
             await _channel.SendAsync(data, ct).ConfigureAwait(false);
         }
         finally
@@ -329,18 +207,13 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
                     {
                         case MessageType.Response:
                         case MessageType.Error:
-                            disposeFrame = !TryCompleteResponse(messageId, frame);
+                            disposeFrame = !_outbound.TryCompleteResponse(messageId, frame);
                             break;
                         case MessageType.Request:
-                            HandleInboundRequest(frame, messageId, ct);
-                            disposeFrame = false;
+                            disposeFrame = !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
                             break;
                         case MessageType.Cancel:
-                            if (_activeInbound.TryGetValue(messageId, out var requestCts))
-                            {
-                                SafeCancel(requestCts);
-                            }
-
+                            _inbound.Cancel(messageId);
                             break;
                     }
                 }
@@ -360,12 +233,18 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         catch (Exception ex)
         {
             readError = ex;
-            _pending.FailAll(new ShaRpcConnectionException("Connection lost.", ex));
         }
         finally
         {
             if (!ct.IsCancellationRequested)
             {
+                Interlocked.Exchange(ref _closed, 1);
+                _outbound.FailPending(
+                    readError is null
+                        ? new ShaRpcConnectionException("Connection closed.")
+                        : new ShaRpcConnectionException("Connection lost.", readError));
+                await _inbound.StopAsync().ConfigureAwait(false);
+
                 if (readError is not null)
                 {
                     ReadError?.Invoke(readError);
@@ -373,134 +252,6 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
                 Disconnected?.Invoke(this, new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, readError));
             }
-        }
-    }
-
-    private bool TryCompleteResponse(int messageId, Payload frame)
-    {
-        if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out var payload))
-        {
-            return false;
-        }
-
-        var response = _serializer.Deserialize<RpcResponse>(envelope);
-        return _pending.TryComplete(messageId, response, payload, frame);
-    }
-
-    private void HandleInboundRequest(Payload frame, int messageId, CancellationToken loopCt)
-    {
-        if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out var payload))
-        {
-            frame.Dispose();
-            return;
-        }
-
-        RpcRequest request;
-        try
-        {
-            request = _serializer.Deserialize<RpcRequest>(envelope);
-        }
-        catch
-        {
-            frame.Dispose();
-            return;
-        }
-
-        var dispatchCts = CancellationTokenSource.CreateLinkedTokenSource(loopCt);
-        if (!_activeInbound.TryAdd(messageId, dispatchCts))
-        {
-            dispatchCts.Dispose();
-            frame.Dispose();
-            return;
-        }
-
-        var task = ProcessRequestAsync(frame, request, messageId, payload, dispatchCts);
-        _activeTasks[messageId] = task;
-        if (task.IsCompleted)
-        {
-            _activeTasks.TryRemove(messageId, out _);
-        }
-    }
-
-    private async Task ProcessRequestAsync(Payload frame, RpcRequest request, int messageId, ReadOnlyMemory<byte> payload, CancellationTokenSource requestCts)
-    {
-        try
-        {
-            using (frame)
-            {
-                using var responseFrame = await BuildResponseFrameAsync(request, messageId, payload, requestCts.Token).ConfigureAwait(false);
-                await SendRawAsync(responseFrame.Memory, requestCts.Token).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
-        {
-            // Cancelled work sends no response frame.
-        }
-        catch
-        {
-            // Dispatch/send failures are observed and swallowed per-request.
-        }
-        finally
-        {
-            _activeInbound.TryRemove(messageId, out _);
-            _activeTasks.TryRemove(messageId, out _);
-            requestCts.Dispose();
-        }
-    }
-
-    private async ValueTask<Payload> BuildResponseFrameAsync(RpcRequest request, int messageId, ReadOnlyMemory<byte> payload, CancellationToken ct)
-    {
-        if (_rejectInboundCalls)
-        {
-            return BuildErrorFrame(messageId, "This peer does not accept inbound calls.", "ShaRpcInboundRejected");
-        }
-
-        if (!_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
-        {
-            return BuildErrorFrame(messageId, $"Service '{request.ServiceName}' not found.", nameof(ShaRpcNotFoundException));
-        }
-
-        using var writer = new PooledBufferWriter(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
-        MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
-        var envelopeStart = writer.WrittenCount;
-        _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
-        var envelopeLength = writer.WrittenCount - envelopeStart;
-
-        try
-        {
-            await (request.InstanceId is null
-                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, _registry, writer, ct)
-                : dispatcher.DispatchOnInstanceAsync(request.InstanceId, request.MethodName, payload, _serializer, _registry, writer, ct)).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return BuildErrorFrame(messageId, ex.Message, ex.GetType().Name);
-        }
-
-        return MessageFramer.FinishFrame(writer, envelopeLength);
-    }
-
-    private Payload BuildErrorFrame(int messageId, string errorMessage, string errorType) =>
-        MessageFramer.FrameMessage(
-            _serializer,
-            messageId,
-            MessageType.Error,
-            new RpcResponse { MessageId = messageId, IsSuccess = false, ErrorMessage = errorMessage, ErrorType = errorType },
-            ReadOnlySpan<byte>.Empty);
-
-    private static void SafeCancel(CancellationTokenSource cts)
-    {
-        try
-        {
-            cts.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The request completed while the connection was closing.
         }
     }
 
@@ -518,12 +269,10 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             return;
         }
 
+        Interlocked.Exchange(ref _closed, 1);
         _cts?.Cancel();
 
-        foreach (var requestCts in _activeInbound.Values)
-        {
-            SafeCancel(requestCts);
-        }
+        await _inbound.StopAsync().ConfigureAwait(false);
 
         if (_readLoop is not null)
         {
@@ -537,17 +286,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             }
         }
 
-        try
-        {
-            await Task.WhenAll(_activeTasks.Values).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Individual request tasks observe their own failures.
-        }
-
-        _pending.CancelAll();
-        _registry.ReleaseAll();
+        _outbound.CancelPending();
 
         _cts?.Dispose();
         _sendLock.Dispose();
