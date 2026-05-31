@@ -9,12 +9,28 @@ namespace ShaRPC.Generated
     /// </summary>
     public static class ShaRpcGenerated
     {
+        private static readonly global::ShaRPC.Core.Generated.ShaRpcGeneratedService[] s_services =
+        {
+            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(
+                typeof(global::Snap.One.ICalculator),
+                typeof(global::Snap.One.CalculatorProxy),
+                typeof(global::Snap.One.CalculatorDispatcher),
+                "ICalculator"),
+        };
+
         static ShaRpcGenerated()
         {
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.One.ICalculator>(
                 static client => new global::Snap.One.CalculatorProxy(client),
-                static implementation => new global::Snap.One.CalculatorDispatcher((global::Snap.One.ICalculator)implementation));
+                static implementation => new global::Snap.One.CalculatorDispatcher((global::Snap.One.ICalculator)implementation),
+                s_services[0]);
         }
+
+        /// <summary>
+        /// Gets the services generated into this assembly without scanning for generated types.
+        /// </summary>
+        public static global::System.Collections.Generic.IReadOnlyList<global::ShaRPC.Core.Generated.ShaRpcGeneratedService> Services
+            => s_services;
 
         /// <summary>
         /// Creates the generated client proxy for <typeparamref name="TService" />.

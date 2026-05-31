@@ -19,7 +19,7 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("    /// </summary>");
         sb.AppendLine("    public static class ShaRpcGenerated");
         sb.AppendLine("    {");
-        sb.AppendLine("        static ShaRpcGenerated()");
+        sb.AppendLine("        private static readonly global::ShaRPC.Core.Generated.ShaRpcGeneratedService[] s_services =");
         sb.AppendLine("        {");
 
         foreach (var service in services.Array)
@@ -30,12 +30,40 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
+            sb.AppendLine("            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(");
+            sb.AppendLine($"                typeof({fullInterfaceName}),");
+            sb.AppendLine($"                typeof({fullProxyName}),");
+            sb.AppendLine($"                typeof({fullDispatcherName}),");
+            sb.AppendLine($"                \"{LiteralHelpers.EscapeStringLiteral(service.ServiceName)}\"),");
+        }
+
+        sb.AppendLine("        };");
+        sb.AppendLine();
+        sb.AppendLine("        static ShaRpcGenerated()");
+        sb.AppendLine("        {");
+
+        for (var i = 0; i < services.Array.Length; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var service = services.Array[i];
+            var serviceName = NamingHelpers.StripInterfacePrefix(service.InterfaceName);
+            var fullInterfaceName = IdentifierHelpers.QualifyTypeName(service.Namespace, service.InterfaceName);
+            var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
+            var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
+
             sb.AppendLine($"            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<{fullInterfaceName}>(");
             sb.AppendLine($"                static client => new {fullProxyName}(client),");
-            sb.AppendLine($"                static implementation => new {fullDispatcherName}(({fullInterfaceName})implementation));");
+            sb.AppendLine($"                static implementation => new {fullDispatcherName}(({fullInterfaceName})implementation),");
+            sb.AppendLine($"                s_services[{i.ToString(System.Globalization.CultureInfo.InvariantCulture)}]);");
         }
 
         sb.AppendLine("        }");
+        sb.AppendLine();
+        sb.AppendLine("        /// <summary>");
+        sb.AppendLine("        /// Gets the services generated into this assembly without scanning for generated types.");
+        sb.AppendLine("        /// </summary>");
+        sb.AppendLine("        public static global::System.Collections.Generic.IReadOnlyList<global::ShaRPC.Core.Generated.ShaRpcGeneratedService> Services");
+        sb.AppendLine("            => s_services;");
         sb.AppendLine();
         sb.AppendLine("        /// <summary>");
         sb.AppendLine("        /// Creates the generated client proxy for <typeparamref name=\"TService\" />.");

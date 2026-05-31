@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -51,15 +52,27 @@ public class GeneratedFactoryRegistryTests
         var dispatcher = generated
             .GetMethod("CreateDispatcher", new[] { typeof(Type), typeof(object) })!
             .Invoke(null, new[] { interfaceType, implementation });
+        var services = Assert.IsAssignableFrom<IReadOnlyList<ShaRpcGeneratedService>>(
+            generated.GetProperty("Services")!.GetValue(null));
 
         Assert.True(interfaceType.IsInstanceOfType(proxy));
         Assert.IsAssignableFrom<IServiceDispatcher>(dispatcher);
+        Assert.Single(services);
+        Assert.Equal(interfaceType, services[0].ServiceType);
+        Assert.Equal("IGreeter", services[0].ServiceName);
+        Assert.Equal("GreeterProxy", services[0].ProxyType.Name);
+        Assert.Equal("GreeterDispatcher", services[0].DispatcherType.Name);
+
+        var assemblyServices = ShaRpcServiceRegistry.GetServices(assembly);
+        Assert.Same(services, assemblyServices);
 
         var registryProxy = ShaRpcServiceRegistry.CreateProxy(interfaceType, client);
         var registryDispatcher = ShaRpcServiceRegistry.CreateDispatcher(interfaceType, implementation);
+        var registryService = ShaRpcServiceRegistry.GetService(interfaceType);
 
         Assert.True(interfaceType.IsInstanceOfType(registryProxy));
         Assert.Equal("IGreeter", registryDispatcher.ServiceName);
+        Assert.Equal(services[0], registryService);
     }
 
     [Fact]
@@ -71,6 +84,17 @@ public class GeneratedFactoryRegistryTests
         Assert.Contains("No ShaRPC generated factory is registered", ex.Message);
         Assert.Contains("[ShaRpcService]", ex.Message);
         Assert.Contains("source generator", ex.Message);
+    }
+
+    [Fact]
+    public void Registry_ReturnsEmptyServiceCatalogWhenAssemblyHasNoGeneratedRegistry()
+    {
+        var assembly = typeof(GeneratedFactoryRegistryTests).Assembly;
+
+        var services = ShaRpcServiceRegistry.GetServices(assembly);
+
+        Assert.Empty(services);
+        Assert.Same(services, ShaRpcServiceRegistry.GetServices(assembly));
     }
 
     private interface INotGeneratedService

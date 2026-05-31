@@ -9,15 +9,37 @@ namespace ShaRPC.Generated
     /// </summary>
     public static class ShaRpcGenerated
     {
+        private static readonly global::ShaRPC.Core.Generated.ShaRpcGeneratedService[] s_services =
+        {
+            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(
+                typeof(global::Snap.Nested.IRootSnap),
+                typeof(global::Snap.Nested.RootSnapProxy),
+                typeof(global::Snap.Nested.RootSnapDispatcher),
+                "IRootSnap"),
+            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(
+                typeof(global::Snap.Nested.ISubSnap),
+                typeof(global::Snap.Nested.SubSnapProxy),
+                typeof(global::Snap.Nested.SubSnapDispatcher),
+                "ISubSnap"),
+        };
+
         static ShaRpcGenerated()
         {
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Nested.IRootSnap>(
                 static client => new global::Snap.Nested.RootSnapProxy(client),
-                static implementation => new global::Snap.Nested.RootSnapDispatcher((global::Snap.Nested.IRootSnap)implementation));
+                static implementation => new global::Snap.Nested.RootSnapDispatcher((global::Snap.Nested.IRootSnap)implementation),
+                s_services[0]);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Nested.ISubSnap>(
                 static client => new global::Snap.Nested.SubSnapProxy(client),
-                static implementation => new global::Snap.Nested.SubSnapDispatcher((global::Snap.Nested.ISubSnap)implementation));
+                static implementation => new global::Snap.Nested.SubSnapDispatcher((global::Snap.Nested.ISubSnap)implementation),
+                s_services[1]);
         }
+
+        /// <summary>
+        /// Gets the services generated into this assembly without scanning for generated types.
+        /// </summary>
+        public static global::System.Collections.Generic.IReadOnlyList<global::ShaRPC.Core.Generated.ShaRpcGeneratedService> Services
+            => s_services;
 
         /// <summary>
         /// Creates the generated client proxy for <typeparamref name="TService" />.

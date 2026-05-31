@@ -14,6 +14,7 @@ public static class ShaRpcServiceRegistry
     private const string GeneratedFactoryTypeName = "ShaRPC.Generated.ShaRpcGenerated";
 
     private static readonly ConcurrentDictionary<Type, RegisteredService> s_services = new();
+    private static readonly ConcurrentDictionary<Assembly, IReadOnlyList<ShaRpcGeneratedService>> s_serviceCatalogs = new();
     private static readonly ConcurrentDictionary<Assembly, bool> s_registrationAttempts = new();
 
     /// <summary>
@@ -22,6 +23,23 @@ public static class ShaRpcServiceRegistry
     public static void Register<TService>(
         Func<IShaRpcClient, TService> proxyFactory,
         Func<object, IServiceDispatcher> dispatcherFactory)
+        where TService : class =>
+        Register(
+            proxyFactory,
+            dispatcherFactory,
+            new ShaRpcGeneratedService(
+                typeof(TService),
+                typeof(TService),
+                typeof(IServiceDispatcher),
+                typeof(TService).Name));
+
+    /// <summary>
+    /// Registers generated factories and generated service metadata for a service interface.
+    /// </summary>
+    public static void Register<TService>(
+        Func<IShaRpcClient, TService> proxyFactory,
+        Func<object, IServiceDispatcher> dispatcherFactory,
+        ShaRpcGeneratedService service)
         where TService : class
     {
         if (proxyFactory is null)
@@ -34,9 +52,38 @@ public static class ShaRpcServiceRegistry
             throw new ArgumentNullException(nameof(dispatcherFactory));
         }
 
+        ValidateService<TService>(service);
+
         s_services[typeof(TService)] = new RegisteredService(
             client => proxyFactory(client)!,
-            dispatcherFactory);
+            dispatcherFactory,
+            service);
+    }
+
+    /// <summary>
+    /// Gets generated metadata for <typeparamref name="TService"/>.
+    /// </summary>
+    public static ShaRpcGeneratedService GetService<TService>()
+        where TService : class =>
+        GetService(typeof(TService));
+
+    /// <summary>
+    /// Gets generated metadata for <paramref name="serviceInterface"/>.
+    /// </summary>
+    public static ShaRpcGeneratedService GetService(Type serviceInterface) =>
+        Resolve(serviceInterface).Service;
+
+    /// <summary>
+    /// Gets generated service metadata from <paramref name="assembly"/> without scanning its types.
+    /// </summary>
+    public static IReadOnlyList<ShaRpcGeneratedService> GetServices(Assembly assembly)
+    {
+        if (assembly is null)
+        {
+            throw new ArgumentNullException(nameof(assembly));
+        }
+
+        return s_serviceCatalogs.GetOrAdd(assembly, static assembly => LoadGeneratedServices(assembly));
     }
 
     /// <summary>
@@ -148,20 +195,85 @@ public static class ShaRpcServiceRegistry
         }
     }
 
+    private static IReadOnlyList<ShaRpcGeneratedService> LoadGeneratedServices(Assembly assembly)
+    {
+        var generatedType = assembly.GetType(GeneratedFactoryTypeName, throwOnError: false);
+        if (generatedType is null)
+        {
+            s_registrationAttempts.TryAdd(assembly, true);
+            return Array.Empty<ShaRpcGeneratedService>();
+        }
+
+        try
+        {
+            s_registrationAttempts.TryAdd(assembly, true);
+            RuntimeHelpers.RunClassConstructor(generatedType.TypeHandle);
+        }
+        catch (Exception ex)
+        {
+            s_registrationAttempts.TryRemove(assembly, out _);
+            throw new InvalidOperationException(
+                $"ShaRPC generated factory registration failed for assembly '{assembly.FullName}'.",
+                ex);
+        }
+
+        var property = generatedType.GetProperty("Services", BindingFlags.Public | BindingFlags.Static);
+        if (property?.GetValue(null) is IReadOnlyList<ShaRpcGeneratedService> services)
+        {
+            return services;
+        }
+
+        throw new InvalidOperationException(
+            $"ShaRPC generated factory type '{GeneratedFactoryTypeName}' in assembly '{assembly.FullName}' " +
+            "does not expose a compatible Services catalog.");
+    }
+
+    private static void ValidateService<TService>(ShaRpcGeneratedService service)
+        where TService : class
+    {
+        if (service.ServiceType is null)
+        {
+            throw new ArgumentException("Generated service metadata must include a service type.", nameof(service));
+        }
+        if (service.ProxyType is null)
+        {
+            throw new ArgumentException("Generated service metadata must include a proxy type.", nameof(service));
+        }
+        if (service.DispatcherType is null)
+        {
+            throw new ArgumentException("Generated service metadata must include a dispatcher type.", nameof(service));
+        }
+        if (string.IsNullOrEmpty(service.ServiceName))
+        {
+            throw new ArgumentException("Generated service metadata must include a service name.", nameof(service));
+        }
+        if (service.ServiceType != typeof(TService))
+        {
+            throw new ArgumentException(
+                $"Generated service metadata describes {FormatType(service.ServiceType)}, " +
+                $"but it was registered for {FormatType(typeof(TService))}.",
+                nameof(service));
+        }
+    }
+
     private static string FormatType(Type type) => type.FullName ?? type.Name;
 
     private sealed class RegisteredService
     {
         public RegisteredService(
             Func<IShaRpcClient, object> proxyFactory,
-            Func<object, IServiceDispatcher> dispatcherFactory)
+            Func<object, IServiceDispatcher> dispatcherFactory,
+            ShaRpcGeneratedService service)
         {
             CreateProxy = proxyFactory;
             CreateDispatcher = dispatcherFactory;
+            Service = service;
         }
 
         public Func<IShaRpcClient, object> CreateProxy { get; }
 
         public Func<object, IServiceDispatcher> CreateDispatcher { get; }
+
+        public ShaRpcGeneratedService Service { get; }
     }
 }

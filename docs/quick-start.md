@@ -124,6 +124,7 @@ The source generator creates:
 2. **Dispatcher** (`MyServiceDispatcher`) - Server-side router that deserializes and invokes
 3. **Extensions** (`CreateMyServiceProxy()`, `AddMyService()`) - Convenience methods
 4. **Registry factory** (`ShaRpcGenerated`) - Typed proxy/dispatcher factory backed by generated delegates
+5. **Service catalog** (`ShaRpcGenerated.Services`) - Array-backed `ShaRpcGeneratedService` descriptors
 
 You can use the generated factory directly when building framework-style APIs:
 
@@ -132,6 +133,11 @@ using ShaRPC.Generated;
 
 var proxy = ShaRpcGenerated.CreateProxy<IMyService>(client);
 var dispatcher = ShaRpcGenerated.CreateDispatcher<IMyService>(new MyService());
+
+foreach (var service in ShaRpcGenerated.Services)
+{
+    Console.WriteLine($"{service.ServiceType.Name}: {service.ProxyType.Name}");
+}
 ```
 
 ## Next Steps

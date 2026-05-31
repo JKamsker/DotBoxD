@@ -24,10 +24,18 @@ the generator emits:
 - `ChatServiceDispatcher` in the service namespace
 - extension methods such as `CreateChatServiceProxy()` and `AddChatService(...)`
 - `ShaRPC.Generated.ShaRpcGenerated`, a public factory and registration type
+- `ShaRpcGenerated.Services`, an array-backed catalog of generated service descriptors
 
 The generated `ShaRpcGenerated` type registers the service with
 `ShaRPC.Core.Generated.ShaRpcServiceRegistry` through generated delegates. No runtime
 type scan is needed.
+
+Each `ShaRpcGeneratedService` descriptor contains:
+
+- `ServiceType` - the `[ShaRpcService]` interface type
+- `ProxyType` - the generated client proxy implementation type
+- `DispatcherType` - the generated server dispatcher implementation type
+- `ServiceName` - the wire service name after `[ShaRpcService(Name = ...)]`
 
 ## Typed Factory Usage
 
@@ -50,6 +58,26 @@ IServiceDispatcher dispatcher =
 This is the preferred shape for frameworks, plugin hosts, and sidecars that expose
 `Provide<TService>(...)` or `Remote<TService>()` style APIs.
 
+## Generated Service Catalog
+
+Use `ShaRpcGenerated.Services` when you need the list of generated services without
+scanning the assembly for generated proxy or dispatcher types:
+
+```csharp
+using ShaRPC.Generated;
+
+var services = ShaRpcGenerated.Services;
+for (var i = 0; i < services.Count; i++)
+{
+    var service = services[i];
+    Console.WriteLine(
+        $"{service.ServiceType.FullName} -> {service.ProxyType.FullName}, {service.DispatcherType.FullName}");
+}
+```
+
+`Services` is backed by one generated static array per service assembly. Accessing it
+does not allocate another buffer and does not enumerate assembly types.
+
 ## Dynamic Factory Usage
 
 When the service type is known only at runtime, use the non-generic overloads:
@@ -71,6 +99,20 @@ IServiceDispatcher dispatcher =
 The implementation passed to `CreateDispatcher(Type, object)` must implement the
 service interface, otherwise the registry throws an `ArgumentException`.
 
+When infrastructure only has an `Assembly`, use the runtime registry's targeted
+lookup helper. It looks up the known generated factory type by name and returns the
+same generated catalog:
+
+```csharp
+using ShaRPC.Core.Generated;
+
+IReadOnlyList<ShaRpcGeneratedService> services =
+    ShaRpcServiceRegistry.GetServices(contractAssembly);
+```
+
+This is useful for plugin hosts that load contract assemblies dynamically and want
+the service/proxy/dispatcher map without scanning all types in the assembly.
+
 ## Runtime Registry
 
 The lower-level runtime registry is public for advanced hosts:
@@ -78,6 +120,7 @@ The lower-level runtime registry is public for advanced hosts:
 ```csharp
 using ShaRPC.Core.Generated;
 
+var service = ShaRpcServiceRegistry.GetService<IChatService>();
 var proxy = ShaRpcServiceRegistry.CreateProxy<IChatService>(client);
 var dispatcher = ShaRpcServiceRegistry.CreateDispatcher<IChatService>(implementation);
 ```

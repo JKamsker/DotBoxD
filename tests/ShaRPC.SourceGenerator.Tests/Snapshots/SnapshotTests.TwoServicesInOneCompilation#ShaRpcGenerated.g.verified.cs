@@ -9,15 +9,37 @@ namespace ShaRPC.Generated
     /// </summary>
     public static class ShaRpcGenerated
     {
+        private static readonly global::ShaRPC.Core.Generated.ShaRpcGeneratedService[] s_services =
+        {
+            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(
+                typeof(global::Snap.Two.IOne),
+                typeof(global::Snap.Two.OneProxy),
+                typeof(global::Snap.Two.OneDispatcher),
+                "IOne"),
+            new global::ShaRPC.Core.Generated.ShaRpcGeneratedService(
+                typeof(global::Snap.Two.ITwo),
+                typeof(global::Snap.Two.TwoProxy),
+                typeof(global::Snap.Two.TwoDispatcher),
+                "ITwo"),
+        };
+
         static ShaRpcGenerated()
         {
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Two.IOne>(
                 static client => new global::Snap.Two.OneProxy(client),
-                static implementation => new global::Snap.Two.OneDispatcher((global::Snap.Two.IOne)implementation));
+                static implementation => new global::Snap.Two.OneDispatcher((global::Snap.Two.IOne)implementation),
+                s_services[0]);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Two.ITwo>(
                 static client => new global::Snap.Two.TwoProxy(client),
-                static implementation => new global::Snap.Two.TwoDispatcher((global::Snap.Two.ITwo)implementation));
+                static implementation => new global::Snap.Two.TwoDispatcher((global::Snap.Two.ITwo)implementation),
+                s_services[1]);
         }
+
+        /// <summary>
+        /// Gets the services generated into this assembly without scanning for generated types.
+        /// </summary>
+        public static global::System.Collections.Generic.IReadOnlyList<global::ShaRPC.Core.Generated.ShaRpcGeneratedService> Services
+            => s_services;
 
         /// <summary>
         /// Creates the generated client proxy for <typeparamref name="TService" />.

@@ -335,6 +335,7 @@ The generator also emits a public factory class and registers factories with the
 // In namespace ShaRPC.Generated
 public static class ShaRpcGenerated
 {
+    public static IReadOnlyList<ShaRpcGeneratedService> Services { get; }
     public static TService CreateProxy<TService>(IShaRpcClient client) where TService : class;
     public static object CreateProxy(Type serviceInterface, IShaRpcClient client);
     public static IServiceDispatcher CreateDispatcher<TService>(TService implementation) where TService : class;
@@ -342,7 +343,12 @@ public static class ShaRpcGenerated
 }
 ```
 
+`ShaRpcGenerated.Services` is backed by a generated static array of `ShaRpcGeneratedService`
+records. Each descriptor includes `ServiceType`, `ProxyType`, `DispatcherType`, and
+`ServiceName`, so hosts can build a service map without scanning assembly types.
+
 The runtime registry is available as `ShaRPC.Core.Generated.ShaRpcServiceRegistry` and throws a clear diagnostic when no generated factory is registered for a service interface.
+It also exposes `GetService(Type)` and `GetServices(Assembly)` for dynamic hosts that need generated metadata.
 See [Generated Service Registry](./generated-service-registry.md) for examples and assembly-scope details.
 
 ---
