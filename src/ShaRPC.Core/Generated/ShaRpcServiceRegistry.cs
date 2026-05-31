@@ -87,6 +87,23 @@ public static class ShaRpcServiceRegistry
     }
 
     /// <summary>
+    /// Registers generated service metadata for <paramref name="assembly"/>.
+    /// </summary>
+    public static void RegisterServices(Assembly assembly, IReadOnlyList<ShaRpcGeneratedService> services)
+    {
+        if (assembly is null)
+        {
+            throw new ArgumentNullException(nameof(assembly));
+        }
+        if (services is null)
+        {
+            throw new ArgumentNullException(nameof(services));
+        }
+
+        s_serviceCatalogs[assembly] = services;
+    }
+
+    /// <summary>
     /// Creates the generated client proxy for <typeparamref name="TService"/>.
     /// </summary>
     public static TService CreateProxy<TService>(IShaRpcClient client)
@@ -217,15 +234,14 @@ public static class ShaRpcServiceRegistry
                 ex);
         }
 
-        var property = generatedType.GetProperty("Services", BindingFlags.Public | BindingFlags.Static);
-        if (property?.GetValue(null) is IReadOnlyList<ShaRpcGeneratedService> services)
+        if (s_serviceCatalogs.TryGetValue(assembly, out var services))
         {
             return services;
         }
 
         throw new InvalidOperationException(
             $"ShaRPC generated factory type '{GeneratedFactoryTypeName}' in assembly '{assembly.FullName}' " +
-            "does not expose a compatible Services catalog.");
+            "did not publish a compatible Services catalog.");
     }
 
     private static void ValidateService<TService>(ShaRpcGeneratedService service)

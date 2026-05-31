@@ -20,6 +20,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Vt.IVtSnap>(
                 static client => new global::Snap.Vt.VtSnapProxy(client),
                 static implementation => new global::Snap.Vt.VtSnapDispatcher((global::Snap.Vt.IVtSnap)implementation),

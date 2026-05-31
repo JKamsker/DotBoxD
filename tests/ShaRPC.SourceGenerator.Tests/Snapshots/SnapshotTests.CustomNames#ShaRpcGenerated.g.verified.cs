@@ -20,6 +20,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Renamed.IHello>(
                 static client => new global::Snap.Renamed.HelloProxy(client),
                 static implementation => new global::Snap.Renamed.HelloDispatcher((global::Snap.Renamed.IHello)implementation),

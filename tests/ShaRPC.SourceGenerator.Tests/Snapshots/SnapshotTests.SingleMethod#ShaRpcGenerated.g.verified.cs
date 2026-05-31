@@ -20,6 +20,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.One.ICalculator>(
                 static client => new global::Snap.One.CalculatorProxy(client),
                 static implementation => new global::Snap.One.CalculatorDispatcher((global::Snap.One.ICalculator)implementation),

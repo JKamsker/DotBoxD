@@ -41,6 +41,9 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine();
         sb.AppendLine("        static ShaRpcGenerated()");
         sb.AppendLine("        {");
+        sb.AppendLine("            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(");
+        sb.AppendLine("                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,");
+        sb.AppendLine("                s_services);");
 
         for (var i = 0; i < services.Array.Length; i++)
         {

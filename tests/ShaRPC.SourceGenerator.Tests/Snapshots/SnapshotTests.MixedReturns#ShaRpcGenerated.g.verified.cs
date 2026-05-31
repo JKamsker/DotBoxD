@@ -20,6 +20,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Mixed.IMix>(
                 static client => new global::Snap.Mixed.MixProxy(client),
                 static implementation => new global::Snap.Mixed.MixDispatcher((global::Snap.Mixed.IMix)implementation),

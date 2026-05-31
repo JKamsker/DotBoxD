@@ -118,7 +118,8 @@ sink.AddService<IChatService, ChatServiceProxy>();
 
 `TService` is the service interface. `TImplementation` is the generated proxy type
 that implements that interface. The method is generated as direct generic calls, so it
-does not scan assembly types or allocate a descriptor list for the sink path.
+does not scan assembly types. The generated type initializer still publishes the shared
+descriptor catalog once per assembly.
 
 ## Dynamic Factory Usage
 
@@ -143,7 +144,7 @@ service interface, otherwise the registry throws an `ArgumentException`.
 
 When infrastructure only has an `Assembly`, use the runtime registry's targeted
 lookup helper. It looks up the known generated factory type by name and returns the
-same generated catalog:
+same catalog that the generated static constructor published:
 
 ```csharp
 using ShaRPC.Core.Generated;

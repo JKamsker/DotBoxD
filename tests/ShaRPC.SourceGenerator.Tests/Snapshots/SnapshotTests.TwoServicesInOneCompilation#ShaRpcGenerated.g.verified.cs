@@ -25,6 +25,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Two.IOne>(
                 static client => new global::Snap.Two.OneProxy(client),
                 static implementation => new global::Snap.Two.OneDispatcher((global::Snap.Two.IOne)implementation),

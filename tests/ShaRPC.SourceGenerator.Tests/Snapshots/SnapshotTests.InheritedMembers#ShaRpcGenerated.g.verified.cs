@@ -20,6 +20,9 @@ namespace ShaRPC.Generated
 
         static ShaRpcGenerated()
         {
+            global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.RegisterServices(
+                typeof(global::ShaRPC.Generated.ShaRpcGenerated).Assembly,
+                s_services);
             global::ShaRPC.Core.Generated.ShaRpcServiceRegistry.Register<global::Snap.Inherit.IDerived>(
                 static client => new global::Snap.Inherit.DerivedProxy(client),
                 static implementation => new global::Snap.Inherit.DerivedDispatcher((global::Snap.Inherit.IDerived)implementation),
