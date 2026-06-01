@@ -7,7 +7,6 @@ using ShaRPC.Core.Server;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core;
-
 internal sealed class RpcPeerInboundDispatcher
 {
     private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
@@ -58,6 +57,7 @@ internal sealed class RpcPeerInboundDispatcher
         {
             SingleReader = true,
             SingleWriter = true,
+            // Wait lets DropIncoming detect a full queue via TryWrite and release state.
             FullMode = BoundedChannelFullMode.Wait,
         });
     }
@@ -188,6 +188,7 @@ internal sealed class RpcPeerInboundDispatcher
         if (!_activeInbound.TryAdd(messageId, requestCts))
         {
             requestCts.Dispose();
+            protocolError = "Duplicate request message id.";
             return false;
         }
 
@@ -295,5 +296,4 @@ internal sealed class RpcPeerInboundDispatcher
             // Individual request tasks observe their own failures.
         }
     }
-
 }

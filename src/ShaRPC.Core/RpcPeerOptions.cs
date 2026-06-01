@@ -5,15 +5,15 @@ namespace ShaRPC.Core;
 /// <summary>
 /// Options for <see cref="RpcPeer"/> and <see cref="RpcHost"/>.
 /// </summary>
-public sealed class RpcPeerOptions
+public sealed record RpcPeerOptions
 {
     /// <summary>Default per-call timeout for proxies created by this peer.</summary>
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Optional service provider for dispatcher factories that resolve dependencies.
     /// </summary>
-    public IServiceProvider? ServiceProvider { get; set; }
+    public IServiceProvider? ServiceProvider { get; init; }
 
     /// <summary>
     /// When <see langword="true"/>, inbound request frames are answered with an explicit
@@ -21,11 +21,14 @@ public sealed class RpcPeerOptions
     /// error. Use it to make a get-only ("client") peer's one-directional intent explicit.
     /// This is not an authentication or authorization boundary.
     /// </summary>
-    public bool RejectInboundCalls { get; set; }
+    public bool RejectInboundCalls { get; init; }
 
-    /// <summary>Maximum queued inbound frames. Null uses unbounded queues.</summary>
-    public int? InboundQueueCapacity { get; set; }
+    /// <summary>
+    /// Maximum queued inbound frames. Null dispatches inbound requests immediately and does not
+    /// cap concurrent dispatch work.
+    /// </summary>
+    public int? InboundQueueCapacity { get; init; }
 
     /// <summary>Policy used when <see cref="InboundQueueCapacity"/> is set and the queue is full.</summary>
-    public ShaRpcQueueFullMode QueueFullMode { get; set; } = ShaRpcQueueFullMode.Wait;
+    public ShaRpcQueueFullMode QueueFullMode { get; init; } = ShaRpcQueueFullMode.Wait;
 }

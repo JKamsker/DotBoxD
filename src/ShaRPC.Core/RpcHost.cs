@@ -12,13 +12,18 @@ namespace ShaRPC.Core;
 /// </summary>
 public sealed class RpcHost : IAsyncDisposable
 {
+    private static readonly TimeSpan AcceptErrorBackoff = TimeSpan.FromMilliseconds(50);
+
     private readonly IServerTransport _listener;
     private readonly ISerializer _serializer;
     private readonly RpcPeerOptions _options;
+    private readonly object _lifecycleLock = new();
     private readonly List<Action<RpcPeer>> _configure = new();
     private readonly ConcurrentDictionary<RpcPeer, byte> _peers = new();
+    private readonly ConcurrentDictionary<Task, byte> _peerCleanupTasks = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
+    private Task? _stopTask;
     private int _disposed;
 
     private RpcHost(IServerTransport listener, ISerializer serializer, RpcPeerOptions options)
@@ -47,6 +52,11 @@ public sealed class RpcHost : IAsyncDisposable
     /// <summary>Registers configuration that runs for every accepted peer before its read loop
     /// starts. Use it to <see cref="RpcPeer.Provide{TService}(TService)"/> exports (and optionally
     /// <see cref="RpcPeer.Get{TService}"/> proxies to call the peer back).</summary>
+    /// <remarks>
+    /// Services provided here are callable by any accepted peer. ShaRPC does not add
+    /// authentication or authorization; enforce access control at the transport or application
+    /// layer.
+    /// </remarks>
     public RpcHost ForEachPeer(Action<RpcPeer> configure)
     {
         _configure.Add(configure ?? throw new ArgumentNullException(nameof(configure)));
@@ -59,37 +69,78 @@ public sealed class RpcHost : IAsyncDisposable
     /// <summary>Raised when an accepted peer's read loop ends.</summary>
     public event EventHandler<RpcPeerEventArgs>? PeerDisconnected;
 
+    /// <summary>Raised when the host accept loop catches a non-cancellation exception.</summary>
+    public event EventHandler<RpcHostErrorEventArgs>? AcceptError;
+
     public async Task StartAsync(CancellationToken ct = default)
     {
+        CancellationTokenSource cts;
         if (Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(RpcHost));
         }
 
-        if (_cts is not null)
+        lock (_lifecycleLock)
         {
-            throw new InvalidOperationException("Host is already running.");
+            if (_cts is not null)
+            {
+                throw new InvalidOperationException("Host is already running.");
+            }
+
+            cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _cts = cts;
         }
 
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        await _listener.StartAsync(ct).ConfigureAwait(false);
-        _acceptTask = AcceptLoopAsync(_cts.Token);
+        try
+        {
+            await _listener.StartAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            lock (_lifecycleLock)
+            {
+                if (ReferenceEquals(_cts, cts))
+                {
+                    _cts = null;
+                    _stopTask = null;
+                    cts.Dispose();
+                }
+            }
+
+            throw;
+        }
+
+        lock (_lifecycleLock)
+        {
+            if (ReferenceEquals(_cts, cts))
+            {
+                _acceptTask = AcceptLoopAsync(cts.Token);
+            }
+        }
     }
 
-    public async Task StopAsync(CancellationToken ct = default)
+    public Task StopAsync(CancellationToken ct = default)
     {
-        if (_cts is null)
+        lock (_lifecycleLock)
         {
-            return;
+            if (_cts is null)
+            {
+                return Task.CompletedTask;
+            }
+
+            return _stopTask ??= StopCoreAsync(_cts, _acceptTask, ct);
         }
+    }
 
-        _cts.Cancel();
+    private async Task StopCoreAsync(CancellationTokenSource cts, Task? acceptTask, CancellationToken ct)
+    {
+        cts.Cancel();
 
-        if (_acceptTask is not null)
+        if (acceptTask is not null)
         {
             try
             {
-                await _acceptTask.ConfigureAwait(false);
+                await acceptTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -98,8 +149,18 @@ public sealed class RpcHost : IAsyncDisposable
 
         await _listener.StopAsync(ct).ConfigureAwait(false);
         await ClosePeersAsync().ConfigureAwait(false);
-        _cts.Dispose();
-        _cts = null;
+        await AwaitPeerCleanupTasksAsync().ConfigureAwait(false);
+        cts.Dispose();
+
+        lock (_lifecycleLock)
+        {
+            if (ReferenceEquals(_cts, cts))
+            {
+                _cts = null;
+                _acceptTask = null;
+                _stopTask = null;
+            }
+        }
     }
 
     private async Task AcceptLoopAsync(CancellationToken ct)
@@ -115,9 +176,18 @@ public sealed class RpcHost : IAsyncDisposable
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                continue;
+                RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
+                try
+                {
+                    await Task.Delay(AcceptErrorBackoff, ct).ConfigureAwait(false);
+                    continue;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    break;
+                }
             }
 
             await AddPeerAsync(connection).ConfigureAwait(false);
@@ -158,7 +228,7 @@ public sealed class RpcHost : IAsyncDisposable
 
         // Dispose off the read-loop callback so DisposeAsync can await the now-completing loop
         // without deadlocking on itself.
-        _ = Task.Run(async () =>
+        var cleanupTask = Task.Run(async () =>
         {
             try
             {
@@ -169,6 +239,14 @@ public sealed class RpcHost : IAsyncDisposable
                 // Best-effort cleanup.
             }
         });
+        _peerCleanupTasks.TryAdd(cleanupTask, 0);
+        _ = cleanupTask.ContinueWith(
+            static (task, state) =>
+                ((ConcurrentDictionary<Task, byte>)state!).TryRemove(task, out _),
+            _peerCleanupTasks,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public async ValueTask DisposeAsync()
@@ -199,4 +277,21 @@ public sealed class RpcHost : IAsyncDisposable
         _peers.Clear();
     }
 
+    private async Task AwaitPeerCleanupTasksAsync()
+    {
+        var tasks = _peerCleanupTasks.Keys.ToArray();
+        if (tasks.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Peer cleanup is best-effort and each task observes its own dispose failures.
+        }
+    }
 }

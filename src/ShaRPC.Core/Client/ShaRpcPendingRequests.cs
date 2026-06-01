@@ -20,6 +20,8 @@ internal sealed class ShaRpcPendingRequests
         return tcs;
     }
 
+    public bool Contains(int messageId) => _requests.ContainsKey(messageId);
+
     public void Remove(int messageId, Task<ReceivedResponse> task, bool consumed)
     {
         _requests.TryRemove(messageId, out _);
@@ -46,6 +48,17 @@ internal sealed class ShaRpcPendingRequests
             received.Dispose();
         }
 
+        return true;
+    }
+
+    public bool TryFail(int messageId, Exception error)
+    {
+        if (!_requests.TryGetValue(messageId, out var tcs))
+        {
+            return false;
+        }
+
+        tcs.TrySetException(error);
         return true;
     }
 

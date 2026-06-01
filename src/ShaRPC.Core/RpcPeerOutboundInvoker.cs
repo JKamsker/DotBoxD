@@ -104,16 +104,29 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
     {
         if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out var payload))
         {
+            _pending.TryFail(
+                messageId,
+                new ShaRpcProtocolException("Malformed response frame."));
             return false;
         }
 
-        var response = _serializer.Deserialize<RpcResponse>(envelope);
+        RpcResponse response;
+        try
+        {
+            response = _serializer.Deserialize<RpcResponse>(envelope);
+        }
+        catch
+        {
+            _pending.TryFail(
+                messageId,
+                new ShaRpcProtocolException("Malformed response envelope."));
+            return false;
+        }
+
         return _pending.TryComplete(messageId, response, payload, frame);
     }
 
     public void FailPending(Exception error) => _pending.FailAll(error);
-
-    public void CancelPending() => _pending.CancelAll();
 
     private Task<ReceivedResponse> SendRequestAsync<TRequest>(
         string service,
@@ -123,7 +136,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct)
     {
         _ensureStarted();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
+        var messageId = GetNextMessageId();
         var envelope = CreateEnvelope(messageId, service, method, instanceId);
         var frame = MessageFramer.FrameRequest(_serializer, messageId, MessageType.Request, envelope, request);
         return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
@@ -136,7 +149,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct)
     {
         _ensureStarted();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
+        var messageId = GetNextMessageId();
         var envelope = CreateEnvelope(messageId, service, method, instanceId);
         var frame = MessageFramer.FrameMessage(
             _serializer,
@@ -145,6 +158,18 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
             envelope,
             ReadOnlySpan<byte>.Empty);
         return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
+    }
+
+    private int GetNextMessageId()
+    {
+        int messageId;
+        do
+        {
+            messageId = Interlocked.Increment(ref _messageIdCounter);
+        }
+        while (messageId == 0 || _pending.Contains(messageId));
+
+        return messageId;
     }
 
     private static RpcRequest CreateEnvelope(

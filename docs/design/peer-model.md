@@ -118,6 +118,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     // observability
     public event EventHandler<RpcDisconnectedEventArgs>? Disconnected;
     public event EventHandler<RpcReadErrorEventArgs>? ReadError;
+    public event EventHandler<RpcProtocolErrorEventArgs>? ProtocolError;
 }
 ```
 
@@ -136,20 +137,21 @@ await participant.JoinedAsync("Jonas");
 ### `RpcPeerOptions`
 
 ```csharp
-public sealed class RpcPeerOptions
+public sealed record RpcPeerOptions
 {
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
-    public IServiceProvider? ServiceProvider { get; set; }
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public IServiceProvider? ServiceProvider { get; init; }
 
     // When true, inbound Request frames are answered with a clear "this peer accepts no
     // inbound calls" error. Makes a get-only ("client") peer's one-directional intent
     // explicit instead of returning "service not found". This is an intent signal, not
     // an authentication or authorization boundary.
-    public bool RejectInboundCalls { get; set; }
+    public bool RejectInboundCalls { get; init; }
 
-    // Backpressure for inbound dispatch.
-    public int? InboundQueueCapacity { get; set; }
-    public ShaRpcQueueFullMode QueueFullMode { get; set; } = ShaRpcQueueFullMode.Wait;
+    // Backpressure for inbound dispatch. Null dispatches immediately and does not cap
+    // concurrent dispatcher work.
+    public int? InboundQueueCapacity { get; init; }
+    public ShaRpcQueueFullMode QueueFullMode { get; init; } = ShaRpcQueueFullMode.Wait;
 }
 ```
 
@@ -175,6 +177,7 @@ public sealed class RpcHost : IAsyncDisposable
 
     public event EventHandler<RpcPeerEventArgs>? PeerConnected;
     public event EventHandler<RpcPeerEventArgs>? PeerDisconnected;
+    public event EventHandler<RpcHostErrorEventArgs>? AcceptError;
 }
 ```
 

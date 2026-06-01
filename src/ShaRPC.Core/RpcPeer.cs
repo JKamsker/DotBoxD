@@ -7,21 +7,18 @@ using ShaRPC.Core.Server;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core;
-
 /// <summary>
-/// One symmetric side of a ShaRPC connection. A peer can <see cref="Provide{TService}(TService)"/>
-/// implementations the other side calls, and <see cref="Get{TService}"/> proxies to call the
-/// implementations the other side provides — either, or both. A single read loop demuxes inbound
-/// frames: <see cref="MessageType.Response"/>/<see cref="MessageType.Error"/> complete this peer's
-/// pending calls, while <see cref="MessageType.Request"/>/<see cref="MessageType.Cancel"/> are
-/// dispatched to the implementations this peer provides.
+/// One symmetric side of a ShaRPC connection. A peer can provide local services and get proxies
+/// for remote services over one demuxed read loop.
 /// </summary>
 public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 {
     private readonly IRpcChannel _channel;
     private readonly RpcPeerInboundDispatcher _inbound;
     private readonly RpcPeerOutboundInvoker _outbound;
+    private readonly RpcPeerFrameProcessor _frameProcessor;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly object _lifecycleLock = new();
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
     private int _started;
@@ -33,6 +30,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         _channel = channel;
         _inbound = new RpcPeerInboundDispatcher(serializer, options, SendRawAsync);
         _outbound = new RpcPeerOutboundInvoker(serializer, options.RequestTimeout, EnsureStarted, SendRawAsync);
+        _frameProcessor = new RpcPeerFrameProcessor(_inbound, _outbound, RaiseProtocolError);
     }
 
     /// <summary>Creates a peer over <paramref name="channel"/>. Call <see cref="Start"/> to begin
@@ -67,8 +65,13 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     /// <summary>Raised when the read loop fails with a non-cancellation exception.</summary>
     public event EventHandler<RpcReadErrorEventArgs>? ReadError;
 
+    /// <summary>Raised when a malformed or unsupported protocol frame is observed.</summary>
+    public event EventHandler<RpcProtocolErrorEventArgs>? ProtocolError;
+
     /// <summary>Provides a local implementation of <typeparamref name="TService"/> for the other
     /// side to call.</summary>
+    /// <remarks>Provided services are callable by any peer on this channel; enforce access
+    /// control at the transport or application layer.</remarks>
     public RpcPeer Provide<TService>(TService implementation)
         where TService : class
     {
@@ -106,25 +109,28 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     private void EnsureStarted()
     {
-        if (Volatile.Read(ref _disposed) != 0)
+        lock (_lifecycleLock)
         {
-            throw new ObjectDisposedException(nameof(RpcPeer));
-        }
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcPeer));
+            }
 
-        if (Volatile.Read(ref _closed) != 0)
-        {
-            throw new ShaRpcConnectionException("Connection closed.");
-        }
+            if (Volatile.Read(ref _closed) != 0)
+            {
+                throw new ShaRpcConnectionException("Connection closed.");
+            }
 
-        if (Volatile.Read(ref _started) != 0 ||
-            Interlocked.Exchange(ref _started, 1) != 0)
-        {
-            return;
-        }
+            if (Volatile.Read(ref _started) != 0)
+            {
+                return;
+            }
 
-        _cts = new CancellationTokenSource();
-        _inbound.Start(_cts.Token);
-        _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
+            Interlocked.Exchange(ref _started, 1);
+            _cts = new CancellationTokenSource();
+            _inbound.Start(_cts.Token);
+            _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
+        }
     }
     public Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeAsync<TRequest, TResponse>(service, method, request, ct);
@@ -190,27 +196,10 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
                     break;
                 }
 
-                var disposeFrame = true;
+                var disposeFrame = false;
                 try
                 {
-                    if (!MessageFramer.TryReadFrameHeader(frame.Memory, out var messageId, out var messageType))
-                    {
-                        continue;
-                    }
-
-                    switch (messageType)
-                    {
-                        case MessageType.Response:
-                        case MessageType.Error:
-                            disposeFrame = !_outbound.TryCompleteResponse(messageId, frame);
-                            break;
-                        case MessageType.Request:
-                            disposeFrame = !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
-                            break;
-                        case MessageType.Cancel:
-                            _inbound.Cancel(messageId);
-                            break;
-                    }
+                    disposeFrame = await _frameProcessor.ShouldDisposeAsync(frame, ct).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -256,9 +245,8 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         }
     }
 
-    /// <summary>
-    /// Closes the peer and its channel by disposing it. Idempotent; the peer cannot be restarted.
-    /// </summary>
+    /// <summary>Closes the peer by disposing it. The token is checked before disposal starts;
+    /// closed peers cannot be restarted.</summary>
     public Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -267,21 +255,28 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        Task? readLoop;
+        CancellationTokenSource? cts;
+        lock (_lifecycleLock)
         {
-            return;
-        }
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
 
-        Interlocked.Exchange(ref _closed, 1);
-        _cts?.Cancel();
+            Interlocked.Exchange(ref _closed, 1);
+            cts = _cts;
+            readLoop = _readLoop;
+            cts?.Cancel();
+        }
 
         await _inbound.StopAsync().ConfigureAwait(false);
 
-        if (_readLoop is not null)
+        if (readLoop is not null)
         {
             try
             {
-                await _readLoop.ConfigureAwait(false);
+                await readLoop.ConfigureAwait(false);
             }
             catch
             {
@@ -289,10 +284,16 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             }
         }
 
-        _outbound.CancelPending();
+        _outbound.FailPending(new ShaRpcConnectionException("Connection closed."));
 
-        _cts?.Dispose();
+        cts?.Dispose();
         _sendLock.Dispose();
         await _channel.DisposeAsync().ConfigureAwait(false);
     }
+
+    private void RaiseProtocolError(int messageId, MessageType messageType, string message) =>
+        RpcEventHandlerInvoker.Raise(
+            ProtocolError,
+            this,
+            new RpcProtocolErrorEventArgs(_channel.RemoteEndpoint, messageId, messageType, message));
 }

@@ -28,9 +28,9 @@ internal static class RpcPeerInboundRequestReader
             request = serializer.Deserialize<RpcRequest>(envelope);
             return true;
         }
-        catch (Exception ex)
+        catch
         {
-            protocolError = $"Malformed request envelope: {ex.Message}";
+            protocolError = "Malformed request envelope.";
             return false;
         }
     }

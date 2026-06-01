@@ -1,44 +1,30 @@
 using System.Collections.Concurrent;
 using ShaRPC.Core.Buffers;
-using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
-using ShaRPC.Core.Server;
 
-namespace ShaRPC.Core;
+namespace ShaRPC.Core.Server;
 
-internal sealed class RpcPeerResponseBuilder
+internal sealed class ShaRpcServerResponseBuilder
 {
     private readonly ISerializer _serializer;
-    private readonly InstanceRegistry _registry;
     private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers;
-    private readonly bool _rejectInboundCalls;
 
-    public RpcPeerResponseBuilder(
+    public ShaRpcServerResponseBuilder(
         ISerializer serializer,
-        InstanceRegistry registry,
-        ConcurrentDictionary<string, IServiceDispatcher> dispatchers,
-        bool rejectInboundCalls)
+        ConcurrentDictionary<string, IServiceDispatcher> dispatchers)
     {
         _serializer = serializer;
-        _registry = registry;
         _dispatchers = dispatchers;
-        _rejectInboundCalls = rejectInboundCalls;
     }
 
     public async ValueTask<Payload> BuildAsync(
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> payload,
+        IInstanceRegistry registry,
         CancellationToken ct)
     {
-        if (_rejectInboundCalls)
-        {
-            return BuildErrorFrame(
-                messageId,
-                new RpcError("This peer does not accept inbound calls.", "ShaRpcInboundRejected"));
-        }
-
         if (!_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
         {
             return BuildErrorFrame(messageId, RpcErrors.ServiceNotFound(request.ServiceName));
@@ -53,8 +39,8 @@ internal sealed class RpcPeerResponseBuilder
         try
         {
             await (request.InstanceId is null
-                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, _registry, writer, ct)
-                : dispatcher.DispatchOnInstanceAsync(request.InstanceId, request.MethodName, payload, _serializer, _registry, writer, ct)).ConfigureAwait(false);
+                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, registry, writer, ct)
+                : dispatcher.DispatchOnInstanceAsync(request.InstanceId, request.MethodName, payload, _serializer, registry, writer, ct));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -67,9 +53,6 @@ internal sealed class RpcPeerResponseBuilder
 
         return MessageFramer.FinishFrame(writer, envelopeLength);
     }
-
-    public Payload BuildProtocolErrorFrame(int messageId, string errorMessage) =>
-        BuildErrorFrame(messageId, RpcErrors.Protocol(errorMessage));
 
     private Payload BuildErrorFrame(int messageId, RpcError error) =>
         MessageFramer.FrameMessage(

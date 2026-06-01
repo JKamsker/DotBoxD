@@ -15,6 +15,7 @@ public sealed class ShaRpcServer : IShaRpcServer
     private readonly IServerTransport _transport;
     private readonly ISerializer _serializer;
     private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
+    private readonly ShaRpcServerResponseBuilder _responseBuilder;
     private readonly ConcurrentDictionary<IConnection, Task> _connections = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
@@ -24,6 +25,7 @@ public sealed class ShaRpcServer : IShaRpcServer
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+        _responseBuilder = new ShaRpcServerResponseBuilder(_serializer, _dispatchers);
     }
 
     /// <summary>
@@ -221,7 +223,7 @@ public sealed class ShaRpcServer : IShaRpcServer
         {
             using (data)
             {
-                using var responseFrame = await BuildResponseFrameAsync(
+                using var responseFrame = await _responseBuilder.BuildAsync(
                     request,
                     messageId,
                     payload,
@@ -245,50 +247,6 @@ public sealed class ShaRpcServer : IShaRpcServer
             requestCts.Dispose();
         }
     }
-
-    private async ValueTask<Payload> BuildResponseFrameAsync(
-        RpcRequest request,
-        int messageId,
-        ReadOnlyMemory<byte> payload,
-        IInstanceRegistry registry,
-        CancellationToken ct)
-    {
-        if (!_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
-        {
-            return BuildErrorFrame(messageId, $"Service '{request.ServiceName}' not found.", nameof(ShaRpcNotFoundException));
-        }
-
-        using var writer = new PooledBufferWriter(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
-        MessageFramer.WriteFramePrefix(writer, messageId, MessageType.Response);
-        var envelopeStart = writer.WrittenCount;
-        _serializer.Serialize(writer, new RpcResponse { MessageId = messageId, IsSuccess = true });
-        var envelopeLength = writer.WrittenCount - envelopeStart;
-
-        try
-        {
-            await (request.InstanceId is null
-                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, registry, writer, ct)
-                : dispatcher.DispatchOnInstanceAsync(request.InstanceId, request.MethodName, payload, _serializer, registry, writer, ct));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return BuildErrorFrame(messageId, ex.Message, ex.GetType().Name);
-        }
-
-        return MessageFramer.FinishFrame(writer, envelopeLength);
-    }
-
-    private Payload BuildErrorFrame(int messageId, string errorMessage, string errorType) =>
-        MessageFramer.FrameMessage(
-            _serializer,
-            messageId,
-            MessageType.Error,
-            new RpcResponse { MessageId = messageId, IsSuccess = false, ErrorMessage = errorMessage, ErrorType = errorType },
-            ReadOnlySpan<byte>.Empty);
 
     private static async Task WaitForActiveRequestsAsync(IEnumerable<Task> activeRequests)
     {
