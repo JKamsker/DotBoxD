@@ -30,7 +30,7 @@ public sealed class RpcPeerInboundQueueRegressionTests
             serializer,
             new RpcPeerOptions
             {
-                InboundQueueCapacity = 1,
+                InboundQueueCapacity = 2,
                 QueueFullMode = ShaRpcQueueFullMode.Wait,
                 RequestTimeout = TimeSpan.FromMilliseconds(750),
             });

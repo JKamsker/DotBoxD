@@ -59,7 +59,10 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     /// <summary>The remote endpoint string of the underlying channel.</summary>
     public string RemoteEndpoint => _channel.RemoteEndpoint;
 
-    /// <summary>Raised when the read loop ends after a remote close or read error; local close/dispose does not raise it.</summary>
+    /// <summary>
+    /// Raised when the read loop ends after a remote close or read error; local close/dispose does
+    /// not raise it. Handlers run on the teardown path and should not block.
+    /// </summary>
     public event EventHandler<RpcDisconnectedEventArgs>? Disconnected;
 
     /// <summary>Raised when the read loop fails with a non-cancellation exception.</summary>

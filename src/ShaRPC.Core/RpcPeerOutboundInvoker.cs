@@ -136,10 +136,29 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct)
     {
         _ensureStarted();
-        var messageId = GetNextMessageId();
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
-        var frame = MessageFramer.FrameRequest(_serializer, messageId, MessageType.Request, envelope, request);
-        return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
+        var pending = ReservePendingRequest();
+        try
+        {
+            var envelope = CreateEnvelope(pending.MessageId, service, method, instanceId);
+            var frame = MessageFramer.FrameRequest(
+                _serializer,
+                pending.MessageId,
+                MessageType.Request,
+                envelope,
+                request);
+            return SendFrameAndAwaitAsync(
+                pending.MessageId,
+                pending.Completion,
+                frame,
+                service,
+                method,
+                ct);
+        }
+        catch
+        {
+            _pending.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
+            throw;
+        }
     }
 
     private Task<ReceivedResponse> SendRequestAsync(
@@ -149,27 +168,41 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct)
     {
         _ensureStarted();
-        var messageId = GetNextMessageId();
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
-        var frame = MessageFramer.FrameMessage(
-            _serializer,
-            messageId,
-            MessageType.Request,
-            envelope,
-            ReadOnlySpan<byte>.Empty);
-        return SendFrameAndAwaitAsync(messageId, frame, service, method, ct);
+        var pending = ReservePendingRequest();
+        try
+        {
+            var envelope = CreateEnvelope(pending.MessageId, service, method, instanceId);
+            var frame = MessageFramer.FrameMessage(
+                _serializer,
+                pending.MessageId,
+                MessageType.Request,
+                envelope,
+                ReadOnlySpan<byte>.Empty);
+            return SendFrameAndAwaitAsync(
+                pending.MessageId,
+                pending.Completion,
+                frame,
+                service,
+                method,
+                ct);
+        }
+        catch
+        {
+            _pending.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
+            throw;
+        }
     }
 
-    private int GetNextMessageId()
+    private (int MessageId, TaskCompletionSource<ReceivedResponse> Completion) ReservePendingRequest()
     {
-        int messageId;
-        do
+        while (true)
         {
-            messageId = Interlocked.Increment(ref _messageIdCounter);
+            var messageId = Interlocked.Increment(ref _messageIdCounter);
+            if (messageId != 0 && _pending.TryAdd(messageId, out var tcs))
+            {
+                return (messageId, tcs);
+            }
         }
-        while (messageId == 0 || _pending.Contains(messageId));
-
-        return messageId;
     }
 
     private static RpcRequest CreateEnvelope(
@@ -187,17 +220,16 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
 
     private async Task<ReceivedResponse> SendFrameAndAwaitAsync(
         int messageId,
+        TaskCompletionSource<ReceivedResponse> tcs,
         Payload frame,
         string service,
         string method,
         CancellationToken ct)
     {
-        TaskCompletionSource<ReceivedResponse>? tcs = null;
         var consumed = false;
         var requestSent = false;
         try
         {
-            tcs = _pending.Add(messageId);
             using (frame)
             {
                 await _sendAsync(frame.Memory, ct).ConfigureAwait(false);
@@ -242,14 +274,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         }
         finally
         {
-            if (tcs is null)
-            {
-                frame.Dispose();
-            }
-            else
-            {
-                _pending.Remove(messageId, tcs.Task, consumed);
-            }
+            _pending.Remove(messageId, tcs.Task, consumed);
         }
     }
 

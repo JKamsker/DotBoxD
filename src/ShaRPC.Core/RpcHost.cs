@@ -24,6 +24,7 @@ public sealed class RpcHost : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
     private Task? _stopTask;
+    private bool _starting;
     private int _disposed;
 
     private RpcHost(IServerTransport listener, ISerializer serializer, RpcPeerOptions options)
@@ -75,20 +76,21 @@ public sealed class RpcHost : IAsyncDisposable
     public async Task StartAsync(CancellationToken ct = default)
     {
         CancellationTokenSource cts;
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            throw new ObjectDisposedException(nameof(RpcHost));
-        }
-
         lock (_lifecycleLock)
         {
-            if (_cts is not null)
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(nameof(RpcHost));
+            }
+
+            if (_cts is not null || _starting)
             {
                 throw new InvalidOperationException("Host is already running.");
             }
 
             cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             _cts = cts;
+            _starting = true;
         }
 
         try
@@ -105,18 +107,73 @@ public sealed class RpcHost : IAsyncDisposable
                     _stopTask = null;
                     cts.Dispose();
                 }
+
+                _starting = false;
             }
 
             throw;
         }
 
+        var stopStartedListener = false;
+        Exception? startFailure = null;
+        var disposeCts = false;
         lock (_lifecycleLock)
         {
-            if (ReferenceEquals(_cts, cts))
+            if (Volatile.Read(ref _disposed) != 0)
             {
+                var ownsCts = ReferenceEquals(_cts, cts);
+                disposeCts = ownsCts && _stopTask is null;
+                if (ownsCts)
+                {
+                    _cts = null;
+                    _stopTask = null;
+                }
+
+                stopStartedListener = true;
+                startFailure = new ObjectDisposedException(nameof(RpcHost));
+            }
+            else if (!ReferenceEquals(_cts, cts))
+            {
+                stopStartedListener = true;
+            }
+            else if (_stopTask is not null || cts.IsCancellationRequested)
+            {
+                stopStartedListener = true;
+            }
+            else
+            {
+                _starting = false;
                 _acceptTask = AcceptLoopAsync(cts.Token);
+                return;
             }
         }
+
+        try
+        {
+            if (stopStartedListener)
+            {
+                await _listener.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            lock (_lifecycleLock)
+            {
+                _starting = false;
+            }
+        }
+
+        if (startFailure is not null)
+        {
+            if (disposeCts)
+            {
+                cts.Dispose();
+            }
+
+            throw startFailure;
+        }
+
+        throw new InvalidOperationException("Host start was stopped before it completed.");
     }
 
     public Task StopAsync(CancellationToken ct = default)

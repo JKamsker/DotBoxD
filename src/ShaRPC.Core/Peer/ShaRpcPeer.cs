@@ -39,7 +39,8 @@ public sealed class ShaRpcPeer : IAsyncDisposable
     public event Action<Exception>? ReadError;
 
     /// <summary>
-    /// Raised when the remote side closes the shared connection.
+    /// Raised when the remote side closes the shared connection. Handlers run on the teardown path
+    /// and should not block.
     /// </summary>
     public event Action? Disconnected;
 

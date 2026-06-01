@@ -116,7 +116,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     public ValueTask DisposeAsync();
 
     // observability
-    public event EventHandler<RpcDisconnectedEventArgs>? Disconnected;
+    public event EventHandler<RpcDisconnectedEventArgs>? Disconnected; // handlers should not block
     public event EventHandler<RpcReadErrorEventArgs>? ReadError;
     public event EventHandler<RpcProtocolErrorEventArgs>? ProtocolError;
 }
@@ -149,8 +149,9 @@ public sealed record RpcPeerOptions
     public bool RejectInboundCalls { get; init; }
 
     // Backpressure for inbound dispatch. Null dispatches immediately and does not cap
-    // concurrent dispatcher work. In Wait mode, response and cancel frames keep flowing
-    // while request admission waits for dispatch queue space.
+    // concurrent dispatcher work; use it only with trusted peers or externally bounded
+    // transports. In Wait mode, queued requests are bounded and excess request frames
+    // apply read-side backpressure until dispatch queue space is available.
     public int? InboundQueueCapacity { get; init; }
     public ShaRpcQueueFullMode QueueFullMode { get; init; } = ShaRpcQueueFullMode.Wait;
 }
@@ -188,7 +189,7 @@ i.e. `IRpcChannel`). "IChannelListener" is the conceptual name for the same role
 ## Generated surface (per `[ShaRpcService] IGameService`)
 
 The generator emits the same proxy + dispatcher pair. The proxy's backing field is now
-typed `IRpcInvoker` (the field name stays `_client` internally). New extension methods
+typed `IRpcInvoker` and named `_invoker` internally. New extension methods
 target `RpcPeer`; the legacy `Create…Proxy` / `Add…` extensions remain for the
 client/server API.
 

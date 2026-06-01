@@ -88,7 +88,7 @@ internal static class ProxyGenerationHelpers
     {
         var unescapedName = IdentifierHelpers.UnescapeIdentifier(methodName);
         return unescapedName == proxyName ||
-            unescapedName == "_client" ||
+            unescapedName == "_invoker" ||
             unescapedName == "_instanceId" ||
             unescapedName == "Equals" ||
             unescapedName == "GetHashCode" ||

@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using System.Net;
 using Shared;
 using ShaRPC.Core;
 using ShaRPC.Core.Buffers;
@@ -132,20 +133,22 @@ public class PeerTests
     [Fact]
     public async Task RpcPeer_OverTcp_RoundTrips()
     {
-        const int port = 15055;
         Exception? clientReadError = null;
         Exception? serverReadError = null;
+        var serverTransport = new ShaRPC.Transports.Tcp.TcpServerTransport(IPAddress.Loopback, 0);
 
         await using var host = RpcHost
-            .Listen(new ShaRPC.Transports.Tcp.TcpServerTransport(port), NewSerializer())
+            .Listen(serverTransport, NewSerializer())
             .ForEachPeer(peer =>
             {
                 peer.Provide<IGameService>(new TestGameService());
                 peer.ReadError += (_, args) => serverReadError = args.Error;
             });
         await host.StartAsync();
+        var port = serverTransport.LocalEndpoint?.Port ??
+            throw new InvalidOperationException("TCP test server did not expose a bound port.");
 
-        var transport = new ShaRPC.Transports.Tcp.TcpTransport("localhost", port);
+        var transport = new ShaRPC.Transports.Tcp.TcpTransport("127.0.0.1", port);
         await transport.ConnectAsync();
         await using var client = RpcPeer.Over(transport.Connection!, NewSerializer(),
             new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) });
@@ -168,17 +171,19 @@ public class PeerTests
     [Fact]
     public async Task RpcPeer_OverTcp_Bidirectional_LikeSample()
     {
-        const int port = 15056;
         var greeted = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serverTransport = new ShaRPC.Transports.Tcp.TcpServerTransport(IPAddress.Loopback, 0);
 
         // Exercise the generated Provide/Get extension methods (the shape the sample uses).
         await using var host = RpcHost
-            .Listen(new ShaRPC.Transports.Tcp.TcpServerTransport(port), NewSerializer())
+            .Listen(serverTransport, NewSerializer())
             .ForEachPeer(peer => peer.ProvideGameService(new TestGameService()));
         host.PeerConnected += (_, args) => _ = GreetAsync(args.Peer, greeted);
         await host.StartAsync();
+        var port = serverTransport.LocalEndpoint?.Port ??
+            throw new InvalidOperationException("TCP test server did not expose a bound port.");
 
-        var transport = new ShaRPC.Transports.Tcp.TcpTransport("localhost", port);
+        var transport = new ShaRPC.Transports.Tcp.TcpTransport("127.0.0.1", port);
         await transport.ConnectAsync();
         await using var client = RpcPeer.Over(transport.Connection!, NewSerializer(),
                 new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })

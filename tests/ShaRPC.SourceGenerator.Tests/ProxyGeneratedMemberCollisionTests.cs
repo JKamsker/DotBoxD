@@ -20,7 +20,7 @@ public class ProxyGeneratedMemberCollisionTests
                 [ShaRpcService]
                 public interface IFieldCollision
                 {
-                    int _client();
+                    int _invoker();
                     Task<int> _instanceId();
                 }
             }
@@ -32,14 +32,14 @@ public class ProxyGeneratedMemberCollisionTests
         var proxy = runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName.EndsWith("IFieldCollision.ShaRpcProxy.g.cs"))
             .SourceText.ToString();
-        proxy.Should().Contain("int global::Regress.ProxyGeneratedMembers.IFieldCollision._client()");
+        proxy.Should().Contain("int global::Regress.ProxyGeneratedMembers.IFieldCollision._invoker()");
         proxy.Should().Contain(
             "global::System.Threading.Tasks.Task<int> global::Regress.ProxyGeneratedMembers.IFieldCollision._instanceId()");
         proxy.Should().Contain(
-            "public async global::System.Threading.Tasks.Task<int> _clientAsync(");
+            "public async global::System.Threading.Tasks.Task<int> _invokerAsync(");
         proxy.Should().Contain(
             "global::System.Threading.Tasks.Task<int> global::Regress.ProxyGeneratedMembers.IFieldCollisionAsync._instanceId(");
-        proxy.Should().NotContain("public int _client()");
+        proxy.Should().NotContain("public int _invoker()");
         proxy.Should().NotContain("public async global::System.Threading.Tasks.Task<int> _instanceId(");
     }
 

@@ -24,9 +24,9 @@ public sealed record RpcPeerOptions
     public bool RejectInboundCalls { get; init; }
 
     /// <summary>
-    /// Maximum queued inbound requests. Null dispatches inbound requests immediately and does not
-    /// cap concurrent dispatch work. In wait mode, response and cancel frames keep being read while
-    /// request admission waits for dispatch queue space.
+    /// Maximum queued inbound requests. Null dispatches inbound requests immediately, does not
+    /// cap concurrent dispatch work, and should only be used with trusted peers or externally
+    /// bounded transports. In wait mode, request admission waits for bounded dispatch queue space.
     /// </summary>
     public int? InboundQueueCapacity { get; init; }
 

@@ -120,11 +120,31 @@ public sealed class ShaRpcClient : IShaRpcClient
         CancellationToken ct)
     {
         var connection = EnsureConnected();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
+        var pending = ReservePendingRequest();
+        try
+        {
+            var envelope = CreateEnvelope(pending.MessageId, service, method, instanceId);
 
-        var frame = MessageFramer.FrameRequest(_serializer, messageId, MessageType.Request, envelope, request);
-        return SendFrameAndAwaitAsync(messageId, frame, connection, service, method, ct);
+            var frame = MessageFramer.FrameRequest(
+                _serializer,
+                pending.MessageId,
+                MessageType.Request,
+                envelope,
+                request);
+            return SendFrameAndAwaitAsync(
+                pending.MessageId,
+                pending.Completion,
+                frame,
+                connection,
+                service,
+                method,
+                ct);
+        }
+        catch
+        {
+            _pendingRequests.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
+            throw;
+        }
     }
 
     private Task<ReceivedResponse> SendRequestAsync(
@@ -134,11 +154,43 @@ public sealed class ShaRpcClient : IShaRpcClient
         CancellationToken ct)
     {
         var connection = EnsureConnected();
-        var messageId = Interlocked.Increment(ref _messageIdCounter);
-        var envelope = CreateEnvelope(messageId, service, method, instanceId);
+        var pending = ReservePendingRequest();
+        try
+        {
+            var envelope = CreateEnvelope(pending.MessageId, service, method, instanceId);
 
-        var frame = MessageFramer.FrameMessage(_serializer, messageId, MessageType.Request, envelope, ReadOnlySpan<byte>.Empty);
-        return SendFrameAndAwaitAsync(messageId, frame, connection, service, method, ct);
+            var frame = MessageFramer.FrameMessage(
+                _serializer,
+                pending.MessageId,
+                MessageType.Request,
+                envelope,
+                ReadOnlySpan<byte>.Empty);
+            return SendFrameAndAwaitAsync(
+                pending.MessageId,
+                pending.Completion,
+                frame,
+                connection,
+                service,
+                method,
+                ct);
+        }
+        catch
+        {
+            _pendingRequests.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
+            throw;
+        }
+    }
+
+    private (int MessageId, TaskCompletionSource<ReceivedResponse> Completion) ReservePendingRequest()
+    {
+        while (true)
+        {
+            var messageId = Interlocked.Increment(ref _messageIdCounter);
+            if (messageId != 0 && _pendingRequests.TryAdd(messageId, out var tcs))
+            {
+                return (messageId, tcs);
+            }
+        }
     }
 
     private IConnection EnsureConnected()
@@ -170,18 +222,17 @@ public sealed class ShaRpcClient : IShaRpcClient
     /// </summary>
     private async Task<ReceivedResponse> SendFrameAndAwaitAsync(
         int messageId,
+        TaskCompletionSource<ReceivedResponse> tcs,
         Payload frame,
         IConnection connection,
         string service,
         string method,
         CancellationToken ct)
     {
-        TaskCompletionSource<ReceivedResponse>? tcs = null;
         var consumed = false;
         var requestSent = false;
         try
         {
-            tcs = _pendingRequests.Add(messageId);
             using (frame)
             {
                 await connection.SendAsync(frame.Memory, ct);
@@ -228,14 +279,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         }
         finally
         {
-            if (tcs is null)
-            {
-                frame.Dispose();
-            }
-            else
-            {
-                _pendingRequests.Remove(messageId, tcs.Task, consumed);
-            }
+            _pendingRequests.Remove(messageId, tcs.Task, consumed);
         }
     }
 

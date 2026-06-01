@@ -19,7 +19,7 @@ public class InheritedExplicitProxyTests
                 public interface IBase
                 {
                     int FooProxy();
-                    int _client();
+                    int _invoker();
                     int _instanceId();
                 }
 
@@ -35,7 +35,7 @@ public class InheritedExplicitProxyTests
 
         var proxy = GetProxy(runResult);
         proxy.Should().Contain("int global::Regress.InheritedExplicitProxy.IBase.FooProxy()");
-        proxy.Should().Contain("int global::Regress.InheritedExplicitProxy.IBase._client()");
+        proxy.Should().Contain("int global::Regress.InheritedExplicitProxy.IBase._invoker()");
         proxy.Should().Contain("int global::Regress.InheritedExplicitProxy.IBase._instanceId()");
         proxy.Should().NotContain("global::Regress.InheritedExplicitProxy.IFoo.FooProxy()");
     }

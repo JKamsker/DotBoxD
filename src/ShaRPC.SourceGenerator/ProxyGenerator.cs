@@ -45,20 +45,20 @@ internal static class ProxyGenerator
         sb.AppendLine("    /// </summary>");
         sb.AppendLine($"    public sealed class {proxyName} : {baseList}");
         sb.AppendLine("    {");
-        sb.AppendLine("        private readonly global::ShaRPC.Core.IRpcInvoker _client;");
+        sb.AppendLine("        private readonly global::ShaRPC.Core.IRpcInvoker _invoker;");
         sb.AppendLine("        /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>");
         sb.AppendLine("        private readonly string? _instanceId;");
         sb.AppendLine();
         sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.IRpcInvoker client)");
         sb.AppendLine("        {");
-        sb.AppendLine("            this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));");
+        sb.AppendLine("            this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));");
         sb.AppendLine("            this._instanceId = null;");
         sb.AppendLine("        }");
         sb.AppendLine();
         sb.AppendLine($"        /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>");
         sb.AppendLine($"        public {proxyName}(global::ShaRPC.Core.IRpcInvoker client, string instanceId)");
         sb.AppendLine("        {");
-        sb.AppendLine("            this._client = client ?? throw new global::System.ArgumentNullException(nameof(client));");
+        sb.AppendLine("            this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));");
         sb.AppendLine("            this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));");
         sb.AppendLine("        }");
 
@@ -145,7 +145,7 @@ internal static class ProxyGenerator
     }
 
     /// <summary>
-    /// Builds the call to <c>_client.InvokeAsync</c> or <c>_client.InvokeOnInstanceAsync</c>.
+    /// Builds the call to <c>_invoker.InvokeAsync</c> or <c>_invoker.InvokeOnInstanceAsync</c>.
     /// For sub-service-returning methods, the wire response type is always
     /// <c>ServiceHandle</c>; the caller wraps it in a generated sub-proxy. The emitted
     /// expression branches on <c>_instanceId</c> so the same proxy class can serve both
@@ -220,7 +220,7 @@ internal static class ProxyGenerator
             callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", ({tupleValues}), {ctArg}";
         }
 
-        return $"(this._instanceId is null ? this._client.InvokeAsync{typeArgs}({callArgs}) : this._client.InvokeOnInstanceAsync{typeArgs}({callArgsInst}))";
+        return $"(this._instanceId is null ? this._invoker.InvokeAsync{typeArgs}({callArgs}) : this._invoker.InvokeOnInstanceAsync{typeArgs}({callArgsInst}))";
     }
 
     private static string GetServiceHandleType(MethodModel method) =>

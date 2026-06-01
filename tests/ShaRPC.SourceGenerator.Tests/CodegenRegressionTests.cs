@@ -665,7 +665,7 @@ public class CodegenRegressionTests
         var proxy = runResult.Results.Single().GeneratedSources
             .Single(g => g.HintName == "IRoot.ShaRpcProxy.g.cs")
             .SourceText.ToString();
-        proxy.Should().Contain("return new global::SubProxy(this._client, __sharpc_handle.InstanceId);");
+        proxy.Should().Contain("return new global::SubProxy(this._invoker, __sharpc_handle.InstanceId);");
         proxy.Should().NotContain("global::ISubProxy");
     }
 

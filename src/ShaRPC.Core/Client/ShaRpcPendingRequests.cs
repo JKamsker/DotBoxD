@@ -8,19 +8,17 @@ internal sealed class ShaRpcPendingRequests
 {
     private readonly ConcurrentDictionary<int, TaskCompletionSource<ReceivedResponse>> _requests = new();
 
-    public TaskCompletionSource<ReceivedResponse> Add(int messageId)
+    public bool TryAdd(int messageId, out TaskCompletionSource<ReceivedResponse> tcs)
     {
-        var tcs = new TaskCompletionSource<ReceivedResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_requests.TryAdd(messageId, tcs))
+        tcs = new TaskCompletionSource<ReceivedResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (_requests.TryAdd(messageId, tcs))
         {
-            throw new InvalidOperationException(
-                $"A ShaRPC request with message id {messageId} is already pending.");
+            return true;
         }
 
-        return tcs;
+        tcs = null!;
+        return false;
     }
-
-    public bool Contains(int messageId) => _requests.ContainsKey(messageId);
 
     public void Remove(int messageId, Task<ReceivedResponse> task, bool consumed)
     {

@@ -13,7 +13,8 @@ public sealed class ShaRpcPeerOptions
     public TimeSpan? RequestTimeout { get; set; }
 
     /// <summary>
-    /// Maximum queued frames per peer direction. Null uses unbounded queues.
+    /// Maximum queued frames per peer direction. Null uses unbounded queues and should only be used
+    /// with trusted peers or externally bounded transports.
     /// </summary>
     public int? InboundQueueCapacity { get; set; }
 

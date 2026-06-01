@@ -157,7 +157,7 @@ generated proxies for services provided by the remote side.
 |--------|-------------|
 | `Provide<TService>(TService)` / `Provide(IServiceDispatcher)` | Registers an inbound service |
 | `Get<TService>()` | Creates a generated proxy for a remote service |
-| `Disconnected` | Raised when a remote close or read error ends the read loop; local close/dispose does not raise it |
+| `Disconnected` | Raised when a remote close or read error ends the read loop; local close/dispose does not raise it. Handlers run on the teardown path and should not block |
 | `ReadError` | Raised when the read loop faults |
 | `ProtocolError` | Raised when a malformed or unsupported protocol frame is observed |
 | `CloseAsync()` / `DisposeAsync()` | Idempotently disposes the peer and underlying connection; closed peers cannot be restarted |
@@ -166,9 +166,9 @@ generated proxies for services provided by the remote side.
 but it is not an authentication or authorization boundary. Any connected peer can still send
 request frames; secure transports or application-level checks should enforce trust.
 Leaving `RpcPeerOptions.InboundQueueCapacity` unset dispatches inbound peer requests
-immediately and does not cap concurrent dispatcher work. In `Wait` mode, request
-admission can wait for dispatch queue space while response and cancel frames continue
-through the peer read loop.
+immediately and does not cap concurrent dispatcher work; use it only with trusted peers
+or externally bounded transports. When a capacity is set, `Wait` mode bounds queued
+requests and applies read-side backpressure instead of retaining unbounded request frames.
 
 #### `ShaRpcPeer`
 Bidirectional endpoint over one duplex `IConnection`. One peer can serve local dispatchers and create generated proxies for the remote side over the same connection.
@@ -188,12 +188,12 @@ var remote = peer.CreateProxy<IRemoteService>();
 | `CreateProxy<TService>()` / `GetProxy<TService>()` | Creates a generated proxy for the remote peer |
 | `RegisterDispatcher(IServiceDispatcher)` | Registers an inbound dispatcher |
 | `ReadError` | Raised when the shared read loop faults |
-| `Disconnected` | Raised when the remote connection closes |
+| `Disconnected` | Raised when the remote connection closes. Handlers run on the teardown path and should not block |
 | `ConnectionClosed` | Raised when the shared read loop ends, with endpoint and exception details |
 | `FrameDropped` | Raised when a bounded duplex queue drops or rejects a routed frame |
 | `CloseAsync()` / `DisposeAsync()` | Idempotently disposes the peer and underlying connection; closed peers cannot be restarted |
 
-`ShaRpcPeerOptions.InboundQueueCapacity` and `QueueFullMode` can bound the internal request/response queues used by the duplex splitter.
+`ShaRpcPeerOptions.InboundQueueCapacity` and `QueueFullMode` can bound the internal request/response queues used by the duplex splitter. Leaving the capacity unset uses unbounded queues and should only be used with trusted peers or externally bounded transports.
 Client-side cancellation sends a ShaRPC cancel frame for the in-flight request. The server
 continues reading the connection while dispatch runs and cancels the matching dispatcher token
 when that frame arrives.
@@ -344,6 +344,9 @@ public TcpServerTransport(string address, int port)
 |-----------|------|-------------|
 | `port` | `int` | Port to listen on |
 | `address` | `IPAddress`/`string` | Interface to bind (default: `IPAddress.Any`) |
+
+`TcpServerTransport.LocalEndpoint` exposes the bound endpoint after `StartAsync` succeeds,
+including the OS-assigned port when the transport is created with port `0`.
 
 ---
 

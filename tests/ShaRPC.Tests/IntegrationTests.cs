@@ -4,6 +4,7 @@ using ShaRPC.Core.Server;
 using ShaRPC.Generated;
 using ShaRPC.Serializers.MessagePack;
 using ShaRPC.Transports.Tcp;
+using System.Net;
 using Xunit;
 
 namespace ShaRPC.Tests;
@@ -13,12 +14,11 @@ public class IntegrationTests : IAsyncLifetime
     private ShaRpcServer? _server;
     private ShaRpcClient? _client;
     private IGameService? _gameService;
-    private const int TestPort = 15000;
 
     public async Task InitializeAsync()
     {
         // Create and start server
-        var serverTransport = new TcpServerTransport(TestPort);
+        var serverTransport = new TcpServerTransport(IPAddress.Loopback, 0);
         var serializer = new MessagePackRpcSerializer();
         var gameServiceImpl = new TestGameService();
 
@@ -29,9 +29,11 @@ public class IntegrationTests : IAsyncLifetime
             .Build();
 
         await _server.StartAsync();
+        var port = serverTransport.LocalEndpoint?.Port ??
+            throw new InvalidOperationException("TCP test server did not expose a bound port.");
 
         // Create and connect client
-        var clientTransport = new TcpTransport("localhost", TestPort);
+        var clientTransport = new TcpTransport("127.0.0.1", port);
         _client = new ShaRpcClientBuilder()
             .UseTransport(clientTransport)
             .UseSerializer(serializer)

@@ -6,7 +6,8 @@ namespace ShaRPC.Core.Transport;
 public sealed class DuplexConnectionSplitterOptions
 {
     /// <summary>
-    /// Maximum queued frames per split side. A null value uses unbounded queues.
+    /// Maximum queued frames per split side. A null value uses unbounded queues and should only be
+    /// used with trusted peers or externally bounded transports.
     /// </summary>
     public int? QueueCapacity { get; set; }
 

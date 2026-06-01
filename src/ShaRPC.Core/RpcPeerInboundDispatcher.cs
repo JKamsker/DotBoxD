@@ -95,7 +95,7 @@ internal sealed class RpcPeerInboundDispatcher
             return true;
         }
 
-        return _queue.TryEnqueue(inbound);
+        return await _queue.EnqueueAsync(inbound, loopCt).ConfigureAwait(false);
     }
 
     public void Cancel(int messageId)

@@ -31,6 +31,11 @@ public sealed class TcpServerTransport : IServerTransport
         _port = port;
     }
 
+    /// <summary>
+    /// Gets the bound endpoint after <see cref="StartAsync"/> succeeds.
+    /// </summary>
+    public IPEndPoint? LocalEndpoint => _listener?.LocalEndpoint as IPEndPoint;
+
     public Task StartAsync(CancellationToken ct = default)
     {
         if (_disposed)

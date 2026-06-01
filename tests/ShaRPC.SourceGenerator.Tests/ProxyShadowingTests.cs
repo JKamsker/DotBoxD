@@ -21,7 +21,7 @@ public class ProxyShadowingTests
                 [ShaRpcService]
                 public interface IShadow
                 {
-                    Task<int> EchoAsync(int _client, string _instanceId, CancellationToken ct = default);
+                    Task<int> EchoAsync(int _invoker, string _instanceId, CancellationToken ct = default);
                 }
             }
             """;
@@ -32,8 +32,8 @@ public class ProxyShadowingTests
             .SourceText.ToString();
 
         proxy.Should().Contain("this._instanceId is null");
-        proxy.Should().Contain("this._client.InvokeAsync");
-        proxy.Should().Contain("this._client.InvokeOnInstanceAsync");
+        proxy.Should().Contain("this._invoker.InvokeAsync");
+        proxy.Should().Contain("this._invoker.InvokeOnInstanceAsync");
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class ProxyShadowingTests
             .SourceText.ToString();
 
         proxy.Should().Contain("var __sharpc_handle1 = await");
-        proxy.Should().Contain("new global::Regress.ProxyShadow.SubProxy(this._client, __sharpc_handle1.InstanceId)");
+        proxy.Should().Contain("new global::Regress.ProxyShadow.SubProxy(this._invoker, __sharpc_handle1.InstanceId)");
     }
 
     private static (Compilation Compilation, GeneratorDriverRunResult RunResult) Compile(string source)
