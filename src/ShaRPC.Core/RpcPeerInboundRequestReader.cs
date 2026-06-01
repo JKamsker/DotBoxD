@@ -11,12 +11,12 @@ internal static class RpcPeerInboundRequestReader
         ISerializer serializer,
         out RpcRequest request,
         out ReadOnlyMemory<byte> payload,
-        out string protocolError,
+        out string? protocolError,
         out Exception? error)
     {
         request = default;
         payload = ReadOnlyMemory<byte>.Empty;
-        protocolError = string.Empty;
+        protocolError = null;
         error = null;
 
         if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out payload))

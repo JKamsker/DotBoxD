@@ -9,17 +9,19 @@ internal static class RpcErrors
     public const int MaxReflectedValueLength = 256;
 
     public static RpcError FromException(Exception exception) =>
-        exception is ShaRpcException
-            ? new RpcError(Truncate(exception.Message), exception.GetType().Name)
-            : new RpcError("Internal error.", RpcErrorTypes.InternalError);
+        exception is ShaRpcNotFoundException
+            ? new RpcError("Service not found.", exception.GetType().Name)
+            : exception is ShaRpcException
+                ? new RpcError("Internal error.", exception.GetType().Name)
+                : new RpcError("Internal error.", RpcErrorTypes.InternalError);
 
-    public static RpcError ServiceNotFound(string serviceName) =>
+    public static RpcError ServiceNotFound() =>
         new(
-            $"Service '{Truncate(serviceName)}' not found.",
+            "Service not found.",
             nameof(ShaRpcNotFoundException));
 
     public static RpcError Protocol(string message) =>
-        new(message, nameof(ShaRpcProtocolException));
+        new(Truncate(message), nameof(ShaRpcProtocolException));
 
     public static string Truncate(string value)
     {

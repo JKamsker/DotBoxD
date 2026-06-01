@@ -108,7 +108,12 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     public RpcPeer Provide<TService>()
         where TService : class
     {
-        if (_serviceProvider?.GetService(typeof(TService)) is not TService implementation)
+        if (_serviceProvider is null)
+        {
+            throw new InvalidOperationException("No ServiceProvider configured on RpcPeerOptions.");
+        }
+
+        if (_serviceProvider.GetService(typeof(TService)) is not TService implementation)
         {
             throw new InvalidOperationException($"Service provider did not resolve service '{typeof(TService).FullName}'.");
         }
@@ -221,11 +226,12 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
                 return new ValueTask(_disposeTask);
             }
 
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            if (_disposed != 0)
             {
                 return default;
             }
 
+            _disposed = 1;
             Interlocked.Exchange(ref _closed, 1);
             cts = _cts;
             readLoop = _readLoop;
@@ -239,6 +245,8 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
+        _outbound.FailPending(new ShaRpcConnectionException("Connection closed."));
+
         await _inbound.StopAsync().ConfigureAwait(false);
 
         if (readLoop is not null)
@@ -253,7 +261,6 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             }
         }
 
-        _outbound.FailPending(new ShaRpcConnectionException("Connection closed."));
         await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
 
         cts?.Dispose();

@@ -5,6 +5,7 @@ namespace ShaRPC.Core.Transport;
 /// legacy spelling of <see cref="IRpcChannel"/> and adds no members of its own — every
 /// connection is already a channel, so it can back an <see cref="ShaRPC.Core.RpcPeer"/>.
 /// </summary>
+[Obsolete("Use IRpcChannel instead.")]
 public interface IConnection : IRpcChannel
 {
 }

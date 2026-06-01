@@ -28,7 +28,7 @@ internal sealed class RpcDispatchResponseBuilder
     {
         if (!_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
         {
-            return BuildErrorFrame(messageId, RpcErrors.ServiceNotFound(request.ServiceName));
+            return BuildErrorFrame(messageId, RpcErrors.ServiceNotFound());
         }
 
         using var writer = new PooledBufferWriter(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);

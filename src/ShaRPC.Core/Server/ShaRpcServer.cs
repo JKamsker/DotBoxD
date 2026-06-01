@@ -17,9 +17,12 @@ public sealed class ShaRpcServer : IShaRpcServer
     private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
     private readonly ShaRpcServerResponseBuilder _responseBuilder;
     private readonly ConcurrentDictionary<IConnection, Task> _connections = new();
+    private readonly object _lifecycleLock = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
-    private bool _disposed;
+    private Task? _stopTask;
+    private int _disposed;
+    private int _started;
 
     public ShaRpcServer(IServerTransport transport, ISerializer serializer)
     {
@@ -41,43 +44,74 @@ public sealed class ShaRpcServer : IShaRpcServer
 
     public async Task StartAsync(CancellationToken ct = default)
     {
-        if (_cts != null)
+        if (Interlocked.Exchange(ref _started, 1) != 0)
         {
-            throw new InvalidOperationException("Server is already running.");
+            throw new InvalidOperationException("Already started.");
         }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        await _transport.StartAsync(ct);
+        await _transport.StartAsync(ct).ConfigureAwait(false);
         _acceptTask = AcceptConnectionsAsync(_cts.Token);
     }
 
-    public async Task StopAsync(CancellationToken ct = default)
+    public Task StopAsync(CancellationToken ct = default)
     {
-        if (_cts == null)
+        lock (_lifecycleLock)
         {
-            return;
+            if (_stopTask is not null) return _stopTask;
+            if (_cts is null) return Task.CompletedTask;
+            _stopTask = StopCoreAsync(ct);
         }
 
-        _cts.Cancel();
+        return _stopTask;
+    }
 
-        if (_acceptTask != null)
+    private async Task StopCoreAsync(CancellationToken ct)
+    {
+        CancellationTokenSource cts;
+        Task? acceptTask;
+
+        lock (_lifecycleLock)
         {
-            try
+            cts = _cts!;
+            acceptTask = _acceptTask;
+        }
+
+        try
+        {
+            cts.Cancel();
+
+            if (acceptTask != null)
             {
-                await _acceptTask;
+                try
+                {
+                    await acceptTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
             }
-            catch (OperationCanceledException) { }
-        }
 
-        var connectionTasks = _connections.Values.ToArray();
-        if (connectionTasks.Length > 0)
+            var connectionTasks = _connections.Values.ToArray();
+            if (connectionTasks.Length > 0)
+            {
+                await Task.WhenAll(connectionTasks).ConfigureAwait(false);
+            }
+
+            await _transport.StopAsync(ct).ConfigureAwait(false);
+            cts.Dispose();
+
+            lock (_lifecycleLock)
+            {
+                _cts = null;
+                _acceptTask = null;
+            }
+        }
+        finally
         {
-            await Task.WhenAll(connectionTasks);
+            lock (_lifecycleLock)
+            {
+                _stopTask = null;
+            }
         }
-
-        await _transport.StopAsync(ct);
-        _cts.Dispose();
-        _cts = null;
     }
 
     private async Task AcceptConnectionsAsync(CancellationToken ct)
@@ -86,7 +120,7 @@ public sealed class ShaRpcServer : IShaRpcServer
         {
             try
             {
-                var connection = await _transport.AcceptAsync(ct);
+                var connection = await _transport.AcceptAsync(ct).ConfigureAwait(false);
                 var registry = new InstanceRegistry();
                 var connectionTask = HandleConnectionAsync(connection, registry, ct);
                 _connections.TryAdd(connection, connectionTask);
@@ -97,7 +131,14 @@ public sealed class ShaRpcServer : IShaRpcServer
             {
                 break;
             }
-            catch (Exception) { }
+            catch (Exception)
+            {
+                try
+                {
+                    await Task.Delay(50, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+            }
         }
     }
 
@@ -110,7 +151,7 @@ public sealed class ShaRpcServer : IShaRpcServer
         {
             while (connection.IsConnected && !ct.IsCancellationRequested)
             {
-                var data = await connection.ReceiveAsync(ct);
+                var data = await connection.ReceiveAsync(ct).ConfigureAwait(false);
                 if (data.Length == 0)
                 {
                     data.Dispose();
@@ -133,10 +174,10 @@ public sealed class ShaRpcServer : IShaRpcServer
                 SafeCancel(request);
             }
 
-            await WaitForActiveRequestsAsync(activeTasks.Values);
+            await WaitForActiveRequestsAsync(activeTasks.Values).ConfigureAwait(false);
 
             registry.ReleaseAll();
-            await connection.DisposeAsync();
+            await connection.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -228,8 +269,8 @@ public sealed class ShaRpcServer : IShaRpcServer
                     messageId,
                     payload,
                     registry,
-                    requestCts.Token);
-                await connection.SendAsync(responseFrame.Memory, requestCts.Token);
+                    requestCts.Token).ConfigureAwait(false);
+                await connection.SendAsync(responseFrame.Memory, requestCts.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
@@ -274,13 +315,12 @@ public sealed class ShaRpcServer : IShaRpcServer
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
-        await StopAsync();
-        await _transport.DisposeAsync();
+        await StopAsync().ConfigureAwait(false);
+        await _transport.DisposeAsync().ConfigureAwait(false);
     }
 }

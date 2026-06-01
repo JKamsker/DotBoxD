@@ -5,7 +5,7 @@ namespace ShaRPC.Core;
 /// <summary>
 /// Options for <see cref="RpcPeer"/> and <see cref="RpcHost"/>.
 /// </summary>
-public sealed record RpcPeerOptions
+public sealed class RpcPeerOptions
 {
     public const int DefaultInboundQueueCapacity = 1024;
     public const int DefaultMaxPendingRequests = 4096;

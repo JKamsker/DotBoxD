@@ -19,7 +19,8 @@ public sealed class ShaRpcClient : IShaRpcClient
     private int _messageIdCounter;
     private Task? _receiveTask;
     private CancellationTokenSource? _cts;
-    private bool _disposed;
+    private int _disposed;
+    private int _connected;
 
     public ShaRpcClient(ITransport transport, ISerializer serializer, TimeSpan? timeout = null)
     {
@@ -32,7 +33,12 @@ public sealed class ShaRpcClient : IShaRpcClient
     public bool IsConnected => _transport.IsConnected;
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        await _transport.ConnectAsync(ct);
+        if (Interlocked.Exchange(ref _connected, 1) != 0)
+        {
+            throw new InvalidOperationException("Already connected.");
+        }
+
+        await _transport.ConnectAsync(ct).ConfigureAwait(false);
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _receiveTask = _receiveLoop.RunAsync(_cts.Token);
     }
@@ -43,7 +49,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, request, instanceId: null, ct);
+        using var received = await SendRequestAsync(service, method, request, instanceId: null, ct).ConfigureAwait(false);
         return _serializer.Deserialize<TResponse>(received.Payload);
     }
 
@@ -52,7 +58,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, instanceId: null, ct);
+        using var received = await SendRequestAsync(service, method, instanceId: null, ct).ConfigureAwait(false);
         return _serializer.Deserialize<TResponse>(received.Payload);
     }
 
@@ -62,7 +68,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, request, instanceId: null, ct);
+        using var received = await SendRequestAsync(service, method, request, instanceId: null, ct).ConfigureAwait(false);
     }
 
     public async Task InvokeAsync(
@@ -70,7 +76,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, instanceId: null, ct);
+        using var received = await SendRequestAsync(service, method, instanceId: null, ct).ConfigureAwait(false);
     }
 
     public async Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(
@@ -80,7 +86,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, request, instanceId, ct);
+        using var received = await SendRequestAsync(service, method, request, instanceId, ct).ConfigureAwait(false);
         return _serializer.Deserialize<TResponse>(received.Payload);
     }
 
@@ -90,7 +96,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, instanceId, ct);
+        using var received = await SendRequestAsync(service, method, instanceId, ct).ConfigureAwait(false);
         return _serializer.Deserialize<TResponse>(received.Payload);
     }
 
@@ -101,7 +107,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         TRequest request,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, request, instanceId, ct);
+        using var received = await SendRequestAsync(service, method, request, instanceId, ct).ConfigureAwait(false);
     }
 
     public async Task InvokeOnInstanceAsync(
@@ -110,7 +116,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         string method,
         CancellationToken ct = default)
     {
-        using var received = await SendRequestAsync(service, method, instanceId, ct);
+        using var received = await SendRequestAsync(service, method, instanceId, ct).ConfigureAwait(false);
     }
 
     private Task<ReceivedResponse> SendRequestAsync<TRequest>(
@@ -220,7 +226,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         {
             using (frame)
             {
-                await connection.SendAsync(frame.Memory, ct);
+                await connection.SendAsync(frame.Memory, ct).ConfigureAwait(false);
                 requestSent = true;
             }
 
@@ -236,13 +242,16 @@ public sealed class ShaRpcClient : IShaRpcClient
             {
                 try
                 {
-                    received = await tcs.Task;
+                    received = await tcs.Task.ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
                 {
                     if (requestSent)
                     {
-                        _ = ShaRpcClientFrameHelpers.SendCancelFrameAsync(connection, messageId);
+                        _ = ShaRpcClientFrameHelpers.SendCancelFrameAsync(connection, messageId)
+                            .ContinueWith(
+                                static _ => { },
+                                TaskContinuationOptions.OnlyOnFaulted);
                     }
 
                     // The linked token fires for both the caller's cancellation and the timeout;
@@ -270,12 +279,10 @@ public sealed class ShaRpcClient : IShaRpcClient
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
-
-        _disposed = true;
 
         _cts?.Cancel();
 
@@ -283,7 +290,7 @@ public sealed class ShaRpcClient : IShaRpcClient
         {
             try
             {
-                await _receiveTask;
+                await _receiveTask.ConfigureAwait(false);
             }
             catch
             {
@@ -291,9 +298,9 @@ public sealed class ShaRpcClient : IShaRpcClient
             }
         }
 
-        _pendingRequests.CancelAll();
+        _pendingRequests.FailAll(new ShaRpcConnectionException("Connection closed."));
 
         _cts?.Dispose();
-        await _transport.DisposeAsync();
+        await _transport.DisposeAsync().ConfigureAwait(false);
     }
 }

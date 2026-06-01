@@ -192,7 +192,14 @@ public sealed class RpcHost : IAsyncDisposable
         var completed = false;
         try
         {
-            cts.Cancel();
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // CTS was disposed by a prior failed stop attempt.
+            }
 
             if (acceptTask is not null)
             {
@@ -200,19 +207,28 @@ public sealed class RpcHost : IAsyncDisposable
                 {
                     await acceptTask.ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (Exception)
                 {
+                    // Accept loop faults are swallowed during shutdown.
                 }
             }
 
             await _listener.StopAsync(ct).ConfigureAwait(false);
             await _peers.CloseAllAsync().ConfigureAwait(false);
             await _peers.AwaitCleanupAsync().ConfigureAwait(false);
-            cts.Dispose();
             completed = true;
         }
         finally
         {
+            try
+            {
+                cts.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed by a prior failed stop attempt.
+            }
+
             lock (_lifecycleLock)
             {
                 if (ReferenceEquals(_cts, cts))
@@ -248,8 +264,8 @@ public sealed class RpcHost : IAsyncDisposable
             return;
         }
 
-        _peers.Add(peer);
         peer.Disconnected += OnPeerDisconnected;
+        _peers.Add(peer);
         peer.Start();
         RpcEventHandlerInvoker.Raise(PeerConnected, this, new RpcPeerEventArgs(peer));
     }
@@ -264,6 +280,7 @@ public sealed class RpcHost : IAsyncDisposable
             return;
         }
 
+        peer.Disconnected -= OnPeerDisconnected;
         _peers.Remove(peer);
         RpcEventHandlerInvoker.Raise(PeerDisconnected, this, new RpcPeerEventArgs(peer));
 
@@ -279,8 +296,14 @@ public sealed class RpcHost : IAsyncDisposable
             return;
         }
 
-        await StopAsync().ConfigureAwait(false);
-        await _listener.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await StopAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await _listener.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
 }

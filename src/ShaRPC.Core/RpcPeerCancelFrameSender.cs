@@ -66,7 +66,14 @@ internal sealed class RpcPeerCancelFrameSender
         lock (_lock)
         {
             _tasks.Remove(task);
-            _slots.Release();
+            try
+            {
+                _slots.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // StopAsync already disposed _slots.
+            }
         }
     }
 

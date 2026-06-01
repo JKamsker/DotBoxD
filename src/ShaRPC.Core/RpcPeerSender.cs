@@ -29,7 +29,13 @@ internal sealed class RpcPeerSender : IDisposable
         }
         finally
         {
-            _sendLock.Release();
+            try
+            {
+                _sendLock.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
     }
 

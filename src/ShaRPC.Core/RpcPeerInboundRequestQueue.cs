@@ -44,6 +44,7 @@ internal sealed class RpcPeerInboundRequestQueue
                 return true;
             }
 
+            inbound.Frame.Dispose();
             _release(inbound);
             return false;
         }

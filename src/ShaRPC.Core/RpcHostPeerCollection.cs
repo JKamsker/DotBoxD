@@ -36,19 +36,25 @@ internal sealed class RpcHostPeerCollection
 
     public async Task CloseAllAsync()
     {
-        foreach (var peer in _peers.Keys)
+        var tasks = _peers.Keys.Select(peer => DisposeOnePeerAsync(peer)).ToArray();
+        if (tasks.Length != 0)
         {
-            try
-            {
-                await peer.DisposeAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-                // Best-effort cleanup.
-            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         _peers.Clear();
+    }
+
+    private static async Task DisposeOnePeerAsync(RpcPeer peer)
+    {
+        try
+        {
+            await peer.DisposeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Best-effort cleanup.
+        }
     }
 
     public async Task AwaitCleanupAsync()

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
@@ -78,9 +79,13 @@ internal sealed class RpcPeerInboundDispatcher
             out var protocolError,
             out var protocolException))
         {
-            _protocolError(messageId, MessageType.Request, protocolError, protocolException);
-            using var errorFrame = _responseBuilder.BuildProtocolErrorFrame(messageId, protocolError);
-            await _sendAsync(errorFrame.Memory, loopCt).ConfigureAwait(false);
+            if (protocolError is not null)
+            {
+                _protocolError(messageId, MessageType.Request, protocolError, protocolException);
+                using var errorFrame = _responseBuilder.BuildProtocolErrorFrame(messageId, protocolError);
+                await _sendAsync(errorFrame.Memory, loopCt).ConfigureAwait(false);
+            }
+
             return false;
         }
 
@@ -131,7 +136,7 @@ internal sealed class RpcPeerInboundDispatcher
         int messageId,
         CancellationToken loopCt,
         out RpcPeerInboundRequest inbound,
-        out string protocolError,
+        out string? protocolError,
         out Exception? protocolException)
     {
         inbound = default;
@@ -155,6 +160,16 @@ internal sealed class RpcPeerInboundDispatcher
             return false;
         }
 
+        // Re-check after adding: if StopAsync ran between our initial check and TryAdd,
+        // the CTS was missed by StopAsync's cancellation loop.
+        if (Volatile.Read(ref _stopped) != 0)
+        {
+            _activeInbound.TryRemove(messageId, out _);
+            requestCts.Dispose();
+            protocolError = null;
+            return false;
+        }
+
         inbound = new RpcPeerInboundRequest(frame, request, messageId, payload, requestCts);
         return true;
     }
@@ -164,6 +179,7 @@ internal sealed class RpcPeerInboundDispatcher
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!_activeTasks.TryAdd(inbound.MessageId, completion.Task))
         {
+            Debug.Assert(false, "Duplicate message ID in _activeTasks");
             inbound.Frame.Dispose();
             ReleaseRequest(inbound);
             return;
