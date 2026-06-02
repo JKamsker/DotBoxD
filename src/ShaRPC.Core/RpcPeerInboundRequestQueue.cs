@@ -12,6 +12,10 @@ internal sealed class RpcPeerInboundRequestQueue
     private readonly bool _dropIncomingWhenFull;
     private readonly SemaphoreSlim _slots;
     private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
+    private readonly long _maxInboundBytes;
+    private readonly object _byteGate = new();
+    private long _inFlightBytes;
+    private TaskCompletionSource<bool>? _byteAvailable;
     private CancellationTokenSource? _cts;
     private Task? _dispatchWorker;
 
@@ -19,12 +23,16 @@ internal sealed class RpcPeerInboundRequestQueue
         int capacity,
         ShaRpcQueueFullMode mode,
         int maxConcurrency,
+        long? maxInboundBytes,
         Func<RpcPeerInboundRequest, Task> processAsync,
         Action<RpcPeerInboundRequest> release)
     {
         _processAsync = processAsync;
         _release = release;
         _dropIncomingWhenFull = mode == ShaRpcQueueFullMode.DropIncoming;
+        // long.MaxValue == byte bound disabled (count-only). Otherwise total in-flight inbound frame
+        // bytes are capped at maxInboundBytes, independent of the capacity (count) bound.
+        _maxInboundBytes = maxInboundBytes ?? long.MaxValue;
         // maxConcurrency == 1 keeps dispatch strictly serial; > 1 admits that many concurrent
         // dispatches. Total in-flight inbound work is bounded by capacity + maxConcurrency.
         _slots = new SemaphoreSlim(maxConcurrency, maxConcurrency);
@@ -44,16 +52,36 @@ internal sealed class RpcPeerInboundRequestQueue
 
     public async ValueTask<bool> EnqueueAsync(RpcPeerInboundRequest inbound, CancellationToken ct)
     {
+        var bytes = inbound.Frame.Length;
+
         if (_dropIncomingWhenFull)
         {
-            if (_queue.Writer.TryWrite(inbound))
+            // Drop when over the byte budget or when the count queue is full. Release the request
+            // resources but leave frame disposal to the read loop, which disposes on the false return.
+            // Disposing here too would double-return the pooled buffer (benign only while
+            // Payload.Dispose stays idempotent).
+            if (TryAdmitBytes(bytes))
             {
-                return true;
+                if (_queue.Writer.TryWrite(inbound))
+                {
+                    return true;
+                }
+
+                ReleaseBytes(bytes);
             }
 
-            // Release the request resources but leave frame disposal to the read loop, which
-            // disposes on the false return. Disposing here too would double-return the pooled
-            // buffer (benign only while Payload.Dispose stays idempotent).
+            _release(inbound);
+            return false;
+        }
+
+        try
+        {
+            // Wait for byte-budget headroom before committing the frame to the queue, so peak
+            // in-flight inbound memory stays bounded regardless of how many large frames a peer sends.
+            await AdmitBytesAsync(bytes, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
             _release(inbound);
             return false;
         }
@@ -65,14 +93,84 @@ internal sealed class RpcPeerInboundRequestQueue
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            ReleaseBytes(bytes);
             _release(inbound);
             return false;
         }
         catch (ChannelClosedException)
         {
+            ReleaseBytes(bytes);
             _release(inbound);
             return false;
         }
+    }
+
+    private bool TryAdmitBytes(long bytes)
+    {
+        if (_maxInboundBytes == long.MaxValue)
+        {
+            return true;
+        }
+
+        lock (_byteGate)
+        {
+            // Admit when it fits, or when nothing is in flight so a single frame larger than the
+            // whole budget still makes progress instead of deadlocking.
+            if (_inFlightBytes == 0 || _inFlightBytes + bytes <= _maxInboundBytes)
+            {
+                _inFlightBytes += bytes;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private async ValueTask AdmitBytesAsync(long bytes, CancellationToken ct)
+    {
+        if (_maxInboundBytes == long.MaxValue)
+        {
+            return;
+        }
+
+        // Single writer (the peer read loop) calls this, so at most one waiter exists at a time.
+        while (true)
+        {
+            Task wait;
+            lock (_byteGate)
+            {
+                if (_inFlightBytes == 0 || _inFlightBytes + bytes <= _maxInboundBytes)
+                {
+                    _inFlightBytes += bytes;
+                    return;
+                }
+
+                _byteAvailable ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                wait = _byteAvailable.Task;
+            }
+
+            // netstandard2.1 has no Task.WaitAsync(ct); RpcTaskWaiter throws OperationCanceledException
+            // on cancellation (peer shutdown) while leaving the shared signal intact for the next admit.
+            await RpcTaskWaiter.WaitAsync(wait, ct).ConfigureAwait(false);
+        }
+    }
+
+    private void ReleaseBytes(long bytes)
+    {
+        if (_maxInboundBytes == long.MaxValue)
+        {
+            return;
+        }
+
+        TaskCompletionSource<bool>? signal;
+        lock (_byteGate)
+        {
+            _inFlightBytes -= bytes;
+            signal = _byteAvailable;
+            _byteAvailable = null;
+        }
+
+        signal?.TrySetResult(true);
     }
 
     public async Task StopAsync()
@@ -146,6 +244,9 @@ internal sealed class RpcPeerInboundRequestQueue
 
     private async Task ProcessOneAsync(RpcPeerInboundRequest inbound)
     {
+        // Capture before dispatch: _processAsync disposes the frame, and the byte budget must be
+        // released exactly once when the frame leaves the queue.
+        var bytes = inbound.Frame.Length;
         try
         {
             await _processAsync(inbound).ConfigureAwait(false);
@@ -156,6 +257,7 @@ internal sealed class RpcPeerInboundRequestQueue
         }
         finally
         {
+            ReleaseBytes(bytes);
             try
             {
                 _slots.Release();
@@ -171,6 +273,7 @@ internal sealed class RpcPeerInboundRequestQueue
     {
         while (_queue.Reader.TryRead(out var inbound))
         {
+            ReleaseBytes(inbound.Frame.Length);
             inbound.Frame.Dispose();
             _release(inbound);
         }

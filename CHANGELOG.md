@@ -16,6 +16,26 @@
   inbound dispatch per connection: the default dispatches serially, and raising it admits up
   to that many concurrent dispatches while total in-flight inbound work stays bounded by
   `InboundQueueCapacity` + this value.
+- Added `RpcPeerOptions.MaxInboundBytes` (default 64 MiB; `null` disables) to bound the total
+  bytes of in-flight inbound request frames per peer. `InboundQueueCapacity` bounds frame *count*
+  only, which alone permits up to `capacity × max-frame-size` bytes; this caps peak memory
+  independent of frame size. A frame larger than the budget is still admitted when nothing else
+  is in flight, so a single large request never deadlocks.
+- Added a frame-read idle timeout to the TCP transport (`TcpConnection`, default 30s;
+  `Timeout.InfiniteTimeSpan` disables), configurable via `TcpServerTransport.FrameReadIdleTimeout`
+  and `TcpTransport.FrameReadIdleTimeout`. It tears down a connection whose in-progress frame read
+  stalls (a slow-loris peer that declares a large frame then trickles or sends nothing), while
+  leaving legitimately idle connections — those awaiting the next frame — untouched.
+- **Fixed:** disposing an idle `RpcPeer`/`RpcHost` could deadlock on netstandard2.1 runtimes
+  (.NET Framework, Unity/Mono) where an in-progress socket read ignores the cancellation token.
+  `DisposeAsync` now closes the channel before awaiting the read loop.
+- **Fixed:** `TcpConnection` now uses `ConfigureAwait(false)` on all I/O (removing a sync-context
+  deadlock risk on GUI/Unity hosts), caches `RemoteEndpoint` so reading it after dispose no longer
+  throws, and an outbound send racing dispose now surfaces `ShaRpcConnectionException` rather than
+  hanging or leaking `ObjectDisposedException`.
+- **Fixed:** a malformed request envelope with a null service name is now answered with
+  `ServiceNotFound` instead of being mis-reported as an internal error; `InstanceRegistry(int)`
+  validates its bound.
 - Peer wait-mode inbound queues now bound retained request frames instead of staging
   excess requests in an unbounded intake queue.
 - TCP tests and callers can bind `TcpServerTransport` to port `0` and read the assigned

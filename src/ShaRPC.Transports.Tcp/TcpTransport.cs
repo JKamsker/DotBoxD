@@ -25,6 +25,13 @@ public sealed class TcpTransport : ITransport
 
     public bool IsConnected => _connection?.IsConnected ?? false;
 
+    /// <summary>
+    /// Inter-read idle timeout applied to this connection's in-progress frame reads (slow-loris
+    /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
+    /// </summary>
+    public TimeSpan? FrameReadIdleTimeout { get; init; }
+
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         if (_disposed)
@@ -50,7 +57,7 @@ public sealed class TcpTransport : ITransport
         }
 
         await connectTask;
-        _connection = new TcpConnection(_client);
+        _connection = new TcpConnection(_client, FrameReadIdleTimeout);
     }
 
     public async ValueTask DisposeAsync()

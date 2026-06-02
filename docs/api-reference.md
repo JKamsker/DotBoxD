@@ -195,8 +195,15 @@ Options for both `RpcPeer` and `RpcHost`.
 | `RejectInboundCalls` | `bool` | `false` | Answers inbound requests with an explicit "does not accept inbound calls" error; makes get-only intent explicit. Not an auth boundary |
 | `InboundQueueCapacity` | `int?` | 1024 | Max queued inbound requests (bounded read-side backpressure). `null` dispatches immediately and does not cap concurrent dispatch work — trusted/bounded transports only |
 | `MaxConcurrentInboundDispatch` | `int` | 1 | Max inbound requests dispatched concurrently when `InboundQueueCapacity` is set. Default `1` dispatches serially per connection; raise it for bounded-concurrent per-connection dispatch. Ignored when `InboundQueueCapacity` is `null` |
+| `MaxInboundBytes` | `long?` | 64 MiB | Max total bytes of in-flight inbound request frames when `InboundQueueCapacity` is set. Caps peak memory independent of frame count; `null` disables. An oversized frame is still admitted when nothing else is in flight, so one large request never deadlocks. Ignored when `InboundQueueCapacity` is `null` |
 | `MaxPendingRequests` | `int` | 4096 | Max concurrent outbound calls awaiting responses |
 | `QueueFullMode` | `ShaRpcQueueFullMode` | `Wait` | Policy when `InboundQueueCapacity` is set and the request queue is full (`Wait` applies backpressure; `DropIncoming` rejects) |
+
+The TCP transport additionally enforces a per-frame read idle timeout (`TcpConnection`, default 30s;
+`Timeout.InfiniteTimeSpan` disables), set via `TcpServerTransport.FrameReadIdleTimeout` /
+`TcpTransport.FrameReadIdleTimeout`. It tears down a connection whose *in-progress* frame read stalls
+(a slow-loris peer that declares a large frame then trickles or sends nothing), but never times out a
+connection idly awaiting its next request.
 
 `RejectInboundCalls` is not an authentication or authorization boundary. Any connected peer can
 still send request frames; secure transports or application-level checks should enforce trust.

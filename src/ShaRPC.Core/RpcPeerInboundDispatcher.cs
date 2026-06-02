@@ -46,6 +46,7 @@ internal sealed class RpcPeerInboundDispatcher
             capacity,
             options.QueueFullMode,
             options.MaxConcurrentInboundDispatch,
+            options.MaxInboundBytes,
             ProcessRequestAsync,
             ReleaseRequest);
     }

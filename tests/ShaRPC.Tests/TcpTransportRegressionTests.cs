@@ -82,4 +82,30 @@ public sealed class TcpTransportRegressionTests
         var after = accepted.RemoteEndpoint;
         Assert.Equal(before, after);
     }
+
+    [Fact]
+    public async Task ReceiveAsync_TimesOutStalledFrameBody()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0)
+        {
+            FrameReadIdleTimeout = TimeSpan.FromMilliseconds(200),
+        };
+        await server.StartAsync();
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        using var rawClient = new TcpClient();
+        var acceptTask = server.AcceptAsync();
+        await rawClient.ConnectAsync(IPAddress.Loopback, port);
+        await using var serverConnection = await acceptTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        // Declare a 4 KB frame, then send no body: a slow-loris peer must not pin the connection and
+        // the rented buffer indefinitely. The in-progress body read times out with an IOException.
+        var prefix = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(prefix, 4096);
+        await rawClient.GetStream().WriteAsync(prefix);
+        await rawClient.GetStream().FlushAsync();
+
+        await Assert.ThrowsAsync<IOException>(
+            () => serverConnection.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2)));
+    }
 }

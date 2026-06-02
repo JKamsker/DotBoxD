@@ -12,9 +12,13 @@ public sealed class RpcPeerOptions
     public const int DefaultMaxPendingRequests = 4096;
     public const int DefaultMaxConcurrentInboundDispatch = 1;
 
+    /// <summary>Default <see cref="MaxInboundBytes"/>: 64 MiB of in-flight inbound frames per peer.</summary>
+    public const long DefaultMaxInboundBytes = 64L * 1024 * 1024;
+
     private int? _inboundQueueCapacity = DefaultInboundQueueCapacity;
     private int _maxPendingRequests = DefaultMaxPendingRequests;
     private int _maxConcurrentInboundDispatch = DefaultMaxConcurrentInboundDispatch;
+    private long? _maxInboundBytes = DefaultMaxInboundBytes;
     private ShaRpcQueueFullMode _queueFullMode = ShaRpcQueueFullMode.Wait;
     private TimeSpan _requestTimeout = TimeSpan.FromSeconds(30);
 
@@ -127,6 +131,33 @@ public sealed class RpcPeerOptions
             }
 
             _maxConcurrentInboundDispatch = value;
+        }
+    }
+
+    /// <summary>
+    /// Maximum total bytes of in-flight inbound request frames buffered for dispatch when
+    /// <see cref="InboundQueueCapacity"/> is set. <see cref="InboundQueueCapacity"/> bounds frame
+    /// <em>count</em> only, so it alone permits up to capacity × max-frame-size bytes (a hostile or
+    /// overwhelming peer sending large frames can otherwise pin that much memory). This caps the peak
+    /// independent of frame size; the default is 64 MiB. A frame larger than the budget is still
+    /// admitted when no other inbound work is in flight, so one oversized request never deadlocks.
+    /// Set to <see langword="null"/> to disable the byte bound (count-only). Ignored when
+    /// <see cref="InboundQueueCapacity"/> is <see langword="null"/> (which does not buffer or bound).
+    /// </summary>
+    public long? MaxInboundBytes
+    {
+        get => _maxInboundBytes;
+        init
+        {
+            if (value is <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(MaxInboundBytes),
+                    value,
+                    "Maximum inbound bytes must be greater than zero.");
+            }
+
+            _maxInboundBytes = value;
         }
     }
 

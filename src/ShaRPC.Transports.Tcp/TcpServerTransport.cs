@@ -37,6 +37,13 @@ public sealed class TcpServerTransport : IServerTransport
     /// </summary>
     public IPEndPoint? LocalEndpoint => _listener?.LocalEndpoint as IPEndPoint;
 
+    /// <summary>
+    /// Inter-read idle timeout applied to accepted connections' in-progress frame reads (slow-loris
+    /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
+    /// </summary>
+    public TimeSpan? FrameReadIdleTimeout { get; init; }
+
     public Task StartAsync(CancellationToken ct = default)
     {
         if (Volatile.Read(ref _disposed) != 0)
@@ -101,7 +108,7 @@ public sealed class TcpServerTransport : IServerTransport
             throw new OperationCanceledException(ct);
         }
 
-        return new TcpConnection(client);
+        return new TcpConnection(client, FrameReadIdleTimeout);
     }
 
     public Task StopAsync(CancellationToken ct = default)
