@@ -17,7 +17,24 @@ internal sealed class RpcPeerSender : IDisposable
 
     public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+        // Fast-fail once the peer is closing so an outbound call started during teardown does not
+        // park in WaitAsync (with a non-cancellable token) only to strand on a disposed send lock.
+        if (_isClosed())
+        {
+            throw new ShaRpcConnectionException("Connection closed.");
+        }
+
+        try
+        {
+            await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // DisposeAsync disposed the send lock while this send raced teardown; surface the
+            // connection contract rather than leaking ObjectDisposedException to the caller.
+            throw new ShaRpcConnectionException("Connection closed.");
+        }
+
         try
         {
             if (_isClosed())

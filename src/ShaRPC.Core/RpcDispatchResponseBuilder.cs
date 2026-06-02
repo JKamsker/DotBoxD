@@ -26,7 +26,12 @@ internal sealed class RpcDispatchResponseBuilder
         IInstanceRegistry registry,
         CancellationToken ct)
     {
-        if (!_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
+        // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
+        // envelope (MessagePack nil). Guard before the dictionary lookup: ConcurrentDictionary throws
+        // ArgumentNullException on a null key, which would escape this method (the lookup is outside
+        // the try below) and be mis-reported as InternalError instead of a clean ServiceNotFound.
+        if (string.IsNullOrEmpty(request.ServiceName) ||
+            !_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
         {
             return BuildErrorFrame(messageId, RpcErrors.ServiceNotFound());
         }

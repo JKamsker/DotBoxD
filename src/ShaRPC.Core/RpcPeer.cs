@@ -244,6 +244,14 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     private async Task DisposeCoreAsync(Task? readLoop, CancellationTokenSource? cts)
     {
+        // Dispose the channel BEFORE awaiting the read loop. The loop is normally parked inside
+        // _channel.ReceiveAsync; on runtimes where an in-progress socket read does not observe the
+        // cancellation token (netstandard2.1: .NET Framework, Unity/Mono), cancelling the CTS alone
+        // never unblocks it — only closing the channel does. Awaiting the read loop first (before the
+        // channel is closed) would therefore deadlock DisposeAsync/StopAsync for any idle peer.
+        // Closing first is safe: ReceiveAsync then returns empty or throws, both of which end the loop.
+        await _channel.DisposeAsync().ConfigureAwait(false);
+
         if (readLoop is not null)
         {
             try
@@ -261,7 +269,6 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         await _inbound.StopAsync().ConfigureAwait(false);
 
         _sender.Dispose();
-        await _channel.DisposeAsync().ConfigureAwait(false);
         cts?.Dispose();
     }
 

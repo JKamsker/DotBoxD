@@ -18,6 +18,14 @@ public sealed class InstanceRegistry : IInstanceRegistry
 
     public InstanceRegistry(int maxInstances)
     {
+        if (maxInstances <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxInstances),
+                maxInstances,
+                "Maximum instances must be greater than zero.");
+        }
+
         _maxInstances = maxInstances;
     }
 

@@ -59,4 +59,27 @@ public sealed class TcpTransportRegressionTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => serverConnection.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2)));
     }
+
+    [Fact]
+    public async Task RemoteEndpoint_RemainsReadableAfterDispose()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
+        await server.StartAsync();
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        using var client = new TcpClient();
+        var acceptTask = server.AcceptAsync();
+        await client.ConnectAsync(IPAddress.Loopback, port);
+        var accepted = await acceptTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var before = accepted.RemoteEndpoint;
+        Assert.NotEqual("unknown", before);
+
+        await accepted.DisposeAsync();
+
+        // Reading the endpoint after dispose must not throw ObjectDisposedException from the now-closed
+        // socket; it is captured at construction so logging and Disconnected handlers stay safe.
+        var after = accepted.RemoteEndpoint;
+        Assert.Equal(before, after);
+    }
 }

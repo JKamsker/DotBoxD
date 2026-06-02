@@ -22,11 +22,15 @@ public sealed class TcpConnection : IConnection
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _stream = client.GetStream();
+        // Capture the endpoint once: after DisposeAsync closes the client its underlying socket is
+        // disposed, so reading RemoteEndPoint live would throw ObjectDisposedException from logging
+        // or a Disconnected handler. Mirrors StreamConnection's cached endpoint.
+        RemoteEndpoint = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
     }
 
     public bool IsConnected => _client.Connected && Volatile.Read(ref _disposed) == 0;
 
-    public string RemoteEndpoint => _client.Client.RemoteEndPoint?.ToString() ?? "unknown";
+    public string RemoteEndpoint { get; }
 
     public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
@@ -35,11 +39,11 @@ public sealed class TcpConnection : IConnection
             throw new ObjectDisposedException(nameof(TcpConnection));
         }
 
-        await _sendLock.WaitAsync(ct);
+        await _sendLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await _stream.WriteAsync(data, ct);
-            await _stream.FlushAsync(ct);
+            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+            await _stream.FlushAsync(ct).ConfigureAwait(false);
         }
         finally
         {
@@ -114,7 +118,7 @@ public sealed class TcpConnection : IConnection
         var totalRead = 0;
         while (totalRead < buffer.Length)
         {
-            var read = await stream.ReadAsync(buffer.Slice(totalRead), ct);
+            var read = await stream.ReadAsync(buffer.Slice(totalRead), ct).ConfigureAwait(false);
             if (read == 0)
             {
                 return totalRead; // Connection closed

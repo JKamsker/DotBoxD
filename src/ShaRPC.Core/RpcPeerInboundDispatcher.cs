@@ -187,6 +187,20 @@ internal sealed class RpcPeerInboundDispatcher
             return;
         }
 
+        // Re-check after registering: if StopAsync ran between AcceptRequestAsync's check and this
+        // TryAdd, its _activeTasks snapshot missed this entry, so the dispatch would run after
+        // StopAsync returned (the contract the queued path upholds via _inFlight). StopAsync sets
+        // _stopped before snapshotting, so either it now sees this task (and awaits it) or we observe
+        // _stopped here and abandon the dispatch — closing the window either way.
+        if (Volatile.Read(ref _stopped) != 0)
+        {
+            _activeTasks.TryRemove(inbound.MessageId, out _);
+            completion.TrySetResult(false);
+            inbound.Frame.Dispose();
+            ReleaseRequest(inbound);
+            return;
+        }
+
         _ = ProcessTrackedRequestAsync(inbound, completion);
     }
 
