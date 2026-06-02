@@ -44,7 +44,22 @@ internal sealed class RpcHostAcceptLoop
                 continue;
             }
 
-            await _addPeerAsync(connection).ConfigureAwait(false);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _addPeerAsync(connection).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _acceptError(ex);
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+            }, ct);
         }
     }
 

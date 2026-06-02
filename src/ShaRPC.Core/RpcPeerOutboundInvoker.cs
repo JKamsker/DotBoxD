@@ -164,7 +164,6 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         catch
         {
             _pending.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
-            ReleasePendingSlot();
             throw;
         }
     }
@@ -197,7 +196,6 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         catch
         {
             _pending.Remove(pending.MessageId, pending.Completion.Task, consumed: true);
-            ReleasePendingSlot();
             throw;
         }
     }
@@ -206,22 +204,29 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
     {
         if (Interlocked.Increment(ref _pendingCount) > _maxPendingRequests)
         {
-            // Do not decrement here; the caller's catch block calls ReleasePendingSlot.
+            Interlocked.Decrement(ref _pendingCount);
             throw new ShaRpcException("Maximum pending requests reached.");
         }
 
-        for (var attempts = 0; attempts < _maxPendingRequests; attempts++)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var messageId = Interlocked.Increment(ref _messageIdCounter);
-            if (messageId != 0 && _pending.TryAdd(messageId, out var tcs))
+            for (var attempts = 0; attempts < _maxPendingRequests; attempts++)
             {
-                return (messageId, tcs);
+                ct.ThrowIfCancellationRequested();
+                var messageId = Interlocked.Increment(ref _messageIdCounter);
+                if (messageId != 0 && _pending.TryAdd(messageId, out var tcs))
+                {
+                    return (messageId, tcs);
+                }
             }
-        }
 
-        // Do not decrement here; the caller's catch block calls ReleasePendingSlot.
-        throw new ShaRpcException("Unable to reserve a request message id.");
+            throw new ShaRpcException("Unable to reserve a request message id.");
+        }
+        catch
+        {
+            Interlocked.Decrement(ref _pendingCount);
+            throw;
+        }
     }
 
     private void ReleasePendingSlot() => Interlocked.Decrement(ref _pendingCount);

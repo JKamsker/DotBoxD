@@ -219,6 +219,11 @@ public sealed class ShaRpcClient : IShaRpcClient
 
     private IConnection EnsureConnected()
     {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            throw new ObjectDisposedException(nameof(ShaRpcClient));
+        }
+
         var connection = _transport.Connection;
         if (connection == null || !_transport.IsConnected)
         {

@@ -104,7 +104,7 @@ public sealed class ShaRpcServer : IShaRpcServer
             }
 
             await _transport.StopAsync(ct).ConfigureAwait(false);
-            cts.Dispose();
+            try { cts.Dispose(); } catch (ObjectDisposedException) { }
 
             lock (_lifecycleLock)
             {
@@ -288,7 +288,7 @@ public sealed class ShaRpcServer : IShaRpcServer
             activeTasks,
             concurrency,
             dispatchCts);
-        activeTasks[messageId] = task;
+        activeTasks.TryAdd(messageId, task);
         if (task.IsCompleted)
         {
             activeTasks.TryRemove(messageId, out _);
@@ -326,7 +326,7 @@ public sealed class ShaRpcServer : IShaRpcServer
         }
         catch (Exception ex)
         {
-            RpcDiagnostics.Report($"Request {request.ServiceName}.{request.MethodName} failed", ex);
+            RpcDiagnostics.Report("Request dispatch failed", ex);
             try
             {
                 var error = RpcErrors.FromException(ex);

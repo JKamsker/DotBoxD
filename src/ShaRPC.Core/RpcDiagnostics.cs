@@ -15,7 +15,7 @@ public static class RpcDiagnostics
 
     internal static void Report(string operation, Exception error)
     {
-        Trace.TraceError($"{operation}: {error}");
+        Trace.TraceError($"{operation}: {error.GetType().Name}: {error.Message}");
 
         var handler = Error;
         if (handler is null)

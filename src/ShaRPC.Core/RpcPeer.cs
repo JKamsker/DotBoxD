@@ -283,13 +283,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
                 inbound.Request.InstanceId,
                 error));
 
-    private void MarkClosed()
-    {
-        lock (_lifecycleLock)
-        {
-            Volatile.Write(ref _closed, 1);
-        }
-    }
+    private void MarkClosed() => Volatile.Write(ref _closed, 1);
 
     private void RaiseReadError(Exception error) =>
         RpcEventHandlerInvoker.Raise(
