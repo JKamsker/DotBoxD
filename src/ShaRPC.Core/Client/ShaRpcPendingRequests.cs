@@ -62,24 +62,36 @@ internal sealed class ShaRpcPendingRequests
         return true;
     }
 
-    public void FailAll(Exception error)
+    /// <summary>
+    /// Atomically removes the pending request and cancels it. Returns <see langword="false"/> when the
+    /// entry was already removed (for example, a response completed it first), making the caller a
+    /// no-op. This lets a timeout and a response race on a single removal so a delivered response is
+    /// never discarded as a spurious cancellation.
+    /// </summary>
+    public bool TryCancel(int messageId)
     {
-        foreach (var key in _requests.Keys)
+        if (!_requests.TryRemove(messageId, out var tcs))
         {
-            if (_requests.TryRemove(key, out var tcs))
-            {
-                tcs.TrySetException(error);
-            }
+            return false;
         }
+
+        tcs.TrySetCanceled();
+        return true;
     }
 
-    public void CancelAll()
+    public void FailAll(Exception error)
     {
-        foreach (var key in _requests.Keys)
+        // Remove by exact key+value, not key alone: a teardown racing a brand-new request that reused a
+        // wrapped-around message id (the counter is a 32-bit Interlocked.Increment) must fail only the
+        // request captured in the snapshot, never the new request's different completion source. The
+        // ICollection<KeyValuePair> remover matches both key and value atomically (netstandard2.1 has no
+        // public ConcurrentDictionary.TryRemove(KeyValuePair) overload).
+        var entries = (ICollection<KeyValuePair<int, TaskCompletionSource<ReceivedResponse>>>)_requests;
+        foreach (var pair in _requests.ToArray())
         {
-            if (_requests.TryRemove(key, out var tcs))
+            if (entries.Remove(pair))
             {
-                tcs.TrySetCanceled();
+                pair.Value.TrySetException(error);
             }
         }
     }

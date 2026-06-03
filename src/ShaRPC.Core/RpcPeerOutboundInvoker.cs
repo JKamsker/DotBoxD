@@ -142,6 +142,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         string? instanceId,
         CancellationToken ct)
     {
+        ValidateTarget(service, method);
         _ensureStarted();
         var pending = ReservePendingRequest(ct);
         try
@@ -178,6 +179,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
         string? instanceId,
         CancellationToken ct)
     {
+        ValidateTarget(service, method);
         _ensureStarted();
         var pending = ReservePendingRequest(ct);
         try
@@ -239,6 +241,19 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
 
     private void ReleasePendingSlot() => Interlocked.Decrement(ref _pendingCount);
 
+    private static void ValidateTarget(string service, string method)
+    {
+        if (string.IsNullOrEmpty(service))
+        {
+            throw new ArgumentException("Service name must not be null or empty.", nameof(service));
+        }
+
+        if (string.IsNullOrEmpty(method))
+        {
+            throw new ArgumentException("Method name must not be null or empty.", nameof(method));
+        }
+    }
+
     private static RpcRequest CreateEnvelope(
         int messageId,
         string service,
@@ -276,9 +291,17 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
             timeoutCts.CancelAfter(_timeout);
 
             ReceivedResponse received;
+            // Cancel through the pending-request table rather than the TCS directly, so the timeout and
+            // an incoming response race on a single atomic removal: whichever removes the entry first
+            // wins and the loser is a guaranteed no-op. Cancelling the TCS directly could win the race
+            // against TryComplete and discard an already-delivered response as a spurious timeout.
             using (timeoutCts.Token.Register(
-                static state => ((TaskCompletionSource<ReceivedResponse>)state!).TrySetCanceled(),
-                tcs))
+                static state =>
+                {
+                    var pendingState = ((ShaRpcPendingRequests Pending, int MessageId))state!;
+                    pendingState.Pending.TryCancel(pendingState.MessageId);
+                },
+                (_pending, messageId)))
             {
                 try
                 {

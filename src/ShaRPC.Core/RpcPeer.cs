@@ -212,10 +212,15 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         _outbound.InvokeOnInstanceAsync(service, instanceId, method, ct);
 
     /// <summary>Closes the peer by disposing it; closed peers cannot be restarted.</summary>
-    public Task CloseAsync(CancellationToken ct = default)
+    /// <remarks>
+    /// Disposal always runs to completion: <paramref name="ct"/> fails fast only before any teardown
+    /// begins, and never abandons an in-progress dispose to finish in the background (which would
+    /// surface a misleading <see cref="OperationCanceledException"/> while cleanup actually continues).
+    /// </remarks>
+    public async Task CloseAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return RpcTaskWaiter.WaitAsync(DisposeAsync().AsTask(), ct);
+        await DisposeAsync().ConfigureAwait(false);
     }
 
     public ValueTask DisposeAsync()

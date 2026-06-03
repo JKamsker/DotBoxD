@@ -82,26 +82,41 @@ internal sealed class RpcPeerInboundRequestQueue
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            // No ReleaseBytes here: AdmitBytesAsync admits atomically — it increments _inFlightBytes only
+            // immediately before returning, with no await in between — and its sole throw point is the
+            // wait that runs *before* admitting. A cancelled admit therefore reserved nothing to release.
             _release(inbound);
             return false;
         }
 
+        var committed = false;
         try
         {
             await _queue.Writer.WriteAsync(inbound, ct).ConfigureAwait(false);
+            committed = true;
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            ReleaseBytes(bytes);
-            _release(inbound);
             return false;
         }
         catch (ChannelClosedException)
         {
-            ReleaseBytes(bytes);
-            _release(inbound);
             return false;
+        }
+        finally
+        {
+            // Any path that did not hand the frame to the queue — cancellation, a closed channel, or an
+            // unexpected WriteAsync failure that propagates — must return the admitted bytes and release
+            // the request. Otherwise the byte budget leaks and the peer eventually stops admitting
+            // inbound work even though nothing is in flight. On the return paths the read loop disposes
+            // the frame (EnqueueAsync returned false); on a propagating throw the read loop's finally
+            // disposes it.
+            if (!committed)
+            {
+                ReleaseBytes(bytes);
+                _release(inbound);
+            }
         }
     }
 

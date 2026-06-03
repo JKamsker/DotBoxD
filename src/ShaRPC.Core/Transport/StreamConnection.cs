@@ -61,7 +61,15 @@ public sealed class StreamConnection : IRpcChannel
         }
         finally
         {
-            _sendLock.Release();
+            try
+            {
+                _sendLock.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // CloseAsync disposed the send lock while this send was in flight; the real I/O fault
+                // (if any) already propagates from the WriteAsync above. Mirrors TcpConnection.SendAsync.
+            }
         }
     }
 

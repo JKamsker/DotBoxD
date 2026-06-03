@@ -46,19 +46,37 @@ public sealed class TcpTransport : ITransport
 
         _client = new TcpClient();
 
-        // Wrap ConnectAsync with cancellation support for .NET Standard 2.1
+        // netstandard2.1 has no CancellationToken overload for ConnectAsync, so race it against an
+        // infinite delay bound to the token. The delay is cancelled in the finally so its timer and
+        // token registration are released on the success path instead of lingering for ct's lifetime.
         var connectTask = _client.ConnectAsync(_host, _port);
-        var completedTask = await Task.WhenAny(connectTask, Task.Delay(Timeout.Infinite, ct));
-
-        if (completedTask != connectTask)
+        using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        try
         {
-            _client.Dispose();
-            ct.ThrowIfCancellationRequested();
+            if (await Task.WhenAny(connectTask, Task.Delay(Timeout.Infinite, connectCts.Token)) != connectTask)
+            {
+                _client.Dispose();
+                // The connect attempt now faults against the disposed client; observe it so it does not
+                // surface later as an unobserved task exception.
+                ObserveFault(connectTask);
+                ct.ThrowIfCancellationRequested();
+            }
+        }
+        finally
+        {
+            connectCts.Cancel();
         }
 
         await connectTask;
         _connection = new TcpConnection(_client, FrameReadIdleTimeout);
     }
+
+    private static void ObserveFault(Task task) =>
+        _ = task.ContinueWith(
+            static t => _ = t.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
     public async ValueTask DisposeAsync()
     {
