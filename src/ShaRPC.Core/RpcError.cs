@@ -9,8 +9,12 @@ internal static class RpcErrors
     public const int MaxReflectedValueLength = 256;
 
     public static RpcError FromException(Exception exception) =>
-        exception is ShaRpcNotFoundException
-            ? new RpcError("Service not found.", RpcErrorTypes.ServiceNotFound)
+        exception is ShaRpcNotFoundException notFound
+            // Preserve the (truncated) not-found message so the caller and server logs can tell a
+            // missing service from a missing method from an expired sub-service instance. The text
+            // only echoes names the caller already supplied, so it discloses nothing new. Every
+            // other framework exception stays opaque to avoid leaking internal failure detail.
+            ? new RpcError(Truncate(notFound.Message), RpcErrorTypes.ServiceNotFound)
             : new RpcError("Internal error.", RpcErrorTypes.InternalError);
 
     public static RpcError ServiceNotFound() =>
