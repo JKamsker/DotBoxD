@@ -63,6 +63,11 @@ public sealed class TcpServerTransport : IServerTransport
         {
             var listener = new TcpListener(_address, _port);
             listener.Start();
+
+            // Fire the pre-publish seam (null/no-op in production) so a deterministic test can race a
+            // concurrent DisposeAsync into the window between starting the listener and publishing it.
+            _onListenerStartedBeforePublishForTest?.Invoke();
+
             _listener = listener;
         }
         catch
@@ -278,6 +283,11 @@ public sealed class TcpServerTransport : IServerTransport
     /// <c>listener.AcceptTcpClientAsync()</c> is started (and before the in-body cancellation check),
     /// so a test can deterministically cancel the token in that exact window. No-op in production.</summary>
     internal Action? _onFreshAcceptStartedForTest;
+
+    /// <summary>Invoked inside <see cref="StartAsync"/> after <c>listener.Start()</c> but before the
+    /// listener is published to <c>_listener</c>, so a test can deterministically race a concurrent
+    /// <see cref="DisposeAsync"/> into the publish window. No-op in production.</summary>
+    internal Action? _onListenerStartedBeforePublishForTest;
 
     internal Task<TcpClient>? ClaimPendingAcceptForTest() => ClaimPendingAccept();
 
