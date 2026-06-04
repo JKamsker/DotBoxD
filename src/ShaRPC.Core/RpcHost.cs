@@ -24,6 +24,11 @@ public sealed class RpcHost : IAsyncDisposable
     private bool _starting;
     private int _disposed;
 
+    // Test seam: invoked after _listener.StartAsync succeeds but before StartAsync's second
+    // lifecycle lock. Null (inert) in production. Lets a test deterministically run StopCoreAsync
+    // to completion in the gap so the second lock observes a cleared _cts.
+    internal Func<Task>? _onListenerStartedForTest;
+
     private RpcHost(IServerTransport listener, ISerializer serializer, RpcPeerOptions options)
     {
         _listener = listener;
@@ -130,6 +135,12 @@ public sealed class RpcHost : IAsyncDisposable
             }
 
             throw;
+        }
+
+        var onListenerStarted = _onListenerStartedForTest;
+        if (onListenerStarted is not null)
+        {
+            await onListenerStarted().ConfigureAwait(false);
         }
 
         var stopStartedListener = false;

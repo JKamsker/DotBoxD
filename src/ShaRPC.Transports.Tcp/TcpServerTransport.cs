@@ -15,6 +15,7 @@ public sealed class TcpServerTransport : IServerTransport
     private Task<TcpClient>? _pendingAccept;
     private int _disposed;
     private int _started;
+    private int _freshAcceptStartsForTest;
 
     public TcpServerTransport(int port) : this(IPAddress.Any, port)
     {
@@ -97,7 +98,18 @@ public sealed class TcpServerTransport : IServerTransport
         // here too — a plain read+null could let both this call and ObservePendingAccept take the same
         // stashed accept, returning a TcpClient that is also disposed at shutdown.
         var claimed = ClaimPendingAccept();
-        var acceptTask = claimed ?? listener.AcceptTcpClientAsync();
+        Task<TcpClient> acceptTask;
+        if (claimed is not null)
+        {
+            acceptTask = claimed;
+        }
+        else
+        {
+            // Count fresh OS-level accepts so a deterministic test can prove that a pre-cancelled token
+            // does not start (and orphan) one. Inert in production beyond a single Interlocked increment.
+            Interlocked.Increment(ref _freshAcceptStartsForTest);
+            acceptTask = listener.AcceptTcpClientAsync();
+        }
 
         // Honour an already-cancelled token before the IsCompleted short-circuit below can return a
         // completed (e.g. stashed) accept. If the accept came from the stash, re-stash it first so the
@@ -242,4 +254,8 @@ public sealed class TcpServerTransport : IServerTransport
     internal void StashPendingAcceptForTest(Task<TcpClient> accept) => Volatile.Write(ref _pendingAccept, accept);
 
     internal Task<TcpClient>? ReclaimPendingAcceptForTest() => Interlocked.Exchange(ref _pendingAccept, null);
+
+    /// <summary>Number of fresh OS-level accepts started (i.e. not served from the stash). A
+    /// pre-cancelled <see cref="AcceptAsync"/> must not start one.</summary>
+    internal int FreshAcceptStartsForTest => Volatile.Read(ref _freshAcceptStartsForTest);
 }
