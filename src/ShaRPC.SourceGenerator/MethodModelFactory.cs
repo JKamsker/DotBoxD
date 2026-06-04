@@ -316,7 +316,10 @@ internal static class MethodModelFactory
         '\r' => "\\r",
         '\t' => "\\t",
         '\v' => "\\v",
-        _ => char.IsControl(c)
+        // U+2028 (LINE SEPARATOR) and U+2029 (PARAGRAPH SEPARATOR) are line terminators inside a char
+        // literal (CS1010) but are NOT control chars, so route them through the same \uXXXX escape path.
+        // Mirrors LiteralHelpers.EscapeStringLiteral, which escapes both code points explicitly.
+        _ => char.IsControl(c) || c == 0x2028 || c == 0x2029
             ? "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture)
             : c.ToString(),
     };

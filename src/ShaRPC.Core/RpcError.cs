@@ -78,10 +78,18 @@ internal static class RpcErrors
 
         var cutAt = MaxReflectedValueLength - 3;
 
-        // Never split a UTF-16 surrogate pair: if the last kept char is a high surrogate, drop it so the
-        // result cannot end with an orphaned (malformed) surrogate that breaks strict UTF-8 encoding.
+        // Never end on an orphaned UTF-16 surrogate, which breaks strict UTF-8 encoding.
         if (char.IsHighSurrogate(value[cutAt - 1]))
         {
+            // High half of a pair whose low half is being dropped: drop the high half too.
+            cutAt--;
+        }
+        else if (char.IsLowSurrogate(value[cutAt - 1]) &&
+                 (cutAt < 2 || !char.IsHighSurrogate(value[cutAt - 2])))
+        {
+            // A lone (unpaired) low surrogate at the boundary — already-malformed input — would otherwise
+            // be kept as an orphan. Drop it. A low surrogate that completes a high surrogate just before
+            // it is a valid pair fully inside the kept region and is left intact.
             cutAt--;
         }
 

@@ -94,12 +94,18 @@ public sealed class InstanceRegistry : IInstanceRegistry
     /// rather than blocking a pooled thread on it — avoiding the thread-pool starvation / captured-context
     /// deadlock that sync-over-async disposal causes when a user disposer suspends.
     /// </summary>
-    internal Task ReleaseAllAsync()
+    internal async Task ReleaseAllAsync()
     {
-        // RED-state seam: still sync-over-async (the defect under test). The fix replaces this body with a
-        // true async drain that awaits DisposeAsync.
-        ReleaseAll();
-        return Task.CompletedTask;
+        // TryRemove each key (Keys is a snapshot on ConcurrentDictionary) so every instance is disposed
+        // exactly once and its slot freed, even if Release races in concurrently.
+        foreach (var key in _entries.Keys)
+        {
+            if (_entries.TryRemove(key, out var instance))
+            {
+                Interlocked.Decrement(ref _count);
+                await DisposeInstanceAsync(instance).ConfigureAwait(false);
+            }
+        }
     }
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
@@ -115,6 +121,29 @@ public sealed class InstanceRegistry : IInstanceRegistry
             {
                 case IAsyncDisposable asyncDisposable:
                     asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    break;
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShaRPC.Core.RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+        }
+    }
+
+    // Async counterpart of DisposeInstance for the teardown drain: awaits IAsyncDisposable.DisposeAsync
+    // (preferred when present) instead of blocking on it, so a suspending user disposer never sync-blocks
+    // a pooled thread. Same best-effort contract: a faulting dispose is reported, never rethrown.
+    private static async Task DisposeInstanceAsync(object instance)
+    {
+        try
+        {
+            switch (instance)
+            {
+                case IAsyncDisposable asyncDisposable:
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
                     break;
                 case IDisposable disposable:
                     disposable.Dispose();

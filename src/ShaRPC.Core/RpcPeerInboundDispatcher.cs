@@ -155,7 +155,7 @@ internal sealed class RpcPeerInboundDispatcher
             await ObserveShutdownAsync(Task.WhenAll(_activeTasks.Values)).ConfigureAwait(false);
         }
 
-        _registry.ReleaseAll();
+        await _registry.ReleaseAllAsync().ConfigureAwait(false);
     }
 
     private bool TryCreateInboundRequest(
