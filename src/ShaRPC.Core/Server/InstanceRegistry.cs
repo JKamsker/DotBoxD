@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace ShaRPC.Core.Server;
 
@@ -85,6 +86,20 @@ public sealed class InstanceRegistry : IInstanceRegistry
                 DisposeInstance(instance);
             }
         }
+    }
+
+    /// <summary>
+    /// Async teardown drain used by the connection-cleanup path. Like <see cref="ReleaseAll"/> it removes
+    /// and disposes every registered instance, but it awaits <see cref="IAsyncDisposable.DisposeAsync"/>
+    /// rather than blocking a pooled thread on it — avoiding the thread-pool starvation / captured-context
+    /// deadlock that sync-over-async disposal causes when a user disposer suspends.
+    /// </summary>
+    internal Task ReleaseAllAsync()
+    {
+        // RED-state seam: still sync-over-async (the defect under test). The fix replaces this body with a
+        // true async drain that awaits DisposeAsync.
+        ReleaseAll();
+        return Task.CompletedTask;
     }
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
