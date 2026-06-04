@@ -55,13 +55,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
     /// </summary>
     public static MessagePackSerializerOptions CreateOptions(params IFormatterResolver[] resolvers)
     {
-        var extraCount = resolvers?.Length ?? 0;
+        // A null array (CreateOptions(null)) is legal C# for a params parameter and would otherwise be
+        // treated as "no resolvers", silently dropping all the caller's custom formatters — the same
+        // silent failure the null-element guard below prevents. Reject it eagerly. CreateOptions() with
+        // no arguments still receives an empty (non-null) array and is unaffected.
+        if (resolvers is null)
+        {
+            throw new ArgumentNullException(nameof(resolvers));
+        }
+
+        var extraCount = resolvers.Length;
         var effectiveResolvers = new IFormatterResolver[extraCount + 2];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
             // fails opaquely on the first Serialize/Deserialize, far from the configuration mistake.
-            effectiveResolvers[i] = resolvers![i]
+            effectiveResolvers[i] = resolvers[i]
                 ?? throw new ArgumentException("Resolvers must not contain null elements.", nameof(resolvers));
         }
 

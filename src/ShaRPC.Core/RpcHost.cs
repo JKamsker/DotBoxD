@@ -209,21 +209,28 @@ public sealed class RpcHost : IAsyncDisposable
                 await _listener.StopAsync(CancellationToken.None).ConfigureAwait(false);
             }
         }
+        catch (Exception stopEx)
+        {
+            // Best-effort cleanup of a listener we started but will not use: do not let its failure mask
+            // the real start outcome (startFailure), nor unwind past the disposal below and leak the
+            // linked CTS. Surface it to diagnostics instead.
+            RpcDiagnostics.Report("Listener stop during start recovery failed", stopEx);
+        }
         finally
         {
             lock (_lifecycleLock)
             {
                 _starting = false;
             }
-        }
 
-        if (startFailure is not null)
-        {
             if (disposeCts)
             {
                 cts.Dispose();
             }
+        }
 
+        if (startFailure is not null)
+        {
             throw startFailure;
         }
 
@@ -369,8 +376,21 @@ public sealed class RpcHost : IAsyncDisposable
         // it before this event could surface PeerDisconnected ahead of PeerConnected for the same peer.
         // StopCoreAsync.DrainInFlightAsync awaits this hand-off, so the peer is still started before
         // the host drains and closes its peers.
-        RpcEventHandlerInvoker.Raise(PeerConnected, this, new RpcPeerEventArgs(peer));
-        peer.Start();
+        try
+        {
+            RpcEventHandlerInvoker.Raise(PeerConnected, this, new RpcPeerEventArgs(peer));
+            peer.Start();
+        }
+        catch (ObjectDisposedException)
+        {
+            // A PeerConnected handler disposed the peer (a documented access-control gesture). peer.Start()
+            // then throws on the disposed peer — this is not an accept/transport failure, so do NOT raise
+            // AcceptError. Unsubscribe and drop it from the host's collection (the read loop never started,
+            // so OnPeerDisconnected will never run to do this); the peer/channel disposal is already in
+            // flight from the handler.
+            peer.Disconnected -= OnPeerDisconnected;
+            _peers.Remove(peer);
+        }
     }
 
     private void RaiseAcceptError(Exception ex) =>

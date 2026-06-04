@@ -46,21 +46,32 @@ public sealed class NamedPipeServerTransport : IServerTransport
     {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (Interlocked.Exchange(ref _started, 1) != 0)
+
+        // Publish _stopCts BEFORE marking the server started, both under _sync (the same lock StopAsync
+        // and AcceptAsync read these under). This closes the partial-initialization window: a concurrent
+        // StopAsync can never observe _started == 1 with _stopCts == null (which leaked the CTS), and a
+        // concurrent AcceptAsync can never spuriously throw "Server not started." mid-start.
+        var stopCts = new CancellationTokenSource();
+        lock (_sync)
         {
-            throw new InvalidOperationException("Server already started.");
+            if (Volatile.Read(ref _started) != 0)
+            {
+                stopCts.Dispose();
+                throw new InvalidOperationException("Server already started.");
+            }
+
+            _stopCts = stopCts;
+            Volatile.Write(ref _started, 1);
         }
 
-        // Test seam (null/no-op in production): fires in the window between publishing _started and
-        // assigning _stopCts so a test can deterministically race StopAsync into that gap. Never set in
-        // production.
+        // Test seam (null/no-op in production): fires after the atomic publish so a test can race
+        // StopAsync against a fully-initialized transport. Never set in production.
         var transitionHook = _onStartTransitionForTest;
         if (transitionHook is not null)
         {
-            return StartWithTransitionHookAsync(transitionHook);
+            return transitionHook();
         }
 
-        _stopCts = new CancellationTokenSource();
         return Task.CompletedTask;
     }
 
@@ -75,12 +86,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
     internal CancellationTokenSource? StopCtsForTest
     {
         get { lock (_sync) { return _stopCts; } }
-    }
-
-    private async Task StartWithTransitionHookAsync(Func<Task> transitionHook)
-    {
-        await transitionHook().ConfigureAwait(false);
-        _stopCts = new CancellationTokenSource();
     }
 
     public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)

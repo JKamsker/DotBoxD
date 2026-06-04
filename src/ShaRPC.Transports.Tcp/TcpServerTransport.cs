@@ -127,13 +127,14 @@ public sealed class TcpServerTransport : IServerTransport
         // path instead of being leaked, mirroring the cancellation re-stash logic below.
         if (ct.IsCancellationRequested)
         {
-            if (claimed is not null)
+            // Re-stash whatever accept we hold — a claimed one OR a freshly-started one — so the
+            // in-flight accept (and any socket it completes with) is reclaimed by the shutdown
+            // observation path instead of being orphaned. A fresh accept (claimed == null) was
+            // previously left untracked here, leaking its TcpClient if the OS delivered one.
+            _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
+            if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
             {
-                _ = Interlocked.Exchange(ref _pendingAccept, acceptTask);
-                if (Volatile.Read(ref _started) == 0 || Volatile.Read(ref _disposed) != 0)
-                {
-                    ObservePendingAccept();
-                }
+                ObservePendingAccept();
             }
 
             throw new OperationCanceledException(ct);
