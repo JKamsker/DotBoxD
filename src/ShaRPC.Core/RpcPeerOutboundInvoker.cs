@@ -107,7 +107,7 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
 
     public bool TryCompleteResponse(int messageId, Payload frame)
     {
-        if (!MessageFramer.TryReadFrame(frame.Memory, out _, out _, out var envelope, out var payload))
+        if (!MessageFramer.TryReadFrame(frame.Memory, out _, out var messageType, out var envelope, out var payload))
         {
             _pending.TryFail(
                 messageId,
@@ -125,6 +125,14 @@ internal sealed class RpcPeerOutboundInvoker : IRpcInvoker
             _pending.TryFail(
                 messageId,
                 new ShaRpcProtocolException("Malformed response envelope."));
+            return false;
+        }
+
+        if (messageType == MessageType.Error && response.IsSuccess)
+        {
+            _pending.TryFail(
+                messageId,
+                new ShaRpcProtocolException("Malformed error response frame."));
             return false;
         }
 

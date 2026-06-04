@@ -63,6 +63,8 @@ public sealed class SingleConnectionServerTransport : IServerTransport
 
     public Task StartAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(SingleConnectionServerTransport));

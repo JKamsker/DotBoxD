@@ -96,12 +96,30 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public T Deserialize<T>(ReadOnlyMemory<byte> data)
     {
-        return MessagePackSerializer.Deserialize<T>(data, _options);
+        var value = MessagePackSerializer.Deserialize<T>(data, _options, out var bytesRead, CancellationToken.None);
+        ThrowIfTrailingBytes(data.Length, bytesRead);
+        return value;
     }
 
     public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
     {
-        return MessagePackSerializer.Deserialize(type, data, _options);
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        var reader = new MessagePackReader(data);
+        var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
+        ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
+        return value;
+    }
+
+    private static void ThrowIfTrailingBytes(int totalLength, int bytesRead)
+    {
+        if (bytesRead != totalLength)
+        {
+            throw new MessagePackSerializationException("Trailing bytes after serialized value.");
+        }
     }
 
     private sealed class ReadOnlyMemoryByteFormatter : IMessagePackFormatter<ReadOnlyMemory<byte>>
