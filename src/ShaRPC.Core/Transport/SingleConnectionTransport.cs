@@ -96,7 +96,10 @@ public sealed class SingleConnectionServerTransport : IServerTransport
         }
 
         ct.ThrowIfCancellationRequested();
-        throw new OperationCanceledException();
+
+        // Associate the cancellation with the caller's token even when StopAsync (not the token) released
+        // the parked accept, so token-scoped catch filters observe it — matching Tcp/NamedPipe transports.
+        throw new OperationCanceledException(ct);
     }
 
     public Task StopAsync(CancellationToken ct = default)

@@ -47,6 +47,8 @@ public sealed class TcpServerTransport : IServerTransport
 
     public Task StartAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(TcpServerTransport));
@@ -175,7 +177,19 @@ public sealed class TcpServerTransport : IServerTransport
             throw new OperationCanceledException(ct);
         }
 
-        return new TcpConnection(client, FrameReadIdleTimeout);
+        try
+        {
+            return new TcpConnection(client, FrameReadIdleTimeout);
+        }
+        catch
+        {
+            // The OS socket was already accepted; if TcpConnection construction fails (e.g. an invalid
+            // FrameReadIdleTimeout), dispose the client so its socket is not leaked — otherwise the host
+            // accept loop's error-retry cycle would leak one socket per iteration. Mirrors the equivalent
+            // catch in NamedPipeServerTransport.AcceptAsync.
+            client.Dispose();
+            throw;
+        }
     }
 
     public Task StopAsync(CancellationToken ct = default)

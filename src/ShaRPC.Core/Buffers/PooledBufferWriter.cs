@@ -9,6 +9,9 @@ namespace ShaRPC.Core.Buffers;
 /// </summary>
 public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
 {
+    // Largest single-dimension array the runtime allows (== Array.MaxLength, which netstandard2.1 lacks).
+    private const int MaxArrayLength = 0x7FFFFFC7;
+
     private byte[]? _buffer;
     private int _written;
 
@@ -97,13 +100,23 @@ public sealed class PooledBufferWriter : IBufferWriter<byte>, IDisposable
             throw new ArgumentOutOfRangeException(nameof(sizeHint));
         }
 
-        var required = _written + Math.Max(sizeHint, 1);
+        // Widen to 64-bit: _written + sizeHint in 32-bit signed arithmetic can overflow to a negative
+        // value, making the guard below pass and handing back a span SMALLER than sizeHint (an
+        // IBufferWriter<T> contract break the caller cannot detect).
+        var required = (long)_written + Math.Max(sizeHint, 1);
         if (required <= buffer.Length)
         {
             return;
         }
 
-        var newSize = Math.Max(required, buffer.Length * 2);
+        if (required > MaxArrayLength)
+        {
+            // The request cannot be satisfied by a single array; refuse rather than silently truncate.
+            throw new OutOfMemoryException(
+                $"Requested buffer capacity ({required}) exceeds the maximum array length ({MaxArrayLength}).");
+        }
+
+        var newSize = (int)Math.Min(Math.Max(required, (long)buffer.Length * 2), MaxArrayLength);
         var newBuffer = ArrayPool<byte>.Shared.Rent(newSize);
         Array.Copy(buffer, 0, newBuffer, 0, _written);
         _buffer = newBuffer;

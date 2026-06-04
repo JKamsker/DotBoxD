@@ -273,7 +273,18 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         // never unblocks it — only closing the channel does. Awaiting the read loop first (before the
         // channel is closed) would therefore deadlock DisposeAsync/StopAsync for any idle peer.
         // Closing first is safe: ReceiveAsync then returns empty or throws, both of which end the loop.
-        await _channel.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await _channel.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // A user-supplied channel's DisposeAsync may throw. That must not abort the rest of teardown
+            // (failing pending requests, stopping inbound, disposing the send lock / CTS), which would
+            // leak unmanaged semaphore handles and leave pending outbound calls hung forever. Surface it
+            // to diagnostics and continue — disposal is best-effort, matching the read-loop await below.
+            RpcDiagnostics.Report("Channel dispose during peer teardown failed", ex);
+        }
 
         if (readLoop is not null)
         {
