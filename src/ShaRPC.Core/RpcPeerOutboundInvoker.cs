@@ -239,6 +239,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         catch
         {
             _streams.ReleaseOutboundReservations(streams);
+            await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
             throw;
         }
 
@@ -250,6 +251,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         catch
         {
             _streams.ReleaseOutboundReservations(streams);
+            await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
             throw;
         }
 

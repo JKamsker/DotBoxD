@@ -51,6 +51,44 @@ public sealed class StreamingProxyReservationBehaviorTests
         invoker.InvokeCalled.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task GeneratedProxy_ReleasesReservations_WhenStreamedInvokeThrowsSynchronously()
+    {
+        const string source = """
+            using ShaRPC.Core.Attributes;
+            using System.IO;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace Behavior.Streaming
+            {
+                [ShaRpcService]
+                public interface IUpload
+                {
+                    Task<int> UploadAsync(Stream first, Stream second, CancellationToken ct = default);
+                }
+            }
+            """;
+
+        var assembly = CompileWithGenerator(source);
+        var proxyType = assembly.GetType("Behavior.Streaming.UploadProxy")!;
+        var interfaceType = assembly.GetType("Behavior.Streaming.IUpload")!;
+        var invoker = new SynchronousRejectingInvoker();
+        var proxy = Activator.CreateInstance(proxyType, invoker)!;
+        var upload = interfaceType.GetMethod("UploadAsync")!;
+
+        using var first = new MemoryStream(new byte[] { 1 });
+        using var second = new MemoryStream(new byte[] { 2 });
+        var task = (Task)upload.Invoke(
+            proxy,
+            new object[] { first, second, CancellationToken.None })!;
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => task);
+        ex.Message.Should().Be("streamed invoke rejected");
+        invoker.ReleasedStreamIds.Should().Equal(2, 1);
+        invoker.InvokeCalled.Should().BeTrue();
+    }
+
     private static Assembly CompileWithGenerator(string source)
     {
         var compilation = GeneratorTestHelper.CreateCompilation(source);
@@ -112,6 +150,88 @@ public sealed class StreamingProxyReservationBehaviorTests
         {
             InvokeCalled = true;
             throw new InvalidOperationException("invoke should not run");
+        }
+
+        public Task<TResponse> InvokeAsync<TRequest, TResponse>(
+            string service,
+            string method,
+            TRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResponse> InvokeAsync<TResponse>(
+            string service,
+            string method,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task InvokeAsync<TRequest>(
+            string service,
+            string method,
+            TRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task InvokeAsync(
+            string service,
+            string method,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(
+            string service,
+            string instanceId,
+            string method,
+            TRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResponse> InvokeOnInstanceAsync<TResponse>(
+            string service,
+            string instanceId,
+            string method,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task InvokeOnInstanceAsync<TRequest>(
+            string service,
+            string instanceId,
+            string method,
+            TRequest request,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task InvokeOnInstanceAsync(
+            string service,
+            string instanceId,
+            string method,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class SynchronousRejectingInvoker : IRpcInvoker
+    {
+        private int _reserveCount;
+
+        public List<int> ReleasedStreamIds { get; } = new();
+
+        public bool InvokeCalled { get; private set; }
+
+        public RpcStreamHandle ReserveStream(RpcStreamKind kind) =>
+            new(Interlocked.Increment(ref _reserveCount), kind);
+
+        public void ReleaseStream(RpcStreamHandle handle) =>
+            ReleasedStreamIds.Add(handle.StreamId);
+
+        public Task<TResponse> InvokeAsync<TRequest, TResponse>(
+            string service,
+            string method,
+            TRequest request,
+            RpcStreamAttachment[] streams,
+            CancellationToken ct = default)
+        {
+            InvokeCalled = true;
+            throw new InvalidOperationException("streamed invoke rejected");
         }
 
         public Task<TResponse> InvokeAsync<TRequest, TResponse>(

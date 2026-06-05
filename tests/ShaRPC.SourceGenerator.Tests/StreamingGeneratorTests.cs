@@ -148,6 +148,8 @@ public sealed class StreamingGeneratorTests
         reserveIndex.Should().BeGreaterThan(returnIndex);
         proxy.Should().Contain("async global::System.Collections.Generic.IAsyncEnumerable<int> __sharpc_enumerate");
         proxy.Should().Contain("[global::System.Runtime.CompilerServices.EnumeratorCancellation]");
+        proxy.Should().Contain(".GetAsyncEnumerator(__sharpc_enumerationCt)");
+        proxy.Should().NotContain("TaskAsyncEnumerableExtensions");
         proxy.Should().Contain("this._invoker.ReleaseStream(__sharpc_stream1)");
         proxy.Should().Contain("this._invoker.ReleaseStream(__sharpc_stream2)");
     }

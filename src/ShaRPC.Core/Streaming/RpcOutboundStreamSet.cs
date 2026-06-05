@@ -70,33 +70,45 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var pair in _streams)
-        {
-            pair.State.Cancel();
-        }
-
-        var tasks = _tasks;
-        if (tasks is { Length: > 0 })
-        {
-            try
-            {
-                await Task.WhenAll(tasks).ConfigureAwait(false);
-            }
-            catch
-            {
-            }
-        }
-        else if (Interlocked.Exchange(ref _started, 1) == 0)
+        try
         {
             foreach (var pair in _streams)
             {
-                await pair.Attachment.DisposeSourceAsync().ConfigureAwait(false);
+                pair.State.Cancel();
+            }
+
+            var tasks = _tasks;
+            if (tasks is { Length: > 0 })
+            {
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+            }
+            else if (Interlocked.Exchange(ref _started, 1) == 0)
+            {
+                foreach (var pair in _streams)
+                {
+                    try
+                    {
+                        await pair.Attachment.DisposeSourceAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
+                    }
+                }
             }
         }
-
-        foreach (var pair in _streams)
+        finally
         {
-            _manager.RemoveOutbound(pair.State.StreamId);
+            foreach (var pair in _streams)
+            {
+                _manager.RemoveOutbound(pair.State.StreamId);
+            }
         }
     }
 

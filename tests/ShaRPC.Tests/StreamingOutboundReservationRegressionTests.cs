@@ -25,9 +25,10 @@ public sealed class StreamingOutboundReservationRegressionTests
             SendNoopAsync,
             streams);
         var handle = invoker.ReserveStream(RpcStreamKind.Binary);
+        var source = new TrackingStream(new byte[] { 1 });
         var attachments = new[]
         {
-            RpcStreamAttachment.FromStream(handle, new MemoryStream(new byte[] { 1 })),
+            RpcStreamAttachment.FromStream(handle, source, leaveOpen: false),
         };
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -40,6 +41,7 @@ public sealed class StreamingOutboundReservationRegressionTests
                 attachments,
                 cts.Token));
 
+        Assert.True(source.Disposed);
         AssertNoPendingCreditForReleasedReservation(streams, handle.StreamId);
     }
 
@@ -58,9 +60,10 @@ public sealed class StreamingOutboundReservationRegressionTests
         var pending = invoker.InvokeAsync("Svc", "Hold");
         var pendingId = await sentRequest.Task.WaitAsync(Timeout);
         var handle = invoker.ReserveStream(RpcStreamKind.Binary);
+        var source = new TrackingStream(new byte[] { 1 });
         var attachments = new[]
         {
-            RpcStreamAttachment.FromStream(handle, new MemoryStream(new byte[] { 1 })),
+            RpcStreamAttachment.FromStream(handle, source, leaveOpen: false),
         };
 
         await Assert.ThrowsAsync<ShaRpcException>(() =>
@@ -70,6 +73,7 @@ public sealed class StreamingOutboundReservationRegressionTests
                 handle,
                 attachments));
 
+        Assert.True(source.Disposed);
         AssertNoPendingCreditForReleasedReservation(streams, handle.StreamId);
         CompleteSuccess(invoker, serializer, pendingId);
         await pending.WaitAsync(Timeout);
@@ -80,6 +84,35 @@ public sealed class StreamingOutboundReservationRegressionTests
             sentRequest.TrySetResult(messageId);
             return Task.CompletedTask;
         }
+    }
+
+    [Fact]
+    public async Task StreamedInvoke_TargetValidationFailure_DisposesOwnedAttachmentSource()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var invoker = new RpcPeerOutboundInvoker(
+            serializer,
+            new RpcPeerOptions { RequestTimeout = Timeout },
+            ensureStarted: static () => { },
+            SendNoopAsync,
+            streams);
+        var handle = invoker.ReserveStream(RpcStreamKind.Binary);
+        var source = new TrackingStream(new byte[] { 1 });
+        var attachments = new[]
+        {
+            RpcStreamAttachment.FromStream(handle, source, leaveOpen: false),
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            invoker.InvokeAsync<RpcStreamHandle, int>(
+                "",
+                "Upload",
+                handle,
+                attachments));
+
+        Assert.True(source.Disposed);
+        AssertNoPendingCreditForReleasedReservation(streams, handle.StreamId);
     }
 
     [Fact]

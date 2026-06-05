@@ -70,6 +70,23 @@ public sealed class StreamingWave4RegressionTests
     }
 
     [Fact]
+    public async Task RegisteredOutboundSet_DisposedBeforeStart_RemovesSenderWhenSourceDisposeThrows()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var handle = streams.ReserveOutbound(RpcStreamKind.Binary);
+        var source = new ThrowingDisposeStream(new byte[] { 1 });
+        var outbound = streams.RegisterOutbound(
+            new[] { RpcStreamAttachment.FromStream(handle, source, leaveOpen: false) },
+            CancellationToken.None);
+
+        await outbound.DisposeAsync().AsTask().WaitAsync(TestTimeout);
+
+        Assert.True(source.DisposeAttempted);
+        Assert.Equal(0, streams.OutboundSenderCount);
+    }
+
+    [Fact]
     public async Task RequestCleanup_RemovesContextAcquiredReceiverNotDeclaredByRequest()
     {
         var serializer = new MessagePackRpcSerializer();
@@ -177,6 +194,28 @@ public sealed class StreamingWave4RegressionTests
         {
             Disposed = true;
             await base.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private sealed class ThrowingDisposeStream : MemoryStream
+    {
+        public ThrowingDisposeStream(byte[] buffer)
+            : base(buffer)
+        {
+        }
+
+        public bool DisposeAttempted { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            DisposeAttempted = true;
+            throw new InvalidOperationException("Dispose failed.");
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            DisposeAttempted = true;
+            throw new InvalidOperationException("Dispose failed.");
         }
     }
 }
