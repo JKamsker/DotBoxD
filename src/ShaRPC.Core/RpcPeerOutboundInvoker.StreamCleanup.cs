@@ -18,14 +18,8 @@ internal sealed partial class RpcPeerOutboundInvoker
                 continue;
             }
 
-            try
-            {
-                await stream.DisposeSourceAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
-            }
+            await stream.DisposeSourceBestEffortAsync("Outbound stream source cleanup failed")
+                .ConfigureAwait(false);
         }
     }
 }

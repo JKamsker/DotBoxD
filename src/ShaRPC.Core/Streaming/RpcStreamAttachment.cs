@@ -62,6 +62,18 @@ public abstract class RpcStreamAttachment
 
     internal virtual ValueTask DisposeSourceAsync() => default;
 
+    internal async ValueTask DisposeSourceBestEffortAsync(string operation)
+    {
+        try
+        {
+            await DisposeSourceAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report(operation, ex);
+        }
+    }
+
     private static void RequireKind(RpcStreamHandle handle, RpcStreamKind expected)
     {
         if (handle.Kind != expected)
@@ -140,15 +152,21 @@ public abstract class RpcStreamAttachment
                 {
                     var result = await _pipe.Reader.ReadAsync(ct).ConfigureAwait(false);
                     var buffer = result.Buffer;
-                    foreach (var segment in buffer)
+                    try
                     {
-                        if (!segment.IsEmpty)
+                        foreach (var segment in buffer)
                         {
-                            await streams.SendStreamItemAsync(Handle.StreamId, segment, ct).ConfigureAwait(false);
+                            if (!segment.IsEmpty)
+                            {
+                                await streams.SendStreamItemAsync(Handle.StreamId, segment, ct).ConfigureAwait(false);
+                            }
                         }
                     }
+                    finally
+                    {
+                        _pipe.Reader.AdvanceTo(buffer.End);
+                    }
 
-                    _pipe.Reader.AdvanceTo(buffer.End);
                     if (result.IsCompleted)
                     {
                         return;

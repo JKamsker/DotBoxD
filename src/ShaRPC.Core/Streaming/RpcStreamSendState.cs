@@ -3,6 +3,7 @@ namespace ShaRPC.Core.Streaming;
 internal sealed class RpcStreamSendState : IDisposable
 {
     private readonly CancellationTokenSource _cts;
+    private readonly CancellationToken _token;
     private readonly SemaphoreSlim _credits = new(0);
     private int _disposed;
 
@@ -10,13 +11,14 @@ internal sealed class RpcStreamSendState : IDisposable
     {
         StreamId = streamId;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ownerToken);
+        _token = _cts.Token;
     }
 
     public int StreamId { get; }
 
-    public CancellationToken Token => _cts.Token;
+    public CancellationToken Token => _token;
 
-    public bool IsCancellationRequested => _cts.IsCancellationRequested;
+    public bool IsCancellationRequested => _token.IsCancellationRequested;
 
     public Task WaitForCreditAsync(CancellationToken ct) =>
         _credits.WaitAsync(ct);

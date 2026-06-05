@@ -43,7 +43,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
         }
 
         _streams?.ReleaseOutboundReservation(response.Handle.StreamId);
-        await response.DisposeSourceAsync().ConfigureAwait(false);
+        await response.DisposeSourceBestEffortAsync("Streaming response cleanup failed").ConfigureAwait(false);
     }
 
     public Stream GetStream(RpcStreamHandle handle)

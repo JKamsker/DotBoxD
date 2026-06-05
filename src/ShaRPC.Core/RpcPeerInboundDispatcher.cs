@@ -387,14 +387,16 @@ internal sealed class RpcPeerInboundDispatcher
         {
             if (!registered)
             {
-                await stream.DisposeSourceAsync().ConfigureAwait(false);
+                await stream.DisposeSourceBestEffortAsync("Inbound response stream source cleanup failed")
+                    .ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
             if (!registered)
             {
-                await stream.DisposeSourceAsync().ConfigureAwait(false);
+                await stream.DisposeSourceBestEffortAsync("Inbound response stream source cleanup failed")
+                    .ConfigureAwait(false);
             }
 
             _dispatchError(inbound, ex);

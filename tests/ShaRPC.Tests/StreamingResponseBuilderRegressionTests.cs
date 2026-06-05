@@ -58,6 +58,39 @@ public sealed class StreamingResponseBuilderRegressionTests
         AssertNoPendingCreditForReleasedReservation(streams, streamId: 1);
     }
 
+    [Fact]
+    public async Task DispatchFailureAfterSetResponse_WhenResponseDisposeThrows_ReturnsDispatchError()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = CreateStreamManager(serializer);
+        var dispatcher = new ThrowAfterSetResponseDispatcher();
+        var builder = CreateBuilder(serializer, dispatcher);
+        var context = new RpcStreamingContext(streams, serializer, CancellationToken.None);
+
+        using var result = await builder.BuildAsync(
+            CreateRequest(dispatcher.ServiceName),
+            messageId: 1,
+            ReadOnlyMemory<byte>.Empty,
+            new InstanceRegistry(),
+            context,
+            CancellationToken.None);
+
+        Assert.Null(result.Stream);
+        Assert.True(dispatcher.ResponseStream.DisposeAttempted);
+        AssertNoPendingCreditForReleasedReservation(streams, streamId: 1);
+        Assert.True(MessageFramer.TryReadFrame(
+            result.Frame.Memory,
+            out _,
+            out var messageType,
+            out var envelope,
+            out _));
+        Assert.Equal(MessageType.Error, messageType);
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+        Assert.False(response.IsSuccess);
+        Assert.Equal(RpcErrorTypes.InternalError, response.ErrorType);
+        Assert.Equal("Internal error.", response.ErrorMessage);
+    }
+
     private static RpcDispatchResponseBuilder CreateBuilder(
         ISerializer serializer,
         IServiceDispatcher dispatcher)
@@ -149,6 +182,35 @@ public sealed class StreamingResponseBuilderRegressionTests
             throw new NotSupportedException();
     }
 
+    private sealed class ThrowAfterSetResponseDispatcher : IServiceDispatcher
+    {
+        public string ServiceName => "ThrowAfterSetResponse";
+
+        public ThrowingDisposeStream ResponseStream { get; } = new();
+
+        public Task DispatchAsync(
+            string method,
+            ReadOnlyMemory<byte> payload,
+            ISerializer serializer,
+            IInstanceRegistry registry,
+            IBufferWriter<byte> output,
+            IRpcStreamingContext streaming,
+            CancellationToken ct = default)
+        {
+            streaming.SetResponse(ResponseStream);
+            throw new InvalidOperationException("Dispatch failed.");
+        }
+
+        public Task DispatchAsync(
+            string method,
+            ReadOnlyMemory<byte> payload,
+            ISerializer serializer,
+            IInstanceRegistry registry,
+            IBufferWriter<byte> output,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
     private sealed class TrackingStream : MemoryStream
     {
         public bool Disposed { get; private set; }
@@ -163,6 +225,23 @@ public sealed class StreamingResponseBuilderRegressionTests
         {
             Disposed = true;
             await base.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private sealed class ThrowingDisposeStream : MemoryStream
+    {
+        public bool DisposeAttempted { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            DisposeAttempted = true;
+            throw new InvalidOperationException("Dispose failed.");
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            DisposeAttempted = true;
+            throw new InvalidOperationException("Dispose failed.");
         }
     }
 
