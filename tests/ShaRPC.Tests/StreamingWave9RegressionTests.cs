@@ -51,7 +51,6 @@ public sealed class StreamingWave9RegressionTests
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             receiver.ReadChunkAsync(CancellationToken.None).AsTask().WaitAsync(TestTimeout));
         Assert.Equal(0, streams.InboundReceiverCount);
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
         Assert.Equal(new[] { RpcStreamManager.WindowSize }, credits.ToArray());
     }
 
