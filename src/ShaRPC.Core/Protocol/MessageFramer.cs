@@ -305,7 +305,13 @@ public static class MessageFramer
                     if (bytesRead < payloadLength)
                     {
                         payload.Dispose();
-                        return null; // Connection closed
+                        if (bytesRead == 0)
+                        {
+                            return null;
+                        }
+
+                        throw new InvalidDataException(
+                            $"Connection closed after {bytesRead} of {payloadLength} payload bytes.");
                     }
                 }
                 catch

@@ -39,6 +39,7 @@ internal static class RpcPipeBridge
                     if (flush.IsCanceled || flush.IsCompleted)
                     {
                         receiver.Cancel();
+                        await writer.CompleteAsync().ConfigureAwait(false);
                         return;
                     }
                 }

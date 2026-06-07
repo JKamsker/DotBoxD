@@ -142,18 +142,17 @@ public sealed class StreamConnectionCoverageTests
     }
 
     [Fact]
-    public async Task ReceiveAsync_ReturnsEmpty_WhenBodyTruncated()
+    public async Task ReceiveAsync_Throws_WhenBodyTruncated()
     {
-        // Valid length prefix promises a larger frame than the stream actually delivers; the body
-        // read comes up short and the pooled frame is disposed and Empty is returned.
+        // Valid length prefix promises a larger frame than the stream actually delivers.
+        // A truncated mid-frame body is a protocol error, not a graceful disconnect.
         var total = MessageFramer.HeaderSize + 8;
         var bytes = new byte[MessageFramer.HeaderSize]; // prefix + header only, body missing
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(0, 4), total);
         await using var connection = new StreamConnection(new MemoryStream(bytes));
 
-        using var received = await connection.ReceiveAsync().WaitAsync(Timeout);
-
-        Assert.Same(Payload.Empty, received);
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => connection.ReceiveAsync().WaitAsync(Timeout));
     }
 
     [Fact]

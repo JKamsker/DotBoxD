@@ -352,10 +352,10 @@ public sealed class MessageFramerCoverageTests
     }
 
     [Fact]
-    public async Task ReadMessageAsync_PayloadTruncatedMidFrame_ReturnsNull()
+    public async Task ReadMessageAsync_PayloadTruncatedMidFrame_ThrowsInvalidDataException()
     {
-        // Arrange: a valid header announcing a payload, but the stream ends partway through it
-        // (line 303-306: bytesRead < payloadLength -> dispose payload + return null).
+        // Arrange: a valid header announcing a payload, but the stream ends partway through it.
+        // A truncated frame is a protocol error, not a graceful disconnect.
         var messageId = 5;
         var fullPayload = new byte[64];
         new Random(7).NextBytes(fullPayload);
@@ -365,11 +365,9 @@ public sealed class MessageFramerCoverageTests
         var truncated = frame.Memory.Slice(0, frame.Length - 10).ToArray();
         using var stream = new MemoryStream(truncated);
 
-        // Act
-        var result = await MessageFramer.ReadMessageAsync(stream).AsTaskWithTimeout(Timeout);
-
-        // Assert
-        Assert.Null(result);
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => MessageFramer.ReadMessageAsync(stream).AsTaskWithTimeout(Timeout));
     }
 
     [Fact]

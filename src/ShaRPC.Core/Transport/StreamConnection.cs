@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipes;
 using ShaRPC.Core.Buffers;
@@ -17,6 +16,7 @@ public sealed class StreamConnection : IRpcChannel
     private readonly string _remoteEndpoint;
     private readonly int _maxMessageSize;
     private readonly TimeSpan _frameReadIdleTimeout;
+    private readonly byte[] _lengthBuffer = new byte[4];
     private int _disposed;
 
     /// <summary>
@@ -103,46 +103,40 @@ public sealed class StreamConnection : IRpcChannel
     {
         ThrowIfDisposed();
 
-        var lengthBuffer = ArrayPool<byte>.Shared.Rent(4);
+        var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false).ConfigureAwait(false);
+        if (read < 4)
+        {
+            return Payload.Empty;
+        }
+
+        var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer.AsSpan(0, 4));
+        ValidateIncomingLength(totalLength);
+
+        var frame = Payload.Rent(totalLength);
+        BinaryPrimitives.WriteInt32LittleEndian(frame.Memory.Span.Slice(0, 4), totalLength);
+
         try
         {
-            // The first read of the length prefix waits for the next frame and is not timed (an idle
-            // connection is legitimate); once any byte arrives, the rest of the frame is timed.
-            var read = await ReadExactAsync(lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false).ConfigureAwait(false);
-            if (read < 4)
-            {
-                return Payload.Empty;
-            }
-
-            var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.AsSpan(0, 4));
-            ValidateIncomingLength(totalLength);
-
-            var frame = Payload.Rent(totalLength);
-            BinaryPrimitives.WriteInt32LittleEndian(frame.Memory.Span.Slice(0, 4), totalLength);
-
-            try
-            {
-                // The header has fully arrived, so a frame is in progress: time every body read so a
-                // peer that stalls mid-frame cannot pin this rented buffer indefinitely (slow-loris).
-                read = await ReadExactAsync(frame.Memory.Slice(4), ct, timeFirstRead: true).ConfigureAwait(false);
-                if (read < totalLength - 4)
-                {
-                    frame.Dispose();
-                    return Payload.Empty;
-                }
-            }
-            catch
+            read = await ReadExactAsync(frame.Memory.Slice(4), ct, timeFirstRead: true).ConfigureAwait(false);
+            if (read < totalLength - 4)
             {
                 frame.Dispose();
-                throw;
-            }
+                if (read == 0)
+                {
+                    return Payload.Empty;
+                }
 
-            return frame;
+                throw new InvalidDataException(
+                    $"Connection closed after {read + 4} of {totalLength} frame bytes.");
+            }
         }
-        finally
+        catch
         {
-            ArrayPool<byte>.Shared.Return(lengthBuffer);
+            frame.Dispose();
+            throw;
         }
+
+        return frame;
     }
 
     /// <summary>
