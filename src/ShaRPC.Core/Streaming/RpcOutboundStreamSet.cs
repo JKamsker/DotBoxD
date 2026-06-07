@@ -60,12 +60,12 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
             tasks[i] = Task.Run(() => PumpAsync(pair.Attachment, pair.State));
         }
 
-        _tasks = tasks;
+        Volatile.Write(ref _tasks, tasks);
     }
 
     public async Task WaitAsync()
     {
-        var tasks = _tasks;
+        var tasks = Volatile.Read(ref _tasks);
         if (tasks is not { Length: > 0 })
         {
             return;
@@ -94,7 +94,7 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
                 pair.State.Cancel();
             }
 
-            var tasks = _tasks;
+            var tasks = Volatile.Read(ref _tasks);
             if (tasks is { Length: > 0 })
             {
                 if (HasRunningTask(tasks))

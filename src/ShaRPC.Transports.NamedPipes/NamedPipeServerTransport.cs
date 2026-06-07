@@ -144,7 +144,6 @@ public sealed class NamedPipeServerTransport : IServerTransport
                 // cancellation instead.
                 if (linkedCts.IsCancellationRequested || !stream.IsConnected)
                 {
-                    stream.Dispose();
                     throw new OperationCanceledException(linkedCts.Token);
                 }
 
