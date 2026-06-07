@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\ShaRPC.Transports.Tcp\ShaRPC.Transports.Tcp.csproj" />
     <ProjectReference Include="..\..\src\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj" />
     <ProjectReference Include="..\..\samples\GameService\Shared\Shared.csproj" />
+    <ProjectReference Include="..\ShaRPC.Tests.GeneratedFixtures\ShaRPC.Tests.GeneratedFixtures.csproj" />
     <ProjectReference Include="..\..\src\ShaRPC.Transports.NamedPipes\ShaRPC.Transports.NamedPipes.csproj" />
   </ItemGroup>
 

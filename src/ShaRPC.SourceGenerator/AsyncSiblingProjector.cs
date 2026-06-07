@@ -40,6 +40,8 @@ internal static class AsyncSiblingProjector
             {
                 MethodReturnKind.Void => MethodReturnKind.Task,
                 MethodReturnKind.Sync => MethodReturnKind.TaskOf,
+                MethodReturnKind.Stream => MethodReturnKind.TaskOfStream,
+                MethodReturnKind.Pipe => MethodReturnKind.TaskOfPipe,
                 _ => m.ReturnKind,
             };
 

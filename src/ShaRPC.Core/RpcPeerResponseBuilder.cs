@@ -3,6 +3,7 @@ using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Server;
+using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core;
 
@@ -24,20 +25,23 @@ internal sealed class RpcPeerResponseBuilder
         _rejectInboundCalls = rejectInboundCalls;
     }
 
-    public async ValueTask<Payload> BuildAsync(
+    public async ValueTask<RpcDispatchResult> BuildAsync(
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> payload,
+        RpcStreamingContext streaming,
         CancellationToken ct)
     {
         if (_rejectInboundCalls)
         {
-            return _inner.BuildErrorFrame(
-                messageId,
-                new RpcError("This peer does not accept inbound calls.", RpcErrorTypes.InboundRejected));
+            return new RpcDispatchResult(
+                _inner.BuildErrorFrame(
+                    messageId,
+                    new RpcError("This peer does not accept inbound calls.", RpcErrorTypes.InboundRejected)),
+                stream: null);
         }
 
-        return await _inner.BuildAsync(request, messageId, payload, _registry, ct).ConfigureAwait(false);
+        return await _inner.BuildAsync(request, messageId, payload, _registry, streaming, ct).ConfigureAwait(false);
     }
 
     public Payload BuildProtocolErrorFrame(int messageId, string errorMessage) =>

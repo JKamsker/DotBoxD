@@ -38,4 +38,10 @@ public struct RpcRequest
     /// Wire-compatible with older peers because absent properties deserialize to null.
     /// </summary>
     public string? InstanceId { get; set; }
+
+    /// <summary>
+    /// Streams opened by this request body. The dispatch side registers these handles before
+    /// processing later frames so streamed arguments cannot race their receivers.
+    /// </summary>
+    public RpcStreamHandle[]? Streams { get; set; }
 }

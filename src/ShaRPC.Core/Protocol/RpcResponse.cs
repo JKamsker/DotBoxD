@@ -26,4 +26,9 @@ public struct RpcResponse
     /// Error type name (if not successful).
     /// </summary>
     public string? ErrorType { get; set; }
+
+    /// <summary>
+    /// Non-null when the response payload is delivered by subsequent stream frames.
+    /// </summary>
+    public RpcStreamHandle? Stream { get; set; }
 }

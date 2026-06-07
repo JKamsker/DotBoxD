@@ -3,7 +3,9 @@ using ShaRPC.Core.Generated;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Server;
+using ShaRPC.Core.Streaming;
 using ShaRPC.Core.Transport;
+using System.IO.Pipelines;
 
 namespace ShaRPC.Core;
 /// <summary>
@@ -17,6 +19,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     private readonly RpcPeerOutboundInvoker _outbound;
     private readonly RpcPeerReadLoop _readLoopRunner;
     private readonly RpcPeerSender _sender;
+    private readonly RpcStreamManager _streams;
     private readonly object _lifecycleLock = new();
     private readonly IServiceProvider? _serviceProvider;
     private CancellationTokenSource? _cts;
@@ -30,18 +33,21 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     {
         _channel = channel;
         _sender = new RpcPeerSender(channel, () => Volatile.Read(ref _closed) != 0);
+        _streams = new RpcStreamManager(serializer, _sender.SendAsync, options.ExceptionTransformer);
         _inbound = new RpcPeerInboundDispatcher(
             serializer,
             options,
+            _streams,
             _sender.SendAsync,
             RaiseProtocolError,
             RaiseDispatchError);
-        _outbound = new RpcPeerOutboundInvoker(serializer, options, EnsureStarted, _sender.SendAsync);
-        var frameProcessor = new RpcPeerFrameProcessor(_inbound, _outbound, RaiseProtocolError);
+        _outbound = new RpcPeerOutboundInvoker(serializer, options, EnsureStarted, _sender.SendAsync, _streams);
+        var frameProcessor = new RpcPeerFrameProcessor(_inbound, _outbound, _streams, RaiseProtocolError);
         _readLoopRunner = new RpcPeerReadLoop(
             channel,
             _inbound,
             _outbound,
+            _streams,
             frameProcessor,
             MarkClosed,
             RaiseReadError,
@@ -214,20 +220,64 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
     public Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeAsync<TRequest, TResponse>(service, method, request, ct);
+    public Task<TResponse> InvokeAsync<TRequest, TResponse>(string service, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
+        _outbound.InvokeAsync<TRequest, TResponse>(service, method, request, streams, ct);
     public Task<TResponse> InvokeAsync<TResponse>(string service, string method, CancellationToken ct = default) =>
         _outbound.InvokeAsync<TResponse>(service, method, ct);
     public Task InvokeAsync<TRequest>(string service, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeAsync(service, method, request, ct);
+    public Task InvokeAsync<TRequest>(string service, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
+        _outbound.InvokeAsync(service, method, request, streams, ct);
     public Task InvokeAsync(string service, string method, CancellationToken ct = default) =>
         _outbound.InvokeAsync(service, method, ct);
+    public Task<Stream> InvokeStreamAsync(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokeStreamAsync(service, method, ct);
+    public Task<Stream> InvokeStreamAsync<TRequest>(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeStreamAsync(service, method, request, streams, ct);
+    public Task<Pipe> InvokePipeAsync(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokePipeAsync(service, method, ct);
+    public Task<Pipe> InvokePipeAsync<TRequest>(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokePipeAsync(service, method, request, streams, ct);
+    public IAsyncEnumerable<T> InvokeAsyncEnumerable<T>(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerable<T>(service, method, ct);
+    public IAsyncEnumerable<T> InvokeAsyncEnumerable<TRequest, T>(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerable<TRequest, T>(service, method, request, streams, ct);
+    public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableAsync<T>(string service, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableAsync<T>(service, method, ct);
+    public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableAsync<TRequest, T>(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableAsync<TRequest, T>(service, method, request, streams, ct);
     public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeOnInstanceAsync<TRequest, TResponse>(service, instanceId, method, request, ct);
+    public Task<TResponse> InvokeOnInstanceAsync<TRequest, TResponse>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync<TRequest, TResponse>(service, instanceId, method, request, streams, ct);
     public Task<TResponse> InvokeOnInstanceAsync<TResponse>(string service, string instanceId, string method, CancellationToken ct = default) =>
         _outbound.InvokeOnInstanceAsync<TResponse>(service, instanceId, method, ct);
     public Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, CancellationToken ct = default) =>
         _outbound.InvokeOnInstanceAsync(service, instanceId, method, request, ct);
+    public Task InvokeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default) =>
+        _outbound.InvokeOnInstanceAsync(service, instanceId, method, request, streams, ct);
     public Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default) =>
         _outbound.InvokeOnInstanceAsync(service, instanceId, method, ct);
+    public Task<Stream> InvokeStreamOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokeStreamOnInstanceAsync(service, instanceId, method, ct);
+    public Task<Stream> InvokeStreamOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeStreamOnInstanceAsync(service, instanceId, method, request, streams, ct);
+    public Task<Pipe> InvokePipeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokePipeOnInstanceAsync(service, instanceId, method, ct);
+    public Task<Pipe> InvokePipeOnInstanceAsync<TRequest>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokePipeOnInstanceAsync(service, instanceId, method, request, streams, ct);
+    public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<T>(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableOnInstance<T>(service, instanceId, method, ct);
+    public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableOnInstance<TRequest, T>(service, instanceId, method, request, streams, ct);
+    public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<T>(string service, string instanceId, string method, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableOnInstanceAsync<T>(service, instanceId, method, ct);
+    public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
+        _outbound.InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(service, instanceId, method, request, streams, ct);
+    public RpcStreamHandle ReserveStream(RpcStreamKind kind) =>
+        _outbound.ReserveStream(kind);
+    public void ReleaseStream(RpcStreamHandle handle) =>
+        _outbound.ReleaseStream(handle);
 
     /// <summary>Closes the peer by disposing it; closed peers cannot be restarted.</summary>
     /// <remarks>
@@ -300,6 +350,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
         await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
         _outbound.FailPending(new ShaRpcConnectionException("Connection closed."));
+        _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 
         _sender.Dispose();

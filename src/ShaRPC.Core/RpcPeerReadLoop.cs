@@ -1,5 +1,6 @@
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
+using ShaRPC.Core.Streaming;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core;
@@ -9,6 +10,7 @@ internal sealed class RpcPeerReadLoop
     private readonly IRpcChannel _channel;
     private readonly RpcPeerInboundDispatcher _inbound;
     private readonly RpcPeerOutboundInvoker _outbound;
+    private readonly RpcStreamManager _streams;
     private readonly RpcPeerFrameProcessor _frameProcessor;
     private readonly Action _markClosed;
     private readonly Action<Exception> _readError;
@@ -18,6 +20,7 @@ internal sealed class RpcPeerReadLoop
         IRpcChannel channel,
         RpcPeerInboundDispatcher inbound,
         RpcPeerOutboundInvoker outbound,
+        RpcStreamManager streams,
         RpcPeerFrameProcessor frameProcessor,
         Action markClosed,
         Action<Exception> readError,
@@ -26,6 +29,7 @@ internal sealed class RpcPeerReadLoop
         _channel = channel;
         _inbound = inbound;
         _outbound = outbound;
+        _streams = streams;
         _frameProcessor = frameProcessor;
         _markClosed = markClosed;
         _readError = readError;
@@ -101,6 +105,7 @@ internal sealed class RpcPeerReadLoop
             readError is null
                 ? new ShaRpcConnectionException("Connection closed.")
                 : new ShaRpcConnectionException("Connection lost.", readError));
+        _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 
         if (readError is not null)

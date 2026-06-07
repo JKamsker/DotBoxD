@@ -77,16 +77,25 @@ internal static class DispatcherGenerator
         CancellationToken ct)
     {
         sb.AppendLine();
-        // CS1998: when every method on the service is sync the body has no `await`, but
-        // we must keep the async return type to satisfy the interface contract.
-        sb.AppendLine("#pragma warning disable CS1998");
         if (isInstanceScoped)
         {
             sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            await DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("#pragma warning disable CS1998");
+            sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)");
         }
         else
         {
             sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            await DispatchAsync(method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("#pragma warning disable CS1998");
+            sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)");
         }
         sb.AppendLine("#pragma warning restore CS1998");
         sb.AppendLine("        {");
@@ -141,7 +150,7 @@ internal static class DispatcherGenerator
         var requestParameters = GetRequestParameters(method.Parameters, ct);
         if (requestParameters.Count == 1)
         {
-            var wireType = ProxyGenerationHelpers.GetWireType(requestParameters[0].Type);
+            var wireType = ProxyGenerationHelpers.GetWireType(requestParameters[0]);
             sb.AppendLine($"                    var arg = serializer.Deserialize<{wireType}>(payload);");
         }
         else if (requestParameters.Count > 1)
@@ -152,35 +161,48 @@ internal static class DispatcherGenerator
                 ct.ThrowIfCancellationRequested();
 
                 if (i > 0) tupleTypes.Append(", ");
-                tupleTypes.Append(ProxyGenerationHelpers.GetWireType(requestParameters[i].Type));
+                tupleTypes.Append(ProxyGenerationHelpers.GetWireType(requestParameters[i]));
             }
 
             sb.AppendLine($"                    var args = serializer.Deserialize<({tupleTypes})>(payload);");
         }
 
+        var locals = new GeneratedLocalNames(method.Parameters, ct);
+        var argumentExpressions = new string[method.Parameters.Count];
+        var argumentRequestIndex = 0;
+        for (var i = 0; i < method.Parameters.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var parameter = method.Parameters[i];
+            if (parameter.IsCancellationToken)
+            {
+                argumentExpressions[i] = "ct";
+                continue;
+            }
+
+            argumentRequestIndex++;
+            var source = requestParameters.Count == 1
+                ? "arg"
+                : "args.Item" + argumentRequestIndex;
+            if (parameter.StreamKind == ParameterStreamKind.None)
+            {
+                argumentExpressions[i] = source;
+                continue;
+            }
+
+            var local = locals.Reserve("__sharpc_arg" + argumentRequestIndex, ct);
+            sb.AppendLine($"                    var {local} = {BuildStreamingArgument(parameter, source)};");
+            argumentExpressions[i] = local;
+        }
+
         var argList = new StringBuilder();
-        var requestIndex = 0;
         for (var i = 0; i < method.Parameters.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
             if (i > 0) argList.Append(", ");
-
-            var parameter = method.Parameters[i];
-            if (parameter.IsCancellationToken)
-            {
-                argList.Append("ct");
-            }
-            else if (requestParameters.Count == 1)
-            {
-                argList.Append("arg");
-                requestIndex++;
-            }
-            else
-            {
-                requestIndex++;
-                argList.Append("args.Item").Append(requestIndex);
-            }
+            argList.Append(argumentExpressions[i]);
         }
 
         var target = method.RequiresDispatcherReceiverCast
@@ -267,10 +289,38 @@ internal static class DispatcherGenerator
                 sb.AppendLine("                    return;");
                 break;
             }
+
+            case MethodReturnKind.AsyncEnumerable:
+            case MethodReturnKind.Stream:
+            case MethodReturnKind.Pipe:
+                sb.AppendLine($"                    var result = {call};");
+                sb.AppendLine("                    streaming.SetResponse(result);");
+                sb.AppendLine("                    return;");
+                break;
+
+            case MethodReturnKind.TaskOfAsyncEnumerable:
+            case MethodReturnKind.ValueTaskOfAsyncEnumerable:
+            case MethodReturnKind.TaskOfStream:
+            case MethodReturnKind.ValueTaskOfStream:
+            case MethodReturnKind.TaskOfPipe:
+            case MethodReturnKind.ValueTaskOfPipe:
+                sb.AppendLine($"                    var result = await {call};");
+                sb.AppendLine("                    streaming.SetResponse(result);");
+                sb.AppendLine("                    return;");
+                break;
         }
 
         sb.AppendLine("                }");
     }
+
+    private static string BuildStreamingArgument(ParameterModel parameter, string source) =>
+        parameter.StreamKind switch
+        {
+            ParameterStreamKind.Stream => $"streaming.GetStream({source})",
+            ParameterStreamKind.Pipe => $"streaming.GetPipe({source})",
+            ParameterStreamKind.AsyncEnumerable => $"streaming.GetAsyncEnumerable<{parameter.StreamItemType}>({source})",
+            _ => source,
+        };
 
     private static List<ParameterModel> GetRequestParameters(
         EquatableArray<ParameterModel> parameters,

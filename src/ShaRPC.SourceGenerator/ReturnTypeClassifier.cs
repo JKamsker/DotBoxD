@@ -6,6 +6,9 @@ namespace ShaRPC.SourceGenerator;
 internal static class ReturnTypeClassifier
 {
     private const string ShaRpcServiceAttributeName = "ShaRPC.Core.Attributes.ShaRpcServiceAttribute";
+    private const string SystemCollectionsGeneric = "System.Collections.Generic";
+    private const string SystemIO = "System.IO";
+    private const string SystemIOPipelines = "System.IO.Pipelines";
     private const string SystemThreadingTasks = "System.Threading.Tasks";
 
     private static readonly SymbolDisplayFormat s_qualifiedFormat =
@@ -68,6 +71,24 @@ internal static class ReturnTypeClassifier
                 if (named.Name == "Task")
                 {
                     var arg = named.TypeArguments[0];
+                    if (TryGetAsyncEnumerableItemType(arg, out var itemType))
+                    {
+                        unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.TaskOfAsyncEnumerable;
+                    }
+
+                    if (IsStream(arg))
+                    {
+                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.TaskOfStream;
+                    }
+
+                    if (IsPipe(arg))
+                    {
+                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.TaskOfPipe;
+                    }
+
                     unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
                     if (TryGetSubServiceInfo(arg, ct, out var sub))
                     {
@@ -80,6 +101,24 @@ internal static class ReturnTypeClassifier
                 if (named.Name == "ValueTask")
                 {
                     var arg = named.TypeArguments[0];
+                    if (TryGetAsyncEnumerableItemType(arg, out var itemType))
+                    {
+                        unwrappedReturnType = itemType.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.ValueTaskOfAsyncEnumerable;
+                    }
+
+                    if (IsStream(arg))
+                    {
+                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.ValueTaskOfStream;
+                    }
+
+                    if (IsPipe(arg))
+                    {
+                        unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
+                        return MethodReturnKind.ValueTaskOfPipe;
+                    }
+
                     unwrappedReturnType = arg.ToDisplayString(s_qualifiedFormat);
                     if (TryGetSubServiceInfo(arg, ct, out var sub))
                     {
@@ -113,9 +152,53 @@ internal static class ReturnTypeClassifier
             return MethodReturnKind.Void;
         }
 
+        if (TryGetAsyncEnumerableItemType(returnType, out var enumerableItemType))
+        {
+            unwrappedReturnType = enumerableItemType.ToDisplayString(s_qualifiedFormat);
+            return MethodReturnKind.AsyncEnumerable;
+        }
+
+        if (IsStream(returnType))
+        {
+            unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+            return MethodReturnKind.Stream;
+        }
+
+        if (IsPipe(returnType))
+        {
+            unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+            return MethodReturnKind.Pipe;
+        }
+
         unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
         return MethodReturnKind.Sync;
     }
+
+    public static bool TryGetAsyncEnumerableItemType(ITypeSymbol type, out ITypeSymbol itemType)
+    {
+        itemType = null!;
+        if (type is not INamedTypeSymbol { IsGenericType: true } named)
+        {
+            return false;
+        }
+
+        if (named.Name != "IAsyncEnumerable" ||
+            named.ContainingNamespace?.ToDisplayString() != SystemCollectionsGeneric)
+        {
+            return false;
+        }
+
+        itemType = named.TypeArguments[0];
+        return true;
+    }
+
+    public static bool IsStream(ITypeSymbol type) =>
+        type.Name == "Stream" &&
+        type.ContainingNamespace?.ToDisplayString() == SystemIO;
+
+    public static bool IsPipe(ITypeSymbol type) =>
+        type.Name == "Pipe" &&
+        type.ContainingNamespace?.ToDisplayString() == SystemIOPipelines;
 
     private static bool TryGetAsyncPayloadType(ITypeSymbol type, out ITypeSymbol payloadType)
     {

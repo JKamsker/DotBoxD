@@ -118,8 +118,9 @@ internal static class ProxyGenerator
         var paramList = new StringBuilder();
         ProxyGenerationHelpers.AppendParameterList(paramList, method.Parameters, ct);
 
-        var declaredReturn = NamingHelpers.GetDeclaredReturnTypeText(method.ReturnKind, method.UnwrappedReturnType);
-        var isAsync = NamingHelpers.IsAsync(method.ReturnKind);
+        var declaredReturn = method.DeclaredReturnType;
+        var isAsync = NamingHelpers.IsAsync(method.ReturnKind) &&
+            method.ReturnKind != MethodReturnKind.AsyncEnumerable;
         // Stubs stay non-async so out-parameters are definitely assigned by throw.
         var asyncKeyword = (isAsync && method.UnsupportedReason is null) ? "async " : string.Empty;
         var unsafeKeyword = method.RequiresUnsafeSignature ? "unsafe " : string.Empty;
@@ -137,11 +138,88 @@ internal static class ProxyGenerator
         }
         else
         {
-            var invocation = BuildClientInvocation(service, method, ctArg, ct);
-            ProxyInvocationEmitter.Emit(sb, method, invocation, ct);
+            var locals = new GeneratedLocalNames(method.Parameters, ct);
+            if (method.ReturnKind == MethodReturnKind.AsyncEnumerable &&
+                HasStreamedRequestParameter(method, ct))
+            {
+                EmitLazyAsyncEnumerableInvocation(sb, service, method, ctArg, locals, ct);
+            }
+            else
+            {
+                var invocation = BuildClientInvocation(sb, service, method, ctArg, locals, ct);
+                ProxyInvocationCleanupEmitter.EmitProxyInvocation(
+                    sb,
+                    method,
+                    invocation.Invocation,
+                    invocation.Reservations,
+                    locals,
+                    ct);
+            }
         }
 
         sb.AppendLine("        }");
+    }
+
+    private static bool HasStreamedRequestParameter(MethodModel method, CancellationToken ct)
+    {
+        foreach (var parameter in method.Parameters.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (parameter.StreamKind != ParameterStreamKind.None)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void EmitLazyAsyncEnumerableInvocation(
+        StringBuilder sb,
+        ServiceModel service,
+        MethodModel method,
+        string ctArg,
+        GeneratedLocalNames locals,
+        CancellationToken ct)
+    {
+        var iteratorName = locals.Reserve("__sharpc_enumerate", ct);
+        var enumerationCt = locals.Reserve("__sharpc_enumerationCt", ct);
+        var sequenceName = locals.Reserve("__sharpc_sequence", ct);
+        var enumeratorName = locals.Reserve("__sharpc_enumerator", ct);
+        sb.AppendLine($"            return {iteratorName}();");
+        sb.AppendLine();
+        sb.AppendLine($"            async {method.DeclaredReturnType} {iteratorName}([global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken {enumerationCt} = default)");
+        sb.AppendLine("            {");
+        var invocation = BuildClientInvocation(
+            sb,
+            service,
+            method,
+            ctArg,
+            locals,
+            ct,
+            "                ");
+        ProxyInvocationCleanupEmitter.EmitInvocationAssignment(
+            sb,
+            method.DeclaredReturnType,
+            sequenceName,
+            invocation.Invocation,
+            invocation.Reservations,
+            locals,
+            ct,
+            "                ");
+        sb.AppendLine($"                var {enumeratorName} = {sequenceName}.GetAsyncEnumerator({enumerationCt});");
+        sb.AppendLine("                try");
+        sb.AppendLine("                {");
+        sb.AppendLine($"                    while (await {enumeratorName}.MoveNextAsync())");
+        sb.AppendLine("                    {");
+        sb.AppendLine($"                        yield return {enumeratorName}.Current;");
+        sb.AppendLine("                    }");
+        sb.AppendLine("                }");
+        sb.AppendLine("                finally");
+        sb.AppendLine("                {");
+        sb.AppendLine($"                    await {enumeratorName}.DisposeAsync();");
+        sb.AppendLine("                }");
+        sb.AppendLine("            }");
     }
 
     /// <summary>
@@ -151,11 +229,14 @@ internal static class ProxyGenerator
     /// expression branches on <c>_instanceId</c> so the same proxy class can serve both
     /// the top-level and the nested-instance call paths.
     /// </summary>
-    private static string BuildClientInvocation(
+    private static (string Invocation, System.Collections.Generic.List<(string HandleName, string ReservedName)>? Reservations) BuildClientInvocation(
+        StringBuilder sb,
         ServiceModel service,
         MethodModel method,
         string ctArg,
-        CancellationToken ct)
+        GeneratedLocalNames locals,
+        CancellationToken ct,
+        string indent = "            ")
     {
         var isSubServiceReturn = NamingHelpers.IsSubServiceReturn(method.ReturnKind);
         var hasReturn = NamingHelpers.HasReturnValue(method.ReturnKind);
@@ -165,8 +246,12 @@ internal static class ProxyGenerator
                 ? null
                 : ProxyGenerationHelpers.GetWireType(method.UnwrappedReturnType);
         var requestParameters = ProxyGenerationHelpers.GetRequestParameters(method.Parameters, ct);
+        var streamSetup = ProxyStreamSetupEmitter.Emit(sb, requestParameters, locals, ct, indent);
+        var streamArray = streamSetup.ArrayName;
         var svc = service.ServiceName;
         var rpc = method.RpcName;
+        var singletonMethod = GetInvokerMethod(method.ReturnKind, isInstanceScoped: false);
+        var instanceMethod = GetInvokerMethod(method.ReturnKind, isInstanceScoped: true);
 
         // Build the type-parameter list and argument list once; switch between the two
         // overload prefixes via the ternary.
@@ -176,27 +261,21 @@ internal static class ProxyGenerator
 
         if (requestParameters.Count == 0)
         {
-            if (hasReturn)
-            {
-                typeArgs = $"<{returnType}>";
-                callArgs = $"\"{svc}\", \"{rpc}\", {ctArg}";
-                callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {ctArg}";
-            }
-            else
-            {
-                typeArgs = string.Empty;
-                callArgs = $"\"{svc}\", \"{rpc}\", {ctArg}";
-                callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {ctArg}";
-            }
+            typeArgs = BuildTypeArgs(method.ReturnKind, requestType: null, returnType, hasReturn);
+            callArgs = $"\"{svc}\", \"{rpc}\", {ctArg}";
+            callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {ctArg}";
         }
         else if (requestParameters.Count == 1)
         {
             var p = requestParameters[0];
-            var wireType = ProxyGenerationHelpers.GetWireType(p.Type);
-            var wireArgument = ProxyGenerationHelpers.GetWireArgument(p);
-            typeArgs = hasReturn ? $"<{wireType}, {returnType}>" : $"<{wireType}>";
-            callArgs = $"\"{svc}\", \"{rpc}\", {wireArgument}, {ctArg}";
-            callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {wireArgument}, {ctArg}";
+            var wireType = ProxyGenerationHelpers.GetWireType(p);
+            var wireArgument = GetWireArgument(p, requestIndex: 0, streamSetup.Handles);
+            typeArgs = BuildTypeArgs(method.ReturnKind, wireType, returnType, hasReturn);
+            var streamArg = NeedsStreamArrayArgument(method.ReturnKind, streamArray)
+                ? $", {streamArray ?? "null"}"
+                : string.Empty;
+            callArgs = $"\"{svc}\", \"{rpc}\", {wireArgument}{streamArg}, {ctArg}";
+            callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", {wireArgument}{streamArg}, {ctArg}";
         }
         else
         {
@@ -211,22 +290,91 @@ internal static class ProxyGenerator
                     tupleTypes.Append(", ");
                     tupleValues.Append(", ");
                 }
-                tupleTypes.Append(ProxyGenerationHelpers.GetWireType(requestParameters[i].Type));
-                tupleValues.Append(ProxyGenerationHelpers.GetWireArgument(requestParameters[i]));
+                tupleTypes.Append(ProxyGenerationHelpers.GetWireType(requestParameters[i]));
+                tupleValues.Append(GetWireArgument(requestParameters[i], i, streamSetup.Handles));
             }
 
-            typeArgs = hasReturn ? $"<({tupleTypes}), {returnType}>" : $"<({tupleTypes})>";
-            callArgs = $"\"{svc}\", \"{rpc}\", ({tupleValues}), {ctArg}";
-            callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", ({tupleValues}), {ctArg}";
+            typeArgs = BuildTypeArgs(method.ReturnKind, $"({tupleTypes})", returnType, hasReturn);
+            var streamArg = NeedsStreamArrayArgument(method.ReturnKind, streamArray)
+                ? $", {streamArray ?? "null"}"
+                : string.Empty;
+            callArgs = $"\"{svc}\", \"{rpc}\", ({tupleValues}){streamArg}, {ctArg}";
+            callArgsInst = $"\"{svc}\", this._instanceId!, \"{rpc}\", ({tupleValues}){streamArg}, {ctArg}";
         }
 
-        return $"(this._instanceId is null ? this._invoker.InvokeAsync{typeArgs}({callArgs}) : this._invoker.InvokeOnInstanceAsync{typeArgs}({callArgsInst}))";
+        return (
+            $"(this._instanceId is null ? this._invoker.{singletonMethod}{typeArgs}({callArgs}) : this._invoker.{instanceMethod}{typeArgs}({callArgsInst}))",
+            streamSetup.Reservations);
     }
 
     private static string GetServiceHandleType(MethodModel method) =>
         method.SubService?.AllowsNull == true
             ? "global::ShaRPC.Core.Protocol.ServiceHandle?"
             : "global::ShaRPC.Core.Protocol.ServiceHandle";
+
+    private static string BuildTypeArgs(
+        MethodReturnKind returnKind,
+        string? requestType,
+        string? returnType,
+        bool hasReturn)
+    {
+        if (NamingHelpers.IsAsyncEnumerableReturn(returnKind))
+        {
+            return requestType is null
+                ? $"<{returnType}>"
+                : $"<{requestType}, {returnType}>";
+        }
+
+        if (NamingHelpers.IsStreamReturn(returnKind) || NamingHelpers.IsPipeReturn(returnKind))
+        {
+            return requestType is null ? string.Empty : $"<{requestType}>";
+        }
+
+        if (requestType is null)
+        {
+            return hasReturn ? $"<{returnType}>" : string.Empty;
+        }
+
+        return hasReturn ? $"<{requestType}, {returnType}>" : $"<{requestType}>";
+    }
+
+    private static bool NeedsStreamArrayArgument(MethodReturnKind returnKind, string? streamArray) =>
+        streamArray is not null ||
+        NamingHelpers.IsStreamReturn(returnKind) ||
+        NamingHelpers.IsPipeReturn(returnKind) ||
+        NamingHelpers.IsAsyncEnumerableReturn(returnKind);
+
+    private static string GetWireArgument(
+        ParameterModel parameter,
+        int requestIndex,
+        System.Collections.Generic.Dictionary<int, string> streamHandles) =>
+        parameter.StreamKind == ParameterStreamKind.None
+            ? ProxyGenerationHelpers.GetWireArgument(parameter)
+            : streamHandles[requestIndex];
+
+    private static string GetInvokerMethod(MethodReturnKind returnKind, bool isInstanceScoped)
+    {
+        if (NamingHelpers.IsStreamReturn(returnKind))
+        {
+            return isInstanceScoped ? "InvokeStreamOnInstanceAsync" : "InvokeStreamAsync";
+        }
+
+        if (NamingHelpers.IsPipeReturn(returnKind))
+        {
+            return isInstanceScoped ? "InvokePipeOnInstanceAsync" : "InvokePipeAsync";
+        }
+
+        if (NamingHelpers.IsAsyncEnumerableReturn(returnKind))
+        {
+            var eager = returnKind == MethodReturnKind.TaskOfAsyncEnumerable ||
+                returnKind == MethodReturnKind.ValueTaskOfAsyncEnumerable;
+            return isInstanceScoped
+                ? eager ? "InvokeAsyncEnumerableOnInstanceAsync" : "InvokeAsyncEnumerableOnInstance"
+                : eager ? "InvokeAsyncEnumerableAsync" : "InvokeAsyncEnumerable";
+        }
+
+        return isInstanceScoped ? "InvokeOnInstanceAsync" : "InvokeAsync";
+    }
 
     /// <summary>
     /// Emits a non-blocking proxy method that satisfies the async sibling interface.
@@ -250,7 +398,8 @@ internal static class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
-        sb.AppendLine($"        {access}async {declaredReturn} {target}({paramList})");
+        var asyncKeyword = s.SiblingReturnKind == MethodReturnKind.AsyncEnumerable ? string.Empty : "async ";
+        sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 
         // For the wire call, treat the sibling as having a CancellationToken AND the
@@ -261,12 +410,24 @@ internal static class ProxyGenerator
             ReturnKind = s.SiblingReturnKind,
             Parameters = s.Parameters,
         };
-        var invocation = BuildClientInvocation(
-            service,
-            virtualSource,
-            ProxyGenerationHelpers.GetCancellationTokenArgument(s.Parameters, ct),
-            ct);
-        ProxyInvocationEmitter.Emit(sb, virtualSource, invocation, ct);
+        var locals = new GeneratedLocalNames(s.Parameters, ct);
+        var ctArg = ProxyGenerationHelpers.GetCancellationTokenArgument(s.Parameters, ct);
+        if (virtualSource.ReturnKind == MethodReturnKind.AsyncEnumerable &&
+            HasStreamedRequestParameter(virtualSource, ct))
+        {
+            EmitLazyAsyncEnumerableInvocation(sb, service, virtualSource, ctArg, locals, ct);
+        }
+        else
+        {
+            var invocation = BuildClientInvocation(sb, service, virtualSource, ctArg, locals, ct);
+            ProxyInvocationCleanupEmitter.EmitProxyInvocation(
+                sb,
+                virtualSource,
+                invocation.Invocation,
+                invocation.Reservations,
+                locals,
+                ct);
+        }
 
         sb.AppendLine("        }");
     }

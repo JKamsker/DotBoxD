@@ -21,6 +21,32 @@ internal enum MethodReturnKind
     TaskOfSubService,
     /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> where <c>TResult</c> is itself a <c>[ShaRpcService]</c> interface — nested sub-service.</summary>
     ValueTaskOfSubService,
+    /// <summary><see cref="System.Collections.Generic.IAsyncEnumerable{T}"/> streamed item-by-item.</summary>
+    AsyncEnumerable,
+    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <see cref="System.Collections.Generic.IAsyncEnumerable{T}"/>.</summary>
+    TaskOfAsyncEnumerable,
+    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.Collections.Generic.IAsyncEnumerable{T}"/>.</summary>
+    ValueTaskOfAsyncEnumerable,
+    /// <summary><see cref="System.IO.Stream"/> streamed as bytes.</summary>
+    Stream,
+    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <see cref="System.IO.Stream"/>.</summary>
+    TaskOfStream,
+    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.IO.Stream"/>.</summary>
+    ValueTaskOfStream,
+    /// <summary><see cref="System.IO.Pipelines.Pipe"/> streamed as bytes.</summary>
+    Pipe,
+    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <see cref="System.IO.Pipelines.Pipe"/>.</summary>
+    TaskOfPipe,
+    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.IO.Pipelines.Pipe"/>.</summary>
+    ValueTaskOfPipe,
+}
+
+internal enum ParameterStreamKind
+{
+    None,
+    Stream,
+    Pipe,
+    AsyncEnumerable,
 }
 
 /// <summary>
@@ -51,6 +77,7 @@ internal sealed record MethodModel(
     string ExplicitImplementationType,
     string RpcName,
     MethodReturnKind ReturnKind,
+    string DeclaredReturnType,
     string? UnwrappedReturnType,
     string ReturnRefKindKeyword,
     bool HasCancellationToken,
@@ -83,7 +110,9 @@ internal sealed record ParameterModel(
     string RefKindKeyword = "",
     bool IsCancellationToken = false,
     bool HasDefaultValue = false,
-    string DefaultValueLiteral = "");
+    string DefaultValueLiteral = "",
+    ParameterStreamKind StreamKind = ParameterStreamKind.None,
+    string? StreamItemType = null);
 
 /// <summary>
 /// A <see cref="ServiceModel"/> paired with its computed async-sibling projection. Lives
@@ -163,6 +192,15 @@ internal static class NamingHelpers
             // interface; the proxy's body short-circuits to a generated sub-proxy.
             MethodReturnKind.TaskOfSubService => $"global::System.Threading.Tasks.Task<{unwrappedReturnType}>",
             MethodReturnKind.ValueTaskOfSubService => $"global::System.Threading.Tasks.ValueTask<{unwrappedReturnType}>",
+            MethodReturnKind.AsyncEnumerable => $"global::System.Collections.Generic.IAsyncEnumerable<{unwrappedReturnType}>",
+            MethodReturnKind.TaskOfAsyncEnumerable => $"global::System.Threading.Tasks.Task<global::System.Collections.Generic.IAsyncEnumerable<{unwrappedReturnType}>>",
+            MethodReturnKind.ValueTaskOfAsyncEnumerable => $"global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IAsyncEnumerable<{unwrappedReturnType}>>",
+            MethodReturnKind.Stream => "global::System.IO.Stream",
+            MethodReturnKind.TaskOfStream => "global::System.Threading.Tasks.Task<global::System.IO.Stream>",
+            MethodReturnKind.ValueTaskOfStream => "global::System.Threading.Tasks.ValueTask<global::System.IO.Stream>",
+            MethodReturnKind.Pipe => "global::System.IO.Pipelines.Pipe",
+            MethodReturnKind.TaskOfPipe => "global::System.Threading.Tasks.Task<global::System.IO.Pipelines.Pipe>",
+            MethodReturnKind.ValueTaskOfPipe => "global::System.Threading.Tasks.ValueTask<global::System.IO.Pipelines.Pipe>",
             _ => "void",
         };
     }
@@ -177,7 +215,14 @@ internal static class NamingHelpers
         kind == MethodReturnKind.ValueTask ||
         kind == MethodReturnKind.ValueTaskOf ||
         kind == MethodReturnKind.TaskOfSubService ||
-        kind == MethodReturnKind.ValueTaskOfSubService;
+        kind == MethodReturnKind.ValueTaskOfSubService ||
+        kind == MethodReturnKind.AsyncEnumerable ||
+        kind == MethodReturnKind.TaskOfAsyncEnumerable ||
+        kind == MethodReturnKind.ValueTaskOfAsyncEnumerable ||
+        kind == MethodReturnKind.TaskOfStream ||
+        kind == MethodReturnKind.ValueTaskOfStream ||
+        kind == MethodReturnKind.TaskOfPipe ||
+        kind == MethodReturnKind.ValueTaskOfPipe;
 
     /// <summary>
     /// Returns true if the return kind carries a response payload (a generic Task/ValueTask of T
@@ -188,12 +233,36 @@ internal static class NamingHelpers
         kind == MethodReturnKind.TaskOf ||
         kind == MethodReturnKind.ValueTaskOf ||
         kind == MethodReturnKind.TaskOfSubService ||
-        kind == MethodReturnKind.ValueTaskOfSubService;
+        kind == MethodReturnKind.ValueTaskOfSubService ||
+        kind == MethodReturnKind.AsyncEnumerable ||
+        kind == MethodReturnKind.TaskOfAsyncEnumerable ||
+        kind == MethodReturnKind.ValueTaskOfAsyncEnumerable ||
+        kind == MethodReturnKind.Stream ||
+        kind == MethodReturnKind.TaskOfStream ||
+        kind == MethodReturnKind.ValueTaskOfStream ||
+        kind == MethodReturnKind.Pipe ||
+        kind == MethodReturnKind.TaskOfPipe ||
+        kind == MethodReturnKind.ValueTaskOfPipe;
 
     /// <summary>True for the two sub-service-returning kinds.</summary>
     public static bool IsSubServiceReturn(MethodReturnKind kind) =>
         kind == MethodReturnKind.TaskOfSubService ||
         kind == MethodReturnKind.ValueTaskOfSubService;
+
+    public static bool IsStreamReturn(MethodReturnKind kind) =>
+        kind == MethodReturnKind.Stream ||
+        kind == MethodReturnKind.TaskOfStream ||
+        kind == MethodReturnKind.ValueTaskOfStream;
+
+    public static bool IsPipeReturn(MethodReturnKind kind) =>
+        kind == MethodReturnKind.Pipe ||
+        kind == MethodReturnKind.TaskOfPipe ||
+        kind == MethodReturnKind.ValueTaskOfPipe;
+
+    public static bool IsAsyncEnumerableReturn(MethodReturnKind kind) =>
+        kind == MethodReturnKind.AsyncEnumerable ||
+        kind == MethodReturnKind.TaskOfAsyncEnumerable ||
+        kind == MethodReturnKind.ValueTaskOfAsyncEnumerable;
 
     /// <summary>
     /// Name of the auto-generated async sibling interface for <paramref name="interfaceName"/>.

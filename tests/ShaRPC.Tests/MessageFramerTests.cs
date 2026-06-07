@@ -229,6 +229,11 @@ public class MessageFramerTests
     [InlineData(MessageType.Response)]
     [InlineData(MessageType.Error)]
     [InlineData(MessageType.Cancel)]
+    [InlineData(MessageType.StreamItem)]
+    [InlineData(MessageType.StreamComplete)]
+    [InlineData(MessageType.StreamError)]
+    [InlineData(MessageType.StreamCredit)]
+    [InlineData(MessageType.StreamCancel)]
     public async Task RoundTrip_ShouldPreserveMessageType(MessageType type)
     {
         // Arrange

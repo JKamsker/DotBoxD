@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using ShaRPC.Core.Buffers;
+using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Server;
+using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core;
 
@@ -22,11 +24,12 @@ internal sealed class RpcDispatchResponseBuilder
         _exceptionTransformer = exceptionTransformer;
     }
 
-    public async ValueTask<Payload> BuildAsync(
+    public async ValueTask<RpcDispatchResult> BuildAsync(
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> payload,
         IInstanceRegistry registry,
+        RpcStreamingContext streaming,
         CancellationToken ct)
     {
         // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
@@ -36,7 +39,7 @@ internal sealed class RpcDispatchResponseBuilder
         if (string.IsNullOrEmpty(request.ServiceName) ||
             !_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
         {
-            return BuildErrorFrame(messageId, RpcErrors.ServiceNotFound());
+            return new RpcDispatchResult(BuildErrorFrame(messageId, RpcErrors.ServiceNotFound()), stream: null);
         }
 
         using var writer = new PooledBufferWriter(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
@@ -48,7 +51,7 @@ internal sealed class RpcDispatchResponseBuilder
         try
         {
             await (request.InstanceId is null
-                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, registry, writer, ct)
+                ? dispatcher.DispatchAsync(request.MethodName, payload, _serializer, registry, writer, streaming, ct)
                 : dispatcher.DispatchOnInstanceAsync(
                     request.InstanceId,
                     request.MethodName,
@@ -56,18 +59,57 @@ internal sealed class RpcDispatchResponseBuilder
                     _serializer,
                     registry,
                     writer,
+                    streaming,
                     ct)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
+        }
+        catch (ShaRpcProtocolException ex)
+        {
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
+            return new RpcDispatchResult(
+                BuildErrorFrame(messageId, RpcErrors.Protocol(ex.Message)),
+                stream: null);
         }
         catch (Exception ex)
         {
-            return BuildErrorFrame(messageId, RpcErrors.FromException(ex, _exceptionTransformer));
+            await streaming.AbandonResponseAsync().ConfigureAwait(false);
+            return new RpcDispatchResult(
+                BuildErrorFrame(messageId, RpcErrors.FromException(ex, _exceptionTransformer)),
+                stream: null);
         }
 
-        return MessageFramer.FinishFrame(writer, envelopeLength);
+        if (streaming.Response is { } stream)
+        {
+            try
+            {
+                var response = new RpcResponse
+                {
+                    MessageId = messageId,
+                    IsSuccess = true,
+                    Stream = stream.Handle,
+                };
+                using var responseWriter = new PooledBufferWriter(
+                    MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
+                MessageFramer.WriteFramePrefix(responseWriter, messageId, MessageType.Response);
+                var responseEnvelopeStart = responseWriter.WrittenCount;
+                _serializer.Serialize(responseWriter, response);
+                var responseEnvelopeLength = responseWriter.WrittenCount - responseEnvelopeStart;
+                return new RpcDispatchResult(
+                    MessageFramer.FinishFrame(responseWriter, responseEnvelopeLength),
+                    stream);
+            }
+            catch
+            {
+                await streaming.AbandonResponseAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        return new RpcDispatchResult(MessageFramer.FinishFrame(writer, envelopeLength), stream: null);
     }
 
     public Payload BuildProtocolErrorFrame(int messageId, string errorMessage) =>

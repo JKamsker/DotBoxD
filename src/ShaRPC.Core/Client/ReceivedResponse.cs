@@ -1,5 +1,6 @@
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
+using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Client;
 
@@ -9,19 +10,49 @@ namespace ShaRPC.Core.Client;
 internal sealed class ReceivedResponse : IDisposable
 {
     private Payload? _frame;
+    private RpcOutboundStreamSet? _outboundStreams;
+    private RpcStreamReceiver? _stream;
 
-    public ReceivedResponse(RpcResponse response, ReadOnlyMemory<byte> payload, Payload frame)
+    public ReceivedResponse(
+        RpcResponse response,
+        ReadOnlyMemory<byte> payload,
+        Payload frame,
+        RpcStreamReceiver? stream)
     {
         Response = response;
         Payload = payload;
         _frame = frame;
+        _stream = stream;
     }
 
     public RpcResponse Response { get; }
 
     public ReadOnlyMemory<byte> Payload { get; }
 
-    public void Dispose() => Interlocked.Exchange(ref _frame, null)?.Dispose();
+    public RpcStreamReceiver? Stream => _stream;
+
+    public void AttachOutboundStreams(RpcOutboundStreamSet streams) =>
+        _outboundStreams = streams;
+
+    public RpcOutboundStreamSet? DetachOutboundStreams() =>
+        Interlocked.Exchange(ref _outboundStreams, null);
+
+    public RpcStreamReceiver? DetachStream() =>
+        Interlocked.Exchange(ref _stream, null);
+
+    public void Dispose()
+    {
+        Interlocked.Exchange(ref _frame, null)?.Dispose();
+        if (Interlocked.Exchange(ref _outboundStreams, null) is { } streams)
+        {
+            _ = streams.DisposeAsync();
+        }
+
+        if (Interlocked.Exchange(ref _stream, null) is { } stream)
+        {
+            stream.Cancel();
+        }
+    }
 
     public static void DisposeWhenAvailable(Task<ReceivedResponse> task)
     {

@@ -1,6 +1,7 @@
 using System.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Serialization;
+using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Server;
 
@@ -33,6 +34,20 @@ public interface IServiceDispatcher
         CancellationToken ct = default);
 
     /// <summary>
+    /// Dispatches a singleton-service request with access to streamed arguments and streamed
+    /// responses. Existing dispatchers fall back to the non-streaming overload.
+    /// </summary>
+    Task DispatchAsync(
+        string method,
+        ReadOnlyMemory<byte> payload,
+        ISerializer serializer,
+        IInstanceRegistry registry,
+        IBufferWriter<byte> output,
+        IRpcStreamingContext streaming,
+        CancellationToken ct = default) =>
+        DispatchAsync(method, payload, serializer, registry, output, ct);
+
+    /// <summary>
     /// Dispatches a call to a specific server-side instance previously registered with
     /// <see cref="IInstanceRegistry.Register"/>, serializing the result into <paramref name="output"/>.
     /// Default implementation throws — the generator only emits an override for service dispatchers
@@ -49,4 +64,19 @@ public interface IServiceDispatcher
         throw new ShaRpcNotFoundException(
             $"Service '{ServiceName}' does not support instance-scoped dispatch.",
             ShaRpcNotFoundException.NotFoundKind.Instance);
+
+    /// <summary>
+    /// Dispatches an instance-scoped request with access to streamed arguments and streamed
+    /// responses. Existing dispatchers fall back to the non-streaming overload.
+    /// </summary>
+    Task DispatchOnInstanceAsync(
+        string instanceId,
+        string method,
+        ReadOnlyMemory<byte> payload,
+        ISerializer serializer,
+        IInstanceRegistry registry,
+        IBufferWriter<byte> output,
+        IRpcStreamingContext streaming,
+        CancellationToken ct = default) =>
+        DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, ct);
 }

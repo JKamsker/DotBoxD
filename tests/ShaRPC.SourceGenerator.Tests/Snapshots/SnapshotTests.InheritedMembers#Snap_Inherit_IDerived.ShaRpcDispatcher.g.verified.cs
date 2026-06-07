@@ -18,8 +18,13 @@ namespace Snap.Inherit
 
         public string ServiceName => "IDerived";
 
-#pragma warning disable CS1998
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)
+        {
+            await DispatchAsync(method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);
+        }
+
+#pragma warning disable CS1998
+        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             switch (method)
@@ -42,8 +47,13 @@ namespace Snap.Inherit
             }
         }
 
-#pragma warning disable CS1998
         public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)
+        {
+            await DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);
+        }
+
+#pragma warning disable CS1998
+        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             if (!registry.TryGet("IDerived", instanceId, out var __obj) || __obj is not global::Snap.Inherit.IDerived __inst)

@@ -83,6 +83,11 @@ internal static class ProxyGenerationHelpers
     public static string GetWireType(string type) =>
         type == "dynamic" ? "global::System.Object" : type;
 
+    public static string GetWireType(ParameterModel parameter) =>
+        parameter.StreamKind == ParameterStreamKind.None
+            ? GetWireType(parameter.Type)
+            : "global::ShaRPC.Core.Protocol.RpcStreamHandle";
+
     public static string GetWireArgument(ParameterModel parameter) =>
         parameter.Type == "dynamic"
             ? "(global::System.Object)" + parameter.Name

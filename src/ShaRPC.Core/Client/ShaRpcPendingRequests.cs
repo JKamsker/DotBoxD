@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
+using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Client;
 
@@ -31,18 +32,22 @@ internal sealed class ShaRpcPendingRequests
         }
     }
 
+    public bool TryTake(int messageId, out TaskCompletionSource<ReceivedResponse> tcs) =>
+        _requests.TryRemove(messageId, out tcs!);
+
     public bool TryComplete(
         int messageId,
         RpcResponse response,
         ReadOnlyMemory<byte> payload,
-        Payload frame)
+        Payload frame,
+        RpcStreamReceiver? stream)
     {
         if (!_requests.TryRemove(messageId, out var tcs))
         {
             return false;
         }
 
-        var received = new ReceivedResponse(response, payload, frame);
+        var received = new ReceivedResponse(response, payload, frame, stream);
         if (!tcs.TrySetResult(received))
         {
             received.Dispose();

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -37,6 +39,7 @@ internal static class GeneratorTestHelper
         var references = new List<MetadataReference>(Basic.Reference.Assemblies.Net80.References.All)
         {
             MetadataReference.CreateFromFile(typeof(ShaRpcServiceAttribute).Assembly.Location),
+            CreatePipelinesReference(),
         };
 
         var unique = Interlocked.Increment(ref s_compilationCounter);
@@ -45,6 +48,28 @@ internal static class GeneratorTestHelper
             syntaxTrees: trees,
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static MetadataReference CreatePipelinesReference()
+    {
+        var packageRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (string.IsNullOrWhiteSpace(packageRoot))
+        {
+            packageRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".nuget",
+                "packages");
+        }
+
+        var packagePath = Path.Combine(
+            packageRoot,
+            "system.io.pipelines",
+            "8.0.0",
+            "lib",
+            "netstandard2.0",
+            "System.IO.Pipelines.dll");
+        return MetadataReference.CreateFromFile(
+            File.Exists(packagePath) ? packagePath : typeof(Pipe).Assembly.Location);
     }
 
     /// <summary>
