@@ -26,24 +26,68 @@ namespace Snap.Inherit
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<string> DerivedAsync()
+        public global::System.Threading.Tasks.Task<string> DerivedAsync()
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IDerived", "DerivedAsync", default) : this._invoker.InvokeOnInstanceAsync<string>("IDerived", this._instanceId!, "DerivedAsync", default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IDerived", "DerivedAsync", default) : this._invoker.InvokeOnInstanceAsync<string>("IDerived", this._instanceId!, "DerivedAsync", default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> BaseAsync(int x)
+        public global::System.Threading.Tasks.Task<int> BaseAsync(int x)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IDerived", "BaseAsync", x, default) : this._invoker.InvokeOnInstanceAsync<int, int>("IDerived", this._instanceId!, "BaseAsync", x, default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IDerived", "BaseAsync", x, default) : this._invoker.InvokeOnInstanceAsync<int, int>("IDerived", this._instanceId!, "BaseAsync", x, default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<string> DerivedAsync(global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<string> DerivedAsync(global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IDerived", "DerivedAsync", ct) : this._invoker.InvokeOnInstanceAsync<string>("IDerived", this._instanceId!, "DerivedAsync", ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IDerived", "DerivedAsync", ct) : this._invoker.InvokeOnInstanceAsync<string>("IDerived", this._instanceId!, "DerivedAsync", ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> BaseAsync(int x, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> BaseAsync(int x, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IDerived", "BaseAsync", x, ct) : this._invoker.InvokeOnInstanceAsync<int, int>("IDerived", this._instanceId!, "BaseAsync", x, ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IDerived", "BaseAsync", x, ct) : this._invoker.InvokeOnInstanceAsync<int, int>("IDerived", this._instanceId!, "BaseAsync", x, ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
     }
 }

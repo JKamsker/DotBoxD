@@ -26,14 +26,36 @@ namespace Snap.Kw
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<int> DoAsync(int @class, int @default)
+        public global::System.Threading.Tasks.Task<int> DoAsync(int @class, int @default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IKwSnap", "DoAsync", (@class, @default), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IKwSnap", this._instanceId!, "DoAsync", (@class, @default), default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IKwSnap", "DoAsync", (@class, @default), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IKwSnap", this._instanceId!, "DoAsync", (@class, @default), default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> DoAsync(int @class, int @default, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> DoAsync(int @class, int @default, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IKwSnap", "DoAsync", (@class, @default), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IKwSnap", this._instanceId!, "DoAsync", (@class, @default), ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IKwSnap", "DoAsync", (@class, @default), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IKwSnap", this._instanceId!, "DoAsync", (@class, @default), ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
     }
 }

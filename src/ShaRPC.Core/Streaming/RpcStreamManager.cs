@@ -220,6 +220,46 @@ internal sealed class RpcStreamManager
             throw;
         }
     }
+
+    public RpcOutboundStreamSet RegisterOutbound(
+        RpcStreamAttachment attachment,
+        CancellationToken ct)
+    {
+        RpcStreamValidation.ValidateOutboundAttachment(attachment);
+
+        var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[1];
+        var state = new RpcStreamSendState(attachment.Handle.StreamId, ct);
+        var added = false;
+        try
+        {
+            if (!_senders.TryAdd(state.StreamId, state))
+            {
+                throw new ShaRpcProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
+            }
+
+            added = true;
+            DrainPendingOutbound(state);
+            _reservedOutbound.TryRemove(state.StreamId, out _);
+            DrainPendingOutbound(state);
+            rows[0] = (attachment, state);
+            return new RpcOutboundStreamSet(this, _serializer, rows);
+        }
+        catch
+        {
+            if (added)
+            {
+                RemoveOutbound(state.StreamId);
+            }
+            else
+            {
+                state.Dispose();
+            }
+
+            ReleaseOutboundReservation(attachment.Handle.StreamId);
+            throw;
+        }
+    }
+
     public bool TryAcceptItem(int streamId, Payload frame)
     {
         if (!_receivers.TryGetValue(streamId, out var receiver))

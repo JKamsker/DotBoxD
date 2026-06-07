@@ -350,9 +350,9 @@ public sealed class PeerInboundCoverageTests
 
         await dispatcher.FirstEntered.WaitAsync(ShortTimeout);
 
-        // The handler is parked inside DispatchAsync (tracked in _activeTasks). Disposing cancels the
-        // linked CTS, so the handler's await throws OperationCanceledException and StopAsync drains the
-        // tracked task via ObserveShutdownAsync without surfacing the cancellation.
+        // The handler is parked inside DispatchAsync. Disposing cancels the linked CTS, so the
+        // handler's await throws OperationCanceledException and StopAsync drains active dispatch work
+        // without surfacing the cancellation.
         await peer.DisposeAsync().AsTask().WaitAsync(ShortTimeout);
         await connection.DisposeAsync();
 

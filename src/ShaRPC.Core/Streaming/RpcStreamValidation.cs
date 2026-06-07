@@ -10,23 +10,21 @@ internal static class RpcStreamValidation
         out string? protocolError)
     {
         protocolError = null;
-        if (handles is null)
+        if (handles is null || handles.Length == 0)
         {
             return true;
         }
 
-        var streamIds = new HashSet<int>();
+        if (handles.Length == 1)
+        {
+            return TryValidateInboundHandle(handles[0], out protocolError);
+        }
+
+        var streamIds = new HashSet<int>(handles.Length);
         foreach (var handle in handles)
         {
-            if (handle.StreamId == 0)
+            if (!TryValidateInboundHandle(handle, out protocolError))
             {
-                protocolError = "Stream id must not be zero.";
-                return false;
-            }
-
-            if (!IsKnownKind(handle.Kind))
-            {
-                protocolError = $"Unknown stream kind '{handle.Kind}'.";
                 return false;
             }
 
@@ -42,25 +40,36 @@ internal static class RpcStreamValidation
 
     public static void ValidateOutboundAttachments(RpcStreamAttachment[] attachments)
     {
-        var streamIds = new HashSet<int>();
+        if (attachments.Length == 1)
+        {
+            ValidateOutboundAttachment(attachments[0]);
+            return;
+        }
+
+        var streamIds = new HashSet<int>(attachments.Length);
         foreach (var attachment in attachments)
         {
-            if (attachment is null)
-            {
-                throw new ArgumentNullException(nameof(attachments), "Outbound stream attachment must not be null.");
-            }
-
-            if (attachment.Handle.StreamId == 0)
-            {
-                throw new ShaRpcProtocolException("Stream id must not be zero.");
-            }
-
-            ValidateKind(attachment.Handle.Kind);
+            ValidateOutboundAttachment(attachment);
             if (!streamIds.Add(attachment.Handle.StreamId))
             {
                 throw new ShaRpcProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
             }
         }
+    }
+
+    public static void ValidateOutboundAttachment(RpcStreamAttachment attachment)
+    {
+        if (attachment is null)
+        {
+            throw new ArgumentNullException(nameof(attachment), "Outbound stream attachment must not be null.");
+        }
+
+        if (attachment.Handle.StreamId == 0)
+        {
+            throw new ShaRpcProtocolException("Stream id must not be zero.");
+        }
+
+        ValidateKind(attachment.Handle.Kind);
     }
 
     public static void ValidateKind(RpcStreamKind kind)
@@ -73,4 +82,24 @@ internal static class RpcStreamValidation
 
     private static bool IsKnownKind(RpcStreamKind kind) =>
         kind == RpcStreamKind.Binary || kind == RpcStreamKind.Items;
+
+    private static bool TryValidateInboundHandle(
+        RpcStreamHandle handle,
+        out string? protocolError)
+    {
+        if (handle.StreamId == 0)
+        {
+            protocolError = "Stream id must not be zero.";
+            return false;
+        }
+
+        if (!IsKnownKind(handle.Kind))
+        {
+            protocolError = $"Unknown stream kind '{handle.Kind}'.";
+            return false;
+        }
+
+        protocolError = null;
+        return true;
+    }
 }

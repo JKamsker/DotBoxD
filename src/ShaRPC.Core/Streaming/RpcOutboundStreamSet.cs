@@ -33,8 +33,15 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
         _manager = manager;
         _serializer = serializer;
         _streams = streams;
-        _waitCancellation = CreateLinkedCancellationSource(streams);
-        _waitToken = _waitCancellation.Token;
+        if (streams.Length == 1)
+        {
+            _waitToken = streams[0].State.Token;
+        }
+        else
+        {
+            _waitCancellation = CreateLinkedCancellationSource(streams);
+            _waitToken = _waitCancellation.Token;
+        }
     }
 
     public bool IsEmpty => _streams.Length == 0;
@@ -164,7 +171,8 @@ internal sealed class RpcOutboundStreamSet : IAsyncDisposable
 
     private async Task WaitForPumpTasksAsync(Task[] tasks)
     {
-        await RpcTaskWaiter.WaitAsync(Task.WhenAll(tasks), _waitToken).ConfigureAwait(false);
+        var wait = tasks.Length == 1 ? tasks[0] : Task.WhenAll(tasks);
+        await RpcTaskWaiter.WaitAsync(wait, _waitToken).ConfigureAwait(false);
     }
 
     private static CancellationTokenSource CreateLinkedCancellationSource(

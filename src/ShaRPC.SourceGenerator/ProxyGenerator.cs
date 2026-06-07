@@ -119,10 +119,10 @@ internal static class ProxyGenerator
         ProxyGenerationHelpers.AppendParameterList(paramList, method.Parameters, ct);
 
         var declaredReturn = method.DeclaredReturnType;
-        var isAsync = NamingHelpers.IsAsync(method.ReturnKind) &&
-            method.ReturnKind != MethodReturnKind.AsyncEnumerable;
         // Stubs stay non-async so out-parameters are definitely assigned by throw.
-        var asyncKeyword = (isAsync && method.UnsupportedReason is null) ? "async " : string.Empty;
+        var asyncKeyword = method.UnsupportedReason is null && RequiresAsyncStateMachine(method.ReturnKind)
+            ? "async "
+            : string.Empty;
         var unsafeKeyword = method.RequiresUnsafeSignature ? "unsafe " : string.Empty;
         var ctArg = ProxyGenerationHelpers.GetCancellationTokenArgument(method.Parameters, ct);
         var explicitInterface = ProxyGenerationHelpers.MethodNameRequiresExplicitImplementation(method.Name, proxyName);
@@ -246,7 +246,7 @@ internal static class ProxyGenerator
                 ? null
                 : ProxyGenerationHelpers.GetWireType(method.UnwrappedReturnType);
         var requestParameters = ProxyGenerationHelpers.GetRequestParameters(method.Parameters, ct);
-        var streamSetup = ProxyStreamSetupEmitter.Emit(sb, requestParameters, locals, ct, indent);
+        var streamSetup = ProxyStreamSetupEmitter.Emit(sb, method, requestParameters, locals, ct, indent);
         var streamArray = streamSetup.ArrayName;
         var svc = service.ServiceName;
         var rpc = method.RpcName;
@@ -398,7 +398,7 @@ internal static class ProxyGenerator
         var access = explicitInterface ? string.Empty : "public ";
         var target = explicitInterface ? qualifiedAsyncSibling + "." + s.Name : s.Name;
 
-        var asyncKeyword = s.SiblingReturnKind == MethodReturnKind.AsyncEnumerable ? string.Empty : "async ";
+        var asyncKeyword = RequiresAsyncStateMachine(s.SiblingReturnKind) ? "async " : string.Empty;
         sb.AppendLine($"        {access}{asyncKeyword}{declaredReturn} {target}({paramList})");
         sb.AppendLine("        {");
 
@@ -431,4 +431,7 @@ internal static class ProxyGenerator
 
         sb.AppendLine("        }");
     }
+
+    private static bool RequiresAsyncStateMachine(MethodReturnKind returnKind) =>
+        returnKind is MethodReturnKind.TaskOfSubService or MethodReturnKind.ValueTaskOfSubService;
 }

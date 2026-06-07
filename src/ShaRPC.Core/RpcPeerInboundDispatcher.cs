@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
@@ -14,8 +13,6 @@ internal sealed class RpcPeerInboundDispatcher
 {
     private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
     private readonly ConcurrentDictionary<int, CancellationTokenSource> _activeInbound = new();
-    private readonly ConcurrentDictionary<int, Task> _activeTasks = new();
-    private readonly ConcurrentDictionary<int, Task> _activeStreamTasks = new();
     private readonly InstanceRegistry _registry = new();
     private readonly ISerializer _serializer;
     private readonly RpcPeerResponseBuilder _responseBuilder;
@@ -25,6 +22,10 @@ internal sealed class RpcPeerInboundDispatcher
     private readonly Action<RpcPeerInboundRequest, Exception> _dispatchError;
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
     private readonly RpcPeerInboundRequestQueue? _queue;
+    private TaskCompletionSource<bool>? _activeRequestsDrained;
+    private TaskCompletionSource<bool>? _activeStreamsDrained;
+    private int _activeRequestCount;
+    private int _activeStreamCount;
     private int _stopped;
 
     public RpcPeerInboundDispatcher(
@@ -158,15 +159,8 @@ internal sealed class RpcPeerInboundDispatcher
             await _queue.StopAsync().ConfigureAwait(false);
         }
 
-        if (!_activeTasks.IsEmpty)
-        {
-            await ObserveShutdownAsync(Task.WhenAll(_activeTasks.Values)).ConfigureAwait(false);
-        }
-
-        if (!_activeStreamTasks.IsEmpty)
-        {
-            await ObserveShutdownAsync(Task.WhenAll(_activeStreamTasks.Values)).ConfigureAwait(false);
-        }
+        await WaitForActiveRequestsAsync().ConfigureAwait(false);
+        await WaitForActiveStreamsAsync().ConfigureAwait(false);
 
         await _registry.ReleaseAllAsync().ConfigureAwait(false);
     }
@@ -235,49 +229,29 @@ internal sealed class RpcPeerInboundDispatcher
 
     private void StartRequest(RpcPeerInboundRequest inbound)
     {
-        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_activeTasks.TryAdd(inbound.MessageId, completion.Task))
+        if (!TryEnterActiveRequest())
         {
-            Debug.Assert(false, "Duplicate message ID in _activeTasks");
             inbound.Frame.Dispose();
             ReleaseRequest(inbound);
             return;
         }
 
-        // Re-check after registering: if StopAsync ran between AcceptRequestAsync's check and this
-        // TryAdd, its _activeTasks snapshot missed this entry, so the dispatch would run after
-        // StopAsync returned (the contract the queued path upholds via _inFlight). StopAsync sets
-        // _stopped before snapshotting, so either it now sees this task (and awaits it) or we observe
-        // _stopped here and abandon the dispatch — closing the window either way.
-        if (Volatile.Read(ref _stopped) != 0)
-        {
-            _activeTasks.TryRemove(inbound.MessageId, out _);
-            completion.TrySetResult(false);
-            inbound.Frame.Dispose();
-            ReleaseRequest(inbound);
-            return;
-        }
-
-        _ = ProcessTrackedRequestAsync(inbound, completion);
+        _ = ProcessTrackedRequestAsync(inbound);
     }
 
-    private async Task ProcessTrackedRequestAsync(
-        RpcPeerInboundRequest inbound,
-        TaskCompletionSource<bool> completion)
+    private async Task ProcessTrackedRequestAsync(RpcPeerInboundRequest inbound)
     {
         try
         {
             await ProcessRequestAsync(inbound).ConfigureAwait(false);
-            completion.TrySetResult(true);
         }
         catch (Exception ex)
         {
-            completion.TrySetException(ex);
             RpcDiagnostics.Report("Tracked inbound request failed", ex);
         }
         finally
         {
-            _activeTasks.TryRemove(inbound.MessageId, out _);
+            CompleteActiveRequest();
         }
     }
 
@@ -317,8 +291,14 @@ internal sealed class RpcPeerInboundDispatcher
 
                 if (responseStream is not null)
                 {
-                    StartResponseStream(inbound, responseStream, streaming);
-                    releaseRequest = false;
+                    if (StartResponseStream(inbound, responseStream, streaming))
+                    {
+                        releaseRequest = false;
+                    }
+                    else
+                    {
+                        await streaming.AbandonResponseAsync().ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -346,27 +326,23 @@ internal sealed class RpcPeerInboundDispatcher
         {
             if (releaseRequest)
             {
-                ReleaseRequest(inbound, streaming?.AcquiredInboundStreamIds);
+                ReleaseRequest(inbound);
             }
         }
     }
 
-    private void StartResponseStream(
+    private bool StartResponseStream(
         RpcPeerInboundRequest inbound,
         RpcStreamAttachment stream,
         RpcStreamingContext streaming)
     {
-        var task = ProcessResponseStreamAsync(inbound, stream, streaming);
-        if (!_activeStreamTasks.TryAdd(inbound.MessageId, task))
+        if (!TryEnterActiveStream())
         {
-            RpcDiagnostics.Report(
-                "Duplicate inbound response stream task",
-                new InvalidOperationException("Duplicate message ID in _activeStreamTasks."));
+            return false;
         }
-        else if (task.IsCompleted)
-        {
-            _activeStreamTasks.TryRemove(inbound.MessageId, out _);
-        }
+
+        _ = ProcessResponseStreamAsync(inbound, stream, streaming);
+        return true;
     }
 
     private async Task ProcessResponseStreamAsync(
@@ -377,9 +353,7 @@ internal sealed class RpcPeerInboundDispatcher
         var registered = false;
         try
         {
-            await using var outbound = _streams.RegisterOutbound(
-                new[] { stream },
-                inbound.RequestCts.Token);
+            await using var outbound = _streams.RegisterOutbound(stream, inbound.RequestCts.Token);
             registered = true;
             outbound.Start();
             await outbound.WaitAsync().ConfigureAwait(false);
@@ -405,12 +379,12 @@ internal sealed class RpcPeerInboundDispatcher
         }
         finally
         {
-            _activeStreamTasks.TryRemove(inbound.MessageId, out _);
-            ReleaseRequest(inbound, streaming.AcquiredInboundStreamIds);
+            CompleteActiveStream();
+            ReleaseRequest(inbound);
         }
     }
 
-    private void ReleaseRequest(RpcPeerInboundRequest inbound, int[]? acquiredInboundStreamIds = null)
+    private void ReleaseRequest(RpcPeerInboundRequest inbound)
     {
         if (inbound.Request.Streams is { } streams)
         {
@@ -420,16 +394,79 @@ internal sealed class RpcPeerInboundDispatcher
             }
         }
 
-        if (acquiredInboundStreamIds is { Length: > 0 })
-        {
-            foreach (var streamId in acquiredInboundStreamIds)
-            {
-                _streams.RemoveInbound(streamId);
-            }
-        }
-
         _activeInbound.TryRemove(inbound.MessageId, out _);
         inbound.RequestCts.Dispose();
+    }
+
+    private bool TryEnterActiveRequest() =>
+        TryEnterActiveOperation(ref _activeRequestCount, ref _activeRequestsDrained);
+
+    private bool TryEnterActiveStream() =>
+        TryEnterActiveOperation(ref _activeStreamCount, ref _activeStreamsDrained);
+
+    private bool TryEnterActiveOperation(
+        ref int count,
+        ref TaskCompletionSource<bool>? drained)
+    {
+        if (Volatile.Read(ref _stopped) != 0)
+        {
+            return false;
+        }
+
+        Interlocked.Increment(ref count);
+        if (Volatile.Read(ref _stopped) == 0)
+        {
+            return true;
+        }
+
+        CompleteActiveOperation(ref count, ref drained);
+        return false;
+    }
+
+    private Task WaitForActiveRequestsAsync() =>
+        WaitForActiveOperationsAsync(ref _activeRequestCount, ref _activeRequestsDrained);
+
+    private Task WaitForActiveStreamsAsync() =>
+        WaitForActiveOperationsAsync(ref _activeStreamCount, ref _activeStreamsDrained);
+
+    private static Task WaitForActiveOperationsAsync(
+        ref int count,
+        ref TaskCompletionSource<bool>? drained)
+    {
+        if (Volatile.Read(ref count) == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var signal = Volatile.Read(ref drained);
+        if (signal is null)
+        {
+            var created = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            signal = Interlocked.CompareExchange(ref drained, created, null) ?? created;
+        }
+
+        if (Volatile.Read(ref count) == 0)
+        {
+            signal.TrySetResult(true);
+        }
+
+        return signal.Task;
+    }
+
+    private void CompleteActiveRequest() =>
+        CompleteActiveOperation(ref _activeRequestCount, ref _activeRequestsDrained);
+
+    private void CompleteActiveStream() =>
+        CompleteActiveOperation(ref _activeStreamCount, ref _activeStreamsDrained);
+
+    private static void CompleteActiveOperation(
+        ref int count,
+        ref TaskCompletionSource<bool>? drained)
+    {
+        if (Interlocked.Decrement(ref count) == 0)
+        {
+            Volatile.Read(ref drained)?.TrySetResult(true);
+        }
     }
 
     private static void SafeCancel(CancellationTokenSource cts)
@@ -441,18 +478,6 @@ internal sealed class RpcPeerInboundDispatcher
         catch (ObjectDisposedException)
         {
             // The request completed while the connection was closing.
-        }
-    }
-
-    private static async Task ObserveShutdownAsync(Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Individual request tasks observe their own failures.
         }
     }
 

@@ -10,6 +10,7 @@ internal static class ProxyStreamSetupEmitter
         System.Collections.Generic.Dictionary<int, string> Handles,
         System.Collections.Generic.List<(string HandleName, string ReservedName)>? Reservations) Emit(
         StringBuilder sb,
+        MethodModel method,
         System.Collections.Generic.List<ParameterModel> requestParameters,
         GeneratedLocalNames locals,
         CancellationToken ct,
@@ -50,7 +51,7 @@ internal static class ProxyStreamSetupEmitter
             sb.AppendLine($"{indent}var {reservedName} = false;");
         }
 
-        EmitReservationBlock(sb, reservations, ct, indent, arrayName);
+        EmitReservationBlock(sb, method, reservations, locals, ct, indent, arrayName);
         return (arrayName, handles, reservationFlags);
     }
 
@@ -73,7 +74,9 @@ internal static class ProxyStreamSetupEmitter
 
     private static void EmitReservationBlock(
         StringBuilder sb,
+        MethodModel method,
         System.Collections.Generic.List<(string HandleName, string ReservedName, string Kind, string AttachmentExpression)> reservations,
+        GeneratedLocalNames locals,
         CancellationToken ct,
         string indent,
         string arrayName)
@@ -98,7 +101,36 @@ internal static class ProxyStreamSetupEmitter
 
         sb.AppendLine($"{indent}    }};");
         sb.AppendLine($"{indent}}}");
-        sb.AppendLine($"{indent}catch");
+        var canReturnFaulted = ProxyFaultedReturnEmitter.CanReturnFaulted(method.ReturnKind);
+        if (canReturnFaulted)
+        {
+            var canceledName = locals.Reserve("__sharpc_canceled", ct);
+            sb.AppendLine($"{indent}catch (global::System.OperationCanceledException {canceledName}) when ({canceledName}.CancellationToken.IsCancellationRequested)");
+            EmitReservationReleases(sb, reservations, ct, indent);
+            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, canceledName)};");
+            sb.AppendLine($"{indent}}}");
+
+            var exceptionName = locals.Reserve("__sharpc_ex", ct);
+            sb.AppendLine($"{indent}catch (global::System.Exception {exceptionName})");
+            EmitReservationReleases(sb, reservations, ct, indent);
+            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.Build(method, exceptionName!)};");
+            sb.AppendLine($"{indent}}}");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}catch");
+            EmitReservationReleases(sb, reservations, ct, indent);
+            sb.AppendLine($"{indent}    throw;");
+            sb.AppendLine($"{indent}}}");
+        }
+    }
+
+    private static void EmitReservationReleases(
+        StringBuilder sb,
+        System.Collections.Generic.List<(string HandleName, string ReservedName, string Kind, string AttachmentExpression)> reservations,
+        CancellationToken ct,
+        string indent)
+    {
         sb.AppendLine($"{indent}{{");
         for (var i = reservations.Count - 1; i >= 0; i--)
         {
@@ -109,9 +141,6 @@ internal static class ProxyStreamSetupEmitter
             sb.AppendLine($"{indent}        this._invoker.ReleaseStream({reservation.HandleName});");
             sb.AppendLine($"{indent}    }}");
         }
-
-        sb.AppendLine($"{indent}    throw;");
-        sb.AppendLine($"{indent}}}");
     }
 
     private static string BuildAttachmentExpression(ParameterModel parameter, string handleName) =>

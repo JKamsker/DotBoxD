@@ -79,20 +79,16 @@ internal static class DispatcherGenerator
         sb.AppendLine();
         if (isInstanceScoped)
         {
-            sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            await DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
-            sb.AppendLine("        }");
+            sb.AppendLine("        public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>");
+            sb.AppendLine("            DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
             sb.AppendLine();
             sb.AppendLine("#pragma warning disable CS1998");
             sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)");
         }
         else
         {
-            sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            await DispatchAsync(method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
-            sb.AppendLine("        }");
+            sb.AppendLine("        public global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>");
+            sb.AppendLine("            DispatchAsync(method, payload, serializer, registry, output, global::ShaRPC.Core.Streaming.RpcStreamingContext.Disabled, ct);");
             sb.AppendLine();
             sb.AppendLine("#pragma warning disable CS1998");
             sb.AppendLine("        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::ShaRPC.Core.Serialization.ISerializer serializer, global::ShaRPC.Core.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::ShaRPC.Core.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)");

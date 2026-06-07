@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Threading.Channels;
 using ShaRPC.Core.Transport;
 
@@ -26,13 +25,14 @@ internal sealed class RpcPeerInboundRequestQueue
     private readonly Action<RpcPeerInboundRequest> _release;
     private readonly bool _dropIncomingWhenFull;
     private readonly SemaphoreSlim _slots;
-    private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
     private readonly long _maxInboundBytes;
     private readonly object _byteGate = new();
     private long _inFlightBytes;
     private TaskCompletionSource<bool>? _byteAvailable;
     private CancellationTokenSource? _cts;
     private Task? _dispatchWorker;
+    private TaskCompletionSource<bool>? _inFlightDrained;
+    private int _inFlightCount;
 
     public RpcPeerInboundRequestQueue(
         int capacity,
@@ -54,7 +54,7 @@ internal sealed class RpcPeerInboundRequestQueue
         _queue = Channel.CreateBounded<RpcPeerInboundRequest>(new BoundedChannelOptions(capacity)
         {
             SingleReader = true,
-            SingleWriter = false,
+            SingleWriter = true,
             FullMode = BoundedChannelFullMode.Wait,
         });
     }
@@ -213,11 +213,7 @@ internal sealed class RpcPeerInboundRequestQueue
             await ObserveShutdownAsync(_dispatchWorker).ConfigureAwait(false);
         }
 
-        var inFlight = _inFlight.Keys.ToArray();
-        if (inFlight.Length != 0)
-        {
-            await ObserveShutdownAsync(Task.WhenAll(inFlight)).ConfigureAwait(false);
-        }
+        await WaitForInFlightAsync().ConfigureAwait(false);
 
         Drain();
         _slots.Dispose();
@@ -255,21 +251,8 @@ internal sealed class RpcPeerInboundRequestQueue
 
     private void StartProcessing(RpcPeerInboundRequest inbound)
     {
-        var task = ProcessOneAsync(inbound);
-        if (task.IsCompleted)
-        {
-            return;
-        }
-
-        // Track in-flight dispatches so StopAsync can await them. Register before attaching the
-        // self-removal continuation so a task that completes between the check and TryAdd is still removed.
-        _inFlight.TryAdd(task, 0);
-        _ = task.ContinueWith(
-            static (completed, state) => ((ConcurrentDictionary<Task, byte>)state!).TryRemove(completed, out _),
-            _inFlight,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        Interlocked.Increment(ref _inFlightCount);
+        _ = ProcessOneAsync(inbound);
     }
 
     private async Task ProcessOneAsync(RpcPeerInboundRequest inbound)
@@ -296,6 +279,38 @@ internal sealed class RpcPeerInboundRequestQueue
             {
                 // StopAsync disposed the slot semaphore after the dispatch worker stopped.
             }
+
+            CompleteInFlight();
+        }
+    }
+
+    private Task WaitForInFlightAsync()
+    {
+        if (Volatile.Read(ref _inFlightCount) == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var signal = Volatile.Read(ref _inFlightDrained);
+        if (signal is null)
+        {
+            var created = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            signal = Interlocked.CompareExchange(ref _inFlightDrained, created, null) ?? created;
+        }
+
+        if (Volatile.Read(ref _inFlightCount) == 0)
+        {
+            signal.TrySetResult(true);
+        }
+
+        return signal.Task;
+    }
+
+    private void CompleteInFlight()
+    {
+        if (Interlocked.Decrement(ref _inFlightCount) == 0)
+        {
+            Volatile.Read(ref _inFlightDrained)?.TrySetResult(true);
         }
     }
 

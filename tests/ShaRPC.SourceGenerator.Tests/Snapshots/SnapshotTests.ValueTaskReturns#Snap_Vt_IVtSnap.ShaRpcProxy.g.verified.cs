@@ -26,24 +26,68 @@ namespace Snap.Vt
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.ValueTask<int> AddAsync(int a, int b)
+        public global::System.Threading.Tasks.ValueTask<int> AddAsync(int a, int b)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), default));
+            try
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>((this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), default)));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken));
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex));
+            }
         }
 
-        public async global::System.Threading.Tasks.ValueTask PingAsync()
+        public global::System.Threading.Tasks.ValueTask PingAsync()
         {
-            await (this._instanceId is null ? this._invoker.InvokeAsync("IVtSnap", "PingAsync", default) : this._invoker.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", default));
+            try
+            {
+                return new global::System.Threading.Tasks.ValueTask((this._instanceId is null ? this._invoker.InvokeAsync("IVtSnap", "PingAsync", default) : this._invoker.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", default)));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromCanceled(__sharpc_canceled.CancellationToken));
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromException(__sharpc_ex));
+            }
         }
 
-        public async global::System.Threading.Tasks.ValueTask<int> AddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.ValueTask<int> AddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), ct));
+            try
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>((this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IVtSnap", "AddAsync", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IVtSnap", this._instanceId!, "AddAsync", (a, b), ct)));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken));
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return new global::System.Threading.Tasks.ValueTask<int>(global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex));
+            }
         }
 
-        public async global::System.Threading.Tasks.ValueTask PingAsync(global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.ValueTask PingAsync(global::System.Threading.CancellationToken ct = default)
         {
-            await (this._instanceId is null ? this._invoker.InvokeAsync("IVtSnap", "PingAsync", ct) : this._invoker.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", ct));
+            try
+            {
+                return new global::System.Threading.Tasks.ValueTask((this._instanceId is null ? this._invoker.InvokeAsync("IVtSnap", "PingAsync", ct) : this._invoker.InvokeOnInstanceAsync("IVtSnap", this._instanceId!, "PingAsync", ct)));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromCanceled(__sharpc_canceled.CancellationToken));
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return new global::System.Threading.Tasks.ValueTask(global::System.Threading.Tasks.Task.FromException(__sharpc_ex));
+            }
         }
     }
 }

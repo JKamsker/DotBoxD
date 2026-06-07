@@ -53,16 +53,7 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
                 transform: static (ctx, ct) => ServiceModelFactory.GetServiceResult(ctx, ct))
             .WithTrackingName("RawServiceResults");
 
-        var existingTypeKeys = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                predicate: static (node, _) =>
-                    ExistingTypeIndex.IsPotentialGeneratedTypeDeclaration(node),
-                transform: static (ctx, _) => ExistingTypeIndex.KeyFromDeclaration(ctx.Node))
-            .Where(static key => key is not null)
-            .Select(static (key, _) => key!.Value)
-            .WithTrackingName("ExistingTypeKeys");
-
-        var existingTypeLocations = context.SyntaxProvider
+        var existingTypeDeclarations = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) =>
                     ExistingTypeIndex.IsPotentialGeneratedTypeDeclaration(node),
@@ -71,12 +62,16 @@ public sealed class ShaRpcGenerator : IIncrementalGenerator
             .Select(static (declaration, _) => declaration!.Value)
             .WithTrackingName("ExistingTypeDeclarations");
 
+        var existingTypeKeys = existingTypeDeclarations
+            .Select(static (declaration, _) => declaration.Key)
+            .WithTrackingName("ExistingTypeKeys");
+
         var existingTypes = existingTypeKeys
             .Collect()
             .Select(static (types, ct) => ExistingTypeIndex.Create(types, ct))
             .WithTrackingName("ExistingTypes");
 
-        var existingTypeLocationIndex = existingTypeLocations
+        var existingTypeLocationIndex = existingTypeDeclarations
             .Collect()
             .Select(static (types, ct) => ExistingTypeLocationIndex.Create(types, ct))
             .WithTrackingName("ExistingTypeLocations");

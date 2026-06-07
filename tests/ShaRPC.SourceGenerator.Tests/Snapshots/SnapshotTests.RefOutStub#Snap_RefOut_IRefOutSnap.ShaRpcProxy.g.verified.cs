@@ -31,14 +31,36 @@ namespace Snap.RefOut
             throw new global::System.NotSupportedException("ShaRPC cannot marshal 'BadOut': parameter 'x' uses an unsupported pass-by-reference kind 'out'");
         }
 
-        public async global::System.Threading.Tasks.Task<int> GoodAsync(int a)
+        public global::System.Threading.Tasks.Task<int> GoodAsync(int a)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IRefOutSnap", "GoodAsync", a, default) : this._invoker.InvokeOnInstanceAsync<int, int>("IRefOutSnap", this._instanceId!, "GoodAsync", a, default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IRefOutSnap", "GoodAsync", a, default) : this._invoker.InvokeOnInstanceAsync<int, int>("IRefOutSnap", this._instanceId!, "GoodAsync", a, default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> GoodAsync(int a, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> GoodAsync(int a, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IRefOutSnap", "GoodAsync", a, ct) : this._invoker.InvokeOnInstanceAsync<int, int>("IRefOutSnap", this._instanceId!, "GoodAsync", a, ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int, int>("IRefOutSnap", "GoodAsync", a, ct) : this._invoker.InvokeOnInstanceAsync<int, int>("IRefOutSnap", this._instanceId!, "GoodAsync", a, ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
     }
 }

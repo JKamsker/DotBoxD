@@ -26,14 +26,36 @@ namespace Snap.Renamed
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<string> HelloAsync(string who)
+        public global::System.Threading.Tasks.Task<string> HelloAsync(string who)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string, string>("Greeter", "Greet", who, default) : this._invoker.InvokeOnInstanceAsync<string, string>("Greeter", this._instanceId!, "Greet", who, default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string, string>("Greeter", "Greet", who, default) : this._invoker.InvokeOnInstanceAsync<string, string>("Greeter", this._instanceId!, "Greet", who, default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<string> HelloAsync(string who, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<string> HelloAsync(string who, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string, string>("Greeter", "Greet", who, ct) : this._invoker.InvokeOnInstanceAsync<string, string>("Greeter", this._instanceId!, "Greet", who, ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string, string>("Greeter", "Greet", who, ct) : this._invoker.InvokeOnInstanceAsync<string, string>("Greeter", this._instanceId!, "Greet", who, ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
     }
 }

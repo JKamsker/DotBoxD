@@ -36,7 +36,7 @@ public class ProxyGeneratedMemberCollisionTests
         proxy.Should().Contain(
             "global::System.Threading.Tasks.Task<int> global::Regress.ProxyGeneratedMembers.IFieldCollision._instanceId()");
         proxy.Should().Contain(
-            "public async global::System.Threading.Tasks.Task<int> _invokerAsync(");
+            "public global::System.Threading.Tasks.Task<int> _invokerAsync(");
         proxy.Should().Contain(
             "global::System.Threading.Tasks.Task<int> global::Regress.ProxyGeneratedMembers.IFieldCollisionAsync._instanceId(");
         proxy.Should().NotContain("public int _invoker()");

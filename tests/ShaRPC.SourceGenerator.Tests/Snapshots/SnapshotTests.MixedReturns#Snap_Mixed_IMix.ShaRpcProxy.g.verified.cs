@@ -26,14 +26,36 @@ namespace Snap.Mixed
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<string> GetNameAsync()
+        public global::System.Threading.Tasks.Task<string> GetNameAsync()
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "GetNameAsync", default) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "GetNameAsync", default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "GetNameAsync", default) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "GetNameAsync", default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task SaveAsync(string value)
+        public global::System.Threading.Tasks.Task SaveAsync(string value)
         {
-            await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "SaveAsync", value, default) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "SaveAsync", value, default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "SaveAsync", value, default) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "SaveAsync", value, default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException(__sharpc_ex);
+            }
         }
 
         public int SyncAdd(int a, int b)
@@ -46,24 +68,68 @@ namespace Snap.Mixed
             (this._instanceId is null ? this._invoker.InvokeAsync("IMix", "SyncPing", default) : this._invoker.InvokeOnInstanceAsync("IMix", this._instanceId!, "SyncPing", default)).GetAwaiter().GetResult();
         }
 
-        public async global::System.Threading.Tasks.Task<string> GetNameAsync(global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<string> GetNameAsync(global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "GetNameAsync", ct) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "GetNameAsync", ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "GetNameAsync", ct) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "GetNameAsync", ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<string>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<string>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task SaveAsync(string value, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task SaveAsync(string value, global::System.Threading.CancellationToken ct = default)
         {
-            await (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "SaveAsync", value, ct) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "SaveAsync", value, ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<string>("IMix", "SaveAsync", value, ct) : this._invoker.InvokeOnInstanceAsync<string>("IMix", this._instanceId!, "SaveAsync", value, ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> SyncAddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> SyncAddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IMix", "SyncAdd", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IMix", this._instanceId!, "SyncAdd", (a, b), ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("IMix", "SyncAdd", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("IMix", this._instanceId!, "SyncAdd", (a, b), ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task SyncPingAsync(global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task SyncPingAsync(global::System.Threading.CancellationToken ct = default)
         {
-            await (this._instanceId is null ? this._invoker.InvokeAsync("IMix", "SyncPing", ct) : this._invoker.InvokeOnInstanceAsync("IMix", this._instanceId!, "SyncPing", ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync("IMix", "SyncPing", ct) : this._invoker.InvokeOnInstanceAsync("IMix", this._instanceId!, "SyncPing", ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException(__sharpc_ex);
+            }
         }
     }
 }

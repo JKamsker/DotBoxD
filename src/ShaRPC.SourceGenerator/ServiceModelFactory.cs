@@ -74,7 +74,8 @@ internal static class ServiceModelFactory
                 qualifiedInterfaceName);
         }
 
-        var unsupportedMemberDiagnostic = ServiceShapeValidator.GetUnsupportedMemberDiagnostic(interfaceSymbol, ct);
+        var interfaceMethods = new List<IMethodSymbol>();
+        var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMethods(interfaceSymbol, interfaceMethods, ct);
         if (unsupportedMemberDiagnostic is not null)
         {
             return RejectedService(
@@ -106,7 +107,7 @@ internal static class ServiceModelFactory
         var seenSignatureIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
         var validationCache = SharedRpcTypeValidationCache.Get(context.SemanticModel.Compilation);
 
-        foreach (var methodSymbol in EnumerateMethods(interfaceSymbol, ct))
+        foreach (var methodSymbol in interfaceMethods)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -250,41 +251,6 @@ internal static class ServiceModelFactory
         }
 
         return string.Join(".", parts);
-    }
-
-    private static IEnumerable<IMethodSymbol> EnumerateMethods(
-        INamedTypeSymbol interfaceSymbol,
-        CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-        var members = interfaceSymbol.GetMembers();
-        ct.ThrowIfCancellationRequested();
-        foreach (var member in members)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (member is IMethodSymbol m && m.MethodKind == MethodKind.Ordinary)
-            {
-                yield return m;
-            }
-        }
-
-        ct.ThrowIfCancellationRequested();
-        var baseInterfaces = interfaceSymbol.AllInterfaces;
-        ct.ThrowIfCancellationRequested();
-        foreach (var baseInterface in baseInterfaces)
-        {
-            ct.ThrowIfCancellationRequested();
-            var baseMembers = baseInterface.GetMembers();
-            ct.ThrowIfCancellationRequested();
-            foreach (var member in baseMembers)
-            {
-                ct.ThrowIfCancellationRequested();
-                if (member is IMethodSymbol m && m.MethodKind == MethodKind.Ordinary)
-                {
-                    yield return m;
-                }
-            }
-        }
     }
 
 }

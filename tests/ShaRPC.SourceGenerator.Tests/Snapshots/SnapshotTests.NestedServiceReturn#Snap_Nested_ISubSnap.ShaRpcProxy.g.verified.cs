@@ -26,14 +26,36 @@ namespace Snap.Nested
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<int> CountAsync()
+        public global::System.Threading.Tasks.Task<int> CountAsync()
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int>("ISubSnap", "CountAsync", default) : this._invoker.InvokeOnInstanceAsync<int>("ISubSnap", this._instanceId!, "CountAsync", default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int>("ISubSnap", "CountAsync", default) : this._invoker.InvokeOnInstanceAsync<int>("ISubSnap", this._instanceId!, "CountAsync", default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> CountAsync(global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> CountAsync(global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<int>("ISubSnap", "CountAsync", ct) : this._invoker.InvokeOnInstanceAsync<int>("ISubSnap", this._instanceId!, "CountAsync", ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<int>("ISubSnap", "CountAsync", ct) : this._invoker.InvokeOnInstanceAsync<int>("ISubSnap", this._instanceId!, "CountAsync", ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
     }
 }

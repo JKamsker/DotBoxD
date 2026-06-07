@@ -12,7 +12,9 @@ internal sealed class RpcStreamReceiver
     private readonly RpcStreamManager _manager;
     private readonly object _completionGate = new();
     private RpcOutboundStreamSet? _outboundStreams;
+    private int _creditFlushScheduled;
     private int _completed;
+    private int _pendingCreditCount;
 
     public RpcStreamReceiver(RpcStreamManager manager, RpcStreamHandle handle)
     {
@@ -22,8 +24,8 @@ internal sealed class RpcStreamReceiver
             new BoundedChannelOptions(RpcStreamManager.WindowSize)
             {
                 FullMode = BoundedChannelFullMode.Wait,
-                SingleReader = false,
-                SingleWriter = false,
+                SingleReader = true,
+                SingleWriter = true,
             });
     }
 
@@ -211,7 +213,8 @@ internal sealed class RpcStreamReceiver
     {
         if (Volatile.Read(ref _completed) == 0)
         {
-            SendCreditBestEffort(1, CancellationToken.None);
+            AddPendingCredit(1);
+            ScheduleCreditFlush();
         }
     }
 
@@ -229,6 +232,56 @@ internal sealed class RpcStreamReceiver
             RpcDiagnostics.Report("Stream credit notification failed", ex);
             Abort(new ShaRpcConnectionException("Stream credit notification failed.", ex));
             _manager.RemoveCompletedInbound(this);
+        }
+    }
+
+    private void AddPendingCredit(int count)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _pendingCreditCount);
+            var next = current > int.MaxValue - count ? int.MaxValue : current + count;
+            if (Interlocked.CompareExchange(ref _pendingCreditCount, next, current) == current)
+            {
+                return;
+            }
+        }
+    }
+
+    private void ScheduleCreditFlush()
+    {
+        if (Interlocked.Exchange(ref _creditFlushScheduled, 1) == 0)
+        {
+            _ = FlushPendingCreditBestEffortAsync();
+        }
+    }
+
+    private async Task FlushPendingCreditBestEffortAsync()
+    {
+        while (true)
+        {
+            var count = Interlocked.Exchange(ref _pendingCreditCount, 0);
+            if (count > 0)
+            {
+                if (Volatile.Read(ref _completed) != 0)
+                {
+                    return;
+                }
+
+                await SendCreditBestEffortAsync(count, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            if (Volatile.Read(ref _pendingCreditCount) != 0)
+            {
+                continue;
+            }
+
+            Interlocked.Exchange(ref _creditFlushScheduled, 0);
+            if (Volatile.Read(ref _pendingCreditCount) == 0 ||
+                Interlocked.Exchange(ref _creditFlushScheduled, 1) != 0)
+            {
+                return;
+            }
         }
     }
 }

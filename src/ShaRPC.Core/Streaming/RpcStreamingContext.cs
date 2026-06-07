@@ -15,7 +15,6 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
     private readonly CancellationToken _ct;
     private readonly Dictionary<int, RpcStreamKind>? _declaredInboundStreams;
     private HashSet<int>? _claimedInboundStreamIds;
-    private HashSet<int>? _inboundStreamIds;
     private RpcStreamAttachment? _response;
 
     public static RpcStreamingContext Disabled { get; } = new();
@@ -37,8 +36,6 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
     }
 
     internal RpcStreamAttachment? Response => _response;
-
-    internal int[]? AcquiredInboundStreamIds => _inboundStreamIds?.ToArray();
 
     internal async ValueTask AbandonResponseAsync()
     {
@@ -131,9 +128,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
         EnsureEnabled();
         EnsureKind(handle, expected);
         ClaimDeclaredInbound(handle);
-        var receiver = _streams!.GetRegisteredInbound(handle);
-        (_inboundStreamIds ??= new HashSet<int>()).Add(receiver.Handle.StreamId);
-        return receiver;
+        return _streams!.GetRegisteredInbound(handle);
     }
 
     private void ClaimDeclaredInbound(RpcStreamHandle handle)

@@ -25,9 +25,16 @@ internal static class ProxyInvocationCleanupEmitter
         EmitTracker(sb, returnedName, trackName, locals.Reserve("__sharpc_value", ct), indent);
         sb.AppendLine($"{indent}try");
         sb.AppendLine($"{indent}{{");
-        ProxyInvocationEmitter.Emit(sb, method, $"{trackName}({invocation})", locals, ct, indent + "    ");
+        ProxyInvocationEmitter.Emit(
+            sb,
+            method,
+            $"{trackName}({invocation})",
+            locals,
+            ct,
+            indent + "    ",
+            captureSynchronousExceptions: false);
         sb.AppendLine($"{indent}}}");
-        EmitReservationCleanupCatch(sb, returnedName, reservations, ct, indent);
+        EmitReservationCleanupCatch(sb, method, returnedName, reservations, locals, ct, indent);
     }
 
     public static void EmitInvocationAssignment(
@@ -54,7 +61,7 @@ internal static class ProxyInvocationCleanupEmitter
         sb.AppendLine($"{indent}{{");
         sb.AppendLine($"{indent}    {targetName} = {trackName}({invocation});");
         sb.AppendLine($"{indent}}}");
-        EmitReservationCleanupCatch(sb, returnedName, reservations, ct, indent);
+        EmitReservationCleanupRethrowCatch(sb, returnedName, reservations, ct, indent);
     }
 
     private static void EmitTracker(
@@ -74,12 +81,57 @@ internal static class ProxyInvocationCleanupEmitter
 
     private static void EmitReservationCleanupCatch(
         StringBuilder sb,
+        MethodModel method,
+        string returnedName,
+        System.Collections.Generic.List<(string HandleName, string ReservedName)> reservations,
+        GeneratedLocalNames locals,
+        CancellationToken ct,
+        string indent)
+    {
+        var canReturnFaulted = ProxyFaultedReturnEmitter.CanReturnFaulted(method.ReturnKind);
+        if (canReturnFaulted)
+        {
+            var canceledName = locals.Reserve("__sharpc_canceled", ct);
+            sb.AppendLine($"{indent}catch (global::System.OperationCanceledException {canceledName}) when ({canceledName}.CancellationToken.IsCancellationRequested)");
+            EmitReservationReleases(sb, returnedName, reservations, ct, indent);
+            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.BuildCanceled(method, canceledName)};");
+            sb.AppendLine($"{indent}}}");
+
+            var exceptionName = locals.Reserve("__sharpc_ex", ct);
+            sb.AppendLine($"{indent}catch (global::System.Exception {exceptionName})");
+            EmitReservationReleases(sb, returnedName, reservations, ct, indent);
+            sb.AppendLine($"{indent}    return {ProxyFaultedReturnEmitter.Build(method, exceptionName!)};");
+            sb.AppendLine($"{indent}}}");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}catch");
+            EmitReservationReleases(sb, returnedName, reservations, ct, indent);
+            sb.AppendLine($"{indent}    throw;");
+            sb.AppendLine($"{indent}}}");
+        }
+    }
+
+    private static void EmitReservationCleanupRethrowCatch(
+        StringBuilder sb,
         string returnedName,
         System.Collections.Generic.List<(string HandleName, string ReservedName)> reservations,
         CancellationToken ct,
         string indent)
     {
         sb.AppendLine($"{indent}catch");
+        EmitReservationReleases(sb, returnedName, reservations, ct, indent);
+        sb.AppendLine($"{indent}    throw;");
+        sb.AppendLine($"{indent}}}");
+    }
+
+    private static void EmitReservationReleases(
+        StringBuilder sb,
+        string returnedName,
+        System.Collections.Generic.List<(string HandleName, string ReservedName)> reservations,
+        CancellationToken ct,
+        string indent)
+    {
         sb.AppendLine($"{indent}{{");
         sb.AppendLine($"{indent}    if (!{returnedName})");
         sb.AppendLine($"{indent}    {{");
@@ -94,7 +146,5 @@ internal static class ProxyInvocationCleanupEmitter
         }
 
         sb.AppendLine($"{indent}    }}");
-        sb.AppendLine($"{indent}    throw;");
-        sb.AppendLine($"{indent}}}");
     }
 }

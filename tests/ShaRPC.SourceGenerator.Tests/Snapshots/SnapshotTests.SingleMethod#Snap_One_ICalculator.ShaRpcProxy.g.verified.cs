@@ -26,14 +26,36 @@ namespace Snap.One
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));
         }
 
-        public async global::System.Threading.Tasks.Task<int> AddAsync(int a, int b)
+        public global::System.Threading.Tasks.Task<int> AddAsync(int a, int b)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("ICalculator", "AddAsync", (a, b), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("ICalculator", this._instanceId!, "AddAsync", (a, b), default));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("ICalculator", "AddAsync", (a, b), default) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("ICalculator", this._instanceId!, "AddAsync", (a, b), default));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
 
-        public async global::System.Threading.Tasks.Task<int> AddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
+        public global::System.Threading.Tasks.Task<int> AddAsync(int a, int b, global::System.Threading.CancellationToken ct = default)
         {
-            return await (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("ICalculator", "AddAsync", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("ICalculator", this._instanceId!, "AddAsync", (a, b), ct));
+            try
+            {
+                return (this._instanceId is null ? this._invoker.InvokeAsync<(int, int), int>("ICalculator", "AddAsync", (a, b), ct) : this._invoker.InvokeOnInstanceAsync<(int, int), int>("ICalculator", this._instanceId!, "AddAsync", (a, b), ct));
+            }
+            catch (global::System.OperationCanceledException __sharpc_canceled) when (__sharpc_canceled.CancellationToken.IsCancellationRequested)
+            {
+                return global::System.Threading.Tasks.Task.FromCanceled<int>(__sharpc_canceled.CancellationToken);
+            }
+            catch (global::System.Exception __sharpc_ex)
+            {
+                return global::System.Threading.Tasks.Task.FromException<int>(__sharpc_ex);
+            }
         }
     }
 }

@@ -22,11 +22,13 @@ internal static class RpcRawFrame
 
     public static Payload FrameInt32(int messageId, MessageType type, int value)
     {
-        using var writer = new PooledBufferWriter(MessageFramer.HeaderSize + sizeof(int));
-        WritePrefix(writer, messageId, type);
-        BinaryPrimitives.WriteInt32LittleEndian(writer.GetSpan(sizeof(int)), value);
-        writer.Advance(sizeof(int));
-        return Finish(writer);
+        var frame = Payload.Rent(MessageFramer.HeaderSize + sizeof(int));
+        var span = frame.Memory.Span;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(0, 4), frame.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(4, 4), messageId);
+        span[8] = (byte)type;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(MessageFramer.HeaderSize, sizeof(int)), value);
+        return frame;
     }
 
     public static bool TryReadInt32(ReadOnlyMemory<byte> frame, out int value)
