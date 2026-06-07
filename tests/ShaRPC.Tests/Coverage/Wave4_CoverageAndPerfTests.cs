@@ -101,29 +101,29 @@ public sealed class Wave4_CoverageAndPerfTests
     }
 
     [Fact]
-    public void RpcStreamAttachment_DisposeSourceOnceAsync_SecondCallIsNoop()
+    public async Task RpcStreamAttachment_DisposeSourceOnceAsync_SecondCallIsNoop()
     {
         var stream = new MemoryStream(new byte[] { 1, 2, 3 });
         var handle = new RpcStreamHandle(42, RpcStreamKind.Binary);
         var attachment = RpcStreamAttachment.FromStream(handle, stream, leaveOpen: false);
 
-        attachment.DisposeSourceOnceAsync().AsTask().GetAwaiter().GetResult();
+        await attachment.DisposeSourceOnceAsync();
 
         Assert.Throws<ObjectDisposedException>(() => stream.ReadByte());
 
-        attachment.DisposeSourceOnceAsync().AsTask().GetAwaiter().GetResult();
+        await attachment.DisposeSourceOnceAsync();
     }
 
     [Fact]
-    public void RpcStreamAttachment_DisposeSourceBestEffort_WhenAlreadyDisposed_IsNoop()
+    public async Task RpcStreamAttachment_DisposeSourceBestEffort_WhenAlreadyDisposed_IsNoop()
     {
         var stream = new MemoryStream(new byte[] { 1, 2, 3 });
         var handle = new RpcStreamHandle(43, RpcStreamKind.Binary);
         var attachment = RpcStreamAttachment.FromStream(handle, stream, leaveOpen: false);
 
-        attachment.DisposeSourceOnceAsync().AsTask().GetAwaiter().GetResult();
+        await attachment.DisposeSourceOnceAsync();
 
-        attachment.DisposeSourceBestEffortAsync("test").AsTask().GetAwaiter().GetResult();
+        await attachment.DisposeSourceBestEffortAsync("test");
     }
 
     [Fact]

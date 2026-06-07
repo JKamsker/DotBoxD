@@ -79,7 +79,7 @@ public sealed class Wave1_BugAndPerfTests
     // ────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void PooledBufferWriter_ConcurrentDisposeAndDetach_ExactlyOneWins()
+    public async Task PooledBufferWriter_ConcurrentDisposeAndDetach_ExactlyOneWins()
     {
         var bothSucceeded = 0;
 
@@ -107,7 +107,7 @@ public sealed class Wave1_BugAndPerfTests
             });
 
             barrier.Set();
-            Task.WaitAll(t1, t2);
+            await Task.WhenAll(t1, t2);
 
             if (detached is not null && !detachFailed)
             {
