@@ -12,7 +12,7 @@ public static class SafeHttpBindings
             SandboxType.String,
             SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.Network,
             "net.http.get",
-            BindingCostModel.PerByte(baseFuel: 75, perByteFuel: 1),
+            BindingCostModel.Fixed(75),
             AuditLevel.PerResource,
             BindingSafety.ReadOnlyExternal,
             async (context, args, cancellationToken) => {

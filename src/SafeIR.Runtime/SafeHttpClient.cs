@@ -113,7 +113,7 @@ public static class SafeHttpClient
             memory.Write(buffer, 0, read);
         }
 
-        context.ChargeFuel(75 + memory.Length);
+        context.ChargeFuel(memory.Length);
         context.ChargeAllocation(memory.Length);
         var text = Encoding.UTF8.GetString(memory.ToArray());
         context.ChargeString(text);

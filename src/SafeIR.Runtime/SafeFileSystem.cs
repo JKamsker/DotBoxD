@@ -25,7 +25,7 @@ public static class SafeFileSystem
             }
 
             var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, cancellationToken).ConfigureAwait(false);
-            context.ChargeFuel(50 + bytes.Length);
+            context.ChargeFuel(bytes.Length);
             var text = Encoding.UTF8.GetString(bytes);
             context.ChargeString(text);
             AuditRead(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
@@ -69,7 +69,7 @@ public static class SafeFileSystem
             await File.WriteAllBytesAsync(tempPath, bytes, cancellationToken).ConfigureAwait(false);
             EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             File.Move(tempPath, resolved.FullPath, overwrite: true);
-            context.ChargeFuel(50 + bytes.Length);
+            context.ChargeFuel(bytes.Length);
             AuditWrite(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
         }
         catch (SandboxRuntimeException ex) {
