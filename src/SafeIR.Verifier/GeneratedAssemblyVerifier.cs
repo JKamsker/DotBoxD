@@ -164,6 +164,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
     {
         foreach (var fieldHandle in type.GetFields()) {
             var field = reader.GetFieldDefinition(fieldHandle);
+            diagnostics.Add(new VerificationDiagnostic("V-FIELD", "generated fields are not allowed"));
             if ((field.Attributes & FieldAttributes.Static) != 0 &&
                 (field.Attributes & (FieldAttributes.InitOnly | FieldAttributes.Literal)) == 0) {
                 diagnostics.Add(new VerificationDiagnostic("V-FIELD-STATIC", "mutable static fields are not allowed"));
