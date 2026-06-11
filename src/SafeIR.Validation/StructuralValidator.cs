@@ -7,6 +7,11 @@ internal static class StructuralValidator
     public static void Validate(SandboxModule module, List<SandboxDiagnostic> diagnostics)
     {
         CheckIdentifier(module.Id, "module id", diagnostics);
+        if (!SandboxLanguage.Supports(module.TargetSandboxVersion)) {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-IR-VERSION",
+                $"target sandbox version '{module.TargetSandboxVersion}' is not supported by runtime '{SandboxLanguage.CurrentVersionText}'"));
+        }
 
         foreach (var request in module.CapabilityRequests) {
             CheckIdentifier(request.Id, "capability id", diagnostics);

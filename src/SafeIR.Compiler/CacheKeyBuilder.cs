@@ -9,8 +9,9 @@ public static class CacheKeyBuilder
 {
     public const string CompilerVersion = "safe-ir-compiler-5";
     public const string RuntimeFacadeHash = "safe-ir-runtime-facade-5";
-    public const string LanguageVersion = "1.0.0";
     public const string TargetFramework = "net10.0";
+
+    public static string LanguageVersion => SandboxLanguage.CurrentVersionText;
 
     public static string Build(ExecutionPlan plan, VerificationPolicy policy, bool optimize)
     {

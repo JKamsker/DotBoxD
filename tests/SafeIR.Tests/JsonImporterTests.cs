@@ -133,6 +133,39 @@ public sealed class JsonImporterTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-IR-CLR-REF");
     }
 
+    [Theory]
+    [InlineData("1.1.0")]
+    [InlineData("2.0.0")]
+    public async Task Unsupported_target_sandbox_version_is_rejected(string targetSandboxVersion)
+    {
+        var host = SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+        });
+        var module = await host.ParseJsonAsync(MinimalModule(
+            $"""
+            "targetSandboxVersion": "{targetSandboxVersion}",
+            """));
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-IR-VERSION");
+    }
+
+    [Fact]
+    public async Task Missing_target_sandbox_version_defaults_to_current_language_version()
+    {
+        var host = SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+        });
+        var module = await host.ParseJsonAsync(MinimalModule(""));
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build());
+
+        Assert.Equal(SandboxLanguage.CurrentVersion, plan.Module.TargetSandboxVersion);
+    }
+
     [Fact]
     public async Task Forbidden_clr_call_is_rejected_before_execution()
     {
