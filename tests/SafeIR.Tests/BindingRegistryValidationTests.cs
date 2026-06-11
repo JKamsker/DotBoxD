@@ -31,10 +31,60 @@ public sealed class BindingRegistryValidationTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
     }
 
+    [Fact]
+    public void Binding_registry_rejects_runtime_type_outside_compiled_runtime()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(CompiledBinding.RuntimeStub("SafeIR.Runtime.SafeFileSystem", "ReadTextAsync"))));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_unknown_compiled_runtime_method()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, "DeleteEverything"))));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_direct_runtime_method_for_host_facade()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                BindingSafety.PureHostFacade)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
+    }
+
+    [Fact]
+    public void Default_bindings_use_approved_compiled_targets()
+    {
+        var registry = new BindingRegistryBuilder()
+            .AddDefaultPureBindings()
+            .AddFileBindings()
+            .AddTimeBindings()
+            .AddRandomBindings()
+            .AddNetworkBindings()
+            .AddLogBindings()
+            .Build();
+
+        Assert.NotEmpty(registry.Signatures);
+        Assert.All(registry.Signatures, binding => {
+            Assert.Equal("RuntimeStub", binding.Compiled.Kind);
+            Assert.Equal(typeof(CompiledRuntime).FullName, binding.Compiled.Type);
+        });
+    }
+
     private static BindingRegistry Build(BindingDescriptor binding)
         => new BindingRegistryBuilder().Add(binding).Build();
 
-    private static BindingDescriptor TestBinding(CompiledBinding compiled)
+    private static BindingDescriptor TestBinding(
+        CompiledBinding compiled,
+        BindingSafety safety = BindingSafety.PureHostFacade)
         => new(
             "test.binding",
             SemVersion.One,
@@ -44,7 +94,7 @@ public sealed class BindingRegistryValidationTests
             null,
             BindingCostModel.Fixed(1),
             AuditLevel.None,
-            BindingSafety.PureHostFacade,
+            safety,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
             compiled);
 }

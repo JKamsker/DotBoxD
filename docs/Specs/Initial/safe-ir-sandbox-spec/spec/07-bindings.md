@@ -130,14 +130,20 @@ Compiled code should call stable runtime stubs, not arbitrary host methods.
 Preferred:
 
 ```csharp
-public static class GeneratedBindingStubs
+public static class CompiledRuntime
 {
-    public static SandboxValue File_ReadText(SandboxContext ctx, SandboxValue path)
-        => ctx.Bindings.InvokeKnown("file.readText", path);
+    public static SandboxValue CallBinding(
+        SandboxContext ctx,
+        string bindingId,
+        SandboxValue[] args)
+        => ctx.Bindings.InvokeKnown(bindingId, args);
 }
 ```
 
-For performance, generated stubs may call typed safe facades directly, but the verifier must allow only exact approved methods.
+For performance, pure sandbox intrinsics may point at exact reviewed `CompiledRuntime` methods
+such as `AbsI32` or `StringLength`. External host facades must route through the generic
+binding-call stub. The registry must validate the exact compiled target type and method; a
+namespace prefix such as `SafeIR.Runtime.*` is not enough.
 
 Avoid generating code that directly calls arbitrary app methods.
 
@@ -254,6 +260,8 @@ Registry build should validate:
 - unknown types
 - unknown effects
 - invalid compiled stubs
+- compiled stub targets are exact reviewed `CompiledRuntime` methods
+- direct runtime methods are used only by pure intrinsic bindings
 
 ## Default bindings
 
