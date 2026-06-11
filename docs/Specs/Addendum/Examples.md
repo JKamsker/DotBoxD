@@ -153,6 +153,15 @@ await kernel.ModifyAsync(
     atomic: true);
 ```
 
+Direct `kernel.Value` assignments use full synchronous synchronization by default. If a caller wants fire-and-forget direct assignments, set `UpdateMode` and flush only when an acknowledgement is needed:
+
+```csharp
+kernel.UpdateMode = LiveUpdateMode.AsyncSet;
+kernel.Value.MinDamage = 250;
+
+await kernel.FlushUpdatesAsync();
+```
+
 For small scripts, the same live-update behavior is available through value bindings:
 
 ```csharp

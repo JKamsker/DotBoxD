@@ -13,7 +13,7 @@ internal static class LiveKernelValueFactory
         var state = Activator.CreateInstance<T>();
         var properties = LiveProperties(typeof(T));
         PullFromStore(kernel, state, properties);
-        kernel.RegisterStateSynchronizer(() => PushToStore(kernel, state, properties));
+        kernel.RegisterStateSynchronizer(typeof(T), () => PushToStore(kernel, state, properties));
         return state;
     }
 

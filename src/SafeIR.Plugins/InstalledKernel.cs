@@ -6,12 +6,15 @@ using SafeIR.Hosting;
 public sealed class InstalledKernel
 {
     private readonly object _typedValueGate = new();
+    private readonly object _updateModeGate = new();
     private readonly SemaphoreSlim _executionGate = new(1, 1);
     private readonly SandboxHost _host;
     private readonly ExecutionPlan _plan;
     private readonly KernelEntrypoints _entrypoints;
-    private readonly List<Action> _stateSynchronizers = [];
+    private readonly List<LiveStateSynchronizer> _stateSynchronizers = [];
     private readonly Dictionary<Type, object> _typedValues = [];
+    private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
+    private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
 
     internal InstalledKernel(SandboxHost host, ExecutionPlan plan, PluginPackage package)
     {
@@ -26,9 +29,10 @@ public sealed class InstalledKernel
     public PluginPackage Package { get; }
     public PluginManifest Manifest { get; }
     public LiveSettingStore Value { get; }
+    public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError;
 
-    internal void RegisterStateSynchronizer(Action synchronize)
-        => _stateSynchronizers.Add(synchronize);
+    internal void RegisterStateSynchronizer(Type stateType, Action synchronize)
+        => _stateSynchronizers.Add(new LiveStateSynchronizer(stateType, synchronize));
 
     internal TSettings GetTypedValue<TSettings>() where TSettings : class
     {
@@ -46,6 +50,23 @@ public sealed class InstalledKernel
             return created;
         }
     }
+
+    internal LiveUpdateMode GetUpdateMode(Type stateType)
+    {
+        lock (_updateModeGate) {
+            return _updateModes.TryGetValue(stateType, out var mode) ? mode : LiveUpdateMode.Sync;
+        }
+    }
+
+    internal void SetUpdateMode(Type stateType, LiveUpdateMode mode)
+    {
+        lock (_updateModeGate) {
+            _updateModes[stateType] = mode;
+        }
+    }
+
+    public ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
+        => _pendingLiveUpdates.FlushAsync(cancellationToken);
 
     public async ValueTask<bool> ShouldHandleAsync<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
@@ -195,10 +216,14 @@ public sealed class InstalledKernel
 
     private SandboxValue BuildInput<TEvent>(IPluginEventAdapter<TEvent> adapter, TEvent e)
     {
-        SynchronizeLiveState();
+        var deferredUpdates = SynchronizeLiveStateForInput();
         var values = adapter.ToSandboxValues(e)
             .Concat(Value.ToSandboxValues(Manifest.LiveSettings))
             .ToArray();
+        foreach (var update in deferredUpdates) {
+            _pendingLiveUpdates.Enqueue(update);
+        }
+
         return SandboxValue.FromList(values);
     }
 
@@ -216,11 +241,20 @@ public sealed class InstalledKernel
         }
     }
 
-    private void SynchronizeLiveState()
+    private List<Action> SynchronizeLiveStateForInput()
     {
+        var deferredUpdates = new List<Action>();
         foreach (var synchronize in _stateSynchronizers) {
-            synchronize();
+            var mode = GetUpdateMode(synchronize.StateType);
+            if ((mode & LiveUpdateMode.AsyncSet) == LiveUpdateMode.AsyncSet) {
+                deferredUpdates.Add(synchronize.Synchronize);
+                continue;
+            }
+
+            synchronize.Synchronize();
         }
+
+        return deferredUpdates;
     }
 
     private void ValidateFunction(string functionId, SandboxType returnType, IReadOnlyList<Parameter> expected)
@@ -245,22 +279,6 @@ public sealed class InstalledKernel
 
     private SandboxValidationException SignatureError(string functionId)
         => new([new SandboxDiagnostic("SGP033", $"Kernel entrypoint '{functionId}' does not match the hook event and live settings.")]);
-}
 
-public sealed class TypedInstalledKernel<TSettings> where TSettings : class
-{
-    internal TypedInstalledKernel(InstalledKernel kernel)
-    {
-        Kernel = kernel;
-        Value = kernel.GetTypedValue<TSettings>();
-    }
-
-    public InstalledKernel Kernel { get; }
-    public TSettings Value { get; }
-
-    public ValueTask ModifyAsync(
-        Action<TSettings> modify,
-        bool atomic = false,
-        CancellationToken cancellationToken = default)
-        => Kernel.ModifyAsync(Value, modify, atomic, cancellationToken);
+    private sealed record LiveStateSynchronizer(Type StateType, Action Synchronize);
 }
