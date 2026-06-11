@@ -83,21 +83,10 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
 
     private static bool IsAllowedLiveSettingType(ITypeSymbol type)
     {
-        if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable &&
-            nullable.TypeArguments.Length == 1) {
-            return IsAllowedLiveSettingType(nullable.TypeArguments[0]);
-        }
-
-        if (type.TypeKind == TypeKind.Enum) {
-            return true;
-        }
-
         return type.SpecialType is SpecialType.System_Boolean
             or SpecialType.System_Int32
             or SpecialType.System_Int64
-            or SpecialType.System_Single
             or SpecialType.System_Double
-            or SpecialType.System_Decimal
             or SpecialType.System_String;
     }
 }

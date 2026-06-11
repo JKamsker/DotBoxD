@@ -180,26 +180,22 @@ public sealed class SandboxPolicyBuilder
         _grants.Add(new CapabilityGrant("log.write", new Dictionary<string, string>()));
         return this;
     }
-
     public SandboxPolicyBuilder GrantGameMessageWrite()
     {
         _allowedEffects |= SandboxEffect.GameStateWrite | SandboxEffect.Audit;
         _grants.Add(new CapabilityGrant("game.message.write", new Dictionary<string, string>()));
         return this;
     }
-
     public SandboxPolicyBuilder WithFuel(long maxFuel)
     {
         _limits = _limits with { MaxFuel = maxFuel };
         return this;
     }
-
     public SandboxPolicyBuilder WithMaxHostCalls(int calls)
     {
         _limits = _limits with { MaxHostCalls = calls };
         return this;
     }
-
     public SandboxPolicyBuilder WithMaxCallDepth(int depth)
     {
         _limits = _limits with { MaxCallDepth = depth };

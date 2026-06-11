@@ -84,6 +84,15 @@ public sealed class LiveSettingStore
         setting.SetObject(value);
     }
 
+    public void SetObject(string name, object? value)
+    {
+        if (!_settings.TryGetValue(name, out var setting)) {
+            throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
+        }
+
+        setting.SetObject(value);
+    }
+
     public T As<T>() where T : class => LiveContextProxy<T>.Create(this);
 
     internal IReadOnlyList<SandboxValue> ToSandboxValues(IReadOnlyList<LiveSettingDefinition> orderedSettings)

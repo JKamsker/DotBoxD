@@ -10,15 +10,15 @@ public sealed class PluginAddendumTests
     {
         var messages = new InMemoryPluginMessageSink();
         var server = PluginServer.Create(messages);
-        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
-        server.Hooks.On(DamageEventAdapter.Instance).UseKernel(kernel);
+        await server.InstallAsync(FireDamagePluginPackage.Create());
+        server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
 
         await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
-        kernel.Value.Set("MinDamage", 250);
+        var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
+        kernel.Value.MinDamage = 250;
         await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
 
-        var typed = server.Kernels.Get<IFireDamageSettings>("fire-damage");
-        typed.Value.DamageType = "ice";
+        kernel.Value.DamageType = "ice";
         await server.Hooks.PublishAsync(new DamageEvent("ice", 300, "player-2"));
 
         Assert.Equal(2, messages.Messages.Count);
@@ -32,7 +32,7 @@ public sealed class PluginAddendumTests
         var server = PluginServer.Create();
         var minimum = server.BindValue("minimum", 100);
         var handled = 0;
-        server.Hooks.On(DamageEventAdapter.Instance)
+        server.Hooks.On<DamageEvent>()
             .Where((e, _) => e.Amount >= minimum.Value)
             .InvokeKernel((_, _) => handled++);
 
@@ -51,7 +51,6 @@ public sealed class PluginAddendumTests
         var settings = server.BindContext<IFireDamageSettings>(
             "damage",
             value => {
-                value.Enabled = true;
                 value.DamageType = "fire";
                 value.MinDamage = 100;
             });
@@ -59,7 +58,6 @@ public sealed class PluginAddendumTests
         settings.Value.MinDamage = 250;
         settings.Value.DamageType = "ice";
 
-        Assert.True(settings.Value.Enabled);
         Assert.Equal("ice", settings.Settings.Get<string>("DamageType"));
         Assert.Equal(250, settings.Settings.Get<int>("MinDamage"));
     }
@@ -89,6 +87,38 @@ public sealed class PluginAddendumTests
         var ex = Assert.Throws<SandboxValidationException>(() => kernel.Value.Set("MinDamage", 10_001));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "SGP023");
+    }
+
+    [Fact]
+    public async Task Class_kernel_setting_updates_are_validated_before_execution()
+    {
+        var server = PluginServer.Create();
+        await server.InstallAsync(FireDamagePluginPackage.Create());
+        server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
+        var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
+
+        kernel.Value.MinDamage = 10_001;
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.Hooks.PublishAsync(new DamageEvent("fire", 20_000, "player-1")).AsTask());
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP023");
+    }
+
+    [Fact]
+    public async Task Class_kernel_setting_value_is_stable_for_repeated_gets()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages);
+        await server.InstallAsync(FireDamagePluginPackage.Create());
+        server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
+        var first = server.Kernels.Get<FireDamageKernel>("fire-damage");
+        var second = server.Kernels.Get<FireDamageKernel>("fire-damage");
+
+        first.Value.MinDamage = 250;
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
+
+        Assert.Same(first.Value, second.Value);
+        Assert.Empty(messages.Messages);
     }
 
     [Fact]

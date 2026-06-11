@@ -8,22 +8,21 @@ var serverGate = server.BindValue("serverGateMinDamage", 0);
 var groupedSettings = server.BindContext<IFireDamageSettings>(
     "operatorDefaults",
     settings => {
-        settings.Enabled = true;
         settings.DamageType = "fire";
         settings.MinDamage = 100;
     });
 
-var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
-server.Hooks.On(DamageEventAdapter.Instance)
+await server.InstallAsync(FireDamagePluginPackage.Create());
+server.Hooks.On<DamageEvent>()
     .Where((e, _) => e.Amount >= serverGate.Value)
-    .UseKernel(kernel);
+    .UseKernel<FireDamageKernel>();
 
 await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
-kernel.Value.Set("MinDamage", 250);
+var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
+kernel.Value.MinDamage = 250;
 await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
 
-var typedKernel = server.Kernels.Get<IFireDamageSettings>("fire-damage");
-typedKernel.Value.DamageType = "ice";
+kernel.Value.DamageType = "ice";
 await server.Hooks.PublishAsync(new DamageEvent("ice", 300, "player-2"));
 
 Console.WriteLine("Live context defaults:");

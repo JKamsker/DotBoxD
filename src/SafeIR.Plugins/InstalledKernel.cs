@@ -5,9 +5,12 @@ using SafeIR.Hosting;
 
 public sealed class InstalledKernel
 {
+    private readonly object _typedValueGate = new();
     private readonly SandboxHost _host;
     private readonly ExecutionPlan _plan;
     private readonly KernelEntrypoints _entrypoints;
+    private readonly List<Action> _stateSynchronizers = [];
+    private readonly Dictionary<Type, object> _typedValues = [];
 
     internal InstalledKernel(SandboxHost host, ExecutionPlan plan, PluginPackage package)
     {
@@ -22,6 +25,26 @@ public sealed class InstalledKernel
     public PluginPackage Package { get; }
     public PluginManifest Manifest { get; }
     public LiveSettingStore Value { get; }
+
+    internal void RegisterStateSynchronizer(Action synchronize)
+        => _stateSynchronizers.Add(synchronize);
+
+    internal TSettings GetTypedValue<TSettings>() where TSettings : class
+    {
+        if (typeof(TSettings).IsInterface) {
+            return Value.As<TSettings>();
+        }
+
+        lock (_typedValueGate) {
+            if (_typedValues.TryGetValue(typeof(TSettings), out var value)) {
+                return (TSettings)value;
+            }
+
+            var created = LiveKernelValueFactory.Create<TSettings>(this);
+            _typedValues[typeof(TSettings)] = created;
+            return created;
+        }
+    }
 
     public async ValueTask<bool> ShouldHandleAsync<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
@@ -82,10 +105,18 @@ public sealed class InstalledKernel
 
     private SandboxValue BuildInput<TEvent>(IPluginEventAdapter<TEvent> adapter, TEvent e)
     {
+        SynchronizeLiveState();
         var values = adapter.ToSandboxValues(e)
             .Concat(Value.ToSandboxValues(Manifest.LiveSettings))
             .ToArray();
         return SandboxValue.FromList(values);
+    }
+
+    private void SynchronizeLiveState()
+    {
+        foreach (var synchronize in _stateSynchronizers) {
+            synchronize();
+        }
     }
 
     private void ValidateFunction(string functionId, SandboxType returnType, IReadOnlyList<Parameter> expected)
@@ -117,7 +148,7 @@ public sealed class TypedInstalledKernel<TSettings> where TSettings : class
     internal TypedInstalledKernel(InstalledKernel kernel)
     {
         Kernel = kernel;
-        Value = kernel.Value.As<TSettings>();
+        Value = kernel.GetTypedValue<TSettings>();
     }
 
     public InstalledKernel Kernel { get; }

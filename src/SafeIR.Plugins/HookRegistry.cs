@@ -4,10 +4,23 @@ public sealed class HookRegistry
 {
     private readonly Dictionary<Type, object> _pipelines = [];
     private readonly IPluginMessageSink _messages;
+    private readonly PluginEventAdapterRegistry _events;
+    private readonly KernelRegistry _kernels;
 
-    internal HookRegistry(IPluginMessageSink messages)
+    internal HookRegistry(
+        IPluginMessageSink messages,
+        PluginEventAdapterRegistry events,
+        KernelRegistry kernels)
     {
         _messages = messages;
+        _events = events;
+        _kernels = kernels;
+    }
+
+    public HookPipeline<TEvent> On<TEvent>()
+    {
+        var adapter = _events.Resolve<TEvent>();
+        return On(adapter);
     }
 
     public HookPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
@@ -16,7 +29,7 @@ public sealed class HookRegistry
             return (HookPipeline<TEvent>)existing;
         }
 
-        var pipeline = new HookPipeline<TEvent>(adapter, _messages);
+        var pipeline = new HookPipeline<TEvent>(adapter, _messages, _kernels);
         _pipelines[typeof(TEvent)] = pipeline;
         return pipeline;
     }
@@ -35,11 +48,16 @@ public sealed class HookPipeline<TEvent>
     private readonly List<Func<TEvent, HookContext, ValueTask>> _handlers = [];
     private readonly IPluginEventAdapter<TEvent> _adapter;
     private readonly IPluginMessageSink _messages;
+    private readonly KernelRegistry _kernels;
 
-    internal HookPipeline(IPluginEventAdapter<TEvent> adapter, IPluginMessageSink messages)
+    internal HookPipeline(
+        IPluginEventAdapter<TEvent> adapter,
+        IPluginMessageSink messages,
+        KernelRegistry kernels)
     {
         _adapter = adapter;
         _messages = messages;
+        _kernels = kernels;
     }
 
     public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
@@ -73,6 +91,9 @@ public sealed class HookPipeline<TEvent>
         });
         return this;
     }
+
+    public HookPipeline<TEvent> UseKernel<TKernel>() where TKernel : class
+        => UseKernel(_kernels.GetByKernelType<TKernel>());
 
     internal async ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken)
     {

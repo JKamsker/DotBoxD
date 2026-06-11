@@ -12,12 +12,14 @@ public sealed class PluginServer
     {
         _host = host;
         _defaultPolicy = defaultPolicy;
-        Hooks = new HookRegistry(messages);
+        Events = new PluginEventAdapterRegistry();
         Kernels = new KernelRegistry();
+        Hooks = new HookRegistry(messages, Events, Kernels);
     }
 
     public HookRegistry Hooks { get; }
     public KernelRegistry Kernels { get; }
+    public PluginEventAdapterRegistry Events { get; }
 
     public static PluginServer Create(
         IPluginMessageSink? messages = null,
@@ -48,6 +50,12 @@ public sealed class PluginServer
     public LiveContext<T> BindContext<T>(string name, Action<T>? initialize = null) where T : class
         => LiveContextFactory.Create(name, initialize);
 
+    public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
+    {
+        Events.Register(adapter);
+        return this;
+    }
+
     public async ValueTask<InstalledKernel> InstallAsync(
         PluginPackage package,
         SandboxPolicy? policy = null,
@@ -68,8 +76,14 @@ public sealed class KernelRegistry
 
     public InstalledKernel Get(string pluginId) => _kernels[pluginId];
 
-    public TypedInstalledKernel<TSettings> Get<TSettings>(string pluginId) where TSettings : class
+    public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
         => new(Get(pluginId));
+
+    internal InstalledKernel GetByKernelType<TKernel>() where TKernel : class
+    {
+        var pluginId = KernelTypeMetadata.PluginId(typeof(TKernel));
+        return Get(pluginId);
+    }
 
     internal void Add(InstalledKernel kernel)
         => _kernels[kernel.Manifest.PluginId] = kernel;

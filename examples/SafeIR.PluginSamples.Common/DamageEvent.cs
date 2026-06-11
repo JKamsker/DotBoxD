@@ -7,7 +7,6 @@ public sealed record DamageEvent(string DamageType, int Amount, string TargetId)
 
 public interface IFireDamageSettings
 {
-    bool Enabled { get; set; }
     string DamageType { get; set; }
     int MinDamage { get; set; }
 }

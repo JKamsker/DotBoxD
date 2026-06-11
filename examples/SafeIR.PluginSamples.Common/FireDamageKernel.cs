@@ -7,20 +7,16 @@ using SafeIR.Plugins;
 public sealed partial class FireDamageKernel : IEventKernel<DamageEvent>
 {
     [LiveSetting]
-    public bool Enabled { get; set; } = true;
-
-    [LiveSetting]
     public string DamageType { get; set; } = "fire";
 
     [LiveSetting]
     [Range(0, 10_000)]
     public int MinDamage { get; set; } = 100;
 
-    public bool ShouldHandle(DamageEvent e, HookContext context)
-        => Enabled &&
-           e.DamageType == DamageType &&
+    public bool ShouldHandle(DamageEvent e, HookContext ctx)
+        => e.DamageType == DamageType &&
            e.Amount >= MinDamage;
 
-    public void Handle(DamageEvent e, HookContext context)
-        => context.Messages.Send(e.TargetId, "Ouch, fire.");
+    public void Handle(DamageEvent e, HookContext ctx)
+        => ctx.Messages.Send(e.TargetId, "Ouch, fire.");
 }
