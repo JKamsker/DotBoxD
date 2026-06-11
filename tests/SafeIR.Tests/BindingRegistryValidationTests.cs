@@ -5,6 +5,30 @@ namespace SafeIR.Tests;
 public sealed class BindingRegistryValidationTests
 {
     [Fact]
+    public void Default_pure_bindings_contain_math_intrinsics()
+    {
+        var registry = new BindingRegistryBuilder()
+            .AddDefaultPureBindings()
+            .Build();
+
+        Assert.True(registry.TryGet("math.abs", out _));
+        Assert.True(registry.TryGet("math.sqrt", out _));
+        Assert.False(registry.TryGet("app.nope", out _));
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_duplicate_binding_id()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() =>
+            new BindingRegistryBuilder()
+                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))))
+                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))))
+                .Build());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-DUP");
+    }
+
+    [Fact]
     public void Binding_registry_rejects_unsupported_compiled_target_kind()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
@@ -60,6 +84,26 @@ public sealed class BindingRegistryValidationTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
     }
 
+    [Fact]
+    public void Binding_registry_rejects_side_effecting_binding_without_capability()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            effects: SandboxEffect.FileRead)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-CAP");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_dangerous_binding()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            safety: BindingSafety.DangerousRequiresReview)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-DANGER");
+    }
+
     [Theory]
     [MemberData(nameof(NegativeCostModels))]
     public void Binding_registry_rejects_negative_cost_model(BindingCostModel costModel)
@@ -97,13 +141,14 @@ public sealed class BindingRegistryValidationTests
     private static BindingDescriptor TestBinding(
         CompiledBinding compiled,
         BindingSafety safety = BindingSafety.PureHostFacade,
-        BindingCostModel? costModel = null)
+        BindingCostModel? costModel = null,
+        SandboxEffect effects = SandboxEffect.Cpu)
         => new(
             "test.binding",
             SemVersion.One,
             [],
             SandboxType.Unit,
-            SandboxEffect.Cpu,
+            effects,
             null,
             costModel ?? BindingCostModel.Fixed(1),
             AuditLevel.None,

@@ -139,6 +139,12 @@ eq ne lt lte gt gte
 and or
 ```
 
+`and` and `or` are short-circuiting boolean operators. Implementations should evaluate
+the cheaper pure operand first when that can determine the result, even if that operand is
+authored on the right side. Operands with effects outside CPU/allocation preserve authored
+left-to-right order so file, network, log, clock, random, or other externally visible
+operations are not silently dropped or reordered.
+
 Unary operations:
 
 ```json

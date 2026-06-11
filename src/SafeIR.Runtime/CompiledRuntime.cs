@@ -232,11 +232,13 @@ public static class CompiledRuntime
     private static MapValue AsMap(SandboxValue value)
         => value as MapValue ?? throw InvalidInput("expected map value");
 
-    private static void RequireType(SandboxValue value, SandboxType expected, string message)
+    private static SandboxValue RequireType(SandboxValue value, SandboxType expected, string message)
     {
         if (value.Type != expected) {
             throw InvalidInput(message);
         }
+
+        return value;
     }
 
     private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)
