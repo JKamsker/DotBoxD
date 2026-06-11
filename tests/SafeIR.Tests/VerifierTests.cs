@@ -12,6 +12,8 @@ public sealed class VerifierTests
         => new() {
             { "System.IO.File.ReadAllText", FileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] },
             { "System.Type.GetType", TypeGetTypeAssembly, ["V-TYPE-REF", "V-MEMBER"] },
+            { "System.Reflection.Assembly.Load", AssemblyLoadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
+            { "System.Reflection.MethodInfo.Invoke", MethodInfoInvokeAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "System.Environment", EnvironmentAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "System.Threading.Thread", ThreadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "Activator.CreateInstance", ActivatorAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
@@ -81,6 +83,25 @@ public sealed class VerifierTests
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldstr, "System.IO.File");
             il.Emit(OpCodes.Call, typeof(Type).GetMethod(nameof(Type.GetType), [typeof(string)])!);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] AssemblyLoadAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(Assembly), []);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldstr, "System.Private.CoreLib");
+            il.Emit(OpCodes.Call, typeof(Assembly).GetMethod(nameof(Assembly.Load), [typeof(string)])!);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] MethodInfoInvokeAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(object), []);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Callvirt, typeof(MethodBase).GetMethod(nameof(MethodBase.Invoke), [typeof(object), typeof(object[])])!);
             il.Emit(OpCodes.Ret);
         });
 
