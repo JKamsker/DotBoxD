@@ -136,6 +136,7 @@ internal sealed class MethodEmitter
 
     private void EmitExpression(Expression expression)
     {
+        EmitFuel(1);
         switch (expression) {
             case LiteralExpression literal:
                 EmitLiteral(literal.Value);
