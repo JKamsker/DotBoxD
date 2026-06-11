@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\SafeIR.Validation\SafeIR.Validation.csproj" />
+    <ProjectReference Include="..\SafeIR.Runtime\SafeIR.Runtime.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

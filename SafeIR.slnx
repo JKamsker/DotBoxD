@@ -1,0 +1,34 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/SafeIR.Compiler/SafeIR.Compiler.csproj" />
+        <Project Path="src/SafeIR.Core/SafeIR.Core.csproj" />
+        <Project Path="src/SafeIR.Hosting/SafeIR.Hosting.csproj" />
+        <Project Path="src/SafeIR.Interpreter/SafeIR.Interpreter.csproj" />
+        <Project Path="src/SafeIR.Runtime/SafeIR.Runtime.csproj" />
+        <Project Path="src/SafeIR.Validation/SafeIR.Validation.csproj" />
+        <Project Path="src/SafeIR.Verifier/SafeIR.Verifier.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
+    </Folder>
+    <!-- Solution Items -->
+<!--
+    <Folder Name="/Solution Items/">
+        <File Path="Directory.Packages.props" />
+    </Folder>
+-->
+
+    <!-- List of Projects -->
+<!--
+    <Project Path="ADD_PROJECT_FILE_1_RELATIVE_PATH_HERE" />
+    <Project Path="ADD_PROJECT_FILE_2_RELATIVE_PATH_HERE">
+        <Configuration />
+        <Deploy />
+    </Project>
+-->
+
+    <!-- Support is provisionally available on Visual Studio 17.10 and later versions. -->
+    <Properties Name="Visual Studio">
+        <Property Name="OpenWith" Value="17" />
+    </Properties>
+</Solution>

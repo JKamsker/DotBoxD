@@ -1,0 +1,262 @@
+# 16 — Proposed Public C# API
+
+## High-level usage
+
+```csharp
+var sandbox = SandboxHost.Create(builder =>
+{
+    builder.AddDefaultPureBindings();
+    builder.AddFileBindings();
+    builder.UseInterpreter();
+    builder.UseCompilerIfAvailable();
+});
+
+var module = await sandbox.ParseJsonAsync(jsonIr, cancellationToken);
+var policy = SandboxPolicyBuilder.Create()
+    .AllowPureComputation()
+    .GrantFileRead(root: "tenant://123/config", maxBytesPerRun: 256_000)
+    .WithFuel(100_000)
+    .WithWallTime(TimeSpan.FromMilliseconds(50))
+    .Build();
+
+var plan = await sandbox.PrepareAsync(module, policy, cancellationToken);
+
+var result = await sandbox.ExecuteAsync(
+    plan,
+    entrypoint: "main",
+    input: SandboxValue.Unit,
+    options: new SandboxExecutionOptions
+    {
+        Mode = ExecutionMode.Auto
+    },
+    cancellationToken);
+```
+
+## Main abstractions
+
+### `SandboxHost`
+
+```csharp
+public sealed class SandboxHost
+{
+    public ValueTask<SandboxModule> ParseJsonAsync(
+        string jsonIr,
+        CancellationToken cancellationToken);
+
+    public ValueTask<ExecutionPlan> PrepareAsync(
+        SandboxModule module,
+        SandboxPolicy policy,
+        CancellationToken cancellationToken);
+
+    public ValueTask<SandboxExecutionResult> ExecuteAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken);
+}
+```
+
+### `SandboxExecutionOptions`
+
+```csharp
+public sealed record SandboxExecutionOptions
+{
+    public ExecutionMode Mode { get; init; } = ExecutionMode.Auto;
+    public bool EnableDebugTrace { get; init; }
+    public bool AllowFallbackToInterpreter { get; init; } = true;
+    public bool RequireDeterministic { get; init; }
+    public SandboxRunId? RunId { get; init; }
+}
+
+public enum ExecutionMode
+{
+    Interpreted,
+    Compiled,
+    Auto
+}
+```
+
+### `SandboxExecutionResult`
+
+```csharp
+public sealed record SandboxExecutionResult
+{
+    public bool Succeeded { get; init; }
+    public SandboxValue? Value { get; init; }
+    public SandboxError? Error { get; init; }
+    public SandboxResourceUsage ResourceUsage { get; init; }
+    public IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
+    public ExecutionMode ActualMode { get; init; }
+    public string ModuleHash { get; init; }
+    public string PlanHash { get; init; }
+    public string PolicyHash { get; init; }
+    public string? ArtifactHash { get; init; }
+}
+```
+
+## Policy builder
+
+```csharp
+public sealed class SandboxPolicyBuilder
+{
+    public SandboxPolicyBuilder AllowPureComputation();
+    public SandboxPolicyBuilder Grant(string capabilityId, object parameters);
+    public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun);
+    public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun);
+    public SandboxPolicyBuilder WithFuel(long maxFuel);
+    public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime);
+    public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes);
+    public SandboxPolicyBuilder Deterministic(DateTimeOffset logicalNow, ulong randomSeed);
+    public SandboxPolicy Build();
+}
+```
+
+## Binding registration
+
+```csharp
+public sealed class BindingRegistryBuilder
+{
+    public BindingRegistryBuilder Add(BindingDescriptor descriptor);
+    public BindingRegistryBuilder AddRange(IEnumerable<BindingDescriptor> descriptors);
+    public BindingRegistry Build();
+}
+```
+
+Example:
+
+```csharp
+builder.Add(new BindingDescriptor(
+    Id: "file.readText",
+    Version: SemVersion.Parse("1.0.0"),
+    Parameters: [SandboxTypes.Path],
+    ReturnType: SandboxTypes.String,
+    Effects: SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.FileRead,
+    RequiredCapability: "file.read",
+    CostModel: BindingCostModel.PerByte(baseFuel: 50, perByteFuel: 1),
+    AuditLevel: AuditLevel.PerResource,
+    Safety: BindingSafety.ReadOnlyExternal,
+    Interpreter: SafeFileBindings.ReadTextInterpreter,
+    Compiled: CompiledBinding.RuntimeStub("Sandbox.Runtime.GeneratedBindingStubs", "File_ReadText")));
+```
+
+## Execution plan
+
+```csharp
+public sealed record ExecutionPlan
+{
+    public string ModuleHash { get; init; }
+    public string PlanHash { get; init; }
+    public string PolicyHash { get; init; }
+    public string BindingManifestHash { get; init; }
+    public SandboxModule Module { get; init; }
+    public SandboxPolicy Policy { get; init; }
+    public BindingTable Bindings { get; init; }
+    public ResourceBudget Budget { get; init; }
+    public ExecutableBytecode Bytecode { get; init; }
+}
+```
+
+## Interpreter API
+
+```csharp
+public interface ISandboxInterpreter
+{
+    ValueTask<SandboxExecutionResult> ExecuteAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken);
+}
+```
+
+## Compiler API
+
+```csharp
+public interface ISandboxCompiler
+{
+    ValueTask<CompiledArtifact> CompileAsync(
+        ExecutionPlan plan,
+        CompileOptions options,
+        CancellationToken cancellationToken);
+}
+```
+
+## Verifier API
+
+```csharp
+public interface IGeneratedAssemblyVerifier
+{
+    ValueTask<VerificationResult> VerifyAsync(
+        ReadOnlyMemory<byte> assemblyBytes,
+        ArtifactManifest manifest,
+        VerificationPolicy policy,
+        CancellationToken cancellationToken);
+}
+```
+
+## Execution-mode selector
+
+```csharp
+public interface IExecutionModeSelector
+{
+    ExecutionModeDecision Choose(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options,
+        ModuleHotnessStats hotness,
+        CompiledCacheStatus cacheStatus);
+}
+```
+
+## Worker process API optional
+
+```csharp
+public interface ISandboxWorkerClient
+{
+    ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken);
+}
+```
+
+## Error model
+
+```csharp
+public sealed record SandboxError(
+    SandboxErrorCode Code,
+    string SafeMessage,
+    string? DiagnosticId = null);
+
+public enum SandboxErrorCode
+{
+    ParseError,
+    ValidationError,
+    PolicyDenied,
+    PermissionDenied,
+    QuotaExceeded,
+    Timeout,
+    Cancelled,
+    BindingFailure,
+    VerifierFailure,
+    CacheInvalid,
+    HostFailure
+}
+```
+
+## Minimal MVP API
+
+For first implementation, this is enough:
+
+```csharp
+public sealed class Sandbox
+{
+    public PreparedScript PrepareJson(string jsonIr, SandboxPolicy policy);
+    public SandboxResult ExecuteInterpreted(PreparedScript script, SandboxValue input);
+}
+```
+
+Add compiler/cache after the core model is proven.
