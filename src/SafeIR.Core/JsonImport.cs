@@ -33,6 +33,42 @@ internal static class JsonImport
         return value.GetString() ?? "";
     }
 
+    public static int ReadInt32Value(JsonElement value, string name)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var result)) {
+            throw Error("E-JSON-TYPE", $"'{name}' must be a 32-bit integer");
+        }
+
+        return result;
+    }
+
+    public static long ReadInt64Value(JsonElement value, string name)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var result)) {
+            throw Error("E-JSON-TYPE", $"'{name}' must be a 64-bit integer");
+        }
+
+        return result;
+    }
+
+    public static double ReadDoubleValue(JsonElement value, string name)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var result)) {
+            throw Error("E-JSON-TYPE", $"'{name}' must be a number");
+        }
+
+        return result;
+    }
+
+    public static bool ReadBoolValue(JsonElement value, string name)
+    {
+        if (value.ValueKind is not JsonValueKind.True and not JsonValueKind.False) {
+            throw Error("E-JSON-TYPE", $"'{name}' must be a boolean");
+        }
+
+        return value.GetBoolean();
+    }
+
     public static void RequireObject(JsonElement value, string name)
     {
         if (value.ValueKind != JsonValueKind.Object) {
@@ -40,11 +76,13 @@ internal static class JsonImport
         }
     }
 
-    public static void RequireArray(JsonElement value, string name)
+    public static JsonElement RequireArray(JsonElement value, string name)
     {
         if (value.ValueKind != JsonValueKind.Array) {
             throw Error("E-JSON-TYPE", $"{name} must be an array");
         }
+
+        return value;
     }
 
     public static void RequireAllowedProperties(JsonElement value, string name, params string[] allowed)
