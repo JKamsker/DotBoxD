@@ -203,7 +203,18 @@ public static class CompiledRuntime
     {
         var descriptor = context.Bindings.GetDescriptor(id);
         context.ChargeBindingCall(descriptor);
-        return descriptor.Interpreter(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+        try {
+            return descriptor.Interpreter(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+        }
+        catch (SandboxRuntimeException) {
+            throw;
+        }
+        catch (OperationCanceledException) {
+            throw;
+        }
+        catch (Exception) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed"));
+        }
     }
 
     private static ListValue AsList(SandboxValue value)

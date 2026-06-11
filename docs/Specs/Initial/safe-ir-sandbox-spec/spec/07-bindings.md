@@ -333,7 +333,7 @@ Example mapping:
 | file too large | `QuotaExceeded` |
 | timeout | `Timeout` |
 | cancellation | `Cancelled` |
-| unexpected exception | `HostFailure` with safe message |
+| unexpected binding exception | `BindingFailure` with safe message |
 
 Do not leak secrets, full paths, connection strings, stack traces, or internal object details to untrusted users.
 

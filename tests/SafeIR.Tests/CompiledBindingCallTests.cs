@@ -51,6 +51,34 @@ public sealed class CompiledBindingCallTests
         Assert.Equal(1, compiled.ResourceUsage.HostCalls);
     }
 
+    [Fact]
+    public async Task Compiled_binding_stub_sanitizes_unexpected_binding_exceptions()
+    {
+        var host = SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.AddBinding(ThrowingBinding());
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable();
+        });
+        var module = await host.ParseJsonAsync(CallBindingJson("test.throw"));
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var interpreted = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+        var compiled = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        AssertBindingFailureIsSanitized(interpreted);
+        AssertBindingFailureIsSanitized(compiled);
+        Assert.Equal(ExecutionMode.Compiled, compiled.ActualMode);
+    }
+
     private static BindingDescriptor DoubleBinding()
         => new(
             "test.double",
@@ -67,4 +95,42 @@ public sealed class CompiledBindingCallTests
                 return ValueTask.FromResult(SandboxValue.FromInt32(value * 2));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static BindingDescriptor ThrowingBinding()
+        => new(
+            "test.throw",
+            SemVersion.One,
+            [],
+            SandboxType.I32,
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) => throw new InvalidOperationException("secret host detail"),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static string CallBindingJson(string bindingId)
+        => $$"""
+        {
+          "id": "compiled-binding-error",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "call": "{{bindingId}}", "args": [] } }]
+            }
+          ]
+        }
+        """;
+
+    private static void AssertBindingFailureIsSanitized(SandboxExecutionResult result)
+    {
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.BindingFailure, result.Error!.Code);
+        Assert.DoesNotContain("secret", result.Error.SafeMessage, StringComparison.OrdinalIgnoreCase);
+    }
 }
