@@ -1,6 +1,7 @@
 namespace SafeIR.Runtime;
 
 using System.Globalization;
+using System.Text;
 using SafeIR;
 
 public static class SafeFileSystem
@@ -23,11 +24,11 @@ public static class SafeFileSystem
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
             }
 
-            context.Budget.ChargeFileRead(info.Length);
-            context.ChargeFuel(50 + info.Length);
-            var text = await File.ReadAllTextAsync(info.FullName, cancellationToken).ConfigureAwait(false);
+            var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, cancellationToken).ConfigureAwait(false);
+            context.ChargeFuel(50 + bytes.Length);
+            var text = Encoding.UTF8.GetString(bytes);
             context.ChargeString(text);
-            AuditRead(context, startedAt, true, resolved.SanitizedPath, info.Length, null);
+            AuditRead(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
             return text;
         }
         catch (SandboxRuntimeException ex) {
@@ -118,6 +119,37 @@ public static class SafeFileSystem
         }
 
         return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+    }
+
+    private static async ValueTask<byte[]> ReadLimitedBytesAsync(
+        SandboxContext context,
+        ResolvedPath resolved,
+        long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            resolved.FullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            useAsync: true);
+        EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
+        using var memory = new MemoryStream();
+        var buffer = new byte[4096];
+        while (true) {
+            var read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (read == 0) {
+                return memory.ToArray();
+            }
+
+            if (memory.Length + read > maxBytes) {
+                throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
+            }
+
+            context.Budget.ChargeFileRead(read);
+            memory.Write(buffer, 0, read);
+        }
     }
 
     private static void EnsureWriteAllowed(ResolvedPath resolved, long byteCount)
