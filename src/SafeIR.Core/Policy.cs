@@ -1,14 +1,17 @@
-using System.Security.Cryptography;
-using System.Text;
-
 namespace SafeIR;
+
+using System.Collections.ObjectModel;
 
 public sealed record CapabilityGrant(
     string Id,
     IReadOnlyDictionary<string, string> Parameters,
     DateTimeOffset? ExpiresAt = null,
     string GrantedBy = "host-policy",
-    string Reason = "");
+    string Reason = "")
+{
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } =
+        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(Parameters, StringComparer.Ordinal));
+}
 
 public sealed record SandboxPolicy(
     string PolicyId,
@@ -19,6 +22,8 @@ public sealed record SandboxPolicy(
     DateTimeOffset? LogicalNow = null,
     ulong? RandomSeed = null)
 {
+    public IReadOnlyList<CapabilityGrant> Grants { get; init; } = Grants.ToArray();
+
     public string Hash => StableHash();
 
     public bool GrantsCapability(string capabilityId)
@@ -40,37 +45,7 @@ public sealed record SandboxPolicy(
         => StringComparer.Ordinal.Equals(grant.Id, capabilityId) &&
            (grant.ExpiresAt is null || grant.ExpiresAt > now);
 
-    private string StableHash()
-    {
-        var builder = new StringBuilder();
-        builder.Append("policy|").Append(PolicyId).Append('|').Append((int)AllowedEffects).Append('|');
-        builder.Append(Deterministic).Append('|').Append(LogicalNow?.ToUnixTimeMilliseconds()).Append('|').Append(RandomSeed);
-        AppendResourceLimits(builder);
-
-        foreach (var grant in Grants.OrderBy(g => g.Id, StringComparer.Ordinal)) {
-            builder.Append("|grant|").Append(grant.Id);
-            foreach (var item in grant.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal)) {
-                builder.Append('|').Append(item.Key).Append('=').Append(item.Value);
-            }
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
-    private void AppendResourceLimits(StringBuilder builder)
-    {
-        builder.Append("|limits|").Append(ResourceLimits.MaxFuel);
-        builder.Append('|').Append(ResourceLimits.EffectiveWallTime.Ticks);
-        builder.Append('|').Append(ResourceLimits.MaxAllocatedBytes);
-        builder.Append('|').Append(ResourceLimits.MaxCallDepth).Append('|').Append(ResourceLimits.MaxHostCalls);
-        builder.Append('|').Append(ResourceLimits.MaxListLength).Append('|').Append(ResourceLimits.MaxMapEntries);
-        builder.Append('|').Append(ResourceLimits.MaxCollectionDepth).Append('|').Append(ResourceLimits.MaxTotalCollectionElements);
-        builder.Append('|').Append(ResourceLimits.MaxFileBytesRead).Append('|').Append(ResourceLimits.MaxFileBytesWritten);
-        builder.Append('|').Append(ResourceLimits.MaxNetworkBytesRead).Append('|').Append(ResourceLimits.MaxLogEvents);
-        builder.Append('|').Append(ResourceLimits.MaxLogMessageLength);
-        builder.Append('|').Append(ResourceLimits.MaxStringLength).Append('|').Append(ResourceLimits.MaxTotalStringBytes);
-    }
+    private string StableHash() => PolicyHash.Compute(this);
 }
 
 public sealed class SandboxPolicyBuilder
@@ -273,7 +248,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicy Build()
     {
         ResourceLimitValidation.Validate(_limits);
-        return new SandboxPolicy(_policyId, _allowedEffects, _grants, _limits, _deterministic, _logicalNow, _randomSeed);
+        return new SandboxPolicy(_policyId, _allowedEffects, _grants.ToArray(), _limits, _deterministic, _logicalNow, _randomSeed);
     }
 
     private static void ThrowIfNegative(long value, string paramName)
@@ -289,10 +264,14 @@ internal static class ParameterReader
     public static IReadOnlyDictionary<string, string> Read(object parameters)
     {
         if (parameters is IReadOnlyDictionary<string, string> values) {
-            return values;
+            return new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(values, StringComparer.Ordinal));
         }
 
-        return parameters.GetType().GetProperties()
-            .ToDictionary(p => p.Name, p => Convert.ToString(p.GetValue(parameters), System.Globalization.CultureInfo.InvariantCulture) ?? "");
+        var dictionary = parameters.GetType().GetProperties()
+            .ToDictionary(
+                p => p.Name,
+                p => Convert.ToString(p.GetValue(parameters), System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                StringComparer.Ordinal);
+        return new ReadOnlyDictionary<string, string>(dictionary);
     }
 }

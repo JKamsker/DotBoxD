@@ -83,6 +83,47 @@ public sealed class JsonImporterTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-SCHEMA");
     }
 
+    [Theory]
+    [InlineData("""{ "i32": "1" }""")]
+    [InlineData("""{ "i64": true }""")]
+    [InlineData("""{ "f64": "1.5" }""")]
+    [InlineData("""{ "bool": 1 }""")]
+    public void Literal_values_reject_wrong_json_kinds(string expression)
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import(MinimalModule("", expression)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
+    }
+
+    [Fact]
+    public void If_else_rejects_non_array_shape()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import("""
+        {
+          "id": "bad-else",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [
+                {
+                  "op": "if",
+                  "condition": { "bool": true },
+                  "then": [{ "op": "return", "value": { "i32": 1 } }],
+                  "else": { "op": "return", "value": { "i32": 2 } }
+                }
+              ]
+            }
+          ]
+        }
+        """));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
+    }
+
     [Fact]
     public void Function_rejects_unknown_visibility()
     {

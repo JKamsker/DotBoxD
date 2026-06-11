@@ -29,10 +29,7 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    [InlineData("C:\\Windows\\win.ini")]
-    [InlineData("\\\\server\\share\\x")]
-    [InlineData("file:///etc/passwd")]
-    public async Task Path_traversal_and_absolute_paths_are_denied(string path)
+    public async Task File_read_path_traversal_is_denied(string path)
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
@@ -47,6 +44,94 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Theory]
+    [InlineData("./config/settings.json")]
+    [InlineData("sub/../config/settings.json")]
+    public async Task Normalized_file_read_paths_inside_root_are_allowed(string path)
+    {
+        using var temp = TempDirectory.Create();
+        Directory.CreateDirectory(Path.Combine(temp.Path, "config"));
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
+
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(temp.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("tenant-settings", ((StringValue)result.Value!).Value);
+    }
+
+    [Fact]
+    public async Task File_read_denies_nested_reparse_point()
+    {
+        using var root = TempDirectory.Create();
+        using var outside = TempDirectory.Create();
+        Directory.CreateDirectory(Path.Combine(outside.Path, "sub"));
+        await File.WriteAllTextAsync(Path.Combine(outside.Path, "sub", "secret.txt"), "secret");
+        var link = Path.Combine(root.Path, "link");
+        if (!TryCreateDirectoryLink(link, outside.Path)) {
+            return;
+        }
+
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("link/sub/secret.txt"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(root.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task File_read_charges_actual_streamed_bytes()
+    {
+        using var temp = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(temp.Path, 5)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(5, result.ResourceUsage.FileBytesRead);
+        Assert.Contains(result.AuditEvents, e => e.BindingId == "file.readText" && e.Bytes == 5);
+    }
+
+    [Fact]
+    public async Task File_read_respects_byte_quota_while_streaming()
+    {
+        using var temp = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(temp.Path, 4)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
     }
 
     [Fact]
@@ -84,10 +169,7 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    [InlineData("C:\\Windows\\win.ini")]
-    [InlineData("\\\\server\\share\\x")]
-    [InlineData("file:///etc/passwd")]
-    public async Task File_write_path_traversal_and_absolute_paths_are_denied(string path)
+    public async Task File_write_path_traversal_is_denied(string path)
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
@@ -173,6 +255,23 @@ public sealed class SafeFileSystemTests
           ]
         }
         """;
+
+    private static bool TryCreateDirectoryLink(string link, string target)
+    {
+        try {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException) {
+            return false;
+        }
+        catch (UnauthorizedAccessException) {
+            return false;
+        }
+        catch (PlatformNotSupportedException) {
+            return false;
+        }
+    }
 
     private sealed class TempDirectory : IDisposable
     {

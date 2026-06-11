@@ -1,15 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
-
 namespace SafeIR;
 
 public static class CanonicalModuleHasher
 {
     public static string Hash(SandboxModule module)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(Serialize(module)));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+        => CanonicalEncoding.HashRecords(new[] { Serialize(module) });
 
     public static string Serialize(SandboxModule module)
     {
@@ -33,9 +27,9 @@ public static class CanonicalModuleHasher
 
     private static void WriteFunction(CanonicalWriter writer, SandboxFunction function)
     {
-        writer.Write("fn", function.IsEntrypoint ? "entry" : "private", function.Id, function.ReturnType.ToString());
+        writer.Write("fn", function.IsEntrypoint ? "entry" : "private", function.Id, Type(function.ReturnType));
         foreach (var parameter in function.Parameters) {
-            writer.Write("param", parameter.Name, parameter.Type.ToString());
+            writer.Write("param", parameter.Name, Type(parameter.Type));
         }
 
         foreach (var statement in function.Body) {
@@ -76,48 +70,80 @@ public static class CanonicalModuleHasher
     }
 
     private static string Expr(Expression expression) => expression switch {
-        LiteralExpression literal => "lit(" + Value(literal.Value) + ")",
-        VariableExpression variable => $"var({variable.Name})",
-        UnaryExpression unary => $"unary({unary.Operator},{Expr(unary.Operand)})",
-        BinaryExpression binary => $"bin({binary.Operator},{Expr(binary.Left)},{Expr(binary.Right)})",
-        CallExpression call => $"call({call.Name},{call.GenericType},{string.Join(",", call.Arguments.Select(Expr))})",
+        LiteralExpression literal => Node("lit", Value(literal.Value)),
+        VariableExpression variable => Node("var", variable.Name),
+        UnaryExpression unary => Node("unary", unary.Operator, Expr(unary.Operand)),
+        BinaryExpression binary => Node("bin", binary.Operator, Expr(binary.Left), Expr(binary.Right)),
+        CallExpression call => Call(call),
         _ => throw new NotSupportedException(expression.GetType().Name)
     };
 
     private static string Value(SandboxValue value)
         => value switch {
-            UnitValue => "unit",
-            BoolValue boolean => "bool:" + (boolean.Value ? "true" : "false"),
-            I32Value number => "i32:" + number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            I64Value number => "i64:" + number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            F64Value number => "f64:" + number.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
-            StringValue text => "string:" + text.Value,
-            SandboxPathValue path => "path:" + path.Value.RelativePath,
-            SandboxUriValue uri => "uri:" + uri.Value.Value,
-            ListValue list => "list:" + list.ItemType + "[" + string.Join(",", list.Values.Select(Value)) + "]",
-            MapValue map => "map:" + map.KeyType + ":" + map.ValueType + "{" +
-                            string.Join(",", map.Values.OrderBy(p => Value(p.Key), StringComparer.Ordinal)
-                                .Select(p => Value(p.Key) + "=>" + Value(p.Value))) + "}",
+            UnitValue => Node("unit"),
+            BoolValue boolean => Node("bool", boolean.Value ? "true" : "false"),
+            I32Value number => Node("i32", number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            I64Value number => Node("i64", number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            F64Value number => Node("f64", number.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)),
+            StringValue text => Node("string", text.Value),
+            SandboxPathValue path => Node("path", path.Value.RelativePath),
+            SandboxUriValue uri => Node("uri", uri.Value.Value),
+            ListValue list => ListLiteral(list),
+            MapValue map => MapLiteral(map),
             _ => throw new NotSupportedException(value.GetType().Name)
         };
 
+    private static string Type(SandboxType type)
+    {
+        var fields = new List<string?> { "type", type.Name };
+        fields.AddRange(type.Arguments.Select(Type));
+        return Node(fields);
+    }
+
+    private static string Call(CallExpression call)
+    {
+        var fields = new List<string?> {
+            "call",
+            call.Name,
+            call.GenericType is null ? null : Type(call.GenericType)
+        };
+        fields.AddRange(call.Arguments.Select(Expr));
+        return Node(fields);
+    }
+
+    private static string ListLiteral(ListValue list)
+    {
+        var fields = new List<string?> { "list", Type(list.ItemType) };
+        fields.AddRange(list.Values.Select(Value));
+        return Node(fields);
+    }
+
+    private static string MapLiteral(MapValue map)
+    {
+        var entries = map.Values
+            .Select(p => Node("entry", Value(p.Key), Value(p.Value)))
+            .Order(StringComparer.Ordinal);
+        var fields = new List<string?> { "map", Type(map.KeyType), Type(map.ValueType) };
+        fields.AddRange(entries);
+        return Node(fields);
+    }
+
+    private static string Node(params string?[] fields)
+        => CanonicalEncoding.Record(fields);
+
+    private static string Node(IEnumerable<string?> fields)
+        => CanonicalEncoding.Record(fields);
+
     private sealed class CanonicalWriter
     {
-        private readonly StringBuilder _builder = new();
+        private readonly System.Text.StringBuilder _builder = new();
 
         public void Write(params string[] fields)
         {
-            _builder.Append(string.Join('\u001f', fields.Select(Escape)));
+            _builder.Append(CanonicalEncoding.Record(fields));
             _builder.Append('\n');
         }
 
         public override string ToString() => _builder.ToString();
-
-        private static string Escape(string value)
-            => value
-                .Replace("\\", "\\\\", StringComparison.Ordinal)
-                .Replace("\u001f", "\\u001f", StringComparison.Ordinal)
-                .Replace("\r", "\\r", StringComparison.Ordinal)
-                .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 }

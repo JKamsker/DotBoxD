@@ -5,12 +5,15 @@ using System.Net;
 using System.Text;
 using SafeIR;
 
+public delegate ValueTask<IReadOnlyList<IPAddress>> SafeDnsResolver(string host, CancellationToken cancellationToken);
+
 public static class SafeHttpClient
 {
     public static async ValueTask<string> GetTextAsync(
         SandboxContext context,
         SandboxUri uri,
-        HttpMessageInvoker invoker,
+        HttpMessageInvoker? invoker,
+        SafeDnsResolver? dnsResolver,
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
@@ -19,8 +22,23 @@ public static class SafeHttpClient
             var request = ResolveRequest(context, uri);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(request.Timeout);
+            var addresses = await ResolveVettedAddressesAsync(
+                    request.Grant,
+                    request.Uri.Host,
+                    dnsResolver ?? ResolveDnsAsync,
+                    timeout.Token)
+                .ConfigureAwait(false);
             using var message = new HttpRequestMessage(HttpMethod.Get, request.Uri);
-            using var response = await invoker.SendAsync(message, timeout.Token).ConfigureAwait(false);
+            using var response = await SafePinnedHttpTransport.SendAsync(invoker, message, addresses, timeout.Token)
+                .ConfigureAwait(false);
+            if (response.RequestMessage?.RequestUri is { } finalUri && !SameUri(finalUri, request.Uri)) {
+                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+            }
+
+            if (IsRedirect(response.StatusCode)) {
+                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+            }
+
             response.EnsureSuccessStatusCode();
             var text = await ReadLimitedTextAsync(context, response, request.MaxResponseBytes, timeout.Token).ConfigureAwait(false);
             Audit(context, startedAt, true, resource, Encoding.UTF8.GetByteCount(text), null);
@@ -61,11 +79,11 @@ public static class SafeHttpClient
 
         RequireAllowedScheme(grant, uri);
         RequireAllowedHost(grant, uri);
-        RequireIpPolicy(grant, uri.Host);
         return new SafeHttpRequest(
+            grant,
             uri,
             ReadLong(grant, "maxResponseBytes", context.Budget.Limits.MaxNetworkBytesRead),
-            TimeSpan.FromMilliseconds(ReadLong(grant, "timeoutMs", 2_000)));
+            ReadTimeout(grant));
     }
 
     private static async ValueTask<string> ReadLimitedTextAsync(
@@ -113,40 +131,65 @@ public static class SafeHttpClient
     private static void RequireAllowedHost(CapabilityGrant grant, Uri uri)
     {
         var allowed = ReadSet(grant, "allowedHosts", []);
-        if (allowed.Count == 0 || !allowed.Contains(uri.Host)) {
+        if (allowed.Count == 0 || !allowed.Any(host => MatchesAllowedAuthority(host, uri))) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: host is not allowed");
         }
     }
 
-    private static void RequireIpPolicy(CapabilityGrant grant, string host)
+    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveVettedAddressesAsync(
+        CapabilityGrant grant,
+        string host,
+        SafeDnsResolver dnsResolver,
+        CancellationToken cancellationToken)
     {
-        if (!IPAddress.TryParse(host, out var address)) {
-            return;
+        if (IPAddress.TryParse(host, out var address)) {
+            RequireIpLiteralAllowed(grant, address);
+            return [address];
         }
 
+        var allowPrivateNetwork = ReadBool(grant, "allowPrivateNetwork");
+        var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
+        if (addresses.Count == 0 ||
+            !allowPrivateNetwork && addresses.Any(SafeIpAddressClassifier.IsNonGlobal)) {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
+        }
+
+        return addresses;
+    }
+
+    private static void RequireIpLiteralAllowed(CapabilityGrant grant, IPAddress address)
+    {
         if (!ReadBool(grant, "allowIpLiterals")) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: IP literals are not allowed");
         }
 
-        if (!ReadBool(grant, "allowPrivateNetwork") && IsPrivateOrLoopback(address)) {
+        if (!ReadBool(grant, "allowPrivateNetwork") && SafeIpAddressClassifier.IsNonGlobal(address)) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
         }
     }
 
-    private static bool IsPrivateOrLoopback(IPAddress address)
+    private static bool IsRedirect(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.MultipleChoices or
+            HttpStatusCode.Moved or
+            HttpStatusCode.Redirect or
+            HttpStatusCode.SeeOther or
+            HttpStatusCode.TemporaryRedirect or
+            HttpStatusCode.PermanentRedirect;
+
+    private static TimeSpan ReadTimeout(CapabilityGrant grant)
     {
-        if (IPAddress.IsLoopback(address)) {
-            return true;
+        var milliseconds = ReadLong(grant, "timeoutMs", 2_000);
+        if (milliseconds <= 0 || milliseconds > 60_000) {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: timeout is outside the allowed range");
         }
 
-        var bytes = address.GetAddressBytes();
-        return bytes.Length == 4 && (
-            bytes[0] == 10 ||
-            bytes[0] == 127 ||
-            bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
-            bytes[0] == 192 && bytes[1] == 168 ||
-            bytes[0] == 169 && bytes[1] == 254);
+        return TimeSpan.FromMilliseconds(milliseconds);
     }
+
+    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveDnsAsync(
+        string host,
+        CancellationToken cancellationToken)
+        => await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
 
     private static HashSet<string> ReadSet(CapabilityGrant grant, string key, string[] fallback)
     {
@@ -156,15 +199,30 @@ public static class SafeHttpClient
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)
-        => grant.Parameters.TryGetValue(key, out var value) &&
-           bool.TryParse(value, out var parsed) &&
-           parsed;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return false;
+        }
+
+        if (!bool.TryParse(value, out var parsed)) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"net.http.get denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-        => grant.Parameters.TryGetValue(key, out var value) &&
-           long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"net.http.get denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static void Audit(
         SandboxContext context,
@@ -187,10 +245,28 @@ public static class SafeHttpClient
 
     private static string SanitizeForAudit(string value)
         => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            ? $"{uri.Scheme}://{uri.Host}{uri.AbsolutePath}"
+            ? $"{uri.Scheme}://{NormalizedAuthority(uri)}{uri.AbsolutePath}"
             : "invalid-uri";
+
+    private static bool MatchesAllowedAuthority(string allowed, Uri uri)
+    {
+        var authority = NormalizedAuthority(uri);
+        if (StringComparer.OrdinalIgnoreCase.Equals(allowed, authority)) {
+            return true;
+        }
+
+        return uri.IsDefaultPort && StringComparer.OrdinalIgnoreCase.Equals(allowed, uri.Host);
+    }
+
+    private static string NormalizedAuthority(Uri uri)
+        => uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+
+    private static bool SameUri(Uri left, Uri right)
+        => StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
+           StringComparer.OrdinalIgnoreCase.Equals(NormalizedAuthority(left), NormalizedAuthority(right)) &&
+           StringComparer.Ordinal.Equals(left.PathAndQuery, right.PathAndQuery);
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
-    private sealed record SafeHttpRequest(Uri Uri, long MaxResponseBytes, TimeSpan Timeout);
+    private sealed record SafeHttpRequest(CapabilityGrant Grant, Uri Uri, long MaxResponseBytes, TimeSpan Timeout);
 }

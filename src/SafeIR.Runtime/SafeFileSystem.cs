@@ -1,5 +1,7 @@
 namespace SafeIR.Runtime;
 
+using System.Globalization;
+using System.Text;
 using SafeIR;
 
 public static class SafeFileSystem
@@ -22,11 +24,11 @@ public static class SafeFileSystem
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
             }
 
-            context.Budget.ChargeFileRead(info.Length);
-            context.ChargeFuel(50 + info.Length);
-            var text = await File.ReadAllTextAsync(info.FullName, cancellationToken).ConfigureAwait(false);
+            var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, cancellationToken).ConfigureAwait(false);
+            context.ChargeFuel(50 + bytes.Length);
+            var text = Encoding.UTF8.GetString(bytes);
             context.ChargeString(text);
-            AuditRead(context, startedAt, true, resolved.SanitizedPath, info.Length, null);
+            AuditRead(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
             return text;
         }
         catch (SandboxRuntimeException ex) {
@@ -62,8 +64,10 @@ public static class SafeFileSystem
                 Directory.CreateDirectory(directory);
             }
 
+            EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             var tempPath = resolved.FullPath + ".tmp-" + Guid.NewGuid().ToString("N");
             await File.WriteAllBytesAsync(tempPath, bytes, cancellationToken).ConfigureAwait(false);
+            EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             File.Move(tempPath, resolved.FullPath, overwrite: true);
             context.ChargeFuel(50 + bytes.Length);
             AuditWrite(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
@@ -101,7 +105,7 @@ public static class SafeFileSystem
 
         EnsureNoReparsePoint(rootFull, fullPath);
         EnsureExtensionAllowed(grant, fullPath);
-        return new ResolvedPath(grant, fullPath, $"sandbox://{capabilityId}/" + relative.Replace('\\', '/'));
+        return new ResolvedPath(grant, rootFull, fullPath, $"sandbox://{capabilityId}/" + relative.Replace('\\', '/'));
     }
 
     private static string NormalizeRelative(string path)
@@ -115,6 +119,37 @@ public static class SafeFileSystem
         }
 
         return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+    }
+
+    private static async ValueTask<byte[]> ReadLimitedBytesAsync(
+        SandboxContext context,
+        ResolvedPath resolved,
+        long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            resolved.FullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            useAsync: true);
+        EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
+        using var memory = new MemoryStream();
+        var buffer = new byte[4096];
+        while (true) {
+            var read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (read == 0) {
+                return memory.ToArray();
+            }
+
+            if (memory.Length + read > maxBytes) {
+                throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
+            }
+
+            context.Budget.ChargeFileRead(read);
+            memory.Write(buffer, 0, read);
+        }
     }
 
     private static void EnsureWriteAllowed(ResolvedPath resolved, long byteCount)
@@ -136,14 +171,22 @@ public static class SafeFileSystem
 
     private static void EnsureNoReparsePoint(string rootFull, string fullPath)
     {
-        CheckAttributes(rootFull);
-        var parent = Path.GetDirectoryName(fullPath);
-        if (parent is not null && Directory.Exists(parent)) {
-            CheckAttributes(parent);
+        var root = rootFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        CheckAttributes(root);
+
+        var relative = Path.GetRelativePath(root, fullPath);
+        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathFullyQualified(relative)) {
+            throw Error(SandboxErrorCode.PermissionDenied, "file access denied: path is outside the granted sandbox root");
         }
 
-        if (File.Exists(fullPath)) {
-            CheckAttributes(fullPath);
+        var current = root;
+        foreach (var part in relative.Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            StringSplitOptions.RemoveEmptyEntries)) {
+            current = Path.Combine(current, part);
+            if (Directory.Exists(current) || File.Exists(current)) {
+                CheckAttributes(current);
+            }
         }
     }
 
@@ -151,7 +194,7 @@ public static class SafeFileSystem
     {
         var attributes = File.GetAttributes(path);
         if ((attributes & FileAttributes.ReparsePoint) != 0) {
-            throw Error(SandboxErrorCode.PermissionDenied, "file.readText denied: reparse points are not allowed");
+            throw Error(SandboxErrorCode.PermissionDenied, "file access denied: reparse points are not allowed");
         }
     }
 
@@ -215,14 +258,34 @@ public static class SafeFileSystem
         => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
     private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-        => grant.Parameters.TryGetValue(key, out var value) && long.TryParse(value, out var parsed) ? parsed : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static bool ReadBool(CapabilityGrant grant, string key, bool fallback)
-        => grant.Parameters.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!bool.TryParse(value, out var parsed)) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static string Sanitize(string value) => value.Replace('\\', '/');
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
-    private sealed record ResolvedPath(CapabilityGrant Grant, string FullPath, string SanitizedPath);
+    private sealed record ResolvedPath(CapabilityGrant Grant, string RootFull, string FullPath, string SanitizedPath);
 }

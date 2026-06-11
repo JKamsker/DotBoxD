@@ -12,18 +12,21 @@ internal sealed class MethodEmitter
     private readonly SandboxFunction _function;
     private readonly IReadOnlyDictionary<string, MethodInfo> _functions;
     private readonly IBindingCatalog _bindings;
+    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly Dictionary<string, LocalBuilder> _locals = new(StringComparer.Ordinal);
 
     public MethodEmitter(
         ILGenerator il,
         SandboxFunction function,
         IReadOnlyDictionary<string, MethodInfo> functions,
-        IBindingCatalog bindings)
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
     {
         _il = il;
         _function = function;
         _functions = functions;
         _bindings = bindings;
+        _functionAnalysis = functionAnalysis;
     }
 
     public void Emit()
@@ -61,6 +64,10 @@ internal sealed class MethodEmitter
                 EmitExpression(ret.Value);
                 EmitReturnValue();
                 break;
+            case ExpressionStatement expression:
+                EmitExpression(expression.Value);
+                _il.Emit(OpCodes.Pop);
+                break;
             case IfStatement branch:
                 EmitIf(branch);
                 break;
@@ -71,8 +78,7 @@ internal sealed class MethodEmitter
                 EmitWhile(loop);
                 break;
             default:
-                EmitUnsupported("statement not supported");
-                break;
+                throw Unsupported("statement not supported");
         }
     }
 
@@ -136,6 +142,7 @@ internal sealed class MethodEmitter
 
     private void EmitExpression(Expression expression)
     {
+        EmitFuel(1);
         switch (expression) {
             case LiteralExpression literal:
                 EmitLiteral(literal.Value);
@@ -153,8 +160,7 @@ internal sealed class MethodEmitter
                 EmitCall(call);
                 break;
             default:
-                EmitUnsupported("expression not supported");
-                break;
+                throw Unsupported("expression not supported");
         }
     }
 
@@ -179,8 +185,7 @@ internal sealed class MethodEmitter
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringConst)));
                 break;
             default:
-                EmitUnsupported("literal not supported by compiler");
-                break;
+                throw Unsupported("literal not supported by compiler");
         }
     }
 
@@ -197,6 +202,11 @@ internal sealed class MethodEmitter
 
     private void EmitBinary(BinaryExpression binary)
     {
+        if (binary.Operator is "&&" or "||") {
+            ShortCircuitBooleanEmitter.Emit(binary, _il, _bindings, _functionAnalysis, EmitExpression);
+            return;
+        }
+
         EmitExpression(binary.Left);
         EmitExpression(binary.Right);
         var method = binary.Operator switch {
@@ -211,8 +221,6 @@ internal sealed class MethodEmitter
             "<=" => nameof(CompiledRuntime.LteI32),
             ">" => nameof(CompiledRuntime.GtI32),
             ">=" => nameof(CompiledRuntime.GteI32),
-            "&&" => nameof(CompiledRuntime.And),
-            "||" => nameof(CompiledRuntime.Or),
             _ => throw Unsupported("operator not supported by compiler")
         };
         _il.Emit(OpCodes.Call, Runtime(method));
@@ -220,15 +228,17 @@ internal sealed class MethodEmitter
 
     private void EmitCall(CallExpression call)
     {
+        if (PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
+            return;
+        }
+
         if (_functions.TryGetValue(call.Name, out var method)) {
             EmitFunctionCall(call, method);
             return;
         }
 
-        if (!PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
-            if (!BindingCallEmitter.TryEmit(call, _bindings, _il, EmitExpression)) {
-                EmitUnsupported($"call '{call.Name}' is not supported by compiler");
-            }
+        if (!BindingCallEmitter.TryEmit(call, _bindings, _il, EmitExpression)) {
+            throw Unsupported($"call '{call.Name}' is not supported by compiler");
         }
     }
 
@@ -278,10 +288,10 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, value);
         EmitExitCall();
         _il.Emit(OpCodes.Ldloc, value);
+        EmitSandboxType(_il, _function.ReturnType);
+        _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.RequireValueType)));
         _il.Emit(OpCodes.Ret);
     }
-
-    private void EmitUnsupported(string message) => throw Unsupported(message);
 
     private static Exception Unsupported(string message)
         => new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, message));

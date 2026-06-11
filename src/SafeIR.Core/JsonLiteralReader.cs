@@ -8,25 +8,25 @@ internal static class JsonLiteralReader
     public static bool TryRead(JsonElement element, out SandboxValue value, out string literalName)
     {
         if (element.TryGetProperty("i32", out var i32)) {
-            value = SandboxValue.FromInt32(i32.GetInt32());
+            value = SandboxValue.FromInt32(ReadInt32Value(i32, "i32"));
             literalName = "i32";
             return true;
         }
 
         if (element.TryGetProperty("i64", out var i64)) {
-            value = SandboxValue.FromInt64(i64.GetInt64());
+            value = SandboxValue.FromInt64(ReadInt64Value(i64, "i64"));
             literalName = "i64";
             return true;
         }
 
         if (element.TryGetProperty("f64", out var f64)) {
-            value = SandboxValue.FromDouble(f64.GetDouble());
+            value = SandboxValue.FromDouble(ReadDoubleValue(f64, "f64"));
             literalName = "f64";
             return true;
         }
 
         if (element.TryGetProperty("bool", out var boolean)) {
-            value = SandboxValue.FromBool(boolean.GetBoolean());
+            value = SandboxValue.FromBool(ReadBoolValue(boolean, "bool"));
             literalName = "bool";
             return true;
         }
@@ -38,7 +38,7 @@ internal static class JsonLiteralReader
         }
 
         if (element.TryGetProperty("path", out var path)) {
-            value = SandboxValue.FromPath(ReadStringValue(path, "path"));
+            value = SandboxValue.FromPath(ReadPathValue(path, "path"));
             literalName = "path";
             return true;
         }

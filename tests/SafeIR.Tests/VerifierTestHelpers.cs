@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using SafeIR.Runtime;
 using SafeIR.Verifier;
 
 namespace SafeIR.Tests;
@@ -57,6 +58,9 @@ internal static class VerifierTestHelpers
             typeof(SandboxValue),
             [typeof(SandboxContext), typeof(SandboxValue)]);
         var il = method.GetILGenerator();
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ret);
         return method;

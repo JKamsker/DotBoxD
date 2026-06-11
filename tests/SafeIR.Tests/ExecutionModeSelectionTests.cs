@@ -29,7 +29,7 @@ public sealed class ExecutionModeSelectionTests
     }
 
     [Fact]
-    public async Task Auto_mode_uses_interpreter_without_hotness_selector()
+    public async Task Auto_mode_uses_interpreter_below_hotness_threshold()
     {
         var compiler = new FailingCompiler();
         var host = HostWithCompiler(compiler);
@@ -46,6 +46,26 @@ public sealed class ExecutionModeSelectionTests
         Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
         Assert.Null(result.ArtifactHash);
         Assert.Equal(0, compiler.Calls);
+    }
+
+    [Fact]
+    public async Task Auto_mode_promotes_to_compiled_after_hotness_threshold()
+    {
+        var compiler = new DelegateCompiler();
+        var host = HostWithCompiler(compiler);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 2 };
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
+
+        var first = await host.ExecuteAsync(plan, "main", input, options);
+        var second = await host.ExecuteAsync(plan, "main", input, options);
+
+        Assert.True(first.Succeeded, first.Error?.SafeMessage);
+        Assert.True(second.Succeeded, second.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, first.ActualMode);
+        Assert.Equal(ExecutionMode.Compiled, second.ActualMode);
+        Assert.Equal(1, compiler.Calls);
     }
 
     [Fact]

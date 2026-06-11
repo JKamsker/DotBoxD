@@ -8,13 +8,14 @@ internal static class SandboxTestHost
     public static SandboxHost Create(
         bool compiler = false,
         string? compilerCache = null,
-        HttpMessageInvoker? networkInvoker = null)
+        HttpMessageInvoker? networkInvoker = null,
+        SafeDnsResolver? dnsResolver = null)
         => SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
             builder.AddFileBindings();
             builder.AddTimeBindings();
             builder.AddRandomBindings();
-            builder.AddNetworkBindings(networkInvoker);
+            builder.AddNetworkBindings(networkInvoker, dnsResolver ?? (networkInvoker is null ? null : PublicDns));
             builder.AddLogBindings();
             builder.UseInterpreter();
             if (compilerCache is not null) {
@@ -25,6 +26,12 @@ internal static class SandboxTestHost
                 builder.UseCompilerIfAvailable();
             }
         });
+
+    private static ValueTask<IReadOnlyList<System.Net.IPAddress>> PublicDns(
+        string host,
+        CancellationToken cancellationToken)
+        => ValueTask.FromResult<IReadOnlyList<System.Net.IPAddress>>(
+            new[] { System.Net.IPAddress.Parse("93.184.216.34") });
 
     public static string PureScoreJson(string id = "loot-score")
         => $$"""

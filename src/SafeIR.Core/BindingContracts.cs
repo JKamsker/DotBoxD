@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-
 namespace SafeIR;
 
 public delegate ValueTask<SandboxValue> BindingInvoker(
@@ -63,7 +60,7 @@ public sealed record BindingDescriptor(
     CompiledBinding Compiled)
 {
     public BindingSignature Signature => new(
-        Id, Version, Parameters, ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled);
+        Id, Version, Parameters.ToArray(), ReturnType, Effects, RequiredCapability, CostModel, AuditLevel, Safety, Compiled);
 }
 
 public interface IBindingCatalog
@@ -79,7 +76,7 @@ public sealed class BindingRegistry : IBindingCatalog
 
     public BindingRegistry(IEnumerable<BindingDescriptor> bindings)
     {
-        _bindings = bindings.ToDictionary(b => b.Id, StringComparer.Ordinal);
+        _bindings = bindings.Select(Freeze).ToDictionary(b => b.Id, StringComparer.Ordinal);
         ManifestHash = ComputeManifestHash(Signatures);
     }
 
@@ -102,17 +99,44 @@ public sealed class BindingRegistry : IBindingCatalog
 
     private static string ComputeManifestHash(IEnumerable<BindingSignature> signatures)
     {
-        var builder = new StringBuilder("bindings-v1");
-        foreach (var binding in signatures.OrderBy(b => b.Id, StringComparer.Ordinal)) {
-            builder.Append('|').Append(binding.Id).Append('@').Append(binding.Version);
-            builder.Append('|').Append(string.Join(",", binding.Parameters.Select(p => p.ToString())));
-            builder.Append("->").Append(binding.ReturnType);
-            builder.Append('|').Append((int)binding.Effects).Append('|').Append(binding.RequiredCapability);
-            builder.Append('|').Append(binding.CostModel).Append('|').Append(binding.AuditLevel).Append('|').Append(binding.Safety);
-            builder.Append('|').Append(binding.Compiled.Kind).Append(':').Append(binding.Compiled.Type).Append('.').Append(binding.Compiled.Method);
-        }
+        var records = new List<string> {
+            CanonicalEncoding.Record("bindings-v2")
+        };
+        records.AddRange(signatures.Select(BindingRecord).Order(StringComparer.Ordinal));
+        return CanonicalEncoding.HashRecords(records);
+    }
 
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
+    private static BindingDescriptor Freeze(BindingDescriptor binding)
+        => binding with { Parameters = binding.Parameters.ToArray() };
+
+    private static string BindingRecord(BindingSignature binding)
+    {
+        var fields = new List<string?> {
+            "binding",
+            binding.Id,
+            binding.Version.ToString(),
+            Type(binding.ReturnType),
+            ((long)binding.Effects).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            binding.RequiredCapability,
+            binding.CostModel.BaseFuel.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            binding.CostModel.PerByteFuel.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            binding.CostModel.AllocationFromReturnBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            binding.CostModel.MaxCallsPerRun?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            binding.AuditLevel.ToString(),
+            binding.Safety.ToString(),
+            binding.Compiled.Kind,
+            binding.Compiled.Type,
+            binding.Compiled.Method
+        };
+        fields.AddRange(binding.Parameters.Select(Type));
+        return CanonicalEncoding.Record(fields);
+    }
+
+    private static string Type(SandboxType type)
+    {
+        var fields = new List<string?> { "type", type.Name };
+        fields.AddRange(type.Arguments.Select(Type));
+        return CanonicalEncoding.Record(fields);
     }
 }
 

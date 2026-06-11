@@ -10,17 +10,20 @@ public static class CompiledRuntime
 
     public static void ExitCall(SandboxContext context) => context.ExitCall();
 
-    public static SandboxValue GetInputArgument(SandboxValue input, int index)
+    public static void ValidateEntrypointInput(SandboxValue input, int parameterCount)
+        => EntrypointBinder.ValidateInputShape(input, parameterCount);
+
+    public static SandboxValue GetInputArgument(
+        SandboxValue input,
+        int index,
+        int parameterCount,
+        SandboxType expectedType)
+        => EntrypointBinder.GetArgument(input, index, parameterCount, expectedType);
+
+    public static SandboxValue RequireValueType(SandboxValue value, SandboxType expectedType)
     {
-        if (index == 0 && input is not ListValue) {
-            return input;
-        }
-
-        if (input is ListValue list && index >= 0 && index < list.Values.Count) {
-            return list.Values[index];
-        }
-
-        throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "entrypoint input argument mismatch"));
+        EntrypointBinder.RequireType(value, expectedType, "function return type mismatch");
+        return value;
     }
 
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
@@ -49,17 +52,22 @@ public static class CompiledRuntime
 
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
-    public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) + AsI32(right));
+    public static SandboxValue AddI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
 
-    public static SandboxValue SubI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) - AsI32(right));
+    public static SandboxValue SubI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
 
-    public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) * AsI32(right));
+    public static SandboxValue MulI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
 
-    public static SandboxValue DivI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) / AsI32(right));
+    public static SandboxValue DivI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Divide(AsI32(left), AsI32(right)));
 
-    public static SandboxValue RemI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) % AsI32(right));
+    public static SandboxValue RemI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Remainder(AsI32(left), AsI32(right)));
 
-    public static SandboxValue NegI32(SandboxValue value) => I32(-AsI32(value));
+    public static SandboxValue NegI32(SandboxValue value) => I32(SandboxInt32Math.Negate(AsI32(value)));
 
     public static SandboxValue NotBool(SandboxValue value) => Bool(!AsBool(value));
 
@@ -224,11 +232,13 @@ public static class CompiledRuntime
     private static MapValue AsMap(SandboxValue value)
         => value as MapValue ?? throw InvalidInput("expected map value");
 
-    private static void RequireType(SandboxValue value, SandboxType expected, string message)
+    private static SandboxValue RequireType(SandboxValue value, SandboxType expected, string message)
     {
         if (value.Type != expected) {
             throw InvalidInput(message);
         }
+
+        return value;
     }
 
     private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)

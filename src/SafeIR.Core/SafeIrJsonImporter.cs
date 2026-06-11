@@ -141,7 +141,7 @@ public static class SafeIrJsonImporter
         return new IfStatement(
                 ReadExpression(Required(element, "condition")),
                 ReadStatements(RequiredArray(element, "then")),
-                element.TryGetProperty("else", out var otherwise) ? ReadStatements(otherwise) : [],
+                element.TryGetProperty("else", out var otherwise) ? ReadStatements(RequireArray(otherwise, "else")) : [],
                 JsonSpan);
     }
 

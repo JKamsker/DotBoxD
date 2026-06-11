@@ -1,0 +1,44 @@
+using System.Security.Cryptography;
+using System.Text;
+
+namespace SafeIR;
+
+internal static class CanonicalEncoding
+{
+    public static string Record(params string?[] fields)
+        => Record((IEnumerable<string?>)fields);
+
+    public static string Record(IEnumerable<string?> fields)
+    {
+        var builder = new StringBuilder();
+        foreach (var field in fields) {
+            AppendField(builder, field);
+        }
+
+        return builder.ToString();
+    }
+
+    public static string HashRecords(IEnumerable<string> records)
+    {
+        var text = string.Join('\n', records);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+    }
+
+    private static void AppendField(StringBuilder builder, string? value)
+    {
+        if (value is null) {
+            builder.Append('n').Append(';');
+            return;
+        }
+
+        var escaped = Escape(value);
+        builder.Append('s').Append(escaped.Length).Append(':').Append(escaped).Append(';');
+    }
+
+    private static string Escape(string value)
+        => value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\u001f", "\\u001f", StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
+}

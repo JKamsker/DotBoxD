@@ -6,6 +6,7 @@ internal sealed class InterpreterEvaluator
 {
     private readonly SandboxContext _context;
     private readonly Dictionary<string, SandboxFunction> _functions;
+    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
 
     public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
@@ -13,6 +14,7 @@ internal sealed class InterpreterEvaluator
         _context = context;
         _options = options;
         _functions = plan.Module.Functions.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        _functionAnalysis = plan.FunctionAnalysis;
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -22,7 +24,7 @@ internal sealed class InterpreterEvaluator
         }
 
         _context.ChargeValue(input);
-        return InvokeFunctionAsync(function, BuildArguments(function, input));
+        return InvokeFunctionAsync(function, EntrypointBinder.BindArguments(function, input));
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
@@ -36,6 +38,7 @@ internal sealed class InterpreterEvaluator
             foreach (var statement in function.Body) {
                 var result = await ExecuteStatementAsync(statement, frame).ConfigureAwait(false);
                 if (result is not null) {
+                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
                     return result;
                 }
             }
@@ -119,22 +122,5 @@ internal sealed class InterpreterEvaluator
     }
 
     private ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => new ExpressionEvaluator(_context, this, _options).EvaluateAsync(expression, frame);
-
-    private static IReadOnlyList<SandboxValue> BuildArguments(SandboxFunction function, SandboxValue input)
-    {
-        if (function.Parameters.Count == 0) {
-            return [];
-        }
-
-        if (function.Parameters.Count == 1) {
-            return [input];
-        }
-
-        if (input is ListValue list && list.Values.Count == function.Parameters.Count) {
-            return list.Values;
-        }
-
-        throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "entrypoint input argument mismatch"));
-    }
+        => new ExpressionEvaluator(_context, this, _functionAnalysis, _options).EvaluateAsync(expression, frame);
 }

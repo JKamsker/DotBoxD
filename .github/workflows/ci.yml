@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-test-pack:
+    name: Build, Test, Pack
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore SafeIR.slnx
+
+      - name: Build
+        run: dotnet build SafeIR.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test SafeIR.slnx --configuration Release --no-build
+
+      - name: Check C# file lengths
+        shell: pwsh
+        run: ./scripts/check-csharp-file-lines.ps1
+
+      - name: Pack
+        run: dotnet pack SafeIR.slnx --configuration Release --no-build --output artifacts/packages
