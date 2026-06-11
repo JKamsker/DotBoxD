@@ -252,6 +252,7 @@ public static class SafeIrJsonImporter
         }
 
         RequireObject(metadata, "metadata");
+        RequireUniqueProperties(metadata, "metadata");
         return metadata.EnumerateObject()
             .ToDictionary(p => p.Name, p => ReadStringValue(p.Value, $"metadata.{p.Name}"), StringComparer.Ordinal);
     }

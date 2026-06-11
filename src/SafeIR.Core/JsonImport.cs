@@ -49,10 +49,21 @@ internal static class JsonImport
 
     public static void RequireAllowedProperties(JsonElement value, string name, params string[] allowed)
     {
-        RequireObject(value, name);
+        RequireUniqueProperties(value, name);
         foreach (var property in value.EnumerateObject()) {
             if (!allowed.Contains(property.Name, StringComparer.Ordinal)) {
                 throw Error("E-JSON-SCHEMA", $"{name} contains unsupported property '{property.Name}'");
+            }
+        }
+    }
+
+    public static void RequireUniqueProperties(JsonElement value, string name)
+    {
+        RequireObject(value, name);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject()) {
+            if (!seen.Add(property.Name)) {
+                throw Error("E-JSON-SCHEMA", $"{name} contains duplicate property '{property.Name}'");
             }
         }
     }

@@ -10,6 +10,7 @@ The JSON IR must be:
 - typed: every value has a known sandbox type
 - effect-aware: every side-effecting operation is visible
 - deterministic to canonicalize/hash
+- unambiguous: duplicate object properties are rejected
 - easy to deserialize with normal JSON tooling
 - easy to interpret
 - easy to lower to a safe compiled runtime form
