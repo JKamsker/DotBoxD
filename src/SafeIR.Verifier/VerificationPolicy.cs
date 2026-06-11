@@ -13,6 +13,7 @@ public sealed record VerificationPolicy(
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.String",
+            "System.Double",
             "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.Runtime.CompiledRuntime"
         },
         new HashSet<string>(StringComparer.Ordinal) {
@@ -21,6 +22,7 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.ExitCall",
             "SafeIR.Runtime.CompiledRuntime.GetInputArgument",
             "SafeIR.Runtime.CompiledRuntime.I32",
+            "SafeIR.Runtime.CompiledRuntime.F64",
             "SafeIR.Runtime.CompiledRuntime.Bool",
             "SafeIR.Runtime.CompiledRuntime.StringConst",
             "SafeIR.Runtime.CompiledRuntime.AsI32",
@@ -41,7 +43,15 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.And",
             "SafeIR.Runtime.CompiledRuntime.Or",
             "SafeIR.Runtime.CompiledRuntime.StringLength",
-            "SafeIR.Runtime.CompiledRuntime.ConcatString"
+            "SafeIR.Runtime.CompiledRuntime.ConcatString",
+            "SafeIR.Runtime.CompiledRuntime.AbsI32",
+            "SafeIR.Runtime.CompiledRuntime.MinI32",
+            "SafeIR.Runtime.CompiledRuntime.MaxI32",
+            "SafeIR.Runtime.CompiledRuntime.ClampI32",
+            "SafeIR.Runtime.CompiledRuntime.SqrtF64",
+            "SafeIR.Runtime.CompiledRuntime.FloorF64",
+            "SafeIR.Runtime.CompiledRuntime.CeilF64",
+            "SafeIR.Runtime.CompiledRuntime.RoundF64"
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",

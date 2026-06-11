@@ -166,6 +166,10 @@ internal sealed class MethodEmitter
                 EmitInt32(_il, boolean.Value ? 1 : 0);
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
                 break;
+            case F64Value f64:
+                _il.Emit(OpCodes.Ldc_R8, f64.Value);
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
+                break;
             case StringValue text:
                 _il.Emit(OpCodes.Ldarg_0);
                 _il.Emit(OpCodes.Ldstr, text.Value);
@@ -213,7 +217,9 @@ internal sealed class MethodEmitter
             return;
         }
 
-        EmitPureBindingCall(call);
+        if (!PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
+            EmitUnsupported($"call '{call.Name}' is not supported by compiler");
+        }
     }
 
     private void EmitFunctionCall(CallExpression call, MethodInfo method)
@@ -224,25 +230,6 @@ internal sealed class MethodEmitter
         }
 
         _il.Emit(OpCodes.Call, method);
-    }
-
-    private void EmitPureBindingCall(CallExpression call)
-    {
-        if (call.Name == "string.length") {
-            EmitExpression(call.Arguments[0]);
-            _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringLength)));
-            return;
-        }
-
-        if (call.Name == "string.concatBudgeted") {
-            _il.Emit(OpCodes.Ldarg_0);
-            EmitExpression(call.Arguments[0]);
-            EmitExpression(call.Arguments[1]);
-            _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ConcatString)));
-            return;
-        }
-
-        EmitUnsupported($"call '{call.Name}' is not supported by compiler");
     }
 
     private LocalBuilder Declare(string name)

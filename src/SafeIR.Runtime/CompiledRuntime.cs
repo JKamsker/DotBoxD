@@ -25,6 +25,8 @@ public static class CompiledRuntime
 
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
 
+    public static SandboxValue F64(double value) => SandboxValue.FromDouble(value);
+
     public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
     private static SandboxValue String(string value) => SandboxValue.FromString(value);
@@ -80,7 +82,38 @@ public static class CompiledRuntime
         return String(text);
     }
 
+    public static SandboxValue AbsI32(SandboxValue value)
+    {
+        var number = AsI32(value);
+        if (number == int.MinValue) {
+            throw InvalidInput("math.abs overflow");
+        }
+
+        return I32(Math.Abs(number));
+    }
+
+    public static SandboxValue MinI32(SandboxValue left, SandboxValue right) => I32(Math.Min(AsI32(left), AsI32(right)));
+
+    public static SandboxValue MaxI32(SandboxValue left, SandboxValue right) => I32(Math.Max(AsI32(left), AsI32(right)));
+
+    public static SandboxValue ClampI32(SandboxValue value, SandboxValue min, SandboxValue max)
+    {
+        var minimum = AsI32(min);
+        var maximum = AsI32(max);
+        if (minimum > maximum) {
+            throw InvalidInput("math.clamp range is invalid");
+        }
+
+        return I32(Math.Clamp(AsI32(value), minimum, maximum));
+    }
+
     public static SandboxValue SqrtF64(SandboxValue value) => SandboxValue.FromDouble(Math.Sqrt(AsF64(value)));
+
+    public static SandboxValue FloorF64(SandboxValue value) => F64(Math.Floor(AsF64(value)));
+
+    public static SandboxValue CeilF64(SandboxValue value) => F64(Math.Ceiling(AsF64(value)));
+
+    public static SandboxValue RoundF64(SandboxValue value) => F64(Math.Round(AsF64(value), MidpointRounding.ToEven));
 
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
     {
@@ -88,4 +121,7 @@ public static class CompiledRuntime
         context.ChargeBindingCall(descriptor);
         return descriptor.Interpreter(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
     }
+
+    private static SandboxRuntimeException InvalidInput(string message)
+        => new(new SandboxError(SandboxErrorCode.InvalidInput, message));
 }
