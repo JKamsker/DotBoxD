@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SafeIR;
 
-public delegate ValueTask<SandboxValue> InterpreterBinding(
+public delegate ValueTask<SandboxValue> BindingInvoker(
     SandboxContext context,
     IReadOnlyList<SandboxValue> args,
     CancellationToken cancellationToken);
@@ -56,7 +56,7 @@ public sealed record BindingDescriptor(
     BindingCostModel CostModel,
     AuditLevel AuditLevel,
     BindingSafety Safety,
-    InterpreterBinding Interpreter,
+    BindingInvoker Invoke,
     CompiledBinding Compiled)
 {
     public BindingSignature Signature => new(
