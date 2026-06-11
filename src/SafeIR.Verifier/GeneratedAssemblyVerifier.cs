@@ -54,6 +54,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
         VerifyAssemblyReferences(reader, policy, diagnostics);
         VerifyTypeReferences(reader, policy, diagnostics);
         VerifyCustomAttributes(reader, diagnostics);
+        MetadataTableVerifier.Verify(reader, diagnostics);
         VerifyDefinitions(peReader, reader, policy, diagnostics, cancellationToken);
         if (reader.ManifestResources.Count > 0) {
             diagnostics.Add(new VerificationDiagnostic("V-RESOURCE", "embedded resources are not allowed"));
