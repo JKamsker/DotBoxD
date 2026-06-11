@@ -53,6 +53,10 @@ public sealed class SandboxHost
         CancellationToken cancellationToken = default)
     {
         options ??= new SandboxExecutionOptions();
+        if (options.RequireDeterministic && !plan.Policy.Deterministic) {
+            return DeterminismRequiredResult(plan, options);
+        }
+
         if (ShouldUseCompiler(options)) {
             var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
             if (compiled is not null) {
@@ -87,4 +91,31 @@ public sealed class SandboxHost
     private static bool CanFallback(SandboxExecutionOptions options, SandboxRuntimeException ex)
         => options.Mode == ExecutionMode.Auto ||
            (options.AllowFallbackToInterpreter && ex.Error.Code is SandboxErrorCode.VerifierFailure or SandboxErrorCode.ValidationError);
+
+    private static SandboxExecutionResult DeterminismRequiredResult(ExecutionPlan plan, SandboxExecutionOptions options)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var error = new SandboxError(SandboxErrorCode.PolicyDenied, "deterministic execution is required");
+        var audit = new InMemoryAuditSink();
+        audit.Write(new SandboxAuditEvent(
+            runId,
+            "PolicyDenied",
+            DateTimeOffset.UtcNow,
+            false,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: error.Code,
+            Message: error.SafeMessage));
+
+        return new SandboxExecutionResult {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.Events,
+            ActualMode = options.Mode,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
+    }
 }
