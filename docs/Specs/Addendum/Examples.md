@@ -48,7 +48,7 @@ Simple filters request CPU-only execution. They do not mutate server state and d
 
 ### 2. Implement A Kernel
 
-Use kernels when the plugin needs both a server-side filter and an approved action path. The current sample kernel lives at `examples\SafeIR.PluginLocal\FireDamageKernel.cs`.
+Use kernels when the plugin needs both a server-side filter and an approved action path. The current sample kernel lives at `examples\LocalPlugin\SafeIR.PluginLocal\FireDamageKernel.cs`.
 
 ```csharp
 [GamePlugin("fire-damage")]
@@ -257,10 +257,10 @@ If the policy does not grant `game.message.write`, package preparation fails clo
 
 The flagship example is implemented in:
 
-- `examples\SafeIR.PluginLocal\FireDamageKernel.cs`
-- `examples\SafeIR.PluginIpc.Server.Abstractions\DamageEvent.cs`
+- `examples\LocalPlugin\SafeIR.PluginLocal\FireDamageKernel.cs`
+- `examples\PluginIpc\SafeIR.PluginIpc.Server.Abstractions\DamageEvent.cs`
 - `SafeIR.PluginAnalyzer` generated `FireDamagePluginPackage.g.cs`
-- `examples\SafeIR.PluginLocal\Program.cs`
+- `examples\LocalPlugin\SafeIR.PluginLocal\Program.cs`
 
 Mental model:
 
@@ -276,7 +276,7 @@ The server executes verified Safe IR, not arbitrary plugin DLLs.
 Run:
 
 ```powershell
-dotnet run --project examples\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj
+dotnet run --project examples\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj
 ```
 
 The example installs the `fire-damage` kernel, publishes events, updates `MinDamage` and `DamageType` at runtime, and shows that future hook executions observe the latest live settings.
@@ -303,13 +303,13 @@ The example projects also reference the matching serializer and named-pipe trans
 Run the server in one terminal:
 
 ```powershell
-dotnet run --project examples\SafeIR.PluginIpc.Server\SafeIR.PluginIpc.Server.csproj -- safe-ir-plugin-ipc
+dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Server\SafeIR.PluginIpc.Server.csproj -- safe-ir-plugin-ipc
 ```
 
 Run the client in another:
 
 ```powershell
-dotnet run --project examples\SafeIR.PluginIpc.Client\SafeIR.PluginIpc.Client.csproj -- safe-ir-plugin-ipc
+dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Client\SafeIR.PluginIpc.Client.csproj -- safe-ir-plugin-ipc
 ```
 
 The client reads settings, publishes a matching event, changes live settings over IPC, and publishes again to prove the server-side hook pipeline uses the updated state.

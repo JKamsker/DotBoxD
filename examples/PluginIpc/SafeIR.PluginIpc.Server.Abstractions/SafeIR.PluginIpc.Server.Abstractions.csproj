@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SafeIR.Core\SafeIR.Core.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\src\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

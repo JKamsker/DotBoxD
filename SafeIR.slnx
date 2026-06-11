@@ -11,11 +11,11 @@
         <Project Path="src/SafeIR.Verifier/SafeIR.Verifier.csproj" />
     </Folder>
     <Folder Name="/examples/">
-        <Project Path="examples/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
-        <Project Path="examples/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
-        <Project Path="examples/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
-        <Project Path="examples/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
-        <Project Path="examples/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
+        <Project Path="examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
