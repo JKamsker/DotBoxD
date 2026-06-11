@@ -16,6 +16,28 @@ public sealed class ResourceLimitValidationTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ResourceMeter(new ResourceLimits(MaxFuel: -1)));
     }
 
+    [Fact]
+    public void Resource_meter_fuel_overflow_fails_as_quota()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxFuel: long.MaxValue));
+        meter.ChargeFuel(long.MaxValue);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeFuel(1));
+
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
+
+    [Fact]
+    public void Resource_meter_byte_counter_overflow_fails_as_quota()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxFileBytesRead: long.MaxValue));
+        meter.ChargeFileRead(long.MaxValue);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeFileRead(1));
+
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
+
     public static TheoryData<Func<SandboxPolicyBuilder, SandboxPolicyBuilder>> NegativePolicyLimits()
         => new() {
             builder => builder.WithFuel(-1),

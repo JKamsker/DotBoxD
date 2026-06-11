@@ -2,27 +2,6 @@ using System.Diagnostics;
 
 namespace SafeIR;
 
-public sealed record ResourceLimits(
-    long MaxFuel = 100_000,
-    TimeSpan? MaxWallTime = null,
-    long MaxAllocatedBytes = 1_048_576,
-    int MaxCallDepth = 64,
-    int MaxHostCalls = 100,
-    int MaxListLength = 10_000,
-    int MaxMapEntries = 10_000,
-    int MaxCollectionDepth = 32,
-    long MaxTotalCollectionElements = 100_000,
-    long MaxFileBytesRead = 1_048_576,
-    long MaxFileBytesWritten = 0,
-    long MaxNetworkBytesRead = 1_048_576,
-    int MaxLogEvents = 100,
-    int MaxLogMessageLength = 4_096,
-    int MaxStringLength = 65_536,
-    long MaxTotalStringBytes = 1_048_576)
-{
-    public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100);
-}
-
 public sealed class ResourceMeter
 {
     private readonly Dictionary<string, int> _callsByBinding = new(StringComparer.Ordinal);
@@ -66,7 +45,7 @@ public sealed class ResourceMeter
             throw new ArgumentOutOfRangeException(nameof(amount));
         }
 
-        FuelUsed += amount;
+        FuelUsed = AddChecked(FuelUsed, amount, "fuel exhausted");
         if (FuelUsed > Limits.MaxFuel) {
             throw Quota("fuel exhausted");
         }
@@ -80,7 +59,7 @@ public sealed class ResourceMeter
     public void ChargeAllocation(long bytes)
     {
         ThrowIfNegative(bytes, nameof(bytes));
-        AllocatedBytes += bytes;
+        AllocatedBytes = AddChecked(AllocatedBytes, bytes, "allocation budget exhausted");
         if (AllocatedBytes > Limits.MaxAllocatedBytes) {
             throw Quota("allocation budget exhausted");
         }
@@ -101,7 +80,7 @@ public sealed class ResourceMeter
             throw Quota("collection depth budget exhausted");
         }
 
-        CollectionElements += shape.Elements;
+        CollectionElements = AddChecked(CollectionElements, shape.Elements, "collection element budget exhausted");
         if (CollectionElements > Limits.MaxTotalCollectionElements) {
             throw Quota("collection element budget exhausted");
         }
@@ -128,7 +107,7 @@ public sealed class ResourceMeter
             throw Quota("collection depth budget exhausted");
         }
 
-        CollectionElements += shape.Elements;
+        CollectionElements = AddChecked(CollectionElements, shape.Elements, "collection element budget exhausted");
         if (CollectionElements > Limits.MaxTotalCollectionElements) {
             throw Quota("collection element budget exhausted");
         }
@@ -144,12 +123,14 @@ public sealed class ResourceMeter
 
     public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null)
     {
-        HostCalls++;
+        HostCalls = AddChecked(HostCalls, 1, $"host call budget exhausted at {bindingId}");
         if (HostCalls > Limits.MaxHostCalls) {
             throw Quota($"host call budget exhausted at {bindingId}");
         }
 
-        var bindingCalls = _callsByBinding.TryGetValue(bindingId, out var existing) ? existing + 1 : 1;
+        var bindingCalls = _callsByBinding.TryGetValue(bindingId, out var existing)
+            ? AddChecked(existing, 1, $"binding call budget exhausted at {bindingId}")
+            : 1;
         _callsByBinding[bindingId] = bindingCalls;
         if (maxCallsPerRun is not null && bindingCalls > maxCallsPerRun.Value) {
             throw Quota($"binding call budget exhausted at {bindingId}");
@@ -159,7 +140,7 @@ public sealed class ResourceMeter
     public void ChargeFileRead(long bytes)
     {
         ThrowIfNegative(bytes, nameof(bytes));
-        FileBytesRead += bytes;
+        FileBytesRead = AddChecked(FileBytesRead, bytes, "file read byte budget exhausted");
         if (FileBytesRead > Limits.MaxFileBytesRead) {
             throw Quota("file read byte budget exhausted");
         }
@@ -168,7 +149,7 @@ public sealed class ResourceMeter
     public void ChargeFileWrite(long bytes)
     {
         ThrowIfNegative(bytes, nameof(bytes));
-        FileBytesWritten += bytes;
+        FileBytesWritten = AddChecked(FileBytesWritten, bytes, "file write byte budget exhausted");
         if (FileBytesWritten > Limits.MaxFileBytesWritten) {
             throw Quota("file write byte budget exhausted");
         }
@@ -177,7 +158,7 @@ public sealed class ResourceMeter
     public void ChargeNetworkRead(long bytes)
     {
         ThrowIfNegative(bytes, nameof(bytes));
-        NetworkBytesRead += bytes;
+        NetworkBytesRead = AddChecked(NetworkBytesRead, bytes, "network read byte budget exhausted");
         if (NetworkBytesRead > Limits.MaxNetworkBytesRead) {
             throw Quota("network read byte budget exhausted");
         }
@@ -189,7 +170,7 @@ public sealed class ResourceMeter
             throw Quota("log message length budget exhausted");
         }
 
-        LogEvents++;
+        LogEvents = AddChecked(LogEvents, 1, "log event budget exhausted");
         if (LogEvents > Limits.MaxLogEvents) {
             throw Quota("log event budget exhausted");
         }
@@ -222,9 +203,29 @@ public sealed class ResourceMeter
             ChargeAllocation(shape.StringBytes);
         }
 
-        StringBytes += shape.StringBytes;
+        StringBytes = AddChecked(StringBytes, shape.StringBytes, "string byte budget exhausted");
         if (StringBytes > Limits.MaxTotalStringBytes) {
             throw Quota("string byte budget exhausted");
+        }
+    }
+
+    private static long AddChecked(long current, long amount, string quotaMessage)
+    {
+        try {
+            return checked(current + amount);
+        }
+        catch (OverflowException) {
+            throw Quota(quotaMessage);
+        }
+    }
+
+    private static int AddChecked(int current, int amount, string quotaMessage)
+    {
+        try {
+            return checked(current + amount);
+        }
+        catch (OverflowException) {
+            throw Quota(quotaMessage);
         }
     }
 
@@ -277,15 +278,3 @@ public sealed class ResourceMeter
         }
     }
 }
-
-public sealed record SandboxResourceUsage(
-    long FuelUsed,
-    long MaxFuel,
-    long AllocatedBytes,
-    int HostCalls,
-    long FileBytesRead,
-    long FileBytesWritten,
-    long NetworkBytesRead,
-    int LogEvents,
-    long CollectionElements,
-    long StringBytes);
