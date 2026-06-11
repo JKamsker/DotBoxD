@@ -85,6 +85,12 @@ dotnet pack SafeIR.slnx --configuration Release --output artifacts/packages
 
 The addendum implementation lives in `src/SafeIR.Plugins`.
 
+Run the complete addendum example set:
+
+```powershell
+dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
+```
+
 Run the local live-kernel example:
 
 ```powershell

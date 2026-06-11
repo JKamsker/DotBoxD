@@ -273,6 +273,12 @@ The server executes verified Safe IR, not arbitrary plugin DLLs.
 
 ## Local Kernel Example
 
+Run the complete addendum example set:
+
+```powershell
+dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
+```
+
 Run:
 
 ```powershell
