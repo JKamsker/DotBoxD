@@ -21,6 +21,9 @@
         <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
         <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
     </Folder>
+    <Folder Name="/benchmarks/">
+        <Project Path="benchmarks/SafeIR.Benchmarks/SafeIR.Benchmarks.csproj" />
+    </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
     </Folder>

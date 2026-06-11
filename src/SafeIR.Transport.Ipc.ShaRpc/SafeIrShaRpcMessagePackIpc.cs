@@ -6,6 +6,12 @@ using ShaRPC.Transports.NamedPipes;
 
 public static class SafeIrShaRpcMessagePackIpc
 {
+    private static readonly MessagePackRpcSerializer Serializer = new();
+    private static readonly RpcPeerOptions DefaultClientOptions = new() {
+        RequestTimeout = TimeSpan.FromSeconds(10),
+        RejectInboundCalls = true
+    };
+
     public static RpcHost ListenNamedPipe(
         string pipeName,
         Action<RpcPeer> configurePeer,
@@ -13,7 +19,7 @@ public static class SafeIrShaRpcMessagePackIpc
     {
         ArgumentNullException.ThrowIfNull(configurePeer);
         return RpcHost
-            .Listen(new NamedPipeServerTransport(pipeName), new MessagePackRpcSerializer(), options)
+            .Listen(new NamedPipeServerTransport(pipeName), Serializer, options)
             .ForEachPeer(configurePeer);
     }
 
@@ -35,8 +41,8 @@ public static class SafeIrShaRpcMessagePackIpc
             var peer = RpcPeer
                 .Over(
                     transport.Connection!,
-                    new MessagePackRpcSerializer(),
-                    options ?? CreateClientOptions())
+                    Serializer,
+                    options ?? DefaultClientOptions)
                 .Start();
             return new SafeIrShaRpcClientPeer(transport, peer);
         }
@@ -46,9 +52,4 @@ public static class SafeIrShaRpcMessagePackIpc
         }
     }
 
-    private static RpcPeerOptions CreateClientOptions()
-        => new() {
-            RequestTimeout = TimeSpan.FromSeconds(10),
-            RejectInboundCalls = true
-        };
 }
