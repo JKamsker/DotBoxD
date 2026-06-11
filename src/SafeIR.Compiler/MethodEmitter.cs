@@ -11,16 +11,19 @@ internal sealed class MethodEmitter
     private readonly ILGenerator _il;
     private readonly SandboxFunction _function;
     private readonly IReadOnlyDictionary<string, MethodInfo> _functions;
+    private readonly IBindingCatalog _bindings;
     private readonly Dictionary<string, LocalBuilder> _locals = new(StringComparer.Ordinal);
 
     public MethodEmitter(
         ILGenerator il,
         SandboxFunction function,
-        IReadOnlyDictionary<string, MethodInfo> functions)
+        IReadOnlyDictionary<string, MethodInfo> functions,
+        IBindingCatalog bindings)
     {
         _il = il;
         _function = function;
         _functions = functions;
+        _bindings = bindings;
     }
 
     public void Emit()
@@ -223,7 +226,9 @@ internal sealed class MethodEmitter
         }
 
         if (!PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
-            EmitUnsupported($"call '{call.Name}' is not supported by compiler");
+            if (!BindingCallEmitter.TryEmit(call, _bindings, _il, EmitExpression)) {
+                EmitUnsupported($"call '{call.Name}' is not supported by compiler");
+            }
         }
     }
 

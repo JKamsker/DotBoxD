@@ -103,7 +103,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
 
         EmitExecute(execute.GetILGenerator(), function, functions[function.Id]);
         foreach (var item in plan.Module.Functions) {
-            new MethodEmitter(functions[item.Id].GetILGenerator(), item, methodReferences).Emit();
+            new MethodEmitter(functions[item.Id].GetILGenerator(), item, methodReferences, plan.Bindings).Emit();
         }
 
         type.CreateType();

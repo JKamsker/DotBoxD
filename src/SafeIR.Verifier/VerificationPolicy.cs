@@ -76,7 +76,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("MapContainsKey", $"{Value},{Value}", Value),
                 RuntimeMember("MapGet", $"{Value},{Value}", Value),
                 RuntimeMember("MapSet", $"{Context},{Value},{Value},{Value}", Value),
-                RuntimeMember("MapRemove", $"{Context},{Value},{Value}", Value)
+                RuntimeMember("MapRemove", $"{Context},{Value},{Value}", Value),
+                RuntimeMember("CallBinding", $"{Context},{String},{ValueArray}", Value)
             },
             new HashSet<string>(StringComparer.Ordinal) {
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",

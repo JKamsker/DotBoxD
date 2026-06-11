@@ -44,7 +44,7 @@ internal static class PureBindingCallEmitter
                 return true;
             case "list.of":
                 il.Emit(OpCodes.Ldarg_0);
-                EmitValueArray(call, il, emitExpression);
+                ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListOf)));
                 return true;
             case "list.count":
@@ -96,18 +96,6 @@ internal static class PureBindingCallEmitter
     {
         foreach (var argument in call.Arguments) {
             emitExpression(argument);
-        }
-    }
-
-    private static void EmitValueArray(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
-    {
-        EmitInt32(il, call.Arguments.Count);
-        il.Emit(OpCodes.Newarr, typeof(SandboxValue));
-        for (var i = 0; i < call.Arguments.Count; i++) {
-            il.Emit(OpCodes.Dup);
-            EmitInt32(il, i);
-            emitExpression(call.Arguments[i]);
-            il.Emit(OpCodes.Stelem_Ref);
         }
     }
 
