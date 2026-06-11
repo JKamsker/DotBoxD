@@ -62,6 +62,16 @@ public sealed class SandboxContext
 
     public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
 
+    public void ChargeBindingCall(BindingDescriptor descriptor)
+    {
+        if (descriptor.RequiredCapability is not null) {
+            RequireCapability(descriptor.RequiredCapability);
+        }
+
+        Budget.ChargeHostCall(descriptor.Id, descriptor.CostModel.MaxCallsPerRun);
+        ChargeFuel(descriptor.CostModel.BaseFuel);
+    }
+
     public DateTimeOffset UtcNow()
     {
         if (Policy.Deterministic) {

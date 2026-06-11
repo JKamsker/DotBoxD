@@ -23,6 +23,7 @@ public sealed record ResourceLimits(
 
 public sealed class ResourceMeter
 {
+    private readonly Dictionary<string, int> _callsByBinding = new(StringComparer.Ordinal);
     private readonly long _deadline;
     private int _chargesSinceDeadlineCheck;
 
@@ -100,11 +101,17 @@ public sealed class ResourceMeter
         }
     }
 
-    public void ChargeHostCall(string bindingId)
+    public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null)
     {
         HostCalls++;
         if (HostCalls > Limits.MaxHostCalls) {
             throw Quota($"host call budget exhausted at {bindingId}");
+        }
+
+        var bindingCalls = _callsByBinding.TryGetValue(bindingId, out var existing) ? existing + 1 : 1;
+        _callsByBinding[bindingId] = bindingCalls;
+        if (maxCallsPerRun is not null && bindingCalls > maxCallsPerRun.Value) {
+            throw Quota($"binding call budget exhausted at {bindingId}");
         }
     }
 

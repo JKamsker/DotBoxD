@@ -106,6 +106,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun);
     public SandboxPolicyBuilder GrantLogging();
     public SandboxPolicyBuilder WithFuel(long maxFuel);
+    public SandboxPolicyBuilder WithMaxHostCalls(int calls);
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime);
     public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes);
     public SandboxPolicyBuilder WithMaxListLength(int length);

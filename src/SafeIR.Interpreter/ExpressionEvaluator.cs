@@ -111,12 +111,7 @@ internal sealed class ExpressionEvaluator
     private async ValueTask<SandboxValue> CallBindingAsync(string id, IReadOnlyList<SandboxValue> args)
     {
         var descriptor = _context.Bindings.GetDescriptor(id);
-        if (descriptor.RequiredCapability is not null) {
-            _context.RequireCapability(descriptor.RequiredCapability);
-        }
-
-        _context.Budget.ChargeHostCall(id);
-        _context.ChargeFuel(descriptor.CostModel.BaseFuel);
+        _context.ChargeBindingCall(descriptor);
         try {
             return await descriptor.Interpreter(_context, args, _context.CancellationToken).ConfigureAwait(false);
         }

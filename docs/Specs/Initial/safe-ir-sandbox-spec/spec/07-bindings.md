@@ -228,6 +228,7 @@ Changing any of these requires version/hash update:
 - effects
 - required capability
 - cost model
+- per-run call limit
 - compiled target
 - safety classification
 - semantics

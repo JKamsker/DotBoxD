@@ -75,6 +75,7 @@ public static class CompiledRuntime
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
     {
         var descriptor = context.Bindings.GetDescriptor(id);
+        context.ChargeBindingCall(descriptor);
         return descriptor.Interpreter(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
     }
 }

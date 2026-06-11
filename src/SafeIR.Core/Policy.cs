@@ -170,6 +170,12 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
 
+    public SandboxPolicyBuilder WithMaxHostCalls(int calls)
+    {
+        _limits = _limits with { MaxHostCalls = calls };
+        return this;
+    }
+
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime)
     {
         _limits = _limits with { MaxWallTime = maxWallTime };

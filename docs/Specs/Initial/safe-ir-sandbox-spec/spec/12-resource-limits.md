@@ -50,7 +50,7 @@ public sealed class ResourceBudget
     public void ChargeAllocation(long bytes);
     public void ChargeCollection(SandboxValue value);
     public void ChargeLogEvent(string message);
-    public void ChargeHostCall(string bindingId);
+    public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null);
 }
 ```
 
@@ -192,6 +192,10 @@ Policy example:
   }
 }
 ```
+
+The binding descriptor can also declare a per-binding `MaxCallsPerRun` cost-model value.
+That limit is enforced in the same host-call accounting path as the global `maxHostCalls`
+limit, including compiled runtime binding stubs.
 
 ## Log limits
 
