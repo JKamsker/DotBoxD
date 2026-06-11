@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="ShaRPC" Version="1.0.0-ci.18" />
+    <PackageReference Include="ShaRPC.Serializers.MessagePack" Version="1.0.0-ci.18" />
+    <PackageReference Include="ShaRPC.Transports.NamedPipes" Version="1.0.0-ci.18" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SafeIR.PluginIpc.Shared\SafeIR.PluginIpc.Shared.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

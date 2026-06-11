@@ -172,6 +172,13 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
 
+    public SandboxPolicyBuilder GrantGameMessageWrite()
+    {
+        _allowedEffects |= SandboxEffect.GameStateWrite | SandboxEffect.Audit;
+        _grants.Add(new CapabilityGrant("game.message.write", new Dictionary<string, string>()));
+        return this;
+    }
+
     public SandboxPolicyBuilder WithFuel(long maxFuel)
     {
         _limits = _limits with { MaxFuel = maxFuel };
