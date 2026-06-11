@@ -29,6 +29,12 @@ public static class CompiledRuntime
 
     public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
+    public static SandboxType TypeScalar(string name) => SandboxType.Scalar(name);
+
+    public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType);
+
+    public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType);
+
     private static SandboxValue String(string value) => SandboxValue.FromString(value);
 
     public static SandboxValue StringConst(SandboxContext context, string value)
@@ -147,6 +153,52 @@ public static class CompiledRuntime
         return ChargeValue(context, SandboxValue.FromList(values, source.ItemType));
     }
 
+    public static SandboxValue MapEmpty(SandboxContext context, SandboxType keyType, SandboxType valueType)
+    {
+        context.ChargeAllocation(16);
+        return ChargeValue(context, SandboxValue.FromMap(new Dictionary<SandboxValue, SandboxValue>(), keyType, valueType));
+    }
+
+    public static SandboxValue MapContainsKey(SandboxValue map, SandboxValue key)
+    {
+        var typedMap = AsMap(map);
+        RequireType(key, typedMap.KeyType, "map key type mismatch");
+        return Bool(typedMap.Values.ContainsKey(key));
+    }
+
+    public static SandboxValue MapGet(SandboxValue map, SandboxValue key)
+    {
+        var typedMap = AsMap(map);
+        RequireType(key, typedMap.KeyType, "map key type mismatch");
+        if (!typedMap.Values.TryGetValue(key, out var value)) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.NotFound, "map key was not found"));
+        }
+
+        return value;
+    }
+
+    public static SandboxValue MapSet(SandboxContext context, SandboxValue map, SandboxValue key, SandboxValue value)
+    {
+        var typedMap = AsMap(map);
+        RequireType(key, typedMap.KeyType, "map key type mismatch");
+        RequireType(value, typedMap.ValueType, "map value type mismatch");
+        var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values) {
+            [key] = value
+        };
+        context.ChargeAllocation(Math.Max(1, values.Count) * 32);
+        return ChargeValue(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
+    }
+
+    public static SandboxValue MapRemove(SandboxContext context, SandboxValue map, SandboxValue key)
+    {
+        var typedMap = AsMap(map);
+        RequireType(key, typedMap.KeyType, "map key type mismatch");
+        var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values);
+        values.Remove(key);
+        context.ChargeAllocation(Math.Max(1, values.Count) * 32);
+        return ChargeValue(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
+    }
+
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
     {
         var descriptor = context.Bindings.GetDescriptor(id);
@@ -156,6 +208,16 @@ public static class CompiledRuntime
 
     private static ListValue AsList(SandboxValue value)
         => value as ListValue ?? throw InvalidInput("expected list value");
+
+    private static MapValue AsMap(SandboxValue value)
+        => value as MapValue ?? throw InvalidInput("expected map value");
+
+    private static void RequireType(SandboxValue value, SandboxType expected, string message)
+    {
+        if (value.Type != expected) {
+            throw InvalidInput(message);
+        }
+    }
 
     private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)
     {

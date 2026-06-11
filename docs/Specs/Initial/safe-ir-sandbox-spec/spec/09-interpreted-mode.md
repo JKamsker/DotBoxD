@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Interpreted mode executes verified IR directly without compiling to IL or loading a DLL.
+Interpreted mode executes verified IR directly without compiling to IL, creating a `DynamicMethod`,
+or loading a DLL. The interpreter is an IR interpreter, not an IL interpreter.
 
 This is required for:
 
@@ -64,7 +65,8 @@ Cons:
 - harder to optimize
 
 Do not add an interpreter bytecode layer. If a lower-level representation is needed, it belongs
-to compiled mode and must produce verified runtime IL or a managed DLL before execution.
+to compiled mode and must produce a compiler-owned runtime form such as a gated `DynamicMethod`
+or a verified managed DLL before execution.
 
 ## Interpreter state
 
@@ -169,6 +171,7 @@ host runs in constrained environment
 ## Auto mode
 
 Auto mode should begin interpreted and promote to compiled after a threshold.
+Until hotness tracking and a selector are implemented, `Auto` should behave like interpreted mode.
 
 Suggested heuristic:
 

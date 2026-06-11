@@ -39,19 +39,19 @@
      |          |
      |          |
      v          v
-+---------+  +-----------------+
-|Interpreter| | IL Compiler    |
-+----+----+  +--------+--------+
-     |                |
++------------+ +-----------------+
+| Direct IR  | | Compiler        |
+| Interpreter| +--------+--------+
++-----+------+          |
      |                v
      |       +-----------------+
+     |       | DynamicMethod or|
      |       | Generated DLL   |
      |       +--------+--------+
      |                |
      |                v
      |       +-----------------+
-     |       | IL/Metadata     |
-     |       | Verifier        |
+     |       | Verifier/Gate   |
      |       +--------+--------+
      |                |
      +--------+-------+
@@ -110,7 +110,7 @@ Contains:
 
 Contains:
 
-- direct IR interpreter
+- direct IR interpreter over the validated `SandboxModule`
 - debug stepping
 - trace events
 - interpreter-specific optimizations
@@ -119,8 +119,8 @@ Contains:
 
 Contains:
 
-- IR lowering to IL
-- assembly generation
+- IR lowering to a compiled runtime form
+- `DynamicMethod` generation or managed assembly generation
 - compiled delegate creation
 - cache artifact writer
 - generated symbol/debug info where needed
@@ -268,7 +268,8 @@ ExecutionMode.Auto
 
 ### 9A. Interpret
 
-The interpreter executes the verified IR held by the plan directly.
+The interpreter executes the verified IR held by the plan directly. It must not emit IL,
+build a `DynamicMethod`, load a DLL, or run an interpreter bytecode layer.
 
 It must:
 
@@ -280,7 +281,7 @@ It must:
 
 ### 9B. Compile
 
-The compiler emits a valid .NET assembly.
+The compiler emits a compiled runtime form: either a `DynamicMethod` or a valid .NET assembly.
 
 It must:
 
@@ -288,7 +289,7 @@ It must:
 - call safe runtime stubs/facades
 - inject budget checks
 - avoid arbitrary allocations
-- save DLL and manifest when caching
+- save DLL and manifest when caching an assembly backend
 
 ### 10B. Verify generated assembly
 
@@ -377,6 +378,6 @@ Suggested layers:
 
 ```text
 JSON IR        user-facing format
-Canonical IR   stable, typed, named operations
-IL/DLL         compiled backend only, never user-facing
+Canonical IR   stable, typed, named operations interpreted directly
+IL artifact    compiled backend only, never user-facing (`DynamicMethod` or DLL)
 ```

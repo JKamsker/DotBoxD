@@ -1,6 +1,6 @@
 # Safe IR Sandbox Specification
 
-This specification describes a C#/.NET sandbox where untrusted users submit a restricted JSON intermediate representation (JSON IR), not C# and not MSIL. The host validates the IR, grants explicit capabilities, executes it either through an interpreter or by compiling it to a managed DLL, and ensures all dangerous operations are routed through safe host APIs.
+This specification describes a C#/.NET sandbox where untrusted users submit a restricted JSON intermediate representation (JSON IR), not C# and not MSIL. The host validates the IR, grants explicit capabilities, executes it either by walking the IR in an interpreter or by compiling it to a compiled runtime artifact, and ensures all dangerous operations are routed through safe host APIs.
 
 The core principle is simple:
 
@@ -11,8 +11,8 @@ The user never supplies .NET IL, assemblies, raw method tokens, type names, dele
 
 The sandbox has two execution modes:
 
-1. **Interpreted mode** for quick, rare, low-volume, debuggable execution without generating IL.
-2. **Compiled mode** for hot paths, where verified IR is emitted into a valid .NET assembly, post-verified, cached, loaded, and executed.
+1. **Interpreted mode** for quick, rare, low-volume, debuggable execution by walking the verified IR directly, without generating IL, a `DynamicMethod`, or a DLL.
+2. **Compiled mode** for hot paths, where verified IR is emitted into a compiler-owned runtime form such as a `DynamicMethod` or a valid .NET assembly, verified/gated, loaded or delegated, cached where applicable, and executed.
 
 Both modes share the same IR, type system, effect system, binding registry, capability policy, resource accounting, audit model, and tests.
 
@@ -42,7 +42,7 @@ For hard isolation against runtime bugs, memory exhaustion, process termination,
 | `spec/07-bindings.md` | Host API binding model and manifests |
 | `spec/08-runtime-safe-apis.md` | Safe facades for IO, network, game state, time, random |
 | `spec/09-interpreted-mode.md` | Interpreter backend, quick execution, debugging, hotness transition |
-| `spec/10-compiled-mode.md` | IR to IL/DLL backend, caching, loading |
+| `spec/10-compiled-mode.md` | IR to compiled runtime artifact backend, caching, loading |
 | `spec/11-generated-code-verifier.md` | Post-emit verifier requirements |
 | `spec/12-resource-limits.md` | Fuel, time, memory, IO quotas, process boundary |
 | `spec/13-cache-versioning.md` | Cache keys, invalidation, manifests, policy changes |
@@ -62,7 +62,7 @@ For hard isolation against runtime bugs, memory exhaustion, process termination,
 ## One-sentence architecture
 
 ```text
-JSON IR -> import -> canonicalize -> type check -> effect check -> capability policy -> execution plan -> interpreter or compiler -> runtime facades -> audit
+JSON IR -> import -> canonicalize -> type check -> effect check -> capability policy -> execution plan -> direct IR interpreter or compiled runtime artifact -> runtime facades -> audit
 ```
 
 ## Preferred default

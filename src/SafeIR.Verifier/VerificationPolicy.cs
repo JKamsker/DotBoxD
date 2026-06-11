@@ -14,7 +14,7 @@ public sealed record VerificationPolicy(
         new HashSet<string>(StringComparer.Ordinal) {
             "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.String",
             "System.Double",
-            "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.Runtime.CompiledRuntime"
+            "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.SandboxType", "SafeIR.Runtime.CompiledRuntime"
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "SafeIR.Runtime.CompiledRuntime.ChargeFuel",
@@ -24,6 +24,9 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.I32",
             "SafeIR.Runtime.CompiledRuntime.F64",
             "SafeIR.Runtime.CompiledRuntime.Bool",
+            "SafeIR.Runtime.CompiledRuntime.TypeScalar",
+            "SafeIR.Runtime.CompiledRuntime.TypeList",
+            "SafeIR.Runtime.CompiledRuntime.TypeMap",
             "SafeIR.Runtime.CompiledRuntime.StringConst",
             "SafeIR.Runtime.CompiledRuntime.AsI32",
             "SafeIR.Runtime.CompiledRuntime.AsBool",
@@ -55,7 +58,12 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.ListOf",
             "SafeIR.Runtime.CompiledRuntime.ListCount",
             "SafeIR.Runtime.CompiledRuntime.ListGet",
-            "SafeIR.Runtime.CompiledRuntime.ListAdd"
+            "SafeIR.Runtime.CompiledRuntime.ListAdd",
+            "SafeIR.Runtime.CompiledRuntime.MapEmpty",
+            "SafeIR.Runtime.CompiledRuntime.MapContainsKey",
+            "SafeIR.Runtime.CompiledRuntime.MapGet",
+            "SafeIR.Runtime.CompiledRuntime.MapSet",
+            "SafeIR.Runtime.CompiledRuntime.MapRemove"
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",

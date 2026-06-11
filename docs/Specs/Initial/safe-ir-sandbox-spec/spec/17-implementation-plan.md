@@ -90,6 +90,7 @@ Acceptance:
 Deliver:
 
 - compiler backend using runtime stubs
+- compiled runtime form only; no interpreter IL layer
 - generated assembly in memory/file
 - simple entrypoint delegate
 - no async generated code

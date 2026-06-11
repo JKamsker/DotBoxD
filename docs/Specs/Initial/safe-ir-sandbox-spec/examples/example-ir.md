@@ -105,15 +105,15 @@ The IR never references `System.IO.File`.
 ## Interpreted execution
 
 ```text
-json IR -> import -> validate -> effects -> policy -> interpreter
+json IR -> import -> validate -> effects -> policy -> direct IR interpreter
 ```
 
-No DLL generated.
+No IL, `DynamicMethod`, or DLL is generated.
 
 ## Compiled execution
 
 ```text
-json IR -> import -> validate -> effects -> policy -> IL/DLL -> verifier -> DLL cache -> run
+json IR -> import -> validate -> effects -> policy -> compiled runtime artifact -> verifier/gate -> run
 ```
 
 ## Forbidden examples

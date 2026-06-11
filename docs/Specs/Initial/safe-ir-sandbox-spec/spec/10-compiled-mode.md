@@ -2,15 +2,17 @@
 
 ## Purpose
 
-Compiled mode turns verified IR into a valid managed .NET assembly and optionally persists it as a DLL cache artifact.
+Compiled mode turns verified IR into a compiler-owned runtime form and executes that compiled form.
+Supported forms are a `DynamicMethod` backend or a valid managed .NET assembly that can optionally
+be persisted as a DLL cache artifact.
 
 Compiled mode is for hot code paths and repeated execution.
 
 ## Important distinction
 
-The system does not load raw MSIL.
+The system does not load raw MSIL and never treats interpreted mode as an IL execution path.
 
-It emits a valid managed assembly image containing:
+For an assembly backend, it emits a valid managed assembly image containing:
 
 - PE/COFF structure
 - CLR header
@@ -20,18 +22,20 @@ It emits a valid managed assembly image containing:
 - member references
 - IL method bodies
 
-Then it loads that assembly.
+Then it verifies and loads that assembly.
+
+For a `DynamicMethod` backend, the compiler emits IL through trusted code only and creates a delegate
+directly. This backend is acceptable only with equivalent allowlist gating for emitted calls, opcodes,
+and runtime stubs. Users still never provide IL bytes, metadata tokens, or CLR member names.
 
 ## Compiler pipeline
 
 ```text
 ExecutionPlan
   -> backend lowering
-  -> generate assembly
-  -> save to memory/file
-  -> verify generated assembly
-  -> load in AssemblyLoadContext
-  -> create entrypoint delegate
+  -> generate DynamicMethod or assembly
+  -> verify/gate generated runtime form
+  -> create/load entrypoint delegate
   -> execute
 ```
 
@@ -70,6 +74,27 @@ Cons:
 Recommendation:
 
 Start with `PersistedAssemblyBuilder` if available and sufficient. Keep the compiler abstraction separate so the backend can later move to `System.Reflection.Metadata`.
+
+### Option C: `DynamicMethod`
+
+Use for an in-memory compiled delegate when no DLL artifact is needed.
+
+Pros:
+
+- no assembly file to persist or load
+- lower startup overhead for one-process hot paths
+- direct delegate creation
+
+Cons:
+
+- verifier support must be designed differently from DLL metadata verification
+- no persistent DLL cache artifact
+- easier to accidentally expand the emitted IL surface
+
+Recommendation:
+
+Use only after the assembly backend and verifier rules are proven, or keep the surface identical to
+the assembly backend runtime stubs.
 
 ## Generated assembly shape
 

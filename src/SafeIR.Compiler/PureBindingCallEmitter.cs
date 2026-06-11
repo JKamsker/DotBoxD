@@ -58,6 +58,25 @@ internal static class PureBindingCallEmitter
                 EmitArguments(call, emitExpression);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListAdd)));
                 return true;
+            case "map.empty":
+                EmitMapEmpty(call, il);
+                return true;
+            case "map.containsKey":
+                EmitCall(il, emitExpression, call, nameof(CompiledRuntime.MapContainsKey));
+                return true;
+            case "map.get":
+                EmitCall(il, emitExpression, call, nameof(CompiledRuntime.MapGet));
+                return true;
+            case "map.set":
+                il.Emit(OpCodes.Ldarg_0);
+                EmitArguments(call, emitExpression);
+                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapSet)));
+                return true;
+            case "map.remove":
+                il.Emit(OpCodes.Ldarg_0);
+                EmitArguments(call, emitExpression);
+                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapRemove)));
+                return true;
             default:
                 return false;
         }
@@ -91,4 +110,43 @@ internal static class PureBindingCallEmitter
             il.Emit(OpCodes.Stelem_Ref);
         }
     }
+
+    private static void EmitMapEmpty(CallExpression call, ILGenerator il)
+    {
+        if (call.GenericType is not { Name: "Map", Arguments.Count: 2 } mapType) {
+            throw Unsupported("map.empty requires Map<K,V> genericType");
+        }
+
+        il.Emit(OpCodes.Ldarg_0);
+        EmitType(mapType.Arguments[0], il);
+        EmitType(mapType.Arguments[1], il);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapEmpty)));
+    }
+
+    private static void EmitType(SandboxType type, ILGenerator il)
+    {
+        if (type.Arguments.Count == 0) {
+            il.Emit(OpCodes.Ldstr, type.Name);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeScalar)));
+            return;
+        }
+
+        if (type is { Name: "List", Arguments.Count: 1 }) {
+            EmitType(type.Arguments[0], il);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeList)));
+            return;
+        }
+
+        if (type is { Name: "Map", Arguments.Count: 2 }) {
+            EmitType(type.Arguments[0], il);
+            EmitType(type.Arguments[1], il);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeMap)));
+            return;
+        }
+
+        throw Unsupported($"type '{type}' is not supported by compiler");
+    }
+
+    private static Exception Unsupported(string message)
+        => new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, message));
 }

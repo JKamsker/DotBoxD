@@ -77,6 +77,12 @@ public enum ExecutionMode
 }
 ```
 
+`Interpreted` means direct execution of the verified IR held by the `ExecutionPlan`; it must not
+compile to IL, create a `DynamicMethod`, or load a DLL. `Compiled` is the only mode that may execute
+generated IL, and only after the compiler has produced a trusted runtime form such as a gated
+`DynamicMethod` or a verified generated assembly. `Auto` starts as interpreted until a hotness/cache
+selector explicitly promotes a plan to compiled mode.
+
 ### `SandboxExecutionResult`
 
 ```csharp

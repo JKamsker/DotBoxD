@@ -57,20 +57,48 @@ public sealed class SandboxHost
             return DeterminismRequiredResult(plan, options);
         }
 
-        if (ShouldUseCompiler(options)) {
-            var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
-            if (compiled is not null) {
-                return compiled;
-            }
-        }
-
-        return await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        return options.Mode switch {
+            ExecutionMode.Compiled => await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false),
+            ExecutionMode.Interpreted or ExecutionMode.Auto => await ExecuteInterpretedAsync(
+                    plan,
+                    entrypoint,
+                    input,
+                    options,
+                    cancellationToken)
+                .ConfigureAwait(false),
+            _ => CompilerUnavailableResult(plan, options)
+        };
     }
 
-    private bool ShouldUseCompiler(SandboxExecutionOptions options)
-        => _compiler is not null &&
-           !options.EnableDebugTrace &&
-           options.Mode is ExecutionMode.Compiled or ExecutionMode.Auto;
+    private async ValueTask<SandboxExecutionResult> ExecuteCompiledAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (_compiler is null || options.EnableDebugTrace) {
+            return options.AllowFallbackToInterpreter
+                ? await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false)
+                : CompilerUnavailableResult(plan, options);
+        }
+
+        var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        if (compiled is not null) {
+            return compiled;
+        }
+
+        return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<SandboxExecutionResult> ExecuteInterpretedAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
 
     private async ValueTask<SandboxExecutionResult?> TryExecuteCompiledAsync(
         ExecutionPlan plan,
@@ -89,8 +117,35 @@ public sealed class SandboxHost
     }
 
     private static bool CanFallback(SandboxExecutionOptions options, SandboxRuntimeException ex)
-        => options.Mode == ExecutionMode.Auto ||
-           (options.AllowFallbackToInterpreter && ex.Error.Code is SandboxErrorCode.VerifierFailure or SandboxErrorCode.ValidationError);
+        => options.AllowFallbackToInterpreter &&
+           ex.Error.Code is SandboxErrorCode.VerifierFailure or SandboxErrorCode.ValidationError;
+
+    private static SandboxExecutionResult CompilerUnavailableResult(ExecutionPlan plan, SandboxExecutionOptions options)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var error = new SandboxError(SandboxErrorCode.ValidationError, "compiled execution is not available for this run");
+        var audit = new InMemoryAuditSink();
+        audit.Write(new SandboxAuditEvent(
+            runId,
+            "CompilerUnavailable",
+            DateTimeOffset.UtcNow,
+            false,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: error.Code,
+            Message: error.SafeMessage));
+
+        return new SandboxExecutionResult {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.Events,
+            ActualMode = ExecutionMode.Compiled,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
+    }
 
     private static SandboxExecutionResult DeterminismRequiredResult(ExecutionPlan plan, SandboxExecutionOptions options)
     {

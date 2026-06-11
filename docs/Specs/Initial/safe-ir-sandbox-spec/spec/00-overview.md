@@ -10,10 +10,10 @@ The same verified IR can be executed in two ways:
 
 ```text
 Interpreted mode:
-    IR -> verified execution plan -> interpreter -> safe host APIs
+    IR -> verified execution plan -> direct IR interpreter -> safe host APIs
 
 Compiled mode:
-    IR -> verified execution plan -> IL/DLL -> verifier -> AssemblyLoadContext -> safe host APIs
+    IR -> verified execution plan -> compiled runtime artifact -> verifier/gate -> delegate/load -> safe host APIs
 ```
 
 Interpreted mode is for quick, rare, low-volume executions. Compiled mode is for hot or frequently reused logic.
@@ -63,7 +63,7 @@ The in-process security boundary is semantic:
 ```text
 User can only express allowed IR operations.
 Compiler/interpreter only implement those operations.
-Generated IL is verified after emission.
+Generated IL exists only in compiled mode and is verified or gated before execution.
 Host APIs are narrow capability facades.
 ```
 
@@ -72,7 +72,7 @@ For hard security boundaries, use an OS boundary:
 ```text
 Main host process
     -> sandbox worker process/container/restricted account
-        -> IR interpreter or compiled backend
+        -> direct IR interpreter or compiled backend
 ```
 
 This is especially important when the threat model includes malicious tenants, memory exhaustion, denial-of-service, runtime bugs, or defense in depth against unknown .NET escape paths.
@@ -92,7 +92,7 @@ Use when:
 
 Properties:
 
-- no IL emitted
+- no IL, `DynamicMethod`, DLL, or interpreter bytecode emitted
 - no `AssemblyLoadContext` needed
 - same IR validator and policy system
 - easy fuel checks
@@ -111,10 +111,11 @@ Use when:
 
 Properties:
 
-- emits a valid managed assembly, not a raw MSIL blob
-- post-emission verifier is mandatory
-- generated DLL is cached by IR/policy/binding/runtime hash
-- loaded through a controlled `AssemblyLoadContext`
+- emits a compiler-owned runtime artifact, not a raw MSIL blob supplied by a user
+- supported runtime forms are a verified generated assembly/DLL or a future `DynamicMethod` backend with equivalent allowlist gating
+- post-emission verification/gating is mandatory before execution
+- generated DLLs are cached by IR/policy/binding/runtime hash when using the assembly backend
+- generated assemblies are loaded through a controlled `AssemblyLoadContext`
 - faster steady-state execution, but more moving parts
 
 ## Trust model
