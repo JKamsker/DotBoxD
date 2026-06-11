@@ -129,6 +129,45 @@ public sealed class ExecutionModeSelectionTests
         Assert.Equal("throwing-artifact", result.ArtifactHash);
     }
 
+    [Fact]
+    public async Task Compiled_mode_compiler_sandbox_failure_returns_result_when_fallback_disabled()
+    {
+        var host = HostWithCompiler(new SandboxFailureCompiler(SandboxErrorCode.VerifierFailure));
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.VerifierFailure, result.Error!.Code);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Null(result.ArtifactHash);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "CompiledExecutionFailed");
+    }
+
+    [Fact]
+    public async Task Compiled_mode_unexpected_compiler_exception_returns_host_failure()
+    {
+        var host = HostWithCompiler(new UnexpectedFailureCompiler());
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Null(result.ArtifactHash);
+    }
+
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
         => SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
@@ -200,5 +239,23 @@ public sealed class ExecutionModeSelectionTests
                 new VerificationResult(true, [], "throwing-artifact", "delegate-verifier", DateTimeOffset.UtcNow),
                 (_, _) => throw new InvalidOperationException("compiled delegate failed"),
                 CompiledRuntimeFormKind.DynamicMethod));
+    }
+
+    private sealed class SandboxFailureCompiler(SandboxErrorCode code) : ISandboxCompiler
+    {
+        public ValueTask<CompiledArtifact> CompileAsync(
+            ExecutionPlan plan,
+            CompileOptions options,
+            CancellationToken cancellationToken)
+            => throw new SandboxRuntimeException(new SandboxError(code, "compiler failed"));
+    }
+
+    private sealed class UnexpectedFailureCompiler : ISandboxCompiler
+    {
+        public ValueTask<CompiledArtifact> CompileAsync(
+            ExecutionPlan plan,
+            CompileOptions options,
+            CancellationToken cancellationToken)
+            => throw new InvalidOperationException("compiler failed unexpectedly");
     }
 }

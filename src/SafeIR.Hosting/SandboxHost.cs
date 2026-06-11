@@ -114,6 +114,15 @@ public sealed class SandboxHost
         catch (SandboxRuntimeException ex) when (CanFallback(options, ex)) {
             return null;
         }
+        catch (SandboxRuntimeException ex) {
+            return CompiledFailureResult(plan, options, ex.Error);
+        }
+        catch (OperationCanceledException) {
+            return CompiledFailureResult(plan, options, new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled"));
+        }
+        catch (Exception) {
+            return CompiledFailureResult(plan, options, new SandboxError(SandboxErrorCode.HostFailure, "compiled execution failed"));
+        }
     }
 
     private static bool CanFallback(SandboxExecutionOptions options, SandboxRuntimeException ex)
@@ -129,6 +138,35 @@ public sealed class SandboxHost
         audit.Write(new SandboxAuditEvent(
             runId,
             "CompilerUnavailable",
+            DateTimeOffset.UtcNow,
+            false,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: error.Code,
+            Message: error.SafeMessage));
+
+        return new SandboxExecutionResult {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.Events,
+            ActualMode = ExecutionMode.Compiled,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
+    }
+
+    private static SandboxExecutionResult CompiledFailureResult(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options,
+        SandboxError error)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var audit = new InMemoryAuditSink();
+        audit.Write(new SandboxAuditEvent(
+            runId,
+            "CompiledExecutionFailed",
             DateTimeOffset.UtcNow,
             false,
             ResourceId: $"module:{plan.ModuleHash}",
