@@ -256,7 +256,7 @@ Registry build should validate:
 
 ## Default bindings
 
-Default pure bindings:
+Default pure bindings and sandbox intrinsics:
 
 ```text
 math.abs
@@ -268,8 +268,16 @@ math.sin/cos/tan optional
 math.floor/ceil/round
 string.length
 string.concatBudgeted
+list.empty
+list.of
 list.count
+list.get
+list.add
+map.empty
 map.containsKey
+map.get
+map.set
+map.remove
 parse.int optional
 format.simple optional
 ```

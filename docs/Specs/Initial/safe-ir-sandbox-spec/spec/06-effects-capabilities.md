@@ -154,7 +154,10 @@ Examples:
 | Operation | Effects |
 |---|---|
 | `add I32` | `Cpu` |
+| `list.empty` / `list.of` | `Cpu | Alloc` |
 | `list.add` | `Cpu | Alloc` |
+| `map.empty` / `map.set` / `map.remove` | `Cpu | Alloc` |
+| `list.count` / `list.get` / `map.containsKey` / `map.get` | `Cpu` |
 | `math.sqrt` | `Cpu` |
 | `clock.now` | `Cpu | Time` |
 | `random.next` | `Cpu | Random` |

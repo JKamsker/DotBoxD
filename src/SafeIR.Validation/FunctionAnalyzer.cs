@@ -7,6 +7,7 @@ internal sealed class FunctionAnalyzer
     private readonly IBindingCatalog _bindings;
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly Dictionary<string, SandboxFunction> _functions;
+    private readonly CollectionCallAnalyzer _collections;
     private readonly Dictionary<string, FunctionAnalysis> _analyzed = new(StringComparer.Ordinal);
     private readonly HashSet<string> _analyzing = new(StringComparer.Ordinal);
 
@@ -15,6 +16,7 @@ internal sealed class FunctionAnalyzer
         _bindings = bindings;
         _diagnostics = diagnostics;
         _functions = module.Functions.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        _collections = new CollectionCallAnalyzer(diagnostics, AnalyzeExpression);
     }
 
     public HashSet<string> RequiredCapabilities { get; } = new(StringComparer.Ordinal);
@@ -170,17 +172,8 @@ internal sealed class FunctionAnalyzer
 
     private SandboxType AnalyzeCall(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
-        if (call.Name == "list.empty" && call.GenericType is not null && call.Arguments.Count == 0) {
-            effects |= SandboxEffect.Alloc;
-            return SandboxType.List(call.GenericType);
-        }
-
-        if (call.Name == "list.of") {
-            return AnalyzeListOf(call, scope, ref effects);
-        }
-
-        if (call.Name is "list.count" or "list.get" or "list.add") {
-            return AnalyzeListOperation(call, scope, ref effects);
+        if (_collections.TryAnalyze(call, scope, ref effects, out var collectionType)) {
+            return collectionType;
         }
 
         if (_functions.TryGetValue(call.Name, out var function)) {
@@ -201,77 +194,6 @@ internal sealed class FunctionAnalyzer
 
         _diagnostics.Add(new SandboxDiagnostic("E-CALL-UNKNOWN", $"unknown function or binding '{call.Name}'", Span: call.Span));
         return SandboxType.Unit;
-    }
-
-    private SandboxType AnalyzeListOf(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
-    {
-        effects |= SandboxEffect.Alloc;
-        SandboxType? itemType = null;
-        foreach (var arg in call.Arguments) {
-            var current = AnalyzeExpression(arg, scope, ref effects);
-            itemType ??= current;
-            Require(current, itemType, arg.Span);
-        }
-
-        return SandboxType.List(itemType ?? SandboxType.Unit);
-    }
-
-    private SandboxType AnalyzeListOperation(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
-        => call.Name switch {
-            "list.count" => AnalyzeListCount(call, scope, ref effects),
-            "list.get" => AnalyzeListGet(call, scope, ref effects),
-            _ => AnalyzeListAdd(call, scope, ref effects)
-        };
-
-    private SandboxType AnalyzeListCount(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
-    {
-        if (call.Arguments.Count != 1) {
-            _diagnostics.Add(new SandboxDiagnostic("E-CALL-ARITY", "list.count expects 1 argument", Span: call.Span));
-            return SandboxType.I32;
-        }
-
-        RequireList(AnalyzeExpression(call.Arguments[0], scope, ref effects), call.Span);
-        return SandboxType.I32;
-    }
-
-    private SandboxType AnalyzeListGet(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
-    {
-        if (call.Arguments.Count != 2) {
-            _diagnostics.Add(new SandboxDiagnostic("E-CALL-ARITY", "list.get expects 2 arguments", Span: call.Span));
-            return SandboxType.Unit;
-        }
-
-        var listType = RequireList(AnalyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
-        Require(AnalyzeExpression(call.Arguments[1], scope, ref effects), SandboxType.I32, call.Arguments[1].Span);
-        return listType?.Arguments[0] ?? SandboxType.Unit;
-    }
-
-    private SandboxType AnalyzeListAdd(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
-    {
-        effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 2) {
-            _diagnostics.Add(new SandboxDiagnostic("E-CALL-ARITY", "list.add expects 2 arguments", Span: call.Span));
-            return SandboxType.List(SandboxType.Unit);
-        }
-
-        var listType = RequireList(AnalyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
-        var itemType = AnalyzeExpression(call.Arguments[1], scope, ref effects);
-        if (listType is not null) {
-            Require(itemType, listType.Arguments[0], call.Arguments[1].Span);
-            return listType;
-        }
-
-        return SandboxType.List(itemType);
-    }
-
-    private SandboxType? RequireList(SandboxType actual, SourceSpan span)
-    {
-        if (actual.Name == "List" && actual.Arguments.Count == 1) {
-            return actual;
-        }
-
-        _diagnostics.Add(new SandboxDiagnostic("E-TYPE-MISMATCH", $"expected List<T>, got {actual}", Span: span));
-        return null;
     }
 
     private void CheckArguments(CallExpression call, IReadOnlyList<SandboxType> expected, FunctionScope scope, ref SandboxEffect effects)

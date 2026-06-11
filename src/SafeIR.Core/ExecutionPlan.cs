@@ -19,6 +19,11 @@ public enum BytecodeOp
     ListCount,
     ListGet,
     ListAdd,
+    MapEmpty,
+    MapContainsKey,
+    MapGet,
+    MapSet,
+    MapRemove,
     Return
 }
 

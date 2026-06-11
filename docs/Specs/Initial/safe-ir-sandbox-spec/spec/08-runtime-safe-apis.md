@@ -252,11 +252,20 @@ public sealed class SandboxList<T>
 {
     public int Count { get; }
     public T Get(int index);
-    public void Add(SandboxContext ctx, T value);
+    public SandboxList<T> Add(SandboxContext ctx, T value);
+}
+
+public sealed class SandboxMap<TKey, TValue>
+{
+    public bool ContainsKey(TKey key);
+    public TValue Get(TKey key);
+    public SandboxMap<TKey, TValue> Set(SandboxContext ctx, TKey key, TValue value);
+    public SandboxMap<TKey, TValue> Remove(SandboxContext ctx, TKey key);
 }
 ```
 
-Growth charges allocation budget.
+Growth and copy-on-write updates charge allocation budget. Missing map keys return a safe
+`NotFound` sandbox error. Unsupported map key types are rejected during validation.
 
 ## Safe logging API
 

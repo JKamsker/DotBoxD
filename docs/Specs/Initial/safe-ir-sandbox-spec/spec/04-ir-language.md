@@ -58,6 +58,7 @@ Composite types must use JSON objects:
 
 ```json
 { "name": "List", "arguments": ["Command"] }
+{ "name": "Map", "arguments": ["String", "I32"] }
 ```
 
 Generic type strings such as `"List<Command>"` are rejected to avoid a separate type-expression parser.
@@ -159,6 +160,16 @@ Generic calls use `genericType`:
 }
 ```
 
+Map construction uses the full `Map<TKey,TValue>` type as `genericType`:
+
+```json
+{
+  "call": "map.empty",
+  "genericType": { "name": "Map", "arguments": ["String", "I32"] },
+  "args": []
+}
+```
+
 There is no generic `call typeName.methodName(args)` instruction.
 
 ## Capability requests
@@ -249,7 +260,7 @@ MVP starts with:
 - `if`
 - bounded `forRange`
 - fuel-accounted `while`
-- lists through safe runtime calls
+- lists and maps through safe sandbox collection operations
 - internal function calls without recursion
 - host calls through bindings
 

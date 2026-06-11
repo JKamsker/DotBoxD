@@ -20,7 +20,17 @@ public abstract record SandboxValue
 
     public static SandboxValue FromUri(string value) => new SandboxUriValue(new SandboxUri(value));
 
-    public static SandboxValue FromList(IReadOnlyList<SandboxValue> values) => new ListValue(values);
+    public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
+        => new ListValue(values, values.Count == 0 ? SandboxType.Unit : values[0].Type);
+
+    public static SandboxValue FromList(IReadOnlyList<SandboxValue> values, SandboxType itemType)
+        => new ListValue(values, itemType);
+
+    public static SandboxValue FromMap(
+        IReadOnlyDictionary<SandboxValue, SandboxValue> values,
+        SandboxType keyType,
+        SandboxType valueType)
+        => new MapValue(values, keyType, valueType);
 }
 
 public sealed record UnitValue : SandboxValue
@@ -73,8 +83,15 @@ public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
     public override SandboxType Type => SandboxType.Scalar("SandboxUri");
 }
 
-public sealed record ListValue(IReadOnlyList<SandboxValue> Values) : SandboxValue
+public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue
 {
-    public override SandboxType Type
-        => Values.Count == 0 ? SandboxType.List(SandboxType.Unit) : SandboxType.List(Values[0].Type);
+    public override SandboxType Type => SandboxType.List(ItemType);
+}
+
+public sealed record MapValue(
+    IReadOnlyDictionary<SandboxValue, SandboxValue> Values,
+    SandboxType KeyType,
+    SandboxType ValueType) : SandboxValue
+{
+    public override SandboxType Type => SandboxType.Map(KeyType, ValueType);
 }

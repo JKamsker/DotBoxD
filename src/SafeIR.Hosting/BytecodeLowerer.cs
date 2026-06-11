@@ -163,6 +163,21 @@ internal sealed class FunctionBytecodeBuilder
         else if (call.Name == "list.add") {
             Emit(BytecodeOp.ListAdd);
         }
+        else if (call.Name == "map.empty") {
+            Emit(BytecodeOp.MapEmpty, call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit));
+        }
+        else if (call.Name == "map.containsKey") {
+            Emit(BytecodeOp.MapContainsKey);
+        }
+        else if (call.Name == "map.get") {
+            Emit(BytecodeOp.MapGet);
+        }
+        else if (call.Name == "map.set") {
+            Emit(BytecodeOp.MapSet);
+        }
+        else if (call.Name == "map.remove") {
+            Emit(BytecodeOp.MapRemove);
+        }
         else if (_bindings.TryGet(call.Name, out _)) {
             Emit(BytecodeOp.CallBinding, new BytecodeCall(call.Name, call.Arguments.Count));
         }

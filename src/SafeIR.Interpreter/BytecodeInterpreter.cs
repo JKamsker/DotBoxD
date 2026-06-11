@@ -87,20 +87,34 @@ internal sealed class BytecodeInterpreter
                 frame.Push(await CallFunctionAsync((BytecodeCall)instruction.Operand!, frame).ConfigureAwait(false));
                 break;
             case BytecodeOp.ListEmpty:
-                _context.ChargeAllocation(8);
-                frame.Push(SandboxValue.FromList([]));
+                frame.Push(BytecodeCollectionOperations.CreateList((SandboxType)instruction.Operand!, _context));
                 break;
             case BytecodeOp.ListOf:
-                frame.Push(BuildList((int)instruction.Operand!, frame));
+                frame.Push(BytecodeCollectionOperations.BuildList((int)instruction.Operand!, frame, _context));
                 break;
             case BytecodeOp.ListCount:
-                frame.Push(CountList(frame.Pop()));
+                frame.Push(BytecodeCollectionOperations.CountList(frame.Pop()));
                 break;
             case BytecodeOp.ListGet:
-                frame.Push(GetListItem(frame.Pop(), frame.Pop()));
+                frame.Push(BytecodeCollectionOperations.GetListItem(frame.Pop(), frame.Pop()));
                 break;
             case BytecodeOp.ListAdd:
-                frame.Push(AddListItem(frame.Pop(), frame.Pop()));
+                frame.Push(BytecodeCollectionOperations.AddListItem(frame.Pop(), frame.Pop(), _context));
+                break;
+            case BytecodeOp.MapEmpty:
+                frame.Push(BytecodeCollectionOperations.CreateMap((SandboxType)instruction.Operand!, _context));
+                break;
+            case BytecodeOp.MapContainsKey:
+                frame.Push(BytecodeCollectionOperations.ContainsMapKey(frame.Pop(), frame.Pop()));
+                break;
+            case BytecodeOp.MapGet:
+                frame.Push(BytecodeCollectionOperations.GetMapValue(frame.Pop(), frame.Pop()));
+                break;
+            case BytecodeOp.MapSet:
+                frame.Push(BytecodeCollectionOperations.SetMapValue(frame.Pop(), frame.Pop(), frame.Pop(), _context));
+                break;
+            case BytecodeOp.MapRemove:
+                frame.Push(BytecodeCollectionOperations.RemoveMapValue(frame.Pop(), frame.Pop(), _context));
                 break;
             case BytecodeOp.Return:
                 return frame.Pop();
@@ -141,7 +155,7 @@ internal sealed class BytecodeInterpreter
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown function '{call.Id}'"));
         }
 
-        return await InvokeFunctionAsync(function, PopArguments(frame, call.ArgumentCount)).ConfigureAwait(false);
+        return await InvokeFunctionAsync(function, frame.PopArguments(call.ArgumentCount)).ConfigureAwait(false);
     }
 
     private async ValueTask<SandboxValue> CallBindingAsync(BytecodeCall call, BytecodeFrame frame)
@@ -154,7 +168,7 @@ internal sealed class BytecodeInterpreter
         _context.Budget.ChargeHostCall(call.Id);
         _context.ChargeFuel(descriptor.CostModel.BaseFuel);
         try {
-            return await descriptor.Interpreter(_context, PopArguments(frame, call.ArgumentCount), _context.CancellationToken)
+            return await descriptor.Interpreter(_context, frame.PopArguments(call.ArgumentCount), _context.CancellationToken)
                 .ConfigureAwait(false);
         }
         catch (SandboxRuntimeException) {
@@ -166,45 +180,6 @@ internal sealed class BytecodeInterpreter
         catch (Exception) {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{call.Id}' failed"));
         }
-    }
-
-    private SandboxValue BuildList(int count, BytecodeFrame frame)
-    {
-        var values = PopArguments(frame, count);
-        _context.ChargeAllocation(values.Count * 16);
-        return SandboxValue.FromList(values);
-    }
-
-    private static SandboxValue CountList(SandboxValue list)
-        => SandboxValue.FromInt32(((ListValue)list).Values.Count);
-
-    private static SandboxValue GetListItem(SandboxValue index, SandboxValue list)
-    {
-        var values = ((ListValue)list).Values;
-        var i = ((I32Value)index).Value;
-        if (i < 0 || i >= values.Count) {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "list index is out of range"));
-        }
-
-        return values[i];
-    }
-
-    private SandboxValue AddListItem(SandboxValue item, SandboxValue list)
-    {
-        var values = ((ListValue)list).Values.ToList();
-        values.Add(item);
-        _context.ChargeAllocation(values.Count * 16);
-        return SandboxValue.FromList(values);
-    }
-
-    private static IReadOnlyList<SandboxValue> PopArguments(BytecodeFrame frame, int count)
-    {
-        var values = new SandboxValue[count];
-        for (var i = count - 1; i >= 0; i--) {
-            values[i] = frame.Pop();
-        }
-
-        return values;
     }
 
     private static IReadOnlyList<SandboxValue> BuildArguments(BytecodeFunction function, SandboxValue input)

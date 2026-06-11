@@ -28,4 +28,14 @@ internal sealed class BytecodeFrame
         => _stack.Count > 0
             ? _stack.Pop()
             : throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "bytecode stack underflow"));
+
+    public IReadOnlyList<SandboxValue> PopArguments(int count)
+    {
+        var values = new SandboxValue[count];
+        for (var i = count - 1; i >= 0; i--) {
+            values[i] = Pop();
+        }
+
+        return values;
+    }
 }

@@ -237,6 +237,8 @@ public enum SandboxErrorCode
     ValidationError,
     PolicyDenied,
     PermissionDenied,
+    NotFound,
+    InvalidInput,
     QuotaExceeded,
     Timeout,
     Cancelled,

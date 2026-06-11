@@ -32,6 +32,8 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public static SandboxType List(SandboxType item) => new("List", [item]);
 
+    public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value]);
+
     public static bool IsForbiddenName(string name)
         => ForbiddenNames.Contains(name) ||
            name.StartsWith("System.", StringComparison.Ordinal) ||
