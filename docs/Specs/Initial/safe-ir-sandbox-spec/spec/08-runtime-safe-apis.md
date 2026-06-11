@@ -61,10 +61,16 @@ Reject:
 
 ```text
 ../secret.txt
+./config/settings.json
+config/../secret.txt
 C:\Windows\win.ini
 /etc/passwd
 \\server\share\file
 file://...
+NUL
+CON.txt
+paths containing control characters
+segments ending with dot or space
 ```
 
 ### Safe facade

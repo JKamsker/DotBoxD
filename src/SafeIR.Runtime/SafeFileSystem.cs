@@ -14,6 +14,7 @@ public static class SafeFileSystem
         var startedAt = DateTimeOffset.UtcNow;
         try {
             var resolved = ResolvePath(context, path, "file.read", "file.readText");
+            using var timeout = CreateWallTimeToken(context, cancellationToken);
             var info = new FileInfo(resolved.FullPath);
             if (!info.Exists) {
                 throw Error(SandboxErrorCode.NotFound, "file.readText denied: file was not found");
@@ -24,7 +25,7 @@ public static class SafeFileSystem
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
             }
 
-            var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, cancellationToken).ConfigureAwait(false);
+            var bytes = await ReadLimitedBytesAsync(context, resolved, maxBytes, timeout.Token).ConfigureAwait(false);
             context.ChargeFuel(bytes.Length);
             var text = Encoding.UTF8.GetString(bytes);
             context.ChargeString(text);
@@ -34,6 +35,11 @@ public static class SafeFileSystem
         catch (SandboxRuntimeException ex) {
             AuditRead(context, startedAt, false, Sanitize(path.RelativePath), null, ex.Error.Code);
             throw;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+            var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
+            AuditRead(context, startedAt, false, Sanitize(path.RelativePath), null, error.Code);
+            throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException) {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.readText cancelled");
@@ -56,6 +62,7 @@ public static class SafeFileSystem
         var startedAt = DateTimeOffset.UtcNow;
         try {
             var resolved = ResolvePath(context, path, "file.write", "file.writeText");
+            using var timeout = CreateWallTimeToken(context, cancellationToken);
             var bytes = System.Text.Encoding.UTF8.GetBytes(text);
             var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, bytes.Length);
             context.Budget.ChargeFileWrite(bytes.Length);
@@ -64,7 +71,7 @@ public static class SafeFileSystem
             SafeFileWritePublisher.EnsureParentDirectory(resolved.RootFull, resolved.FullPath, permission);
             var tempPath = resolved.FullPath + ".tmp-" + Guid.NewGuid().ToString("N");
             try {
-                await File.WriteAllBytesAsync(tempPath, bytes, cancellationToken).ConfigureAwait(false);
+                await File.WriteAllBytesAsync(tempPath, bytes, timeout.Token).ConfigureAwait(false);
                 EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
                 SafeFileWritePublisher.PublishTempFile(tempPath, resolved.FullPath, permission);
             }
@@ -78,6 +85,11 @@ public static class SafeFileSystem
         catch (SandboxRuntimeException ex) {
             AuditWrite(context, startedAt, false, Sanitize(path.RelativePath), null, ex.Error.Code);
             throw;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+            var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
+            AuditWrite(context, startedAt, false, Sanitize(path.RelativePath), null, error.Code);
+            throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException) {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.writeText cancelled");
@@ -113,12 +125,8 @@ public static class SafeFileSystem
 
     private static string NormalizeRelative(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) ||
-            Uri.TryCreate(path, UriKind.Absolute, out _) ||
-            Path.IsPathFullyQualified(path) ||
-            path.StartsWith('\\') ||
-            path.StartsWith('/')) {
-            throw Error(SandboxErrorCode.PermissionDenied, "file path denied: absolute paths are not allowed");
+        if (!SandboxLiteralConstraints.IsPortableRelativePath(path)) {
+            throw Error(SandboxErrorCode.PermissionDenied, "file path denied: path is not a portable relative path");
         }
 
         return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
@@ -242,6 +250,14 @@ public static class SafeFileSystem
 
     private static string EnsureTrailingSeparator(string path)
         => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    private static CancellationTokenSource CreateWallTimeToken(SandboxContext context, CancellationToken cancellationToken)
+    {
+        var remaining = context.Budget.RemainingWallTime();
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(remaining);
+        return timeout;
+    }
 
     private static long ReadLong(CapabilityGrant grant, string key, long fallback)
     {

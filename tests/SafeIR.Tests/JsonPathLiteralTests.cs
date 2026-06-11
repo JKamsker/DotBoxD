@@ -15,6 +15,14 @@ public sealed class JsonPathLiteralTests
     [InlineData("C:foo")]
     [InlineData("safe.txt:ads")]
     [InlineData("config//settings.json")]
+    [InlineData("./config/settings.json")]
+    [InlineData("sub/../config/settings.json")]
+    [InlineData("config/./settings.json")]
+    [InlineData("config/settings.json.")]
+    [InlineData("config/settings.json ")]
+    [InlineData("NUL")]
+    [InlineData("CON.txt")]
+    [InlineData("config/\u0001settings.json")]
     public void Path_literals_reject_non_portable_paths(string path)
     {
         var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
@@ -27,9 +35,8 @@ public sealed class JsonPathLiteralTests
 
     [Theory]
     [InlineData("config/settings.json")]
-    [InlineData("./config/settings.json")]
-    [InlineData("sub/../config/settings.json")]
-    public void Path_literals_allow_normalizable_relative_paths(string path)
+    [InlineData("sub/config/settings.json")]
+    public void Path_literals_allow_canonical_relative_paths(string path)
     {
         var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
 

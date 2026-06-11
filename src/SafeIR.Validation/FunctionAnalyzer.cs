@@ -91,6 +91,7 @@ internal sealed class FunctionAnalyzer
                 AnalyzeBlock(range.Body, child, returnType, ref effects);
                 return false;
             default:
+                _diagnostics.Add(new SandboxDiagnostic("E-STMT-UNKNOWN", $"unsupported statement '{statement.GetType().Name}'", Span: statement.Span));
                 return false;
         }
     }
@@ -114,8 +115,14 @@ internal sealed class FunctionAnalyzer
             UnaryExpression unary => AnalyzeUnary(unary, scope, ref effects),
             BinaryExpression binary => AnalyzeBinary(binary, scope, ref effects),
             CallExpression call => AnalyzeCall(call, scope, ref effects),
-            _ => SandboxType.Unit
+            _ => UnknownExpression(expression)
         };
+    }
+
+    private SandboxType UnknownExpression(Expression expression)
+    {
+        _diagnostics.Add(new SandboxDiagnostic("E-EXPR-UNKNOWN", $"unsupported expression '{expression.GetType().Name}'", Span: expression.Span));
+        return SandboxType.Unit;
     }
 
     private static SandboxType LiteralType(LiteralExpression literal, ref SandboxEffect effects)
@@ -158,13 +165,7 @@ internal sealed class FunctionAnalyzer
     }
 
     private static bool IsPortableRelativePath(string path)
-        => !string.IsNullOrWhiteSpace(path) &&
-           !path.Contains('\\') &&
-           !path.Contains(':') &&
-           !path.StartsWith("/", StringComparison.Ordinal) &&
-           !Uri.TryCreate(path, UriKind.Absolute, out _) &&
-           !Path.IsPathRooted(path) &&
-           !path.Split('/').Any(segment => segment is "");
+        => SandboxLiteralConstraints.IsPortableRelativePath(path);
 
     private static bool IsSandboxUri(string value)
         => !string.IsNullOrWhiteSpace(value) &&

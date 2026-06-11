@@ -66,6 +66,8 @@ public static class CanonicalModuleHasher
                 range.Body.ToList().ForEach(s => WriteStatement(writer, s));
                 writer.Write("endfor");
                 break;
+            default:
+                throw new NotSupportedException(statement.GetType().Name);
         }
     }
 

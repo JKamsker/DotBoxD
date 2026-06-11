@@ -70,7 +70,7 @@ internal sealed class InterpreterEvaluator
             case ForRangeStatement range:
                 return await ExecuteForAsync(range, frame).ConfigureAwait(false);
             default:
-                return null;
+                throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported statement"));
         }
     }
 

@@ -29,9 +29,32 @@ public sealed class PathUriLiteralValidationTests
     [InlineData(@"C:\Windows\win.ini")]
     [InlineData("/etc/passwd")]
     [InlineData("file:///etc/passwd")]
+    [InlineData("../secret.txt")]
+    [InlineData("config/../../secret.txt")]
+    [InlineData("./config/settings.json")]
+    [InlineData("NUL")]
+    [InlineData("CON.txt")]
+    [InlineData("config/name.")]
+    [InlineData("config/name ")]
+    [InlineData("config/\u0001settings.json")]
     public void Path_factory_rejects_non_portable_values(string path)
     {
         Assert.Throws<ArgumentException>(() => SandboxValue.FromPath(path));
+    }
+
+    [Theory]
+    [InlineData("../secret.txt")]
+    [InlineData("config/../../secret.txt")]
+    [InlineData("NUL")]
+    [InlineData("config/\u0001settings.json")]
+    public void Path_literals_reject_invalid_json_values(string path)
+    {
+        var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
+
+        var ex = Assert.Throws<SandboxValidationException>(() =>
+            SafeIrJsonImporter.Import(ModuleWithReturn("SandboxPath", expression)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
 
     [Theory]
@@ -42,12 +65,17 @@ public sealed class PathUriLiteralValidationTests
         Assert.Throws<ArgumentException>(() => SandboxValue.FromUri(uri));
     }
 
-    [Fact]
-    public async Task Programmatic_path_literal_rejects_non_portable_value()
+    [Theory]
+    [InlineData(@"C:\Windows\win.ini")]
+    [InlineData("../secret.txt")]
+    [InlineData("NUL")]
+    [InlineData("config/name.")]
+    [InlineData("config/\u0001settings.json")]
+    public async Task Programmatic_path_literal_rejects_non_portable_value(string path)
     {
         var module = ModuleWithValue(
             SandboxType.SandboxPath,
-            new SandboxPathValue(new SandboxPath(@"C:\Windows\win.ini")));
+            new SandboxPathValue(new SandboxPath(path)));
 
         var ex = await PrepareThrowsAsync(module);
 

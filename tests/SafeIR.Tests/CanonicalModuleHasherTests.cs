@@ -89,14 +89,39 @@ public sealed class CanonicalModuleHasherTests
     public void Canonical_serialization_escapes_internal_control_separators()
     {
         var module = SafeIrJsonImporter.Import(ModuleWithReturn(
-            """{ "string": "a\u001fb\r\nc\\d" }""",
+            """{ "string": "a\u0000b\u001fc\r\n\t\\d" }""",
             "String"));
 
         var serialized = CanonicalModuleHasher.Serialize(module);
 
+        Assert.Contains(@"\u0000", serialized);
         Assert.Contains("u001f", serialized);
+        Assert.Contains(@"\t", serialized);
         Assert.DoesNotContain(serialized, c => c == (char)0x1f);
+        Assert.DoesNotContain(serialized, c => c == (char)0x00);
+        Assert.DoesNotContain(serialized, c => c == '\t');
         Assert.DoesNotContain("\r", serialized);
+    }
+
+    [Fact]
+    public void Canonical_serialization_rejects_unknown_statement_shape()
+    {
+        var module = new SandboxModule(
+            "unknown-statement",
+            SemVersion.One,
+            SandboxLanguage.CurrentVersion,
+            [],
+            [
+                new SandboxFunction(
+                    "main",
+                    true,
+                    [],
+                    SandboxType.Unit,
+                    [new UnknownStatement(new SourceSpan(0, 0))])
+            ],
+            new Dictionary<string, string>());
+
+        Assert.Throws<NotSupportedException>(() => CanonicalModuleHasher.Serialize(module));
     }
 
     [Fact]
@@ -218,4 +243,6 @@ public sealed class CanonicalModuleHasherTests
           ]
         }
         """;
+
+    private sealed record UnknownStatement(SourceSpan Span) : Statement(Span);
 }

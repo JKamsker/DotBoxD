@@ -43,5 +43,16 @@ internal static class SafeIpAddressClassifier
            bytes[0] == 0xff ||
            (bytes[0] & 0xfe) == 0xfc ||
            (bytes[0] & 0xe0) != 0x20 ||
-           bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8;
+           IsIetfProtocolAssignment(bytes) ||
+           IsDocumentation(bytes) ||
+           Is6To4(bytes);
+
+    private static bool IsIetfProtocolAssignment(byte[] bytes)
+        => bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] <= 0x01;
+
+    private static bool IsDocumentation(byte[] bytes)
+        => bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8;
+
+    private static bool Is6To4(byte[] bytes)
+        => bytes[0] == 0x20 && bytes[1] == 0x02;
 }

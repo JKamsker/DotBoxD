@@ -1,8 +1,14 @@
 namespace SafeIR;
 
-internal static class SandboxLiteralConstraints
+public static class SandboxLiteralConstraints
 {
     public const int MaxTextLiteralLength = 65_536;
+
+    private static readonly HashSet<string> ReservedWindowsDeviceNames = new(StringComparer.OrdinalIgnoreCase) {
+        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
 
     public static bool IsPortableRelativePath(string? path)
     {
@@ -11,12 +17,25 @@ internal static class SandboxLiteralConstraints
             path.Contains(':') ||
             path.StartsWith("/", StringComparison.Ordinal) ||
             Uri.TryCreate(path, UriKind.Absolute, out _) ||
-            Path.IsPathRooted(path) ||
-            path.Split('/').Any(segment => segment is "")) {
+            Path.IsPathRooted(path)) {
             return false;
         }
 
-        return true;
+        return path.Split('/').All(IsValidPathSegment);
+    }
+
+    private static bool IsValidPathSegment(string segment)
+    {
+        if (segment is "" or "." or ".." ||
+            segment.Any(char.IsControl) ||
+            segment.EndsWith(' ') ||
+            segment.EndsWith('.')) {
+            return false;
+        }
+
+        var extensionStart = segment.IndexOf('.', StringComparison.Ordinal);
+        var deviceName = extensionStart < 0 ? segment : segment[..extensionStart];
+        return !ReservedWindowsDeviceNames.Contains(deviceName);
     }
 
     public static bool IsSandboxUri(string? value)
@@ -26,6 +45,6 @@ internal static class SandboxLiteralConstraints
            !string.IsNullOrWhiteSpace(uri.Host) &&
            string.IsNullOrEmpty(uri.UserInfo);
 
-    public static ValueShape TextShape(string value)
+    internal static ValueShape TextShape(string value)
         => new(0, 0, 0, 0, value.Length, value.Length * sizeof(char));
 }

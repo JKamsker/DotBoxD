@@ -36,9 +36,39 @@ internal static class CanonicalEncoding
     }
 
     private static string Escape(string value)
-        => value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\u001f", "\\u001f", StringComparison.Ordinal)
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal);
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value) {
+            AppendEscaped(builder, character);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendEscaped(StringBuilder builder, char character)
+    {
+        switch (character) {
+            case '\\':
+                builder.Append(@"\\");
+                break;
+            case '\r':
+                builder.Append(@"\r");
+                break;
+            case '\n':
+                builder.Append(@"\n");
+                break;
+            case '\t':
+                builder.Append(@"\t");
+                break;
+            default:
+                if (char.IsControl(character)) {
+                    builder.Append(@"\u");
+                    builder.Append(((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+                    return;
+                }
+
+                builder.Append(character);
+                break;
+        }
+    }
 }

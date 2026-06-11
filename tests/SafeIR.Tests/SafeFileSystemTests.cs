@@ -29,44 +29,14 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    public async Task File_read_path_traversal_is_denied(string path)
+    public async Task File_read_path_traversal_is_denied_at_import(string path)
     {
-        using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
-        var policy = SandboxPolicyBuilder.Create()
-            .GrantFileRead(temp.Path, 1024)
-            .WithFuel(5_000)
-            .Build();
-        var plan = await host.PrepareAsync(module, policy);
 
-        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path)));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-    }
-
-    [Theory]
-    [InlineData("./config/settings.json")]
-    [InlineData("sub/../config/settings.json")]
-    public async Task Normalized_file_read_paths_inside_root_are_allowed(string path)
-    {
-        using var temp = TempDirectory.Create();
-        Directory.CreateDirectory(Path.Combine(temp.Path, "config"));
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
-
-        var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
-        var policy = SandboxPolicyBuilder.Create()
-            .GrantFileRead(temp.Path, 1024)
-            .WithFuel(5_000)
-            .Build();
-        var plan = await host.PrepareAsync(module, policy);
-
-        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
-
-        Assert.True(result.Succeeded);
-        Assert.Equal("tenant-settings", ((StringValue)result.Value!).Value);
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
 
     [Fact]
@@ -169,21 +139,14 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    public async Task File_write_path_traversal_is_denied(string path)
+    public async Task File_write_path_traversal_is_denied_at_import(string path)
     {
-        using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson(path, "blocked"));
-        var policy = SandboxPolicyBuilder.Create()
-            .GrantFileWrite(temp.Path, 1024)
-            .WithFuel(5_000)
-            .Build();
-        var plan = await host.PrepareAsync(module, policy);
 
-        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.ParseJsonAsync(FileWriteJson(path, "blocked")));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
 
     [Fact]
