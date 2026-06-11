@@ -8,6 +8,9 @@ using System.Security.Cryptography;
 
 public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
 {
+    private const string GeneratedNamespace = "SafeIR.Generated";
+    private const string GeneratedTypePrefix = "Module_";
+
     public ValueTask<VerificationResult> VerifyAsync(
         ReadOnlyMemory<byte> assemblyBytes,
         ArtifactManifest manifest,
@@ -142,6 +145,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
         TypeDefinition type,
         List<VerificationDiagnostic> diagnostics)
     {
+        VerifyGeneratedTypeName(reader, type, diagnostics);
         var visibility = type.Attributes & TypeAttributes.VisibilityMask;
         if (visibility != TypeAttributes.Public) {
             diagnostics.Add(new VerificationDiagnostic("V-PUBLIC-SURFACE", "generated type must be public"));
@@ -159,6 +163,28 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
             diagnostics.Add(new VerificationDiagnostic("V-TYPE-SHAPE", "generated type must not be an interface"));
         }
     }
+
+    private static void VerifyGeneratedTypeName(
+        MetadataReader reader,
+        TypeDefinition type,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var ns = reader.GetString(type.Namespace);
+        var name = reader.GetString(type.Name);
+        if (ns == GeneratedNamespace &&
+            name.StartsWith(GeneratedTypePrefix, StringComparison.Ordinal) &&
+            name.Length == GeneratedTypePrefix.Length + 16 &&
+            name[GeneratedTypePrefix.Length..].All(IsLowerHex)) {
+            return;
+        }
+
+        diagnostics.Add(new VerificationDiagnostic(
+            "V-PUBLIC-SURFACE",
+            "generated type name must match SafeIR.Generated.Module_<16-hex-hash>"));
+    }
+
+    private static bool IsLowerHex(char value)
+        => value is >= '0' and <= '9' or >= 'a' and <= 'f';
 
     private static void VerifyFields(MetadataReader reader, TypeDefinition type, List<VerificationDiagnostic> diagnostics)
     {
