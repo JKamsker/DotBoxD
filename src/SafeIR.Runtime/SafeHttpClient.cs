@@ -97,7 +97,9 @@ public static class SafeHttpClient
 
         context.ChargeFuel(75 + memory.Length);
         context.ChargeAllocation(memory.Length);
-        return Encoding.UTF8.GetString(memory.ToArray());
+        var text = Encoding.UTF8.GetString(memory.ToArray());
+        context.ChargeString(text);
+        return text;
     }
 
     private static void RequireAllowedScheme(CapabilityGrant grant, Uri uri)

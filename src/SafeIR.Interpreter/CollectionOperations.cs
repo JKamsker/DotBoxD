@@ -110,7 +110,7 @@ internal static class CollectionOperations
 
     private static SandboxValue Charge(SandboxContext context, SandboxValue value)
     {
-        context.ChargeCollection(value);
+        context.ChargeValue(value);
         return value;
     }
 

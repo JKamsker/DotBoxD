@@ -29,7 +29,7 @@ public static class StringBindings
             BindingSafety.PureIntrinsic,
             (ctx, args, _) => {
                 var text = ((StringValue)args[0]).Value + ((StringValue)args[1]).Value;
-                ctx.ChargeAllocation(text.Length * sizeof(char));
+                ctx.ChargeString(text);
                 return ValueTask.FromResult(SandboxValue.FromString(text));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.ConcatString)))

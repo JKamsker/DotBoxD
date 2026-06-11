@@ -45,10 +45,14 @@ public sealed class ResourceBudget
     public long MaxNetworkBytesRead { get; }
     public int MaxLogEvents { get; }
     public int MaxLogMessageLength { get; }
+    public int MaxStringLength { get; }
+    public long MaxTotalStringBytes { get; }
 
     public void ChargeFuel(long amount);
     public void ChargeAllocation(long bytes);
     public void ChargeCollection(SandboxValue value);
+    public void ChargeValue(SandboxValue value);
+    public void ChargeString(string value);
     public void ChargeLogEvent(string message);
     public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null);
 }
@@ -171,6 +175,10 @@ Policy example:
 ```
 
 Reject huge string constants at validation time.
+
+Runtime must also check strings produced after validation: string literals as they are
+evaluated, entrypoint inputs, nested strings inside sandbox collections, string
+concatenation, and strings returned by host APIs such as file/network bindings.
 
 ## Host call limits
 

@@ -16,14 +16,15 @@ internal sealed class ExpressionEvaluator
     public async ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
     {
         _context.ChargeFuel(1);
-        return expression switch {
-            LiteralExpression literal => literal.Value,
+        var value = expression switch {
+            LiteralExpression literal => ChargeLiteral(literal.Value),
             VariableExpression variable => frame.Locals[variable.Name],
             UnaryExpression unary => await EvaluateUnaryAsync(unary, frame).ConfigureAwait(false),
             BinaryExpression binary => await EvaluateBinaryAsync(binary, frame).ConfigureAwait(false),
             CallExpression call => await EvaluateCallAsync(call, frame).ConfigureAwait(false),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
+        return value;
     }
 
     private async ValueTask<SandboxValue> EvaluateUnaryAsync(UnaryExpression unary, InterpreterFrame frame)
@@ -129,8 +130,17 @@ internal sealed class ExpressionEvaluator
     private SandboxValue Concat(string left, string right)
     {
         var text = left + right;
-        _context.ChargeAllocation(text.Length * sizeof(char));
+        _context.ChargeString(text);
         return SandboxValue.FromString(text);
+    }
+
+    private SandboxValue ChargeLiteral(SandboxValue value)
+    {
+        if (value is StringValue) {
+            _context.ChargeValue(value);
+        }
+
+        return value;
     }
 
     private static SandboxValue Arg(IReadOnlyList<SandboxValue> args, int index)

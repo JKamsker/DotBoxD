@@ -60,6 +60,7 @@ public sealed record SandboxPolicy(
         builder.Append('|').Append(ResourceLimits.MaxFileBytesRead).Append('|').Append(ResourceLimits.MaxFileBytesWritten);
         builder.Append('|').Append(ResourceLimits.MaxNetworkBytesRead).Append('|').Append(ResourceLimits.MaxLogEvents);
         builder.Append('|').Append(ResourceLimits.MaxLogMessageLength);
+        builder.Append('|').Append(ResourceLimits.MaxStringLength).Append('|').Append(ResourceLimits.MaxTotalStringBytes);
     }
 }
 
@@ -221,6 +222,18 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithMaxLogMessageLength(int length)
     {
         _limits = _limits with { MaxLogMessageLength = length };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxStringLength(int length)
+    {
+        _limits = _limits with { MaxStringLength = length };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxTotalStringBytes(long bytes)
+    {
+        _limits = _limits with { MaxTotalStringBytes = bytes };
         return this;
     }
 

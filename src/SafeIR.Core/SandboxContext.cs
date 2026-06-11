@@ -60,6 +60,10 @@ public sealed class SandboxContext
 
     public void ChargeCollection(SandboxValue value) => Budget.ChargeCollection(value);
 
+    public void ChargeValue(SandboxValue value) => Budget.ChargeValue(value);
+
+    public void ChargeString(string value) => Budget.ChargeString(value);
+
     public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
 
     public void ChargeBindingCall(BindingDescriptor descriptor)

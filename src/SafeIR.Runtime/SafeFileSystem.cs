@@ -25,7 +25,7 @@ public static class SafeFileSystem
             context.Budget.ChargeFileRead(info.Length);
             context.ChargeFuel(50 + info.Length);
             var text = await File.ReadAllTextAsync(info.FullName, cancellationToken).ConfigureAwait(false);
-            context.ChargeAllocation(text.Length * sizeof(char));
+            context.ChargeString(text);
             AuditRead(context, startedAt, true, resolved.SanitizedPath, info.Length, null);
             return text;
         }

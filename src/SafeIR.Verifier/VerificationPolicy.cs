@@ -20,7 +20,7 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.GetInputArgument",
             "SafeIR.Runtime.CompiledRuntime.I32",
             "SafeIR.Runtime.CompiledRuntime.Bool",
-            "SafeIR.Runtime.CompiledRuntime.String",
+            "SafeIR.Runtime.CompiledRuntime.StringConst",
             "SafeIR.Runtime.CompiledRuntime.AsI32",
             "SafeIR.Runtime.CompiledRuntime.AsBool",
             "SafeIR.Runtime.CompiledRuntime.AddI32",

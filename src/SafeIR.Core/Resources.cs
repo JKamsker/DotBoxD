@@ -16,7 +16,9 @@ public sealed record ResourceLimits(
     long MaxFileBytesWritten = 0,
     long MaxNetworkBytesRead = 1_048_576,
     int MaxLogEvents = 100,
-    int MaxLogMessageLength = 4_096)
+    int MaxLogMessageLength = 4_096,
+    int MaxStringLength = 65_536,
+    long MaxTotalStringBytes = 1_048_576)
 {
     public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100);
 }
@@ -42,6 +44,7 @@ public sealed class ResourceMeter
     public long NetworkBytesRead { get; private set; }
     public int LogEvents { get; private set; }
     public long CollectionElements { get; private set; }
+    public long StringBytes { get; private set; }
 
     public SandboxResourceUsage Snapshot()
         => new(
@@ -53,7 +56,8 @@ public sealed class ResourceMeter
             FileBytesWritten,
             NetworkBytesRead,
             LogEvents,
-            CollectionElements);
+            CollectionElements,
+            StringBytes);
 
     public void ChargeFuel(long amount)
     {
@@ -82,7 +86,7 @@ public sealed class ResourceMeter
 
     public void ChargeCollection(SandboxValue value)
     {
-        var shape = MeasureCollection(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        var shape = MeasureValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
         if (shape.MaxListLength > Limits.MaxListLength) {
             throw Quota("list length budget exhausted");
         }
@@ -99,6 +103,41 @@ public sealed class ResourceMeter
         if (CollectionElements > Limits.MaxTotalCollectionElements) {
             throw Quota("collection element budget exhausted");
         }
+
+        ChargeStringShape(shape);
+    }
+
+    public void ChargeValue(SandboxValue value)
+    {
+        var shape = MeasureValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        if (shape.MaxStringLength > Limits.MaxStringLength) {
+            throw Quota("string length budget exhausted");
+        }
+
+        if (shape.MaxListLength > Limits.MaxListLength) {
+            throw Quota("list length budget exhausted");
+        }
+
+        if (shape.MaxMapEntries > Limits.MaxMapEntries) {
+            throw Quota("map entry budget exhausted");
+        }
+
+        if (shape.Depth > Limits.MaxCollectionDepth) {
+            throw Quota("collection depth budget exhausted");
+        }
+
+        CollectionElements += shape.Elements;
+        if (CollectionElements > Limits.MaxTotalCollectionElements) {
+            throw Quota("collection element budget exhausted");
+        }
+
+        ChargeStringShape(shape);
+    }
+
+    public void ChargeString(string value)
+    {
+        var bytes = value.Length * sizeof(char);
+        ChargeStringShape(new ValueShape(0, 0, 0, 0, value.Length, bytes));
     }
 
     public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null)
@@ -161,20 +200,37 @@ public sealed class ResourceMeter
     private static SandboxRuntimeException Quota(string message)
         => new(new SandboxError(SandboxErrorCode.QuotaExceeded, message));
 
-    private static CollectionShape MeasureCollection(SandboxValue value, HashSet<object> stack)
+    private void ChargeStringShape(ValueShape shape)
+    {
+        if (shape.MaxStringLength > Limits.MaxStringLength) {
+            throw Quota("string length budget exhausted");
+        }
+
+        if (shape.StringBytes > 0) {
+            ChargeAllocation(shape.StringBytes);
+        }
+
+        StringBytes += shape.StringBytes;
+        if (StringBytes > Limits.MaxTotalStringBytes) {
+            throw Quota("string byte budget exhausted");
+        }
+    }
+
+    private static ValueShape MeasureValue(SandboxValue value, HashSet<object> stack)
         => value switch {
             ListValue list => MeasureList(list, stack),
             MapValue map => MeasureMap(map, stack),
-            _ => new CollectionShape(0, 0, 0, 0)
+            StringValue text => new ValueShape(0, 0, 0, 0, text.Value.Length, text.Value.Length * sizeof(char)),
+            _ => new ValueShape(0, 0, 0, 0, 0, 0)
         };
 
-    private static CollectionShape MeasureList(ListValue list, HashSet<object> stack)
+    private static ValueShape MeasureList(ListValue list, HashSet<object> stack)
     {
         Enter(list, stack);
         try {
-            var shape = new CollectionShape(list.Values.Count, list.Values.Count, 0, 1);
+            var shape = new ValueShape(list.Values.Count, list.Values.Count, 0, 1, 0, 0);
             foreach (var item in list.Values) {
-                shape = shape.Combine(MeasureCollection(item, stack));
+                shape = shape.Combine(MeasureValue(item, stack));
             }
 
             return shape;
@@ -184,15 +240,15 @@ public sealed class ResourceMeter
         }
     }
 
-    private static CollectionShape MeasureMap(MapValue map, HashSet<object> stack)
+    private static ValueShape MeasureMap(MapValue map, HashSet<object> stack)
     {
         Enter(map, stack);
         try {
-            var shape = new CollectionShape(map.Values.Count, 0, map.Values.Count, 1);
+            var shape = new ValueShape(map.Values.Count, 0, map.Values.Count, 1, 0, 0);
             foreach (var pair in map.Values) {
                 shape = shape
-                    .Combine(MeasureCollection(pair.Key, stack))
-                    .Combine(MeasureCollection(pair.Value, stack));
+                    .Combine(MeasureValue(pair.Key, stack))
+                    .Combine(MeasureValue(pair.Value, stack));
             }
 
             return shape;
@@ -219,14 +275,23 @@ public sealed record SandboxResourceUsage(
     long FileBytesWritten,
     long NetworkBytesRead,
     int LogEvents,
-    long CollectionElements);
+    long CollectionElements,
+    long StringBytes);
 
-internal readonly record struct CollectionShape(long Elements, int MaxListLength, int MaxMapEntries, int Depth)
+internal readonly record struct ValueShape(
+    long Elements,
+    int MaxListLength,
+    int MaxMapEntries,
+    int Depth,
+    int MaxStringLength,
+    long StringBytes)
 {
-    public CollectionShape Combine(CollectionShape nested)
+    public ValueShape Combine(ValueShape nested)
         => new(
             Elements + nested.Elements,
             Math.Max(MaxListLength, nested.MaxListLength),
             Math.Max(MaxMapEntries, nested.MaxMapEntries),
-            Math.Max(Depth, nested.Depth == 0 ? Depth : nested.Depth + 1));
+            Math.Max(Depth, nested.Depth == 0 ? Depth : nested.Depth + 1),
+            Math.Max(MaxStringLength, nested.MaxStringLength),
+            StringBytes + nested.StringBytes);
 }

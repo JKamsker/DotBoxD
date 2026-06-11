@@ -23,7 +23,13 @@ public static class CompiledRuntime
 
     public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
-    public static SandboxValue String(string value) => SandboxValue.FromString(value);
+    private static SandboxValue String(string value) => SandboxValue.FromString(value);
+
+    public static SandboxValue StringConst(SandboxContext context, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromString(value);
+    }
 
     public static int AsI32(SandboxValue value) => ((I32Value)value).Value;
 
@@ -66,7 +72,7 @@ public static class CompiledRuntime
     public static SandboxValue ConcatString(SandboxContext context, SandboxValue left, SandboxValue right)
     {
         var text = ((StringValue)left).Value + ((StringValue)right).Value;
-        context.ChargeAllocation(text.Length * sizeof(char));
+        context.ChargeString(text);
         return String(text);
     }
 

@@ -115,13 +115,15 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements);
     public SandboxPolicyBuilder WithMaxLogEvents(int events);
     public SandboxPolicyBuilder WithMaxLogMessageLength(int length);
+    public SandboxPolicyBuilder WithMaxStringLength(int length);
+    public SandboxPolicyBuilder WithMaxTotalStringBytes(long bytes);
     public SandboxPolicyBuilder Deterministic(DateTimeOffset logicalNow, ulong randomSeed);
     public SandboxPolicy Build();
 }
 ```
 
 `SandboxResourceUsage` reports fuel, allocation bytes, host calls, file/network bytes,
-log events, and cumulative collection elements charged during the run.
+log events, cumulative collection elements, and string bytes charged during the run.
 
 ## Binding registration
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
+using SafeIR.Runtime;
 using SafeIR.Verifier;
 
 namespace SafeIR.Tests;
@@ -17,7 +18,8 @@ public sealed class VerifierTests
             { "PInvoke ImplMap", PInvokeAssembly, ["V-PINVOKE", "V-METHOD-PINVOKE"] },
             { "ldtoken opcode", LdTokenAssembly, ["V-OPCODE"] },
             { "mutable static field", MutableStaticFieldAssembly, ["V-FIELD-STATIC"] },
-            { "static constructor", StaticConstructorAssembly, ["V-METHOD-SPECIAL"] }
+            { "static constructor", StaticConstructorAssembly, ["V-METHOD-SPECIAL"] },
+            { "unbudgeted CompiledRuntime.String", UnbudgetedStringFactoryAssembly, ["V-MEMBER"] }
         };
 
     [Theory]
@@ -139,6 +141,21 @@ public sealed class VerifierTests
             cctor.GetILGenerator().Emit(OpCodes.Ret);
             var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(void), []);
             method.GetILGenerator().Emit(OpCodes.Ret);
+        });
+
+    private static byte[] UnbudgetedStringFactoryAssembly()
+        => BuildAssembly(type => {
+            var factory = typeof(CompiledRuntime).GetMethod(
+                "String",
+                BindingFlags.NonPublic | BindingFlags.Static,
+                binder: null,
+                types: [typeof(string)],
+                modifiers: null)!;
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(SandboxValue), []);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldstr, "unchecked");
+            il.Emit(OpCodes.Call, factory);
+            il.Emit(OpCodes.Ret);
         });
 
     private static byte[] BuildAssembly(Action<TypeBuilder> define)

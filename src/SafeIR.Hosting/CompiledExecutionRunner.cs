@@ -19,7 +19,7 @@ internal static class CompiledExecutionRunner
         var startedAt = DateTimeOffset.UtcNow;
 
         try {
-            context.ChargeCollection(input);
+            context.ChargeValue(input);
             var value = artifact.Entrypoint(context, input);
             WriteSummary(audit, runId, startedAt, plan, artifact, budget, true, null);
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, true, value, null));

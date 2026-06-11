@@ -160,8 +160,9 @@ internal sealed class MethodEmitter
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
                 break;
             case StringValue text:
+                _il.Emit(OpCodes.Ldarg_0);
                 _il.Emit(OpCodes.Ldstr, text.Value);
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.String)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringConst)));
                 break;
             default:
                 EmitUnsupported("literal not supported by compiler");
