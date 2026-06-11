@@ -46,10 +46,7 @@ internal sealed class FunctionAnalyzer
         var effects = SandboxEffect.Cpu;
         var alwaysReturns = false;
         foreach (var statement in function.Body) {
-            alwaysReturns = AnalyzeStatement(statement, scope, function.ReturnType, ref effects);
-            if (alwaysReturns) {
-                break;
-            }
+            alwaysReturns |= AnalyzeStatement(statement, scope, function.ReturnType, ref effects);
         }
 
         if (!alwaysReturns) {
@@ -98,13 +95,12 @@ internal sealed class FunctionAnalyzer
 
     private bool AnalyzeBlock(IReadOnlyList<Statement> block, FunctionScope scope, SandboxType returnType, ref SandboxEffect effects)
     {
+        var alwaysReturns = false;
         foreach (var statement in block) {
-            if (AnalyzeStatement(statement, scope, returnType, ref effects)) {
-                return true;
-            }
+            alwaysReturns |= AnalyzeStatement(statement, scope, returnType, ref effects);
         }
 
-        return false;
+        return alwaysReturns;
     }
 
     private SandboxType AnalyzeExpression(Expression expression, FunctionScope scope, ref SandboxEffect effects)
@@ -182,6 +178,7 @@ internal sealed class FunctionAnalyzer
 
     private SandboxType AnalyzeCall(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
+        ValidateGenericType(call);
         if (_collections.TryAnalyze(call, scope, ref effects, out var collectionType)) {
             return collectionType;
         }
@@ -204,6 +201,21 @@ internal sealed class FunctionAnalyzer
 
         _diagnostics.Add(new SandboxDiagnostic("E-CALL-UNKNOWN", $"unknown function or binding '{call.Name}'", Span: call.Span));
         return SandboxType.Unit;
+    }
+
+    private void ValidateGenericType(CallExpression call)
+    {
+        if (call.GenericType is null) {
+            return;
+        }
+
+        if (!call.GenericType.IsKnown() || call.GenericType.IsForbidden()) {
+            _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{call.GenericType}'", Span: call.Span));
+        }
+
+        if (call.Name is not ("list.empty" or "map.empty")) {
+            _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", $"call '{call.Name}' does not accept genericType", Span: call.Span));
+        }
     }
 
     private void CheckArguments(CallExpression call, IReadOnlyList<SandboxType> expected, FunctionScope scope, ref SandboxEffect effects)

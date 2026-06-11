@@ -15,6 +15,10 @@ internal static class PolicyResolver
             return;
         }
 
+        if (!policy.AllowedEffects.ContainsOnlyKnownBits()) {
+            diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "policy declares unknown effects"));
+        }
+
         foreach (var request in module.CapabilityRequests) {
             if (!policy.GrantsCapability(request.Id)) {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"requested capability '{request.Id}' is not granted"));
@@ -42,9 +46,22 @@ internal static class PolicyResolver
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires a random seed for Random effects"));
             }
 
-            if ((requiredEffects & SandboxEffect.Network) != 0) {
-                diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy denies Network effects"));
+            var externalEffects = ExternalEffects(requiredEffects | policy.AllowedEffects);
+            if (externalEffects != SandboxEffect.None) {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "E-POLICY-DETERMINISM",
+                    $"deterministic policy denies external effects {externalEffects}"));
             }
         }
     }
+
+    private static SandboxEffect ExternalEffects(SandboxEffect effects)
+        => effects & (
+            SandboxEffect.FileRead |
+            SandboxEffect.FileWrite |
+            SandboxEffect.Network |
+            SandboxEffect.GameStateRead |
+            SandboxEffect.GameStateWrite |
+            SandboxEffect.DatabaseRead |
+            SandboxEffect.DatabaseWrite);
 }
