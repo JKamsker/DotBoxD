@@ -6,12 +6,18 @@ internal sealed class ExpressionEvaluator
 {
     private readonly SandboxContext _context;
     private readonly InterpreterEvaluator _interpreter;
+    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
 
-    public ExpressionEvaluator(SandboxContext context, InterpreterEvaluator interpreter, SandboxExecutionOptions options)
+    public ExpressionEvaluator(
+        SandboxContext context,
+        InterpreterEvaluator interpreter,
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
+        SandboxExecutionOptions options)
     {
         _context = context;
         _interpreter = interpreter;
+        _functionAnalysis = functionAnalysis;
         _options = options;
     }
 
@@ -42,6 +48,28 @@ internal sealed class ExpressionEvaluator
 
     private async ValueTask<SandboxValue> EvaluateBinaryAsync(BinaryExpression binary, InterpreterFrame frame)
     {
+        if (binary.Operator == "&&") {
+            var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
+            var first = (BoolValue)await EvaluateAsync(order.First, frame).ConfigureAwait(false);
+            if (!first.Value) {
+                return SandboxValue.FromBool(false);
+            }
+
+            var second = (BoolValue)await EvaluateAsync(order.Second, frame).ConfigureAwait(false);
+            return SandboxValue.FromBool(second.Value);
+        }
+
+        if (binary.Operator == "||") {
+            var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
+            var first = (BoolValue)await EvaluateAsync(order.First, frame).ConfigureAwait(false);
+            if (first.Value) {
+                return SandboxValue.FromBool(true);
+            }
+
+            var second = (BoolValue)await EvaluateAsync(order.Second, frame).ConfigureAwait(false);
+            return SandboxValue.FromBool(second.Value);
+        }
+
         var left = await EvaluateAsync(binary.Left, frame).ConfigureAwait(false);
         var right = await EvaluateAsync(binary.Right, frame).ConfigureAwait(false);
         return binary.Operator switch {
@@ -49,19 +77,46 @@ internal sealed class ExpressionEvaluator
             "+" => SandboxValue.FromInt32(((I32Value)left).Value + ((I32Value)right).Value),
             "-" => SandboxValue.FromInt32(((I32Value)left).Value - ((I32Value)right).Value),
             "*" => SandboxValue.FromInt32(((I32Value)left).Value * ((I32Value)right).Value),
-            "/" => SandboxValue.FromInt32(((I32Value)left).Value / ((I32Value)right).Value),
-            "%" => SandboxValue.FromInt32(((I32Value)left).Value % ((I32Value)right).Value),
+            "/" => SandboxValue.FromInt32(DivideI32(((I32Value)left).Value, ((I32Value)right).Value)),
+            "%" => SandboxValue.FromInt32(RemainderI32(((I32Value)left).Value, ((I32Value)right).Value)),
             "==" => SandboxValue.FromBool(Equals(left, right)),
             "!=" => SandboxValue.FromBool(!Equals(left, right)),
             "<" => SandboxValue.FromBool(((I32Value)left).Value < ((I32Value)right).Value),
             "<=" => SandboxValue.FromBool(((I32Value)left).Value <= ((I32Value)right).Value),
             ">" => SandboxValue.FromBool(((I32Value)left).Value > ((I32Value)right).Value),
             ">=" => SandboxValue.FromBool(((I32Value)left).Value >= ((I32Value)right).Value),
-            "&&" => SandboxValue.FromBool(((BoolValue)left).Value && ((BoolValue)right).Value),
-            "||" => SandboxValue.FromBool(((BoolValue)left).Value || ((BoolValue)right).Value),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"))
         };
     }
+
+    private static int DivideI32(int left, int right)
+    {
+        if (right == 0) {
+            throw InvalidInput("division by zero");
+        }
+
+        if (left == int.MinValue && right == -1) {
+            throw InvalidInput("integer division overflow");
+        }
+
+        return left / right;
+    }
+
+    private static int RemainderI32(int left, int right)
+    {
+        if (right == 0) {
+            throw InvalidInput("division by zero");
+        }
+
+        if (left == int.MinValue && right == -1) {
+            return 0;
+        }
+
+        return left % right;
+    }
+
+    private static SandboxRuntimeException InvalidInput(string message)
+        => new(new SandboxError(SandboxErrorCode.InvalidInput, message));
 
     private async ValueTask<SandboxValue> EvaluateCallAsync(CallExpression call, InterpreterFrame frame)
     {

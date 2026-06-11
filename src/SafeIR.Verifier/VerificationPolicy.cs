@@ -33,6 +33,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("EnterCall", Context, Void),
                 RuntimeMember("ExitCall", Context, Void),
                 RuntimeMember("GetInputArgument", $"{Value},{Int32}", Value),
+                RuntimeMember("GetTypedInputArgument", $"{Value},{Int32},{Int32},{SandboxType}", Value),
                 RuntimeMember("I32", Int32, Value),
                 RuntimeMember("F64", Double, Value),
                 RuntimeMember("Bool", Boolean, Value),

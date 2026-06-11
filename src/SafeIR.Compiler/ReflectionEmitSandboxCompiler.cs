@@ -113,7 +113,12 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
 
         EmitExecute(execute.GetILGenerator(), function, functions[function.Id]);
         foreach (var item in plan.Module.Functions) {
-            new MethodEmitter(functions[item.Id].GetILGenerator(), item, methodReferences, plan.Bindings).Emit();
+            new MethodEmitter(
+                functions[item.Id].GetILGenerator(),
+                item,
+                methodReferences,
+                plan.Bindings,
+                plan.FunctionAnalysis).Emit();
         }
 
         type.CreateType();
@@ -154,11 +159,39 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         for (var i = 0; i < entrypoint.Parameters.Count; i++) {
             il.Emit(OpCodes.Ldarg_1);
             EmitInt32(il, i);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GetInputArgument)));
+            EmitInt32(il, entrypoint.Parameters.Count);
+            EmitType(entrypoint.Parameters[i].Type, il);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GetTypedInputArgument)));
         }
 
         il.Emit(OpCodes.Call, entrypointMethod);
         il.Emit(OpCodes.Ret);
+    }
+
+    private static void EmitType(SandboxType type, ILGenerator il)
+    {
+        if (type.Arguments.Count == 0) {
+            il.Emit(OpCodes.Ldstr, type.Name);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeScalar)));
+            return;
+        }
+
+        if (type is { Name: "List", Arguments.Count: 1 }) {
+            EmitType(type.Arguments[0], il);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeList)));
+            return;
+        }
+
+        if (type is { Name: "Map", Arguments.Count: 2 }) {
+            EmitType(type.Arguments[0], il);
+            EmitType(type.Arguments[1], il);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeMap)));
+            return;
+        }
+
+        throw new SandboxRuntimeException(new SandboxError(
+            SandboxErrorCode.ValidationError,
+            $"type '{type}' is not supported by compiler"));
     }
 
     private ArtifactManifest BuildManifest(ExecutionPlan plan, byte[] assemblyBytes, CompileOptions options)

@@ -222,6 +222,8 @@ interpret(plan, input) == compileAndRun(plan, input)
 ```
 
 For nondeterministic effects, compare under deterministic injected clock/random/network fixtures.
+Boolean `and`/`or` short-circuit decisions and cheap-first pure operand ordering must match
+between interpreted and compiled mode.
 
 ## Failure behavior
 

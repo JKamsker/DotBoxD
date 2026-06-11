@@ -23,6 +23,28 @@ public static class CompiledRuntime
         throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "entrypoint input argument mismatch"));
     }
 
+    public static SandboxValue GetTypedInputArgument(
+        SandboxValue input,
+        int index,
+        int parameterCount,
+        SandboxType expectedType)
+    {
+        SandboxValue value;
+        if (parameterCount == 1) {
+            value = input;
+        }
+        else if (input is ListValue list && list.Values.Count == parameterCount && index >= 0 && index < parameterCount) {
+            value = list.Values[index];
+        }
+        else {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "entrypoint input argument mismatch"));
+        }
+
+        return RequireType(value, expectedType, "entrypoint input argument type mismatch");
+    }
+
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
 
     public static SandboxValue F64(double value) => SandboxValue.FromDouble(value);
@@ -55,9 +77,9 @@ public static class CompiledRuntime
 
     public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) * AsI32(right));
 
-    public static SandboxValue DivI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) / AsI32(right));
+    public static SandboxValue DivI32(SandboxValue left, SandboxValue right) => I32(DivideI32(AsI32(left), AsI32(right)));
 
-    public static SandboxValue RemI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) % AsI32(right));
+    public static SandboxValue RemI32(SandboxValue left, SandboxValue right) => I32(RemainderI32(AsI32(left), AsI32(right)));
 
     public static SandboxValue NegI32(SandboxValue value) => I32(-AsI32(value));
 
@@ -224,11 +246,39 @@ public static class CompiledRuntime
     private static MapValue AsMap(SandboxValue value)
         => value as MapValue ?? throw InvalidInput("expected map value");
 
-    private static void RequireType(SandboxValue value, SandboxType expected, string message)
+    private static int DivideI32(int left, int right)
+    {
+        if (right == 0) {
+            throw InvalidInput("division by zero");
+        }
+
+        if (left == int.MinValue && right == -1) {
+            throw InvalidInput("integer division overflow");
+        }
+
+        return left / right;
+    }
+
+    private static int RemainderI32(int left, int right)
+    {
+        if (right == 0) {
+            throw InvalidInput("division by zero");
+        }
+
+        if (left == int.MinValue && right == -1) {
+            return 0;
+        }
+
+        return left % right;
+    }
+
+    private static SandboxValue RequireType(SandboxValue value, SandboxType expected, string message)
     {
         if (value.Type != expected) {
             throw InvalidInput(message);
         }
+
+        return value;
     }
 
     private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)
