@@ -4,7 +4,7 @@ using SafeIR;
 
 public static class SafeHttpBindings
 {
-    public static BindingDescriptor GetText(HttpMessageInvoker? invoker = null)
+    public static BindingDescriptor GetText(HttpMessageInvoker? invoker = null, SafeDnsResolver? dnsResolver = null)
         => new(
             "net.http.get",
             SemVersion.One,
@@ -20,6 +20,7 @@ public static class SafeHttpBindings
                     context,
                     ((SandboxUriValue)args[0]).Value,
                     invoker ?? SharedHttp.Invoker,
+                    dnsResolver,
                     cancellationToken).ConfigureAwait(false);
                 return SandboxValue.FromString(text);
             },
@@ -27,6 +28,8 @@ public static class SafeHttpBindings
 
     private static class SharedHttp
     {
-        public static readonly HttpMessageInvoker Invoker = new(new HttpClientHandler());
+        public static readonly HttpMessageInvoker Invoker = new(new HttpClientHandler {
+            AllowAutoRedirect = false
+        });
     }
 }

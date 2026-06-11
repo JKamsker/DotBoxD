@@ -50,6 +50,32 @@ public sealed class SafeFileSystemTests
     }
 
     [Fact]
+    public async Task File_read_denies_nested_reparse_point()
+    {
+        using var root = TempDirectory.Create();
+        using var outside = TempDirectory.Create();
+        Directory.CreateDirectory(Path.Combine(outside.Path, "sub"));
+        await File.WriteAllTextAsync(Path.Combine(outside.Path, "sub", "secret.txt"), "secret");
+        var link = Path.Combine(root.Path, "link");
+        if (!TryCreateDirectoryLink(link, outside.Path)) {
+            return;
+        }
+
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("link/sub/secret.txt"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(root.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
     public async Task File_write_is_denied_without_host_grant()
     {
         var host = SandboxTestHost.Create();
@@ -173,6 +199,23 @@ public sealed class SafeFileSystemTests
           ]
         }
         """;
+
+    private static bool TryCreateDirectoryLink(string link, string target)
+    {
+        try {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException) {
+            return false;
+        }
+        catch (UnauthorizedAccessException) {
+            return false;
+        }
+        catch (PlatformNotSupportedException) {
+            return false;
+        }
+    }
 
     private sealed class TempDirectory : IDisposable
     {

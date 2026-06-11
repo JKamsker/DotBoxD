@@ -5,12 +5,15 @@ using System.Net;
 using System.Text;
 using SafeIR;
 
+public delegate ValueTask<IReadOnlyList<IPAddress>> SafeDnsResolver(string host, CancellationToken cancellationToken);
+
 public static class SafeHttpClient
 {
     public static async ValueTask<string> GetTextAsync(
         SandboxContext context,
         SandboxUri uri,
         HttpMessageInvoker invoker,
+        SafeDnsResolver? dnsResolver,
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
@@ -19,8 +22,14 @@ public static class SafeHttpClient
             var request = ResolveRequest(context, uri);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(request.Timeout);
+            await RequireIpPolicyAsync(request.Grant, request.Uri.Host, dnsResolver ?? ResolveDnsAsync, timeout.Token)
+                .ConfigureAwait(false);
             using var message = new HttpRequestMessage(HttpMethod.Get, request.Uri);
             using var response = await invoker.SendAsync(message, timeout.Token).ConfigureAwait(false);
+            if (IsRedirect(response.StatusCode)) {
+                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+            }
+
             response.EnsureSuccessStatusCode();
             var text = await ReadLimitedTextAsync(context, response, request.MaxResponseBytes, timeout.Token).ConfigureAwait(false);
             Audit(context, startedAt, true, resource, Encoding.UTF8.GetByteCount(text), null);
@@ -61,11 +70,11 @@ public static class SafeHttpClient
 
         RequireAllowedScheme(grant, uri);
         RequireAllowedHost(grant, uri);
-        RequireIpPolicy(grant, uri.Host);
         return new SafeHttpRequest(
+            grant,
             uri,
             ReadLong(grant, "maxResponseBytes", context.Budget.Limits.MaxNetworkBytesRead),
-            TimeSpan.FromMilliseconds(ReadLong(grant, "timeoutMs", 2_000)));
+            ReadTimeout(grant));
     }
 
     private static async ValueTask<string> ReadLimitedTextAsync(
@@ -118,12 +127,29 @@ public static class SafeHttpClient
         }
     }
 
-    private static void RequireIpPolicy(CapabilityGrant grant, string host)
+    private static async ValueTask RequireIpPolicyAsync(
+        CapabilityGrant grant,
+        string host,
+        SafeDnsResolver dnsResolver,
+        CancellationToken cancellationToken)
     {
-        if (!IPAddress.TryParse(host, out var address)) {
+        if (IPAddress.TryParse(host, out var address)) {
+            RequireIpLiteralAllowed(grant, address);
             return;
         }
 
+        if (ReadBool(grant, "allowPrivateNetwork")) {
+            return;
+        }
+
+        var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
+        if (addresses.Any(IsPrivateOrLoopback)) {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
+        }
+    }
+
+    private static void RequireIpLiteralAllowed(CapabilityGrant grant, IPAddress address)
+    {
         if (!ReadBool(grant, "allowIpLiterals")) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: IP literals are not allowed");
         }
@@ -139,14 +165,47 @@ public static class SafeHttpClient
             return true;
         }
 
+        if (address.IsIPv4MappedToIPv6) {
+            return IsPrivateOrLoopback(address.MapToIPv4());
+        }
+
         var bytes = address.GetAddressBytes();
-        return bytes.Length == 4 && (
-            bytes[0] == 10 ||
-            bytes[0] == 127 ||
-            bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
-            bytes[0] == 192 && bytes[1] == 168 ||
-            bytes[0] == 169 && bytes[1] == 254);
+        if (bytes.Length == 4) {
+            return bytes[0] == 10 ||
+                   bytes[0] == 127 ||
+                   bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
+                   bytes[0] == 192 && bytes[1] == 168 ||
+                   bytes[0] == 169 && bytes[1] == 254;
+        }
+
+        return bytes.Length == 16 && (
+            address.IsIPv6LinkLocal ||
+            address.IsIPv6SiteLocal ||
+            (bytes[0] & 0xfe) == 0xfc);
     }
+
+    private static bool IsRedirect(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.MultipleChoices or
+            HttpStatusCode.Moved or
+            HttpStatusCode.Redirect or
+            HttpStatusCode.SeeOther or
+            HttpStatusCode.TemporaryRedirect or
+            HttpStatusCode.PermanentRedirect;
+
+    private static TimeSpan ReadTimeout(CapabilityGrant grant)
+    {
+        var milliseconds = ReadLong(grant, "timeoutMs", 2_000);
+        if (milliseconds <= 0 || milliseconds > 60_000) {
+            throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: timeout is outside the allowed range");
+        }
+
+        return TimeSpan.FromMilliseconds(milliseconds);
+    }
+
+    private static async ValueTask<IReadOnlyList<IPAddress>> ResolveDnsAsync(
+        string host,
+        CancellationToken cancellationToken)
+        => await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
 
     private static HashSet<string> ReadSet(CapabilityGrant grant, string key, string[] fallback)
     {
@@ -192,5 +251,5 @@ public static class SafeHttpClient
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
-    private sealed record SafeHttpRequest(Uri Uri, long MaxResponseBytes, TimeSpan Timeout);
+    private sealed record SafeHttpRequest(CapabilityGrant Grant, Uri Uri, long MaxResponseBytes, TimeSpan Timeout);
 }

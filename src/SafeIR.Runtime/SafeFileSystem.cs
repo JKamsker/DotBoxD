@@ -62,8 +62,10 @@ public static class SafeFileSystem
                 Directory.CreateDirectory(directory);
             }
 
+            EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             var tempPath = resolved.FullPath + ".tmp-" + Guid.NewGuid().ToString("N");
             await File.WriteAllBytesAsync(tempPath, bytes, cancellationToken).ConfigureAwait(false);
+            EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             File.Move(tempPath, resolved.FullPath, overwrite: true);
             context.ChargeFuel(50 + bytes.Length);
             AuditWrite(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
@@ -101,7 +103,7 @@ public static class SafeFileSystem
 
         EnsureNoReparsePoint(rootFull, fullPath);
         EnsureExtensionAllowed(grant, fullPath);
-        return new ResolvedPath(grant, fullPath, $"sandbox://{capabilityId}/" + relative.Replace('\\', '/'));
+        return new ResolvedPath(grant, rootFull, fullPath, $"sandbox://{capabilityId}/" + relative.Replace('\\', '/'));
     }
 
     private static string NormalizeRelative(string path)
@@ -136,14 +138,22 @@ public static class SafeFileSystem
 
     private static void EnsureNoReparsePoint(string rootFull, string fullPath)
     {
-        CheckAttributes(rootFull);
-        var parent = Path.GetDirectoryName(fullPath);
-        if (parent is not null && Directory.Exists(parent)) {
-            CheckAttributes(parent);
+        var root = rootFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        CheckAttributes(root);
+
+        var relative = Path.GetRelativePath(root, fullPath);
+        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathFullyQualified(relative)) {
+            throw Error(SandboxErrorCode.PermissionDenied, "file access denied: path is outside the granted sandbox root");
         }
 
-        if (File.Exists(fullPath)) {
-            CheckAttributes(fullPath);
+        var current = root;
+        foreach (var part in relative.Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            StringSplitOptions.RemoveEmptyEntries)) {
+            current = Path.Combine(current, part);
+            if (Directory.Exists(current) || File.Exists(current)) {
+                CheckAttributes(current);
+            }
         }
     }
 
@@ -151,7 +161,7 @@ public static class SafeFileSystem
     {
         var attributes = File.GetAttributes(path);
         if ((attributes & FileAttributes.ReparsePoint) != 0) {
-            throw Error(SandboxErrorCode.PermissionDenied, "file.readText denied: reparse points are not allowed");
+            throw Error(SandboxErrorCode.PermissionDenied, "file access denied: reparse points are not allowed");
         }
     }
 
@@ -224,5 +234,5 @@ public static class SafeFileSystem
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
-    private sealed record ResolvedPath(CapabilityGrant Grant, string FullPath, string SanitizedPath);
+    private sealed record ResolvedPath(CapabilityGrant Grant, string RootFull, string FullPath, string SanitizedPath);
 }
