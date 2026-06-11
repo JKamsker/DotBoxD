@@ -74,12 +74,12 @@ internal sealed class ExpressionEvaluator
             return collectionValue;
         }
 
-        if (_context.Bindings.TryGet(call.Name, out _)) {
-            return await CallBindingAsync(call.Name, args).ConfigureAwait(false);
-        }
-
         if (_interpreter.TryGetFunction(call.Name, out var function)) {
             return await _interpreter.InvokeFunctionAsync(function, args).ConfigureAwait(false);
+        }
+
+        if (_context.Bindings.TryGet(call.Name, out _)) {
+            return await CallBindingAsync(call.Name, args).ConfigureAwait(false);
         }
 
         throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown call '{call.Name}' at runtime"));

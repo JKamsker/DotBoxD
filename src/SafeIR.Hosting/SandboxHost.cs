@@ -145,7 +145,7 @@ public sealed class SandboxHost
     {
         try {
             var artifact = await _compiler!.CompileAsync(plan, new CompileOptions(entrypoint), cancellationToken).ConfigureAwait(false);
-            var result = await CompiledExecutionRunner.ExecuteAsync(artifact, plan, input, options, cancellationToken)
+            var result = await CompiledExecutionRunner.ExecuteAsync(artifact, plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
             return new CompiledAttempt(result, null);
         }

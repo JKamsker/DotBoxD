@@ -220,15 +220,17 @@ internal sealed class MethodEmitter
 
     private void EmitCall(CallExpression call)
     {
+        if (PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
+            return;
+        }
+
         if (_functions.TryGetValue(call.Name, out var method)) {
             EmitFunctionCall(call, method);
             return;
         }
 
-        if (!PureBindingCallEmitter.TryEmit(call, _il, EmitExpression)) {
-            if (!BindingCallEmitter.TryEmit(call, _bindings, _il, EmitExpression)) {
-                EmitUnsupported($"call '{call.Name}' is not supported by compiler");
-            }
+        if (!BindingCallEmitter.TryEmit(call, _bindings, _il, EmitExpression)) {
+            EmitUnsupported($"call '{call.Name}' is not supported by compiler");
         }
     }
 
