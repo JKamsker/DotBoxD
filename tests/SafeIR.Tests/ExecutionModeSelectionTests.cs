@@ -110,12 +110,48 @@ public sealed class ExecutionModeSelectionTests
             e => e.Message?.Contains("runtimeForm=DynamicMethod", StringComparison.Ordinal) == true);
     }
 
+    [Fact]
+    public async Task Compiled_runtime_unexpected_exception_returns_host_failure()
+    {
+        var host = HostWithCompiler(new ThrowingDelegateCompiler());
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Equal("throwing-artifact", result.ArtifactHash);
+    }
+
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
         => SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(compiler);
         });
+
+    private static ArtifactManifest Manifest(ExecutionPlan plan, string artifactHash)
+        => new(
+            1,
+            "delegate-cache-key",
+            plan.ModuleHash,
+            plan.PlanHash,
+            plan.PolicyHash,
+            plan.BindingManifestHash,
+            "delegate-runtime",
+            "delegate-compiler",
+            "delegate-verifier",
+            "1.0.0",
+            "net10.0",
+            ["dynamic-method"],
+            artifactHash,
+            DateTimeOffset.UtcNow);
 
     private sealed class FailingCompiler : ISandboxCompiler
     {
@@ -144,27 +180,25 @@ public sealed class ExecutionModeSelectionTests
             return ValueTask.FromResult(new CompiledArtifact(
                 [0],
                 "delegate-artifact",
-                Manifest(plan),
+                Manifest(plan, "delegate-artifact"),
                 new VerificationResult(true, [], "delegate-artifact", "delegate-verifier", DateTimeOffset.UtcNow),
                 (_, _) => SandboxValue.FromInt32(123),
                 CompiledRuntimeFormKind.DynamicMethod));
         }
+    }
 
-        private static ArtifactManifest Manifest(ExecutionPlan plan)
-            => new(
-                1,
-                "delegate-cache-key",
-                plan.ModuleHash,
-                plan.PlanHash,
-                plan.PolicyHash,
-                plan.BindingManifestHash,
-                "delegate-runtime",
-                "delegate-compiler",
-                "delegate-verifier",
-                "1.0.0",
-                "net10.0",
-                ["dynamic-method"],
-                "delegate-artifact",
-                DateTimeOffset.UtcNow);
+    private sealed class ThrowingDelegateCompiler : ISandboxCompiler
+    {
+        public ValueTask<CompiledArtifact> CompileAsync(
+            ExecutionPlan plan,
+            CompileOptions options,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(new CompiledArtifact(
+                [0],
+                "throwing-artifact",
+                Manifest(plan, "throwing-artifact"),
+                new VerificationResult(true, [], "throwing-artifact", "delegate-verifier", DateTimeOffset.UtcNow),
+                (_, _) => throw new InvalidOperationException("compiled delegate failed"),
+                CompiledRuntimeFormKind.DynamicMethod));
     }
 }
