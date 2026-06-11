@@ -90,7 +90,12 @@ public sealed class InterpreterAndPolicyTests
         Assert.True(result.Succeeded);
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "DebugTrace" &&
-            e.Message?.Contains(nameof(AssignmentStatement), StringComparison.Ordinal) == true);
+            e.Message?.Contains($"node=statement:{nameof(AssignmentStatement)}", StringComparison.Ordinal) == true &&
+            e.Message.Contains("function=main", StringComparison.Ordinal));
+        Assert.Contains(result.AuditEvents, e =>
+            e.Kind == "DebugTrace" &&
+            e.Message?.Contains($"node=expression:{nameof(BinaryExpression)}", StringComparison.Ordinal) == true &&
+            e.Message.Contains("fuelRemaining=", StringComparison.Ordinal));
         Assert.DoesNotContain(result.AuditEvents, e =>
             e.Kind == "DebugTrace" &&
             e.Message?.Contains("Bytecode", StringComparison.Ordinal) == true);

@@ -4,7 +4,13 @@ using SafeIR;
 
 internal sealed class InterpreterFrame
 {
-    private InterpreterFrame(Dictionary<string, SandboxValue> locals) => Locals = locals;
+    private InterpreterFrame(string functionId, Dictionary<string, SandboxValue> locals)
+    {
+        FunctionId = functionId;
+        Locals = locals;
+    }
+
+    public string FunctionId { get; }
 
     public Dictionary<string, SandboxValue> Locals { get; }
 
@@ -15,6 +21,6 @@ internal sealed class InterpreterFrame
             locals[function.Parameters[i].Name] = args[i];
         }
 
-        return new InterpreterFrame(locals);
+        return new InterpreterFrame(function.Id, locals);
     }
 }

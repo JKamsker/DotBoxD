@@ -50,7 +50,7 @@ internal sealed class InterpreterEvaluator
     private async ValueTask<SandboxValue?> ExecuteStatementAsync(Statement statement, InterpreterFrame frame)
     {
         _context.ChargeFuel(1);
-        Trace(statement);
+        InterpreterTrace.Write(_context, _options, frame.FunctionId, "statement", statement.GetType().Name);
         switch (statement) {
             case AssignmentStatement assignment:
                 frame.Locals[assignment.Name] = await EvaluateAsync(assignment.Value, frame).ConfigureAwait(false);
@@ -119,21 +119,7 @@ internal sealed class InterpreterEvaluator
     }
 
     private ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => new ExpressionEvaluator(_context, this).EvaluateAsync(expression, frame);
-
-    private void Trace(Statement statement)
-    {
-        if (!_options.EnableDebugTrace) {
-            return;
-        }
-
-        _context.Audit.Write(new SandboxAuditEvent(
-            _context.RunId,
-            "DebugTrace",
-            DateTimeOffset.UtcNow,
-            true,
-            Message: $"{statement.GetType().Name} fuelRemaining={_context.Budget.Limits.MaxFuel - _context.Budget.FuelUsed}"));
-    }
+        => new ExpressionEvaluator(_context, this, _options).EvaluateAsync(expression, frame);
 
     private static IReadOnlyList<SandboxValue> BuildArguments(SandboxFunction function, SandboxValue input)
     {

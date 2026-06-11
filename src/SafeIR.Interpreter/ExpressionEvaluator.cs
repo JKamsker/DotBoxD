@@ -6,16 +6,19 @@ internal sealed class ExpressionEvaluator
 {
     private readonly SandboxContext _context;
     private readonly InterpreterEvaluator _interpreter;
+    private readonly SandboxExecutionOptions _options;
 
-    public ExpressionEvaluator(SandboxContext context, InterpreterEvaluator interpreter)
+    public ExpressionEvaluator(SandboxContext context, InterpreterEvaluator interpreter, SandboxExecutionOptions options)
     {
         _context = context;
         _interpreter = interpreter;
+        _options = options;
     }
 
     public async ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
     {
         _context.ChargeFuel(1);
+        InterpreterTrace.Write(_context, _options, frame.FunctionId, "expression", expression.GetType().Name);
         var value = expression switch {
             LiteralExpression literal => ChargeLiteral(literal.Value),
             VariableExpression variable => frame.Locals[variable.Name],
