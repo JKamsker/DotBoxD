@@ -19,7 +19,8 @@ public sealed class VerifierTests
             { "ldtoken opcode", LdTokenAssembly, ["V-OPCODE"] },
             { "mutable static field", MutableStaticFieldAssembly, ["V-FIELD-STATIC"] },
             { "static constructor", StaticConstructorAssembly, ["V-METHOD-SPECIAL"] },
-            { "unbudgeted CompiledRuntime.String", UnbudgetedStringFactoryAssembly, ["V-MEMBER"] }
+            { "unbudgeted CompiledRuntime.String", UnbudgetedStringFactoryAssembly, ["V-MEMBER"] },
+            { "local helper calls System.IO.File.ReadAllText", LocalHelperFileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] }
         };
 
     [Theory]
@@ -155,6 +156,24 @@ public sealed class VerifierTests
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldstr, "unchecked");
             il.Emit(OpCodes.Call, factory);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] LocalHelperFileReadAssembly()
+        => BuildAssembly(type => {
+            var helper = type.DefineMethod(
+                "Read",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(string),
+                []);
+            var helperIl = helper.GetILGenerator();
+            helperIl.Emit(OpCodes.Ldstr, "secret.txt");
+            helperIl.Emit(OpCodes.Call, typeof(File).GetMethod(nameof(File.ReadAllText), [typeof(string)])!);
+            helperIl.Emit(OpCodes.Ret);
+
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(string), []);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Call, helper);
             il.Emit(OpCodes.Ret);
         });
 

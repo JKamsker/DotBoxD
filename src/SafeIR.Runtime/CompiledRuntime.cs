@@ -6,6 +6,10 @@ public static class CompiledRuntime
 {
     public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount);
 
+    public static void EnterCall(SandboxContext context) => context.EnterCall();
+
+    public static void ExitCall(SandboxContext context) => context.ExitCall();
+
     public static SandboxValue GetInputArgument(SandboxValue input, int index)
     {
         if (index == 0 && input is not ListValue) {

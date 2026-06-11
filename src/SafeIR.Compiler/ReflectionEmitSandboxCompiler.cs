@@ -4,7 +4,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
 using SafeIR;
+using SafeIR.Runtime;
 using SafeIR.Verifier;
+using static IlEmitterPrimitives;
 
 public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
 {
@@ -75,10 +77,6 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "compiled mode supports pure modules only"));
         }
 
-        if (plan.Module.Functions.Count > 1) {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "compiled mode does not support internal calls yet"));
-        }
-
         return function;
     }
 
@@ -88,18 +86,62 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         var assembly = new PersistedAssemblyBuilder(assemblyName, typeof(object).Assembly);
         var module = assembly.DefineDynamicModule("SafeIR.Generated.Module");
         var type = module.DefineType("SafeIR.Generated.Module_" + plan.ModuleHash[..16], TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
-        var method = type.DefineMethod(
+        var functions = DefineFunctionMethods(type, plan.Module.Functions);
+        var methodReferences = functions.ToDictionary(p => p.Key, p => (MethodInfo)p.Value, StringComparer.Ordinal);
+        var execute = type.DefineMethod(
             "Execute",
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(SandboxValue),
             [typeof(SandboxContext), typeof(SandboxValue)]);
 
-        new MethodEmitter(method.GetILGenerator(), function).Emit();
+        EmitExecute(execute.GetILGenerator(), function, functions[function.Id]);
+        foreach (var item in plan.Module.Functions) {
+            new MethodEmitter(functions[item.Id].GetILGenerator(), item, methodReferences).Emit();
+        }
+
         type.CreateType();
 
         using var stream = new MemoryStream();
         assembly.Save(stream);
         return stream.ToArray();
+    }
+
+    private static Dictionary<string, MethodBuilder> DefineFunctionMethods(
+        TypeBuilder type,
+        IReadOnlyList<SandboxFunction> functions)
+    {
+        var methods = new Dictionary<string, MethodBuilder>(StringComparer.Ordinal);
+        for (var i = 0; i < functions.Count; i++) {
+            var function = functions[i];
+            methods[function.Id] = type.DefineMethod(
+                "Fn_" + i,
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                FunctionParameterTypes(function));
+        }
+
+        return methods;
+    }
+
+    private static Type[] FunctionParameterTypes(SandboxFunction function)
+    {
+        var parameters = new Type[function.Parameters.Count + 1];
+        parameters[0] = typeof(SandboxContext);
+        Array.Fill(parameters, typeof(SandboxValue), 1, function.Parameters.Count);
+        return parameters;
+    }
+
+    private static void EmitExecute(ILGenerator il, SandboxFunction entrypoint, MethodInfo entrypointMethod)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        for (var i = 0; i < entrypoint.Parameters.Count; i++) {
+            il.Emit(OpCodes.Ldarg_1);
+            EmitInt32(il, i);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GetInputArgument)));
+        }
+
+        il.Emit(OpCodes.Call, entrypointMethod);
+        il.Emit(OpCodes.Ret);
     }
 
     private ArtifactManifest BuildManifest(ExecutionPlan plan, byte[] assemblyBytes, CompileOptions options)

@@ -17,6 +17,8 @@ public sealed record VerificationPolicy(
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "SafeIR.Runtime.CompiledRuntime.ChargeFuel",
+            "SafeIR.Runtime.CompiledRuntime.EnterCall",
+            "SafeIR.Runtime.CompiledRuntime.ExitCall",
             "SafeIR.Runtime.CompiledRuntime.GetInputArgument",
             "SafeIR.Runtime.CompiledRuntime.I32",
             "SafeIR.Runtime.CompiledRuntime.Bool",

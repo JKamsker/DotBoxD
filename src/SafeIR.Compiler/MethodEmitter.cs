@@ -4,26 +4,35 @@ using System.Reflection;
 using System.Reflection.Emit;
 using SafeIR;
 using SafeIR.Runtime;
+using static IlEmitterPrimitives;
 
 internal sealed class MethodEmitter
 {
     private readonly ILGenerator _il;
     private readonly SandboxFunction _function;
+    private readonly IReadOnlyDictionary<string, MethodInfo> _functions;
     private readonly Dictionary<string, LocalBuilder> _locals = new(StringComparer.Ordinal);
 
-    public MethodEmitter(ILGenerator il, SandboxFunction function)
+    public MethodEmitter(
+        ILGenerator il,
+        SandboxFunction function,
+        IReadOnlyDictionary<string, MethodInfo> functions)
     {
         _il = il;
         _function = function;
+        _functions = functions;
     }
 
     public void Emit()
     {
+        EmitEnterCall();
+        EmitFuel(1);
         EmitParameters();
         foreach (var statement in _function.Body) {
             EmitStatement(statement);
         }
 
+        EmitExitCall();
         _il.Emit(OpCodes.Ldnull);
         _il.Emit(OpCodes.Ret);
     }
@@ -32,9 +41,7 @@ internal sealed class MethodEmitter
     {
         for (var i = 0; i < _function.Parameters.Count; i++) {
             var local = Declare(_function.Parameters[i].Name);
-            _il.Emit(OpCodes.Ldarg_1);
-            EmitInt(i);
-            _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GetInputArgument)));
+            _il.Emit(OpCodes.Ldarg, i + 1);
             _il.Emit(OpCodes.Stloc, local);
         }
     }
@@ -49,7 +56,7 @@ internal sealed class MethodEmitter
                 break;
             case ReturnStatement ret:
                 EmitExpression(ret.Value);
-                _il.Emit(OpCodes.Ret);
+                EmitReturnValue();
                 break;
             case IfStatement branch:
                 EmitIf(branch);
@@ -103,7 +110,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, Declare(range.LocalName));
         range.Body.ToList().ForEach(EmitStatement);
         _il.Emit(OpCodes.Ldloc, index);
-        EmitInt(1);
+        EmitInt32(_il, 1);
         _il.Emit(OpCodes.Add);
         _il.Emit(OpCodes.Stloc, index);
         _il.Emit(OpCodes.Br, startLabel);
@@ -140,7 +147,7 @@ internal sealed class MethodEmitter
                 EmitBinary(binary);
                 break;
             case CallExpression call:
-                EmitPureCall(call);
+                EmitCall(call);
                 break;
             default:
                 EmitUnsupported("expression not supported");
@@ -152,11 +159,11 @@ internal sealed class MethodEmitter
     {
         switch (value) {
             case I32Value i32:
-                EmitInt(i32.Value);
+                EmitInt32(_il, i32.Value);
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
                 break;
             case BoolValue boolean:
-                EmitInt(boolean.Value ? 1 : 0);
+                EmitInt32(_il, boolean.Value ? 1 : 0);
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
                 break;
             case StringValue text:
@@ -199,7 +206,27 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Call, Runtime(method));
     }
 
-    private void EmitPureCall(CallExpression call)
+    private void EmitCall(CallExpression call)
+    {
+        if (_functions.TryGetValue(call.Name, out var method)) {
+            EmitFunctionCall(call, method);
+            return;
+        }
+
+        EmitPureBindingCall(call);
+    }
+
+    private void EmitFunctionCall(CallExpression call, MethodInfo method)
+    {
+        _il.Emit(OpCodes.Ldarg_0);
+        foreach (var argument in call.Arguments) {
+            EmitExpression(argument);
+        }
+
+        _il.Emit(OpCodes.Call, method);
+    }
+
+    private void EmitPureBindingCall(CallExpression call)
     {
         if (call.Name == "string.length") {
             EmitExpression(call.Arguments[0]);
@@ -232,57 +259,33 @@ internal sealed class MethodEmitter
     private void EmitFuel(int amount)
     {
         _il.Emit(OpCodes.Ldarg_0);
-        EmitInt(amount);
+        EmitInt32(_il, amount);
         _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeFuel)));
+    }
+
+    private void EmitEnterCall()
+    {
+        _il.Emit(OpCodes.Ldarg_0);
+        _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.EnterCall)));
+    }
+
+    private void EmitExitCall()
+    {
+        _il.Emit(OpCodes.Ldarg_0);
+        _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ExitCall)));
+    }
+
+    private void EmitReturnValue()
+    {
+        var value = _il.DeclareLocal(typeof(SandboxValue));
+        _il.Emit(OpCodes.Stloc, value);
+        EmitExitCall();
+        _il.Emit(OpCodes.Ldloc, value);
+        _il.Emit(OpCodes.Ret);
     }
 
     private void EmitUnsupported(string message) => throw Unsupported(message);
 
     private static Exception Unsupported(string message)
         => new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, message));
-
-    private void EmitInt(int value)
-    {
-        switch (value) {
-            case -1:
-                _il.Emit(OpCodes.Ldc_I4_M1);
-                break;
-            case 0:
-                _il.Emit(OpCodes.Ldc_I4_0);
-                break;
-            case 1:
-                _il.Emit(OpCodes.Ldc_I4_1);
-                break;
-            case 2:
-                _il.Emit(OpCodes.Ldc_I4_2);
-                break;
-            case 3:
-                _il.Emit(OpCodes.Ldc_I4_3);
-                break;
-            case 4:
-                _il.Emit(OpCodes.Ldc_I4_4);
-                break;
-            case 5:
-                _il.Emit(OpCodes.Ldc_I4_5);
-                break;
-            case 6:
-                _il.Emit(OpCodes.Ldc_I4_6);
-                break;
-            case 7:
-                _il.Emit(OpCodes.Ldc_I4_7);
-                break;
-            case 8:
-                _il.Emit(OpCodes.Ldc_I4_8);
-                break;
-            case >= sbyte.MinValue and <= sbyte.MaxValue:
-                _il.Emit(OpCodes.Ldc_I4_S, (sbyte)value);
-                break;
-            default:
-                _il.Emit(OpCodes.Ldc_I4, value);
-                break;
-        }
-    }
-
-    private static MethodInfo Runtime(string name)
-        => typeof(CompiledRuntime).GetMethods(BindingFlags.Public | BindingFlags.Static).Single(m => m.Name == name);
 }

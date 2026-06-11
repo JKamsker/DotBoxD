@@ -177,6 +177,12 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
 
+    public SandboxPolicyBuilder WithMaxCallDepth(int depth)
+    {
+        _limits = _limits with { MaxCallDepth = depth };
+        return this;
+    }
+
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime)
     {
         _limits = _limits with { MaxWallTime = maxWallTime };

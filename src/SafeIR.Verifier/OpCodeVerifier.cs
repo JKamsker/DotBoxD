@@ -1,5 +1,6 @@
 namespace SafeIR.Verifier;
 
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 
@@ -69,6 +70,11 @@ internal static class OpCodeVerifier
     {
         if (opcode is ILOpCode.Call or ILOpCode.Callvirt or ILOpCode.Newobj) {
             var handle = MetadataTokens.EntityHandle(il.ReadInt32());
+            if (opcode == ILOpCode.Call && handle.Kind == HandleKind.MethodDefinition) {
+                VerifyLocalCall(reader, (MethodDefinitionHandle)handle, diagnostics);
+                return;
+            }
+
             var member = MetadataName.Member(reader, handle);
             if (!policy.IsMemberAllowed(member.TypeName, member.MemberName)) {
                 diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{member.TypeName}.{member.MemberName}' is not allowed"));
@@ -78,6 +84,17 @@ internal static class OpCodeVerifier
         }
 
         SkipOperand(opcode, ref il);
+    }
+
+    private static void VerifyLocalCall(
+        MetadataReader reader,
+        MethodDefinitionHandle handle,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var method = reader.GetMethodDefinition(handle);
+        if ((method.Attributes & MethodAttributes.Static) == 0) {
+            diagnostics.Add(new VerificationDiagnostic("V-MEMBER", "local method calls must target static methods"));
+        }
     }
 
     private static void SkipOperand(ILOpCode opcode, ref BlobReader il)

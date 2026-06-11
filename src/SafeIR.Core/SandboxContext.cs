@@ -3,6 +3,7 @@ namespace SafeIR;
 public sealed class SandboxContext
 {
     private Random? _random;
+    private int _callDepth;
 
     public SandboxContext(
         SandboxRunId runId,
@@ -54,6 +55,20 @@ public sealed class SandboxContext
     {
         CancellationToken.ThrowIfCancellationRequested();
         Budget.ChargeFuel(amount);
+    }
+
+    public void EnterCall()
+    {
+        if (++_callDepth > Budget.Limits.MaxCallDepth) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.QuotaExceeded, "call depth exceeded"));
+        }
+    }
+
+    public void ExitCall()
+    {
+        if (_callDepth > 0) {
+            _callDepth--;
+        }
     }
 
     public void ChargeAllocation(long bytes) => Budget.ChargeAllocation(bytes);

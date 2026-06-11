@@ -7,7 +7,6 @@ internal sealed class InterpreterEvaluator
     private readonly SandboxContext _context;
     private readonly Dictionary<string, SandboxFunction> _functions;
     private readonly SandboxExecutionOptions _options;
-    private int _callDepth;
 
     public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
     {
@@ -30,10 +29,7 @@ internal sealed class InterpreterEvaluator
 
     public async ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
     {
-        if (++_callDepth > _context.Budget.Limits.MaxCallDepth) {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.QuotaExceeded, "call depth exceeded"));
-        }
-
+        _context.EnterCall();
         try {
             _context.ChargeFuel(1);
             var frame = InterpreterFrame.Create(function, args);
@@ -47,7 +43,7 @@ internal sealed class InterpreterEvaluator
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
         }
         finally {
-            _callDepth--;
+            _context.ExitCall();
         }
     }
 

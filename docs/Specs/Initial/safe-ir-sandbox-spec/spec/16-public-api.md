@@ -107,6 +107,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder GrantLogging();
     public SandboxPolicyBuilder WithFuel(long maxFuel);
     public SandboxPolicyBuilder WithMaxHostCalls(int calls);
+    public SandboxPolicyBuilder WithMaxCallDepth(int depth);
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime);
     public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes);
     public SandboxPolicyBuilder WithMaxListLength(int length);

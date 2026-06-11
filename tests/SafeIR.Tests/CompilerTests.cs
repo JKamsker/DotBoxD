@@ -51,6 +51,131 @@ public sealed class CompilerTests
         Assert.Equal("from-file", ((StringValue)result.Value!).Value);
     }
 
+    [Fact]
+    public async Task Compiled_module_supports_internal_function_calls()
+    {
+        var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ParseJsonAsync(InternalCallJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(7), SandboxValue.FromInt32(3)]);
+
+        var interpreted = await host.ExecuteAsync(
+            plan,
+            "main",
+            input,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+        var compiled = await host.ExecuteAsync(
+            plan,
+            "main",
+            input,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.True(interpreted.Succeeded, interpreted.Error?.SafeMessage);
+        Assert.True(compiled.Succeeded, compiled.Error?.SafeMessage);
+        Assert.Equal(((I32Value)interpreted.Value!).Value, ((I32Value)compiled.Value!).Value);
+        Assert.Equal(145, ((I32Value)compiled.Value).Value);
+        Assert.Equal(ExecutionMode.Compiled, compiled.ActualMode);
+    }
+
+    [Fact]
+    public async Task Compiled_internal_calls_enforce_call_depth_limit()
+    {
+        var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ParseJsonAsync(CallDepthJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxCallDepth(2).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+    }
+
+    [Fact]
+    public void Call_depth_limit_is_part_of_policy_hash()
+    {
+        var first = SandboxPolicyBuilder.Create().WithMaxCallDepth(1).Build();
+        var second = SandboxPolicyBuilder.Create().WithMaxCallDepth(2).Build();
+
+        Assert.NotEqual(first.Hash, second.Hash);
+    }
+
+    private static string InternalCallJson()
+        => """
+        {
+          "id": "compiled-internal-call",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "score",
+              "parameters": [
+                { "name": "level", "type": "I32" },
+                { "name": "rarity", "type": "I32" }
+              ],
+              "returnType": "I32",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "op": "add",
+                    "left": { "op": "mul", "left": { "var": "level" }, "right": { "i32": 10 } },
+                    "right": { "op": "mul", "left": { "var": "rarity" }, "right": { "i32": 25 } }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [
+                { "name": "level", "type": "I32" },
+                { "name": "rarity", "type": "I32" }
+              ],
+              "returnType": "I32",
+              "body": [
+                {
+                  "op": "return",
+                  "value": { "call": "score", "args": [{ "var": "level" }, { "var": "rarity" }] }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string CallDepthJson()
+        => """
+        {
+          "id": "compiled-call-depth",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "second",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "i32": 1 } }]
+            },
+            {
+              "id": "first",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "call": "second", "args": [] } }]
+            },
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "call": "first", "args": [] } }]
+            }
+          ]
+        }
+        """;
+
     private sealed class TempDirectory : IDisposable
     {
         private TempDirectory(string path) => Path = path;
