@@ -11,7 +11,8 @@ public sealed class SandboxContext
         ResourceMeter budget,
         BindingRegistry bindings,
         IAuditSink audit,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? allowedBindingIds = null)
     {
         RunId = runId;
         Policy = policy;
@@ -19,6 +20,7 @@ public sealed class SandboxContext
         Bindings = bindings;
         Audit = audit;
         CancellationToken = cancellationToken;
+        AllowedBindingIds = allowedBindingIds;
     }
 
     public SandboxRunId RunId { get; }
@@ -27,6 +29,7 @@ public sealed class SandboxContext
     public BindingRegistry Bindings { get; }
     public IAuditSink Audit { get; }
     public CancellationToken CancellationToken { get; }
+    private IReadOnlySet<string>? AllowedBindingIds { get; }
 
     public void RequireCapability(string capabilityId)
     {
@@ -83,6 +86,12 @@ public sealed class SandboxContext
 
     public void ChargeBindingCall(BindingDescriptor descriptor)
     {
+        if (AllowedBindingIds is not null && !AllowedBindingIds.Contains(descriptor.Id)) {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.ValidationError,
+                $"binding '{descriptor.Id}' is not referenced by the verified execution plan"));
+        }
+
         if (descriptor.RequiredCapability is not null) {
             RequireCapability(descriptor.RequiredCapability);
         }
