@@ -11,6 +11,7 @@ The JSON IR must be:
 - effect-aware: every side-effecting operation is visible
 - deterministic to canonicalize/hash
 - unambiguous: duplicate object properties are rejected
+- named with non-empty identifiers and call names that contain no control characters
 - easy to deserialize with normal JSON tooling
 - easy to interpret
 - easy to lower to a safe compiled runtime form

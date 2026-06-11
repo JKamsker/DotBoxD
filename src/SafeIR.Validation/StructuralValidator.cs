@@ -20,7 +20,7 @@ internal static class StructuralValidator
 
         foreach (var item in module.Metadata) {
             CheckIdentifier(item.Key, "metadata key", diagnostics);
-            CheckIdentifier(item.Value, "metadata value", diagnostics);
+            CheckText(item.Value, "metadata value", diagnostics);
         }
 
         foreach (var group in module.Functions.GroupBy(f => f.Id, StringComparer.Ordinal).Where(g => g.Count() > 1)) {
@@ -63,6 +63,11 @@ internal static class StructuralValidator
 
     private static void CheckIdentifier(string value, string description, List<SandboxDiagnostic> diagnostics)
     {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl)) {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-ID", $"{description} must be non-empty and must not contain control characters"));
+            return;
+        }
+
         if (DangerousReferenceDetector.IsDangerousReference(value)) {
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", $"{description} '{value}' looks like a forbidden CLR reference"));
         }
@@ -71,7 +76,14 @@ internal static class StructuralValidator
     private static void CheckOptionalText(string? value, string description, List<SandboxDiagnostic> diagnostics)
     {
         if (value is not null) {
-            CheckIdentifier(value, description, diagnostics);
+            CheckText(value, description, diagnostics);
+        }
+    }
+
+    private static void CheckText(string value, string description, List<SandboxDiagnostic> diagnostics)
+    {
+        if (DangerousReferenceDetector.IsDangerousReference(value)) {
+            diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", $"{description} '{value}' looks like a forbidden CLR reference"));
         }
     }
 }

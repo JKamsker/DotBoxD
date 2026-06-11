@@ -65,6 +65,14 @@ internal static class DangerousReferenceDetector
 
     private static void Check(string value, List<SandboxDiagnostic> diagnostics, SourceSpan span)
     {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl)) {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-IR-ID",
+                "IR identifiers and call names must be non-empty and must not contain control characters",
+                Span: span));
+            return;
+        }
+
         if (IsDangerousReference(value)) {
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", $"forbidden CLR reference '{value}'", Span: span));
         }
