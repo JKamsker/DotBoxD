@@ -38,7 +38,7 @@ internal static class JsonLiteralReader
         }
 
         if (element.TryGetProperty("path", out var path)) {
-            value = SandboxValue.FromPath(ReadStringValue(path, "path"));
+            value = SandboxValue.FromPath(ReadPathValue(path, "path"));
             literalName = "path";
             return true;
         }

@@ -33,6 +33,22 @@ internal static class JsonImport
         return value.GetString() ?? "";
     }
 
+    public static string ReadPathValue(JsonElement value, string name)
+    {
+        var path = ReadStringValue(value, name);
+        if (string.IsNullOrWhiteSpace(path) ||
+            path.Contains('\\') ||
+            path.Contains(':') ||
+            path.StartsWith("/", StringComparison.Ordinal) ||
+            Uri.TryCreate(path, UriKind.Absolute, out _) ||
+            Path.IsPathRooted(path) ||
+            path.Split('/').Any(segment => segment is "")) {
+            throw Error("E-JSON-PATH", $"'{name}' must be a portable relative path");
+        }
+
+        return path;
+    }
+
     public static int ReadInt32Value(JsonElement value, string name)
     {
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var result)) {

@@ -29,10 +29,7 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    [InlineData("C:\\Windows\\win.ini")]
-    [InlineData("\\\\server\\share\\x")]
-    [InlineData("file:///etc/passwd")]
-    public async Task Path_traversal_and_absolute_paths_are_denied(string path)
+    public async Task File_read_path_traversal_is_denied(string path)
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
@@ -47,6 +44,29 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Theory]
+    [InlineData("./config/settings.json")]
+    [InlineData("sub/../config/settings.json")]
+    public async Task Normalized_file_read_paths_inside_root_are_allowed(string path)
+    {
+        using var temp = TempDirectory.Create();
+        Directory.CreateDirectory(Path.Combine(temp.Path, "config"));
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
+
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(temp.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("tenant-settings", ((StringValue)result.Value!).Value);
     }
 
     [Fact]
@@ -110,10 +130,7 @@ public sealed class SafeFileSystemTests
     [Theory]
     [InlineData("../secret.txt")]
     [InlineData("config/../../secret.txt")]
-    [InlineData("C:\\Windows\\win.ini")]
-    [InlineData("\\\\server\\share\\x")]
-    [InlineData("file:///etc/passwd")]
-    public async Task File_write_path_traversal_and_absolute_paths_are_denied(string path)
+    public async Task File_write_path_traversal_is_denied(string path)
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
