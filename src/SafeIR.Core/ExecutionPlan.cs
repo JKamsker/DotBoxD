@@ -2,7 +2,35 @@ namespace SafeIR;
 
 public sealed record FunctionAnalysis(SandboxType ReturnType, SandboxEffect Effects);
 
-public sealed record ExecutableBytecode(IReadOnlyList<string> OperationNames);
+public enum BytecodeOp
+{
+    LoadConst,
+    LoadLocal,
+    StoreLocal,
+    Pop,
+    Unary,
+    Binary,
+    Jump,
+    JumpIfFalse,
+    CallBinding,
+    CallFunction,
+    ListEmpty,
+    ListOf,
+    Return
+}
+
+public sealed record BytecodeInstruction(BytecodeOp Op, object? Operand = null);
+
+public sealed record BytecodeCall(string Id, int ArgumentCount);
+
+public sealed record BytecodeFunction(
+    string Id,
+    bool IsEntrypoint,
+    IReadOnlyList<Parameter> Parameters,
+    SandboxType ReturnType,
+    IReadOnlyList<BytecodeInstruction> Instructions);
+
+public sealed record ExecutableBytecode(IReadOnlyDictionary<string, BytecodeFunction> Functions);
 
 public sealed record ExecutionPlan(
     string ModuleHash,

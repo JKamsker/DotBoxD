@@ -23,35 +23,8 @@ internal static class ExecutionPlanBuilder
             policy,
             bindings,
             policy.ResourceLimits,
-            new ExecutableBytecode(CollectOperations(module)),
+            BytecodeLowerer.Lower(module, bindings),
             functions);
-    }
-
-    private static IReadOnlyList<string> CollectOperations(SandboxModule module)
-    {
-        var operations = new List<string>();
-        foreach (var statement in module.Functions.SelectMany(f => f.Body)) {
-            Collect(statement, operations);
-        }
-
-        return operations;
-    }
-
-    private static void Collect(Statement statement, List<string> operations)
-    {
-        operations.Add(statement.GetType().Name);
-        switch (statement) {
-            case IfStatement branch:
-                branch.Then.ToList().ForEach(s => Collect(s, operations));
-                branch.Else.ToList().ForEach(s => Collect(s, operations));
-                break;
-            case WhileStatement loop:
-                loop.Body.ToList().ForEach(s => Collect(s, operations));
-                break;
-            case ForRangeStatement range:
-                range.Body.ToList().ForEach(s => Collect(s, operations));
-                break;
-        }
     }
 
     private static string Hash(params string[] parts)
