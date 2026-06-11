@@ -36,7 +36,7 @@ public sealed class PersistentCompiledArtifactCache
         try {
             var manifest = await ReadJsonAsync<ArtifactManifest>(Path.Combine(entryPath, "manifest.json"), cancellationToken)
                 .ConfigureAwait(false);
-            ValidateManifest(cacheKey, plan, manifest);
+            ValidateManifest(cacheKey, plan, manifest, policy);
             var assemblyBytes = await File.ReadAllBytesAsync(Path.Combine(entryPath, "module.dll"), cancellationToken)
                 .ConfigureAwait(false);
             var verification = await verifier.VerifyAsync(assemblyBytes, manifest, policy, cancellationToken).ConfigureAwait(false);
@@ -50,6 +50,7 @@ public sealed class PersistentCompiledArtifactCache
                 manifest,
                 verification,
                 (_, _) => throw new InvalidOperationException("cached artifact entrypoint is loaded by the compiler"),
+                CompiledRuntimeFormKind.LoadedAssembly,
                 CompiledCacheStatus.Hit));
         }
         catch (Exception ex) when (ex is IOException or JsonException or SandboxRuntimeException or UnauthorizedAccessException) {
@@ -64,9 +65,14 @@ public sealed class PersistentCompiledArtifactCache
         byte[] assemblyBytes,
         ArtifactManifest manifest,
         VerificationResult verification,
+        VerificationPolicy policy,
         CancellationToken cancellationToken)
     {
-        ValidateManifest(cacheKey, plan, manifest);
+        ValidateManifest(cacheKey, plan, manifest, policy);
+        if (verification.VerifierVersion != policy.VerifierVersion) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.CacheInvalid, "verification result does not match current verifier"));
+        }
+
         var finalPath = EntryPath(cacheKey);
         var tempPath = Path.Combine(_rootDirectory, ".tmp-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempPath);
@@ -99,7 +105,24 @@ public sealed class PersistentCompiledArtifactCache
         return Path.Combine(_rootDirectory, cacheKey[..2], cacheKey[2..4], cacheKey);
     }
 
-    private static void ValidateManifest(string cacheKey, ExecutionPlan plan, ArtifactManifest manifest)
+    private static void ValidateManifest(
+        string cacheKey,
+        ExecutionPlan plan,
+        ArtifactManifest manifest,
+        VerificationPolicy policy)
+    {
+        ValidateManifest(cacheKey, plan, manifest, policy.VerifierVersion);
+        var expectedFlags = ExpectedOptimizationFlags(cacheKey, plan, policy);
+        if (!manifest.OptimizationFlags.SequenceEqual(expectedFlags, StringComparer.Ordinal)) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.CacheInvalid, "cached artifact optimization flags do not match cache key"));
+        }
+    }
+
+    private static void ValidateManifest(
+        string cacheKey,
+        ExecutionPlan plan,
+        ArtifactManifest manifest,
+        string verifierVersion)
     {
         if (manifest.ArtifactVersion != 1 ||
             manifest.CacheKey != cacheKey ||
@@ -108,11 +131,25 @@ public sealed class PersistentCompiledArtifactCache
             manifest.PolicyHash != plan.PolicyHash ||
             manifest.BindingManifestHash != plan.BindingManifestHash ||
             manifest.CompilerVersion != CacheKeyBuilder.CompilerVersion ||
+            manifest.VerifierVersion != verifierVersion ||
             manifest.RuntimeFacadeHash != CacheKeyBuilder.RuntimeFacadeHash ||
             manifest.LanguageVersion != CacheKeyBuilder.LanguageVersion ||
             manifest.TargetFramework != CacheKeyBuilder.TargetFramework) {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.CacheInvalid, "cached artifact manifest does not match current plan"));
         }
+    }
+
+    private static string[] ExpectedOptimizationFlags(string cacheKey, ExecutionPlan plan, VerificationPolicy policy)
+    {
+        if (cacheKey == CacheKeyBuilder.Build(plan, policy, optimize: false)) {
+            return ["boxed-values"];
+        }
+
+        if (cacheKey == CacheKeyBuilder.Build(plan, policy, optimize: true)) {
+            return ["opt"];
+        }
+
+        throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.CacheInvalid, "cache key does not match current compile options"));
     }
 
     private static async ValueTask<T> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)

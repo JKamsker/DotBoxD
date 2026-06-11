@@ -12,7 +12,7 @@ The JSON IR must be:
 - deterministic to canonicalize/hash
 - easy to deserialize with normal JSON tooling
 - easy to interpret
-- easy to lower to safe IL
+- easy to lower to a safe compiled runtime form
 - small enough to audit
 
 ## Module shape

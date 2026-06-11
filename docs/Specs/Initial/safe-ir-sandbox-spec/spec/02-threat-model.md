@@ -99,10 +99,11 @@ For this attacker class, in-process sandboxing is not enough. Use a worker proce
        |
        +--> [Interpreter]       trusted backend
        |
-       +--> [IL compiler]       trusted backend
+       +--> [Compiled backend]  trusted backend
                 |
-                v
-            [Generated DLL]     untrusted until post-verified
+                +--> [DynamicMethod delegate] gated before invocation
+                |
+                +--> [Generated DLL]     untrusted until post-verified
                 |
                 v
             [Verifier]          trusted enforcement
@@ -120,6 +121,8 @@ The in-process model assumes:
 - users cannot configure granted capabilities
 - all host API access goes through registered bindings
 - generated assemblies are verified before loading/execution
+- generated IL is invoked only through a compiled runtime form such as a gated `DynamicMethod`
+  delegate or a loaded verified assembly
 - generated assemblies are not modified after verification
 - the host process itself is not compromised
 
@@ -165,9 +168,10 @@ Forbidden boundary types:
 - `SafeHandle`
 - raw domain entities with behavior
 
-### I4. Generated IL must be post-verified
+### I4. Compiled runtime forms must be gated before execution
 
 Even if the compiler is trusted, generated assemblies are treated as untrusted until inspected.
+`DynamicMethod` backends must apply equivalent allowlist gating before delegate invocation.
 
 ### I5. Cache entries are not trusted by path
 

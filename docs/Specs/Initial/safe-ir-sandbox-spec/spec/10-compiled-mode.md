@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Compiled mode turns verified IR into a compiler-owned runtime form and executes that compiled form.
+Compiled mode turns verified IR into a compiler-owned runtime form and invokes an entrypoint
+delegate created from that compiled form.
 Supported forms are a `DynamicMethod` backend or a valid managed .NET assembly that can optionally
 be persisted as a DLL cache artifact.
 
@@ -11,6 +12,9 @@ Compiled mode is for hot code paths and repeated execution.
 ## Important distinction
 
 The system does not load raw MSIL and never treats interpreted mode as an IL execution path.
+Compiled mode does not interpret IL either: emitted IL is executed only by the CLR after trusted code
+creates a gated `DynamicMethod` delegate or loads a verified generated assembly and creates an
+entrypoint delegate.
 
 For an assembly backend, it emits a valid managed assembly image containing:
 

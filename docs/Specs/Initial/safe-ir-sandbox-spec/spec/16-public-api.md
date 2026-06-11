@@ -203,6 +203,24 @@ public interface ISandboxCompiler
 }
 ```
 
+`CompiledArtifact` represents an already-created compiled runtime form. The host invokes its
+entrypoint delegate; it must not interpret raw IL bytes.
+
+```csharp
+public enum CompiledRuntimeFormKind
+{
+    LoadedAssembly,
+    DynamicMethod
+}
+
+public sealed record CompiledArtifact
+{
+    public CompiledRuntimeFormKind RuntimeForm { get; init; }
+    public SandboxCompiledEntrypoint Entrypoint { get; init; }
+    public string ArtifactHash { get; init; }
+}
+```
+
 ## Verifier API
 
 ```csharp

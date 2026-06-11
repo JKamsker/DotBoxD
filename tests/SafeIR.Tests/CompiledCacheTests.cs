@@ -127,6 +127,42 @@ public sealed class CompiledCacheTests
         Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
     }
 
+    [Fact]
+    public async Task Cached_manifest_verifier_version_mismatch_is_quarantined_and_recompiled()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
+        _ = await ExecuteCompiled(host, plan, input);
+        await ReplaceManifestAsync(CacheEntry(temp.Path, plan), m => m with { VerifierVersion = "stale-verifier" });
+
+        var result = await ExecuteCompiled(host, plan, input);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.AuditEvents, e => e.Message?.Contains("cacheStatus=Recompiled", StringComparison.Ordinal) == true);
+        Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
+    }
+
+    [Fact]
+    public async Task Cached_manifest_optimization_flag_mismatch_is_quarantined_and_recompiled()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
+        _ = await ExecuteCompiled(host, plan, input);
+        await ReplaceManifestAsync(CacheEntry(temp.Path, plan), m => m with { OptimizationFlags = ["opt"] });
+
+        var result = await ExecuteCompiled(host, plan, input);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.AuditEvents, e => e.Message?.Contains("cacheStatus=Recompiled", StringComparison.Ordinal) == true);
+        Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
+    }
+
     private static async ValueTask<SandboxExecutionResult> ExecuteCompiled(
         Hosting.SandboxHost host,
         ExecutionPlan plan,
@@ -170,6 +206,11 @@ public sealed class CompiledCacheTests
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 
     private static async Task ReplaceManifestAssemblyHashAsync(string entryPath, string assemblyHash)
+        => await ReplaceManifestAsync(entryPath, manifest => manifest with { AssemblyHash = assemblyHash });
+
+    private static async Task ReplaceManifestAsync(
+        string entryPath,
+        Func<ArtifactManifest, ArtifactManifest> replace)
     {
         var path = Path.Combine(entryPath, "manifest.json");
         ArtifactManifest manifest;
@@ -179,7 +220,7 @@ public sealed class CompiledCacheTests
         }
 
         await using var write = File.Create(path);
-        await JsonSerializer.SerializeAsync(write, manifest with { AssemblyHash = assemblyHash }, JsonOptions);
+        await JsonSerializer.SerializeAsync(write, replace(manifest), JsonOptions);
     }
 
     private sealed class TempDirectory : IDisposable

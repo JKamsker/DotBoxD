@@ -7,6 +7,12 @@ public delegate SandboxValue SandboxCompiledEntrypoint(SandboxContext context, S
 
 public sealed record CompileOptions(string Entrypoint, bool Optimize = false);
 
+public enum CompiledRuntimeFormKind
+{
+    LoadedAssembly,
+    DynamicMethod
+}
+
 public enum CompiledCacheStatus
 {
     None,
@@ -22,7 +28,11 @@ public sealed record CompiledArtifact(
     ArtifactManifest Manifest,
     VerificationResult Verification,
     SandboxCompiledEntrypoint Entrypoint,
-    CompiledCacheStatus CacheStatus = CompiledCacheStatus.None);
+    CompiledRuntimeFormKind RuntimeForm,
+    CompiledCacheStatus CacheStatus = CompiledCacheStatus.None)
+{
+    public string ArtifactHash => AssemblyHash;
+}
 
 public interface ISandboxCompiler
 {

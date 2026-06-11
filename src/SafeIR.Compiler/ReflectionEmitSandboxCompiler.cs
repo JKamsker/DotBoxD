@@ -62,7 +62,14 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         var status = _cache is null
             ? CompiledCacheStatus.None
             : await WriteCacheAsync(cacheKey, lookupStatus, plan, assemblyBytes, manifest, verification, cancellationToken).ConfigureAwait(false);
-        return new CompiledArtifact(assemblyBytes, verification.AssemblyHash, manifest, verification, entrypoint, status);
+        return new CompiledArtifact(
+            assemblyBytes,
+            verification.AssemblyHash,
+            manifest,
+            verification,
+            entrypoint,
+            CompiledRuntimeFormKind.LoadedAssembly,
+            status);
     }
 
     private static SandboxFunction ResolveSupportedFunction(ExecutionPlan plan, string entrypoint)
@@ -177,7 +184,8 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         var existing = lookupStatus == CompiledCacheStatus.Invalid || cache.EntryExists(cacheKey)
             ? CompiledCacheStatus.Recompiled
             : CompiledCacheStatus.Miss;
-        await cache.WriteAsync(cacheKey, plan, assemblyBytes, manifest, verification, cancellationToken).ConfigureAwait(false);
+        await cache.WriteAsync(cacheKey, plan, assemblyBytes, manifest, verification, _verificationPolicy, cancellationToken)
+            .ConfigureAwait(false);
         return existing;
     }
 

@@ -1,6 +1,7 @@
 using SafeIR;
 using SafeIR.Compiler;
 using SafeIR.Hosting;
+using SafeIR.Verifier;
 
 namespace SafeIR.Tests;
 
@@ -85,6 +86,30 @@ public sealed class ExecutionModeSelectionTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "CompilerUnavailable");
     }
 
+    [Fact]
+    public async Task Compiled_mode_invokes_compiler_provided_runtime_form()
+    {
+        var compiler = new DelegateCompiler();
+        var host = HostWithCompiler(compiler);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(123, ((I32Value)result.Value!).Value);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Equal("delegate-artifact", result.ArtifactHash);
+        Assert.Equal(1, compiler.Calls);
+        Assert.Contains(
+            result.AuditEvents,
+            e => e.Message?.Contains("runtimeForm=DynamicMethod", StringComparison.Ordinal) == true);
+    }
+
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
         => SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
@@ -104,5 +129,42 @@ public sealed class ExecutionModeSelectionTests
             Calls++;
             throw new InvalidOperationException("compiler must not be called");
         }
+    }
+
+    private sealed class DelegateCompiler : ISandboxCompiler
+    {
+        public int Calls { get; private set; }
+
+        public ValueTask<CompiledArtifact> CompileAsync(
+            ExecutionPlan plan,
+            CompileOptions options,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return ValueTask.FromResult(new CompiledArtifact(
+                [0],
+                "delegate-artifact",
+                Manifest(plan),
+                new VerificationResult(true, [], "delegate-artifact", "delegate-verifier", DateTimeOffset.UtcNow),
+                (_, _) => SandboxValue.FromInt32(123),
+                CompiledRuntimeFormKind.DynamicMethod));
+        }
+
+        private static ArtifactManifest Manifest(ExecutionPlan plan)
+            => new(
+                1,
+                "delegate-cache-key",
+                plan.ModuleHash,
+                plan.PlanHash,
+                plan.PolicyHash,
+                plan.BindingManifestHash,
+                "delegate-runtime",
+                "delegate-compiler",
+                "delegate-verifier",
+                "1.0.0",
+                "net10.0",
+                ["dynamic-method"],
+                "delegate-artifact",
+                DateTimeOffset.UtcNow);
     }
 }

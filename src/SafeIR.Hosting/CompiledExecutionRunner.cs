@@ -53,7 +53,7 @@ internal static class CompiledExecutionRunner
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash,
-            ArtifactHash = artifact.AssemblyHash
+            ArtifactHash = artifact.ArtifactHash
         };
 
     private static void WriteSummary(
@@ -72,5 +72,5 @@ internal static class CompiledExecutionRunner
             success,
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error?.Code,
-            Message: $"mode=compiled cacheStatus={artifact.CacheStatus} artifact={artifact.AssemblyHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}"));
+            Message: $"mode=compiled runtimeForm={artifact.RuntimeForm} cacheStatus={artifact.CacheStatus} artifact={artifact.ArtifactHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}"));
 }
