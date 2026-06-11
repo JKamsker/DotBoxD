@@ -7,72 +7,87 @@ public sealed record VerificationPolicy(
     IReadOnlySet<string> ForbiddenTypePrefixes,
     string VerifierVersion)
 {
-    public static VerificationPolicy BoxedValueDefaults() => new(
-        new HashSet<string>(StringComparer.Ordinal) {
-            "System.Private.CoreLib", "System.Runtime", "SafeIR.Core", "SafeIR.Runtime"
-        },
-        new HashSet<string>(StringComparer.Ordinal) {
-            "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.String",
-            "System.Double",
-            "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.SandboxType", "SafeIR.Runtime.CompiledRuntime"
-        },
-        new HashSet<string>(StringComparer.Ordinal) {
-            "SafeIR.Runtime.CompiledRuntime.ChargeFuel",
-            "SafeIR.Runtime.CompiledRuntime.EnterCall",
-            "SafeIR.Runtime.CompiledRuntime.ExitCall",
-            "SafeIR.Runtime.CompiledRuntime.GetInputArgument",
-            "SafeIR.Runtime.CompiledRuntime.I32",
-            "SafeIR.Runtime.CompiledRuntime.F64",
-            "SafeIR.Runtime.CompiledRuntime.Bool",
-            "SafeIR.Runtime.CompiledRuntime.TypeScalar",
-            "SafeIR.Runtime.CompiledRuntime.TypeList",
-            "SafeIR.Runtime.CompiledRuntime.TypeMap",
-            "SafeIR.Runtime.CompiledRuntime.StringConst",
-            "SafeIR.Runtime.CompiledRuntime.AsI32",
-            "SafeIR.Runtime.CompiledRuntime.AsBool",
-            "SafeIR.Runtime.CompiledRuntime.AddI32",
-            "SafeIR.Runtime.CompiledRuntime.SubI32",
-            "SafeIR.Runtime.CompiledRuntime.MulI32",
-            "SafeIR.Runtime.CompiledRuntime.DivI32",
-            "SafeIR.Runtime.CompiledRuntime.RemI32",
-            "SafeIR.Runtime.CompiledRuntime.NegI32",
-            "SafeIR.Runtime.CompiledRuntime.NotBool",
-            "SafeIR.Runtime.CompiledRuntime.Eq",
-            "SafeIR.Runtime.CompiledRuntime.Ne",
-            "SafeIR.Runtime.CompiledRuntime.LtI32",
-            "SafeIR.Runtime.CompiledRuntime.LteI32",
-            "SafeIR.Runtime.CompiledRuntime.GtI32",
-            "SafeIR.Runtime.CompiledRuntime.GteI32",
-            "SafeIR.Runtime.CompiledRuntime.And",
-            "SafeIR.Runtime.CompiledRuntime.Or",
-            "SafeIR.Runtime.CompiledRuntime.StringLength",
-            "SafeIR.Runtime.CompiledRuntime.ConcatString",
-            "SafeIR.Runtime.CompiledRuntime.AbsI32",
-            "SafeIR.Runtime.CompiledRuntime.MinI32",
-            "SafeIR.Runtime.CompiledRuntime.MaxI32",
-            "SafeIR.Runtime.CompiledRuntime.ClampI32",
-            "SafeIR.Runtime.CompiledRuntime.SqrtF64",
-            "SafeIR.Runtime.CompiledRuntime.FloorF64",
-            "SafeIR.Runtime.CompiledRuntime.CeilF64",
-            "SafeIR.Runtime.CompiledRuntime.RoundF64",
-            "SafeIR.Runtime.CompiledRuntime.ListOf",
-            "SafeIR.Runtime.CompiledRuntime.ListCount",
-            "SafeIR.Runtime.CompiledRuntime.ListGet",
-            "SafeIR.Runtime.CompiledRuntime.ListAdd",
-            "SafeIR.Runtime.CompiledRuntime.MapEmpty",
-            "SafeIR.Runtime.CompiledRuntime.MapContainsKey",
-            "SafeIR.Runtime.CompiledRuntime.MapGet",
-            "SafeIR.Runtime.CompiledRuntime.MapSet",
-            "SafeIR.Runtime.CompiledRuntime.MapRemove"
-        },
-        new HashSet<string>(StringComparer.Ordinal) {
-            "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
-            "System.Runtime.InteropServices.", "System.Diagnostics.", "System.Threading.",
-            "System.Threading.Tasks.", "System.Activator", "System.Environment",
-            "System.GC", "System.Delegate", "System.Linq.Expressions.", "Microsoft.CSharp."
-        },
-        "safe-ir-verifier-1");
+    private const string Context = "SafeIR.SandboxContext";
+    private const string Value = "SafeIR.SandboxValue";
+    private const string ValueArray = "SafeIR.SandboxValue[]";
+    private const string SandboxType = "SafeIR.SandboxType";
+    private const string Runtime = "SafeIR.Runtime.CompiledRuntime";
+    private const string Void = "System.Void";
+    private const string Boolean = "System.Boolean";
+    private const string Int32 = "System.Int32";
+    private const string Double = "System.Double";
+    private const string String = "System.String";
 
-    public bool IsMemberAllowed(string typeName, string memberName)
-        => AllowedMembers.Contains($"{typeName}.{memberName}");
+    public static VerificationPolicy BoxedValueDefaults()
+        => new(
+            new HashSet<string>(StringComparer.Ordinal) {
+                "System.Private.CoreLib", "System.Runtime", "SafeIR.Core", "SafeIR.Runtime"
+            },
+            new HashSet<string>(StringComparer.Ordinal) {
+                "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.String",
+                "System.Double",
+                "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.SandboxType", "SafeIR.Runtime.CompiledRuntime"
+            },
+            new HashSet<string>(StringComparer.Ordinal) {
+                RuntimeMember("ChargeFuel", $"{Context},{Int32}", Void),
+                RuntimeMember("EnterCall", Context, Void),
+                RuntimeMember("ExitCall", Context, Void),
+                RuntimeMember("GetInputArgument", $"{Value},{Int32}", Value),
+                RuntimeMember("I32", Int32, Value),
+                RuntimeMember("F64", Double, Value),
+                RuntimeMember("Bool", Boolean, Value),
+                RuntimeMember("TypeScalar", String, SandboxType),
+                RuntimeMember("TypeList", SandboxType, SandboxType),
+                RuntimeMember("TypeMap", $"{SandboxType},{SandboxType}", SandboxType),
+                RuntimeMember("StringConst", $"{Context},{String}", Value),
+                RuntimeMember("AsI32", Value, Int32),
+                RuntimeMember("AsBool", Value, Boolean),
+                RuntimeMember("AsF64", Value, Double),
+                RuntimeMember("AddI32", $"{Value},{Value}", Value),
+                RuntimeMember("SubI32", $"{Value},{Value}", Value),
+                RuntimeMember("MulI32", $"{Value},{Value}", Value),
+                RuntimeMember("DivI32", $"{Value},{Value}", Value),
+                RuntimeMember("RemI32", $"{Value},{Value}", Value),
+                RuntimeMember("NegI32", Value, Value),
+                RuntimeMember("NotBool", Value, Value),
+                RuntimeMember("Eq", $"{Value},{Value}", Value),
+                RuntimeMember("Ne", $"{Value},{Value}", Value),
+                RuntimeMember("LtI32", $"{Value},{Value}", Value),
+                RuntimeMember("LteI32", $"{Value},{Value}", Value),
+                RuntimeMember("GtI32", $"{Value},{Value}", Value),
+                RuntimeMember("GteI32", $"{Value},{Value}", Value),
+                RuntimeMember("And", $"{Value},{Value}", Value),
+                RuntimeMember("Or", $"{Value},{Value}", Value),
+                RuntimeMember("StringLength", Value, Value),
+                RuntimeMember("ConcatString", $"{Context},{Value},{Value}", Value),
+                RuntimeMember("AbsI32", Value, Value),
+                RuntimeMember("MinI32", $"{Value},{Value}", Value),
+                RuntimeMember("MaxI32", $"{Value},{Value}", Value),
+                RuntimeMember("ClampI32", $"{Value},{Value},{Value}", Value),
+                RuntimeMember("SqrtF64", Value, Value),
+                RuntimeMember("FloorF64", Value, Value),
+                RuntimeMember("CeilF64", Value, Value),
+                RuntimeMember("RoundF64", Value, Value),
+                RuntimeMember("ListOf", $"{Context},{ValueArray}", Value),
+                RuntimeMember("ListCount", Value, Value),
+                RuntimeMember("ListGet", $"{Value},{Value}", Value),
+                RuntimeMember("ListAdd", $"{Context},{Value},{Value}", Value),
+                RuntimeMember("MapEmpty", $"{Context},{SandboxType},{SandboxType}", Value),
+                RuntimeMember("MapContainsKey", $"{Value},{Value}", Value),
+                RuntimeMember("MapGet", $"{Value},{Value}", Value),
+                RuntimeMember("MapSet", $"{Context},{Value},{Value},{Value}", Value),
+                RuntimeMember("MapRemove", $"{Context},{Value},{Value}", Value)
+            },
+            new HashSet<string>(StringComparer.Ordinal) {
+                "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
+                "System.Runtime.InteropServices.", "System.Diagnostics.", "System.Threading.",
+                "System.Threading.Tasks.", "System.Activator", "System.Environment",
+                "System.GC", "System.Delegate", "System.Linq.Expressions.", "Microsoft.CSharp."
+            },
+            "safe-ir-verifier-1");
+
+    public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
+
+    private static string RuntimeMember(string name, string parameters, string returnType)
+        => $"{Runtime}.{name}({parameters}):{returnType}";
 }

@@ -7,6 +7,9 @@ namespace SafeIR.Tests;
 internal static class VerifierTestHelpers
 {
     public static async ValueTask<VerificationResult> VerifyAsync(byte[] bytes)
+        => await VerifyAsync(bytes, VerificationPolicy.BoxedValueDefaults());
+
+    public static async ValueTask<VerificationResult> VerifyAsync(byte[] bytes, VerificationPolicy policy)
     {
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
         var manifest = new ArtifactManifest(
@@ -26,7 +29,7 @@ internal static class VerifierTestHelpers
             DateTimeOffset.UtcNow);
 
         return await new GeneratedAssemblyVerifier()
-            .VerifyAsync(bytes, manifest, VerificationPolicy.BoxedValueDefaults(), CancellationToken.None);
+            .VerifyAsync(bytes, manifest, policy, CancellationToken.None);
     }
 
     public static byte[] BuildGeneratedAssembly(Action<TypeBuilder> define)

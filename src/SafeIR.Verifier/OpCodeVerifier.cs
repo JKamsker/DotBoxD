@@ -76,9 +76,9 @@ internal static class OpCodeVerifier
                 return;
             }
 
-            var member = MetadataName.Member(reader, handle);
-            if (!policy.IsMemberAllowed(member.TypeName, member.MemberName)) {
-                diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{member.TypeName}.{member.MemberName}' is not allowed"));
+            var member = MetadataName.MemberSignature(reader, handle);
+            if (!policy.IsMemberAllowed(member.Signature)) {
+                diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{member.Signature}' is not allowed"));
             }
 
             return;

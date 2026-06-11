@@ -47,6 +47,36 @@ internal static class MetadataName
         return ("", handle.Kind.ToString());
     }
 
+    public static (string TypeName, string MemberName, string Signature) MemberSignature(
+        MetadataReader reader,
+        EntityHandle handle)
+    {
+        if (handle.Kind == HandleKind.MemberReference) {
+            var member = reader.GetMemberReference((MemberReferenceHandle)handle);
+            var typeName = ParentName(reader, member.Parent);
+            var memberName = reader.GetString(member.Name);
+            if (member.GetKind() != MemberReferenceKind.Method) {
+                return (typeName, memberName, $"{typeName}.{memberName}:field");
+            }
+
+            return (typeName, memberName, MethodSignature(
+                typeName,
+                memberName,
+                member.DecodeMethodSignature(MethodSignatureNameProvider.Instance, genericContext: null)));
+        }
+
+        if (handle.Kind == HandleKind.MethodDefinition) {
+            var method = reader.GetMethodDefinition((MethodDefinitionHandle)handle);
+            var memberName = reader.GetString(method.Name);
+            return ("", memberName, MethodSignature(
+                "",
+                memberName,
+                method.DecodeSignature(MethodSignatureNameProvider.Instance, genericContext: null)));
+        }
+
+        return ("", handle.Kind.ToString(), handle.Kind.ToString());
+    }
+
     private static string ParentName(MetadataReader reader, EntityHandle parent)
         => parent.Kind switch {
             HandleKind.TypeReference => TypeReference(reader, (TypeReferenceHandle)parent),
@@ -54,4 +84,13 @@ internal static class MetadataName
             HandleKind.TypeSpecification => "TypeSpecification",
             _ => parent.Kind.ToString()
         };
+
+    private static string MethodSignature(
+        string typeName,
+        string memberName,
+        MethodSignature<string> signature)
+    {
+        var prefix = string.IsNullOrEmpty(typeName) ? memberName : typeName + "." + memberName;
+        return prefix + "(" + string.Join(",", signature.ParameterTypes) + "):" + signature.ReturnType;
+    }
 }
