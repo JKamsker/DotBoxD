@@ -8,7 +8,7 @@ public static class DefaultSandboxBindings
         => builder.AddRange(MathBindings.All).AddRange(StringBindings.All);
 
     public static BindingRegistryBuilder AddFileBindings(this BindingRegistryBuilder builder)
-        => builder.Add(SafeFileBindings.ReadText);
+        => builder.Add(SafeFileBindings.ReadText).Add(SafeFileBindings.WriteText);
 
     public static BindingRegistryBuilder AddTimeBindings(this BindingRegistryBuilder builder)
         => builder.Add(SafeTimeBindings.NowUnixMillis);

@@ -91,12 +91,18 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
 
-    public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun)
+    public SandboxPolicyBuilder GrantFileWrite(
+        string root,
+        long maxBytesPerRun,
+        bool allowCreate = true,
+        bool allowOverwrite = true)
     {
-        _allowedEffects |= SandboxEffect.FileWrite;
+        _allowedEffects |= SandboxEffect.FileWrite | SandboxEffect.Audit;
         _grants.Add(new CapabilityGrant("file.write", new Dictionary<string, string> {
             ["root"] = root,
-            ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["allowCreate"] = allowCreate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["allowOverwrite"] = allowOverwrite.ToString(System.Globalization.CultureInfo.InvariantCulture)
         }));
         _limits = _limits with { MaxFileBytesWritten = Math.Max(_limits.MaxFileBytesWritten, maxBytesPerRun) };
         return this;

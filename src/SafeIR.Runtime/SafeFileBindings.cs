@@ -20,4 +20,24 @@ public static class SafeFileBindings
             return SandboxValue.FromString(text);
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    public static BindingDescriptor WriteText { get; } = new(
+        "file.writeText",
+        SemVersion.One,
+        [SandboxType.SandboxPath, SandboxType.String],
+        SandboxType.Unit,
+        SandboxEffect.Cpu | SandboxEffect.FileWrite | SandboxEffect.Audit,
+        "file.write",
+        BindingCostModel.PerByte(baseFuel: 50, perByteFuel: 1),
+        AuditLevel.PerResource,
+        BindingSafety.SideEffectingExternal,
+        async (context, args, cancellationToken) => {
+            await SafeFileSystem.WriteTextAsync(
+                context,
+                ((SandboxPathValue)args[0]).Value,
+                ((StringValue)args[1]).Value,
+                cancellationToken).ConfigureAwait(false);
+            return SandboxValue.Unit;
+        },
+        CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 }
