@@ -205,6 +205,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
             if (method.RelativeVirtualAddress != 0) {
                 var body = peReader.GetMethodBody(method.RelativeVirtualAddress);
                 OpCodeVerifier.VerifyBody(reader, policy, body, diagnostics);
+                GeneratedMethodShapeVerifier.VerifyBody(reader, body, name, diagnostics);
             }
         }
 
