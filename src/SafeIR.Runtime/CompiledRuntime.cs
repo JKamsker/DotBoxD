@@ -204,7 +204,8 @@ public static class CompiledRuntime
         var descriptor = context.Bindings.GetDescriptor(id);
         context.ChargeBindingCall(descriptor);
         try {
-            return descriptor.Invoke(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+            var value = descriptor.Invoke(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+            return context.ChargeBindingReturn(descriptor, value);
         }
         catch (SandboxRuntimeException) {
             throw;

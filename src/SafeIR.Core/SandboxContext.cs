@@ -100,6 +100,39 @@ public sealed class SandboxContext
         ChargeFuel(descriptor.CostModel.BaseFuel);
     }
 
+    public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
+    {
+        if (descriptor.ReturnType != value.Type) {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.BindingFailure,
+                $"binding '{descriptor.Id}' returned an unexpected value type"));
+        }
+
+        if (!descriptor.CostModel.AllocationFromReturnBytes) {
+            return value;
+        }
+
+        ChargeValue(value);
+        var bytes = BindingReturnCost.MeasureBytes(value);
+        if (bytes > 0 && descriptor.CostModel.PerByteFuel > 0) {
+            ChargeFuel(CheckedFuel(bytes, descriptor.CostModel.PerByteFuel));
+        }
+
+        return value;
+    }
+
+    private static long CheckedFuel(long bytes, long perByteFuel)
+    {
+        try {
+            return checked(bytes * perByteFuel);
+        }
+        catch (OverflowException) {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.QuotaExceeded,
+                "binding return fuel budget exhausted"));
+        }
+    }
+
     public DateTimeOffset UtcNow()
     {
         if (Policy.Deterministic) {

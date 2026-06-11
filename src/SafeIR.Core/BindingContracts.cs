@@ -26,6 +26,9 @@ public sealed record BindingCostModel(
     public static BindingCostModel Fixed(long baseFuel) => new(baseFuel);
 
     public static BindingCostModel PerByte(long baseFuel, long perByteFuel)
+        => new(baseFuel, perByteFuel);
+
+    public static BindingCostModel PerReturnedByte(long baseFuel, long perByteFuel)
         => new(baseFuel, perByteFuel, AllocationFromReturnBytes: true);
 }
 
