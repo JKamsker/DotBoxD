@@ -79,6 +79,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("FloorF64", Value, Value),
                 RuntimeMember("CeilF64", Value, Value),
                 RuntimeMember("RoundF64", Value, Value),
+                RuntimeMember("ListEmpty", $"{Context},{SandboxType}", Value),
                 RuntimeMember("ListOf", $"{Context},{ValueArray}", Value),
                 RuntimeMember("ListCount", Value, Value),
                 RuntimeMember("ListGet", $"{Value},{Value}", Value),
@@ -96,7 +97,7 @@ public sealed record VerificationPolicy(
                 "System.Threading.Tasks.", "System.Activator", "System.Environment",
                 "System.GC", "System.Delegate", "System.Linq.Expressions.", "Microsoft.CSharp."
             },
-            "safe-ir-verifier-2");
+            "safe-ir-verifier-3");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 

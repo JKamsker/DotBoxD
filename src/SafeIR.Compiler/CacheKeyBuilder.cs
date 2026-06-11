@@ -7,8 +7,8 @@ using SafeIR.Verifier;
 
 public static class CacheKeyBuilder
 {
-    public const string CompilerVersion = "safe-ir-compiler-5";
-    public const string RuntimeFacadeHash = "safe-ir-runtime-facade-5";
+    public const string CompilerVersion = "safe-ir-compiler-6";
+    public const string RuntimeFacadeHash = "safe-ir-runtime-facade-6";
     public const string TargetFramework = "net10.0";
 
     public static string LanguageVersion => SandboxLanguage.CurrentVersionText;

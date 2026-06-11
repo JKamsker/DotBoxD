@@ -10,6 +10,9 @@ internal static class PureBindingCallEmitter
     public static bool TryEmit(CallExpression call, ILGenerator il, Action<Expression> emitExpression)
     {
         switch (call.Name) {
+            case "list.empty":
+                EmitListEmpty(call, il);
+                return true;
             case "list.of":
                 il.Emit(OpCodes.Ldarg_0);
                 ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
@@ -77,6 +80,17 @@ internal static class PureBindingCallEmitter
         EmitSandboxType(il, mapType.Arguments[0]);
         EmitSandboxType(il, mapType.Arguments[1]);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapEmpty)));
+    }
+
+    private static void EmitListEmpty(CallExpression call, ILGenerator il)
+    {
+        if (call.GenericType is not { } itemType) {
+            throw Unsupported("list.empty requires genericType");
+        }
+
+        il.Emit(OpCodes.Ldarg_0);
+        EmitSandboxType(il, itemType);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListEmpty)));
     }
 
     private static Exception Unsupported(string message)

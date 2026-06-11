@@ -142,15 +142,22 @@ internal sealed class ExpressionEvaluator
     {
         var descriptor = _context.Bindings.GetDescriptor(id);
         _context.ChargeBindingCall(descriptor);
+        using var timeout = _context.CreateWallTimeToken();
         try {
-            var value = await descriptor.Invoke(_context, args, _context.CancellationToken).ConfigureAwait(false);
+            var value = await descriptor.Invoke(_context, args, timeout.Token).ConfigureAwait(false);
             return _context.ChargeBindingReturn(descriptor, value);
         }
         catch (SandboxRuntimeException) {
             throw;
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException) when (_context.CancellationToken.IsCancellationRequested) {
             throw;
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out"));
+        }
+        catch (OperationCanceledException) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed"));
         }
         catch (Exception) {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed"));

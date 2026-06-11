@@ -48,7 +48,7 @@ public static class SafeHttpClient
             Audit(context, startedAt, false, resource, null, ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested) {
             var error = new SandboxError(SandboxErrorCode.Timeout, "net.http.get denied: request timed out");
             Audit(context, startedAt, false, resource, null, error.Code);
             throw new SandboxRuntimeException(error);

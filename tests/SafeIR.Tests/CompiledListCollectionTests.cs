@@ -76,6 +76,24 @@ public sealed class CompiledListCollectionTests
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
     }
 
+    [Fact]
+    public async Task Compiled_list_empty_emits_generic_item_type()
+    {
+        var result = await ExecuteReturnAsync(
+            """
+            { "call": "list.empty", "genericType": "I32", "args": [] }
+            """,
+            """{ "name": "List", "arguments": ["I32"] }""",
+            SandboxPolicyBuilder.Create().Build(),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var list = Assert.IsType<ListValue>(result.Value);
+        Assert.Equal(SandboxType.I32, list.ItemType);
+        Assert.Empty(list.Values);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteListAsync(
         string expression,
         SandboxExecutionOptions options)

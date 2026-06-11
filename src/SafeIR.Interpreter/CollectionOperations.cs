@@ -93,20 +93,24 @@ internal static class CollectionOperations
     }
 
     private static ListValue AsList(SandboxValue value)
-        => value as ListValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected list value");
+    {
+        var list = value as ListValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected list value");
+        SandboxValueValidator.RequireType(list, list.Type, "list item type mismatch");
+        return list;
+    }
 
     private static MapValue AsMap(SandboxValue value)
-        => value as MapValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected map value");
+    {
+        var map = value as MapValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected map value");
+        SandboxValueValidator.RequireType(map, map.Type, "map entry type mismatch");
+        return map;
+    }
 
     private static I32Value AsI32(SandboxValue value)
         => value as I32Value ?? throw Error(SandboxErrorCode.InvalidInput, "expected I32 value");
 
     private static void RequireType(SandboxValue value, SandboxType expected, string message)
-    {
-        if (value.Type != expected) {
-            throw Error(SandboxErrorCode.InvalidInput, message);
-        }
-    }
+        => SandboxValueValidator.RequireType(value, expected, message);
 
     private static SandboxValue Charge(SandboxContext context, SandboxValue value)
     {

@@ -36,7 +36,7 @@ public static class SafeFileSystem
             AuditRead(context, startedAt, false, Sanitize(path.RelativePath), null, ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested) {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
             AuditRead(context, startedAt, false, Sanitize(path.RelativePath), null, error.Code);
             throw new SandboxRuntimeException(error);
@@ -86,7 +86,7 @@ public static class SafeFileSystem
             AuditWrite(context, startedAt, false, Sanitize(path.RelativePath), null, ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested) {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
             AuditWrite(context, startedAt, false, Sanitize(path.RelativePath), null, error.Code);
             throw new SandboxRuntimeException(error);

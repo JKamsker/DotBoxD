@@ -102,22 +102,27 @@ public sealed class SandboxContext
 
     public SandboxValue ChargeBindingReturn(BindingDescriptor descriptor, SandboxValue value)
     {
-        if (descriptor.ReturnType != value.Type) {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.BindingFailure,
-                $"binding '{descriptor.Id}' returned an unexpected value type"));
-        }
+        SandboxValueValidator.RequireType(
+            value,
+            descriptor.ReturnType,
+            SandboxErrorCode.BindingFailure,
+            $"binding '{descriptor.Id}' returned an unexpected value type");
 
         var bytes = BindingReturnCost.MeasureBytes(value);
-        if (descriptor.CostModel.AllocationFromReturnBytes) {
-            ChargeValue(value);
-        }
+        ChargeValue(value);
 
         if (bytes > 0 && descriptor.CostModel.PerByteFuel > 0) {
             ChargeFuel(CheckedFuel(bytes, descriptor.CostModel.PerByteFuel));
         }
 
         return value;
+    }
+
+    public CancellationTokenSource CreateWallTimeToken()
+    {
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        timeout.CancelAfter(Budget.RemainingWallTime());
+        return timeout;
     }
 
     private static long CheckedFuel(long bytes, long perByteFuel)

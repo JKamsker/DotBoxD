@@ -65,6 +65,44 @@ public sealed class BindingReturnCostTests
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
     }
 
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted, false)]
+    [InlineData(ExecutionMode.Compiled, true)]
+    public async Task Binding_return_shape_limits_apply_without_allocation_flag(
+        ExecutionMode mode,
+        bool compiler)
+    {
+        var result = await ExecuteAsync(
+            PerByteStringBinding("test.unmeteredString", "hello", perByteFuel: 0),
+            SandboxPolicyBuilder.Create()
+                .WithMaxStringLength(4)
+                .WithFuel(1_000)
+                .Build(),
+            mode,
+            compiler);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+    }
+
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted, false)]
+    [InlineData(ExecutionMode.Compiled, true)]
+    public async Task Binding_return_deep_collection_type_mismatch_is_sanitized(
+        ExecutionMode mode,
+        bool compiler)
+    {
+        var result = await ExecuteAsync(
+            BadListBinding(),
+            SandboxPolicyBuilder.Create().WithFuel(1_000).Build(),
+            mode,
+            compiler,
+            """{ "name": "List", "arguments": ["I32"] }""");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.BindingFailure, result.Error!.Code);
+    }
+
     [Fact]
     public async Task Binding_return_type_mismatch_is_sanitized()
     {
@@ -93,7 +131,8 @@ public sealed class BindingReturnCostTests
         BindingDescriptor binding,
         SandboxPolicy policy,
         ExecutionMode mode,
-        bool compiler)
+        bool compiler,
+        string returnType = "\"String\"")
     {
         var host = SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
@@ -103,7 +142,7 @@ public sealed class BindingReturnCostTests
                 builder.UseCompilerIfAvailable();
             }
         });
-        var module = await host.ParseJsonAsync(ReturnBindingJson(binding.Id));
+        var module = await host.ParseJsonAsync(ReturnBindingJson(binding.Id, returnType));
         var plan = await host.PrepareAsync(module, policy);
         return await host.ExecuteAsync(
             plan,
@@ -140,7 +179,22 @@ public sealed class BindingReturnCostTests
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromString(value)),
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 
-    private static string ReturnBindingJson(string bindingId)
+    private static BindingDescriptor BadListBinding()
+        => new(
+            "test.badList",
+            SemVersion.One,
+            [],
+            SandboxType.List(SandboxType.I32),
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) => ValueTask.FromResult<SandboxValue>(
+                new ListValue([SandboxValue.FromString("wrong")], SandboxType.I32)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static string ReturnBindingJson(string bindingId, string returnType)
         => $$"""
         {
           "id": "binding-return-cost",
@@ -150,7 +204,7 @@ public sealed class BindingReturnCostTests
               "id": "main",
               "visibility": "entrypoint",
               "parameters": [],
-              "returnType": "String",
+              "returnType": {{returnType}},
               "body": [{ "op": "return", "value": { "call": "{{bindingId}}", "args": [] } }]
             }
           ]

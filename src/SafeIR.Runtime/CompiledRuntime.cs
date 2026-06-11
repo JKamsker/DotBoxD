@@ -138,6 +138,12 @@ public static class CompiledRuntime
         return ChargeValue(context, SandboxValue.FromList(values));
     }
 
+    public static SandboxValue ListEmpty(SandboxContext context, SandboxType itemType)
+    {
+        context.ChargeAllocation(8);
+        return ChargeValue(context, SandboxValue.FromList([], itemType));
+    }
+
     public static SandboxValue ListCount(SandboxValue list) => I32(AsList(list).Values.Count);
 
     public static SandboxValue ListGet(SandboxValue list, SandboxValue index)
@@ -214,15 +220,22 @@ public static class CompiledRuntime
     {
         var descriptor = context.Bindings.GetDescriptor(id);
         context.ChargeBindingCall(descriptor);
+        using var timeout = context.CreateWallTimeToken();
         try {
-            var value = descriptor.Invoke(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+            var value = descriptor.Invoke(context, args, timeout.Token).AsTask().GetAwaiter().GetResult();
             return context.ChargeBindingReturn(descriptor, value);
         }
         catch (SandboxRuntimeException) {
             throw;
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested) {
             throw;
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out"));
+        }
+        catch (OperationCanceledException) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed"));
         }
         catch (Exception) {
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed"));
@@ -230,17 +243,22 @@ public static class CompiledRuntime
     }
 
     private static ListValue AsList(SandboxValue value)
-        => value as ListValue ?? throw InvalidInput("expected list value");
+    {
+        var list = value as ListValue ?? throw InvalidInput("expected list value");
+        SandboxValueValidator.RequireType(list, list.Type, "list item type mismatch");
+        return list;
+    }
 
     private static MapValue AsMap(SandboxValue value)
-        => value as MapValue ?? throw InvalidInput("expected map value");
+    {
+        var map = value as MapValue ?? throw InvalidInput("expected map value");
+        SandboxValueValidator.RequireType(map, map.Type, "map entry type mismatch");
+        return map;
+    }
 
     private static SandboxValue RequireType(SandboxValue value, SandboxType expected, string message)
     {
-        if (value.Type != expected) {
-            throw InvalidInput(message);
-        }
-
+        SandboxValueValidator.RequireType(value, expected, message);
         return value;
     }
 

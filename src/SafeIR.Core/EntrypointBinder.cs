@@ -48,9 +48,7 @@ public static class EntrypointBinder
 
     public static void RequireType(SandboxValue value, SandboxType expectedType, string message)
     {
-        if (value.Type != expectedType) {
-            throw InvalidInput(message);
-        }
+        SandboxValueValidator.RequireType(value, expectedType, message);
     }
 
     private static SandboxRuntimeException InvalidInput(string message)

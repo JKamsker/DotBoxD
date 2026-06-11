@@ -67,7 +67,7 @@ public sealed class ResourceMeter
 
     public void ChargeCollection(SandboxValue value)
     {
-        var shape = MeasureValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        var shape = SandboxValueShapeMeter.Measure(value, Limits);
         if (shape.MaxListLength > Limits.MaxListLength) {
             throw Quota("list length budget exhausted");
         }
@@ -90,7 +90,7 @@ public sealed class ResourceMeter
 
     public void ChargeValue(SandboxValue value)
     {
-        var shape = MeasureValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        var shape = SandboxValueShapeMeter.Measure(value, Limits);
         if (shape.MaxStringLength > Limits.MaxStringLength) {
             throw Quota("string length budget exhausted");
         }
@@ -240,54 +240,4 @@ public sealed class ResourceMeter
         }
     }
 
-    private static ValueShape MeasureValue(SandboxValue value, HashSet<object> stack)
-        => value switch {
-            ListValue list => MeasureList(list, stack),
-            MapValue map => MeasureMap(map, stack),
-            StringValue text => SandboxLiteralConstraints.TextShape(text.Value),
-            SandboxPathValue path => SandboxLiteralConstraints.TextShape(path.Value.RelativePath),
-            SandboxUriValue uri => SandboxLiteralConstraints.TextShape(uri.Value.Value),
-            _ => new ValueShape(0, 0, 0, 0, 0, 0)
-        };
-
-    private static ValueShape MeasureList(ListValue list, HashSet<object> stack)
-    {
-        Enter(list, stack);
-        try {
-            var shape = new ValueShape(list.Values.Count, list.Values.Count, 0, 1, 0, 0);
-            foreach (var item in list.Values) {
-                shape = shape.Combine(MeasureValue(item, stack));
-            }
-
-            return shape;
-        }
-        finally {
-            stack.Remove(list);
-        }
-    }
-
-    private static ValueShape MeasureMap(MapValue map, HashSet<object> stack)
-    {
-        Enter(map, stack);
-        try {
-            var shape = new ValueShape(map.Values.Count, 0, map.Values.Count, 1, 0, 0);
-            foreach (var pair in map.Values) {
-                shape = shape
-                    .Combine(MeasureValue(pair.Key, stack))
-                    .Combine(MeasureValue(pair.Value, stack));
-            }
-
-            return shape;
-        }
-        finally {
-            stack.Remove(map);
-        }
-    }
-
-    private static void Enter(object value, HashSet<object> stack)
-    {
-        if (!stack.Add(value)) {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "cyclic collection value is not supported"));
-        }
-    }
 }

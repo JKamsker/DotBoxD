@@ -122,6 +122,66 @@ public sealed class CollectionQuotaTests
         Assert.Equal(SandboxErrorCode.InvalidInput, result.Error!.Code);
     }
 
+    [Fact]
+    public async Task Deep_host_collection_input_fails_by_quota_without_recursion()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync("""
+        {
+          "id": "deep-input",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "i32": 1 } }]
+            }
+          ]
+        }
+        """);
+        SandboxValue input = SandboxValue.FromInt32(0);
+        for (var i = 0; i < 2_048; i++) {
+            input = new ListValue([input], input.Type);
+        }
+
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxCollectionDepth(8).Build());
+
+        var result = await host.ExecuteAsync(plan, "main", input);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Single_list_entrypoint_input_is_validated_deeply()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync("""
+        {
+          "id": "typed-list-input",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "input", "type": { "name": "List", "arguments": ["I32"] } }],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "call": "list.count", "args": [{ "var": "input" }] } }]
+            }
+          ]
+        }
+        """);
+        var input = new ListValue([SandboxValue.FromString("wrong")], SandboxType.I32);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build());
+
+        var result = await host.ExecuteAsync(plan, "main", input);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.InvalidInput, result.Error!.Code);
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteReturnAsync(
         string expression,
         string returnType,
