@@ -36,17 +36,21 @@ internal static class JsonImport
     public static string ReadPathValue(JsonElement value, string name)
     {
         var path = ReadStringValue(value, name);
-        if (string.IsNullOrWhiteSpace(path) ||
-            path.Contains('\\') ||
-            path.Contains(':') ||
-            path.StartsWith("/", StringComparison.Ordinal) ||
-            Uri.TryCreate(path, UriKind.Absolute, out _) ||
-            Path.IsPathRooted(path) ||
-            path.Split('/').Any(segment => segment is "")) {
+        if (!SandboxLiteralConstraints.IsPortableRelativePath(path)) {
             throw Error("E-JSON-PATH", $"'{name}' must be a portable relative path");
         }
 
         return path;
+    }
+
+    public static string ReadUriValue(JsonElement value, string name)
+    {
+        var uri = ReadStringValue(value, name);
+        if (!SandboxLiteralConstraints.IsSandboxUri(uri)) {
+            throw Error("E-JSON-URI", $"'{name}' must be an absolute URI without user info");
+        }
+
+        return uri;
     }
 
     public static int ReadInt32Value(JsonElement value, string name)

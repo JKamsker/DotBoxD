@@ -233,7 +233,9 @@ public sealed class ResourceMeter
         => value switch {
             ListValue list => MeasureList(list, stack),
             MapValue map => MeasureMap(map, stack),
-            StringValue text => new ValueShape(0, 0, 0, 0, text.Value.Length, text.Value.Length * sizeof(char)),
+            StringValue text => SandboxLiteralConstraints.TextShape(text.Value),
+            SandboxPathValue path => SandboxLiteralConstraints.TextShape(path.Value.RelativePath),
+            SandboxUriValue uri => SandboxLiteralConstraints.TextShape(uri.Value.Value),
             _ => new ValueShape(0, 0, 0, 0, 0, 0)
         };
 
