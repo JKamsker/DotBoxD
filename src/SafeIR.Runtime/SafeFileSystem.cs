@@ -1,5 +1,6 @@
 namespace SafeIR.Runtime;
 
+using System.Globalization;
 using SafeIR;
 
 public static class SafeFileSystem
@@ -225,10 +226,30 @@ public static class SafeFileSystem
         => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
     private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-        => grant.Parameters.TryGetValue(key, out var value) && long.TryParse(value, out var parsed) ? parsed : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static bool ReadBool(CapabilityGrant grant, string key, bool fallback)
-        => grant.Parameters.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!bool.TryParse(value, out var parsed)) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static string Sanitize(string value) => value.Replace('\\', '/');
 

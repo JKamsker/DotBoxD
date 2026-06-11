@@ -19,6 +19,8 @@ internal static class PolicyResolver
             diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "policy declares unknown effects"));
         }
 
+        PolicyGrantValidator.Validate(policy, diagnostics);
+
         foreach (var request in module.CapabilityRequests) {
             if (!policy.GrantsCapability(request.Id)) {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"requested capability '{request.Id}' is not granted"));

@@ -215,15 +215,30 @@ public static class SafeHttpClient
     }
 
     private static bool ReadBool(CapabilityGrant grant, string key)
-        => grant.Parameters.TryGetValue(key, out var value) &&
-           bool.TryParse(value, out var parsed) &&
-           parsed;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return false;
+        }
+
+        if (!bool.TryParse(value, out var parsed)) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"net.http.get denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-        => grant.Parameters.TryGetValue(key, out var value) &&
-           long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : fallback;
+    {
+        if (!grant.Parameters.TryGetValue(key, out var value)) {
+            return fallback;
+        }
+
+        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
+            throw Error(SandboxErrorCode.PermissionDenied, $"net.http.get denied: parameter '{key}' is invalid");
+        }
+
+        return parsed;
+    }
 
     private static void Audit(
         SandboxContext context,

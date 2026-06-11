@@ -1,11 +1,17 @@
 namespace SafeIR;
 
+using System.Collections.ObjectModel;
+
 public sealed record CapabilityGrant(
     string Id,
     IReadOnlyDictionary<string, string> Parameters,
     DateTimeOffset? ExpiresAt = null,
     string GrantedBy = "host-policy",
-    string Reason = "");
+    string Reason = "")
+{
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } =
+        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(Parameters, StringComparer.Ordinal));
+}
 
 public sealed record SandboxPolicy(
     string PolicyId,
@@ -16,6 +22,8 @@ public sealed record SandboxPolicy(
     DateTimeOffset? LogicalNow = null,
     ulong? RandomSeed = null)
 {
+    public IReadOnlyList<CapabilityGrant> Grants { get; init; } = Grants.ToArray();
+
     public string Hash => StableHash();
 
     public bool GrantsCapability(string capabilityId)
@@ -237,7 +245,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicy Build()
     {
         ResourceLimitValidation.Validate(_limits);
-        return new SandboxPolicy(_policyId, _allowedEffects, _grants, _limits, _deterministic, _logicalNow, _randomSeed);
+        return new SandboxPolicy(_policyId, _allowedEffects, _grants.ToArray(), _limits, _deterministic, _logicalNow, _randomSeed);
     }
 
     private static void ThrowIfNegative(long value, string paramName)
@@ -253,10 +261,14 @@ internal static class ParameterReader
     public static IReadOnlyDictionary<string, string> Read(object parameters)
     {
         if (parameters is IReadOnlyDictionary<string, string> values) {
-            return values;
+            return new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(values, StringComparer.Ordinal));
         }
 
-        return parameters.GetType().GetProperties()
-            .ToDictionary(p => p.Name, p => Convert.ToString(p.GetValue(parameters), System.Globalization.CultureInfo.InvariantCulture) ?? "");
+        var dictionary = parameters.GetType().GetProperties()
+            .ToDictionary(
+                p => p.Name,
+                p => Convert.ToString(p.GetValue(parameters), System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                StringComparer.Ordinal);
+        return new ReadOnlyDictionary<string, string>(dictionary);
     }
 }

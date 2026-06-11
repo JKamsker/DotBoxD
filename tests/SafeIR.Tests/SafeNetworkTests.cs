@@ -140,7 +140,7 @@ public sealed class SafeNetworkTests
     }
 
     [Fact]
-    public async Task Direct_policy_negative_http_timeout_is_denied_at_runtime()
+    public async Task Direct_policy_negative_http_timeout_is_rejected_at_prepare()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
         var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
@@ -157,12 +157,11 @@ public sealed class SafeNetworkTests
                     })
             ],
             new ResourceLimits(MaxFuel: 5_000, MaxNetworkBytesRead: 1024));
-        var plan = await host.PrepareAsync(module, policy);
 
-        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT-PARAM");
     }
 
     [Fact]
