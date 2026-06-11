@@ -184,7 +184,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
         foreach (var methodHandle in type.GetMethods()) {
             var method = reader.GetMethodDefinition(methodHandle);
             var name = reader.GetString(method.Name);
-            VerifyMethodSurface(method, name, diagnostics);
+            VerifyMethodSurface(reader, method, name, diagnostics);
             VerifyMethodImplementation(method, name, diagnostics);
             if (name == "Execute" && (method.Attributes & MethodAttributes.Public) != 0) {
                 executeMethods++;
@@ -212,6 +212,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
     }
 
     private static void VerifyMethodSurface(
+        MetadataReader reader,
         MethodDefinition method,
         string name,
         List<VerificationDiagnostic> diagnostics)
@@ -230,6 +231,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
                     "Execute must be public and static"));
             }
 
+            VerifyExecuteSignature(reader, method, diagnostics);
             return;
         }
 
@@ -241,6 +243,22 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
 
         if ((method.Attributes & MethodAttributes.Static) == 0) {
             diagnostics.Add(new VerificationDiagnostic("V-METHOD-ATTR", $"method '{name}' must be static"));
+        }
+    }
+
+    private static void VerifyExecuteSignature(
+        MetadataReader reader,
+        MethodDefinition method,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var signature = method.DecodeSignature(MethodSignatureNameProvider.Instance, genericContext: null);
+        if (signature.ReturnType != "SafeIR.SandboxValue" ||
+            signature.ParameterTypes.Length != 2 ||
+            signature.ParameterTypes[0] != "SafeIR.SandboxContext" ||
+            signature.ParameterTypes[1] != "SafeIR.SandboxValue") {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-EXECUTE-SIGNATURE",
+                "Execute must match SandboxValue Execute(SandboxContext, SandboxValue)"));
         }
     }
 

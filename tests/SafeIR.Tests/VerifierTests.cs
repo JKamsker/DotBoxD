@@ -25,6 +25,8 @@ public sealed class VerifierTests
             { "local helper calls System.IO.File.ReadAllText", LocalHelperFileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] },
             { "object array allocation", ObjectArrayAssembly, ["V-ARRAY"] },
             { "extra public method", ExtraPublicMethodAssembly, ["V-PUBLIC-SURFACE"] },
+            { "wrong Execute return type", WrongExecuteReturnTypeAssembly, ["V-EXECUTE-SIGNATURE"] },
+            { "wrong Execute parameters", WrongExecuteParameterAssembly, ["V-EXECUTE-SIGNATURE"] },
             { "extra public type", ExtraPublicTypeAssembly, ["V-PUBLIC-SURFACE"] },
             { "non-static generated type", NonStaticGeneratedTypeAssembly, ["V-TYPE-SHAPE"] },
             { "synchronized method", SynchronizedMethodAssembly, ["V-METHOD-ATTR"] }
@@ -38,34 +40,11 @@ public sealed class VerifierTests
         string[] expectedCodes)
     {
         var bytes = build();
-        var result = await VerifyAsync(bytes);
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, d => expectedCodes.Contains(d.Code));
         Assert.NotEmpty(name);
-    }
-
-    private static async ValueTask<VerificationResult> VerifyAsync(byte[] bytes)
-    {
-        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
-        var manifest = new ArtifactManifest(
-            1,
-            "test",
-            "module",
-            "plan",
-            "policy",
-            "bindings",
-            "runtime",
-            "compiler",
-            "verifier",
-            "1.0.0",
-            "net10.0",
-            [],
-            hash,
-            DateTimeOffset.UtcNow);
-
-        return await new GeneratedAssemblyVerifier()
-            .VerifyAsync(bytes, manifest, VerificationPolicy.BoxedValueDefaults(), CancellationToken.None);
     }
 
     private static byte[] FileReadAssembly()
@@ -217,6 +196,28 @@ public sealed class VerifierTests
             DefineVoidExecute(type);
             var method = type.DefineMethod("Inspect", MethodAttributes.Public | MethodAttributes.Static, typeof(void), []);
             method.GetILGenerator().Emit(OpCodes.Ret);
+        });
+
+    private static byte[] WrongExecuteReturnTypeAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod(
+                "Execute",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(void),
+                [typeof(SandboxContext), typeof(SandboxValue)]);
+            method.GetILGenerator().Emit(OpCodes.Ret);
+        });
+
+    private static byte[] WrongExecuteParameterAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod(
+                "Execute",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Ret);
         });
 
     private static byte[] ExtraPublicTypeAssembly()
