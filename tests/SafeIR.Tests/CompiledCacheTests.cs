@@ -1,11 +1,18 @@
 using SafeIR;
 using SafeIR.Compiler;
+using SafeIR.Hosting;
+using SafeIR.Runtime;
 using SafeIR.Verifier;
+using System.Text.Json;
 
 namespace SafeIR.Tests;
 
 public sealed class CompiledCacheTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) {
+        WriteIndented = true
+    };
+
     [Fact]
     public async Task Compiled_artifact_is_persisted_and_reused()
     {
@@ -46,6 +53,26 @@ public sealed class CompiledCacheTests
     }
 
     [Fact]
+    public async Task Binding_manifest_change_uses_a_different_cache_key()
+    {
+        using var temp = TempDirectory.Create();
+        var defaultHost = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
+        var extendedHost = HostWithExtraBinding(temp.Path);
+        var module = await defaultHost.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var defaultPlan = await defaultHost.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var extendedPlan = await extendedHost.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
+
+        _ = await ExecuteCompiled(defaultHost, defaultPlan, input);
+        _ = await ExecuteCompiled(extendedHost, extendedPlan, input);
+
+        Assert.NotEqual(defaultPlan.BindingManifestHash, extendedPlan.BindingManifestHash);
+        Assert.NotEqual(CacheKey(defaultPlan), CacheKey(extendedPlan));
+        Assert.True(Directory.Exists(CacheEntry(temp.Path, defaultPlan)));
+        Assert.True(Directory.Exists(CacheEntry(temp.Path, extendedPlan)));
+    }
+
+    [Fact]
     public async Task Corrupted_cached_dll_is_quarantined_and_recompiled()
     {
         using var temp = TempDirectory.Create();
@@ -61,6 +88,42 @@ public sealed class CompiledCacheTests
         Assert.True(result.Succeeded);
         Assert.Contains(result.AuditEvents, e => e.Message?.Contains("cacheStatus=Recompiled", StringComparison.Ordinal) == true);
         Assert.True(Directory.Exists(Path.Combine(temp.Path, "quarantine")));
+        Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
+    }
+
+    [Fact]
+    public async Task Corrupted_cached_manifest_is_quarantined_and_recompiled()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
+        _ = await ExecuteCompiled(host, plan, input);
+        await File.WriteAllTextAsync(Path.Combine(CacheEntry(temp.Path, plan), "manifest.json"), "{ broken json");
+
+        var result = await ExecuteCompiled(host, plan, input);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.AuditEvents, e => e.Message?.Contains("cacheStatus=Recompiled", StringComparison.Ordinal) == true);
+        Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
+    }
+
+    [Fact]
+    public async Task Cached_dll_manifest_hash_mismatch_is_quarantined_and_recompiled()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
+        _ = await ExecuteCompiled(host, plan, input);
+        await ReplaceManifestAssemblyHashAsync(CacheEntry(temp.Path, plan), new string('0', 64));
+
+        var result = await ExecuteCompiled(host, plan, input);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.AuditEvents, e => e.Message?.Contains("cacheStatus=Recompiled", StringComparison.Ordinal) == true);
         Assert.NotEmpty(Directory.GetDirectories(Path.Combine(temp.Path, "quarantine")));
     }
 
@@ -82,6 +145,42 @@ public sealed class CompiledCacheTests
 
     private static string CacheKey(ExecutionPlan plan)
         => CacheKeyBuilder.Build(plan, VerificationPolicy.BoxedValueDefaults(), optimize: false);
+
+    private static SandboxHost HostWithExtraBinding(string cacheDirectory)
+        => SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.AddBinding(ExtraBinding());
+            builder.UseInterpreter();
+            builder.UseCompilerCache(cacheDirectory);
+            builder.UseCompilerIfAvailable();
+        });
+
+    private static BindingDescriptor ExtraBinding()
+        => new(
+            "test.extra",
+            SemVersion.One,
+            [],
+            SandboxType.Unit,
+            SandboxEffect.Cpu,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static async Task ReplaceManifestAssemblyHashAsync(string entryPath, string assemblyHash)
+    {
+        var path = Path.Combine(entryPath, "manifest.json");
+        ArtifactManifest manifest;
+        await using (var read = File.OpenRead(path)) {
+            manifest = await JsonSerializer.DeserializeAsync<ArtifactManifest>(read, JsonOptions) ??
+                throw new JsonException("empty manifest");
+        }
+
+        await using var write = File.Create(path);
+        await JsonSerializer.SerializeAsync(write, manifest with { AssemblyHash = assemblyHash }, JsonOptions);
+    }
 
     private sealed class TempDirectory : IDisposable
     {
