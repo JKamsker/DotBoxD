@@ -52,17 +52,22 @@ public static class CompiledRuntime
 
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
-    public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) + AsI32(right));
+    public static SandboxValue AddI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
 
-    public static SandboxValue SubI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) - AsI32(right));
+    public static SandboxValue SubI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
 
-    public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) * AsI32(right));
+    public static SandboxValue MulI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
 
-    public static SandboxValue DivI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) / AsI32(right));
+    public static SandboxValue DivI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Divide(AsI32(left), AsI32(right)));
 
-    public static SandboxValue RemI32(SandboxValue left, SandboxValue right) => I32(AsI32(left) % AsI32(right));
+    public static SandboxValue RemI32(SandboxValue left, SandboxValue right)
+        => I32(SandboxInt32Math.Remainder(AsI32(left), AsI32(right)));
 
-    public static SandboxValue NegI32(SandboxValue value) => I32(-AsI32(value));
+    public static SandboxValue NegI32(SandboxValue value) => I32(SandboxInt32Math.Negate(AsI32(value)));
 
     public static SandboxValue NotBool(SandboxValue value) => Bool(!AsBool(value));
 

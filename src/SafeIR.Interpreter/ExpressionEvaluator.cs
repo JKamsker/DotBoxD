@@ -35,7 +35,7 @@ internal sealed class ExpressionEvaluator
         var value = await EvaluateAsync(unary.Operand, frame).ConfigureAwait(false);
         return unary.Operator switch {
             "!" => SandboxValue.FromBool(!((BoolValue)value).Value),
-            "-" => SandboxValue.FromInt32(-((I32Value)value).Value),
+            "-" => SandboxValue.FromInt32(SandboxInt32Math.Negate(((I32Value)value).Value)),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported unary operator"))
         };
     }
@@ -46,11 +46,11 @@ internal sealed class ExpressionEvaluator
         var right = await EvaluateAsync(binary.Right, frame).ConfigureAwait(false);
         return binary.Operator switch {
             "+" when left is StringValue l && right is StringValue r => Concat(l.Value, r.Value),
-            "+" => SandboxValue.FromInt32(((I32Value)left).Value + ((I32Value)right).Value),
-            "-" => SandboxValue.FromInt32(((I32Value)left).Value - ((I32Value)right).Value),
-            "*" => SandboxValue.FromInt32(((I32Value)left).Value * ((I32Value)right).Value),
-            "/" => SandboxValue.FromInt32(((I32Value)left).Value / ((I32Value)right).Value),
-            "%" => SandboxValue.FromInt32(((I32Value)left).Value % ((I32Value)right).Value),
+            "+" => SandboxValue.FromInt32(SandboxInt32Math.Add(((I32Value)left).Value, ((I32Value)right).Value)),
+            "-" => SandboxValue.FromInt32(SandboxInt32Math.Subtract(((I32Value)left).Value, ((I32Value)right).Value)),
+            "*" => SandboxValue.FromInt32(SandboxInt32Math.Multiply(((I32Value)left).Value, ((I32Value)right).Value)),
+            "/" => SandboxValue.FromInt32(SandboxInt32Math.Divide(((I32Value)left).Value, ((I32Value)right).Value)),
+            "%" => SandboxValue.FromInt32(SandboxInt32Math.Remainder(((I32Value)left).Value, ((I32Value)right).Value)),
             "==" => SandboxValue.FromBool(Equals(left, right)),
             "!=" => SandboxValue.FromBool(!Equals(left, right)),
             "<" => SandboxValue.FromBool(((I32Value)left).Value < ((I32Value)right).Value),
