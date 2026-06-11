@@ -123,6 +123,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
 
             generatedTypeCount++;
             VerifyTypeSurface(reader, type, diagnostics);
+            GenericParameterVerifier.VerifyType(reader, type, diagnostics);
             VerifyFields(reader, type, diagnostics);
             VerifyMethods(peReader, reader, policy, type, diagnostics);
         }
@@ -185,6 +186,7 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
             var method = reader.GetMethodDefinition(methodHandle);
             var name = reader.GetString(method.Name);
             VerifyMethodSurface(reader, method, name, diagnostics);
+            GenericParameterVerifier.VerifyMethod(reader, method, name, diagnostics);
             VerifyMethodImplementation(method, name, diagnostics);
             if (name == "Execute" && (method.Attributes & MethodAttributes.Public) != 0) {
                 executeMethods++;

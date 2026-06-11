@@ -125,6 +125,7 @@ Check generated methods:
 
 - expected type/method names only
 - expected public surface only
+- no generic type or method parameters
 - no unexpected method attributes
 - no `pinvokeimpl`
 - no `internalcall`
