@@ -20,7 +20,8 @@ public sealed class VerifierTests
             { "mutable static field", MutableStaticFieldAssembly, ["V-FIELD-STATIC"] },
             { "static constructor", StaticConstructorAssembly, ["V-METHOD-SPECIAL"] },
             { "unbudgeted CompiledRuntime.String", UnbudgetedStringFactoryAssembly, ["V-MEMBER"] },
-            { "local helper calls System.IO.File.ReadAllText", LocalHelperFileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] }
+            { "local helper calls System.IO.File.ReadAllText", LocalHelperFileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] },
+            { "object array allocation", ObjectArrayAssembly, ["V-ARRAY"] }
         };
 
     [Theory]
@@ -174,6 +175,15 @@ public sealed class VerifierTests
             var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(string), []);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Call, helper);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] ObjectArrayAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(object[]), []);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Newarr, typeof(object));
             il.Emit(OpCodes.Ret);
         });
 

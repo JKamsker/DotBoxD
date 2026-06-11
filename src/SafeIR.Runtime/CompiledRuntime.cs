@@ -115,11 +115,52 @@ public static class CompiledRuntime
 
     public static SandboxValue RoundF64(SandboxValue value) => F64(Math.Round(AsF64(value), MidpointRounding.ToEven));
 
+    public static SandboxValue ListOf(SandboxContext context, SandboxValue[] values)
+    {
+        context.ChargeAllocation(values.Length * 16);
+        return ChargeValue(context, SandboxValue.FromList(values));
+    }
+
+    public static SandboxValue ListCount(SandboxValue list) => I32(AsList(list).Values.Count);
+
+    public static SandboxValue ListGet(SandboxValue list, SandboxValue index)
+    {
+        var values = AsList(list).Values;
+        var i = AsI32(index);
+        if (i < 0 || i >= values.Count) {
+            throw InvalidInput("list index is out of range");
+        }
+
+        return values[i];
+    }
+
+    public static SandboxValue ListAdd(SandboxContext context, SandboxValue list, SandboxValue item)
+    {
+        var source = AsList(list);
+        if (item.Type != source.ItemType) {
+            throw InvalidInput("list item type mismatch");
+        }
+
+        var values = source.Values.ToList();
+        values.Add(item);
+        context.ChargeAllocation(values.Count * 16);
+        return ChargeValue(context, SandboxValue.FromList(values, source.ItemType));
+    }
+
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
     {
         var descriptor = context.Bindings.GetDescriptor(id);
         context.ChargeBindingCall(descriptor);
         return descriptor.Interpreter(context, args, context.CancellationToken).AsTask().GetAwaiter().GetResult();
+    }
+
+    private static ListValue AsList(SandboxValue value)
+        => value as ListValue ?? throw InvalidInput("expected list value");
+
+    private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)
+    {
+        context.ChargeValue(value);
+        return value;
     }
 
     private static SandboxRuntimeException InvalidInput(string message)

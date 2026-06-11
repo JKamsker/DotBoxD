@@ -19,7 +19,8 @@ internal static class OpCodeVerifier
         ILOpCode.Blt, ILOpCode.Blt_s, ILOpCode.Bgt, ILOpCode.Bgt_s, ILOpCode.Ble, ILOpCode.Ble_s,
         ILOpCode.Bge, ILOpCode.Bge_s, ILOpCode.Add, ILOpCode.Sub, ILOpCode.Mul, ILOpCode.Div,
         ILOpCode.Rem, ILOpCode.Neg, ILOpCode.And, ILOpCode.Or, ILOpCode.Xor, ILOpCode.Not,
-        ILOpCode.Ceq, ILOpCode.Clt, ILOpCode.Cgt, ILOpCode.Call, ILOpCode.Ret, ILOpCode.Pop, ILOpCode.Dup
+        ILOpCode.Ceq, ILOpCode.Clt, ILOpCode.Cgt, ILOpCode.Call, ILOpCode.Ret, ILOpCode.Pop, ILOpCode.Dup,
+        ILOpCode.Newarr, ILOpCode.Stelem_ref
     ];
 
     private static readonly HashSet<ILOpCode> Forbidden = [
@@ -78,6 +79,16 @@ internal static class OpCodeVerifier
             var member = MetadataName.Member(reader, handle);
             if (!policy.IsMemberAllowed(member.TypeName, member.MemberName)) {
                 diagnostics.Add(new VerificationDiagnostic("V-MEMBER", $"member '{member.TypeName}.{member.MemberName}' is not allowed"));
+            }
+
+            return;
+        }
+
+        if (opcode == ILOpCode.Newarr) {
+            var handle = MetadataTokens.EntityHandle(il.ReadInt32());
+            var name = MetadataName.Type(reader, handle);
+            if (!StringComparer.Ordinal.Equals(name, "SafeIR.SandboxValue")) {
+                diagnostics.Add(new VerificationDiagnostic("V-ARRAY", $"array element type '{name}' is not allowed"));
             }
 
             return;

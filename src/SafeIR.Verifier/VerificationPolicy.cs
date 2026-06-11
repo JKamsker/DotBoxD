@@ -51,7 +51,11 @@ public sealed record VerificationPolicy(
             "SafeIR.Runtime.CompiledRuntime.SqrtF64",
             "SafeIR.Runtime.CompiledRuntime.FloorF64",
             "SafeIR.Runtime.CompiledRuntime.CeilF64",
-            "SafeIR.Runtime.CompiledRuntime.RoundF64"
+            "SafeIR.Runtime.CompiledRuntime.RoundF64",
+            "SafeIR.Runtime.CompiledRuntime.ListOf",
+            "SafeIR.Runtime.CompiledRuntime.ListCount",
+            "SafeIR.Runtime.CompiledRuntime.ListGet",
+            "SafeIR.Runtime.CompiledRuntime.ListAdd"
         },
         new HashSet<string>(StringComparer.Ordinal) {
             "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",

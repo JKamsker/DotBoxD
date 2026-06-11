@@ -20,6 +20,13 @@ internal static class MetadataName
         return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
     }
 
+    public static string Type(MetadataReader reader, EntityHandle handle)
+        => handle.Kind switch {
+            HandleKind.TypeReference => TypeReference(reader, (TypeReferenceHandle)handle),
+            HandleKind.TypeDefinition => TypeDefinition(reader, (TypeDefinitionHandle)handle),
+            _ => handle.Kind.ToString()
+        };
+
     public static (string TypeName, string MemberName) Member(MetadataReader reader, EntityHandle handle)
     {
         if (handle.Kind == HandleKind.MemberReference) {
