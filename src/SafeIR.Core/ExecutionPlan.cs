@@ -20,6 +20,7 @@ public sealed record SandboxExecutionOptions
     public bool AllowFallbackToInterpreter { get; init; } = true;
     public bool RequireDeterministic { get; init; }
     public SandboxRunId? RunId { get; init; }
+    public int AutoCompileThreshold { get; init; } = 20;
 }
 
 public enum ExecutionMode

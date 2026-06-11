@@ -1,5 +1,6 @@
 namespace SafeIR.Hosting;
 
+using System.Collections.Concurrent;
 using SafeIR;
 using SafeIR.Compiler;
 using SafeIR.Interpreter;
@@ -10,6 +11,7 @@ public sealed class SandboxHost
     private readonly BindingRegistry _bindings;
     private readonly ISandboxInterpreter _interpreter;
     private readonly ISandboxCompiler? _compiler;
+    private readonly ConcurrentDictionary<string, int> _autoRuns = new(StringComparer.Ordinal);
 
     internal SandboxHost(BindingRegistry bindings, ISandboxInterpreter interpreter, ISandboxCompiler? compiler)
     {
@@ -62,15 +64,39 @@ public sealed class SandboxHost
         return options.Mode switch {
             ExecutionMode.Compiled => await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false),
-            ExecutionMode.Interpreted or ExecutionMode.Auto => await ExecuteInterpretedAsync(
+            ExecutionMode.Interpreted => await ExecuteInterpretedAsync(
                     plan,
                     entrypoint,
                     input,
                     options,
                     cancellationToken)
                 .ConfigureAwait(false),
+            ExecutionMode.Auto => await ExecuteAutoAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false),
             _ => CompilerUnavailableResult(plan, options)
         };
+    }
+
+    private async ValueTask<SandboxExecutionResult> ExecuteAutoAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (_compiler is null || options.EnableDebugTrace) {
+            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        var key = plan.PlanHash + "|" + entrypoint;
+        var count = _autoRuns.AddOrUpdate(key, 1, (_, current) => current + 1);
+        var threshold = Math.Max(1, options.AutoCompileThreshold);
+        if (count < threshold) {
+            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        return await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask<SandboxExecutionResult> ExecuteCompiledAsync(
