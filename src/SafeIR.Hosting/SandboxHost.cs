@@ -79,17 +79,51 @@ public sealed class SandboxHost
         CancellationToken cancellationToken)
     {
         if (_compiler is null || options.EnableDebugTrace) {
+            var reason = _compiler is null ? CompilerUnavailableError() : DebugTraceFallbackError();
             return options.AllowFallbackToInterpreter
-                ? await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false)
+                ? await ExecuteFallbackToInterpreterAsync(
+                        plan,
+                        entrypoint,
+                        input,
+                        options,
+                        reason,
+                        cancellationToken)
+                    .ConfigureAwait(false)
                 : CompilerUnavailableResult(plan, options);
         }
 
-        var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
-        if (compiled is not null) {
-            return compiled;
+        var compiled = await TryExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
+            .ConfigureAwait(false);
+        if (compiled.Result is not null) {
+            return compiled.Result;
         }
 
-        return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
+        return await ExecuteFallbackToInterpreterAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                compiled.FallbackReason ?? CompilerUnavailableError(),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask<SandboxExecutionResult> ExecuteFallbackToInterpreterAsync(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        SandboxError reason,
+        CancellationToken cancellationToken)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var fallbackOptions = options with { RunId = runId };
+        var result = await ExecuteInterpretedAsync(plan, entrypoint, input, fallbackOptions, cancellationToken)
+            .ConfigureAwait(false);
+        var audit = new[] { FallbackAudit(plan, runId, reason) }
+            .Concat(result.AuditEvents)
+            .ToArray();
+        return result with { AuditEvents = audit };
     }
 
     private async ValueTask<SandboxExecutionResult> ExecuteInterpretedAsync(
@@ -100,7 +134,7 @@ public sealed class SandboxHost
         CancellationToken cancellationToken)
         => await _interpreter.ExecuteAsync(plan, entrypoint, input, options, cancellationToken).ConfigureAwait(false);
 
-    private async ValueTask<SandboxExecutionResult?> TryExecuteCompiledAsync(
+    private async ValueTask<CompiledAttempt> TryExecuteCompiledAsync(
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,
@@ -109,25 +143,45 @@ public sealed class SandboxHost
     {
         try {
             var artifact = await _compiler!.CompileAsync(plan, new CompileOptions(entrypoint), cancellationToken).ConfigureAwait(false);
-            return await CompiledExecutionRunner.ExecuteAsync(artifact, plan, input, options, cancellationToken).ConfigureAwait(false);
+            var result = await CompiledExecutionRunner.ExecuteAsync(artifact, plan, input, options, cancellationToken)
+                .ConfigureAwait(false);
+            return new CompiledAttempt(result, null);
         }
         catch (SandboxRuntimeException ex) when (CanFallback(options, ex)) {
-            return null;
+            return new CompiledAttempt(null, ex.Error);
         }
         catch (SandboxRuntimeException ex) {
-            return CompiledFailureResult(plan, options, ex.Error);
+            return new CompiledAttempt(CompiledFailureResult(plan, options, ex.Error), null);
         }
         catch (OperationCanceledException) {
-            return CompiledFailureResult(plan, options, new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled"));
+            var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+            return new CompiledAttempt(CompiledFailureResult(plan, options, error), null);
         }
         catch (Exception) {
-            return CompiledFailureResult(plan, options, new SandboxError(SandboxErrorCode.HostFailure, "compiled execution failed"));
+            var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled execution failed");
+            return new CompiledAttempt(CompiledFailureResult(plan, options, error), null);
         }
     }
 
     private static bool CanFallback(SandboxExecutionOptions options, SandboxRuntimeException ex)
         => options.AllowFallbackToInterpreter &&
            ex.Error.Code is SandboxErrorCode.VerifierFailure or SandboxErrorCode.ValidationError;
+
+    private static SandboxError CompilerUnavailableError()
+        => new(SandboxErrorCode.ValidationError, "compiled execution is not available for this run");
+
+    private static SandboxError DebugTraceFallbackError()
+        => new(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
+
+    private static SandboxAuditEvent FallbackAudit(ExecutionPlan plan, SandboxRunId runId, SandboxError reason)
+        => new(
+            runId,
+            "ExecutionFallback",
+            DateTimeOffset.UtcNow,
+            true,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: reason.Code,
+            Message: $"compiled execution fell back to interpreted mode: {reason.SafeMessage}");
 
     private static SandboxExecutionResult CompilerUnavailableResult(ExecutionPlan plan, SandboxExecutionOptions options)
     {
@@ -211,4 +265,6 @@ public sealed class SandboxHost
             PolicyHash = plan.PolicyHash
         };
     }
+
+    private sealed record CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
 }
