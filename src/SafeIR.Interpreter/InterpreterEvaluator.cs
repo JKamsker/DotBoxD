@@ -22,6 +22,7 @@ internal sealed class InterpreterEvaluator
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"entrypoint '{entrypoint}' is not available"));
         }
 
+        _context.ChargeCollection(input);
         return InvokeFunctionAsync(function, BuildArguments(function, input));
     }
 

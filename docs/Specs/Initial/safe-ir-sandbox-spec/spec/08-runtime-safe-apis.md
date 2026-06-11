@@ -265,7 +265,9 @@ public sealed class SandboxMap<TKey, TValue>
 ```
 
 Growth and copy-on-write updates charge allocation budget. Missing map keys return a safe
-`NotFound` sandbox error. Unsupported map key types are rejected during validation.
+`NotFound` sandbox error. Unsupported map key types are rejected during validation. List
+length, map entry count, nested collection depth, and total collection elements are checked
+against policy resource limits.
 
 ## Safe logging API
 

@@ -107,10 +107,17 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithFuel(long maxFuel);
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime);
     public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes);
+    public SandboxPolicyBuilder WithMaxListLength(int length);
+    public SandboxPolicyBuilder WithMaxMapEntries(int entries);
+    public SandboxPolicyBuilder WithMaxCollectionDepth(int depth);
+    public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements);
     public SandboxPolicyBuilder Deterministic(DateTimeOffset logicalNow, ulong randomSeed);
     public SandboxPolicy Build();
 }
 ```
+
+`SandboxResourceUsage` reports fuel, allocation bytes, host calls, file/network bytes,
+log events, and cumulative collection elements charged during the run.
 
 ## Binding registration
 

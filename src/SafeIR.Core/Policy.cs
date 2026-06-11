@@ -36,7 +36,7 @@ public sealed record SandboxPolicy(
         var builder = new StringBuilder();
         builder.Append("policy|").Append(PolicyId).Append('|').Append((int)AllowedEffects).Append('|');
         builder.Append(Deterministic).Append('|').Append(LogicalNow?.ToUnixTimeMilliseconds()).Append('|').Append(RandomSeed);
-        builder.Append("|limits|").Append(ResourceLimits.MaxFuel).Append('|').Append(ResourceLimits.MaxAllocatedBytes);
+        AppendResourceLimits(builder);
 
         foreach (var grant in Grants.OrderBy(g => g.Id, StringComparer.Ordinal)) {
             builder.Append("|grant|").Append(grant.Id);
@@ -47,6 +47,18 @@ public sealed record SandboxPolicy(
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
         return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private void AppendResourceLimits(StringBuilder builder)
+    {
+        builder.Append("|limits|").Append(ResourceLimits.MaxFuel);
+        builder.Append('|').Append(ResourceLimits.EffectiveWallTime.Ticks);
+        builder.Append('|').Append(ResourceLimits.MaxAllocatedBytes);
+        builder.Append('|').Append(ResourceLimits.MaxCallDepth).Append('|').Append(ResourceLimits.MaxHostCalls);
+        builder.Append('|').Append(ResourceLimits.MaxListLength).Append('|').Append(ResourceLimits.MaxMapEntries);
+        builder.Append('|').Append(ResourceLimits.MaxCollectionDepth).Append('|').Append(ResourceLimits.MaxTotalCollectionElements);
+        builder.Append('|').Append(ResourceLimits.MaxFileBytesRead).Append('|').Append(ResourceLimits.MaxFileBytesWritten);
+        builder.Append('|').Append(ResourceLimits.MaxNetworkBytesRead).Append('|').Append(ResourceLimits.MaxLogEvents);
     }
 }
 
@@ -159,6 +171,30 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes)
     {
         _limits = _limits with { MaxAllocatedBytes = bytes };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxListLength(int length)
+    {
+        _limits = _limits with { MaxListLength = length };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxMapEntries(int entries)
+    {
+        _limits = _limits with { MaxMapEntries = entries };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxCollectionDepth(int depth)
+    {
+        _limits = _limits with { MaxCollectionDepth = depth };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements)
+    {
+        _limits = _limits with { MaxTotalCollectionElements = elements };
         return this;
     }
 

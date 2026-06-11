@@ -36,6 +36,10 @@ public sealed class ResourceBudget
     public long MaxAllocatedBytes { get; }
     public int MaxCallDepth { get; }
     public int MaxHostCalls { get; }
+    public int MaxListLength { get; }
+    public int MaxMapEntries { get; }
+    public int MaxCollectionDepth { get; }
+    public long MaxTotalCollectionElements { get; }
     public long MaxFileBytesRead { get; }
     public long MaxFileBytesWritten { get; }
     public long MaxNetworkBytesRead { get; }
@@ -43,6 +47,7 @@ public sealed class ResourceBudget
 
     public void ChargeFuel(long amount);
     public void ChargeAllocation(long bytes);
+    public void ChargeCollection(SandboxValue value);
     public void ChargeHostCall(string bindingId);
 }
 ```
@@ -148,7 +153,8 @@ Policy example:
 }
 ```
 
-Every collection growth operation checks these.
+Every collection creation or growth operation checks these. Entrypoint inputs are checked
+before execution so the host cannot bypass quotas with prebuilt sandbox collections.
 
 ## String and bytes limits
 

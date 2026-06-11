@@ -58,6 +58,8 @@ public sealed class SandboxContext
 
     public void ChargeAllocation(long bytes) => Budget.ChargeAllocation(bytes);
 
+    public void ChargeCollection(SandboxValue value) => Budget.ChargeCollection(value);
+
     public DateTimeOffset UtcNow()
     {
         if (Policy.Deterministic) {

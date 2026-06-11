@@ -7,13 +7,13 @@ internal static class CollectionOperations
     public static SandboxValue CreateList(SandboxType itemType, SandboxContext context)
     {
         context.ChargeAllocation(8);
-        return SandboxValue.FromList([], itemType);
+        return Charge(context, SandboxValue.FromList([], itemType));
     }
 
     public static SandboxValue BuildList(IReadOnlyList<SandboxValue> values, SandboxContext context)
     {
         context.ChargeAllocation(values.Count * 16);
-        return SandboxValue.FromList(values);
+        return Charge(context, SandboxValue.FromList(values));
     }
 
     public static SandboxValue CountList(SandboxValue list)
@@ -37,7 +37,7 @@ internal static class CollectionOperations
         var values = source.Values.ToList();
         values.Add(item);
         context.ChargeAllocation(values.Count * 16);
-        return SandboxValue.FromList(values, source.ItemType);
+        return Charge(context, SandboxValue.FromList(values, source.ItemType));
     }
 
     public static SandboxValue CreateMap(SandboxType mapType, SandboxContext context)
@@ -47,7 +47,9 @@ internal static class CollectionOperations
         }
 
         context.ChargeAllocation(16);
-        return SandboxValue.FromMap(new Dictionary<SandboxValue, SandboxValue>(), mapType.Arguments[0], mapType.Arguments[1]);
+        return Charge(
+            context,
+            SandboxValue.FromMap(new Dictionary<SandboxValue, SandboxValue>(), mapType.Arguments[0], mapType.Arguments[1]));
     }
 
     public static SandboxValue ContainsMapKey(SandboxValue key, SandboxValue map)
@@ -77,7 +79,7 @@ internal static class CollectionOperations
             [key] = value
         };
         context.ChargeAllocation(Math.Max(1, values.Count) * 32);
-        return SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType);
+        return Charge(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
     }
 
     public static SandboxValue RemoveMapValue(SandboxValue key, SandboxValue map, SandboxContext context)
@@ -87,7 +89,7 @@ internal static class CollectionOperations
         var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values);
         values.Remove(key);
         context.ChargeAllocation(Math.Max(1, values.Count) * 32);
-        return SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType);
+        return Charge(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
     }
 
     private static ListValue AsList(SandboxValue value)
@@ -104,6 +106,12 @@ internal static class CollectionOperations
         if (value.Type != expected) {
             throw Error(SandboxErrorCode.InvalidInput, message);
         }
+    }
+
+    private static SandboxValue Charge(SandboxContext context, SandboxValue value)
+    {
+        context.ChargeCollection(value);
+        return value;
     }
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message)

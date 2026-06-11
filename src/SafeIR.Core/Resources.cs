@@ -8,6 +8,10 @@ public sealed record ResourceLimits(
     long MaxAllocatedBytes = 1_048_576,
     int MaxCallDepth = 64,
     int MaxHostCalls = 100,
+    int MaxListLength = 10_000,
+    int MaxMapEntries = 10_000,
+    int MaxCollectionDepth = 32,
+    long MaxTotalCollectionElements = 100_000,
     long MaxFileBytesRead = 1_048_576,
     long MaxFileBytesWritten = 0,
     long MaxNetworkBytesRead = 1_048_576,
@@ -35,9 +39,19 @@ public sealed class ResourceMeter
     public long FileBytesWritten { get; private set; }
     public long NetworkBytesRead { get; private set; }
     public int LogEvents { get; private set; }
+    public long CollectionElements { get; private set; }
 
     public SandboxResourceUsage Snapshot()
-        => new(FuelUsed, Limits.MaxFuel, AllocatedBytes, HostCalls, FileBytesRead, FileBytesWritten, NetworkBytesRead, LogEvents);
+        => new(
+            FuelUsed,
+            Limits.MaxFuel,
+            AllocatedBytes,
+            HostCalls,
+            FileBytesRead,
+            FileBytesWritten,
+            NetworkBytesRead,
+            LogEvents,
+            CollectionElements);
 
     public void ChargeFuel(long amount)
     {
@@ -61,6 +75,27 @@ public sealed class ResourceMeter
         AllocatedBytes += bytes;
         if (AllocatedBytes > Limits.MaxAllocatedBytes) {
             throw Quota("allocation budget exhausted");
+        }
+    }
+
+    public void ChargeCollection(SandboxValue value)
+    {
+        var shape = MeasureCollection(value, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        if (shape.MaxListLength > Limits.MaxListLength) {
+            throw Quota("list length budget exhausted");
+        }
+
+        if (shape.MaxMapEntries > Limits.MaxMapEntries) {
+            throw Quota("map entry budget exhausted");
+        }
+
+        if (shape.Depth > Limits.MaxCollectionDepth) {
+            throw Quota("collection depth budget exhausted");
+        }
+
+        CollectionElements += shape.Elements;
+        if (CollectionElements > Limits.MaxTotalCollectionElements) {
+            throw Quota("collection element budget exhausted");
         }
     }
 
@@ -105,6 +140,54 @@ public sealed class ResourceMeter
 
     private static SandboxRuntimeException Quota(string message)
         => new(new SandboxError(SandboxErrorCode.QuotaExceeded, message));
+
+    private static CollectionShape MeasureCollection(SandboxValue value, HashSet<object> stack)
+        => value switch {
+            ListValue list => MeasureList(list, stack),
+            MapValue map => MeasureMap(map, stack),
+            _ => new CollectionShape(0, 0, 0, 0)
+        };
+
+    private static CollectionShape MeasureList(ListValue list, HashSet<object> stack)
+    {
+        Enter(list, stack);
+        try {
+            var shape = new CollectionShape(list.Values.Count, list.Values.Count, 0, 1);
+            foreach (var item in list.Values) {
+                shape = shape.Combine(MeasureCollection(item, stack));
+            }
+
+            return shape;
+        }
+        finally {
+            stack.Remove(list);
+        }
+    }
+
+    private static CollectionShape MeasureMap(MapValue map, HashSet<object> stack)
+    {
+        Enter(map, stack);
+        try {
+            var shape = new CollectionShape(map.Values.Count, 0, map.Values.Count, 1);
+            foreach (var pair in map.Values) {
+                shape = shape
+                    .Combine(MeasureCollection(pair.Key, stack))
+                    .Combine(MeasureCollection(pair.Value, stack));
+            }
+
+            return shape;
+        }
+        finally {
+            stack.Remove(map);
+        }
+    }
+
+    private static void Enter(object value, HashSet<object> stack)
+    {
+        if (!stack.Add(value)) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "cyclic collection value is not supported"));
+        }
+    }
 }
 
 public sealed record SandboxResourceUsage(
@@ -115,4 +198,15 @@ public sealed record SandboxResourceUsage(
     long FileBytesRead,
     long FileBytesWritten,
     long NetworkBytesRead,
-    int LogEvents);
+    int LogEvents,
+    long CollectionElements);
+
+internal readonly record struct CollectionShape(long Elements, int MaxListLength, int MaxMapEntries, int Depth)
+{
+    public CollectionShape Combine(CollectionShape nested)
+        => new(
+            Elements + nested.Elements,
+            Math.Max(MaxListLength, nested.MaxListLength),
+            Math.Max(MaxMapEntries, nested.MaxMapEntries),
+            Math.Max(Depth, nested.Depth == 0 ? Depth : nested.Depth + 1));
+}
