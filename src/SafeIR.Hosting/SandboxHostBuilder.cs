@@ -44,6 +44,12 @@ public sealed class SandboxHostBuilder
         return this;
     }
 
+    public SandboxHostBuilder AddLogBindings()
+    {
+        _bindings.AddLogBindings();
+        return this;
+    }
+
     public SandboxHostBuilder AddBinding(BindingDescriptor descriptor)
     {
         _bindings.Add(descriptor);

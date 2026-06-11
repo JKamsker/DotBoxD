@@ -162,6 +162,7 @@ Examples:
 | `clock.now` | `Cpu | Time` |
 | `random.next` | `Cpu | Random` |
 | `file.readText` | `Cpu | Alloc | FileRead` |
+| `log.info` / `log.warn` | `Cpu | Audit` |
 | `game.inventory.grant` | `Cpu | GameStateWrite | Audit` |
 
 Function effects are the union of all reachable operation effects.

@@ -104,6 +104,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder Grant(string capabilityId, object parameters);
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun);
     public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun);
+    public SandboxPolicyBuilder GrantLogging();
     public SandboxPolicyBuilder WithFuel(long maxFuel);
     public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime);
     public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes);
@@ -111,6 +112,8 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithMaxMapEntries(int entries);
     public SandboxPolicyBuilder WithMaxCollectionDepth(int depth);
     public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements);
+    public SandboxPolicyBuilder WithMaxLogEvents(int events);
+    public SandboxPolicyBuilder WithMaxLogMessageLength(int length);
     public SandboxPolicyBuilder Deterministic(DateTimeOffset logicalNow, ulong randomSeed);
     public SandboxPolicy Build();
 }

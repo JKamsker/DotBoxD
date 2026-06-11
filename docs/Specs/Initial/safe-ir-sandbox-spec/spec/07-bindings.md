@@ -284,6 +284,13 @@ format.simple optional
 
 Default side-effect bindings should be disabled unless policy grants them.
 
+Default audited logging bindings:
+
+```text
+log.info  capability: log.write
+log.warn  capability: log.write
+```
+
 ## Bindings for IO rewrite
 
 The JSON IR should use semantic operation IDs:

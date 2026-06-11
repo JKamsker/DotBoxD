@@ -278,6 +278,9 @@ log.info(message)
 log.warn(message)
 ```
 
+Both operations require the host-granted `log.write` capability and emit sanitized
+`SandboxLog` audit events.
+
 Limits:
 
 - max log events per run

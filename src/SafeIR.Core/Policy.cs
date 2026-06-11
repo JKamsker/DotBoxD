@@ -59,6 +59,7 @@ public sealed record SandboxPolicy(
         builder.Append('|').Append(ResourceLimits.MaxCollectionDepth).Append('|').Append(ResourceLimits.MaxTotalCollectionElements);
         builder.Append('|').Append(ResourceLimits.MaxFileBytesRead).Append('|').Append(ResourceLimits.MaxFileBytesWritten);
         builder.Append('|').Append(ResourceLimits.MaxNetworkBytesRead).Append('|').Append(ResourceLimits.MaxLogEvents);
+        builder.Append('|').Append(ResourceLimits.MaxLogMessageLength);
     }
 }
 
@@ -156,6 +157,13 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
 
+    public SandboxPolicyBuilder GrantLogging()
+    {
+        _allowedEffects |= SandboxEffect.Audit;
+        _grants.Add(new CapabilityGrant("log.write", new Dictionary<string, string>()));
+        return this;
+    }
+
     public SandboxPolicyBuilder WithFuel(long maxFuel)
     {
         _limits = _limits with { MaxFuel = maxFuel };
@@ -195,6 +203,18 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements)
     {
         _limits = _limits with { MaxTotalCollectionElements = elements };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxLogEvents(int events)
+    {
+        _limits = _limits with { MaxLogEvents = events };
+        return this;
+    }
+
+    public SandboxPolicyBuilder WithMaxLogMessageLength(int length)
+    {
+        _limits = _limits with { MaxLogMessageLength = length };
         return this;
     }
 

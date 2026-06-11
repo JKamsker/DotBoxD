@@ -15,7 +15,8 @@ public sealed record ResourceLimits(
     long MaxFileBytesRead = 1_048_576,
     long MaxFileBytesWritten = 0,
     long MaxNetworkBytesRead = 1_048_576,
-    int MaxLogEvents = 100)
+    int MaxLogEvents = 100,
+    int MaxLogMessageLength = 4_096)
 {
     public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100);
 }
@@ -128,6 +129,18 @@ public sealed class ResourceMeter
         NetworkBytesRead += bytes;
         if (NetworkBytesRead > Limits.MaxNetworkBytesRead) {
             throw Quota("network read byte budget exhausted");
+        }
+    }
+
+    public void ChargeLogEvent(string message)
+    {
+        if (message.Length > Limits.MaxLogMessageLength) {
+            throw Quota("log message length budget exhausted");
+        }
+
+        LogEvents++;
+        if (LogEvents > Limits.MaxLogEvents) {
+            throw Quota("log event budget exhausted");
         }
     }
 

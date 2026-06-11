@@ -44,10 +44,12 @@ public sealed class ResourceBudget
     public long MaxFileBytesWritten { get; }
     public long MaxNetworkBytesRead { get; }
     public int MaxLogEvents { get; }
+    public int MaxLogMessageLength { get; }
 
     public void ChargeFuel(long amount);
     public void ChargeAllocation(long bytes);
     public void ChargeCollection(SandboxValue value);
+    public void ChargeLogEvent(string message);
     public void ChargeHostCall(string bindingId);
 }
 ```
@@ -190,6 +192,19 @@ Policy example:
   }
 }
 ```
+
+## Log limits
+
+Policy example:
+
+```json
+{
+  "maxLogEvents": 100,
+  "maxLogMessageLength": 4096
+}
+```
+
+Every sandbox-visible log operation checks these before writing a sanitized audit event.
 
 ## IO limits
 

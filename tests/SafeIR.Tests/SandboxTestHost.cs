@@ -15,6 +15,7 @@ internal static class SandboxTestHost
             builder.AddTimeBindings();
             builder.AddRandomBindings();
             builder.AddNetworkBindings(networkInvoker);
+            builder.AddLogBindings();
             builder.UseInterpreter();
             if (compilerCache is not null) {
                 builder.UseCompilerCache(compilerCache);

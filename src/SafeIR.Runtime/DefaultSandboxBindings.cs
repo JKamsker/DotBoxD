@@ -18,4 +18,7 @@ public static class DefaultSandboxBindings
 
     public static BindingRegistryBuilder AddNetworkBindings(this BindingRegistryBuilder builder, HttpMessageInvoker? invoker = null)
         => builder.Add(SafeHttpBindings.GetText(invoker));
+
+    public static BindingRegistryBuilder AddLogBindings(this BindingRegistryBuilder builder)
+        => builder.Add(SafeLogBindings.Info).Add(SafeLogBindings.Warn);
 }

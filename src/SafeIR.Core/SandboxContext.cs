@@ -60,6 +60,8 @@ public sealed class SandboxContext
 
     public void ChargeCollection(SandboxValue value) => Budget.ChargeCollection(value);
 
+    public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
+
     public DateTimeOffset UtcNow()
     {
         if (Policy.Deterministic) {
