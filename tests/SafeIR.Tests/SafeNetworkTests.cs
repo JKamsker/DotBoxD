@@ -1,6 +1,6 @@
 using System.Net;
 using SafeIR;
-using SafeIR.Runtime;
+using static SafeIR.Tests.NetworkTestFixtures;
 
 namespace SafeIR.Tests;
 
@@ -54,6 +54,40 @@ public sealed class SafeNetworkTests
     }
 
     [Fact]
+    public async Task Http_get_denies_non_default_port_without_authority_allowlist()
+    {
+        var result = await ExecuteNetworkAsync(
+            "https://api.example.com:8443/config",
+            SandboxPolicyBuilder.Create()
+                .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+                .WithFuel(5_000)
+                .Build());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Http_get_allows_explicit_authority_and_audits_port()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
+        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com:8443/config?token=secret"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com:8443"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Contains(result.AuditEvents, e =>
+            e.BindingId == "net.http.get" &&
+            e.ResourceId == "https://api.example.com:8443/config" &&
+            e.Success);
+    }
+
+    [Fact]
     public async Task Http_get_denies_ip_literals_by_default()
     {
         var result = await ExecuteNetworkAsync(
@@ -81,12 +115,49 @@ public sealed class SafeNetworkTests
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
     }
 
+    [Theory]
+    [InlineData("0.0.0.0")]
+    [InlineData("100.64.0.1")]
+    [InlineData("198.18.0.1")]
+    [InlineData("224.0.0.1")]
+    public async Task Http_get_denies_special_use_ip_literals_by_default(string address)
+    {
+        var result = await ExecuteNetworkAsync(
+            $"https://{address}/config",
+            SandboxPolicyBuilder.Create()
+                .GrantHttpGet([address], 1024, allowIpLiterals: true)
+                .WithFuel(5_000)
+                .Build());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
     [Fact]
     public async Task Http_get_denies_allowed_hostname_that_resolves_to_private_network()
     {
         var host = SandboxTestHost.Create(
             networkInvoker: FakeInvoker("private"),
             dnsResolver: StaticDns(IPAddress.Loopback));
+        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Http_get_denies_allowed_hostname_with_empty_dns_result()
+    {
+        var host = SandboxTestHost.Create(
+            networkInvoker: FakeInvoker("empty"),
+            dnsResolver: StaticDns());
         var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
@@ -126,6 +197,23 @@ public sealed class SafeNetworkTests
             "",
             HttpStatusCode.Redirect,
             "https://evil.example.com/config"));
+        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task Http_get_denies_invoker_that_already_followed_redirect()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: RedirectFollowedInvoker());
         var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
@@ -197,66 +285,4 @@ public sealed class SafeNetworkTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-DETERMINISM");
     }
 
-    private static async ValueTask<SandboxExecutionResult> ExecuteNetworkAsync(string uri, SandboxPolicy policy)
-    {
-        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson(uri));
-        var plan = await host.PrepareAsync(module, policy);
-        return await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
-    }
-
-    private static string NetworkJson(string uri)
-        => $$"""
-        {
-          "id": "network-reader",
-          "version": "1.0.0",
-          "capabilityRequests": [{ "id": "net.http.get" }],
-          "functions": [
-            {
-              "id": "main",
-              "visibility": "entrypoint",
-              "parameters": [],
-              "returnType": "String",
-              "body": [
-                {
-                  "op": "return",
-                  "value": {
-                    "call": "net.http.get",
-                    "args": [{ "uri": "{{uri}}" }]
-                  }
-                }
-              ]
-            }
-          ]
-        }
-        """;
-
-    private static HttpMessageInvoker FakeInvoker(
-        string response,
-        HttpStatusCode statusCode = HttpStatusCode.OK,
-        string? location = null)
-        => new(new FakeHttpMessageHandler(response, statusCode, location));
-
-    private static SafeDnsResolver StaticDns(params IPAddress[] addresses)
-        => (_, _) => ValueTask.FromResult<IReadOnlyList<IPAddress>>(addresses);
-
-    private sealed class FakeHttpMessageHandler(
-        string response,
-        HttpStatusCode statusCode,
-        string? location) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            var message = new HttpResponseMessage(statusCode) {
-                Content = new StringContent(response)
-            };
-            if (location is not null) {
-                message.Headers.Location = new Uri(location);
-            }
-
-            return Task.FromResult(message);
-        }
-    }
 }

@@ -31,7 +31,7 @@ internal static class SandboxTestHost
         string host,
         CancellationToken cancellationToken)
         => ValueTask.FromResult<IReadOnlyList<System.Net.IPAddress>>(
-            new[] { System.Net.IPAddress.Parse("203.0.113.10") });
+            new[] { System.Net.IPAddress.Parse("93.184.216.34") });
 
     public static string PureScoreJson(string id = "loot-score")
         => $$"""

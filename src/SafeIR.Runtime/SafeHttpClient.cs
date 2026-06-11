@@ -26,6 +26,10 @@ public static class SafeHttpClient
                 .ConfigureAwait(false);
             using var message = new HttpRequestMessage(HttpMethod.Get, request.Uri);
             using var response = await invoker.SendAsync(message, timeout.Token).ConfigureAwait(false);
+            if (response.RequestMessage?.RequestUri is { } finalUri && !SameUri(finalUri, request.Uri)) {
+                throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
+            }
+
             if (IsRedirect(response.StatusCode)) {
                 throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");
             }
@@ -122,7 +126,7 @@ public static class SafeHttpClient
     private static void RequireAllowedHost(CapabilityGrant grant, Uri uri)
     {
         var allowed = ReadSet(grant, "allowedHosts", []);
-        if (allowed.Count == 0 || !allowed.Contains(uri.Host)) {
+        if (allowed.Count == 0 || !allowed.Any(host => MatchesAllowedAuthority(host, uri))) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: host is not allowed");
         }
     }
@@ -143,7 +147,7 @@ public static class SafeHttpClient
         }
 
         var addresses = await dnsResolver(host, cancellationToken).ConfigureAwait(false);
-        if (addresses.Any(IsPrivateOrLoopback)) {
+        if (addresses.Count == 0 || addresses.Any(SafeIpAddressClassifier.IsNonGlobal)) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
         }
     }
@@ -154,34 +158,9 @@ public static class SafeHttpClient
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: IP literals are not allowed");
         }
 
-        if (!ReadBool(grant, "allowPrivateNetwork") && IsPrivateOrLoopback(address)) {
+        if (!ReadBool(grant, "allowPrivateNetwork") && SafeIpAddressClassifier.IsNonGlobal(address)) {
             throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: private network targets are not allowed");
         }
-    }
-
-    private static bool IsPrivateOrLoopback(IPAddress address)
-    {
-        if (IPAddress.IsLoopback(address)) {
-            return true;
-        }
-
-        if (address.IsIPv4MappedToIPv6) {
-            return IsPrivateOrLoopback(address.MapToIPv4());
-        }
-
-        var bytes = address.GetAddressBytes();
-        if (bytes.Length == 4) {
-            return bytes[0] == 10 ||
-                   bytes[0] == 127 ||
-                   bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
-                   bytes[0] == 192 && bytes[1] == 168 ||
-                   bytes[0] == 169 && bytes[1] == 254;
-        }
-
-        return bytes.Length == 16 && (
-            address.IsIPv6LinkLocal ||
-            address.IsIPv6SiteLocal ||
-            (bytes[0] & 0xfe) == 0xfc);
     }
 
     private static bool IsRedirect(HttpStatusCode statusCode)
@@ -261,8 +240,26 @@ public static class SafeHttpClient
 
     private static string SanitizeForAudit(string value)
         => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            ? $"{uri.Scheme}://{uri.Host}{uri.AbsolutePath}"
+            ? $"{uri.Scheme}://{NormalizedAuthority(uri)}{uri.AbsolutePath}"
             : "invalid-uri";
+
+    private static bool MatchesAllowedAuthority(string allowed, Uri uri)
+    {
+        var authority = NormalizedAuthority(uri);
+        if (StringComparer.OrdinalIgnoreCase.Equals(allowed, authority)) {
+            return true;
+        }
+
+        return uri.IsDefaultPort && StringComparer.OrdinalIgnoreCase.Equals(allowed, uri.Host);
+    }
+
+    private static string NormalizedAuthority(Uri uri)
+        => uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+
+    private static bool SameUri(Uri left, Uri right)
+        => StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
+           StringComparer.OrdinalIgnoreCase.Equals(NormalizedAuthority(left), NormalizedAuthority(right)) &&
+           StringComparer.Ordinal.Equals(left.PathAndQuery, right.PathAndQuery);
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
