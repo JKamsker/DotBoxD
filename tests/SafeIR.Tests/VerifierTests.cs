@@ -21,7 +21,11 @@ public sealed class VerifierTests
             { "static constructor", StaticConstructorAssembly, ["V-METHOD-SPECIAL"] },
             { "unbudgeted CompiledRuntime.String", UnbudgetedStringFactoryAssembly, ["V-MEMBER"] },
             { "local helper calls System.IO.File.ReadAllText", LocalHelperFileReadAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER", "V-ASM-REF"] },
-            { "object array allocation", ObjectArrayAssembly, ["V-ARRAY"] }
+            { "object array allocation", ObjectArrayAssembly, ["V-ARRAY"] },
+            { "extra public method", ExtraPublicMethodAssembly, ["V-PUBLIC-SURFACE"] },
+            { "extra public type", ExtraPublicTypeAssembly, ["V-PUBLIC-SURFACE"] },
+            { "non-static generated type", NonStaticGeneratedTypeAssembly, ["V-TYPE-SHAPE"] },
+            { "synchronized method", SynchronizedMethodAssembly, ["V-METHOD-ATTR"] }
         };
 
     [Theory]
@@ -186,6 +190,60 @@ public sealed class VerifierTests
             il.Emit(OpCodes.Newarr, typeof(object));
             il.Emit(OpCodes.Ret);
         });
+
+    private static byte[] ExtraPublicMethodAssembly()
+        => BuildAssembly(type => {
+            DefineVoidExecute(type);
+            var method = type.DefineMethod("Inspect", MethodAttributes.Public | MethodAttributes.Static, typeof(void), []);
+            method.GetILGenerator().Emit(OpCodes.Ret);
+        });
+
+    private static byte[] ExtraPublicTypeAssembly()
+    {
+        var assembly = new PersistedAssemblyBuilder(
+            new AssemblyName("Malicious" + Guid.NewGuid().ToString("N")),
+            typeof(object).Assembly);
+        var module = assembly.DefineDynamicModule("MaliciousModule");
+        var first = module.DefineType("Malicious.Module", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+        DefineVoidExecute(first);
+        first.CreateType();
+
+        var second = module.DefineType("Malicious.Extra", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+        DefineVoidExecute(second);
+        second.CreateType();
+
+        using var stream = new MemoryStream();
+        assembly.Save(stream);
+        return stream.ToArray();
+    }
+
+    private static byte[] NonStaticGeneratedTypeAssembly()
+    {
+        var assembly = new PersistedAssemblyBuilder(
+            new AssemblyName("Malicious" + Guid.NewGuid().ToString("N")),
+            typeof(object).Assembly);
+        var module = assembly.DefineDynamicModule("MaliciousModule");
+        var type = module.DefineType("Malicious.Module", TypeAttributes.Public);
+        DefineVoidExecute(type);
+        type.CreateType();
+
+        using var stream = new MemoryStream();
+        assembly.Save(stream);
+        return stream.ToArray();
+    }
+
+    private static byte[] SynchronizedMethodAssembly()
+        => BuildAssembly(type => {
+            var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(void), []);
+            method.SetImplementationFlags(MethodImplAttributes.Synchronized);
+            method.GetILGenerator().Emit(OpCodes.Ret);
+        });
+
+    private static void DefineVoidExecute(TypeBuilder type)
+    {
+        var method = type.DefineMethod("Execute", MethodAttributes.Public | MethodAttributes.Static, typeof(void), []);
+        method.GetILGenerator().Emit(OpCodes.Ret);
+    }
 
     private static byte[] BuildAssembly(Action<TypeBuilder> define)
     {

@@ -99,11 +99,50 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
         List<VerificationDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
+        var generatedTypeCount = 0;
         foreach (var typeHandle in reader.TypeDefinitions) {
             cancellationToken.ThrowIfCancellationRequested();
             var type = reader.GetTypeDefinition(typeHandle);
+            if (IsModuleType(reader, type)) {
+                continue;
+            }
+
+            generatedTypeCount++;
+            VerifyTypeSurface(reader, type, diagnostics);
             VerifyFields(reader, type, diagnostics);
             VerifyMethods(peReader, reader, policy, type, diagnostics);
+        }
+
+        if (generatedTypeCount != 1) {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-PUBLIC-SURFACE",
+                "generated assembly must define exactly one generated type"));
+        }
+    }
+
+    private static bool IsModuleType(MetadataReader reader, TypeDefinition type)
+        => reader.GetString(type.Name) == "<Module>";
+
+    private static void VerifyTypeSurface(
+        MetadataReader reader,
+        TypeDefinition type,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var visibility = type.Attributes & TypeAttributes.VisibilityMask;
+        if (visibility != TypeAttributes.Public) {
+            diagnostics.Add(new VerificationDiagnostic("V-PUBLIC-SURFACE", "generated type must be public"));
+        }
+
+        if ((type.Attributes & (TypeAttributes.Abstract | TypeAttributes.Sealed)) !=
+            (TypeAttributes.Abstract | TypeAttributes.Sealed)) {
+            var name = reader.GetString(type.Name);
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-TYPE-SHAPE",
+                $"generated type '{name}' must be static"));
+        }
+
+        if ((type.Attributes & TypeAttributes.Interface) != 0) {
+            diagnostics.Add(new VerificationDiagnostic("V-TYPE-SHAPE", "generated type must not be an interface"));
         }
     }
 
@@ -125,9 +164,16 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
         TypeDefinition type,
         List<VerificationDiagnostic> diagnostics)
     {
+        var executeMethods = 0;
         foreach (var methodHandle in type.GetMethods()) {
             var method = reader.GetMethodDefinition(methodHandle);
             var name = reader.GetString(method.Name);
+            VerifyMethodSurface(method, name, diagnostics);
+            VerifyMethodImplementation(method, name, diagnostics);
+            if (name == "Execute" && (method.Attributes & MethodAttributes.Public) != 0) {
+                executeMethods++;
+            }
+
             if (name is ".cctor" or "Finalize") {
                 diagnostics.Add(new VerificationDiagnostic("V-METHOD-SPECIAL", $"method '{name}' is not allowed"));
             }
@@ -140,6 +186,54 @@ public sealed class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
                 var body = peReader.GetMethodBody(method.RelativeVirtualAddress);
                 OpCodeVerifier.VerifyBody(reader, policy, body, diagnostics);
             }
+        }
+
+        if (executeMethods != 1) {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-PUBLIC-SURFACE",
+                "generated type must expose exactly one public Execute method"));
+        }
+    }
+
+    private static void VerifyMethodSurface(
+        MethodDefinition method,
+        string name,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var access = method.Attributes & MethodAttributes.MemberAccessMask;
+        if (name == "Execute") {
+            if (access != MethodAttributes.Public || (method.Attributes & MethodAttributes.Static) == 0) {
+                diagnostics.Add(new VerificationDiagnostic(
+                    "V-PUBLIC-SURFACE",
+                    "Execute must be public and static"));
+            }
+
+            return;
+        }
+
+        if (access != MethodAttributes.Private) {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-PUBLIC-SURFACE",
+                $"method '{name}' is not part of the public surface"));
+        }
+
+        if ((method.Attributes & MethodAttributes.Static) == 0) {
+            diagnostics.Add(new VerificationDiagnostic("V-METHOD-ATTR", $"method '{name}' must be static"));
+        }
+    }
+
+    private static void VerifyMethodImplementation(
+        MethodDefinition method,
+        string name,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var impl = method.ImplAttributes;
+        var codeType = impl & MethodImplAttributes.CodeTypeMask;
+        if ((impl & (MethodImplAttributes.InternalCall | MethodImplAttributes.Synchronized | MethodImplAttributes.Unmanaged)) != 0 ||
+            codeType is MethodImplAttributes.Native or MethodImplAttributes.Runtime) {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-METHOD-ATTR",
+                $"method '{name}' uses unsupported implementation attributes"));
         }
     }
 }
