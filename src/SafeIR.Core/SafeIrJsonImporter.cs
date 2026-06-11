@@ -69,6 +69,10 @@ public static class SafeIrJsonImporter
         RequireAllowedProperties(element, "function", ["id", "visibility", "parameters", "returnType", "body"]);
         RequireObject(element, "function");
         var visibility = OptionalString(element, "visibility") ?? "private";
+        if (visibility is not "entrypoint" and not "private") {
+            throw Error("E-JSON-VISIBILITY", $"unsupported function visibility '{visibility}'");
+        }
+
         return new SandboxFunction(
             RequiredString(element, "id"),
             StringComparer.Ordinal.Equals(visibility, "entrypoint"),

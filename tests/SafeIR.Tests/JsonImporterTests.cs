@@ -84,6 +84,28 @@ public sealed class JsonImporterTests
     }
 
     [Fact]
+    public void Function_rejects_unknown_visibility()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import("""
+        {
+          "id": "bad-visibility",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "public",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "i32": 1 } }]
+            }
+          ]
+        }
+        """));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-VISIBILITY");
+    }
+
+    [Fact]
     public async Task Duplicate_parameter_names_return_validation_diagnostic()
     {
         var host = SandboxHost.Create(builder => {
@@ -151,6 +173,23 @@ public sealed class JsonImporterTests
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-IR-VERSION");
+    }
+
+    [Theory]
+    [InlineData("""{ "op": "pow", "left": { "i32": 2 }, "right": { "i32": 8 } }""")]
+    [InlineData("""{ "unary": "bitwiseNot", "operand": { "i32": 1 } }""")]
+    public async Task Unknown_expression_operators_are_rejected_before_execution(string expression)
+    {
+        var host = SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+        });
+        var module = await host.ParseJsonAsync(MinimalModule("", expression));
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-OP-UNKNOWN");
     }
 
     [Fact]

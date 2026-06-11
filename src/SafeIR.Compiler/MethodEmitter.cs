@@ -184,7 +184,12 @@ internal sealed class MethodEmitter
     private void EmitUnary(UnaryExpression unary)
     {
         EmitExpression(unary.Operand);
-        _il.Emit(OpCodes.Call, Runtime(unary.Operator == "!" ? nameof(CompiledRuntime.NotBool) : nameof(CompiledRuntime.NegI32)));
+        var method = unary.Operator switch {
+            "!" => nameof(CompiledRuntime.NotBool),
+            "-" => nameof(CompiledRuntime.NegI32),
+            _ => throw Unsupported("unary operator not supported by compiler")
+        };
+        _il.Emit(OpCodes.Call, Runtime(method));
     }
 
     private void EmitBinary(BinaryExpression binary)

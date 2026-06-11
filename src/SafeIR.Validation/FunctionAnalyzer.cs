@@ -140,6 +140,11 @@ internal sealed class FunctionAnalyzer
             return SandboxType.Bool;
         }
 
+        if (unary.Operator != "-") {
+            _diagnostics.Add(new SandboxDiagnostic("E-OP-UNKNOWN", $"unknown unary operator '{unary.Operator}'", Span: unary.Span));
+            return SandboxType.Unit;
+        }
+
         Require(operand, SandboxType.I32, unary.Span);
         return SandboxType.I32;
     }
@@ -163,6 +168,11 @@ internal sealed class FunctionAnalyzer
             Require(left, SandboxType.Bool, binary.Span);
             Require(right, SandboxType.Bool, binary.Span);
             return SandboxType.Bool;
+        }
+
+        if (binary.Operator is not ("+" or "-" or "*" or "/" or "%")) {
+            _diagnostics.Add(new SandboxDiagnostic("E-OP-UNKNOWN", $"unknown binary operator '{binary.Operator}'", Span: binary.Span));
+            return SandboxType.Unit;
         }
 
         Require(left, SandboxType.I32, binary.Span);
