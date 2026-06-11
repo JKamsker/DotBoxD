@@ -93,6 +93,15 @@ internal sealed class BytecodeInterpreter
             case BytecodeOp.ListOf:
                 frame.Push(BuildList((int)instruction.Operand!, frame));
                 break;
+            case BytecodeOp.ListCount:
+                frame.Push(CountList(frame.Pop()));
+                break;
+            case BytecodeOp.ListGet:
+                frame.Push(GetListItem(frame.Pop(), frame.Pop()));
+                break;
+            case BytecodeOp.ListAdd:
+                frame.Push(AddListItem(frame.Pop(), frame.Pop()));
+                break;
             case BytecodeOp.Return:
                 return frame.Pop();
         }
@@ -162,6 +171,28 @@ internal sealed class BytecodeInterpreter
     private SandboxValue BuildList(int count, BytecodeFrame frame)
     {
         var values = PopArguments(frame, count);
+        _context.ChargeAllocation(values.Count * 16);
+        return SandboxValue.FromList(values);
+    }
+
+    private static SandboxValue CountList(SandboxValue list)
+        => SandboxValue.FromInt32(((ListValue)list).Values.Count);
+
+    private static SandboxValue GetListItem(SandboxValue index, SandboxValue list)
+    {
+        var values = ((ListValue)list).Values;
+        var i = ((I32Value)index).Value;
+        if (i < 0 || i >= values.Count) {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.InvalidInput, "list index is out of range"));
+        }
+
+        return values[i];
+    }
+
+    private SandboxValue AddListItem(SandboxValue item, SandboxValue list)
+    {
+        var values = ((ListValue)list).Values.ToList();
+        values.Add(item);
         _context.ChargeAllocation(values.Count * 16);
         return SandboxValue.FromList(values);
     }

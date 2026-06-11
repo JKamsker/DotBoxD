@@ -16,6 +16,9 @@ public enum BytecodeOp
     CallFunction,
     ListEmpty,
     ListOf,
+    ListCount,
+    ListGet,
+    ListAdd,
     Return
 }
 

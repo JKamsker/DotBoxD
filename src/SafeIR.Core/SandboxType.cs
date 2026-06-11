@@ -41,6 +41,22 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public bool IsForbidden() => IsForbidden(this);
 
+    public bool Equals(SandboxType? other)
+        => other is not null &&
+           StringComparer.Ordinal.Equals(Name, other.Name) &&
+           Arguments.SequenceEqual(other.Arguments);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Name, StringComparer.Ordinal);
+        foreach (var argument in Arguments) {
+            hash.Add(argument);
+        }
+
+        return hash.ToHashCode();
+    }
+
     public override string ToString()
     {
         if (Arguments.Count == 0) {

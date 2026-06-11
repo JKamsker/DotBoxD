@@ -154,6 +154,15 @@ internal sealed class FunctionBytecodeBuilder
         else if (call.Name == "list.of") {
             Emit(BytecodeOp.ListOf, call.Arguments.Count);
         }
+        else if (call.Name == "list.count") {
+            Emit(BytecodeOp.ListCount);
+        }
+        else if (call.Name == "list.get") {
+            Emit(BytecodeOp.ListGet);
+        }
+        else if (call.Name == "list.add") {
+            Emit(BytecodeOp.ListAdd);
+        }
         else if (_bindings.TryGet(call.Name, out _)) {
             Emit(BytecodeOp.CallBinding, new BytecodeCall(call.Name, call.Arguments.Count));
         }
