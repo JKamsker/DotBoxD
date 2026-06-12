@@ -1,3 +1,6 @@
 using CodeEnforcer;
+using Spectre.Console.Cli;
 
-return new CodeEnforcerApp(Console.Out, Console.Error).Run(args, Environment.CurrentDirectory);
+CommandApp<CodeEnforcerCommand> app = new();
+app.Configure(configuration => configuration.SetApplicationName("CodeEnforcer"));
+return app.Run(args);

@@ -1,8 +1,8 @@
 param(
-    [int] $WarnAt = 350,
-    [int] $FailAt = 500,
-    [int] $MaxFilesPerFolder = 15,
-    [string] $Config = "tools/CodeEnforcer/code-enforcer.json"
+    [int] $WarnAt,
+    [int] $FailAt,
+    [int] $MaxFilesPerFolder,
+    [int] $MaxFilesInProjectFolder
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,19 +12,25 @@ $project = Join-Path $root "tools/CodeEnforcer/src/CodeEnforcer/CodeEnforcer.csp
 $targetFramework = "net10.0"
 $configuration = "Release"
 $assembly = Join-Path $root "tools/CodeEnforcer/src/CodeEnforcer/bin/$configuration/$targetFramework/CodeEnforcer.dll"
-$configPath = if ([System.IO.Path]::IsPathRooted($Config)) {
-    $Config
-} else {
-    Join-Path $root $Config
+$arguments = @(
+    "--root", $root
+)
+
+if ($PSBoundParameters.ContainsKey("WarnAt")) {
+    $arguments += @("--soft-line-limit", $WarnAt)
 }
 
-$arguments = @(
-    "--root", $root,
-    "--config", $configPath,
-    "--soft-line-limit", $WarnAt,
-    "--hard-line-limit", $FailAt,
-    "--max-files-per-folder", $MaxFilesPerFolder
-)
+if ($PSBoundParameters.ContainsKey("FailAt")) {
+    $arguments += @("--hard-line-limit", $FailAt)
+}
+
+if ($PSBoundParameters.ContainsKey("MaxFilesPerFolder")) {
+    $arguments += @("--max-files-per-folder", $MaxFilesPerFolder)
+}
+
+if ($PSBoundParameters.ContainsKey("MaxFilesInProjectFolder")) {
+    $arguments += @("--max-files-per-root-dir", $MaxFilesInProjectFolder)
+}
 
 if (-not (Test-Path -LiteralPath $assembly)) {
     Write-Host "CodeEnforcer is not compiled. Building $configuration..."
@@ -34,7 +40,13 @@ if (-not (Test-Path -LiteralPath $assembly)) {
     }
 }
 
-& dotnet $assembly @arguments
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+Push-Location $root
+try {
+    & dotnet $assembly @arguments
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+finally {
+    Pop-Location
 }

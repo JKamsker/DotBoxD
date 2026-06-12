@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "maxFilesPerDir": 15,
+  "maxFilesPerRootDir": 5,
+  "maxLinesSoft": 350,
+  "maxLinesHard": 500
+}

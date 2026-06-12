@@ -90,6 +90,45 @@ public sealed class CodeEnforcerEngineTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void ReportsProjectFolderAboveFileLimit()
+    {
+        CodeEnforcerConfig config = new() { MaxFilesInProjectFolder = 2 };
+        CodeFile[] files =
+        [
+            new("src/App/A.cs", 10),
+            new("src/App/B.cs", 10),
+            new("src/App/C.cs", 10)
+        ];
+        HashSet<string> projectFolders = new(StringComparer.Ordinal) { "src/App" };
+
+        IReadOnlyList<CodeViolation> violations = new CodeEnforcerEngine()
+            .Check(files, projectFolders, config);
+
+        CodeViolation violation = Assert.Single(violations);
+        Assert.Equal("CE0004", violation.Rule);
+        Assert.Equal("src/App", violation.Path);
+    }
+
+    [Fact]
+    public void AllowsProjectFolderAboveFileLimitWhenExcluded()
+    {
+        CodeEnforcerConfig config = new() { MaxFilesInProjectFolder = 2 };
+        config.ProjectFolderExclusions.Add(new PathExclusion { Path = "src/App" });
+        HashSet<string> projectFolders = new(StringComparer.Ordinal) { "src/App" };
+
+        IReadOnlyList<CodeViolation> violations = new CodeEnforcerEngine().Check(
+            [
+                new CodeFile("src/App/A.cs", 10),
+                new CodeFile("src/App/B.cs", 10),
+                new CodeFile("src/App/C.cs", 10)
+            ],
+            projectFolders,
+            config);
+
+        Assert.Empty(violations);
+    }
+
     private static IReadOnlyList<CodeViolation> Check(IReadOnlyList<CodeFile> files, CodeEnforcerConfig config) =>
         new CodeEnforcerEngine().Check(files, config);
 }

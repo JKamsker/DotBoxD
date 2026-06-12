@@ -4,7 +4,7 @@ namespace CodeEnforcer;
 
 internal static class CodeFileCollector
 {
-    public static IReadOnlyList<CodeFile> Collect(string root)
+    public static CodebaseSnapshot Collect(string root)
     {
         List<CodeFile> files = [];
         foreach (string path in ListTrackedCSharpFiles(root))
@@ -19,7 +19,11 @@ internal static class CodeFileCollector
             files.Add(new CodeFile(normalizedPath, File.ReadLines(fullPath).Count()));
         }
 
-        return files;
+        HashSet<string> projectFolders = ListTrackedProjectFiles(root)
+            .Select(path => PathUtility.GetDirectory(PathUtility.Normalize(path)))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return new CodebaseSnapshot(files, projectFolders);
     }
 
     internal static bool ShouldSkip(string path) =>
@@ -28,7 +32,13 @@ internal static class CodeFileCollector
         path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<string> ListTrackedCSharpFiles(string root)
+    private static IReadOnlyList<string> ListTrackedCSharpFiles(string root) =>
+        ListTrackedFiles(root, "*.cs");
+
+    private static IReadOnlyList<string> ListTrackedProjectFiles(string root) =>
+        ListTrackedFiles(root, "*.csproj");
+
+    private static IReadOnlyList<string> ListTrackedFiles(string root, string pattern)
     {
         ProcessStartInfo startInfo = new("git")
         {
@@ -39,7 +49,7 @@ internal static class CodeFileCollector
         startInfo.ArgumentList.Add(root);
         startInfo.ArgumentList.Add("ls-files");
         startInfo.ArgumentList.Add("--");
-        startInfo.ArgumentList.Add("*.cs");
+        startInfo.ArgumentList.Add(pattern);
 
         using Process process = Process.Start(startInfo)
             ?? throw new CodeEnforcerException("Failed to start git.", ExitCodes.InternalError);
