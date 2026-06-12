@@ -106,10 +106,22 @@ public sealed class LiveSettingStore
 
     public T As<T>() where T : class => LiveContextProxy<T>.Create(this);
 
-    internal IReadOnlyList<SandboxValue> ToSandboxValues(IReadOnlyList<LiveSettingDefinition> orderedSettings)
+    internal SandboxValue ToSandboxValue(LiveSettingDefinition setting)
     {
         lock (_gate) {
-            return orderedSettings.Select(s => _settings[s.Name].ToSandboxValue()).ToArray();
+            return _settings[setting.Name].ToSandboxValue();
+        }
+    }
+
+    internal void CopySandboxValues(
+        IReadOnlyList<LiveSettingDefinition> orderedSettings,
+        SandboxValue[] destination,
+        int destinationIndex)
+    {
+        lock (_gate) {
+            for (var i = 0; i < orderedSettings.Count; i++) {
+                destination[destinationIndex + i] = _settings[orderedSettings[i].Name].ToSandboxValue();
+            }
         }
     }
 
