@@ -1,19 +1,19 @@
 ---
 id: COR-0027
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: high
 title: Worker audit validation accepts forged non-summary event evidence
 dedup_key: security/hosting/worker-audit/non-summary-event-forgery
 created_at: 2026-06-12T22:23:28.5564357+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-12T22:23:28.5564357+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T23:03:04.6182972+00:00
+claimed_by: worker
+claimed_at: 2026-06-12T22:52:39.6991766+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-12T23:03:04.6182972+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

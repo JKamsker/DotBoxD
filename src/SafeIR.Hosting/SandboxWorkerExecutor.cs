@@ -96,7 +96,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker audit envelope was malformed");
-        return WorkerAuditMatches(plan, options, result);
+        return WorkerAuditMatches(plan, entrypoint, options, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
@@ -187,6 +187,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
 
     private static bool WorkerAuditMatches(
         ExecutionPlan plan,
+        string entrypoint,
         SandboxExecutionOptions options,
         SandboxExecutionResult result)
     {
@@ -204,6 +205,14 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         if (result.AuditEvents.Any(e => e.RunId != runId))
         {
             return false;
+        }
+
+        foreach (var auditEvent in result.AuditEvents)
+        {
+            if (!WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
+            {
+                return false;
+            }
         }
 
         var summaries = result.AuditEvents.Where(e => e.Kind == "RunSummary").ToArray();
