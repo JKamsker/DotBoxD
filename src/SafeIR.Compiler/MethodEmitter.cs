@@ -195,7 +195,7 @@ internal sealed class MethodEmitter
         var method = unary.Operator switch
         {
             "!" => nameof(CompiledRuntime.NotBool),
-            "-" => nameof(CompiledRuntime.NegI32),
+            "-" => nameof(CompiledRuntime.Neg),
             _ => throw Unsupported("unary operator not supported by compiler")
         };
         _il.Emit(OpCodes.Call, Runtime(method));
@@ -213,17 +213,17 @@ internal sealed class MethodEmitter
         EmitExpression(binary.Right);
         var method = binary.Operator switch
         {
-            "+" => nameof(CompiledRuntime.AddI32),
-            "-" => nameof(CompiledRuntime.SubI32),
-            "*" => nameof(CompiledRuntime.MulI32),
-            "/" => nameof(CompiledRuntime.DivI32),
-            "%" => nameof(CompiledRuntime.RemI32),
+            "+" => nameof(CompiledRuntime.Add),
+            "-" => nameof(CompiledRuntime.Sub),
+            "*" => nameof(CompiledRuntime.Mul),
+            "/" => nameof(CompiledRuntime.Div),
+            "%" => nameof(CompiledRuntime.Rem),
             "==" => nameof(CompiledRuntime.Eq),
             "!=" => nameof(CompiledRuntime.Ne),
-            "<" => nameof(CompiledRuntime.LtI32),
-            "<=" => nameof(CompiledRuntime.LteI32),
-            ">" => nameof(CompiledRuntime.GtI32),
-            ">=" => nameof(CompiledRuntime.GteI32),
+            "<" => nameof(CompiledRuntime.Lt),
+            "<=" => nameof(CompiledRuntime.Lte),
+            ">" => nameof(CompiledRuntime.Gt),
+            ">=" => nameof(CompiledRuntime.Gte),
             _ => throw Unsupported("operator not supported by compiler")
         };
         _il.Emit(OpCodes.Call, Runtime(method));
