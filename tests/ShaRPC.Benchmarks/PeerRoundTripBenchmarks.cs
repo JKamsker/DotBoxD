@@ -51,6 +51,9 @@ public class PeerRoundTripBenchmarks
 
     private sealed class BenchmarkGameService : IGameService
     {
+        private static readonly Task<ActionResult> MoveResult =
+            Task.FromResult(new ActionResult { Success = true, Message = "Moved" });
+
         private readonly Dictionary<string, PlayerState> _players = new();
 
         public Task<PlayerState> GetPlayerStateAsync(PlayerId playerId, CancellationToken ct = default) =>
@@ -62,7 +65,7 @@ public class PeerRoundTripBenchmarks
             state.PositionX = request.X;
             state.PositionY = request.Y;
             state.PositionZ = request.Z;
-            return Task.FromResult(new ActionResult { Success = true, Message = "Moved" });
+            return MoveResult;
         }
 
         public Task<ActionResult> PerformActionAsync(ActionRequest request, CancellationToken ct = default) =>

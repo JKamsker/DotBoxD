@@ -38,8 +38,12 @@ public class PlayerState
 }
 
 [MessagePackObject]
-public class MoveRequest
+public struct MoveRequest
 {
+    public MoveRequest()
+    {
+    }
+
     [Key(0)]
     public string PlayerId { get; set; } = string.Empty;
 
@@ -67,7 +71,7 @@ public class ActionRequest
 }
 
 [MessagePackObject]
-public class ActionResult
+public struct ActionResult
 {
     [Key(0)]
     public bool Success { get; set; }
