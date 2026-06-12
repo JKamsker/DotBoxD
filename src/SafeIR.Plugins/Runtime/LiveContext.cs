@@ -18,6 +18,7 @@ public sealed class LiveContext<T> where T : class
 
 internal class LiveContextProxy<T> : DispatchProxy where T : class
 {
+    private static readonly IReadOnlyDictionary<MethodInfo, LiveContextAccessor> Accessors = CreateAccessors();
     private LiveSettingStore? _settings;
 
     public static T Create(LiveSettingStore settings)
@@ -30,41 +31,46 @@ internal class LiveContextProxy<T> : DispatchProxy where T : class
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
         ArgumentNullException.ThrowIfNull(targetMethod);
-        var propertyName = PropertyName(targetMethod);
-        if (targetMethod.Name.StartsWith("get_", StringComparison.Ordinal)) {
-            return Read(propertyName, targetMethod.ReturnType);
-        }
-
-        if (targetMethod.Name.StartsWith("set_", StringComparison.Ordinal)) {
-            Write(propertyName, args is { Length: 1 } ? args[0] : null);
-            return null;
-        }
-
-        throw new NotSupportedException($"Live context method '{targetMethod.Name}' is not supported.");
+        return Accessors.TryGetValue(targetMethod, out var accessor)
+            ? Invoke(accessor, args)
+            : throw new NotSupportedException($"Live context method '{targetMethod.Name}' is not supported.");
     }
 
-    private object? Read(string propertyName, Type propertyType)
+    private object? Invoke(LiveContextAccessor accessor, object?[]? args)
     {
         var settings = _settings ?? throw new InvalidOperationException("Live context proxy is not initialized.");
-        return typeof(LiveSettingStore)
-            .GetMethod(nameof(LiveSettingStore.Get))!
-            .MakeGenericMethod(propertyType)
-            .Invoke(settings, [propertyName]);
+        if (accessor.IsGetter)
+        {
+            return LiveSettingTypeConverter.CoerceClr(
+                accessor.PropertyType,
+                settings.GetObject(accessor.PropertyName));
+        }
+
+        settings.SetObject(accessor.PropertyName, args is { Length: 1 } ? args[0] : null);
+        return null;
     }
 
-    private void Write(string propertyName, object? value)
+    private static IReadOnlyDictionary<MethodInfo, LiveContextAccessor> CreateAccessors()
     {
-        var settings = _settings ?? throw new InvalidOperationException("Live context proxy is not initialized.");
-        var currentType = value?.GetType() ?? typeof(string);
-        typeof(LiveSettingStore)
-            .GetMethod(nameof(LiveSettingStore.Set))!
-            .MakeGenericMethod(currentType)
-            .Invoke(settings, [propertyName, value]);
-    }
+        var accessors = new Dictionary<MethodInfo, LiveContextAccessor>();
+        foreach (var property in typeof(T).GetProperties())
+        {
+            if (property.GetMethod is { } getter)
+            {
+                accessors.Add(getter, new LiveContextAccessor(property.Name, property.PropertyType, IsGetter: true));
+            }
 
-    private static string PropertyName(MethodInfo method)
-        => method.Name.Length > 4 ? method.Name[4..] : method.Name;
+            if (property.SetMethod is { } setter)
+            {
+                accessors.Add(setter, new LiveContextAccessor(property.Name, property.PropertyType, IsGetter: false));
+            }
+        }
+
+        return accessors;
+    }
 }
+
+internal readonly record struct LiveContextAccessor(string PropertyName, Type PropertyType, bool IsGetter);
 
 internal static class LiveContextFactory
 {

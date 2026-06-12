@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `PAL-0002` medium - Live setting proxy reflects on every property access
-  - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
-  - Dedup: `alloc/plugins/live-context/proxy-reflection-per-access`
 - [ ] `PAL-0003` medium - Map validation and metering buffer reversed entries
   - File: `docs/agent-loop/findings/PAL-0003-map-validation-and-metering-buffer-reversed-entries.md`
   - Dedup: `alloc/sandbox/map-validation/reverse-buffer`
@@ -31,12 +28,14 @@
 
 ## Fixed pending verification
 
-- [~] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
-  - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
+- [~] `PAL-0002` medium - Live setting proxy reflects on every property access
+  - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
   - Fixed by: `fixer`
   - Commit: ``
 
 ## Verified
 
+- [x] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
+  - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
 
 ## Rejected / duplicate / obsolete
