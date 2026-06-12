@@ -1,5 +1,6 @@
 namespace SafeIR.PluginAnalyzer;
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -15,7 +16,8 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         "SafeIR.Security",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Hook filters and kernel handlers must use approved safe facades instead of host APIs.");
+        description: "Hook filters and kernel handlers must use approved safe facades instead of host APIs.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public static readonly DiagnosticDescriptor LiveSettingTypeRule = new(
         "SGP020",
@@ -34,10 +36,15 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
-        context.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
-        context.RegisterOperationAction(AnalyzeObjectCreation, OperationKind.ObjectCreation);
-        context.RegisterOperationAction(AnalyzePropertyReference, OperationKind.PropertyReference);
-        context.RegisterOperationAction(AnalyzeFieldReference, OperationKind.FieldReference);
+        context.RegisterCompilationStartAction(startContext =>
+        {
+            var helperGraph = new ForbiddenHelperCallGraph();
+            startContext.RegisterOperationAction(c => AnalyzeInvocation(c, helperGraph), OperationKind.Invocation);
+            startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, helperGraph), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzePropertyReference(c, helperGraph), OperationKind.PropertyReference);
+            startContext.RegisterOperationAction(c => AnalyzeFieldReference(c, helperGraph), OperationKind.FieldReference);
+            startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
+        });
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
@@ -55,41 +62,42 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeInvocation(OperationAnalysisContext context)
+    private static void AnalyzeInvocation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
         var invocation = (IInvocationOperation)context.Operation;
-        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+        if (context.ContainingSymbol is not IMethodSymbol method) {
             return;
         }
 
-        ReportIfForbidden(context, invocation.TargetMethod.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, invocation.TargetMethod.ContainingType);
+        helperGraph.RecordCall(method, invocation.TargetMethod, context.Operation.Syntax.GetLocation());
     }
 
-    private static void AnalyzeObjectCreation(OperationAnalysisContext context)
+    private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
-        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+        if (context.ContainingSymbol is not IMethodSymbol method) {
             return;
         }
 
-        ReportIfForbidden(context, ((IObjectCreationOperation)context.Operation).Type);
+        ReportAndRecordIfForbidden(context, helperGraph, method, ((IObjectCreationOperation)context.Operation).Type);
     }
 
-    private static void AnalyzePropertyReference(OperationAnalysisContext context)
+    private static void AnalyzePropertyReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
-        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+        if (context.ContainingSymbol is not IMethodSymbol method) {
             return;
         }
 
-        ReportIfForbidden(context, ((IPropertyReferenceOperation)context.Operation).Property.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, ((IPropertyReferenceOperation)context.Operation).Property.ContainingType);
     }
 
-    private static void AnalyzeFieldReference(OperationAnalysisContext context)
+    private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
-        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+        if (context.ContainingSymbol is not IMethodSymbol method) {
             return;
         }
 
-        ReportIfForbidden(context, ((IFieldReferenceOperation)context.Operation).Field.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, ((IFieldReferenceOperation)context.Operation).Field.ContainingType);
     }
 
     private static bool HasAttribute(ISymbol symbol, string metadataName)
@@ -98,9 +106,18 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
             metadataName,
             StringComparison.Ordinal));
 
-    private static void ReportIfForbidden(OperationAnalysisContext context, ITypeSymbol? type)
+    private static void ReportAndRecordIfForbidden(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol method,
+        ITypeSymbol? type)
     {
         if (!IsForbiddenHostApi(type)) {
+            return;
+        }
+
+        helperGraph.RecordForbidden(method, type!);
+        if (!IsEventKernel(method.ContainingType)) {
             return;
         }
 
@@ -147,7 +164,7 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private static bool IsEventKernel(INamedTypeSymbol? type)
+    internal static bool IsEventKernel(INamedTypeSymbol? type)
         => type?.AllInterfaces.Any(i => string.Equals(
             i.OriginalDefinition.ToDisplayString(),
             "SafeIR.Plugins.IEventKernel<TEvent>",
@@ -161,4 +178,57 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
             or SpecialType.System_Double
             or SpecialType.System_String;
     }
+
+    private sealed class ForbiddenHelperCallGraph
+    {
+        private readonly ConcurrentDictionary<ISymbol, ITypeSymbol> _forbidden = new(SymbolEqualityComparer.Default);
+        private readonly ConcurrentBag<HelperCall> _calls = [];
+
+        public void RecordForbidden(IMethodSymbol method, ITypeSymbol type)
+            => _forbidden.TryAdd(method.OriginalDefinition, type);
+
+        public void RecordCall(IMethodSymbol caller, IMethodSymbol target, Location location)
+        {
+            if (target.DeclaringSyntaxReferences.Length == 0 ||
+                IsEventKernel(target.ContainingType)) {
+                return;
+            }
+
+            _calls.Add(new HelperCall(caller.OriginalDefinition, target.OriginalDefinition, location));
+        }
+
+        public void ReportDiagnostics(CompilationAnalysisContext context)
+        {
+            var tainted = PropagateForbiddenHelpers();
+            foreach (var call in _calls) {
+                if (IsEventKernel(call.Caller.ContainingType) &&
+                    tainted.TryGetValue(call.Target, out var type)) {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        ForbiddenHostApiRule,
+                        call.Location,
+                        type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+                }
+            }
+        }
+
+        private Dictionary<ISymbol, ITypeSymbol> PropagateForbiddenHelpers()
+        {
+            var tainted = new Dictionary<ISymbol, ITypeSymbol>(_forbidden, SymbolEqualityComparer.Default);
+            var changed = true;
+            while (changed) {
+                changed = false;
+                foreach (var call in _calls) {
+                    if (!tainted.ContainsKey(call.Caller) &&
+                        tainted.TryGetValue(call.Target, out var type)) {
+                        tainted[call.Caller] = type;
+                        changed = true;
+                    }
+                }
+            }
+
+            return tainted;
+        }
+    }
+
+    private sealed record HelperCall(IMethodSymbol Caller, IMethodSymbol Target, Location Location);
 }

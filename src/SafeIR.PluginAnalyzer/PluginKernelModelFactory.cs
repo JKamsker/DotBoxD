@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 internal static class PluginKernelModelFactory
 {
-    public static GeneratedPluginPackage? Create(
+    public static GeneratedPluginPackageResult? Create(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken)
     {
@@ -31,19 +31,30 @@ internal static class PluginKernelModelFactory
             return null;
         }
 
-        var model = new PluginKernelModel(
-            PluginId: pluginId,
-            Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
-            KernelName: type.Name,
-            PackageName: PackageName(type.Name),
-            EventName: eventType.Name,
-            EventParameterName: shouldHandle.ParameterList.Parameters.FirstOrDefault()?.Identifier.ValueText ?? "e",
-            ContextParameterName: shouldHandle.ParameterList.Parameters.Skip(1).FirstOrDefault()?.Identifier.ValueText ?? "ctx",
-            EventProperties: PluginSymbolReader.EventProperties(eventType),
-            LiveSettings: PluginSymbolReader.LiveSettings(type),
-            ShouldHandle: shouldHandle,
-            Handle: handle);
-        return SafeIrPackageSourceEmitter.Emit(model);
+        try
+        {
+            var model = new PluginKernelModel(
+                PluginId: pluginId,
+                Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
+                KernelName: type.Name,
+                PackageName: PackageName(type.Name),
+                EventName: eventType.Name,
+                EventParameterName: shouldHandle.ParameterList.Parameters.FirstOrDefault()?.Identifier.ValueText ?? "e",
+                ContextParameterName: shouldHandle.ParameterList.Parameters.Skip(1).FirstOrDefault()?.Identifier.ValueText ?? "ctx",
+                EventProperties: PluginSymbolReader.EventProperties(eventType),
+                LiveSettings: PluginSymbolReader.LiveSettings(type),
+                ShouldHandle: shouldHandle,
+                Handle: handle);
+            return new GeneratedPluginPackageResult(SafeIrPackageSourceEmitter.Emit(model), null);
+        }
+        catch (NotSupportedException ex)
+        {
+            var diagnostic = Diagnostic.Create(
+                PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
+                declaration.Identifier.GetLocation(),
+                ex.Message);
+            return new GeneratedPluginPackageResult(null, diagnostic);
+        }
     }
 
     private static string PackageName(string kernelName)

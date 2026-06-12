@@ -86,6 +86,33 @@ public sealed class PluginAnalyzerTests
     }
 
     [Fact]
+    public async Task Reports_forbidden_host_api_hidden_behind_helper_call()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using SafeIR.Plugins;
+
+            public static class BadHelper
+            {
+                public static void Write() => System.IO.File.WriteAllText("x.txt", "bad");
+            }
+
+            [GamePlugin("bad")]
+            public sealed class BadKernel : IEventKernel<string>
+            {
+                public bool ShouldHandle(string e, HookContext context)
+                {
+                    BadHelper.Write();
+                    return true;
+                }
+
+                public void Handle(string e, HookContext context) { }
+            }
+            """);
+
+        Assert.Contains(diagnostics, d => d.Id == "SGP001");
+    }
+
+    [Fact]
     public void Generates_fire_damage_plugin_package_from_kernel_class()
     {
         var compilation = CreateCompilation("""
@@ -133,6 +160,40 @@ public sealed class PluginAnalyzerTests
         Assert.Contains("And(Eq(Var(\"e_DamageType\"), Var(\"DamageType\")), Ge(Var(\"e_Amount\"), Var(\"MinDamage\")))", generated);
         Assert.Contains("global::SafeIR.Plugins.PluginMessageBindings.SendBindingId", generated);
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+    }
+
+    [Fact]
+    public void Generator_reports_unsupported_kernel_shape_as_diagnostic()
+    {
+        var compilation = CreateCompilation("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string DamageType);
+
+            [GamePlugin("bad-shape")]
+            public sealed partial class BadKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => IsFire(e);
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send("player-1", "message");
+
+                private static bool IsFire(DamageEvent e) => e.DamageType == "fire";
+            }
+            """);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new SafeIrPluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out _,
+            out var generatorDiagnostics);
+
+        Assert.Contains(generatorDiagnostics, d => d.Id == "SGP100");
+        Assert.Empty(driver.GetRunResult().GeneratedTrees);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)

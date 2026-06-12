@@ -13,14 +13,21 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
                 "SafeIR.Plugins.GamePluginAttribute",
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
-            .Where(static package => package is not null);
+            .Where(static result => result is not null);
 
-        context.RegisterSourceOutput(packages, static (context, package) => {
-            if (package is null) {
+        context.RegisterSourceOutput(packages, static (context, result) => {
+            if (result is null) {
                 return;
             }
 
-            context.AddSource(package.HintName, package.Source);
+            if (result.Diagnostic is not null) {
+                context.ReportDiagnostic(result.Diagnostic);
+                return;
+            }
+
+            if (result.Package is not null) {
+                context.AddSource(result.Package.HintName, result.Package.Source);
+            }
         });
     }
 }
