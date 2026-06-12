@@ -4,22 +4,8 @@
     {
       "path": "src/SafeIR.Validation/FunctionAnalyzer.cs",
       "justification": "Legacy validation analyzer over the soft limit. Do not grow it; split during the next validation refactor."
-    },
-    {
-      "path": "tests/SafeIR.Tests/PluginAnalyzerTests.cs",
-      "justification": "Legacy broad plugin analyzer tests over the soft limit. New analyzer tests should be split into focused files."
     }
   ],
-  "folders": [
-    {
-      "path": "tests/SafeIR.Tests",
-      "justification": "Legacy monolithic test project folder. New tests should be split into focused subdirectories when practical."
-    }
-  ],
-  "rootFolders": [
-    {
-      "path": "tests/SafeIR.Tests",
-      "justification": "Legacy monolithic test project root predates the project-folder limit. New tests should move into focused subdirectories where practical."
-    }
-  ]
+  "folders": [],
+  "rootFolders": []
 }
