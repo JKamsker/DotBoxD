@@ -147,6 +147,10 @@ Sandbox.Execute
 Sandbox.BindingCall
 ```
 
+Compiled run summaries include both compiler cache status and host
+materialization status so operators can distinguish DLL cache reuse from
+loaded delegate reuse.
+
 ## Debug traces
 
 For interpreted mode, optional debug traces:

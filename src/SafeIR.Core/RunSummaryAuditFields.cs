@@ -9,7 +9,8 @@ public static class RunSummaryAuditFields
         string cacheStatus,
         string? runtimeForm = null,
         string? cacheKey = null,
-        string? artifactHash = null)
+        string? artifactHash = null,
+        string? materializationStatus = null)
     {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -46,6 +47,7 @@ public static class RunSummaryAuditFields
         AddIfPresent(fields, "runtimeForm", runtimeForm);
         AddIfPresent(fields, "cacheKey", cacheKey);
         AddIfPresent(fields, "artifactHash", artifactHash);
+        AddIfPresent(fields, "materializationStatus", materializationStatus);
         return fields;
     }
 

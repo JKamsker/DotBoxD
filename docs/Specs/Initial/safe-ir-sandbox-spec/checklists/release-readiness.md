@@ -26,7 +26,7 @@
 - [ ] DLL cache manifest implemented.
 - [ ] Cache invalidation tests pass.
 - [ ] Cache corruption tests pass.
-- [ ] `AssemblyLoadContext` lifecycle tested.
+- [x] `AssemblyLoadContext` lifecycle tested.
 - [ ] Fallback behavior documented.
 
 ## Production hardening

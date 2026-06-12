@@ -6,13 +6,14 @@ using SafeIR.Compiler;
 internal static class CompiledExecutionRunner
 {
     public static ValueTask<SandboxExecutionResult> ExecuteAsync(
-        CompiledArtifact artifact,
+        CompiledExecutable executable,
         ExecutionPlan plan,
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
         CancellationToken cancellationToken)
     {
+        var artifact = executable.Artifact;
         var runId = options.RunId ?? SandboxRunId.New();
         var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);
@@ -27,24 +28,24 @@ internal static class CompiledExecutionRunner
             WriteCacheInvalidated(audit, runId, startedAt, plan, artifact);
             var value = artifact.Entrypoint(context, input);
             EnsureReturnType(plan, entrypoint, value);
-            WriteSummary(audit, runId, startedAt, plan, artifact, budget, true, null);
+            WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, true, value, null));
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
-            WriteSummary(audit, runId, startedAt, plan, artifact, budget, false, error);
+            WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, error));
         }
         catch (SandboxRuntimeException ex)
         {
-            WriteSummary(audit, runId, startedAt, plan, artifact, budget, false, ex.Error);
+            WriteSummary(audit, runId, startedAt, plan, executable, budget, false, ex.Error);
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, ex.Error));
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
-            WriteSummary(audit, runId, startedAt, plan, artifact, budget, false, error);
+            WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, error));
         }
     }
@@ -76,11 +77,12 @@ internal static class CompiledExecutionRunner
         SandboxRunId runId,
         DateTimeOffset startedAt,
         ExecutionPlan plan,
-        CompiledArtifact artifact,
+        CompiledExecutable executable,
         ResourceMeter budget,
         bool success,
         SandboxError? error)
     {
+        var artifact = executable.Artifact;
         var cacheStatus = artifact.CacheStatus.ToString();
         audit.Write(new SandboxAuditEvent(
             runId,
@@ -90,6 +92,7 @@ internal static class CompiledExecutionRunner
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error?.Code,
             Message: $"mode=compiled runtimeForm={artifact.RuntimeForm} cacheStatus={cacheStatus} " +
+                     $"materializationStatus={executable.MaterializationStatus} " +
                      $"cacheKey={artifact.Manifest.CacheKey} artifact={artifact.ArtifactHash} " +
                      $"plan={plan.PlanHash} policy={plan.PolicyHash} bindings={plan.BindingManifestHash} " +
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
@@ -100,7 +103,8 @@ internal static class CompiledExecutionRunner
                 cacheStatus,
                 artifact.RuntimeForm.ToString(),
                 artifact.Manifest.CacheKey,
-                artifact.ArtifactHash)));
+                artifact.ArtifactHash,
+                executable.MaterializationStatus)));
     }
 
     private static void WriteCacheInvalidated(

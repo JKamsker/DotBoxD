@@ -2,6 +2,7 @@ namespace SafeIR.Hosting;
 
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
 using SafeIR;
 using SafeIR.Compiler;
 using SafeIR.Verifier;
@@ -11,13 +12,13 @@ internal static class CompiledArtifactGuard
     private static readonly VerificationPolicy DefaultVerificationPolicy = VerificationPolicy.BoxedValueDefaults();
     private static readonly IGeneratedAssemblyVerifier Verifier = new GeneratedAssemblyVerifier();
 
-    public static async ValueTask<CompiledArtifact> MaterializeExecutableAsync(
+    public static async ValueTask<MaterializedCompiledArtifact> MaterializeExecutableAsync(
         CompiledArtifact artifact,
         ExecutionPlan plan,
         string entrypoint,
         CancellationToken cancellationToken)
     {
-        EnsureMatchesPlan(artifact, plan, entrypoint);
+        ValidateExecutableEnvelope(artifact, plan, entrypoint);
         if (artifact.RuntimeForm == CompiledRuntimeFormKind.DynamicMethod)
         {
             throw Invalid("dynamic method artifacts require an independent verifier gate before execution");
@@ -43,15 +44,23 @@ internal static class CompiledArtifactGuard
             throw Invalid("compiled artifact bytes do not match artifact hash");
         }
 
-        return new CompiledArtifact(
+        var loaded = LoadEntrypoint(assemblyBytes, artifact.AssemblyHash);
+        return new MaterializedCompiledArtifact(new CompiledArtifact(
             assemblyBytes,
             artifact.AssemblyHash,
             artifact.Manifest,
             verification,
-            LoadEntrypoint(assemblyBytes),
+            loaded.Entrypoint,
             CompiledRuntimeFormKind.LoadedAssembly,
             artifact.CacheStatus,
-            artifact.CacheInvalidReason);
+            artifact.CacheInvalidReason),
+            loaded.Context);
+    }
+
+    public static void ValidateExecutableEnvelope(CompiledArtifact artifact, ExecutionPlan plan, string entrypoint)
+    {
+        EnsureMatchesPlan(artifact, plan, entrypoint);
+        EnsureAssemblyBytesMatchHash(artifact);
     }
 
     private static void EnsureMatchesPlan(CompiledArtifact artifact, ExecutionPlan plan, string entrypoint)
@@ -119,25 +128,25 @@ internal static class CompiledArtifactGuard
         throw Invalid("compiled artifact cache key does not match execution plan");
     }
 
-    private static SandboxCompiledEntrypoint LoadEntrypoint(byte[] assemblyBytes)
+    private static void EnsureAssemblyBytesMatchHash(CompiledArtifact artifact)
     {
-        var context = new AssemblyLoadContext("SafeIR.Generated.Host", isCollectible: true);
+        var actual = Convert.ToHexString(SHA256.HashData(artifact.AssemblyBytes)).ToLowerInvariant();
+        if (!StringComparer.Ordinal.Equals(actual, artifact.AssemblyHash))
+        {
+            throw Invalid("compiled artifact bytes do not match artifact hash");
+        }
+    }
+
+    private static (SandboxCompiledEntrypoint Entrypoint, AssemblyLoadContext Context) LoadEntrypoint(
+        byte[] assemblyBytes,
+        string assemblyHash)
+    {
+        var context = new AssemblyLoadContext("SafeIR.Generated.Host." + assemblyHash, isCollectible: true);
         var assembly = context.LoadFromStream(new MemoryStream(assemblyBytes, writable: false));
         var type = assembly.GetTypes().Single(t => t.Name.StartsWith("Module_", StringComparison.Ordinal));
         var method = type.GetMethod("Execute", BindingFlags.Public | BindingFlags.Static) ??
             throw new MissingMethodException(type.FullName, "Execute");
-        var entrypoint = method.CreateDelegate<SandboxCompiledEntrypoint>();
-        return (sandboxContext, input) =>
-        {
-            try
-            {
-                return entrypoint(sandboxContext, input);
-            }
-            finally
-            {
-                context.Unload();
-            }
-        };
+        return (method.CreateDelegate<SandboxCompiledEntrypoint>(), context);
     }
 
     private static SandboxRuntimeException Invalid(string message)

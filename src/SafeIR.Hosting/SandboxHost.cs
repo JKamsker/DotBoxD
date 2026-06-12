@@ -7,7 +7,7 @@ using SafeIR.Compiler;
 using SafeIR.Interpreter;
 using SafeIR.Validation;
 
-public sealed partial class SandboxHost
+public sealed partial class SandboxHost : IDisposable
 {
     private readonly BindingRegistry _bindings;
     private readonly ISandboxInterpreter _interpreter;
@@ -16,6 +16,8 @@ public sealed partial class SandboxHost
     private readonly Action<SandboxAuditEvent>? _auditObserver;
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly ConcurrentDictionary<string, int> _autoRuns = new(StringComparer.Ordinal);
+    private readonly CompiledExecutableCache _compiledExecutables = new();
+    private int _disposed;
 
     internal SandboxHost(
         BindingRegistry bindings,
@@ -43,6 +45,7 @@ public sealed partial class SandboxHost
         SandboxPolicy policy,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         ExecutionPlanGuard.EnsurePolicyLimits(policy);
         var validation = new ModuleValidator().Validate(module, _bindings, policy);
@@ -61,6 +64,7 @@ public sealed partial class SandboxHost
         SandboxExecutionOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         options ??= new SandboxExecutionOptions();
         ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey);
         if (TryGetRevokedCapability(plan, entrypoint, out var revoked))
@@ -220,7 +224,7 @@ public sealed partial class SandboxHost
         try
         {
             var artifact = await _compiler!.CompileAsync(plan, new CompileOptions(entrypoint), cancellationToken).ConfigureAwait(false);
-            var executable = await CompiledArtifactGuard.MaterializeExecutableAsync(artifact, plan, entrypoint, cancellationToken)
+            var executable = await _compiledExecutables.GetAsync(artifact, plan, entrypoint, cancellationToken)
                 .ConfigureAwait(false);
             var result = await CompiledExecutionRunner.ExecuteAsync(executable, plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
@@ -255,6 +259,17 @@ public sealed partial class SandboxHost
 
     private static SandboxError DebugTraceFallbackError()
         => new(SandboxErrorCode.ValidationError, "compiled execution is disabled while debug tracing is enabled");
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            _compiledExecutables.Dispose();
+        }
+    }
+
+    private void ThrowIfDisposed()
+        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
     private sealed record CompiledAttempt(SandboxExecutionResult? Result, SandboxError? FallbackReason);
 }

@@ -284,6 +284,8 @@ Important:
 - prefer collectible contexts when unloading is needed
 - avoid loading multiple unbounded copies of generated code
 - cache delegates carefully
+- hosts may cache materialized delegates by cache key and assembly hash, but must
+  still validate each returned artifact envelope and byte hash before reuse
 
 ## Delegate creation
 
