@@ -441,6 +441,15 @@ kernel.Value.MinDamage = 250;
 kernel.Value.DamageType = "ice";
 ```
 
+Direct class-kernel property assignment is `LiveUpdateMode.Sync` by default: the runtime synchronizes
+typed settings into the committed `LiveSettingStore` before building sandbox input. If
+`LiveUpdateMode.AsyncSet` is enabled, property assignment updates the typed object immediately, but
+store synchronization is deferred. The hook execution that first sees the change may enqueue the
+deferred update and still run with the previously committed store values. Call
+`FlushUpdatesAsync` before publishing an event when the next run must observe the direct assignment.
+Use `ModifyAsync` for validated batch commits; it ignores `UpdateMode` and completes only after the
+batch has been applied.
+
 This should be the primary user-facing story.
 
 ```text
@@ -560,6 +569,11 @@ cache/materialization status: None | Hit | Miss | Invalid | Recompiled
 
 Admin/server tooling should display this as runtime status, not as a plugin permission. A plugin
 must not be able to request or force compiled execution; mode selection remains a host policy.
+
+Installed kernels expose this status through `LastExecution` and `ExecutionObservations`. Each
+observation records the entrypoint, requested mode, actual mode, success flag, fallback reason when
+present, cache/materialization status, and compiled runtime envelope fields when compiled execution
+was used. These observations are host-owned telemetry snapshots; plugin code cannot mutate them.
 
 ---
 

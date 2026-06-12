@@ -154,14 +154,17 @@ await kernel.ModifyAsync(
     atomic: true);
 ```
 
-Direct `kernel.Value` assignments use full synchronous synchronization by default. If a caller wants fire-and-forget direct assignments, set `UpdateMode` and flush only when an acknowledgement is needed:
+Direct `kernel.Value` assignments use synchronous synchronization by default. If a caller wants fire-and-forget direct assignments, set `UpdateMode = LiveUpdateMode.AsyncSet`. In `AsyncSet`, the typed object changes immediately, but the committed sandbox input is not synchronized until the update queue is drained. A hook execution that observes the assignment before a flush may enqueue the update and still run with the previously committed settings.
 
 ```csharp
 kernel.UpdateMode = LiveUpdateMode.AsyncSet;
 kernel.Value.MinDamage = 250;
 
+// Await this before publishing when the next hook run must see the new value.
 await kernel.FlushUpdatesAsync();
 ```
+
+Use `ModifyAsync` instead of `AsyncSet` when multiple settings must commit together or when the caller needs validation and acknowledgement before continuing. `ModifyAsync` ignores `UpdateMode`, validates the batch, and commits it before returning.
 
 For small scripts, the same live-update behavior is available through value bindings:
 
@@ -260,6 +263,22 @@ SandboxPolicyBuilder.Create()
 ```
 
 If the policy does not grant `game.message.write`, package preparation fails closed with a policy diagnostic. The server still re-validates uploaded JSON packages; local analyzer diagnostics are developer-experience feedback, not the trust boundary.
+
+### 8. Observe Runtime Execution
+
+Installed kernels expose the most recent execution and a snapshot of per-entrypoint observations. These are host/admin status values, not plugin-controlled permissions:
+
+```csharp
+await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
+
+var last = kernel.LastExecution;
+foreach (var observation in kernel.ExecutionObservations) {
+    Console.WriteLine(
+        $"{observation.Entrypoint}: requested={observation.RequestedMode}, actual={observation.ActualMode}");
+}
+```
+
+Each observation includes the entrypoint name, requested mode, actual mode, success flag, safe fallback reason when present, cache/materialization status, and compiled runtime envelope fields when compiled execution was used.
 
 ## Flagship Fire Damage Example
 
