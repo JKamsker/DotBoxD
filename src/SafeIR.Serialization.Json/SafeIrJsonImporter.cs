@@ -17,7 +17,7 @@ public static class SafeIrJsonImporter
                 MaxDepth = 64
             });
 
-            return ReadModule(document.RootElement);
+            return ReadModule(document.RootElement, JsonSourceMap.Create(json, document.RootElement));
         }
         catch (JsonException ex)
         {
@@ -29,7 +29,7 @@ public static class SafeIrJsonImporter
         }
     }
 
-    private static SandboxModule ReadModule(JsonElement element)
+    private static SandboxModule ReadModule(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "module", ["id", "version", "targetSandboxVersion", "capabilityRequests", "functions", "metadata"]);
         RequireObject(element, "module root");
@@ -44,7 +44,7 @@ public static class SafeIrJsonImporter
             version,
             target,
             ReadCapabilityRequests(element),
-            ReadFunctions(element),
+            ReadFunctions(element, source),
             ReadMetadata(element));
     }
 
@@ -71,7 +71,7 @@ public static class SafeIrJsonImporter
         return requests;
     }
 
-    private static IReadOnlyList<SandboxFunction> ReadFunctions(JsonElement module)
+    private static IReadOnlyList<SandboxFunction> ReadFunctions(JsonElement module, JsonSourceMap source)
     {
         var array = RequiredArray(module, "functions");
         var functions = AllocateArray<SandboxFunction>(array, out var count);
@@ -82,13 +82,13 @@ public static class SafeIrJsonImporter
         var index = 0;
         foreach (var item in array.EnumerateArray())
         {
-            functions[index++] = ReadFunction(item);
+            functions[index++] = ReadFunction(item, source);
         }
 
         return functions;
     }
 
-    private static SandboxFunction ReadFunction(JsonElement element)
+    private static SandboxFunction ReadFunction(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "function", ["id", "visibility", "parameters", "returnType", "body"]);
         RequireObject(element, "function");
@@ -103,7 +103,7 @@ public static class SafeIrJsonImporter
             StringComparer.Ordinal.Equals(visibility, "entrypoint"),
             ReadParameters(element),
             ReadType(Required(element, "returnType")),
-            ReadStatements(RequiredArray(element, "body")));
+            ReadStatements(RequiredArray(element, "body"), source));
     }
 
     private static IReadOnlyList<Parameter> ReadParameters(JsonElement function)
@@ -131,7 +131,7 @@ public static class SafeIrJsonImporter
         return parameters;
     }
 
-    private static IReadOnlyList<Statement> ReadStatements(JsonElement array)
+    private static IReadOnlyList<Statement> ReadStatements(JsonElement array, JsonSourceMap source)
     {
         var statements = AllocateArray<Statement>(array, out var count);
         if (count == 0) {
@@ -141,98 +141,98 @@ public static class SafeIrJsonImporter
         var index = 0;
         foreach (var item in array.EnumerateArray())
         {
-            statements[index++] = ReadStatement(item);
+            statements[index++] = ReadStatement(item, source);
         }
 
         return statements;
     }
 
-    private static Statement ReadStatement(JsonElement element)
+    private static Statement ReadStatement(JsonElement element, JsonSourceMap source)
     {
         RequireObject(element, "statement");
         var op = RequiredString(element, "op");
         return op switch
         {
-            "set" => ReadSetStatement(element),
-            "return" => ReadReturnStatement(element),
-            "expr" => ReadExpressionStatement(element),
-            "if" => ReadIfStatement(element),
-            "while" => ReadWhileStatement(element),
-            "forRange" => ReadForRangeStatement(element),
+            "set" => ReadSetStatement(element, source),
+            "return" => ReadReturnStatement(element, source),
+            "expr" => ReadExpressionStatement(element, source),
+            "if" => ReadIfStatement(element, source),
+            "while" => ReadWhileStatement(element, source),
+            "forRange" => ReadForRangeStatement(element, source),
             _ => throw Error("E-JSON-STATEMENT", $"unknown statement op '{op}'")
         };
     }
 
-    private static AssignmentStatement ReadSetStatement(JsonElement element)
+    private static AssignmentStatement ReadSetStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "set statement", ["op", "name", "value"]);
         return new AssignmentStatement(
                 RequiredString(element, "name"),
-                ReadExpression(Required(element, "value")),
-                JsonSpan);
+                ReadExpression(Required(element, "value"), source),
+                source.SpanFor(element));
     }
 
-    private static ReturnStatement ReadReturnStatement(JsonElement element)
+    private static ReturnStatement ReadReturnStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "return statement", ["op", "value"]);
-        return new ReturnStatement(ReadExpression(Required(element, "value")), JsonSpan);
+        return new ReturnStatement(ReadExpression(Required(element, "value"), source), source.SpanFor(element));
     }
 
-    private static ExpressionStatement ReadExpressionStatement(JsonElement element)
+    private static ExpressionStatement ReadExpressionStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "expression statement", ["op", "value"]);
-        return new ExpressionStatement(ReadExpression(Required(element, "value")), JsonSpan);
+        return new ExpressionStatement(ReadExpression(Required(element, "value"), source), source.SpanFor(element));
     }
 
-    private static IfStatement ReadIfStatement(JsonElement element)
+    private static IfStatement ReadIfStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "if statement", ["op", "condition", "then", "else"]);
         return new IfStatement(
-                ReadExpression(Required(element, "condition")),
-                ReadStatements(RequiredArray(element, "then")),
-                element.TryGetProperty("else", out var otherwise) ? ReadStatements(RequireArray(otherwise, "else")) : [],
-                JsonSpan);
+                ReadExpression(Required(element, "condition"), source),
+                ReadStatements(RequiredArray(element, "then"), source),
+                element.TryGetProperty("else", out var otherwise) ? ReadStatements(RequireArray(otherwise, "else"), source) : [],
+                source.SpanFor(element));
     }
 
-    private static WhileStatement ReadWhileStatement(JsonElement element)
+    private static WhileStatement ReadWhileStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "while statement", ["op", "condition", "body"]);
         return new WhileStatement(
-                ReadExpression(Required(element, "condition")),
-                ReadStatements(RequiredArray(element, "body")),
-                JsonSpan);
+                ReadExpression(Required(element, "condition"), source),
+                ReadStatements(RequiredArray(element, "body"), source),
+                source.SpanFor(element));
     }
 
-    private static ForRangeStatement ReadForRangeStatement(JsonElement element)
+    private static ForRangeStatement ReadForRangeStatement(JsonElement element, JsonSourceMap source)
     {
         RequireAllowedProperties(element, "forRange statement", ["op", "local", "start", "end", "body"]);
         return new ForRangeStatement(
                 RequiredString(element, "local"),
-                ReadExpression(Required(element, "start")),
-                ReadExpression(Required(element, "end")),
-                ReadStatements(RequiredArray(element, "body")),
-                JsonSpan);
+                ReadExpression(Required(element, "start"), source),
+                ReadExpression(Required(element, "end"), source),
+                ReadStatements(RequiredArray(element, "body"), source),
+                source.SpanFor(element));
     }
 
-    private static Expression ReadExpression(JsonElement element)
+    private static Expression ReadExpression(JsonElement element, JsonSourceMap source)
     {
         RequireObject(element, "expression");
         if (element.TryGetProperty("var", out var variable))
         {
             RequireAllowedProperties(element, "variable expression", ["var"]);
-            return new VariableExpression(ReadStringValue(variable, "var"), JsonSpan);
+            return new VariableExpression(ReadStringValue(variable, "var"), source.SpanFor(element));
         }
 
         if (JsonLiteralReader.TryRead(element, out var literal, out var literalName))
         {
             RequireAllowedProperties(element, "literal expression", [literalName]);
-            return new LiteralExpression(literal, JsonSpan);
+            return new LiteralExpression(literal, source.SpanFor(element));
         }
 
         if (element.TryGetProperty("call", out var call))
         {
             RequireAllowedProperties(element, "call expression", ["call", "args", "genericType"]);
-            return ReadCall(element, ReadStringValue(call, "call"));
+            return ReadCall(element, ReadStringValue(call, "call"), source);
         }
 
         if (element.TryGetProperty("unary", out var unary))
@@ -240,35 +240,35 @@ public static class SafeIrJsonImporter
             RequireAllowedProperties(element, "unary expression", ["unary", "operand"]);
             return new UnaryExpression(
                 JsonOperatorReader.NormalizeUnary(ReadStringValue(unary, "unary")),
-                ReadExpression(Required(element, "operand")),
-                JsonSpan);
+                ReadExpression(Required(element, "operand"), source),
+                source.SpanFor(element));
         }
 
         if (element.TryGetProperty("op", out var binary))
         {
             RequireAllowedProperties(element, "binary expression", ["op", "left", "right"]);
             return new BinaryExpression(
-                ReadExpression(Required(element, "left")),
+                ReadExpression(Required(element, "left"), source),
                 JsonOperatorReader.NormalizeBinary(ReadStringValue(binary, "op")),
-                ReadExpression(Required(element, "right")),
-                JsonSpan);
+                ReadExpression(Required(element, "right"), source),
+                source.SpanFor(element));
         }
 
         throw Error("E-JSON-EXPR", "unknown expression shape");
     }
 
-    private static CallExpression ReadCall(JsonElement element, string name)
+    private static CallExpression ReadCall(JsonElement element, string name, JsonSourceMap source)
     {
         var args = element.TryGetProperty("args", out var array)
-            ? ReadExpressions(array)
+            ? ReadExpressions(array, source)
             : [];
         var genericType = element.TryGetProperty("genericType", out var generic)
             ? ReadType(generic)
             : null;
-        return new CallExpression(name, args, genericType, JsonSpan);
+        return new CallExpression(name, args, genericType, source.SpanFor(element));
     }
 
-    private static IReadOnlyList<Expression> ReadExpressions(JsonElement array)
+    private static IReadOnlyList<Expression> ReadExpressions(JsonElement array, JsonSourceMap source)
     {
         RequireArray(array, "args");
         var expressions = AllocateArray<Expression>(array, out var count);
@@ -279,7 +279,7 @@ public static class SafeIrJsonImporter
         var index = 0;
         foreach (var item in array.EnumerateArray())
         {
-            expressions[index++] = ReadExpression(item);
+            expressions[index++] = ReadExpression(item, source);
         }
 
         return expressions;
