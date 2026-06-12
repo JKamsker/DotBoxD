@@ -55,9 +55,20 @@ public static partial class SafeLogBindings
             }
         }
 
-        return SecretPattern().Replace(new string(chars), match => match.Groups["key"].Value + "[redacted]");
+        var sanitized = new string(chars);
+        sanitized = UriCredentialPattern().Replace(sanitized, "${prefix}[redacted]@");
+        sanitized = SecretPattern().Replace(sanitized, match => match.Groups["key"].Value + "[redacted]");
+        return AuthSchemePattern().Replace(
+            sanitized,
+            match => match.Groups["scheme"].Value + " [redacted]");
     }
 
-    [GeneratedRegex("(?i)(?<key>\\b(?:password|passwd|pwd|secret|token|api[_-]?key|authorization)\\s*[:=]\\s*)(?<value>[^\\s,;]+)")]
+    [GeneratedRegex("(?i)(?<key>\\b(?:password|passwd|pwd|secret|token|access[_-]?token|refresh[_-]?token|session[_-]?token|api[_-]?key|account[_-]?key|client[_-]?secret|private[_-]?key|authorization)\\s*[:=]\\s*)(?<value>[^\\s,;]+)")]
     private static partial Regex SecretPattern();
+
+    [GeneratedRegex("(?i)\\b(?<scheme>bearer|basic)\\s+[A-Za-z0-9._~+/=-]+")]
+    private static partial Regex AuthSchemePattern();
+
+    [GeneratedRegex("(?<prefix>\\b[A-Za-z][A-Za-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")]
+    private static partial Regex UriCredentialPattern();
 }

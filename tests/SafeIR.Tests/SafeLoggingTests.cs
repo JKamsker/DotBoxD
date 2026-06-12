@@ -54,14 +54,27 @@ public sealed class SafeLoggingTests
     public async Task Log_message_redacts_secret_shaped_values()
     {
         var result = await ExecuteLogAsync(
-            """{ "call": "log.info", "args": [{ "string": "token=abc123 password: hunter2 ok" }] }""",
+            """{ "call": "log.info", "args": [{ "string": "token=abc123 password: hunter2 client_secret=hidden ok" }] }""",
             SandboxPolicyBuilder.Create().GrantLogging().Build());
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         var audit = Assert.Single(result.AuditEvents, e => e.Kind == "SandboxLog");
         Assert.DoesNotContain("abc123", audit.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("hunter2", audit.Message, StringComparison.Ordinal);
-        Assert.Equal("token=[redacted] password: [redacted] ok", audit.Message);
+        Assert.DoesNotContain("hidden", audit.Message, StringComparison.Ordinal);
+        Assert.Equal("token=[redacted] password: [redacted] client_secret=[redacted] ok", audit.Message);
+    }
+
+    [Fact]
+    public async Task Log_message_redacts_auth_scheme_and_uri_credentials()
+    {
+        var result = await ExecuteLogAsync(
+            """{ "call": "log.info", "args": [{ "string": "Bearer abc.def basic dXNlcjpwYXNz postgres://user:pass@example.com/db" }] }""",
+            SandboxPolicyBuilder.Create().GrantLogging().Build());
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "SandboxLog");
+        Assert.Equal("Bearer [redacted] basic [redacted] postgres://[redacted]@example.com/db", audit.Message);
     }
 
     [Fact]
