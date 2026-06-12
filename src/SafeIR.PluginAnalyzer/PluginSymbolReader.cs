@@ -23,16 +23,7 @@ internal static class PluginSymbolReader
 
     public static IReadOnlyList<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
     {
-        var properties = eventType.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public &&
-                        !p.IsStatic &&
-                        p.GetMethod is not null &&
-                        p.Parameters.Length == 0)
-            .ToArray();
-
-        properties = ConstructorPropertyOrder(eventType, properties) ?? properties;
-        return properties
+        return PluginEventPropertyReader.Read(eventType)
             .Select(p => new EventPropertyModel(p.Name, SandboxTypeName(p.Type)))
             .ToArray();
     }
@@ -101,42 +92,6 @@ internal static class PluginSymbolReader
             LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value, semanticModel, cancellationToken),
             range.Min,
             range.Max);
-    }
-
-    private static IPropertySymbol[]? ConstructorPropertyOrder(
-        INamedTypeSymbol eventType,
-        IPropertySymbol[] properties)
-    {
-        var byName = properties.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
-        foreach (var constructor in eventType.InstanceConstructors.Where(c => c.DeclaredAccessibility == Accessibility.Public))
-        {
-            if (constructor.Parameters.Length == 0 || constructor.Parameters.Length != properties.Length)
-            {
-                continue;
-            }
-
-            var selected = new IPropertySymbol[constructor.Parameters.Length];
-            var matched = true;
-            for (var i = 0; i < constructor.Parameters.Length; i++)
-            {
-                var parameter = constructor.Parameters[i];
-                if (!byName.TryGetValue(parameter.Name, out var property) ||
-                    !SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
-                {
-                    matched = false;
-                    break;
-                }
-
-                selected[i] = property;
-            }
-
-            if (matched)
-            {
-                return selected;
-            }
-        }
-
-        return null;
     }
 
     private static (string? Min, string? Max) Range(IPropertySymbol property, string type)

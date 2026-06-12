@@ -67,16 +67,33 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
 
     private static IReadOnlyList<PropertyInfo> ReadableProperties(Type eventType)
     {
-        var properties = eventType
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(p => p.CanRead)
-            .Where(p => p.GetIndexParameters().Length == 0)
-            .OrderBy(p => p.MetadataToken)
-            .ToArray();
+        var properties = ReadablePropertiesInHierarchy(eventType).ToArray();
 
         return TryConstructorPropertyOrder(eventType, properties, out var ordered)
             ? ordered
             : properties;
+    }
+
+    private static IEnumerable<PropertyInfo> ReadablePropertiesInHierarchy(Type eventType)
+    {
+        var hierarchy = new Stack<Type>();
+        for (var current = eventType; current is not null && current != typeof(object); current = current.BaseType)
+        {
+            hierarchy.Push(current);
+        }
+
+        while (hierarchy.Count > 0)
+        {
+            var current = hierarchy.Pop();
+            foreach (var property in current
+                         .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+                         .Where(p => p.CanRead)
+                         .Where(p => p.GetIndexParameters().Length == 0)
+                         .OrderBy(p => p.MetadataToken))
+            {
+                yield return property;
+            }
+        }
     }
 
     private static bool TryConstructorPropertyOrder(
@@ -128,5 +145,5 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
             .ToArray();
 
     private static string EventParameterName(string propertyName)
-        => "e_" + propertyName;
+        => PluginManifestNames.EventParameters.Prefix + propertyName;
 }
