@@ -25,7 +25,7 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore SafeIR.slnx
+        run: dotnet restore SafeIR.slnx --locked-mode
 
       - name: Build
         run: dotnet build SafeIR.slnx --configuration Release --no-restore
@@ -51,3 +51,12 @@ jobs:
 
       - name: Pack
         run: dotnet pack SafeIR.slnx --configuration Release --no-build --output artifacts/packages
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
