@@ -161,6 +161,11 @@ internal static class OpCodeVerifier
 
         switch (opcode)
         {
+            case ILOpCode.Calli or ILOpCode.Ldftn or ILOpCode.Ldvirtftn or ILOpCode.Ldtoken
+                or ILOpCode.Box or ILOpCode.Unbox or ILOpCode.Unbox_any or ILOpCode.Castclass
+                or ILOpCode.Isinst:
+                _ = il.ReadInt32();
+                break;
             case ILOpCode.Ldarg or ILOpCode.Starg or ILOpCode.Ldloc or ILOpCode.Stloc:
                 _ = il.ReadUInt16();
                 break;

@@ -16,6 +16,7 @@ public sealed class VerifierAttackMatrixTests
             { "System.Threading.Tasks.Task.Run", TaskRunAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "calli opcode", CalliAssembly, ["V-OPCODE"] },
             { "ldftn opcode", LdftnAssembly, ["V-OPCODE"] },
+            { "ldvirtftn opcode", LdvirtftnAssembly, ["V-OPCODE"] },
             { "raw SandboxValue array allocation", RawSandboxValueArrayAssembly, ["V-OPCODE"] }
         };
 
@@ -83,6 +84,17 @@ public sealed class VerifierAttackMatrixTests
             var method = DefineExecute(type);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldftn, helper);
+            il.Emit(OpCodes.Pop);
+            ReturnInput(il);
+        });
+
+    private static byte[] LdvirtftnAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var method = DefineExecute(type);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldvirtftn, typeof(object).GetMethod(nameof(ToString), Type.EmptyTypes)!);
             il.Emit(OpCodes.Pop);
             ReturnInput(il);
         });
