@@ -1,19 +1,19 @@
 ---
 id: COR-0016
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: high
 title: Plugin server default policy grants game-message write to every package
 dedup_key: security/plugins/default-policy/game-message-write-auto-grant
 created_at: 2026-06-12T22:06:43.5140899+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-12T22:06:43.5140899+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T22:51:08.0719384+00:00
+claimed_by: worker
+claimed_at: 2026-06-12T22:45:45.9513129+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-12T22:51:08.0719384+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

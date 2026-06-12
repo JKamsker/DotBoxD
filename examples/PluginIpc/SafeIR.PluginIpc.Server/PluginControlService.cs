@@ -25,11 +25,19 @@ public sealed class PluginControlService : IPluginControlService
     public static async ValueTask<PluginControlService> CreateAsync()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages);
+        var server = PluginServer.Create(messages, defaultPolicy: PluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create()).ConfigureAwait(false);
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
         return new PluginControlService(messages, server, kernel);
     }
+
+    private static SandboxPolicy PluginPolicy()
+        => SandboxPolicyBuilder.Create()
+            .GrantLogging()
+            .GrantGameMessageWrite()
+            .WithFuel(100_000)
+            .WithMaxHostCalls(1_000)
+            .Build();
 
     public ValueTask<LiveSettingSnapshot[]> GetSettingsAsync(CancellationToken cancellationToken = default)
     {

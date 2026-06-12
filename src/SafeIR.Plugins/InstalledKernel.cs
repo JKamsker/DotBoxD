@@ -17,6 +17,7 @@ public sealed class InstalledKernel
     private readonly Dictionary<Type, object> _typedValues = [];
     private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
+    private readonly CancellationTokenSource _revocation = new();
     private int _revoked;
 
     internal InstalledKernel(
@@ -43,7 +44,13 @@ public sealed class InstalledKernel
     public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot();
     public bool IsRevoked => Volatile.Read(ref _revoked) != 0;
 
-    public void Revoke() => Volatile.Write(ref _revoked, 1);
+    public void Revoke()
+    {
+        if (Interlocked.Exchange(ref _revoked, 1) == 0)
+        {
+            _revocation.Cancel();
+        }
+    }
 
     internal void RegisterStateSynchronizer(Type stateType, Action synchronize)
         => _liveStateSync.Register(stateType, synchronize);
@@ -108,6 +115,7 @@ public sealed class InstalledKernel
             ValidateFor(adapter);
             var input = BuildInput(adapter, e);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
+            PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             return AsShouldHandleResult(result);
         }
         finally
@@ -128,6 +136,7 @@ public sealed class InstalledKernel
             ValidateFor(adapter);
             var input = BuildInput(adapter, e);
             _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
+            PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
         }
         finally
         {
@@ -249,14 +258,22 @@ public sealed class InstalledKernel
         SandboxValue input,
         CancellationToken cancellationToken)
     {
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _revocation.Token);
         var result = await _host.ExecuteAsync(
                 _plan,
                 entrypoint,
                 input,
                 new SandboxExecutionOptions { Mode = _executionMode },
-                cancellationToken)
+                linkedCancellation.Token)
             .ConfigureAwait(false);
         _executionObserver.Record(entrypoint, _executionMode, result);
+        if (IsRevoked)
+        {
+            PluginKernelRevocation.ThrowIfRevoked(true);
+        }
+
         if (!result.Succeeded)
         {
             throw new SandboxRuntimeException(result.Error ?? new SandboxError(SandboxErrorCode.HostFailure, "kernel execution failed"));

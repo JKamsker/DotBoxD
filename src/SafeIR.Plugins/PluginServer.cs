@@ -50,7 +50,6 @@ public sealed class PluginServer
         });
         defaultPolicy ??= SandboxPolicyBuilder.Create()
             .GrantLogging()
-            .GrantGameMessageWrite()
             .WithFuel(100_000)
             .WithMaxHostCalls(1_000)
             .Build();
@@ -89,9 +88,16 @@ public sealed class PluginServer
 
 public sealed class KernelRegistry
 {
+    private readonly object _gate = new();
     private readonly Dictionary<string, InstalledKernel> _kernels = new(StringComparer.Ordinal);
 
-    public InstalledKernel Get(string pluginId) => _kernels[pluginId];
+    public InstalledKernel Get(string pluginId)
+    {
+        lock (_gate)
+        {
+            return _kernels[pluginId];
+        }
+    }
 
     public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
         => new(Get(pluginId));
@@ -104,18 +110,33 @@ public sealed class KernelRegistry
 
     internal void Add(InstalledKernel kernel)
     {
-        if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
-            !ReferenceEquals(existing, kernel))
+        InstalledKernel? revoke = null;
+        lock (_gate)
         {
-            existing.Revoke();
+            if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
+                !ReferenceEquals(existing, kernel))
+            {
+                revoke = existing;
+            }
+
+            _kernels[kernel.Manifest.PluginId] = kernel;
         }
 
-        _kernels[kernel.Manifest.PluginId] = kernel;
+        revoke?.Revoke();
     }
 
     internal bool Remove(string pluginId)
     {
-        if (!_kernels.Remove(pluginId, out var kernel))
+        InstalledKernel? kernel;
+        lock (_gate)
+        {
+            if (!_kernels.Remove(pluginId, out kernel))
+            {
+                return false;
+            }
+        }
+
+        if (kernel is null)
         {
             return false;
         }

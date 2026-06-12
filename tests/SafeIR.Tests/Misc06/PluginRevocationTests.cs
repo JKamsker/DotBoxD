@@ -11,7 +11,7 @@ public sealed class PluginRevocationTests
     public async Task Uninstall_revokes_existing_hook_pipeline_kernel_reference()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages);
+        var server = PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
 
@@ -29,7 +29,7 @@ public sealed class PluginRevocationTests
     public async Task Reinstall_revokes_previous_kernel_captured_by_hook_pipeline()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages);
+        var server = PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var first = await server.InstallAsync(FireDamagePluginPackage.Create());
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
 
@@ -50,7 +50,7 @@ public sealed class PluginRevocationTests
     [Fact]
     public async Task Revoked_kernel_handle_rejects_direct_execution()
     {
-        var server = PluginServer.Create();
+        var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
         Assert.True(server.Uninstall("fire-damage"));
 
@@ -78,8 +78,13 @@ public sealed class PluginRevocationTests
         await blocking.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(server.Uninstall("revocation-blocking"));
         blocking.Release.SetResult();
-        await publish.WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await Record.ExceptionAsync(
+            async () => await publish.WaitAsync(TimeSpan.FromSeconds(5)));
 
+        Assert.True(
+            error is OperationCanceledException ||
+            error is SandboxRuntimeException { Error.Code: SandboxErrorCode.PolicyDenied },
+            error?.ToString());
         Assert.Empty(messages.Messages);
     }
 

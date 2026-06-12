@@ -4,6 +4,7 @@ using SafeIR;
 
 public sealed class HookRegistry
 {
+    private readonly object _gate = new();
     private readonly Dictionary<Type, object> _pipelines = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
@@ -27,29 +28,38 @@ public sealed class HookRegistry
 
     public HookPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
-        if (_pipelines.TryGetValue(typeof(TEvent), out var existing))
+        lock (_gate)
         {
-            var pipeline = (HookPipeline<TEvent>)existing;
-            if (!pipeline.UsesAdapter(adapter))
+            if (_pipelines.TryGetValue(typeof(TEvent), out var existing))
             {
-                throw new SandboxValidationException([
-                    new SandboxDiagnostic(
-                        "SGP034",
-                        $"Hook pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
-                ]);
+                var pipeline = (HookPipeline<TEvent>)existing;
+                if (!pipeline.UsesAdapter(adapter))
+                {
+                    throw new SandboxValidationException([
+                        new SandboxDiagnostic(
+                            "SGP034",
+                            $"Hook pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
+                    ]);
+                }
+
+                return pipeline;
             }
 
-            return pipeline;
+            var created = new HookPipeline<TEvent>(adapter, _messages, _kernels);
+            _pipelines[typeof(TEvent)] = created;
+            return created;
         }
-
-        var created = new HookPipeline<TEvent>(adapter, _messages, _kernels);
-        _pipelines[typeof(TEvent)] = created;
-        return created;
     }
 
     public async ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
-        if (_pipelines.TryGetValue(typeof(TEvent), out var pipeline))
+        object? pipeline;
+        lock (_gate)
+        {
+            _pipelines.TryGetValue(typeof(TEvent), out pipeline);
+        }
+
+        if (pipeline is not null)
         {
             await ((HookPipeline<TEvent>)pipeline).PublishAsync(e, cancellationToken).ConfigureAwait(false);
         }
@@ -58,6 +68,7 @@ public sealed class HookRegistry
 
 public sealed class HookPipeline<TEvent>
 {
+    private readonly object _gate = new();
     private readonly List<Func<TEvent, HookContext, ValueTask<bool>>> _filters = [];
     private readonly List<Func<TEvent, HookContext, ValueTask>> _handlers = [];
     private readonly IPluginEventAdapter<TEvent> _adapter;
@@ -79,13 +90,21 @@ public sealed class HookPipeline<TEvent>
 
     public HookPipeline<TEvent> Where(Func<TEvent, HookContext, ValueTask<bool>> filter)
     {
-        _filters.Add(filter);
+        lock (_gate)
+        {
+            _filters.Add(filter);
+        }
+
         return this;
     }
 
     public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTask> handler)
     {
-        _handlers.Add(handler);
+        lock (_gate)
+        {
+            _handlers.Add(handler);
+        }
+
         return this;
     }
 
@@ -107,8 +126,7 @@ public sealed class HookPipeline<TEvent>
     public HookPipeline<TEvent> UseKernel(InstalledKernel kernel)
     {
         kernel.ValidateFor(_adapter);
-        _handlers.Add((e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
-        return this;
+        return InvokeHostHandler((e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
     }
 
     public HookPipeline<TEvent> UseKernel<TKernel>() where TKernel : class
@@ -119,8 +137,16 @@ public sealed class HookPipeline<TEvent>
 
     internal async ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken)
     {
+        Func<TEvent, HookContext, ValueTask<bool>>[] filters;
+        Func<TEvent, HookContext, ValueTask>[] handlers;
+        lock (_gate)
+        {
+            filters = _filters.ToArray();
+            handlers = _handlers.ToArray();
+        }
+
         var context = new HookContext(_messages, cancellationToken);
-        foreach (var filter in _filters)
+        foreach (var filter in filters)
         {
             if (!await filter(e, context).ConfigureAwait(false))
             {
@@ -128,7 +154,7 @@ public sealed class HookPipeline<TEvent>
             }
         }
 
-        foreach (var handler in _handlers)
+        foreach (var handler in handlers)
         {
             await handler(e, context).ConfigureAwait(false);
         }

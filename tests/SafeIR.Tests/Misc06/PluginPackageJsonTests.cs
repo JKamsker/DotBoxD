@@ -9,7 +9,7 @@ public sealed class PluginPackageJsonTests
     public async Task InstallJsonAsync_installs_serialized_package_data()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages);
+        var server = PluginServer.Create(messages, defaultPolicy: PluginAddendumTestPolicies.LongWall());
 
         var kernel = await server.InstallJsonAsync(JsonDamagePackage());
         server.Hooks.On(DamageEventAdapter.Instance).UseKernel(kernel);
@@ -19,6 +19,17 @@ public sealed class PluginPackageJsonTests
         var message = Assert.Single(messages.Messages);
         Assert.Equal("player-1", message.TargetId);
         Assert.Equal("json package handled damage", message.Message);
+    }
+
+    [Fact]
+    public async Task InstallJsonAsync_default_policy_denies_game_message_write()
+    {
+        var server = PluginServer.Create(new InMemoryPluginMessageSink());
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallJsonAsync(JsonDamagePackage()).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code is "E-POLICY-CAP" or "E-POLICY-EFFECT");
     }
 
     [Fact]

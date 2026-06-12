@@ -7,6 +7,8 @@ using ShaRPC.Transports.NamedPipes;
 
 public static class SafeIrShaRpcMessagePackIpc
 {
+    private const int MinimumSafePipeNameLength = 32;
+    private const int MinimumSafePipeNameDistinctCharacters = 8;
     private static readonly MessagePackRpcSerializer Serializer = new();
     private static readonly RpcPeerOptions DefaultClientOptions = new() {
         RequestTimeout = TimeSpan.FromSeconds(10),
@@ -54,7 +56,17 @@ public static class SafeIrShaRpcMessagePackIpc
         string pipeName,
         Action<RpcPeer> configurePeer,
         RpcPeerOptions? options = null)
-        => Listen(new NamedPipeServerTransport(pipeName), configurePeer, options);
+        => ListenNamedPipe(pipeName, configurePeer, SafeIrNamedPipeOptions.Default, options);
+
+    public static RpcHost ListenNamedPipe(
+        string pipeName,
+        Action<RpcPeer> configurePeer,
+        SafeIrNamedPipeOptions namedPipeOptions,
+        RpcPeerOptions? options = null)
+    {
+        ValidatePipeName(pipeName, namedPipeOptions);
+        return Listen(new NamedPipeServerTransport(pipeName), configurePeer, options);
+    }
 
     public static Task<RpcPeerSession> ConnectNamedPipeAsync(
         string pipeName,
@@ -63,9 +75,55 @@ public static class SafeIrShaRpcMessagePackIpc
         => ConnectNamedPipeAsync(".", pipeName, options, cancellationToken);
 
     public static Task<RpcPeerSession> ConnectNamedPipeAsync(
+        string pipeName,
+        SafeIrNamedPipeOptions namedPipeOptions,
+        RpcPeerOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => ConnectNamedPipeAsync(".", pipeName, namedPipeOptions, options, cancellationToken);
+
+    public static Task<RpcPeerSession> ConnectNamedPipeAsync(
         string serverName,
         string pipeName,
         RpcPeerOptions? options = null,
         CancellationToken cancellationToken = default)
-        => ConnectAsync(new NamedPipeClientTransport(serverName, pipeName), options, cancellationToken);
+        => ConnectNamedPipeAsync(serverName, pipeName, SafeIrNamedPipeOptions.Default, options, cancellationToken);
+
+    public static Task<RpcPeerSession> ConnectNamedPipeAsync(
+        string serverName,
+        string pipeName,
+        SafeIrNamedPipeOptions namedPipeOptions,
+        RpcPeerOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePipeName(pipeName, namedPipeOptions);
+        return ConnectAsync(new NamedPipeClientTransport(serverName, pipeName), options, cancellationToken);
+    }
+
+    private static void ValidatePipeName(string pipeName, SafeIrNamedPipeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (string.IsNullOrWhiteSpace(pipeName) || pipeName.Any(char.IsControl))
+        {
+            throw new ArgumentException("named pipe name must be non-empty and must not contain control characters", nameof(pipeName));
+        }
+
+        if (options.AllowUnsafeLowEntropyName)
+        {
+            return;
+        }
+
+        if (pipeName.Length < MinimumSafePipeNameLength ||
+            pipeName.Distinct().Count() < MinimumSafePipeNameDistinctCharacters)
+        {
+            throw new ArgumentException(
+                "named pipe name must include an unguessable 128-bit random component or explicitly opt into unsafe development names",
+                nameof(pipeName));
+        }
+    }
+}
+
+public sealed record SafeIrNamedPipeOptions(bool AllowUnsafeLowEntropyName = false)
+{
+    public static SafeIrNamedPipeOptions Default { get; } = new();
+    public static SafeIrNamedPipeOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true);
 }

@@ -9,6 +9,26 @@ namespace SafeIR.Tests;
 public sealed class ShaRpcIpcAddonTests
 {
     [Fact]
+    public void Named_pipe_helpers_reject_predictable_pipe_names_by_default()
+    {
+        var ex = Assert.Throws<ArgumentException>(
+            () => SafeIrShaRpcMessagePackIpc.ListenNamedPipe("safeir-dev", _ => { }));
+
+        Assert.Equal("pipeName", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task Named_pipe_helpers_allow_explicit_unsafe_development_pipe_names()
+    {
+        await using var host = SafeIrShaRpcMessagePackIpc.ListenNamedPipe(
+            "safeir-dev",
+            _ => { },
+            SafeIrNamedPipeOptions.UnsafeDevelopment);
+
+        Assert.NotNull(host);
+    }
+
+    [Fact]
     public async Task Generic_transport_api_connects_over_non_named_pipe_transport()
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
