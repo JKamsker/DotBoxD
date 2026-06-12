@@ -20,6 +20,7 @@ internal static class CompiledBindingDispatcher
         }
 
         using var timeout = context.CreateWallTimeToken();
+        using var returnCredits = context.BeginBindingReturnCreditScope();
         try
         {
             var value = descriptor.Invoke(context, args, timeout.Token).AsTask().GetAwaiter().GetResult();

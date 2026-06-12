@@ -129,6 +129,29 @@ public sealed class StringQuotaTests
     }
 
     [Fact]
+    public async Task File_read_text_at_exact_string_byte_limit_is_charged_once()
+    {
+        using var temp = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.txt"), "hello");
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileRead(temp.Path, 1024)
+            .WithMaxTotalStringBytes(30)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(30, result.ResourceUsage.StringBytes);
+    }
+
+    [Fact]
     public async Task Successful_string_run_reports_string_bytes()
     {
         var result = await ExecuteReturnAsync(

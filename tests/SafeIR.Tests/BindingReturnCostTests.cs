@@ -88,6 +88,28 @@ public sealed class BindingReturnCostTests
     [Theory]
     [InlineData(ExecutionMode.Interpreted, false)]
     [InlineData(ExecutionMode.Compiled, true)]
+    public async Task Precharged_string_binding_return_is_not_charged_twice(
+        ExecutionMode mode,
+        bool compiler)
+    {
+        var result = await ExecuteAsync(
+            PrechargedStringBinding("test.prechargedString", "hello"),
+            SandboxPolicyBuilder.Create()
+                .WithMaxStringLength(64)
+                .WithMaxTotalStringBytes(10)
+                .WithFuel(1_000)
+                .Build(),
+            mode,
+            compiler);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(10, result.ResourceUsage.StringBytes);
+        Assert.Equal("hello", ((StringValue)result.Value!).Value);
+    }
+
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted, false)]
+    [InlineData(ExecutionMode.Compiled, true)]
     public async Task Binding_return_deep_collection_type_mismatch_is_sanitized(
         ExecutionMode mode,
         bool compiler)
@@ -177,6 +199,24 @@ public sealed class BindingReturnCostTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromString(value)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+
+    private static BindingDescriptor PrechargedStringBinding(string id, string value)
+        => new(
+            id,
+            SemVersion.One,
+            [],
+            SandboxType.String,
+            SandboxEffect.Cpu | SandboxEffect.Alloc,
+            null,
+            BindingCostModel.Fixed(1),
+            AuditLevel.None,
+            BindingSafety.PureHostFacade,
+            (context, _, _) =>
+            {
+                context.ChargeString(value);
+                return ValueTask.FromResult(SandboxValue.FromString(value));
+            },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor BadListBinding()

@@ -172,6 +172,7 @@ internal sealed class ExpressionEvaluator
         }
 
         using var timeout = _context.CreateWallTimeToken();
+        using var returnCredits = _context.BeginBindingReturnCreditScope();
         try
         {
             var value = await descriptor.Invoke(_context, args, timeout.Token).ConfigureAwait(false);
