@@ -50,10 +50,6 @@
       "justification": "Existing plugin project root predates the project-folder limit. New plugin implementation files should use subdirectories."
     },
     {
-      "path": "src/SafeIR.Runtime",
-      "justification": "Existing runtime project root predates the project-folder limit. New runtime binding groups should move into subdirectories."
-    },
-    {
       "path": "src/SafeIR.Verifier",
       "justification": "Existing verifier project root predates the project-folder limit. New verifier concerns should use subdirectories."
     },
