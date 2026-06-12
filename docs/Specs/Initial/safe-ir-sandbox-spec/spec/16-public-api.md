@@ -9,6 +9,7 @@ var sandbox = SandboxHost.Create(builder =>
     builder.AddFileBindings();
     builder.UseInterpreter();
     builder.UseCompilerIfAvailable();
+    // Optional: builder.UseWorkerClient(workerClient, SandboxWorkerProfile.HardenedOutOfProcess);
 });
 
 var module = await sandbox.ImportJsonAsync(jsonIr, cancellationToken);
@@ -100,8 +101,8 @@ Hosts may replace the default `IExecutionModeSelector`; the first Auto run is st
 before selector decisions can promote subsequent runs.
 
 `Isolation = WorkerProcess` means the caller requires an out-of-process worker boundary. If the
-host has not configured a worker client, execution must fail closed with a policy error rather than
-falling back to in-process execution.
+host has not configured a hardened worker client, execution must fail closed with a policy error
+rather than falling back to in-process execution.
 
 ### `SandboxExecutionResult`
 
@@ -295,12 +296,25 @@ public interface ISandboxWorkerClient
         SandboxExecutionOptions options,
         CancellationToken cancellationToken);
 }
+
+public sealed record SandboxWorkerProfile(
+    bool OutOfProcess,
+    bool SecretsIsolated,
+    bool ResourceLimitsConfigured)
+{
+    public static SandboxWorkerProfile HardenedOutOfProcess { get; }
+}
+
+builder.UseWorkerClient(workerClient, SandboxWorkerProfile.HardenedOutOfProcess);
 ```
 
-Until a host wires an `ISandboxWorkerClient`, `SandboxIsolation.WorkerProcess` is an explicit
-deny-only mode. Use it for high-risk tenants only when the worker boundary is actually configured.
-This repository currently exposes the enum and fail-closed behavior only; no worker client wiring
-API is implemented yet.
+Until a host wires an `ISandboxWorkerClient` with a hardened profile,
+`SandboxIsolation.WorkerProcess` is an explicit deny-only mode. Incomplete profiles, such as
+in-process clients or workers without resource limits, fail closed without invoking the client.
+
+The host delegates a worker request with `Isolation = InProcess` because the worker process itself
+is the required boundary. The host then validates that the returned module, plan, and policy hashes
+match the requested execution before publishing the worker result.
 
 ## Error model
 

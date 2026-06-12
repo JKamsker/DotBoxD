@@ -164,20 +164,56 @@ public sealed partial class SandboxHost
         };
     }
 
-    private static SandboxExecutionResult WorkerIsolationUnavailableResult(
+    internal static SandboxExecutionResult WorkerIsolationUnavailableResult(
         ExecutionPlan plan,
-        SandboxExecutionOptions options)
+        SandboxExecutionOptions options,
+        SandboxWorkerProfile? profile)
     {
         var runId = options.RunId ?? SandboxRunId.New();
         var budget = new ResourceMeter(plan.Budget);
         var startedAt = DateTimeOffset.UtcNow;
         var error = new SandboxError(
             SandboxErrorCode.PolicyDenied,
-            "worker process isolation is not configured");
+            profile is null
+                ? "worker process isolation is not configured"
+                : "worker process isolation profile is incomplete");
         var audit = new InMemoryAuditSink();
         audit.Write(new SandboxAuditEvent(
             runId,
             "WorkerIsolationUnavailable",
+            startedAt,
+            false,
+            ResourceId: $"module:{plan.ModuleHash}",
+            ErrorCode: error.Code,
+            Message: error.SafeMessage,
+            Fields: profile?.ToAuditFields()));
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+
+        return new SandboxExecutionResult
+        {
+            Succeeded = false,
+            Error = error,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = audit.Events,
+            ActualMode = options.Mode,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash
+        };
+    }
+
+    internal static SandboxExecutionResult WorkerIsolationFailedResult(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options,
+        SandboxError error)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var budget = new ResourceMeter(plan.Budget);
+        var startedAt = DateTimeOffset.UtcNow;
+        var audit = new InMemoryAuditSink();
+        audit.Write(new SandboxAuditEvent(
+            runId,
+            "WorkerIsolationFailed",
             startedAt,
             false,
             ResourceId: $"module:{plan.ModuleHash}",

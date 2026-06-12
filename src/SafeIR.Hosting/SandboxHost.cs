@@ -14,6 +14,7 @@ public sealed partial class SandboxHost : IDisposable
     private readonly ISandboxCompiler? _compiler;
     private readonly IExecutionModeSelector _modeSelector;
     private readonly Action<SandboxAuditEvent>? _auditObserver;
+    private readonly SandboxWorkerExecutor _workerExecutor;
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly ConcurrentDictionary<string, int> _autoRuns = new(StringComparer.Ordinal);
     private readonly CompiledExecutableCache _compiledExecutables = new();
@@ -24,13 +25,15 @@ public sealed partial class SandboxHost : IDisposable
         ISandboxInterpreter interpreter,
         ISandboxCompiler? compiler,
         IExecutionModeSelector modeSelector,
-        Action<SandboxAuditEvent>? auditObserver)
+        Action<SandboxAuditEvent>? auditObserver,
+        ConfiguredSandboxWorker? worker)
     {
         _bindings = bindings;
         _interpreter = interpreter;
         _compiler = compiler;
         _modeSelector = modeSelector;
         _auditObserver = auditObserver;
+        _workerExecutor = new SandboxWorkerExecutor(worker);
     }
 
     public static SandboxHost Create(Action<SandboxHostBuilder>? configure = null)
@@ -74,7 +77,9 @@ public sealed partial class SandboxHost : IDisposable
 
         if (options.Isolation == SandboxIsolation.WorkerProcess)
         {
-            return Publish(WorkerIsolationUnavailableResult(plan, options));
+            var workerResult = await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false);
+            return Publish(workerResult);
         }
 
         if (options.RequireDeterministic && !plan.Policy.Deterministic)
