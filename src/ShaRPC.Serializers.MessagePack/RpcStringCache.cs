@@ -10,7 +10,9 @@ internal static class RpcStringCache
     private const int MaxChars = 256;
 
     private static readonly object Gate = new();
-    private static Entry[] _entries = Array.Empty<Entry>();
+    private static readonly Entry?[] Entries = new Entry?[MaxEntries];
+    private static int _count;
+    private static int _nextReplacement;
 
     public static string GetOrAdd(ReadOnlySpan<byte> utf8)
     {
@@ -19,12 +21,13 @@ internal static class RpcStringCache
             return Encoding.UTF8.GetString(utf8);
         }
 
-        var entries = Volatile.Read(ref _entries);
-        for (var i = 0; i < entries.Length; i++)
+        var count = Volatile.Read(ref _count);
+        for (var i = 0; i < count; i++)
         {
-            if (utf8.SequenceEqual(entries[i].Utf8))
+            var entry = Volatile.Read(ref Entries[i]);
+            if (entry is not null && utf8.SequenceEqual(entry.Utf8))
             {
-                return entries[i].Value;
+                return entry.Value;
             }
         }
 
@@ -38,40 +41,46 @@ internal static class RpcStringCache
             return value;
         }
 
-        var entries = Volatile.Read(ref _entries);
-        for (var i = 0; i < entries.Length; i++)
+        var count = Volatile.Read(ref _count);
+        for (var i = 0; i < count; i++)
         {
-            if (string.Equals(value, entries[i].Value, StringComparison.Ordinal))
+            var entry = Volatile.Read(ref Entries[i]);
+            if (entry is not null && string.Equals(value, entry.Value, StringComparison.Ordinal))
             {
-                return entries[i].Value;
+                return entry.Value;
             }
         }
 
         lock (Gate)
         {
-            entries = Volatile.Read(ref _entries);
-            for (var i = 0; i < entries.Length; i++)
+            count = Volatile.Read(ref _count);
+            for (var i = 0; i < count; i++)
             {
-                if (string.Equals(value, entries[i].Value, StringComparison.Ordinal))
+                var existing = Volatile.Read(ref Entries[i]);
+                if (existing is not null && string.Equals(value, existing.Value, StringComparison.Ordinal))
                 {
-                    return entries[i].Value;
+                    return existing.Value;
                 }
             }
 
-            if (entries.Length >= MaxEntries)
+            var entry = new Entry(value, Encoding.UTF8.GetBytes(value));
+            if (count < MaxEntries)
             {
-                return value;
+                Volatile.Write(ref Entries[count], entry);
+                Volatile.Write(ref _count, count + 1);
+            }
+            else
+            {
+                var index = _nextReplacement;
+                _nextReplacement = (index + 1) % MaxEntries;
+                Volatile.Write(ref Entries[index], entry);
             }
 
-            var next = new Entry[entries.Length + 1];
-            Array.Copy(entries, next, entries.Length);
-            next[entries.Length] = new Entry(value, Encoding.UTF8.GetBytes(value));
-            Volatile.Write(ref _entries, next);
             return value;
         }
     }
 
-    private readonly struct Entry
+    private sealed class Entry
     {
         public Entry(string value, byte[] utf8)
         {

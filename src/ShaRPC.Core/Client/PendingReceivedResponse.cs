@@ -2,6 +2,7 @@ using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Streaming;
+using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core.Client;
 
@@ -44,7 +45,7 @@ internal sealed class PendingReceivedResponse :
     public bool TrySetResponse(
         RpcResponse response,
         ReadOnlyMemory<byte> payload,
-        Payload frame,
+        RpcFrame frame,
         RpcStreamReceiver? stream,
         ISerializer serializer)
     {

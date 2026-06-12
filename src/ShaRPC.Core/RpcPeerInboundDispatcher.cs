@@ -17,6 +17,7 @@ internal sealed class RpcPeerInboundDispatcher
     private readonly RpcPeerResponseBuilder _responseBuilder;
     private readonly RpcStreamManager _streams;
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, Task> _sendAsync;
+    private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
     private readonly Action<int, MessageType, string, Exception?> _protocolError;
     private readonly Action<RpcPeerInboundRequest, Exception> _dispatchError;
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
@@ -37,6 +38,18 @@ internal sealed class RpcPeerInboundDispatcher
         Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
         Action<int, MessageType, string, Exception?> protocolError,
         Action<RpcPeerInboundRequest, Exception> dispatchError)
+        : this(serializer, options, streams, sendAsync, sendFrameAsync: null, protocolError, dispatchError)
+    {
+    }
+
+    public RpcPeerInboundDispatcher(
+        ISerializer serializer,
+        RpcPeerOptions options,
+        RpcStreamManager streams,
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync,
+        Action<int, MessageType, string, Exception?> protocolError,
+        Action<RpcPeerInboundRequest, Exception> dispatchError)
     {
         _serializer = serializer;
         _responseBuilder = new RpcPeerResponseBuilder(
@@ -47,6 +60,7 @@ internal sealed class RpcPeerInboundDispatcher
             options.ExceptionTransformer);
         _streams = streams;
         _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameAsync;
         _protocolError = protocolError;
         _dispatchError = dispatchError;
         _exceptionTransformer = options.ExceptionTransformer;
@@ -96,7 +110,7 @@ internal sealed class RpcPeerInboundDispatcher
     }
 
     public async ValueTask<bool> AcceptRequestAsync(
-        Payload frame,
+        RpcFrame frame,
         int messageId,
         CancellationToken loopCt)
     {
@@ -140,6 +154,12 @@ internal sealed class RpcPeerInboundDispatcher
         return result == InboundEnqueueResult.Accepted;
     }
 
+    public ValueTask<bool> AcceptRequestAsync(
+        Payload frame,
+        int messageId,
+        CancellationToken loopCt) =>
+        AcceptRequestAsync(new RpcFrame(frame), messageId, loopCt);
+
     private async Task SendQueueFullErrorAsync(int messageId, CancellationToken ct)
     {
         try
@@ -180,7 +200,7 @@ internal sealed class RpcPeerInboundDispatcher
     }
 
     private bool TryCreateInboundRequest(
-        Payload frame,
+        RpcFrame frame,
         int messageId,
         CancellationToken loopCt,
         out RpcPeerInboundRequest inbound,
@@ -303,7 +323,15 @@ internal sealed class RpcPeerInboundDispatcher
                 var responseStream = response.Stream;
                 try
                 {
-                    await _sendAsync(response.FrameMemory, inbound.CancellationToken).ConfigureAwait(false);
+                    if (_sendFrameAsync is not null &&
+                        response.TryDetachWriter(out var responseWriter))
+                    {
+                        await _sendFrameAsync(responseWriter, inbound.CancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await _sendAsync(response.FrameMemory, inbound.CancellationToken).ConfigureAwait(false);
+                    }
                 }
                 catch
                 {

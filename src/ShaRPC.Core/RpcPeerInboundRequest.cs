@@ -1,12 +1,13 @@
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
+using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core;
 
 internal readonly struct RpcPeerInboundRequest
 {
     public RpcPeerInboundRequest(
-        Payload frame,
+        RpcFrame frame,
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> body,
@@ -19,7 +20,7 @@ internal readonly struct RpcPeerInboundRequest
         RequestCts = requestCts;
     }
 
-    public Payload Frame { get; }
+    public RpcFrame Frame { get; }
 
     public RpcRequest Request { get; }
 

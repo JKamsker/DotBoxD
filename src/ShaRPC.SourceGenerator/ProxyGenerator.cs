@@ -373,6 +373,11 @@ internal static class ProxyGenerator
                 : eager ? "InvokeAsyncEnumerableAsync" : "InvokeAsyncEnumerable";
         }
 
+        if (returnKind == MethodReturnKind.ValueTaskOf)
+        {
+            return isInstanceScoped ? "InvokeValueOnInstanceAsync" : "InvokeValueAsync";
+        }
+
         return isInstanceScoped ? "InvokeOnInstanceAsync" : "InvokeAsync";
     }
 

@@ -4,6 +4,7 @@ using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Streaming;
+using ShaRPC.Core.Transport;
 using System.IO.Pipelines;
 
 namespace ShaRPC.Core;
@@ -15,6 +16,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
     private readonly int _maxPendingRequests;
     private readonly Action _ensureStarted;
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, Task> _sendAsync;
+    private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
     private readonly RpcStreamManager _streams;
     private readonly RpcPeerStreamingCalls _streamingCalls;
     private readonly ShaRpcPendingRequests _pending = new();
@@ -28,12 +30,24 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         Action ensureStarted,
         Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
         RpcStreamManager streams)
+        : this(serializer, options, ensureStarted, sendAsync, sendFrameAsync: null, streams)
+    {
+    }
+
+    public RpcPeerOutboundInvoker(
+        ISerializer serializer,
+        RpcPeerOptions options,
+        Action ensureStarted,
+        Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
+        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync,
+        RpcStreamManager streams)
     {
         _serializer = serializer;
         _timeout = options.RequestTimeout;
         _maxPendingRequests = options.MaxPendingRequests;
         _ensureStarted = ensureStarted;
         _sendAsync = sendAsync;
+        _sendFrameAsync = sendFrameAsync;
         _streams = streams;
         _streamingCalls = new RpcPeerStreamingCalls(serializer);
         _cancelFrames = new RpcPeerCancelFrameSender(sendAsync);
@@ -157,7 +171,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         _streamingCalls.ReadAsyncEnumerableAsync<T>(
             SendRequestAsync(service, method, request, instanceId: null, streams, ct));
 
-    public bool TryCompleteResponse(int messageId, Payload frame)
+    public bool TryCompleteResponse(int messageId, RpcFrame frame)
     {
         if (!MessageFramer.TryReadFrame(frame.Memory, out _, out var messageType, out var envelope, out var payload))
         {
@@ -211,6 +225,9 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
             return false;
         }
     }
+
+    public bool TryCompleteResponse(int messageId, Payload frame) =>
+        TryCompleteResponse(messageId, new RpcFrame(frame));
 
     public void FailPending(Exception error) => _pending.FailAll(error);
 

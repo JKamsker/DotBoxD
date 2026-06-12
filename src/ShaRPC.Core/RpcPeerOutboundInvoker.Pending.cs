@@ -71,6 +71,35 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
+    private PendingValueTaskUnaryResponse<TResponse> ReservePendingValueTaskUnaryRequest<TResponse>(
+        CancellationToken ct)
+    {
+        if (!TryEnterPendingSlot())
+        {
+            throw new ShaRpcException("Maximum pending requests reached.");
+        }
+
+        try
+        {
+            for (var attempts = 0; attempts < _maxPendingRequests; attempts++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var messageId = NextMessageId(ct);
+                if (messageId != 0 && _pending.TryAddValueTaskUnary<TResponse>(messageId, out var pending))
+                {
+                    return pending;
+                }
+            }
+
+            throw new ShaRpcException("Unable to reserve a request message id.");
+        }
+        catch
+        {
+            ReleasePendingSlot();
+            throw;
+        }
+    }
+
     private bool TryEnterPendingSlot()
     {
         if (Interlocked.Increment(ref _pendingCount) <= _maxPendingRequests)

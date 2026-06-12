@@ -17,12 +17,12 @@ internal static class InMemoryPipe
 }
 
 internal sealed class PipeConnection :
-    IRpcValueTaskChannel,
-    IValueTaskSource<Payload>
+    IRpcFrameChannel,
+    IValueTaskSource<RpcFrame>
 {
     private readonly object _gate = new();
-    private readonly Queue<Payload> _inbound = new();
-    private ManualResetValueTaskSourceCore<Payload> _receiver;
+    private readonly Queue<RpcFrame> _inbound = new();
+    private ManualResetValueTaskSourceCore<RpcFrame> _receiver;
     private PipeConnection? _remote;
     private bool _disposed;
     private bool _waiting;
@@ -50,7 +50,17 @@ internal sealed class PipeConnection :
         var remote = _remote ?? throw new InvalidOperationException("Pipe is not connected.");
         var frame = Payload.Rent(data.Length);
         data.Span.CopyTo(frame.Memory.Span);
-        remote.Enqueue(frame);
+        remote.Enqueue(new RpcFrame(frame));
+        return default;
+    }
+
+    public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ct.ThrowIfCancellationRequested();
+
+        var remote = _remote ?? throw new InvalidOperationException("Pipe is not connected.");
+        remote.Enqueue(new RpcFrame(frame));
         return default;
     }
 
@@ -59,21 +69,32 @@ internal sealed class PipeConnection :
 
     public ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {
+        var frame = ReceiveFrameValueAsync(ct);
+        if (frame.IsCompletedSuccessfully)
+        {
+            return new ValueTask<Payload>(frame.Result.DetachPayload());
+        }
+
+        return AwaitPayloadAsync(frame);
+    }
+
+    public ValueTask<RpcFrame> ReceiveFrameValueAsync(CancellationToken ct = default)
+    {
         if (ct.IsCancellationRequested)
         {
-            return new ValueTask<Payload>(Task.FromCanceled<Payload>(ct));
+            return new ValueTask<RpcFrame>(Task.FromCanceled<RpcFrame>(ct));
         }
 
         lock (_gate)
         {
             if (_inbound.TryDequeue(out var frame))
             {
-                return new ValueTask<Payload>(frame);
+                return new ValueTask<RpcFrame>(frame);
             }
 
             if (_disposed)
             {
-                return new ValueTask<Payload>(Payload.Empty);
+                return new ValueTask<RpcFrame>(new RpcFrame(Payload.Empty));
             }
 
             if (_waiting)
@@ -83,7 +104,7 @@ internal sealed class PipeConnection :
 
             _receiver.Reset();
             _waiting = true;
-            return new ValueTask<Payload>(this, _receiver.Version);
+            return new ValueTask<RpcFrame>(this, _receiver.Version);
         }
     }
 
@@ -106,7 +127,7 @@ internal sealed class PipeConnection :
         return default;
     }
 
-    public Payload GetResult(short token) => _receiver.GetResult(token);
+    public RpcFrame GetResult(short token) => _receiver.GetResult(token);
 
     public ValueTaskSourceStatus GetStatus(short token) => _receiver.GetStatus(token);
 
@@ -117,7 +138,7 @@ internal sealed class PipeConnection :
         ValueTaskSourceOnCompletedFlags flags) =>
         _receiver.OnCompleted(continuation, state, token, flags);
 
-    private void Enqueue(Payload frame)
+    private void Enqueue(RpcFrame frame)
     {
         var complete = false;
         lock (_gate)
@@ -164,7 +185,13 @@ internal sealed class PipeConnection :
 
         if (complete)
         {
-            _receiver.SetResult(Payload.Empty);
+            _receiver.SetResult(new RpcFrame(Payload.Empty));
         }
+    }
+
+    private static async ValueTask<Payload> AwaitPayloadAsync(ValueTask<RpcFrame> frame)
+    {
+        var received = await frame.ConfigureAwait(false);
+        return received.DetachPayload();
     }
 }

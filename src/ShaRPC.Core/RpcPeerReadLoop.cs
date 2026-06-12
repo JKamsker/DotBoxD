@@ -9,6 +9,7 @@ internal sealed class RpcPeerReadLoop
 {
     private readonly IRpcChannel _channel;
     private readonly IRpcValueTaskChannel? _valueTaskChannel;
+    private readonly IRpcFrameChannel? _frameChannel;
     private readonly RpcPeerInboundDispatcher _inbound;
     private readonly RpcPeerOutboundInvoker _outbound;
     private readonly RpcStreamManager _streams;
@@ -29,6 +30,7 @@ internal sealed class RpcPeerReadLoop
     {
         _channel = channel;
         _valueTaskChannel = channel as IRpcValueTaskChannel;
+        _frameChannel = channel as IRpcFrameChannel;
         _inbound = inbound;
         _outbound = outbound;
         _streams = streams;
@@ -66,12 +68,20 @@ internal sealed class RpcPeerReadLoop
     {
         while (!ct.IsCancellationRequested && _channel.IsConnected)
         {
-            Payload frame;
+            RpcFrame frame;
             try
             {
-                frame = _valueTaskChannel is null
-                    ? await _channel.ReceiveAsync(ct).ConfigureAwait(false)
-                    : await _valueTaskChannel.ReceiveValueAsync(ct).ConfigureAwait(false);
+                if (_frameChannel is not null)
+                {
+                    frame = await _frameChannel.ReceiveFrameValueAsync(ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    var payload = _valueTaskChannel is null
+                        ? await _channel.ReceiveAsync(ct).ConfigureAwait(false)
+                        : await _valueTaskChannel.ReceiveValueAsync(ct).ConfigureAwait(false);
+                    frame = new RpcFrame(payload);
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

@@ -1,7 +1,4 @@
 using System.Diagnostics;
-using ShaRPC.Core.Buffers;
-using ShaRPC.Core.Protocol;
-using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Client;
 
@@ -25,13 +22,7 @@ internal sealed class ShaRpcPendingRequests : IDisposable
 
     public int Count
     {
-        get
-        {
-            lock (_requestsGate)
-            {
-                return _requests.Count;
-            }
-        }
+        get { lock (_requestsGate) { return _requests.Count; } }
     }
 
     public bool TryAdd(int messageId, out PendingReceivedResponse pending) =>
@@ -54,14 +45,23 @@ internal sealed class ShaRpcPendingRequests : IDisposable
         return TryAddCore(messageId, candidate, out pending);
     }
 
+    public bool TryAddValueTaskUnary<TResponse>(
+        int messageId,
+        out PendingValueTaskUnaryResponse<TResponse> pending)
+    {
+        var candidate = PendingValueTaskUnaryResponse<TResponse>.Rent(messageId);
+        var added = TryAddCore(messageId, candidate, out pending);
+        if (!added) candidate.Abandon();
+        return added;
+    }
+
     private bool TryAddCore<TPending>(int messageId, TPending candidate, out TPending pending)
         where TPending : IPendingResponse
     {
         lock (_requestsGate)
         {
-            if (!_requests.ContainsKey(messageId))
+            if (_requests.TryAdd(messageId, candidate))
             {
-                _requests.Add(messageId, candidate);
                 pending = candidate;
                 return true;
             }
@@ -279,10 +279,7 @@ internal sealed class ShaRpcPendingRequests : IDisposable
 
     private bool TryRemove(int messageId, IPendingResponse pending)
     {
-        lock (_requestsGate)
-        {
-            return TryRemoveCore(messageId, pending);
-        }
+        lock (_requestsGate) { return TryRemoveCore(messageId, pending); }
     }
 
     private bool TryRemoveCore(int messageId, IPendingResponse pending)

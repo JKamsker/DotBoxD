@@ -40,6 +40,19 @@ internal struct RpcDispatchResult : IDisposable
 
     public RpcStreamAttachment? Stream { get; }
 
+    public bool TryDetachWriter(out PooledBufferWriter writer)
+    {
+        if (_writerFrame is null)
+        {
+            writer = null!;
+            return false;
+        }
+
+        writer = _writerFrame;
+        _writerFrame = null;
+        return true;
+    }
+
     public void Dispose()
     {
         _payloadFrame?.Dispose();

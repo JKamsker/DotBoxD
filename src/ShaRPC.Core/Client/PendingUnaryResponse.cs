@@ -3,6 +3,7 @@ using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Core.Streaming;
+using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core.Client;
 
@@ -55,7 +56,7 @@ internal class PendingUnaryResponse<TResponse> :
     public bool TrySetResponse(
         RpcResponse response,
         ReadOnlyMemory<byte> payload,
-        Payload frame,
+        RpcFrame frame,
         RpcStreamReceiver? stream,
         ISerializer serializer)
     {

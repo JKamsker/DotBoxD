@@ -10,7 +10,7 @@ public class PeerRoundTripBenchmarks
 {
     private RpcPeer _leftPeer = null!;
     private RpcPeer _rightPeer = null!;
-    private IGameService _service = null!;
+    private IValueTaskGameService _service = null!;
     private readonly MoveRequest _request = new()
     {
         PlayerId = "player-1",
@@ -37,10 +37,10 @@ public class PeerRoundTripBenchmarks
                 rightConnection,
                 serializer,
                 CreateOptionsForServer())
-            .Provide<IGameService>(new BenchmarkGameService())
+            .Provide<IValueTaskGameService>(new BenchmarkGameService())
             .Start();
 
-        _service = _leftPeer.Get<IGameService>();
+        _service = _leftPeer.Get<IValueTaskGameService>();
         await _service.RegisterPlayerAsync("player-1").ConfigureAwait(false);
     }
 
@@ -52,7 +52,7 @@ public class PeerRoundTripBenchmarks
     }
 
     [Benchmark]
-    public Task<ActionResult> MovePlayerAsync() =>
+    public ValueTask<ActionResult> MovePlayerAsync() =>
         _service.MovePlayerAsync(_request);
 
     private RpcPeerOptions CreateOptionsForClient() =>
@@ -78,32 +78,31 @@ public class PeerRoundTripBenchmarks
         };
     }
 
-    private sealed class BenchmarkGameService : IGameService
+    private sealed class BenchmarkGameService : IValueTaskGameService
     {
-        private static readonly Task<ActionResult> MoveResult =
-            Task.FromResult(new ActionResult { Success = true, Message = "Moved" });
+        private static readonly ActionResult MoveResult = new() { Success = true, Message = "Moved" };
 
         private readonly Dictionary<string, PlayerState> _players = new();
 
-        public Task<PlayerState> GetPlayerStateAsync(PlayerId playerId, CancellationToken ct = default) =>
-            Task.FromResult(_players[playerId.Id]);
+        public ValueTask<PlayerState> GetPlayerStateAsync(PlayerId playerId, CancellationToken ct = default) =>
+            new(_players[playerId.Id]);
 
-        public Task<ActionResult> MovePlayerAsync(MoveRequest request, CancellationToken ct = default)
+        public ValueTask<ActionResult> MovePlayerAsync(MoveRequest request, CancellationToken ct = default)
         {
             var state = _players[request.PlayerId];
             state.PositionX = request.X;
             state.PositionY = request.Y;
             state.PositionZ = request.Z;
-            return MoveResult;
+            return new ValueTask<ActionResult>(MoveResult);
         }
 
-        public Task<ActionResult> PerformActionAsync(ActionRequest request, CancellationToken ct = default) =>
-            Task.FromResult(new ActionResult { Success = true, Message = request.ActionType });
+        public ValueTask<ActionResult> PerformActionAsync(ActionRequest request, CancellationToken ct = default) =>
+            new(new ActionResult { Success = true, Message = request.ActionType });
 
-        public Task<ServerStatus> GetServerStatusAsync(CancellationToken ct = default) =>
-            Task.FromResult(new ServerStatus { PlayerCount = _players.Count, Version = "bench" });
+        public ValueTask<ServerStatus> GetServerStatusAsync(CancellationToken ct = default) =>
+            new(new ServerStatus { PlayerCount = _players.Count, Version = "bench" });
 
-        public Task<PlayerState> RegisterPlayerAsync(string playerName, CancellationToken ct = default)
+        public ValueTask<PlayerState> RegisterPlayerAsync(string playerName, CancellationToken ct = default)
         {
             var state = new PlayerState
             {
@@ -114,7 +113,7 @@ public class PeerRoundTripBenchmarks
                 MaxHealth = 100
             };
             _players[state.PlayerId] = state;
-            return Task.FromResult(state);
+            return new ValueTask<PlayerState>(state);
         }
     }
 }
