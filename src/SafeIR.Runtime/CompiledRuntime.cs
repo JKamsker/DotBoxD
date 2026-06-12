@@ -5,12 +5,9 @@ using SafeIR;
 public static class CompiledRuntime
 {
     public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount);
-
     public static void ChargeLoopIteration(SandboxContext context, int fuelAmount)
         => context.ChargeLoopIteration(fuelAmount);
-
     public static void EnterCall(SandboxContext context) => context.EnterCall();
-
     public static void ExitCall(SandboxContext context) => context.ExitCall();
 
     public static void ValidateEntrypointInput(SandboxValue input, int parameterCount)
@@ -29,23 +26,18 @@ public static class CompiledRuntime
         return value;
     }
 
+    public static SandboxValue Unit() => SandboxValue.Unit;
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
-
     public static SandboxValue I64(long value) => SandboxValue.FromInt64(value);
-
     public static SandboxValue F64(double value)
         => double.IsFinite(value)
             ? SandboxValue.FromDouble(value)
             : throw InvalidInput("f64 value must be finite");
-
     public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
     public static SandboxType TypeScalar(string name) => SandboxType.Scalar(name);
-
     public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType);
-
     public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType);
-
     private static SandboxValue String(string value) => SandboxValue.FromString(value);
 
     public static SandboxValue StringConst(SandboxContext context, string value)
@@ -54,12 +46,27 @@ public static class CompiledRuntime
         return SandboxValue.FromString(value);
     }
 
+    public static SandboxValue OpaqueIdConst(SandboxContext context, string typeName, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromOpaqueId(typeName, value);
+    }
+
+    public static SandboxValue PathConst(SandboxContext context, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromPath(value);
+    }
+
+    public static SandboxValue UriConst(SandboxContext context, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromUri(value);
+    }
+
     public static int AsI32(SandboxValue value) => ((I32Value)value).Value;
-
     public static long AsI64(SandboxValue value) => ((I64Value)value).Value;
-
     public static bool AsBool(SandboxValue value) => ((BoolValue)value).Value;
-
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
     public static SandboxValue AddI32(SandboxValue left, SandboxValue right)
@@ -101,9 +108,8 @@ public static class CompiledRuntime
 
     public static SandboxValue ConcatString(SandboxContext context, SandboxValue left, SandboxValue right)
     {
-        var text = ((StringValue)left).Value + ((StringValue)right).Value;
-        context.ChargeString(text);
-        return String(text);
+        var text = context.CreateChargedStringConcat(((StringValue)left).Value, ((StringValue)right).Value);
+        return SandboxValue.FromString(text);
     }
 
     public static SandboxValue AbsI32(SandboxValue value)

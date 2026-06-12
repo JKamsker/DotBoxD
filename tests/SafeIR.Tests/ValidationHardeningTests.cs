@@ -219,7 +219,7 @@ public sealed class ValidationHardeningTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
         var policy = SandboxPolicyBuilder.Create()
-            .GrantFileRead("root", 1024)
+            .GrantFileRead(Path.GetTempPath(), 1024)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
             .Build();
 
@@ -235,7 +235,7 @@ public sealed class ValidationHardeningTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = SandboxPolicyBuilder.Create()
-            .GrantFileRead("root", 1024)
+            .GrantFileRead(Path.GetTempPath(), 1024)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
             .Build();
 

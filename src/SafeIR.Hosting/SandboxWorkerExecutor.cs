@@ -17,6 +17,8 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
 
         var workerOptions = options with { Isolation = SandboxIsolation.InProcess };
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(plan.Budget.EffectiveWallTime);
         try
         {
             var result = await worker.Client.ExecuteInWorkerAsync(
@@ -24,7 +26,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                     entrypoint,
                     input,
                     workerOptions,
-                    cancellationToken)
+                    timeout.Token)
                 .ConfigureAwait(false);
             return ValidateWorkerResult(plan, entrypoint, options, result, out var error)
                 ? result with { AuditEvents = result.AuditEvents.ToSequencedArray() }
@@ -33,12 +35,19 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                     options,
                     error);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
                 new SandboxError(SandboxErrorCode.Cancelled, "worker process execution was cancelled"));
+        }
+        catch (OperationCanceledException)
+        {
+            return SandboxHost.WorkerIsolationFailedResult(
+                plan,
+                options,
+                new SandboxError(SandboxErrorCode.Timeout, "worker process execution timed out"));
         }
         catch (Exception)
         {
@@ -76,8 +85,14 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             return false;
         }
 
+        error = new SandboxError(SandboxErrorCode.HostFailure, "worker resource usage was malformed");
+        if (!WorkerResourceUsageMatches(plan, result))
+        {
+            return false;
+        }
+
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker audit envelope was malformed");
-        return WorkerAuditMatches(options, result);
+        return WorkerAuditMatches(plan, options, result);
     }
 
     private static bool WorkerModeMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
@@ -136,7 +151,38 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         return result.Value is null && result.Error is not null;
     }
 
-    private static bool WorkerAuditMatches(SandboxExecutionOptions options, SandboxExecutionResult result)
+    private static bool WorkerResourceUsageMatches(ExecutionPlan plan, SandboxExecutionResult result)
+    {
+        var usage = result.ResourceUsage;
+        return usage.MaxFuel == plan.Budget.MaxFuel &&
+               usage.FuelUsed >= 0 &&
+               usage.FuelUsed <= plan.Budget.MaxFuel &&
+               usage.LoopIterations >= 0 &&
+               usage.LoopIterations <= plan.Budget.MaxLoopIterations &&
+               usage.AllocatedBytes >= 0 &&
+               usage.AllocatedBytes <= plan.Budget.MaxAllocatedBytes &&
+               usage.HostCalls >= 0 &&
+               usage.HostCalls <= plan.Budget.MaxHostCalls &&
+               usage.FileBytesRead >= 0 &&
+               usage.FileBytesRead <= plan.Budget.MaxFileBytesRead &&
+               usage.FileBytesWritten >= 0 &&
+               usage.FileBytesWritten <= plan.Budget.MaxFileBytesWritten &&
+               usage.NetworkBytesRead >= 0 &&
+               usage.NetworkBytesRead <= plan.Budget.MaxNetworkBytesRead &&
+               usage.NetworkBytesWritten >= 0 &&
+               usage.NetworkBytesWritten <= plan.Budget.MaxNetworkBytesWritten &&
+               usage.LogEvents >= 0 &&
+               usage.LogEvents <= plan.Budget.MaxLogEvents &&
+               usage.CollectionElements >= 0 &&
+               usage.CollectionElements <= plan.Budget.MaxTotalCollectionElements &&
+               usage.StringBytes >= 0 &&
+               usage.StringBytes <= plan.Budget.MaxTotalStringBytes;
+    }
+
+    private static bool WorkerAuditMatches(
+        ExecutionPlan plan,
+        SandboxExecutionOptions options,
+        SandboxExecutionResult result)
     {
         if (result.AuditEvents.Count == 0)
         {
@@ -160,8 +206,66 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             return false;
         }
 
-        return result.Succeeded
+        return WorkerRunSummaryMatches(plan, result, summaries[0]) &&
+            (result.Succeeded
             ? summaries[0].ErrorCode is null
-            : summaries[0].ErrorCode == result.Error!.Code;
+            : summaries[0].ErrorCode == result.Error!.Code);
     }
+
+    private static bool WorkerRunSummaryMatches(
+        ExecutionPlan plan,
+        SandboxExecutionResult result,
+        SandboxAuditEvent summary)
+    {
+        if (summary.Fields is null ||
+            !FieldEquals(summary, "mode", result.ActualMode.ToString()) ||
+            !HasNonEmptyField(summary, "cacheStatus") ||
+            !FieldEquals(summary, "moduleHash", plan.ModuleHash) ||
+            !FieldEquals(summary, "planHash", plan.PlanHash) ||
+            !FieldEquals(summary, "policyHash", plan.PolicyHash) ||
+            !FieldEquals(summary, "bindingManifestHash", plan.BindingManifestHash) ||
+            !FieldEquals(summary, "fuelUsed", result.ResourceUsage.FuelUsed) ||
+            !FieldEquals(summary, "maxFuel", result.ResourceUsage.MaxFuel) ||
+            !FieldEquals(summary, "loopIterations", result.ResourceUsage.LoopIterations) ||
+            !FieldEquals(summary, "allocatedBytes", result.ResourceUsage.AllocatedBytes) ||
+            !FieldEquals(summary, "hostCalls", result.ResourceUsage.HostCalls) ||
+            !FieldEquals(summary, "fileBytesRead", result.ResourceUsage.FileBytesRead) ||
+            !FieldEquals(summary, "fileBytesWritten", result.ResourceUsage.FileBytesWritten) ||
+            !FieldEquals(summary, "networkBytesRead", result.ResourceUsage.NetworkBytesRead) ||
+            !FieldEquals(summary, "networkBytesWritten", result.ResourceUsage.NetworkBytesWritten) ||
+            !FieldEquals(summary, "logEvents", result.ResourceUsage.LogEvents) ||
+            !FieldEquals(summary, "collectionElements", result.ResourceUsage.CollectionElements) ||
+            !FieldEquals(summary, "stringBytes", result.ResourceUsage.StringBytes))
+        {
+            return false;
+        }
+
+        if (result.ActualMode != ExecutionMode.Compiled)
+        {
+            return !summary.Fields.ContainsKey("artifactHash") &&
+                   !summary.Fields.ContainsKey("runtimeForm") &&
+                   !summary.Fields.ContainsKey("cacheKey");
+        }
+
+        if (!result.Succeeded)
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(result.ArtifactHash) &&
+               FieldEquals(summary, "artifactHash", result.ArtifactHash) &&
+               HasNonEmptyField(summary, "runtimeForm") &&
+               HasNonEmptyField(summary, "cacheKey");
+    }
+
+    private static bool FieldEquals(SandboxAuditEvent summary, string key, string value)
+        => summary.Fields!.TryGetValue(key, out var actual) &&
+           string.Equals(actual, value, StringComparison.Ordinal);
+
+    private static bool FieldEquals(SandboxAuditEvent summary, string key, long value)
+        => FieldEquals(summary, key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private static bool HasNonEmptyField(SandboxAuditEvent summary, string key)
+        => summary.Fields!.TryGetValue(key, out var value) &&
+           !string.IsNullOrWhiteSpace(value);
 }

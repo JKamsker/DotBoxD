@@ -113,7 +113,16 @@ public sealed class SandboxContext
         Budget.ChargeStringAllocation(charLength);
     }
 
-    public void RecordStringReturnCredit(string value)
+    public string CreateChargedStringConcat(string left, string right)
+    {
+        var length = CheckedCharLength(left.Length, right.Length);
+        ChargeStringAllocation(length);
+        var text = string.Concat(left, right);
+        _returnCredits.RecordString(text);
+        return text;
+    }
+
+    internal void RecordStringReturnCredit(string value)
         => _returnCredits.RecordString(value);
 
     public IDisposable BeginBindingReturnCreditScope() => _returnCredits.BeginScope();
@@ -125,7 +134,7 @@ public sealed class SandboxContext
     public void EnsureRequiredBindingSuccessAudit(BindingDescriptor descriptor, long checkpoint)
     {
         if (descriptor.AuditLevel == AuditLevel.None ||
-            Audit.HasBindingAuditSince(descriptor, checkpoint, success: true))
+            Audit.HasBindingAuditSince(descriptor, checkpoint, success: true, RunId, ModuleHash, PolicyHash))
         {
             return;
         }
@@ -141,7 +150,7 @@ public sealed class SandboxContext
         SandboxErrorCode errorCode)
     {
         if (descriptor.AuditLevel == AuditLevel.None ||
-            Audit.HasBindingAuditSince(descriptor, checkpoint, success: false))
+            Audit.HasBindingAuditSince(descriptor, checkpoint, success: false, RunId, ModuleHash, PolicyHash))
         {
             return;
         }
@@ -233,6 +242,20 @@ public sealed class SandboxContext
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.QuotaExceeded,
                 "binding return fuel budget exhausted"));
+        }
+    }
+
+    private static int CheckedCharLength(int left, int right)
+    {
+        try
+        {
+            return checked(left + right);
+        }
+        catch (OverflowException)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.QuotaExceeded,
+                "string byte budget exhausted"));
         }
     }
 

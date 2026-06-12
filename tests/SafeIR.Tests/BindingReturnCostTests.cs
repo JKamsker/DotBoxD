@@ -149,6 +149,15 @@ public sealed class BindingReturnCostTests
         Assert.Equal(SandboxErrorCode.BindingFailure, result.Error!.Code);
     }
 
+    [Fact]
+    public void Binding_return_credit_recorder_is_not_public_binding_api()
+    {
+        var publicMethods = typeof(SandboxContext)
+            .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+
+        Assert.DoesNotContain(publicMethods, method => method.Name == "RecordStringReturnCredit");
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteAsync(
         BindingDescriptor binding,
         SandboxPolicy policy,

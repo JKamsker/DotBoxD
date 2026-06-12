@@ -5,12 +5,15 @@ using SafeIR;
 using SafeIR.Runtime;
 using static IlEmitterPrimitives;
 
-internal static class CompiledValueEmitter
+internal static class CompiledLiteralEmitter
 {
-    public static void EmitLiteral(ILGenerator il, SandboxValue value)
+    public static void Emit(ILGenerator il, SandboxValue value)
     {
         switch (value)
         {
+            case UnitValue:
+                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Unit)));
+                break;
             case I32Value i32:
                 EmitInt32(il, i32.Value);
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
@@ -28,37 +31,30 @@ internal static class CompiledValueEmitter
                 il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
                 break;
             case StringValue text:
+                EmitContextStringCall(il, text.Value, nameof(CompiledRuntime.StringConst));
+                break;
+            case OpaqueIdValue id:
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldstr, text.Value);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringConst)));
+                il.Emit(OpCodes.Ldstr, id.TypeName);
+                il.Emit(OpCodes.Ldstr, id.Value);
+                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.OpaqueIdConst)));
+                break;
+            case SandboxPathValue path:
+                EmitContextStringCall(il, path.Value.RelativePath, nameof(CompiledRuntime.PathConst));
+                break;
+            case SandboxUriValue uri:
+                EmitContextStringCall(il, uri.Value.Value, nameof(CompiledRuntime.UriConst));
                 break;
             default:
                 throw Unsupported("literal not supported by compiler");
         }
     }
 
-    public static void EmitMeteredSandboxType(ILGenerator il, SandboxType type)
+    private static void EmitContextStringCall(ILGenerator il, string value, string runtimeMethod)
     {
-        if (type is { Name: "List", Arguments.Count: 1 })
-        {
-            EmitMeteredSandboxType(il, type.Arguments[0]);
-            CompiledMeterEmitter.Fuel(il, 1);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeList)));
-            return;
-        }
-
-        if (type is { Name: "Map", Arguments.Count: 2 })
-        {
-            EmitMeteredSandboxType(il, type.Arguments[0]);
-            EmitMeteredSandboxType(il, type.Arguments[1]);
-            CompiledMeterEmitter.Fuel(il, 1);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeMap)));
-            return;
-        }
-
-        CompiledMeterEmitter.Fuel(il, 1);
-        il.Emit(OpCodes.Ldstr, type.Name);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeScalar)));
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldstr, value);
+        il.Emit(OpCodes.Call, Runtime(runtimeMethod));
     }
 
     private static Exception Unsupported(string message)

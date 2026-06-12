@@ -1,7 +1,11 @@
 namespace SafeIR.Verifier;
 
+using System.Reflection.Metadata;
+
 internal static class GeneratedMethodMeterAnalyzer
 {
+    private const int MaxInstructionsBetweenFuelMeters = 32;
+
     public static bool HasUnmeteredWorkPath(
         GeneratedMethodFlow analysis,
         Func<string?, bool> isFuelMeter,
@@ -57,10 +61,56 @@ internal static class GeneratedMethodMeterAnalyzer
 
         var instruction = analysis.Instructions[instructionIndex];
         var previous = analysis.Instructions[instructionIndex - 1];
-        return previous.Int32Value is > 0 &&
-               analysis.EntryStates.ContainsKey(previous.Offset) &&
-               GeneratedMethodFlowAnalyzer.Successors(analysis.Instructions, analysis.ByOffset, previous)
-                   .Contains(instruction.Offset);
+        var predecessors = Predecessors(analysis, instruction.Offset).ToArray();
+        return predecessors.Length == 1 &&
+               predecessors[0].Offset == previous.Offset &&
+               previous.Int32Value is > 0 &&
+               analysis.EntryStates.ContainsKey(previous.Offset);
+    }
+
+    public static bool HasSparseMeterPath(
+        GeneratedMethodFlow analysis,
+        Func<string?, bool> isFuelMeter)
+    {
+        if (analysis.Instructions.Count == 0)
+        {
+            return false;
+        }
+
+        var counts = new Dictionary<int, int> { [analysis.Instructions[0].Offset] = 0 };
+        var queue = new Queue<int>();
+        queue.Enqueue(analysis.Instructions[0].Offset);
+        while (queue.Count > 0)
+        {
+            var offset = queue.Dequeue();
+            var instruction = analysis.ByOffset[offset];
+            var output = isFuelMeter(instruction.CalledMember) && HasPositiveImmediateMeterAmount(analysis, instruction)
+                ? 0
+                : counts[offset] + InstructionCost(instruction);
+            if (output > MaxInstructionsBetweenFuelMeters)
+            {
+                return true;
+            }
+
+            foreach (var successor in GeneratedMethodFlowAnalyzer.Successors(
+                analysis.Instructions,
+                analysis.ByOffset,
+                instruction))
+            {
+                if (!analysis.ByOffset.ContainsKey(successor))
+                {
+                    continue;
+                }
+
+                if (!counts.TryGetValue(successor, out var existing) || output > existing)
+                {
+                    counts[successor] = output;
+                    queue.Enqueue(successor);
+                }
+            }
+        }
+
+        return false;
     }
 
     private static int MeterCredit(
@@ -73,6 +123,9 @@ internal static class GeneratedMethodMeterAnalyzer
 
     private static int WorkCost(GeneratedInstruction instruction, Func<string?, bool> isMeterDensityWorkCall)
         => isMeterDensityWorkCall(instruction.CalledMember) || instruction.IsLocalCall ? 1 : 0;
+
+    private static int InstructionCost(GeneratedInstruction instruction)
+        => instruction.Opcode is ILOpCode.Nop ? 0 : 1;
 
     private static bool HasPositiveImmediateMeterAmount(
         GeneratedMethodFlow analysis,
@@ -88,4 +141,9 @@ internal static class GeneratedMethodMeterAnalyzer
 
         return false;
     }
+
+    private static IEnumerable<GeneratedInstruction> Predecessors(GeneratedMethodFlow analysis, int offset)
+        => analysis.Instructions.Where(candidate =>
+            GeneratedMethodFlowAnalyzer.Successors(analysis.Instructions, analysis.ByOffset, candidate)
+                .Contains(offset));
 }

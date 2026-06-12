@@ -176,7 +176,7 @@ public sealed class PluginAddendumTests
     public async Task ModifyAsync_atomic_waits_for_in_flight_kernel_execution()
     {
         var messages = new BlockingPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
+        var server = PluginServer.Create(messages, defaultPolicy: PluginAddendumTestPolicies.LongWall());
         await server.InstallAsync(FireDamagePluginPackage.Create());
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
         var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
@@ -290,21 +290,4 @@ public sealed class PluginAddendumTests
         Assert.Same(first.Value, second.Value);
         Assert.Empty(messages.Messages);
     }
-
-    private sealed class BlockingPluginMessageSink : IPluginMessageSink
-    {
-        public TaskCompletionSource SendStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource ReleaseSend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public async ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default)
-        {
-            SendStarted.TrySetResult();
-            await ReleaseSend.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    private static SandboxPolicy LongWallPluginPolicy()
-        => SandboxPolicyBuilder.Create().GrantLogging().GrantGameMessageWrite()
-            .WithFuel(100_000).WithMaxHostCalls(1_000)
-            .WithWallTime(TimeSpan.FromSeconds(10)).Build();
 }

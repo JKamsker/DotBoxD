@@ -170,7 +170,7 @@ internal sealed class MethodEmitter
         switch (expression)
         {
             case LiteralExpression literal:
-                CompiledValueEmitter.EmitLiteral(_il, literal.Value);
+                CompiledLiteralEmitter.Emit(_il, literal.Value);
                 break;
             case VariableExpression variable:
                 _il.Emit(OpCodes.Ldloc, _locals[variable.Name]);
@@ -276,7 +276,7 @@ internal sealed class MethodEmitter
         var value = _il.DeclareLocal(typeof(SandboxValue));
         _il.Emit(OpCodes.Stloc, value);
         _il.Emit(OpCodes.Ldloc, value);
-        CompiledValueEmitter.EmitMeteredSandboxType(_il, _function.ReturnType);
+        CompiledTypeEmitter.EmitMetered(_il, _function.ReturnType);
         _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.RequireValueType)));
         _il.Emit(OpCodes.Stloc, value);
         CompiledMeterEmitter.ExitCall(_il);

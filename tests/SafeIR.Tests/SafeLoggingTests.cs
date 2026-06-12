@@ -81,6 +81,19 @@ public sealed class SafeLoggingTests
     }
 
     [Fact]
+    public async Task Log_message_redacts_authorization_header_value()
+    {
+        var result = await ExecuteLogAsync(
+            """{ "call": "log.info", "args": [{ "string": "Authorization: Bearer abc.def ok" }] }""",
+            SandboxPolicyBuilder.Create().GrantLogging().Build());
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "SandboxLog");
+        Assert.Equal("Authorization: Bearer [redacted] ok", audit.Message);
+        Assert.DoesNotContain("abc.def", audit.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Log_binding_requires_policy_grant()
     {
         var host = SandboxTestHost.Create();
@@ -145,6 +158,21 @@ public sealed class SafeLoggingTests
             SandboxPolicyBuilder.Create()
                 .GrantLogging()
                 .WithMaxTotalStringBytes(12)
+                .Build());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "SandboxLog");
+    }
+
+    [Fact]
+    public async Task Log_message_length_limit_uses_sanitized_payload()
+    {
+        var result = await ExecuteLogAsync(
+            """{ "call": "log.info", "args": [{ "string": "Authorization: Bearer abc.def ok" }] }""",
+            SandboxPolicyBuilder.Create()
+                .GrantLogging()
+                .WithMaxLogMessageLength("Authorization: Bearer [redacted] ok".Length - 1)
                 .Build());
 
         Assert.False(result.Succeeded);
