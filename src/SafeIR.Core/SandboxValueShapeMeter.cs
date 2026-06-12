@@ -5,15 +5,23 @@ internal static class SandboxValueShapeMeter
     public static ValueShape Measure(
         SandboxValue value,
         ResourceLimits? limits = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ResourceMeter? meter = null)
     {
         var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var stack = new Stack<Frame>();
         var shape = new ValueShape(0, 0, 0, 0, 0, 0);
+        var scanned = 0;
         stack.Push(new Frame(value, Depth: 0, Exit: false));
         while (stack.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (++scanned % 64 == 0)
+            {
+                meter?.ChargeFuel(1);
+                meter?.CheckDeadline();
+            }
+
             var frame = stack.Pop();
             if (frame.Exit)
             {

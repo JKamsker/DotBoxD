@@ -104,7 +104,7 @@ public sealed class IrIdentifierValidationTests
         }
         """);
 
-        var policy = SandboxPolicyBuilder.Create().GrantFileRead("root", 1).Build();
+        var policy = SandboxPolicyBuilder.Create().GrantFileRead(Path.GetTempPath(), 1).Build();
         var plan = await Host.PrepareAsync(module, policy);
 
         Assert.Equal("reason-text", plan.Module.Id);

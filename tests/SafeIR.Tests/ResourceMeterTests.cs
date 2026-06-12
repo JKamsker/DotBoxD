@@ -73,4 +73,18 @@ public sealed class ResourceMeterTests
 
         Assert.True(remaining > TimeSpan.FromDays(1));
     }
+
+    [Fact]
+    public void Shape_scan_charges_fuel_for_large_collections()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxFuel: 0));
+        var values = Enumerable.Range(0, 128)
+            .Select(SandboxValue.FromInt32)
+            .ToArray();
+        var value = SandboxValue.FromList(values);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeValue(value));
+
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
 }

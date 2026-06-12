@@ -91,16 +91,16 @@ public sealed partial class SandboxHost : IDisposable
             return Publish(CapabilityRevokedResult(plan, options, revoked));
         }
 
+        if (options.RequireDeterministic && !plan.Policy.Deterministic)
+        {
+            return Publish(DeterminismRequiredResult(plan, options));
+        }
+
         if (options.Isolation == SandboxIsolation.WorkerProcess)
         {
             var workerResult = await _workerExecutor.ExecuteAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
             return Publish(workerResult);
-        }
-
-        if (options.RequireDeterministic && !plan.Policy.Deterministic)
-        {
-            return Publish(DeterminismRequiredResult(plan, options));
         }
 
         var result = options.Mode switch

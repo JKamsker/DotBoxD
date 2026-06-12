@@ -29,8 +29,9 @@ public static partial class SafeLogBindings
     private static void Write(SandboxContext context, string bindingId, string level, string message)
     {
         var startedAt = DateTimeOffset.UtcNow;
-        context.ChargeLogEvent(message);
-        context.ChargeStringAllocation(message.Length);
+        var sanitized = AuditTextSanitizer.SanitizeAndRedact(message);
+        context.ChargeLogEvent(sanitized);
+        context.ChargeStringAllocation(sanitized.Length);
         var timestamp = context.UtcNow();
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
@@ -41,7 +42,7 @@ public static partial class SafeLogBindings
             CapabilityId: "log.write",
             Effect: SandboxEffect.Audit,
             ResourceId: $"log:{level}",
-            Message: AuditTextSanitizer.SanitizeAndRedact(message),
+            Message: sanitized,
             Fields: context.BindingAuditFields("log", startedAt)));
     }
 }

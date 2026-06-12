@@ -28,8 +28,9 @@ public static class StringBindings
             AuditLevel.None,
             BindingSafety.PureIntrinsic,
             (ctx, args, _) => {
-                var text = ((StringValue)args[0]).Value + ((StringValue)args[1]).Value;
-                ctx.ChargeString(text);
+                var text = ctx.CreateChargedStringConcat(
+                    ((StringValue)args[0]).Value,
+                    ((StringValue)args[1]).Value);
                 return ValueTask.FromResult(SandboxValue.FromString(text));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))

@@ -37,7 +37,13 @@ public interface IAuditSink
 
     void Write(SandboxAuditEvent auditEvent);
 
-    bool HasBindingAuditSince(BindingDescriptor descriptor, long checkpoint, bool success);
+    bool HasBindingAuditSince(
+        BindingDescriptor descriptor,
+        long checkpoint,
+        bool success,
+        SandboxRunId runId,
+        string moduleHash,
+        string policyHash);
 }
 
 public sealed class InMemoryAuditSink : IAuditSink
@@ -55,16 +61,23 @@ public sealed class InMemoryAuditSink : IAuditSink
         _events.Add(auditEvent with { SequenceNumber = sequence });
     }
 
-    public bool HasBindingAuditSince(BindingDescriptor descriptor, long checkpoint, bool success)
+    public bool HasBindingAuditSince(
+        BindingDescriptor descriptor,
+        long checkpoint,
+        bool success,
+        SandboxRunId runId,
+        string moduleHash,
+        string policyHash)
         => _events.Any(e =>
             e.SequenceNumber > checkpoint &&
+            e.RunId == runId &&
             e.Success == success &&
             IsBindingAuditKind(e.Kind) &&
             StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
             CapabilityMatches(e, descriptor) &&
             EffectMatches(e, descriptor) &&
             !string.IsNullOrWhiteSpace(e.ResourceId) &&
-            HasRequiredFields(e) &&
+            HasRequiredFields(e, moduleHash, policyHash) &&
             (success || e.ErrorCode is not null));
 
     private static bool IsBindingAuditKind(string kind)
@@ -87,16 +100,16 @@ public sealed class InMemoryAuditSink : IAuditSink
                (auditEvent.Effect & nonCpuEffects) != SandboxEffect.None;
     }
 
-    private static bool HasRequiredFields(SandboxAuditEvent auditEvent)
+    private static bool HasRequiredFields(SandboxAuditEvent auditEvent, string moduleHash, string policyHash)
     {
         if (auditEvent.Fields is null ||
             !auditEvent.Fields.TryGetValue("resourceKind", out var resourceKind) ||
             string.IsNullOrWhiteSpace(resourceKind) ||
             !auditEvent.Fields.TryGetValue("durationMs", out var durationMs) ||
-            !auditEvent.Fields.TryGetValue("moduleHash", out var moduleHash) ||
-            string.IsNullOrWhiteSpace(moduleHash) ||
-            !auditEvent.Fields.TryGetValue("policyHash", out var policyHash) ||
-            string.IsNullOrWhiteSpace(policyHash))
+            !auditEvent.Fields.TryGetValue("moduleHash", out var auditModuleHash) ||
+            !StringComparer.Ordinal.Equals(auditModuleHash, moduleHash) ||
+            !auditEvent.Fields.TryGetValue("policyHash", out var auditPolicyHash) ||
+            !StringComparer.Ordinal.Equals(auditPolicyHash, policyHash))
         {
             return false;
         }

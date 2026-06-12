@@ -97,8 +97,7 @@ public static class CompiledRuntime
 
     public static SandboxValue ConcatString(SandboxContext context, SandboxValue left, SandboxValue right)
     {
-        var text = ((StringValue)left).Value + ((StringValue)right).Value;
-        context.ChargeString(text);
+        var text = context.CreateChargedStringConcat(((StringValue)left).Value, ((StringValue)right).Value);
         return String(text);
     }
 

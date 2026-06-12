@@ -79,6 +79,7 @@ internal static class PolicyGrantValidator
             : ["root", "maxBytesPerRun", "allowedExtensions"];
         RequireAllowedKeys(grant, diagnostics, allowed);
         RequireNonEmpty(grant, diagnostics, "root");
+        RequireAbsoluteCanonicalRoot(grant, diagnostics);
         RequireNonNegativeLong(grant, diagnostics, "maxBytesPerRun");
         RequireAllowedExtensions(grant, diagnostics);
         if (allowWriteFlags)
@@ -123,6 +124,28 @@ internal static class PolicyGrantValidator
             value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
         {
             Add(diagnostics, grant, $"parameter '{key}' must contain at least one value");
+        }
+    }
+
+    private static void RequireAbsoluteCanonicalRoot(CapabilityGrant grant, List<SandboxDiagnostic> diagnostics)
+    {
+        if (!grant.Parameters.TryGetValue("root", out var root) || string.IsNullOrWhiteSpace(root))
+        {
+            return;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(root);
+            if (!Path.IsPathFullyQualified(root) ||
+                !PathsEqual(NormalizeRootForCompare(root), NormalizeRootForCompare(fullPath)))
+            {
+                Add(diagnostics, grant, "parameter 'root' must be an absolute canonical path");
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            Add(diagnostics, grant, "parameter 'root' must be an absolute canonical path");
         }
     }
 
@@ -198,4 +221,13 @@ internal static class PolicyGrantValidator
         => extension.Length > 1 &&
            extension[0] == '.' &&
            extension.Skip(1).All(c => !char.IsControl(c) && !char.IsWhiteSpace(c) && c is not '/' and not '\\' and not '.');
+
+    private static string NormalizeRootForCompare(string path)
+        => Path.TrimEndingDirectorySeparator(path);
+
+    private static bool PathsEqual(string left, string right)
+        => string.Equals(
+            left,
+            right,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }

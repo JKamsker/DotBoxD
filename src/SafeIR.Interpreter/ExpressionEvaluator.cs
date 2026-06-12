@@ -217,8 +217,7 @@ internal sealed class ExpressionEvaluator
 
     private SandboxValue Concat(string left, string right)
     {
-        var text = left + right;
-        _context.ChargeString(text);
+        var text = _context.CreateChargedStringConcat(left, right);
         return SandboxValue.FromString(text);
     }
 

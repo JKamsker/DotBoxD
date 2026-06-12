@@ -300,6 +300,7 @@ public sealed class WorkerIsolationTests
             Options = options;
             var runId = options.RunId ?? SandboxRunId.New();
             var audit = new InMemoryAuditSink();
+            var budget = new ResourceMeter(plan.Budget);
             audit.Write(new SandboxAuditEvent(
                 runId,
                 "WorkerExecution",
@@ -308,6 +309,10 @@ public sealed class WorkerIsolationTests
                 ResourceId: $"module:{plan.ModuleHash}",
                 ErrorCode: ResultError?.Code,
                 Message: entrypoint));
+            var runtimeForm = ResultMode == ExecutionMode.Compiled && !string.IsNullOrWhiteSpace(ResultArtifactHash)
+                ? "LoadedAssembly"
+                : null;
+            var cacheKey = runtimeForm is not null ? "worker-cache-key" : null;
             audit.Write(new SandboxAuditEvent(
                 runId,
                 "RunSummary",
@@ -315,14 +320,22 @@ public sealed class WorkerIsolationTests
                 Succeeded,
                 ResourceId: $"module:{plan.ModuleHash}",
                 ErrorCode: ResultError?.Code,
-                Message: "worker execution completed"));
+                Message: "worker execution completed",
+                Fields: RunSummaryAuditFields.Create(
+                    plan,
+                    budget,
+                    ResultMode,
+                    "None",
+                    runtimeForm,
+                    cacheKey,
+                    ResultArtifactHash)));
 
             return ValueTask.FromResult(new SandboxExecutionResult
             {
                 Succeeded = Succeeded,
                 Value = Succeeded ? ResultValue : null,
                 Error = ResultError,
-                ResourceUsage = new ResourceMeter(plan.Budget).Snapshot(),
+                ResourceUsage = budget.Snapshot(),
                 AuditEvents = audit.Events,
                 ActualMode = ResultMode,
                 ModuleHash = ReturnWrongPlanIdentity ? "wrong-module" : plan.ModuleHash,
