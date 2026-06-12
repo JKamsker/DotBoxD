@@ -49,6 +49,7 @@ public sealed class GoldenCorpusTests
             module,
             SandboxPolicyBuilder.Create()
                 .GrantFileRead(temp.Path, 1024)
+                .WithWallTime(TimeSpan.FromSeconds(2))
                 .WithFuel(10_000)
                 .Build());
 
