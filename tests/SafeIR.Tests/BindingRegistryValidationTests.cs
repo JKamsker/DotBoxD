@@ -30,6 +30,40 @@ public sealed class BindingRegistryValidationTests
     }
 
     [Fact]
+    public void Binding_registry_rejects_empty_binding_id()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                id: "")));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_clr_looking_binding_id()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                id: "System.IO.File.ReadAllText")));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_clr_looking_required_capability()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                effects: SandboxEffect.FileRead,
+                requiredCapability: "System.IO.File")));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-CAP");
+    }
+
+    [Fact]
     public void Binding_registry_rejects_unsupported_compiled_target_kind()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
@@ -159,14 +193,16 @@ public sealed class BindingRegistryValidationTests
         CompiledBinding compiled,
         BindingSafety safety = BindingSafety.PureHostFacade,
         BindingCostModel? costModel = null,
-        SandboxEffect effects = SandboxEffect.Cpu)
+        SandboxEffect effects = SandboxEffect.Cpu,
+        string id = "test.binding",
+        string? requiredCapability = null)
         => new(
-            "test.binding",
+            id,
             SemVersion.One,
             [],
             SandboxType.Unit,
             effects,
-            null,
+            requiredCapability,
             costModel ?? BindingCostModel.Fixed(1),
             AuditLevel.None,
             safety,
