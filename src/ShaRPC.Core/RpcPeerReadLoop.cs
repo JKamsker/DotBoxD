@@ -8,6 +8,7 @@ namespace ShaRPC.Core;
 internal sealed class RpcPeerReadLoop
 {
     private readonly IRpcChannel _channel;
+    private readonly IRpcValueTaskChannel? _valueTaskChannel;
     private readonly RpcPeerInboundDispatcher _inbound;
     private readonly RpcPeerOutboundInvoker _outbound;
     private readonly RpcStreamManager _streams;
@@ -27,6 +28,7 @@ internal sealed class RpcPeerReadLoop
         Action<Exception?> disconnected)
     {
         _channel = channel;
+        _valueTaskChannel = channel as IRpcValueTaskChannel;
         _inbound = inbound;
         _outbound = outbound;
         _streams = streams;
@@ -67,7 +69,9 @@ internal sealed class RpcPeerReadLoop
             Payload frame;
             try
             {
-                frame = await _channel.ReceiveAsync(ct).ConfigureAwait(false);
+                frame = _valueTaskChannel is null
+                    ? await _channel.ReceiveAsync(ct).ConfigureAwait(false)
+                    : await _valueTaskChannel.ReceiveValueAsync(ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

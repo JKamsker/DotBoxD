@@ -6,12 +6,14 @@ namespace ShaRPC.Core;
 internal sealed class RpcPeerSender : IDisposable
 {
     private readonly IRpcChannel _channel;
+    private readonly IRpcValueTaskChannel? _valueTaskChannel;
     private readonly Func<bool> _isClosed;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     public RpcPeerSender(IRpcChannel channel, Func<bool> isClosed)
     {
         _channel = channel;
+        _valueTaskChannel = channel as IRpcValueTaskChannel;
         _isClosed = isClosed;
     }
 
@@ -42,7 +44,14 @@ internal sealed class RpcPeerSender : IDisposable
                 throw new ShaRpcConnectionException("Connection closed.");
             }
 
-            await _channel.SendAsync(data, ct).ConfigureAwait(false);
+            if (_valueTaskChannel is null)
+            {
+                await _channel.SendAsync(data, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await _valueTaskChannel.SendValueAsync(data, ct).ConfigureAwait(false);
+            }
         }
         finally
         {
