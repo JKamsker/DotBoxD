@@ -67,4 +67,55 @@ public sealed class PluginMessageBindingTests
         Assert.Equal(SandboxErrorCode.InvalidInput, result.Error!.Code);
         Assert.Empty(messages.Messages);
     }
+
+    [Fact]
+    public async Task Plugin_message_binding_redacts_audit_message_without_changing_sink_payload()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var host = Hosting.SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.AddPluginMessageBindings(messages);
+            builder.UseInterpreter();
+        });
+        var module = await host.ParseJsonAsync("""
+        {
+          "id": "plugin-message-redaction",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "game.message.write" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "call": "game.message.send",
+                    "args": [
+                      { "string": "player-1" },
+                      { "string": "token=abc123\nBearer secret-value" }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .GrantGameMessageWrite()
+            .WithFuel(10_000)
+            .Build());
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("token=abc123 Bearer secret-value", Assert.Single(messages.Messages).Message);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "PluginMessage");
+        Assert.Equal("token=[redacted] Bearer [redacted]", audit.Message);
+        Assert.Equal("32", audit.Fields!["messageLength"]);
+    }
 }

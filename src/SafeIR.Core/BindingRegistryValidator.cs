@@ -31,7 +31,7 @@ internal static class BindingRegistryValidator
     public static IReadOnlyList<SandboxDiagnostic> Validate(IReadOnlyList<BindingDescriptor> bindings)
     {
         var diagnostics = new List<SandboxDiagnostic>();
-        foreach (var group in bindings.GroupBy(b => b.Id, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        foreach (var group in bindings.GroupBy(b => b.Id, StringComparer.Ordinal).Where(g => g.Take(2).Count() > 1))
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-DUP", $"duplicate binding id '{group.Key}'"));
         }

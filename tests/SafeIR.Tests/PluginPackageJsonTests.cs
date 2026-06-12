@@ -33,6 +33,39 @@ public sealed class PluginPackageJsonTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-SCHEMA");
     }
 
+    [Theory]
+    [InlineData("Acme.Plugin.Kernel, Acme.Plugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")]
+    [InlineData("RuntimeTypeHandle")]
+    [InlineData("MetadataToken=06000001")]
+    public async Task InstallJsonAsync_rejects_manifest_loader_descriptors(string contract)
+    {
+        var server = PluginServer.Create();
+        var json = JsonDamagePackage().Replace(
+            "\"contract\": \"IEventKernel<DamageEvent>\"",
+            $"\"contract\": \"{contract}\"",
+            StringComparison.Ordinal);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallJsonAsync(json).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP050");
+    }
+
+    [Fact]
+    public async Task InstallJsonAsync_rejects_module_metadata_loader_descriptors()
+    {
+        var server = PluginServer.Create();
+        var json = JsonDamagePackage().Replace(
+            "\"metadata\": { \"pluginId\": \"json-fire-damage\" }",
+            "\"metadata\": { \"pluginId\": \"json-fire-damage\", \"rawIlBase64\": \"AAAA\" }",
+            StringComparison.Ordinal);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallJsonAsync(json).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-IR-CLR-REF");
+    }
+
     [Fact]
     public void Import_converts_live_setting_defaults_to_clr_scalars()
     {

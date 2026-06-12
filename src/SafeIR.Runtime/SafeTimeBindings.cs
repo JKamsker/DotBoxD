@@ -15,11 +15,12 @@ public static class SafeTimeBindings
         AuditLevel.PerCall,
         BindingSafety.ReadOnlyExternal,
         (context, _, _) => {
-            var value = context.UtcNow().ToUnixTimeMilliseconds();
+            var timestamp = context.UtcNow();
+            var value = timestamp.ToUnixTimeMilliseconds();
             context.Audit.Write(new SandboxAuditEvent(
                 context.RunId,
                 "BindingCall",
-                DateTimeOffset.UtcNow,
+                timestamp,
                 true,
                 BindingId: "time.nowUnixMillis",
                 CapabilityId: "time.now",

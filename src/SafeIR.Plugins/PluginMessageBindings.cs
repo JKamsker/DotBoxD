@@ -49,7 +49,11 @@ public static class PluginMessageBindings
                     CapabilityId: CapabilityId,
                     Effect: SandboxEffect.GameStateWrite,
                     ResourceId: $"player:{targetId}",
-                    Message: message));
+                    Message: AuditTextSanitizer.SanitizeAndRedact(message),
+                    Fields: new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["messageLength"] = message.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    }));
                 return SandboxValue.Unit;
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),

@@ -32,7 +32,8 @@ public sealed class TimeAndRandomTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(logicalNow.ToUnixTimeMilliseconds(), ((I64Value)result.Value!).Value);
-        Assert.Contains(result.AuditEvents, e => e.BindingId == "time.nowUnixMillis" && e.Success);
+        var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "time.nowUnixMillis" && e.Success);
+        Assert.Equal(logicalNow, audit.Timestamp);
     }
 
     [Fact]
@@ -52,6 +53,9 @@ public sealed class TimeAndRandomTests
         Assert.True(first.Succeeded);
         Assert.True(second.Succeeded);
         Assert.Equal(((I32Value)first.Value!).Value, ((I32Value)second.Value!).Value);
+        Assert.All(
+            first.AuditEvents.Where(e => e.BindingId == "random.nextI32"),
+            e => Assert.Equal(DateTimeOffset.UnixEpoch, e.Timestamp));
     }
 
     [Fact]

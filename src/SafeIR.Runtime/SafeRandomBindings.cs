@@ -18,10 +18,11 @@ public static class SafeRandomBindings
             var min = ((I32Value)args[0]).Value;
             var max = ((I32Value)args[1]).Value;
             var value = context.NextRandomInt32(min, max);
+            var timestamp = context.UtcNow();
             context.Audit.Write(new SandboxAuditEvent(
                 context.RunId,
                 "BindingCall",
-                DateTimeOffset.UtcNow,
+                timestamp,
                 true,
                 BindingId: "random.nextI32",
                 CapabilityId: "random",

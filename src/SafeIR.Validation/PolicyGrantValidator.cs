@@ -17,7 +17,7 @@ internal static class PolicyGrantValidator
             .ToArray();
         foreach (var group in activeGrants.GroupBy(g => g.Id, StringComparer.Ordinal))
         {
-            if (group.Count() > 1)
+            if (group.Take(2).Count() > 1)
             {
                 diagnostics.Add(new SandboxDiagnostic(
                     "E-POLICY-GRANT",

@@ -4,23 +4,8 @@ using SafeIR;
 
 internal static class DangerousReferenceDetector
 {
-    private static readonly string[] ForbiddenFragments = [
-        "System.", "Microsoft.", "Assembly.", "Type.", "Reflection.", "Process.",
-        "Environment.", "Thread.", "Task.", "DllImport", "IServiceProvider"
-    ];
-
-    private static readonly string[] ForbiddenIlFragments = [
-        "IL_", "ldtoken", "ldftn", "ldvirtftn", "calli"
-    ];
-
-    private static readonly string[] MetadataTokenPrefixes = [
-        "0x02", "0x04", "0x06", "0x0a", "0x1b", "0x23", "0x70"
-    ];
-
     public static bool IsDangerousReference(string value)
-        => ForbiddenFragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase)) ||
-           ForbiddenIlFragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase)) ||
-           ContainsMetadataToken(value);
+        => SandboxDescriptorGuards.ContainsForbiddenDescriptor(value);
 
     public static void Scan(Statement statement, List<SandboxDiagnostic> diagnostics)
     {
@@ -110,26 +95,4 @@ internal static class DangerousReferenceDetector
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", "forbidden CLR reference in literal", Span: literal.Span));
         }
     }
-
-    private static bool ContainsMetadataToken(string value)
-    {
-        for (var index = 0; index <= value.Length - 10; index++)
-        {
-            var candidate = value.Substring(index, 4);
-            if (!MetadataTokenPrefixes.Contains(candidate, StringComparer.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (Enumerable.Range(index + 4, 6).All(i => IsHex(value[i])))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsHex(char value)
-        => value is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
 }

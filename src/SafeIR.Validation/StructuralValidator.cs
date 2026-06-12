@@ -20,13 +20,18 @@ internal static class StructuralValidator
             CheckOptionalText(request.Reason, "capability reason", diagnostics);
         }
 
+        foreach (var group in module.CapabilityRequests.GroupBy(r => r.Id, StringComparer.Ordinal).Where(g => g.Take(2).Count() > 1))
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-CAP", $"duplicate capability request '{group.Key}'"));
+        }
+
         foreach (var item in module.Metadata)
         {
             CheckIdentifier(item.Key, "metadata key", diagnostics);
             CheckText(item.Value, "metadata value", diagnostics);
         }
 
-        foreach (var group in module.Functions.GroupBy(f => f.Id, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        foreach (var group in module.Functions.GroupBy(f => f.Id, StringComparer.Ordinal).Where(g => g.Take(2).Count() > 1))
         {
             diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-FN", $"duplicate function id '{group.Key}'"));
         }
@@ -46,7 +51,7 @@ internal static class StructuralValidator
     {
         CheckIdentifier(function.Id, "function id", diagnostics);
         CheckType(function.ReturnType, diagnostics);
-        foreach (var group in function.Parameters.GroupBy(p => p.Name, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        foreach (var group in function.Parameters.GroupBy(p => p.Name, StringComparer.Ordinal).Where(g => g.Take(2).Count() > 1))
         {
             diagnostics.Add(new SandboxDiagnostic("E-STRUCT-DUP-PARAM", $"duplicate parameter '{group.Key}' in function '{function.Id}'"));
         }

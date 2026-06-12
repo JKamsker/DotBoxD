@@ -11,6 +11,9 @@ internal static class PluginPackageValidator
             diagnostics.Add(new SandboxDiagnostic("SGP010", "Plugin id is required."));
         }
 
+        ValidateManifestText(package.Manifest.PluginId, "plugin id", diagnostics);
+        ValidateManifestText(package.Manifest.Contract, "plugin contract", diagnostics);
+
         if (!string.Equals(package.Manifest.PluginId, package.Module.Id, StringComparison.Ordinal)) {
             diagnostics.Add(new SandboxDiagnostic("SGP011", "Plugin manifest id must match module id."));
         }
@@ -23,12 +26,14 @@ internal static class PluginPackageValidator
         ValidateManifestEffects(package.Manifest, diagnostics);
         ValidateEntrypoints(package, diagnostics);
         foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal)) {
-            if (group.Count() > 1) {
+            if (group.Take(2).Count() > 1) {
                 diagnostics.Add(new SandboxDiagnostic("SGP021", $"Live setting '{group.Key}' is declared more than once."));
             }
         }
 
         foreach (var setting in package.Manifest.LiveSettings) {
+            ValidateManifestText(setting.Name, "live setting name", diagnostics);
+            ValidateManifestText(setting.Type, "live setting type", diagnostics);
             ValidateSetting(setting, diagnostics);
         }
 
@@ -40,6 +45,9 @@ internal static class PluginPackageValidator
             if (string.IsNullOrWhiteSpace(subscription.Event) || string.IsNullOrWhiteSpace(subscription.Kernel)) {
                 diagnostics.Add(new SandboxDiagnostic("SGP031", "Hook subscription event and kernel are required."));
             }
+
+            ValidateManifestText(subscription.Event, "hook subscription event", diagnostics);
+            ValidateManifestText(subscription.Kernel, "hook subscription kernel", diagnostics);
         }
 
         ThrowIfErrors(diagnostics);
@@ -78,8 +86,22 @@ internal static class PluginPackageValidator
             return;
         }
 
+        ValidateManifestText(functionId, $"kernel {name} entrypoint", diagnostics);
+
         if (!package.Module.Functions.Any(f => f.IsEntrypoint && string.Equals(f.Id, functionId, StringComparison.Ordinal))) {
             diagnostics.Add(new SandboxDiagnostic("SGP032", $"Kernel entrypoint '{functionId}' is missing or not public."));
+        }
+    }
+
+    private static void ValidateManifestText(string value, string description, List<SandboxDiagnostic> diagnostics)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl)) {
+            diagnostics.Add(new SandboxDiagnostic("SGP050", $"Plugin manifest {description} must be non-empty and must not contain control characters."));
+            return;
+        }
+
+        if (SandboxDescriptorGuards.ContainsForbiddenDescriptor(value)) {
+            diagnostics.Add(new SandboxDiagnostic("SGP050", $"Plugin manifest {description} looks like a forbidden CLR or IL descriptor."));
         }
     }
 
