@@ -12,23 +12,100 @@ internal static class SafeIrHandleModelFactory
         EquatableArray<LiveSettingModel> liveSettings)
     {
         var invocation = SingleSendInvocation(method, contextParameterName);
-        if (invocation.ArgumentList.Arguments.Count != 2) {
-            throw new NotSupportedException("Kernel Handle must call ctx.Messages.Send(targetId, message).");
-        }
-
+        var arguments = SendArguments(invocation);
         var target = SafeIrExpressionModelFactory.Create(
-            invocation.ArgumentList.Arguments[0].Expression,
+            arguments.Target,
             eventParameterName,
             eventProperties,
             liveSettings);
         var message = SafeIrExpressionModelFactory.Create(
-            invocation.ArgumentList.Arguments[1].Expression,
+            arguments.Message,
             eventParameterName,
             eventProperties,
             liveSettings);
         RequireString(target, "targetId");
         RequireString(message, "message");
         return new SafeIrHandleModel(target, message);
+    }
+
+    private static SendArgumentExpressions SendArguments(InvocationExpressionSyntax invocation)
+    {
+        var arguments = invocation.ArgumentList.Arguments;
+        if (arguments.Count != 2)
+        {
+            throw new NotSupportedException("Kernel Handle must call ctx.Messages.Send(targetId, message).");
+        }
+
+        ExpressionSyntax? target = null;
+        ExpressionSyntax? message = null;
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            var argument = arguments[i];
+            var name = argument.NameColon?.Name.Identifier.ValueText;
+            if (name is null)
+            {
+                AssignByPosition(i, argument.Expression, ref target, ref message);
+                continue;
+            }
+
+            AssignByName(name, argument.Expression, ref target, ref message);
+        }
+
+        return target is not null && message is not null
+            ? new SendArgumentExpressions(target, message)
+            : throw new NotSupportedException("Kernel Handle must call ctx.Messages.Send(targetId, message).");
+    }
+
+    private static void AssignByPosition(
+        int index,
+        ExpressionSyntax expression,
+        ref ExpressionSyntax? target,
+        ref ExpressionSyntax? message)
+    {
+        if (index == SafeIrGenerationNames.HookContext.SendTargetIndex)
+        {
+            Assign(SafeIrGenerationNames.HookContext.SendTargetArgument, expression, ref target);
+            return;
+        }
+
+        if (index == SafeIrGenerationNames.HookContext.SendMessageIndex)
+        {
+            Assign(SafeIrGenerationNames.HookContext.SendMessageArgument, expression, ref message);
+            return;
+        }
+
+        throw new NotSupportedException("Kernel Handle must call ctx.Messages.Send(targetId, message).");
+    }
+
+    private static void AssignByName(
+        string name,
+        ExpressionSyntax expression,
+        ref ExpressionSyntax? target,
+        ref ExpressionSyntax? message)
+    {
+        if (string.Equals(name, SafeIrGenerationNames.HookContext.SendTargetArgument, StringComparison.Ordinal))
+        {
+            Assign(name, expression, ref target);
+            return;
+        }
+
+        if (string.Equals(name, SafeIrGenerationNames.HookContext.SendMessageArgument, StringComparison.Ordinal))
+        {
+            Assign(name, expression, ref message);
+            return;
+        }
+
+        throw new NotSupportedException("Kernel Handle must call ctx.Messages.Send(targetId, message).");
+    }
+
+    private static void Assign(string name, ExpressionSyntax expression, ref ExpressionSyntax? slot)
+    {
+        if (slot is not null)
+        {
+            throw new NotSupportedException($"Kernel Handle has duplicate ctx.Messages.Send argument '{name}'.");
+        }
+
+        slot = expression;
     }
 
     private static InvocationExpressionSyntax SingleSendInvocation(
@@ -75,4 +152,6 @@ internal static class SafeIrHandleModelFactory
                 $"Kernel Handle {argumentName} argument must lower to a string expression.");
         }
     }
+
+    private sealed record SendArgumentExpressions(ExpressionSyntax Target, ExpressionSyntax Message);
 }

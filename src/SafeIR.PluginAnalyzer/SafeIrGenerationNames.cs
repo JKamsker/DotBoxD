@@ -102,6 +102,10 @@ internal static class SafeIrGenerationNames
     {
         public const string MessagesProperty = "Messages";
         public const string SendMethod = "Send";
+        public const string SendTargetArgument = "targetId";
+        public const string SendMessageArgument = "message";
+        public const int SendTargetIndex = 0;
+        public const int SendMessageIndex = 1;
     }
 
     public static class Helpers
