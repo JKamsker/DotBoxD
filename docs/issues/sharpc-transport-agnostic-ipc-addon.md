@@ -1,4 +1,6 @@
-# Feature Request: Make the ShaRPC IPC Addon Transport-Agnostic
+# Implemented: Make the ShaRPC IPC Addon Transport-Agnostic
+
+Status: implemented in `SafeIR.Transport.Ipc.ShaRpc`.
 
 ## Summary
 
@@ -6,9 +8,9 @@
 
 This keeps Safe-IR's addon boundary intact while letting hosts use named pipes, TCP, in-memory test transports, or future custom ShaRPC transports without changing the addon.
 
-## Current Friction
+## Original Friction
 
-The current addon shape is effectively named-pipe-specific:
+The original addon shape was effectively named-pipe-specific:
 
 ```csharp
 SafeIrShaRpcMessagePackIpc.ListenNamedPipe(...);
@@ -23,9 +25,9 @@ The client handle also owns a concrete `NamedPipeClientTransport`. That makes th
 - `RpcPeer`
 - `RpcHost`
 
-## Recommendation
+## Implemented Shape
 
-Add transport-agnostic overloads as the addon core:
+The addon core exposes transport-agnostic overloads:
 
 ```csharp
 public static RpcHost Listen(
@@ -39,7 +41,7 @@ public static Task<RpcPeerSession> ConnectAsync(
     CancellationToken cancellationToken = default);
 ```
 
-Then keep named-pipe methods as small convenience wrappers:
+Named-pipe methods remain small convenience wrappers:
 
 ```csharp
 public static RpcHost ListenNamedPipe(
@@ -96,6 +98,11 @@ Opening raw networking or arbitrary transport objects to sandboxed code would we
 - IPC examples still use named pipes by default.
 - A test or sample demonstrates using a non-named-pipe ShaRPC transport through the same addon API.
 
-## Package Note
+## Verification
 
-The branch currently references ShaRPC `1.0.0-ci.18`. Upgrade to a package containing the new `RpcPeerSession` / `ConnectPeerAsync` API before adopting this shape.
+- `ShaRpcIpcAddonTests.Generic_transport_api_connects_over_non_named_pipe_transport`
+  demonstrates the generic API over an in-memory test transport.
+- `ShaRpcIpcAddonTests.Configured_generic_client_can_provide_callback_services`
+  covers bidirectional client peer configuration.
+- `AddonBoundaryTests` keeps ShaRPC, MessagePack, and transport addon references out
+  of Safe-IR core/runtime/hosting projects.

@@ -12,7 +12,7 @@ public sealed class InstalledKernel
     private readonly ExecutionPlan _plan;
     private readonly ExecutionMode _executionMode;
     private readonly KernelEntrypoints _entrypoints;
-    private readonly List<LiveStateSynchronizer> _stateSynchronizers = [];
+    private readonly LiveStateSyncRegistry _liveStateSync;
     private readonly Dictionary<Type, object> _typedValues = [];
     private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
@@ -31,6 +31,7 @@ public sealed class InstalledKernel
         Manifest = package.Manifest;
         Value = LiveSettingStore.FromDefinitions(Manifest.LiveSettings);
         _entrypoints = package.Entrypoints;
+        _liveStateSync = new LiveStateSyncRegistry(GetUpdateMode);
     }
 
     public PluginPackage Package { get; }
@@ -42,7 +43,7 @@ public sealed class InstalledKernel
     public void Revoke() => Volatile.Write(ref _revoked, 1);
 
     internal void RegisterStateSynchronizer(Type stateType, Action synchronize)
-        => _stateSynchronizers.Add(new LiveStateSynchronizer(stateType, synchronize));
+        => _liveStateSync.Register(stateType, synchronize);
 
     internal TSettings GetTypedValue<TSettings>() where TSettings : class
     {
@@ -87,7 +88,7 @@ public sealed class InstalledKernel
 
     public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
     {
-        SynchronizeLiveStateForFlush();
+        _liveStateSync.SynchronizeForFlush();
         _pendingLiveUpdates.ClearError();
         await _pendingLiveUpdates.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -260,7 +261,7 @@ public sealed class InstalledKernel
 
     private SandboxValue BuildInput<TEvent>(IPluginEventAdapter<TEvent> adapter, TEvent e)
     {
-        var deferredUpdates = SynchronizeLiveStateForInput();
+        var deferredUpdates = _liveStateSync.SynchronizeForInput();
         var values = adapter.ToSandboxValues(e)
             .Concat(Value.ToSandboxValues(Manifest.LiveSettings))
             .ToArray();
@@ -291,34 +292,4 @@ public sealed class InstalledKernel
         }
     }
 
-    private List<Action> SynchronizeLiveStateForInput()
-    {
-        var deferredUpdates = new List<Action>();
-        foreach (var synchronize in _stateSynchronizers)
-        {
-            var mode = GetUpdateMode(synchronize.StateType);
-            if ((mode & LiveUpdateMode.AsyncSet) == LiveUpdateMode.AsyncSet)
-            {
-                deferredUpdates.Add(synchronize.Synchronize);
-                continue;
-            }
-
-            synchronize.Synchronize();
-        }
-
-        return deferredUpdates;
-    }
-
-    private void SynchronizeLiveStateForFlush()
-    {
-        foreach (var synchronize in _stateSynchronizers)
-        {
-            if ((GetUpdateMode(synchronize.StateType) & LiveUpdateMode.AsyncSet) == LiveUpdateMode.AsyncSet)
-            {
-                synchronize.Synchronize();
-            }
-        }
-    }
-
-    private sealed record LiveStateSynchronizer(Type StateType, Action Synchronize);
 }
