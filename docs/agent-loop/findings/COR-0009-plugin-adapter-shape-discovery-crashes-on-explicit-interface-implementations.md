@@ -1,22 +1,22 @@
 ---
 id: COR-0009
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Plugin adapter shape discovery crashes on explicit interface implementations
 dedup_key: correctness/plugins/adapter-registry/explicit-interface-shape-crash
 created_at: 2026-06-12T21:03:12.9666536+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T21:12:07.0798785+00:00
+updated_at: 2026-06-12T21:16:44.9818034+00:00
 claimed_by: fixer
 claimed_at: 2026-06-12T21:10:55.8738388+00:00
 claim_branch: workflow-work
 fixed_by: fixer
 fixed_at: 2026-06-12T21:12:07.0798785+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-12T21:16:44.9818034+00:00
 verified_commit: 
 duplicate_of: 
 ---

@@ -215,6 +215,60 @@
         "resolved": "4.7.0",
         "contentHash": "VybpaOQQhqE6siHppMktjfGBw1GCwvCqiufqmP8F1nj7fTUNtW35LOEt3UZTEsECfo+ELAl/9o9nJx3U91i7vA=="
       },
+      "safeir.compiler": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )",
+          "SafeIR.Verifier": "[0.1.0, )"
+        }
+      },
+      "safeir.core": {
+        "type": "Project"
+      },
+      "safeir.hosting": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Compiler": "[0.1.0, )",
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Interpreter": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )",
+          "SafeIR.Verifier": "[0.1.0, )"
+        }
+      },
+      "safeir.interpreter": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )"
+        }
+      },
+      "safeir.plugins": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Hosting": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )"
+        }
+      },
+      "safeir.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )"
+        }
+      },
+      "safeir.serialization.json": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Hosting": "[0.1.0, )",
+          "SafeIR.Plugins": "[0.1.0, )"
+        }
+      },
       "safeir.transport.ipc.sharpc": {
         "type": "Project",
         "dependencies": {
@@ -222,6 +276,19 @@
           "ShaRPC": "[1.0.0-ci.30, )",
           "ShaRPC.Serializers.MessagePack": "[1.0.0-ci.30, )",
           "ShaRPC.Transports.NamedPipes": "[1.0.0-ci.30, )"
+        }
+      },
+      "safeir.validation": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )"
+        }
+      },
+      "safeir.verifier": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )"
         }
       }
     }

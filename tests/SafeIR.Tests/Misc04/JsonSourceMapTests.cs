@@ -80,6 +80,38 @@ public sealed class JsonSourceMapTests
         Assert.Equal(LineOf(json, "{ \"op\": \"return\""), int.Parse(trace.Fields!["sourceLine"]));
     }
 
+    [Fact]
+    public void Repeated_literal_expressions_preserve_distinct_source_locations()
+    {
+        var json = """
+        {
+          "id": "repeated-source-map",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [
+                { "op": "set", "name": "first", "value": { "i32": 1 } },
+                { "op": "set", "name": "second", "value": { "i32": 1 } },
+                { "op": "return", "value": { "var": "second" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var module = SafeIrJsonImporter.Import(json);
+        var body = module.Functions.Single().Body;
+        var first = Assert.IsType<AssignmentStatement>(body[0]);
+        var second = Assert.IsType<AssignmentStatement>(body[1]);
+
+        Assert.Equal(LineOf(json, "\"value\": { \"i32\": 1 }"), first.Value.Span.Line);
+        Assert.Equal(LineOf(json, "\"value\": { \"i32\": 1 }", occurrence: 2), second.Value.Span.Line);
+    }
+
     private static int LineOf(string text, string marker, int occurrence = 1)
     {
         var index = -1;

@@ -22,14 +22,6 @@
   - File: `docs/agent-loop/findings/COR-0006-worker-result-validation-accepts-undefined-failure-error-codes.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
-- [~] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits
-  - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
-  - Fixed by: `fixer`
-  - Commit: ``
-- [~] `COR-0009` medium - Plugin adapter shape discovery crashes on explicit interface implementations
-  - File: `docs/agent-loop/findings/COR-0009-plugin-adapter-shape-discovery-crashes-on-explicit-interface-implementations.md`
-  - Fixed by: `fixer`
-  - Commit: ``
 
 ## Verified
 
@@ -39,6 +31,10 @@
   - File: `docs/agent-loop/findings/COR-0005-release-package-metadata-gate-splats-named-parameters-as-positional-strings.md`
 - [x] `COR-0001` medium - AgentQueue allows self-duplicate findings
   - File: `docs/agent-loop/findings/COR-0001-agentqueue-allows-self-duplicate-findings.md`
+- [x] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits
+  - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
+- [x] `COR-0009` medium - Plugin adapter shape discovery crashes on explicit interface implementations
+  - File: `docs/agent-loop/findings/COR-0009-plugin-adapter-shape-discovery-crashes-on-explicit-interface-implementations.md`
 
 ## Rejected / duplicate / obsolete
 

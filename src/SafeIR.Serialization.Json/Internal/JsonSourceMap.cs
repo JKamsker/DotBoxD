@@ -1,109 +1,144 @@
+using System.Text;
 using System.Text.Json;
 
 namespace SafeIR.Serialization.Json.Internal;
 
 internal sealed class JsonSourceMap
 {
-    private readonly string _json;
-    private readonly Dictionary<string, Queue<SourceSpan>> _spansByRawText;
+    private readonly Dictionary<JsonElement, SourceSpan> _spansByElement;
 
-    private JsonSourceMap(string json)
-    {
-        _json = json;
-        _spansByRawText = new Dictionary<string, Queue<SourceSpan>>(StringComparer.Ordinal);
-    }
+    private JsonSourceMap(Dictionary<JsonElement, SourceSpan> spansByElement)
+        => _spansByElement = spansByElement;
 
     public static JsonSourceMap Create(string json, JsonElement root)
     {
-        var map = new JsonSourceMap(json);
-        var cursor = 0;
-        map.Visit(root, ref cursor);
-        return map;
+        var tokenSpans = JsonTokenSpans.Read(json);
+        var spansByElement = new Dictionary<JsonElement, SourceSpan>();
+        var index = 0;
+        Visit(root, tokenSpans, spansByElement, ref index);
+        return new JsonSourceMap(spansByElement);
     }
 
     public SourceSpan SpanFor(JsonElement element)
+        => _spansByElement.TryGetValue(element, out var span) ? span : JsonImport.JsonSpan;
+
+    private static void Visit(
+        JsonElement element,
+        IReadOnlyList<SourceSpan> tokenSpans,
+        Dictionary<JsonElement, SourceSpan> spansByElement,
+        ref int index)
     {
-        var rawText = element.GetRawText();
-        if (_spansByRawText.TryGetValue(rawText, out var spans) && spans.Count > 0)
-        {
-            return spans.Dequeue();
-        }
-
-        var index = _json.IndexOf(rawText, StringComparison.Ordinal);
-        return index < 0 ? JsonImport.JsonSpan : SpanAt(index);
-    }
-
-    private void Visit(JsonElement element, ref int cursor)
-    {
-        var rawText = element.GetRawText();
-        var index = _json.IndexOf(rawText, cursor, StringComparison.Ordinal);
-        if (index < 0)
-        {
-            index = _json.IndexOf(rawText, StringComparison.Ordinal);
-        }
-
-        if (index >= 0)
-        {
-            Add(rawText, SpanAt(index));
-            cursor = Math.Max(cursor, index + 1);
-        }
+        spansByElement[element] = index < tokenSpans.Count ? tokenSpans[index++] : JsonImport.JsonSpan;
 
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
                 {
-                    Visit(property.Value, ref cursor);
+                    Visit(property.Value, tokenSpans, spansByElement, ref index);
                 }
 
                 break;
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
                 {
-                    Visit(item, ref cursor);
+                    Visit(item, tokenSpans, spansByElement, ref index);
                 }
 
                 break;
         }
     }
 
-    private void Add(string rawText, SourceSpan span)
+    private static class JsonTokenSpans
     {
-        if (!_spansByRawText.TryGetValue(rawText, out var spans))
+        public static IReadOnlyList<SourceSpan> Read(string json)
         {
-            spans = new Queue<SourceSpan>();
-            _spansByRawText.Add(rawText, spans);
-        }
-
-        spans.Enqueue(span);
-    }
-
-    private SourceSpan SpanAt(int index)
-    {
-        var line = 1;
-        var column = 1;
-        for (var i = 0; i < index; i++)
-        {
-            if (_json[i] == '\r')
+            var bytes = Encoding.UTF8.GetBytes(json);
+            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
             {
-                line++;
-                column = 1;
-                if (i + 1 < index && _json[i + 1] == '\n')
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 64
+            });
+            var positions = new SourcePositionTracker(json);
+            var spans = new List<SourceSpan>();
+            while (reader.Read())
+            {
+                if (IsValueToken(reader.TokenType))
                 {
-                    i++;
+                    spans.Add(positions.SpanAt(reader.TokenStartIndex));
                 }
             }
-            else if (_json[i] == '\n')
-            {
-                line++;
-                column = 1;
-            }
-            else
-            {
-                column++;
-            }
+
+            return spans;
         }
 
-        return new SourceSpan(line, column);
+        private static bool IsValueToken(JsonTokenType tokenType)
+            => tokenType is JsonTokenType.StartObject
+                or JsonTokenType.StartArray
+                or JsonTokenType.String
+                or JsonTokenType.Number
+                or JsonTokenType.True
+                or JsonTokenType.False
+                or JsonTokenType.Null;
+    }
+
+    private sealed class SourcePositionTracker
+    {
+        private readonly string _json;
+        private int _charIndex;
+        private long _byteOffset;
+        private int _line = 1;
+        private int _column = 1;
+
+        public SourcePositionTracker(string json)
+            => _json = json;
+
+        public SourceSpan SpanAt(long byteOffset)
+        {
+            while (_charIndex < _json.Length && _byteOffset < byteOffset)
+            {
+                Advance();
+            }
+
+            return new SourceSpan(_line, _column);
+        }
+
+        private void Advance()
+        {
+            var current = _json[_charIndex];
+            if (current == '\r')
+            {
+                AdvanceNewLine(charCount: IsCrLf() ? 2 : 1);
+                return;
+            }
+
+            if (current == '\n')
+            {
+                AdvanceNewLine(charCount: 1);
+                return;
+            }
+
+            var charCount = IsSurrogatePair() ? 2 : 1;
+            _byteOffset += Encoding.UTF8.GetByteCount(_json.AsSpan(_charIndex, charCount));
+            _charIndex += charCount;
+            _column += charCount;
+        }
+
+        private void AdvanceNewLine(int charCount)
+        {
+            _byteOffset += charCount;
+            _charIndex += charCount;
+            _line++;
+            _column = 1;
+        }
+
+        private bool IsCrLf()
+            => _charIndex + 1 < _json.Length && _json[_charIndex + 1] == '\n';
+
+        private bool IsSurrogatePair()
+            => char.IsHighSurrogate(_json[_charIndex]) &&
+                _charIndex + 1 < _json.Length &&
+                char.IsLowSurrogate(_json[_charIndex + 1]);
     }
 }

@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `ALG-0001` high - JSON source map import repeatedly searches raw text
-  - File: `docs/agent-loop/findings/ALG-0001-json-source-map-import-repeatedly-searches-raw-text.md`
-  - Dedup: `algorithm/json-import/source-map/repeated-rawtext-search`
 - [ ] `ALG-0002` medium - Collection mutations copy whole containers per update
   - File: `docs/agent-loop/findings/ALG-0002-collection-mutations-copy-whole-containers-per-update.md`
   - Dedup: `algorithm/collections/mutation/whole-container-copy`
@@ -25,6 +22,10 @@
 
 ## Fixed pending verification
 
+- [~] `ALG-0001` high - JSON source map import repeatedly searches raw text
+  - File: `docs/agent-loop/findings/ALG-0001-json-source-map-import-repeatedly-searches-raw-text.md`
+  - Fixed by: `fixer`
+  - Commit: ``
 
 ## Verified
 

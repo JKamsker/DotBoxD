@@ -1,22 +1,22 @@
 ---
 id: COR-0007
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: AgentQueue doctor accepts statuses the renderer omits
 dedup_key: correctness/agentqueue/status-case/doctor-render-mismatch
 created_at: 2026-06-12T21:01:06.1315345+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T21:10:23.7394084+00:00
+updated_at: 2026-06-12T21:16:58.1622359+00:00
 claimed_by: fixer
 claimed_at: 2026-06-12T21:09:25.9540023+00:00
 claim_branch: workflow-work
 fixed_by: fixer
 fixed_at: 2026-06-12T21:10:23.7394084+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: independent-verifier
+verified_at: 2026-06-12T21:16:58.1622359+00:00
 verified_commit: 
 duplicate_of: 
 ---

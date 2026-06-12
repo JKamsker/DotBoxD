@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
+    <ProjectReference Include="..\..\src\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
