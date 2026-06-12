@@ -1,6 +1,5 @@
 namespace SafeIR.Hosting;
 
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using SafeIR;
 using SafeIR.Compiler;
@@ -16,7 +15,7 @@ public sealed partial class SandboxHost : IDisposable
     private readonly Action<SandboxAuditEvent>? _auditObserver;
     private readonly SandboxWorkerExecutor _workerExecutor;
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
-    private readonly ConcurrentDictionary<string, int> _autoRuns = new(StringComparer.Ordinal);
+    private readonly AutoExecutionHotness _autoHotness = new();
     private readonly CompiledExecutableCache _compiledExecutables = new();
     private int _disposed;
 
@@ -132,51 +131,6 @@ public sealed partial class SandboxHost : IDisposable
         }
 
         return result;
-    }
-
-    private async ValueTask<SandboxExecutionResult> ExecuteAutoAsync(
-        ExecutionPlan plan,
-        string entrypoint,
-        SandboxValue input,
-        SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
-    {
-        if (_compiler is null || options.EnableDebugTrace)
-        {
-            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        var key = plan.PlanHash + "|" + entrypoint;
-        var count = _autoRuns.AddOrUpdate(key, 1, (_, current) => current + 1);
-        if (count == 1)
-        {
-            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        var decision = _modeSelector.Choose(
-            plan,
-            options,
-            new ModuleHotnessStats(count),
-            SafeIR.Compiler.CompiledCacheStatus.None);
-        if (decision.Mode == ExecutionMode.Interpreted ||
-            decision.Mode == ExecutionMode.Auto ||
-            !CanCompileEntrypoint(plan, entrypoint))
-        {
-            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (decision.Mode != ExecutionMode.Compiled)
-        {
-            return InvalidExecutionOptionsResult(
-                plan,
-                options,
-                $"execution mode selector returned unsupported mode '{(int)decision.Mode}'");
-        }
-
-        return await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
-            .ConfigureAwait(false);
     }
 
     private async ValueTask<SandboxExecutionResult> ExecuteCompiledAsync(

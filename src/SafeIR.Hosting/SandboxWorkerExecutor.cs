@@ -29,7 +29,11 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                     timeout.Token)
                 .ConfigureAwait(false);
             return ValidateWorkerResult(plan, entrypoint, options, result, out var error)
-                ? result with { AuditEvents = result.AuditEvents.ToSequencedArray() }
+                ? result with
+                {
+                    AuditEvents = result.AuditEvents.ToSequencedArray(),
+                    ExecutionDispatched = true
+                }
                 : SandboxHost.WorkerIsolationFailedResult(
                     plan,
                     options,

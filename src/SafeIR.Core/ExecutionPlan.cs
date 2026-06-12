@@ -102,6 +102,7 @@ public sealed record SandboxExecutionResult
     public required SandboxResourceUsage ResourceUsage { get; init; }
     public required IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
     public ExecutionMode ActualMode { get; init; }
+    public bool ExecutionDispatched { get; init; }
     public required string ModuleHash { get; init; }
     public required string PlanHash { get; init; }
     public required string PolicyHash { get; init; }

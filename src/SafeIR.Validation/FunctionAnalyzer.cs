@@ -244,8 +244,7 @@ internal sealed class FunctionAnalyzer
             return SandboxType.Unit;
         }
 
-        Require(operand, SandboxType.I32, unary.Span);
-        return SandboxType.I32;
+        return AnalyzeNumericUnary(unary, operand);
     }
 
     private SandboxType AnalyzeBinary(
@@ -265,9 +264,7 @@ internal sealed class FunctionAnalyzer
 
         if (binary.Operator is "<" or "<=" or ">" or ">=")
         {
-            Require(left, SandboxType.I32, binary.Span);
-            Require(right, SandboxType.I32, binary.Span);
-            return SandboxType.Bool;
+            return AnalyzeNumericBinary(binary, left, right, comparison: true);
         }
 
         if (binary.Operator is "&&" or "||")
@@ -283,9 +280,39 @@ internal sealed class FunctionAnalyzer
             return SandboxType.Unit;
         }
 
-        Require(left, SandboxType.I32, binary.Span);
-        Require(right, SandboxType.I32, binary.Span);
-        return SandboxType.I32;
+        return AnalyzeNumericBinary(binary, left, right, comparison: false);
+    }
+
+    private SandboxType AnalyzeNumericUnary(UnaryExpression unary, SandboxType operand)
+    {
+        if (IsNumeric(operand))
+        {
+            return operand;
+        }
+
+        _diagnostics.Add(new SandboxDiagnostic(
+            "E-TYPE-MISMATCH",
+            $"expected numeric operand, got {operand}",
+            Span: unary.Span));
+        return SandboxType.Unit;
+    }
+
+    private SandboxType AnalyzeNumericBinary(
+        BinaryExpression binary,
+        SandboxType left,
+        SandboxType right,
+        bool comparison)
+    {
+        if (left == right && IsNumeric(left))
+        {
+            return comparison ? SandboxType.Bool : left;
+        }
+
+        _diagnostics.Add(new SandboxDiagnostic(
+            "E-TYPE-MISMATCH",
+            $"expected matching numeric operands, got {left} and {right}",
+            Span: binary.Span));
+        return comparison ? SandboxType.Bool : SandboxType.Unit;
     }
 
     private SandboxType AnalyzeCall(
@@ -408,6 +435,9 @@ internal sealed class FunctionAnalyzer
         => binding.Safety == BindingSafety.PureIntrinsic && IsPure(binding.Effects);
 
     private static bool IsPure(SandboxEffect effects) => (effects & ~SandboxEffects.Pure) == SandboxEffect.None;
+
+    private static bool IsNumeric(SandboxType type)
+        => type == SandboxType.I32 || type == SandboxType.I64 || type == SandboxType.F64;
 
     private void Require(SandboxType actual, SandboxType expected, SourceSpan span)
     {

@@ -7,38 +7,45 @@ internal static class SafeIrExpressionModelFactory
 {
     public static SafeIrExpressionModel Create(
         ExpressionSyntax expression,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
-        => Lower(expression, eventParameterName, eventProperties, liveSettings);
+        SafeIrExpressionLoweringContext context)
+        => Lower(expression, context);
 
     private static SafeIrExpressionModel Lower(
         ExpressionSyntax expression,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
-        => expression switch {
-            ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, eventParameterName, eventProperties, liveSettings),
-            PrefixUnaryExpressionSyntax unary => LowerUnary(unary, eventParameterName, eventProperties, liveSettings),
-            BinaryExpressionSyntax binary => LowerBinary(binary, eventParameterName, eventProperties, liveSettings),
-            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, liveSettings),
-            MemberAccessExpressionSyntax member => LowerMemberAccess(member, eventParameterName, eventProperties, liveSettings),
+        SafeIrExpressionLoweringContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (SafeIrConstantExpressionLowerer.TryLower(
+                expression,
+                context.SemanticModel,
+                context.CancellationToken) is { } constant)
+        {
+            return constant;
+        }
+
+        return expression switch {
+            ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, context),
+            PrefixUnaryExpressionSyntax unary => LowerUnary(unary, context),
+            BinaryExpressionSyntax binary => LowerBinary(binary, context),
+            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, context.LiveSettings),
+            MemberAccessExpressionSyntax member => LowerMemberAccess(member, context),
+            InterpolatedStringExpressionSyntax interpolated =>
+                SafeIrInterpolatedStringExpressionLowerer.Lower(interpolated, part => Lower(part, context)),
             LiteralExpressionSyntax literal => SafeIrLiteralExpressionLowerer.Lower(literal),
             _ => Unsupported(expression)
         };
+    }
 
     private static SafeIrExpressionModel LowerUnary(
         PrefixUnaryExpressionSyntax unary,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
         if (SafeIrLiteralExpressionLowerer.TryLowerNegative(unary) is { } literal)
         {
             return literal;
         }
 
-        var operand = Lower(unary.Operand, eventParameterName, eventProperties, liveSettings);
+        var operand = Lower(unary.Operand, context);
         return unary.Kind() switch {
             SyntaxKind.LogicalNotExpression => Unary(
                 SafeIrGenerationNames.Helpers.Not,
@@ -46,12 +53,10 @@ internal static class SafeIrExpressionModelFactory
                 operand,
                 SafeIrGenerationNames.ManifestTypes.Bool,
                 SafeIrGenerationNames.ManifestTypes.Bool),
-            SyntaxKind.UnaryMinusExpression => Unary(
+            SyntaxKind.UnaryMinusExpression => SafeIrNumericExpressionLowerer.Unary(
                 SafeIrGenerationNames.Helpers.Neg,
                 SafeIrGenerationNames.Operators.Minus,
-                operand,
-                SafeIrGenerationNames.ManifestTypes.Int,
-                SafeIrGenerationNames.ManifestTypes.Int),
+                operand),
             _ => Unsupported(unary)
         };
     }
@@ -69,12 +74,11 @@ internal static class SafeIrExpressionModelFactory
 
     private static SafeIrExpressionModel LowerBinary(
         BinaryExpressionSyntax binary,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
-        var left = Lower(binary.Left, eventParameterName, eventProperties, liveSettings);
-        var right = Lower(binary.Right, eventParameterName, eventProperties, liveSettings);
+        var left = Lower(binary.Left, context);
+        var right = Lower(binary.Right, context);
+        SafeIrNumericConstantPromoter.Promote(binary, context, ref left, ref right);
         var allocates = left.Allocates || right.Allocates;
 
         return binary.Kind() switch {
@@ -90,33 +94,33 @@ internal static class SafeIrExpressionModelFactory
                 left,
                 right,
                 allocates),
-            SyntaxKind.GreaterThanOrEqualExpression => IntBinary(
+            SyntaxKind.GreaterThanOrEqualExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Ge,
                 SafeIrGenerationNames.Operators.GreaterThanOrEqual,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Bool,
+                comparison: true,
                 allocates),
-            SyntaxKind.GreaterThanExpression => IntBinary(
+            SyntaxKind.GreaterThanExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Gt,
                 SafeIrGenerationNames.Operators.GreaterThan,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Bool,
+                comparison: true,
                 allocates),
-            SyntaxKind.LessThanOrEqualExpression => IntBinary(
+            SyntaxKind.LessThanOrEqualExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Le,
                 SafeIrGenerationNames.Operators.LessThanOrEqual,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Bool,
+                comparison: true,
                 allocates),
-            SyntaxKind.LessThanExpression => IntBinary(
+            SyntaxKind.LessThanExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Lt,
                 SafeIrGenerationNames.Operators.LessThan,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Bool,
+                comparison: true,
                 allocates),
             SyntaxKind.LogicalAndExpression => BoolBinary(
                 SafeIrGenerationNames.Helpers.And,
@@ -131,33 +135,33 @@ internal static class SafeIrExpressionModelFactory
                 right,
                 allocates),
             SyntaxKind.AddExpression => AddBinary(left, right, allocates),
-            SyntaxKind.SubtractExpression => IntBinary(
+            SyntaxKind.SubtractExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Sub,
                 SafeIrGenerationNames.Operators.Minus,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Int,
+                comparison: false,
                 allocates),
-            SyntaxKind.MultiplyExpression => IntBinary(
+            SyntaxKind.MultiplyExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Mul,
                 SafeIrGenerationNames.Operators.Multiply,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Int,
+                comparison: false,
                 allocates),
-            SyntaxKind.DivideExpression => IntBinary(
+            SyntaxKind.DivideExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Div,
                 SafeIrGenerationNames.Operators.Divide,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Int,
+                comparison: false,
                 allocates),
-            SyntaxKind.ModuloExpression => IntBinary(
+            SyntaxKind.ModuloExpression => NumericBinary(
                 SafeIrGenerationNames.Helpers.Mod,
                 SafeIrGenerationNames.Operators.Modulo,
                 left,
                 right,
-                SafeIrGenerationNames.ManifestTypes.Int,
+                comparison: false,
                 allocates),
             _ => Unsupported(binary)
         };
@@ -178,15 +182,16 @@ internal static class SafeIrExpressionModelFactory
 
         if (IsString(left) || IsString(right))
         {
-            throw new NotSupportedException("Operator '+' requires both operands to be strings or both operands to be ints.");
+            throw new NotSupportedException(
+                "Operator '+' requires both operands to be strings or matching numeric operands.");
         }
 
-        return IntBinary(
+        return NumericBinary(
             SafeIrGenerationNames.Helpers.Add,
             SafeIrGenerationNames.Operators.Add,
             left,
             right,
-            SafeIrGenerationNames.ManifestTypes.Int,
+            comparison: false,
             allocates);
     }
 
@@ -208,18 +213,14 @@ internal static class SafeIrExpressionModelFactory
             allocates);
     }
 
-    private static SafeIrExpressionModel IntBinary(
+    private static SafeIrExpressionModel NumericBinary(
         string helper,
         string symbol,
         SafeIrExpressionModel left,
         SafeIrExpressionModel right,
-        string resultType,
+        bool comparison,
         bool allocates)
-    {
-        RequireType(left, SafeIrGenerationNames.ManifestTypes.Int, $"Operator '{symbol}'");
-        RequireType(right, SafeIrGenerationNames.ManifestTypes.Int, $"Operator '{symbol}'");
-        return new SafeIrExpressionModel($"{helper}({left.Source}, {right.Source})", resultType, allocates);
-    }
+        => SafeIrNumericExpressionLowerer.Binary(helper, symbol, left, right, comparison, allocates);
 
     private static SafeIrExpressionModel BoolBinary(
         string helper,
@@ -255,15 +256,13 @@ internal static class SafeIrExpressionModelFactory
 
     private static SafeIrExpressionModel LowerMemberAccess(
         MemberAccessExpressionSyntax member,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
         var memberName = member.Name.Identifier.ValueText;
         if (member.Expression is IdentifierNameSyntax identifier &&
-            string.Equals(identifier.Identifier.ValueText, eventParameterName, StringComparison.Ordinal)) {
-            for (var i = 0; i < eventProperties.Count; i++) {
-                var property = eventProperties[i];
+            string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
+            for (var i = 0; i < context.EventProperties.Count; i++) {
+                var property = context.EventProperties[i];
                 if (string.Equals(property.Name, memberName, StringComparison.Ordinal)) {
                     return new SafeIrExpressionModel(
                         $"{SafeIrGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
@@ -276,7 +275,7 @@ internal static class SafeIrExpressionModelFactory
         }
 
         if (member.Expression is ThisExpressionSyntax) {
-            return LowerIdentifier(memberName, liveSettings);
+            return LowerIdentifier(memberName, context.LiveSettings);
         }
 
         return Unsupported(member);

@@ -24,7 +24,10 @@ internal static class SafeIrPackageSourceEmitter
     private static string HintName(PluginKernelModel model)
         => string.IsNullOrWhiteSpace(model.Namespace)
             ? model.PackageName + ".g.cs"
-            : model.Namespace + "." + model.PackageName + ".g.cs";
+            : HintNamePart(model.Namespace) + "." + model.PackageName + ".g.cs";
+
+    private static string HintNamePart(string value)
+        => value.Replace(SafeIrGenerationNames.CSharpIdentifiers.EscapePrefix, string.Empty);
 
     private static void EmitBody(StringBuilder builder, PluginKernelModel model)
     {
@@ -121,7 +124,7 @@ internal static class SafeIrPackageSourceEmitter
             .AppendLine("(global::System.Collections.Generic.IReadOnlyList<global::SafeIR.Parameter> parameters)");
         builder.AppendLine("        => new(");
         builder.AppendLine($"            {LiteralReader.StringLiteral(SafeIrGenerationNames.Entrypoints.ShouldHandle)}, true, parameters, global::SafeIR.SandboxType.Bool,");
-        builder.AppendLine($"            [new global::SafeIR.ReturnStatement({model.ShouldHandle.Source}, Span)]);");
+        builder.AppendLine($"            {model.ShouldHandle.Source});");
         builder.AppendLine();
         builder.Append("    private static global::SafeIR.SandboxFunction ")
             .Append(SafeIrGenerationNames.Entrypoints.Handle)

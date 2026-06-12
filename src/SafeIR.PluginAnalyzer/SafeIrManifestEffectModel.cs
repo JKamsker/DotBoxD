@@ -18,7 +18,7 @@ internal static class SafeIrManifestEffectModel
         });
 
     public static EquatableArray<string> Create(
-        SafeIrExpressionModel shouldHandle,
+        SafeIrStatementBodyModel shouldHandle,
         SafeIrHandleModel handle)
     {
         return shouldHandle.Allocates || handle.Allocates

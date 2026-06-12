@@ -61,6 +61,12 @@ public sealed record VerificationPolicy(
                 RuntimeMember("DivI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("RemI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("NegI32", SandboxValueName, SandboxValueName),
+                RuntimeMember("Neg", SandboxValueName, SandboxValueName),
+                RuntimeMember("Add", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Sub", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Mul", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Div", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Rem", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("NotBool", SandboxValueName, SandboxValueName),
                 RuntimeMember("Eq", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("Ne", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
@@ -68,6 +74,10 @@ public sealed record VerificationPolicy(
                 RuntimeMember("LteI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("GtI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("GteI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Lt", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Lte", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Gt", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Gte", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("And", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("Or", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("StringLength", SandboxValueName, SandboxValueName),
@@ -101,7 +111,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "safe-ir-verifier-6");
+            "safe-ir-verifier-7");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 

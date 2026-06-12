@@ -16,25 +16,32 @@ internal static class PluginKernelModelFactory
         }
 
         var pluginId = PluginSymbolReader.PluginId(context.Attributes);
-        var eventType = PluginSymbolReader.EventType(type);
+        var eventTypes = PluginSymbolReader.EventTypes(type);
         if (string.IsNullOrWhiteSpace(pluginId)) {
-            var diagnostic = Diagnostic.Create(
-                PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
-                declaration.Identifier.GetLocation(),
+            var diagnostic = PluginKernelDiagnostic.Create(
+                declaration.Identifier,
                 "GamePlugin id must be a non-empty string.");
             return new PluginKernelModelResult(null, diagnostic);
         }
 
-        var validatedPluginId = pluginId!;
-        if (eventType is null)
+        if (eventTypes.Count == 0)
         {
-            var diagnostic = Diagnostic.Create(
-                PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
-                declaration.Identifier.GetLocation(),
+            var diagnostic = PluginKernelDiagnostic.Create(
+                declaration.Identifier,
                 "Game plugins must implement IEventKernel<TEvent>.");
             return new PluginKernelModelResult(null, diagnostic);
         }
 
+        if (eventTypes.Count > 1)
+        {
+            var diagnostic = PluginKernelDiagnostic.Create(
+                declaration.Identifier,
+                "Game plugins must implement exactly one IEventKernel<TEvent>.");
+            return new PluginKernelModelResult(null, diagnostic);
+        }
+
+        var validatedPluginId = pluginId!;
+        var eventType = eventTypes[0];
         try
         {
             var shouldHandle = InterfaceMethodSyntax(context, type, SafeIrGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
@@ -50,6 +57,8 @@ internal static class PluginKernelModelFactory
             {
                 throw new NotSupportedException("Live settings must use supported scalar types.");
             }
+
+            ValidateGeneratedParameterNames(eventProperties, liveSettings);
 
             var eventParameterName = shouldHandle.ParameterList.Parameters
                 .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.EventIndex)
@@ -67,22 +76,24 @@ internal static class PluginKernelModelFactory
                 .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.ContextIndex)
                 ?.Identifier.ValueText ??
                 SafeIrGenerationNames.DefaultContextParameterName;
-            var shouldHandleExpression = SafeIrExpressionModelFactory.Create(
-                ReturnExpression(shouldHandle),
+            var shouldHandleContext = new SafeIrExpressionLoweringContext(
                 eventParameterName,
                 eventProperties,
-                liveSettings);
-            if (!string.Equals(shouldHandleExpression.Type, SafeIrGenerationNames.ManifestTypes.Bool, StringComparison.Ordinal))
-            {
-                throw new NotSupportedException("Kernel ShouldHandle must lower to a bool expression.");
-            }
+                liveSettings,
+                context.SemanticModel,
+                cancellationToken);
+            var shouldHandleBody = SafeIrConditionBodyModelFactory.Create(
+                ReturnExpression(shouldHandle),
+                shouldHandleContext);
 
             var handleModel = SafeIrHandleModelFactory.Create(
                 handle,
                 handleEventParameterName,
                 handleContextParameterName,
                 eventProperties,
-                liveSettings);
+                liveSettings,
+                context.SemanticModel,
+                cancellationToken);
             var model = new PluginKernelModel(
                 PluginId: validatedPluginId,
                 Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
@@ -95,18 +106,40 @@ internal static class PluginKernelModelFactory
                 HandleContextParameterName: handleContextParameterName,
                 EventProperties: eventProperties,
                 LiveSettings: liveSettings,
-                ShouldHandle: shouldHandleExpression,
+                ShouldHandle: shouldHandleBody,
                 Handle: handleModel,
-                ManifestEffects: SafeIrManifestEffectModel.Create(shouldHandleExpression, handleModel));
+                ManifestEffects: SafeIrManifestEffectModel.Create(shouldHandleBody, handleModel));
             return new PluginKernelModelResult(model, null);
         }
         catch (NotSupportedException ex)
         {
-            var diagnostic = Diagnostic.Create(
-                PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
-                declaration.Identifier.GetLocation(),
-                ex.Message);
+            var diagnostic = PluginKernelDiagnostic.Create(declaration.Identifier, ex.Message);
             return new PluginKernelModelResult(null, diagnostic);
+        }
+    }
+
+    private static void ValidateGeneratedParameterNames(
+        EquatableArray<EventPropertyModel> eventProperties,
+        EquatableArray<LiveSettingModel> liveSettings)
+    {
+        var eventParameterNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in eventProperties)
+        {
+            var parameterName = SafeIrExpressionModelFactory.EventVariable(property.Name);
+            if (!eventParameterNames.Add(parameterName))
+            {
+                throw new NotSupportedException(
+                    $"Event property '{property.Name}' generates duplicate parameter '{parameterName}'.");
+            }
+        }
+
+        foreach (var setting in liveSettings)
+        {
+            if (eventParameterNames.Contains(setting.Name))
+            {
+                throw new NotSupportedException(
+                    $"Live setting '{setting.Name}' conflicts with a generated event parameter.");
+            }
         }
     }
 

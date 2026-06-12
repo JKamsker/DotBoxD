@@ -35,6 +35,8 @@ MapId
 Notes:
 
 - `String` is a sandbox string value, not permission to use arbitrary `System.String` APIs.
+- `I32`, `I64`, and `F64` are distinct numeric types. Arithmetic and ordering operations
+  require operands of the same numeric type and never perform implicit numeric conversion.
 - `F32`, `Decimal`, and `Bytes` are not recognized type IDs until the runtime has matching
   sandbox values, quota rules, and interpreter/compiler support.
 

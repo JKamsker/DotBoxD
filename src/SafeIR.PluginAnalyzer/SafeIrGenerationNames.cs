@@ -55,6 +55,11 @@ internal static class SafeIrGenerationNames
         public const string DoubleRoundTripFormat = "R";
     }
 
+    public static class CSharpIdentifiers
+    {
+        public const string EscapePrefix = "@";
+    }
+
     public static class ManifestTypes
     {
         public const string Bool = "bool";
@@ -132,6 +137,12 @@ internal static class SafeIrGenerationNames
         public const string Mul = "Mul";
         public const string Div = "Div";
         public const string Mod = "Mod";
+    }
+
+    public static class IrTypes
+    {
+        public const string IfStatement = "global::SafeIR.IfStatement";
+        public const string ReturnStatement = "global::SafeIR.ReturnStatement";
     }
 
     public static class BindingIds

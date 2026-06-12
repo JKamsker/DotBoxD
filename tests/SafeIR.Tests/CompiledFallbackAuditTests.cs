@@ -73,12 +73,75 @@ public sealed class CompiledFallbackAuditTests
             e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.VerifierFailure);
     }
 
+    [Fact]
+    public async Task Compiled_effectful_binding_falls_back_to_interpreter_when_allowed()
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var plan = await PrepareLogPlanAsync(host);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
+        Assert.Equal(1, result.ResourceUsage.HostCalls);
+        Assert.Contains(result.AuditEvents, IsFallback(SandboxErrorCode.ValidationError));
+        Assert.Contains(result.AuditEvents, e => e.Kind == "SandboxLog" && e.BindingId == "log.info" && e.Success);
+    }
+
+    [Fact]
+    public async Task Compiled_effectful_binding_fails_closed_when_fallback_disabled()
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var plan = await PrepareLogPlanAsync(host);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Equal(0, result.ResourceUsage.HostCalls);
+        Assert.Contains("pure modules only", result.Error.SafeMessage, StringComparison.Ordinal);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "CompiledExecutionFailed");
+        Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "SandboxLog");
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteCompiledAsync(SandboxHost host, ExecutionPlan plan)
         => await host.ExecuteAsync(
             plan,
             "main",
             SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
             new SandboxExecutionOptions { Mode = ExecutionMode.Compiled });
+
+    private static async Task<ExecutionPlan> PrepareLogPlanAsync(SandboxHost host)
+    {
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "compiled-effectful-log",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "log.write", "reason": "test" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [{ "op": "return", "value": { "call": "log.info", "args": [{ "string": "hello" }] } }]
+            }
+          ]
+        }
+        """);
+        return await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().GrantLogging().WithFuel(1_000).Build());
+    }
 
     private static Predicate<SandboxAuditEvent> IsFallback(SandboxErrorCode code)
         => e => e.Kind == "ExecutionFallback" &&
