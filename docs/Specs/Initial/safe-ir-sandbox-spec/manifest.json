@@ -29,13 +29,13 @@
     },
     {
       "path": "checklists/release-readiness.md",
-      "sha256": "06b5d37132ad8c423907393179890f0fdeb68b352bbffea822092ef14427ac10",
-      "bytes": 2043
+      "sha256": "0913db8b7bbd8ed19959ebf9285d224bdcf2cb43423cb152490a4268ae5f5d25",
+      "bytes": 2160
     },
     {
       "path": "checklists/security-review.md",
-      "sha256": "ca0c15710772fc9aaf67c3e5292967a016a9158dcb2e9f033740a5d39a7402b3",
-      "bytes": 3655
+      "sha256": "ae967f403f86423329b4a43548734dc907f734f990ac6d5c0d281d3b0501ed36",
+      "bytes": 3684
     },
     {
       "path": "examples/example-binding-manifest.md",
@@ -49,8 +49,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "2d1d80a438194652e19adc43e70ad5a07646d423cf22bc63e065f5f3024692ce",
-      "bytes": 4387
+      "sha256": "dface1c5d089db46ee0dc572bf5b6f0480d4a10cf52442a81090f61a39e07e8c",
+      "bytes": 4529
     },
     {
       "path": "references.md",
@@ -114,8 +114,8 @@
     },
     {
       "path": "spec/11-generated-code-verifier.md",
-      "sha256": "dbfd7c23a04d9d4cbfe044467e612e7d296167ed8cf1471108e885e7c55efc37",
-      "bytes": 7171
+      "sha256": "17a1373793d0d1beb5bf9e0f3bcb5529a2886ad41bd2f5fb11ee28fcd66b229e",
+      "bytes": 8134
     },
     {
       "path": "spec/12-resource-limits.md",
@@ -124,13 +124,13 @@
     },
     {
       "path": "spec/13-cache-versioning.md",
-      "sha256": "3ddbedc691fc871960579ff404d4fa6dd0ebbd0e370fcaa8256c6df69f074744",
-      "bytes": 5313
+      "sha256": "97f345a820a637a2df4560d9804858c985defa7034e41218c100b5d529bf2407",
+      "bytes": 5396
     },
     {
       "path": "spec/14-observability-audit.md",
-      "sha256": "47701033424bc634a55775cb4dc4abb3b8b631813c4238262d8eed0f56010486",
-      "bytes": 5020
+      "sha256": "2086367cb6cc71056814b05a3f45b14b824f0fea05f20c6f3e888da297bd58ae",
+      "bytes": 5387
     },
     {
       "path": "spec/15-testing-red-team.md",
