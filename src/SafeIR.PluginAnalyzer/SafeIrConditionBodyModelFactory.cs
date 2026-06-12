@@ -11,6 +11,13 @@ internal static class SafeIrConditionBodyModelFactory
         SafeIrExpressionLoweringContext context)
         => LowerCondition(expression, ReturnBool(value: true), ReturnBool(value: false), context);
 
+    public static SafeIrStatementBodyModel CreateBranch(
+        ExpressionSyntax condition,
+        SafeIrStatementBodyModel whenTrue,
+        SafeIrStatementBodyModel whenFalse,
+        SafeIrExpressionLoweringContext context)
+        => LowerCondition(condition, whenTrue, whenFalse, context);
+
     private static SafeIrStatementBodyModel LowerCondition(
         ExpressionSyntax expression,
         SafeIrStatementBodyModel whenTrue,

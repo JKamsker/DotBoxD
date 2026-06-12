@@ -83,9 +83,7 @@ internal static class PluginKernelModelFactory
                 liveSettings,
                 context.SemanticModel,
                 cancellationToken);
-            var shouldHandleBody = SafeIrConditionBodyModelFactory.Create(
-                ReturnExpression(shouldHandle),
-                shouldHandleContext);
+            var shouldHandleBody = SafeIrShouldHandleBodyModelFactory.Create(shouldHandle, shouldHandleContext);
 
             var handleModel = SafeIrHandleModelFactory.Create(
                 handle,
@@ -186,21 +184,4 @@ internal static class PluginKernelModelFactory
                 SafeIrGenerationNames.PluginPackageSuffix
             : kernelName + SafeIrGenerationNames.PluginPackageSuffix;
 
-    private static ExpressionSyntax ReturnExpression(MethodDeclarationSyntax method)
-    {
-        if (method.ExpressionBody?.Expression is { } expression)
-        {
-            return expression;
-        }
-
-        if (method.Body is null ||
-            method.Body.Statements.Count != 1 ||
-            method.Body.Statements[0] is not ReturnStatementSyntax ret ||
-            ret.Expression is null)
-        {
-            throw new NotSupportedException("Kernel ShouldHandle must return exactly one expression.");
-        }
-
-        return ret.Expression;
-    }
 }
