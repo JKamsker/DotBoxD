@@ -223,8 +223,12 @@ public static class CompiledRuntime
         RequireType(key, typedMap.KeyType, "map key type mismatch");
         context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count, addedCount: 1));
         RequireType(value, typedMap.ValueType, "map value type mismatch");
-        var count = typedMap.Values.ContainsKey(key) ? typedMap.Values.Count : typedMap.Values.Count + 1;
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
+        var addedCount = typedMap.Values.ContainsKey(key) ? 0 : 1;
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(
+            typedMap.Values.Count,
+            addedCount,
+            bytesPerElement: 32,
+            minimumOne: true));
         var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values)
         {
             [key] = value

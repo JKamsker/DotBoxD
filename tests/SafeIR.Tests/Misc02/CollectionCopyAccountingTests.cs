@@ -11,6 +11,11 @@ public sealed class CollectionCopyAccountingTests
             int.MaxValue,
             addedCount: 1,
             bytesPerElement: 16));
+        Assert.Equal(68_719_476_736, SandboxCollectionFuel.AllocationBytes(
+            int.MaxValue,
+            addedCount: 1,
+            bytesPerElement: 32,
+            minimumOne: true));
         Assert.Equal(68_719_476_704, SandboxCollectionFuel.AllocationBytes(int.MaxValue, 32, minimumOne: true));
     }
 
