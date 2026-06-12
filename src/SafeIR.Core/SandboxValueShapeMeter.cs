@@ -2,7 +2,10 @@ namespace SafeIR;
 
 internal static class SandboxValueShapeMeter
 {
-    public static ValueShape Measure(SandboxValue value, ResourceLimits? limits = null)
+    public static ValueShape Measure(
+        SandboxValue value,
+        ResourceLimits? limits = null,
+        CancellationToken cancellationToken = default)
     {
         var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var stack = new Stack<Frame>();
@@ -10,6 +13,7 @@ internal static class SandboxValueShapeMeter
         stack.Push(new Frame(value, Depth: 0, Exit: false));
         while (stack.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var frame = stack.Pop();
             if (frame.Exit)
             {

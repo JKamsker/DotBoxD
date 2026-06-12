@@ -4,7 +4,7 @@ public sealed class SandboxContext
 {
     private Random? _random;
     private int _callDepth;
-    private readonly Stack<Dictionary<string, int>> _bindingStringReturnCredits = new();
+    private readonly BindingReturnCreditTracker _returnCredits = new();
 
     public SandboxContext(
         SandboxRunId runId,
@@ -84,26 +84,24 @@ public sealed class SandboxContext
         }
     }
 
-    public void ChargeAllocation(long bytes) => Budget.ChargeAllocation(bytes);
+    public void ChargeAllocation(long bytes)
+    {
+        CancellationToken.ThrowIfCancellationRequested();
+        Budget.ChargeAllocation(bytes);
+    }
 
-    public void ChargeCollection(SandboxValue value) => Budget.ChargeCollection(value);
+    public void ChargeCollection(SandboxValue value) => Budget.ChargeCollection(value, CancellationToken);
 
-    public void ChargeValue(SandboxValue value) => Budget.ChargeValue(value);
+    public void ChargeValue(SandboxValue value) => Budget.ChargeValue(value, CancellationToken);
 
     public void ChargeString(string value)
     {
+        CancellationToken.ThrowIfCancellationRequested();
         Budget.ChargeString(value);
-        if (_bindingStringReturnCredits.TryPeek(out var credits))
-        {
-            credits[value] = credits.TryGetValue(value, out var count) ? count + 1 : 1;
-        }
+        _returnCredits.RecordString(value);
     }
 
-    public IDisposable BeginBindingReturnCreditScope()
-    {
-        _bindingStringReturnCredits.Push(new Dictionary<string, int>(StringComparer.Ordinal));
-        return new BindingReturnCreditScope(this);
-    }
+    public IDisposable BeginBindingReturnCreditScope() => _returnCredits.BeginScope();
 
     public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
 
@@ -173,7 +171,7 @@ public sealed class SandboxContext
             $"binding '{descriptor.Id}' returned an unexpected value type");
 
         var bytes = BindingReturnCost.MeasureBytes(value);
-        if (!TryConsumeStringReturnCredit(value))
+        if (!_returnCredits.TryConsume(value))
         {
             ChargeValue(value);
         }
@@ -204,51 +202,6 @@ public sealed class SandboxContext
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.QuotaExceeded,
                 "binding return fuel budget exhausted"));
-        }
-    }
-
-    private bool TryConsumeStringReturnCredit(SandboxValue value)
-    {
-        if (value is not StringValue text ||
-            !_bindingStringReturnCredits.TryPeek(out var credits) ||
-            !credits.TryGetValue(text.Value, out var count))
-        {
-            return false;
-        }
-
-        if (count == 1)
-        {
-            credits.Remove(text.Value);
-        }
-        else
-        {
-            credits[text.Value] = count - 1;
-        }
-
-        return true;
-    }
-
-    private void EndBindingReturnCreditScope()
-    {
-        if (_bindingStringReturnCredits.Count > 0)
-        {
-            _bindingStringReturnCredits.Pop();
-        }
-    }
-
-    private sealed class BindingReturnCreditScope(SandboxContext context) : IDisposable
-    {
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            context.EndBindingReturnCreditScope();
-            _disposed = true;
         }
     }
 
