@@ -29,7 +29,11 @@ public static class CompiledRuntime
         return value;
     }
 
+    public static SandboxValue Unit() => SandboxValue.Unit;
+
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
+
+    public static SandboxValue I64(long value) => SandboxValue.FromInt64(value);
 
     public static SandboxValue F64(double value)
         => double.IsFinite(value)
@@ -50,6 +54,24 @@ public static class CompiledRuntime
     {
         context.ChargeString(value);
         return SandboxValue.FromString(value);
+    }
+
+    public static SandboxValue OpaqueIdConst(SandboxContext context, string typeName, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromOpaqueId(typeName, value);
+    }
+
+    public static SandboxValue PathConst(SandboxContext context, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromPath(value);
+    }
+
+    public static SandboxValue UriConst(SandboxContext context, string value)
+    {
+        context.ChargeString(value);
+        return SandboxValue.FromUri(value);
     }
 
     public static int AsI32(SandboxValue value) => ((I32Value)value).Value;

@@ -23,6 +23,7 @@ public sealed record VerificationPolicy(
     private const string Void = "System.Void";
     private const string Boolean = "System.Boolean";
     private const string Int32 = "System.Int32";
+    private const string Int64 = "System.Int64";
     private const string Double = "System.Double";
     private const string String = "System.String";
 
@@ -38,7 +39,7 @@ public sealed record VerificationPolicy(
                 AssemblyIdentity("SafeIR.Runtime", SafeIrAssemblyVersion(), "neutral", "null")
             },
             new HashSet<string>(StringComparer.Ordinal) {
-                "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.String",
+                "System.Object", "System.Void", "System.Boolean", "System.Int32", "System.Int64", "System.String",
                 "System.Double",
                 "SafeIR.SandboxValue", "SafeIR.SandboxContext", "SafeIR.SandboxType", "SafeIR.Runtime.CompiledRuntime"
             },
@@ -50,13 +51,18 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ValidateEntrypointInput", $"{Value},{Int32}", Void),
                 RuntimeMember("GetInputArgument", $"{Value},{Int32},{Int32},{SandboxType}", Value),
                 RuntimeMember("RequireValueType", $"{Value},{SandboxType}", Value),
+                RuntimeMember("Unit", "", Value),
                 RuntimeMember("I32", Int32, Value),
+                RuntimeMember("I64", Int64, Value),
                 RuntimeMember("F64", Double, Value),
                 RuntimeMember("Bool", Boolean, Value),
                 RuntimeMember("TypeScalar", String, SandboxType),
                 RuntimeMember("TypeList", SandboxType, SandboxType),
                 RuntimeMember("TypeMap", $"{SandboxType},{SandboxType}", SandboxType),
                 RuntimeMember("StringConst", $"{Context},{String}", Value),
+                RuntimeMember("OpaqueIdConst", $"{Context},{String},{String}", Value),
+                RuntimeMember("PathConst", $"{Context},{String}", Value),
+                RuntimeMember("UriConst", $"{Context},{String}", Value),
                 RuntimeMember("AsI32", Value, Int32),
                 RuntimeMember("AsBool", Value, Boolean),
                 RuntimeMember("AsF64", Value, Double),
@@ -106,7 +112,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "safe-ir-verifier-5");
+            "safe-ir-verifier-6");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 

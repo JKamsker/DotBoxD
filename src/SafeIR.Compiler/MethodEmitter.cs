@@ -193,9 +193,16 @@ internal sealed class MethodEmitter
     {
         switch (value)
         {
+            case UnitValue:
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Unit)));
+                break;
             case I32Value i32:
                 EmitInt32(_il, i32.Value);
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
+                break;
+            case I64Value i64:
+                _il.Emit(OpCodes.Ldc_I8, i64.Value);
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I64)));
                 break;
             case BoolValue boolean:
                 EmitInt32(_il, boolean.Value ? 1 : 0);
@@ -209,6 +216,22 @@ internal sealed class MethodEmitter
                 _il.Emit(OpCodes.Ldarg_0);
                 _il.Emit(OpCodes.Ldstr, text.Value);
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringConst)));
+                break;
+            case OpaqueIdValue id:
+                _il.Emit(OpCodes.Ldarg_0);
+                _il.Emit(OpCodes.Ldstr, id.TypeName);
+                _il.Emit(OpCodes.Ldstr, id.Value);
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.OpaqueIdConst)));
+                break;
+            case SandboxPathValue path:
+                _il.Emit(OpCodes.Ldarg_0);
+                _il.Emit(OpCodes.Ldstr, path.Value.RelativePath);
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.PathConst)));
+                break;
+            case SandboxUriValue uri:
+                _il.Emit(OpCodes.Ldarg_0);
+                _il.Emit(OpCodes.Ldstr, uri.Value.Value);
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.UriConst)));
                 break;
             default:
                 throw Unsupported("literal not supported by compiler");

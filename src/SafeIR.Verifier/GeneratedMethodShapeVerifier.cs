@@ -64,6 +64,7 @@ internal static class GeneratedMethodShapeVerifier
             diagnostics.Add(new VerificationDiagnostic("V-COMPILED-SHAPE", "Execute must not contain control-flow branches"));
         }
 
+        VerifyExecuteReturnShape(analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.CalledMember is not null))
         {
             if (instruction.IsLocalCall)
@@ -113,6 +114,7 @@ internal static class GeneratedMethodShapeVerifier
         VerifyMeterOrder(methodName, analysis, diagnostics);
         VerifyPositiveMeterAmounts(methodName, analysis, diagnostics);
         VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
+        VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.IsLocalCall))
         {
@@ -228,6 +230,43 @@ internal static class GeneratedMethodShapeVerifier
             diagnostics.Add(new VerificationDiagnostic(
                 "V-COMPILED-SHAPE",
                 $"method '{methodName}' must meter each runtime work call"));
+        }
+    }
+
+    private static void VerifyInstructionMeterDensity(
+        string methodName,
+        GeneratedMethodFlow analysis,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        if (GeneratedMethodMeterAnalyzer.HasSparseMeterPath(analysis, IsFuelMeter))
+        {
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-COMPILED-SHAPE",
+                $"method '{methodName}' must not execute long instruction sequences without fuel metering"));
+        }
+    }
+
+    private static void VerifyExecuteReturnShape(
+        GeneratedMethodFlow analysis,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        for (var i = 0; i < analysis.Instructions.Count; i++)
+        {
+            var instruction = analysis.Instructions[i];
+            if (instruction.Opcode != ILOpCode.Ret || !analysis.EntryStates.ContainsKey(instruction.Offset))
+            {
+                continue;
+            }
+
+            var previous = i > 0 ? analysis.Instructions[i - 1] : null;
+            if (previous is null ||
+                !previous.IsLocalCall ||
+                !IsGeneratedFunctionCall(previous.CalledMember))
+            {
+                diagnostics.Add(new VerificationDiagnostic(
+                    "V-COMPILED-SHAPE",
+                    "Execute must directly return the generated function result"));
+            }
         }
     }
 

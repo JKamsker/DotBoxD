@@ -39,6 +39,7 @@ internal sealed class MethodSignatureNameProvider : ISignatureTypeProvider<strin
             PrimitiveTypeCode.Void => "System.Void",
             PrimitiveTypeCode.Boolean => "System.Boolean",
             PrimitiveTypeCode.Int32 => "System.Int32",
+            PrimitiveTypeCode.Int64 => "System.Int64",
             PrimitiveTypeCode.String => "System.String",
             PrimitiveTypeCode.Double => "System.Double",
             PrimitiveTypeCode.Object => "System.Object",
