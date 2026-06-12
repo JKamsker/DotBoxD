@@ -4,6 +4,9 @@
 
 ## Open
 
+- [ ] `API-0009` high - Public packages lack an API compatibility baseline gate
+  - File: `docs/agent-loop/findings/API-0009-public-packages-lack-an-api-compatibility-baseline-gate.md`
+  - Dedup: `api/package-release/public-api-compatibility-baseline-missing`
 - [ ] `API-0003` medium - Plugin JSON upload helpers are omitted from package surface guidance
   - File: `docs/agent-loop/findings/API-0003-plugin-json-upload-helpers-are-omitted-from-package-surface-guidance.md`
   - Dedup: `api-plugin-json-upload-package-guidance`
@@ -19,6 +22,9 @@
 - [ ] `API-0007` medium - NuGet package readme lacks install and package-composition guidance
   - File: `docs/agent-loop/findings/API-0007-nuget-package-readme-lacks-install-and-package-composition-guidance.md`
   - Dedup: `api/nuget-readme/missing-install-package-composition-guidance`
+- [ ] `API-0008` medium - Plugin analyzer package lacks public diagnostic reference
+  - File: `docs/agent-loop/findings/API-0008-plugin-analyzer-package-lacks-public-diagnostic-reference.md`
+  - Dedup: `api/plugin-analyzer/diagnostic-reference/missing-public-docs`
 
 ## Claimed
 

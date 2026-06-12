@@ -116,6 +116,41 @@ public sealed class SafeFileSystemReparsePointTests
         }
     }
 
+    [Fact]
+    public async Task File_write_denies_precreated_temp_reparse_point()
+    {
+        using var root = TempDirectory.Create();
+        using var outside = TempDirectory.Create();
+        var outsideFile = Path.Combine(outside.Path, "secret.txt");
+        await File.WriteAllTextAsync(outsideFile, "original");
+        var tempLink = Path.Combine(root.Path, "target.txt.tmp-known");
+        var directoryLink = false;
+        if (!TryCreateFileLink(tempLink, outsideFile)) {
+            directoryLink = true;
+            Assert.True(
+                TryCreateDirectoryLink(tempLink, outside.Path),
+                "Unable to create a temp file symlink or directory reparse point for the test.");
+        }
+
+        try {
+            using var _ = Runtime.SafeFileSystem.UseTempSuffixForTests("known");
+            var result = await ExecuteWriteAsync(root.Path, "target.txt", "new");
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+            Assert.Equal("original", await File.ReadAllTextAsync(outsideFile));
+            Assert.False(File.Exists(Path.Combine(root.Path, "target.txt")));
+        }
+        finally {
+            if (directoryLink) {
+                TryDeleteDirectoryLink(tempLink);
+            }
+            else {
+                TryDeleteFileLink(tempLink);
+            }
+        }
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteReadAsync(string root, string path)
     {
         var host = SandboxTestHost.Create();
@@ -133,7 +168,7 @@ public sealed class SafeFileSystemReparsePointTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson(path, text));
         var policy = FilePolicyBuilder()
-            .GrantFileWrite(root, 1024)
+            .GrantFileWrite(root, 1024, allowCreate: true, allowOverwrite: true)
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);

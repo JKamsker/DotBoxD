@@ -119,7 +119,7 @@ public sealed class SafeFileSystemTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("out/result.txt", "written"));
         var policy = FilePolicyBuilder()
-            .GrantFileWrite(temp.Path, 1024)
+            .GrantFileWrite(temp.Path, 1024, allowCreate: true, allowOverwrite: false)
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
@@ -168,13 +168,65 @@ public sealed class SafeFileSystemTests
     }
 
     [Fact]
+    public async Task File_write_default_builder_grant_denies_create_and_overwrite()
+    {
+        using var temp = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
+        var host = SandboxTestHost.Create();
+        var createModule = await host.ImportJsonAsync(FileWriteJson("missing.txt", "new"));
+        var overwriteModule = await host.ImportJsonAsync(FileWriteJson("existing.txt", "new"));
+        var policy = FilePolicyBuilder()
+            .GrantFileWrite(temp.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+
+        var createPlan = await host.PrepareAsync(createModule, policy);
+        var overwritePlan = await host.PrepareAsync(overwriteModule, policy);
+        var create = await host.ExecuteAsync(createPlan, "main", SandboxValue.Unit);
+        var overwrite = await host.ExecuteAsync(overwritePlan, "main", SandboxValue.Unit);
+
+        Assert.False(create.Succeeded);
+        Assert.False(overwrite.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, create.Error!.Code);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, overwrite.Error!.Code);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
+        Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
+    }
+
+    [Fact]
+    public async Task File_write_direct_grant_without_modes_denies_create()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(FileWriteJson("missing.txt", "new"));
+        var policy = new SandboxPolicy(
+            "direct-file-write",
+            SandboxEffects.Pure | SandboxEffect.FileWrite | SandboxEffect.Audit,
+            [
+                new CapabilityGrant("file.write", new Dictionary<string, string>
+                {
+                    ["root"] = temp.Path,
+                    ["maxBytesPerRun"] = "1024"
+                })
+            ],
+            new ResourceLimits(MaxFuel: 5_000, MaxFileBytesWritten: 1024));
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
+    }
+
+    [Fact]
     public async Task File_write_respects_byte_quota_before_writing()
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("too-large.txt", "0123456789"));
         var policy = FilePolicyBuilder()
-            .GrantFileWrite(temp.Path, maxBytesPerRun: 4)
+            .GrantFileWrite(temp.Path, maxBytesPerRun: 4, allowCreate: true, allowOverwrite: false)
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
@@ -193,7 +245,7 @@ public sealed class SafeFileSystemTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("alloc-too-large.txt", "abcde"));
         var policy = FilePolicyBuilder()
-            .GrantFileWrite(temp.Path, maxBytesPerRun: 1024)
+            .GrantFileWrite(temp.Path, maxBytesPerRun: 1024, allowCreate: true, allowOverwrite: false)
             .WithMaxAllocatedBytes(12)
             .WithFuel(5_000)
             .Build();

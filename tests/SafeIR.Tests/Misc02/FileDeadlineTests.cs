@@ -29,7 +29,7 @@ public sealed class FileDeadlineTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("result.txt", "value"));
         var policy = SandboxPolicyBuilder.Create()
-            .GrantFileWrite(temp.Path, 1024)
+            .GrantFileWrite(temp.Path, 1024, allowCreate: true, allowOverwrite: false)
             .WithWallTime(TimeSpan.Zero)
             .WithFuel(5_000)
             .Build();

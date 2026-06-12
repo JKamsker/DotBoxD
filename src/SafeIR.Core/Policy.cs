@@ -110,8 +110,8 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder GrantFileWrite(
         string root,
         long maxBytesPerRun,
-        bool allowCreate = true,
-        bool allowOverwrite = true)
+        bool allowCreate = false,
+        bool allowOverwrite = false)
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
         var normalizedRoot = NormalizeFileRoot(root, nameof(root));

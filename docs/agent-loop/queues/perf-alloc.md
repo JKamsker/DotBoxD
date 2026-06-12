@@ -22,6 +22,18 @@
 - [ ] `PAL-0018` medium - Binding return charging traverses large values repeatedly
   - File: `docs/agent-loop/findings/PAL-0018-binding-return-charging-traverses-large-values-repeatedly.md`
   - Dedup: `alloc/binding-return/quota/type-shape-triple-traversal`
+- [ ] `PAL-0019` medium - Canonical module hashing materializes nested records before hashing
+  - File: `docs/agent-loop/findings/PAL-0019-canonical-module-hashing-materializes-nested-records-before-hashing.md`
+  - Dedup: `alloc/canonical-module-hash/nested-record-materialization`
+- [ ] `PAL-0020` medium - Policy hash recomputes canonical grant records on every access
+  - File: `docs/agent-loop/findings/PAL-0020-policy-hash-recomputes-canonical-grant-records-on-every-access.md`
+  - Dedup: `alloc/policy-hash/recompute-per-access`
+- [ ] `PAL-0021` medium - Execution result audit events are copied multiple times
+  - File: `docs/agent-loop/findings/PAL-0021-execution-result-audit-events-are-copied-multiple-times.md`
+  - Dedup: `alloc/audit-events/result-double-copy`
+- [ ] `PAL-0022` medium - File grants are reparsed on every file binding call
+  - File: `docs/agent-loop/findings/PAL-0022-file-grants-are-reparsed-on-every-file-binding-call.md`
+  - Dedup: `alloc/file-grants/runtime/parameter-reparse-per-call`
 - [ ] `PAL-0010` low - Persistent compiled cache leaves lock files per cache key
   - File: `docs/agent-loop/findings/PAL-0010-persistent-compiled-cache-leaves-lock-files-per-cache-key.md`
   - Dedup: `alloc/compiler-cache/file-locks/persistent-key-files`

@@ -10,8 +10,8 @@ internal static class SafeFileWritePublisher
         string fullPath,
         long byteCount)
     {
-        var allowCreate = ReadBool(grant, "allowCreate", fallback: true);
-        var allowOverwrite = ReadBool(grant, "allowOverwrite", fallback: true);
+        var allowCreate = ReadBool(grant, "allowCreate", fallback: false);
+        var allowOverwrite = ReadBool(grant, "allowOverwrite", fallback: false);
         var exists = File.Exists(fullPath);
         if (exists && !allowOverwrite) {
             throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: overwrite is not allowed");

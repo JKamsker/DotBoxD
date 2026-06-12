@@ -6,6 +6,8 @@ using SafeIR;
 
 public static class SafeFileSystem
 {
+    private static readonly AsyncLocal<Func<string>?> TempSuffixFactory = new();
+
     public static async ValueTask<string> ReadTextAsync(
         SandboxContext context,
         SandboxPath path,
@@ -83,12 +85,18 @@ public static class SafeFileSystem
 
             EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             SafeFileWritePublisher.EnsureParentDirectory(resolved.RootFull, resolved.FullPath, permission);
-            var tempPath = resolved.FullPath + ".tmp-" + Guid.NewGuid().ToString("N");
+            var tempPath = resolved.FullPath + ".tmp-" + CreateTempSuffix();
             try
             {
-                await File.WriteAllBytesAsync(tempPath, bytes, timeout.Token).ConfigureAwait(false);
+                await using (var temp = SafeFileNoFollow.CreateNewWrite(tempPath))
+                {
+                    await temp.WriteAsync(bytes, timeout.Token).ConfigureAwait(false);
+                    await temp.FlushAsync(timeout.Token).ConfigureAwait(false);
+                }
+
                 context.CancellationToken.ThrowIfCancellationRequested();
                 context.Budget.CheckDeadline();
+                EnsureNoReparsePoint(resolved.RootFull, tempPath);
                 EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
                 SafeFileWritePublisher.PublishTempFile(tempPath, resolved.FullPath, permission);
                 context.Budget.CheckDeadline();
@@ -235,6 +243,16 @@ public static class SafeFileSystem
         }
     }
 
+    internal static IDisposable UseTempSuffixForTests(string suffix)
+    {
+        var previous = TempSuffixFactory.Value;
+        TempSuffixFactory.Value = () => suffix;
+        return new TempSuffixScope(previous);
+    }
+
+    private static string CreateTempSuffix()
+        => TempSuffixFactory.Value?.Invoke() ?? Guid.NewGuid().ToString("N");
+
     private static void CheckAttributes(string path)
     {
         var attributes = File.GetAttributes(path);
@@ -291,4 +309,9 @@ public static class SafeFileSystem
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
     private sealed record ResolvedPath(CapabilityGrant Grant, string RootFull, string FullPath, string SanitizedPath);
+
+    private sealed class TempSuffixScope(Func<string>? previous) : IDisposable
+    {
+        public void Dispose() => TempSuffixFactory.Value = previous;
+    }
 }

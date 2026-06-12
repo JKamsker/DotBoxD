@@ -13,12 +13,6 @@
 - [ ] `COR-0018` high - Plugin kernel revocation does not fence already-running handlers
   - File: `docs/agent-loop/findings/COR-0018-plugin-kernel-revocation-does-not-fence-already-running-handlers.md`
   - Dedup: `security/plugins/revocation/in-flight-handler-not-fenced`
-- [ ] `COR-0020` high - File write grants default to create-and-overwrite authority
-  - File: `docs/agent-loop/findings/COR-0020-file-write-grants-default-to-create-and-overwrite-authority.md`
-  - Dedup: `security/file-write/grant-defaults/create-overwrite`
-- [ ] `COR-0021` high - File write temp publication can follow a raced reparse point
-  - File: `docs/agent-loop/findings/COR-0021-file-write-temp-publication-can-follow-a-raced-reparse-point.md`
-  - Dedup: `security/file-write/temp-publication/reparse-race`
 - [ ] `COR-0010` medium - Compiled executable cache lets first caller cancellation poison shared materialization
   - File: `docs/agent-loop/findings/COR-0010-compiled-executable-cache-lets-first-caller-cancellation-poison-shared-materiali.md`
   - Dedup: `correctness/compiled-cache/shared-materialization/first-caller-cancellation-poisons-waiters`
@@ -31,6 +25,15 @@
 - [ ] `COR-0017` medium - String byte quota accounting overflows before widening large text lengths
   - File: `docs/agent-loop/findings/COR-0017-string-byte-quota-accounting-overflows-before-widening-large-text-lengths.md`
   - Dedup: `correctness/resource-meter/string-byte-count-overflow-before-widening`
+- [ ] `COR-0022` medium - Worker audit validation accepts undefined non-summary error codes
+  - File: `docs/agent-loop/findings/COR-0022-worker-audit-validation-accepts-undefined-non-summary-error-codes.md`
+  - Dedup: `correctness/hosting/worker-audit/undefined-non-summary-error-code`
+- [ ] `COR-0023` medium - Run summaries expose unsanitized policy IDs
+  - File: `docs/agent-loop/findings/COR-0023-run-summaries-expose-unsanitized-policy-ids.md`
+  - Dedup: `security/audit/run-summary/policy-id-unredacted`
+- [ ] `COR-0024` medium - Module validation results expose mutable analysis collections
+  - File: `docs/agent-loop/findings/COR-0024-module-validation-results-expose-mutable-analysis-collections.md`
+  - Dedup: `correctness/validation/module-result/mutable-analysis-collections`
 
 ## Claimed
 
@@ -41,6 +44,14 @@
   - File: `docs/agent-loop/findings/COR-0004-http-allowlist-entries-can-expand-through-comma-delimited-grant-serialization.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
+- [~] `COR-0020` high - File write grants default to create-and-overwrite authority
+  - File: `docs/agent-loop/findings/COR-0020-file-write-grants-default-to-create-and-overwrite-authority.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `COR-0021` high - File write temp publication can follow a raced reparse point
+  - File: `docs/agent-loop/findings/COR-0021-file-write-temp-publication-can-follow-a-raced-reparse-point.md`
+  - Fixed by: `worker`
+  - Commit: ``
 - [~] `COR-0003` medium - Package metadata check fails on stale packages left in output directory
   - File: `docs/agent-loop/findings/COR-0003-package-metadata-check-fails-on-stale-packages-left-in-output-directory.md`
   - Fixed by: `implementer`
@@ -49,18 +60,6 @@
   - File: `docs/agent-loop/findings/COR-0006-worker-result-validation-accepts-undefined-failure-error-codes.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
-- [~] `COR-0013` medium - Path-shaped audit resources bypass secret redaction
-  - File: `docs/agent-loop/findings/COR-0013-path-shaped-audit-resources-bypass-secret-redaction.md`
-  - Fixed by: `worker`
-  - Commit: ``
-- [~] `COR-0014` medium - Public audit and error payloads expose mutable collection inputs
-  - File: `docs/agent-loop/findings/COR-0014-public-audit-and-error-payloads-expose-mutable-collection-inputs.md`
-  - Fixed by: `worker`
-  - Commit: ``
-- [~] `COR-0019` medium - Capability revocation audit reasons bypass secret redaction
-  - File: `docs/agent-loop/findings/COR-0019-capability-revocation-audit-reasons-bypass-secret-redaction.md`
-  - Fixed by: `worker`
-  - Commit: ``
 
 ## Verified
 
@@ -74,6 +73,12 @@
   - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
 - [x] `COR-0009` medium - Plugin adapter shape discovery crashes on explicit interface implementations
   - File: `docs/agent-loop/findings/COR-0009-plugin-adapter-shape-discovery-crashes-on-explicit-interface-implementations.md`
+- [x] `COR-0013` medium - Path-shaped audit resources bypass secret redaction
+  - File: `docs/agent-loop/findings/COR-0013-path-shaped-audit-resources-bypass-secret-redaction.md`
+- [x] `COR-0014` medium - Public audit and error payloads expose mutable collection inputs
+  - File: `docs/agent-loop/findings/COR-0014-public-audit-and-error-payloads-expose-mutable-collection-inputs.md`
+- [x] `COR-0019` medium - Capability revocation audit reasons bypass secret redaction
+  - File: `docs/agent-loop/findings/COR-0019-capability-revocation-audit-reasons-bypass-secret-redaction.md`
 
 ## Rejected / duplicate / obsolete
 

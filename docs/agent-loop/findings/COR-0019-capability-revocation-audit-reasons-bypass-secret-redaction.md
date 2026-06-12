@@ -1,22 +1,22 @@
 ---
 id: COR-0019
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Capability revocation audit reasons bypass secret redaction
 dedup_key: security/audit/capability-revocation-reason/no-secret-redaction
 created_at: 2026-06-12T22:10:51.8866002+00:00
 created_by: continuous-security-producer
 created_commit: 
-updated_at: 2026-06-12T22:13:59.3186598+00:00
+updated_at: 2026-06-12T22:18:09.5342352+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T22:12:07.5625647+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-12T22:13:59.3186598+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-12T22:18:09.5342352+00:00
 verified_commit: 
 duplicate_of: 
 ---

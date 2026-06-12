@@ -33,7 +33,7 @@ public sealed class SafeFileConcurrencyTests
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()
-                .GrantFileWrite(root, 1024, allowOverwrite: false)
+                .GrantFileWrite(root, 1024, allowCreate: true, allowOverwrite: false)
                 .WithWallTime(TimeSpan.FromSeconds(2))
                 .WithFuel(5_000)
                 .Build());

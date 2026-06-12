@@ -1,22 +1,22 @@
 ---
 id: COR-0014
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Public audit and error payloads expose mutable collection inputs
 dedup_key: correctness/public-model/audit-error-mutable-collection-escape
 created_at: 2026-06-12T22:06:03.1286042+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T22:13:57.9768510+00:00
+updated_at: 2026-06-12T22:18:08.2449667+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T22:08:33.7144506+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-12T22:13:57.9768510+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-12T22:18:08.2449667+00:00
 verified_commit: 
 duplicate_of: 
 ---

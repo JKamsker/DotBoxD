@@ -6,7 +6,10 @@ using Microsoft.Win32.SafeHandles;
 internal static partial class SafeFileNoFollow
 {
     private const uint WindowsGenericRead = 0x80000000;
+    private const uint WindowsGenericWrite = 0x40000000;
     private const uint WindowsFileShareRead = 0x00000001;
+    private const uint WindowsFileShareNone = 0x00000000;
+    private const uint WindowsCreateNew = 1;
     private const uint WindowsOpenExisting = 3;
     private const uint WindowsFileAttributeReparsePoint = 0x00000400;
     private const uint WindowsFileAttributeNormal = 0x00000080;
@@ -21,15 +24,23 @@ internal static partial class SafeFileNoFollow
     private const int WindowsErrorFileNotFound = 2;
     private const int WindowsErrorPathNotFound = 3;
     private const int WindowsErrorAccessDenied = 5;
+    private const int WindowsErrorFileExists = 80;
+    private const int WindowsErrorAlreadyExists = 183;
 
+    private const int UnixOpenWriteOnly = 0x1;
     private const int LinuxOpenNoFollow = 0x20000;
     private const int LinuxOpenCloseOnExec = 0x80000;
+    private const int LinuxOpenCreate = 0x40;
+    private const int LinuxOpenExclusive = 0x80;
     private const int LinuxErrorLoop = 40;
     private const int MacOpenNoFollow = 0x100;
     private const int MacOpenCloseOnExec = 0x1000000;
+    private const int MacOpenCreate = 0x200;
+    private const int MacOpenExclusive = 0x800;
     private const int MacErrorLoop = 62;
     private const int UnixErrorNoEntry = 2;
     private const int UnixErrorAccessDenied = 13;
+    private const int UnixErrorExists = 17;
     private const int UnixErrorNotDirectory = 20;
 
     [DllImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, CharSet = CharSet.Unicode)]

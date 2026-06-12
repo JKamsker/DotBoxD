@@ -22,6 +22,9 @@
 - [ ] `CMP-0011` medium - README lacks a safe-default host baseline before IO examples
   - File: `docs/agent-loop/findings/CMP-0011-readme-lacks-a-safe-default-host-baseline-before-io-examples.md`
   - Dedup: `cmp/samples/safe-default-host-baseline-missing`
+- [ ] `CMP-0012` medium - Public JSON ingestion lacks a versioned schema artifact
+  - File: `docs/agent-loop/findings/CMP-0012-public-json-ingestion-lacks-a-versioned-schema-artifact.md`
+  - Dedup: `completeness/json-ingestion/versioned-schema-artifact-missing`
 
 ## Claimed
 
