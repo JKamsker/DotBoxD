@@ -27,6 +27,12 @@ internal static class SafeIrConditionBodyModelFactory
                 LowerAnd(binary, whenTrue, whenFalse, context),
             BinaryExpressionSyntax binary when binary.Kind() == SyntaxKind.LogicalOrExpression =>
                 LowerOr(binary, whenTrue, whenFalse, context),
+            BinaryExpressionSyntax binary when IsEagerAnd(binary, context) =>
+                LowerEagerAnd(binary, whenTrue, whenFalse, context),
+            BinaryExpressionSyntax binary when IsEagerOr(binary, context) =>
+                LowerEagerOr(binary, whenTrue, whenFalse, context),
+            BinaryExpressionSyntax binary when IsBoolXor(binary, context) =>
+                LowerBoolXor(binary, whenTrue, whenFalse, context),
             BinaryExpressionSyntax binary when IsBoolEquality(binary, context) =>
                 LowerBoolEquality(binary, whenTrue, whenFalse, context),
             _ => LowerLeafCondition(expression, whenTrue, whenFalse, context)
@@ -52,6 +58,39 @@ internal static class SafeIrConditionBodyModelFactory
         => LowerCondition(
             binary.Left,
             whenTrue,
+            LowerCondition(binary.Right, whenTrue, whenFalse, context),
+            context);
+
+    private static SafeIrStatementBodyModel LowerEagerAnd(
+        BinaryExpressionSyntax binary,
+        SafeIrStatementBodyModel whenTrue,
+        SafeIrStatementBodyModel whenFalse,
+        SafeIrExpressionLoweringContext context)
+        => LowerCondition(
+            binary.Left,
+            LowerCondition(binary.Right, whenTrue, whenFalse, context),
+            LowerCondition(binary.Right, whenFalse, whenFalse, context),
+            context);
+
+    private static SafeIrStatementBodyModel LowerEagerOr(
+        BinaryExpressionSyntax binary,
+        SafeIrStatementBodyModel whenTrue,
+        SafeIrStatementBodyModel whenFalse,
+        SafeIrExpressionLoweringContext context)
+        => LowerCondition(
+            binary.Left,
+            LowerCondition(binary.Right, whenTrue, whenTrue, context),
+            LowerCondition(binary.Right, whenTrue, whenFalse, context),
+            context);
+
+    private static SafeIrStatementBodyModel LowerBoolXor(
+        BinaryExpressionSyntax binary,
+        SafeIrStatementBodyModel whenTrue,
+        SafeIrStatementBodyModel whenFalse,
+        SafeIrExpressionLoweringContext context)
+        => LowerCondition(
+            binary.Left,
+            LowerCondition(binary.Right, whenFalse, whenTrue, context),
             LowerCondition(binary.Right, whenTrue, whenFalse, context),
             context);
 
@@ -125,6 +164,26 @@ internal static class SafeIrConditionBodyModelFactory
 
         return IsBool(binary.Left, context) && IsBool(binary.Right, context);
     }
+
+    private static bool IsEagerAnd(
+        BinaryExpressionSyntax binary,
+        SafeIrExpressionLoweringContext context)
+        => binary.Kind() == SyntaxKind.BitwiseAndExpression && IsBoolOperands(binary, context);
+
+    private static bool IsEagerOr(
+        BinaryExpressionSyntax binary,
+        SafeIrExpressionLoweringContext context)
+        => binary.Kind() == SyntaxKind.BitwiseOrExpression && IsBoolOperands(binary, context);
+
+    private static bool IsBoolXor(
+        BinaryExpressionSyntax binary,
+        SafeIrExpressionLoweringContext context)
+        => binary.Kind() == SyntaxKind.ExclusiveOrExpression && IsBoolOperands(binary, context);
+
+    private static bool IsBoolOperands(
+        BinaryExpressionSyntax binary,
+        SafeIrExpressionLoweringContext context)
+        => IsBool(binary.Left, context) && IsBool(binary.Right, context);
 
     private static bool IsBool(ExpressionSyntax expression, SafeIrExpressionLoweringContext context)
         => context.SemanticModel

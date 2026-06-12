@@ -54,6 +54,58 @@ public sealed class PluginAnalyzerShortCircuitOrderTests
         AssertBool(orResult, expected: true, mode);
     }
 
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public async Task Generated_should_handle_evaluates_right_operand_for_eager_bool_operators(
+        ExecutionMode mode)
+    {
+        var andResult = await ExecuteShouldHandleAsync(
+            "e.Enabled & 100 / e.Amount > 0",
+            amount: 0,
+            enabled: false,
+            mode: mode);
+        var orResult = await ExecuteShouldHandleAsync(
+            "e.Enabled | 100 / e.Amount > 0",
+            amount: 0,
+            enabled: true,
+            mode: mode);
+        var xorResult = await ExecuteShouldHandleAsync(
+            "e.Enabled ^ 100 / e.Amount > 0",
+            amount: 0,
+            enabled: false,
+            mode: mode);
+
+        AssertInvalidInput(andResult, mode);
+        AssertInvalidInput(orResult, mode);
+        AssertInvalidInput(xorResult, mode);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public async Task Generated_should_handle_returns_eager_bool_operator_results(
+        ExecutionMode mode)
+    {
+        var andResult = await ExecuteShouldHandleAsync(
+            "e.Enabled & e.Amount > 0",
+            amount: 1,
+            enabled: true,
+            mode: mode);
+        var orResult = await ExecuteShouldHandleAsync(
+            "e.Enabled | e.Amount > 0",
+            amount: 0,
+            enabled: false,
+            mode: mode);
+        var xorResult = await ExecuteShouldHandleAsync(
+            "e.Enabled ^ e.Amount > 0",
+            amount: 0,
+            enabled: true,
+            mode: mode);
+
+        AssertBool(andResult, expected: true, mode);
+        AssertBool(orResult, expected: false, mode);
+        AssertBool(xorResult, expected: true, mode);
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteShouldHandleAsync(
         string expression,
         int amount,
