@@ -1,20 +1,14 @@
-using System.Reflection;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using SafeIR.Hosting;
-using SafeIR.PluginAnalyzer;
 using SafeIR.Plugins;
 
 namespace SafeIR.Tests;
 
 public sealed class PluginAnalyzerGeneratedPackageTests
 {
-    private static readonly CSharpParseOptions ParseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
     [Fact]
     public async Task Generated_package_installs_and_executes_lowered_ir()
     {
-        var package = CreateGeneratedPackage("""
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
             using System.ComponentModel.DataAnnotations;
             using SafeIR.Plugins;
 
@@ -92,7 +86,7 @@ public sealed class PluginAnalyzerGeneratedPackageTests
     [Fact]
     public async Task Generated_package_executes_supported_i32_operator_subset()
     {
-        var package = CreateGeneratedPackage("""
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
             using SafeIR.Plugins;
 
             namespace Sample;
@@ -142,7 +136,7 @@ public sealed class PluginAnalyzerGeneratedPackageTests
     [Fact]
     public async Task Generated_package_executes_i64_literal_lowering_in_compiled_mode()
     {
-        var package = CreateGeneratedPackage("""
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
             using SafeIR.Plugins;
 
             namespace Sample;
@@ -197,38 +191,6 @@ public sealed class PluginAnalyzerGeneratedPackageTests
         Assert.False(((BoolValue)rejected.Value!).Value);
     }
 
-    private static PluginPackage CreateGeneratedPackage(string source)
-    {
-        var compilation = CSharpCompilation.Create(
-            "SafeIrGeneratedPackageRuntimeTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(GamePluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new SafeIrPluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: ParseOptions);
-        driver = driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out var outputCompilation,
-            out var diagnostics);
-
-        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-
-        using var assembly = new MemoryStream();
-        var emit = outputCompilation.Emit(assembly);
-        Assert.True(
-            emit.Success,
-            string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
-
-        var loaded = Assembly.Load(assembly.ToArray());
-        var factory = loaded.GetType("Sample.DamagePluginPackage", throwOnError: true)!;
-        var create = factory.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
-        return Assert.IsType<PluginPackage>(create.Invoke(null, null));
-    }
-
     private static void AssertLiveSetting(
         LiveSettingDefinition actual,
         string name,
@@ -260,13 +222,6 @@ public sealed class PluginAnalyzerGeneratedPackageTests
             SandboxValue.FromInt64(sequence),
             SandboxValue.FromDouble(1.5D)
         ]);
-
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
-    }
 
     private sealed record GeneratedDamageEvent(
         string TargetId, string Message, string DamageType, int Amount, long Sequence, double Ratio);
