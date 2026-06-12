@@ -1,19 +1,19 @@
 ---
 id: PAL-0003
 area: perf_alloc
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Map validation and metering buffer reversed entries
 dedup_key: alloc/sandbox/map-validation/reverse-buffer
 created_at: 2026-06-12T21:00:42.8012382+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T21:00:42.8012382+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T21:32:12.7930647+00:00
+claimed_by: fixer
+claimed_at: 2026-06-12T21:31:19.6730521+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-12T21:32:12.7930647+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

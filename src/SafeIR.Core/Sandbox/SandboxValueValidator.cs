@@ -85,7 +85,7 @@ public static class SandboxValueValidator
 
         Enter(map, active, errorCode, message);
         stack.Push(new Frame(map, expectedType, Exit: true));
-        foreach (var pair in map.Values.Reverse())
+        foreach (var pair in map.Values)
         {
             stack.Push(new Frame(pair.Value, map.ValueType, Exit: false));
             stack.Push(new Frame(pair.Key, map.KeyType, Exit: false));
