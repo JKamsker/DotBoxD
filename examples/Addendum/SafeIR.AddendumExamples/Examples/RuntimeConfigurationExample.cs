@@ -11,7 +11,6 @@ internal static class RuntimeConfigurationExample
         var server = PluginServer.Create(messages);
         var config = FireDamageConfiguration.Default with {
             Settings = new Dictionary<string, object?> {
-                ["Enabled"] = true,
                 ["DamageType"] = "ice",
                 ["MinDamage"] = 250
             }
@@ -26,15 +25,12 @@ internal static class RuntimeConfigurationExample
     }
 
     private sealed record FireDamageConfiguration(
-        bool Enabled,
         string Mode,
         IReadOnlyDictionary<string, object?> Settings)
     {
         public static FireDamageConfiguration Default { get; } = new(
-            true,
             "auto",
             new Dictionary<string, object?> {
-                ["Enabled"] = true,
                 ["DamageType"] = "fire",
                 ["MinDamage"] = 100
             });

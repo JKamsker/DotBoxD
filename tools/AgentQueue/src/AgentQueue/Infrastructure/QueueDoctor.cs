@@ -53,6 +53,8 @@ internal sealed class QueueDoctor
             CheckFinding(finding, ids, dedupKeys, errors);
             CheckEvents(finding, errors);
         }
+
+        CheckDuplicateReferences(findings, errors);
     }
 
     private void CheckFinding(
@@ -152,6 +154,27 @@ internal sealed class QueueDoctor
             }
 
             lastStatus = status;
+        }
+    }
+
+    private static void CheckDuplicateReferences(IReadOnlyList<Finding> findings, List<string> errors)
+    {
+        HashSet<string> ids = findings.Select(finding => finding.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (Finding finding in findings.Where(finding => finding.Status == "duplicate"))
+        {
+            string duplicateOf = finding.Get("duplicate_of");
+            if (string.IsNullOrWhiteSpace(duplicateOf))
+            {
+                errors.Add($"{finding.Id} is marked duplicate without duplicate_of.");
+            }
+            else if (string.Equals(finding.Id, duplicateOf, StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"{finding.Id} must not duplicate itself.");
+            }
+            else if (!ids.Contains(duplicateOf))
+            {
+                errors.Add($"{finding.Id} duplicates unknown finding {duplicateOf}.");
+            }
         }
     }
 

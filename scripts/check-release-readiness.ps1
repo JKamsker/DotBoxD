@@ -79,7 +79,7 @@ function Assert-CompletedItemEvidence {
         },
         @{
             Text = "Canonical hashing implemented."
-            Path = "src/SafeIR.Core/CanonicalModuleHasher.cs"
+            Path = "src/SafeIR.Core/Model/CanonicalModuleHasher.cs"
             Patterns = @("Hash", "Serialize")
         },
         @{
@@ -99,7 +99,7 @@ function Assert-CompletedItemEvidence {
         },
         @{
             Text = "Binding registry validation implemented."
-            Path = "src/SafeIR.Core/BindingRegistryValidator.cs"
+            Path = "src/SafeIR.Core/Bindings/BindingRegistryValidator.cs"
             Patterns = @("Validate", "BindingDescriptor")
         },
         @{
@@ -109,82 +109,82 @@ function Assert-CompletedItemEvidence {
         },
         @{
             Text = "Fuel limits implemented."
-            Path = "src/SafeIR.Core/Resources.cs"
+            Path = "src/SafeIR.Core/Model/Resources.cs"
             Patterns = @("ChargeFuel", "MaxFuel")
         },
         @{
             Text = "Safe error model implemented."
-            Path = "src/SafeIR.Core/SandboxError.cs"
+            Path = "src/SafeIR.Core/Model/Diagnostics.cs"
             Patterns = @("SandboxError", "SafeMessage")
         },
         @{
             Text = "Basic audit implemented."
-            Path = "src/SafeIR.Core/Audit.cs"
+            Path = "src/SafeIR.Core/Bindings/Audit.cs"
             Patterns = @("SandboxAuditEvent", "IAuditSink")
         },
         @{
             Text = "At least one safe file binding implemented and tested."
-            Path = "tests/SafeIR.Tests/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
             Patterns = @("Granted_file_read", "file.readText")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/SafeIR.Tests/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
             Text = "Binding security checklist passes."
-            Path = "tests/SafeIR.Tests/BindingRegistryHardeningTests.cs"
+            Path = "tests/SafeIR.Tests/Misc01/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING-AUDIT", "E-BINDING-GRANT", "E-BINDING-TYPE")
         },
         @{
             Text = "Compiler emits valid managed assemblies."
-            Path = "src/SafeIR.Compiler/ReflectionEmitSandboxCompiler.cs"
+            Path = "src/SafeIR.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
             Patterns = @("AssemblyBuilder", "CompileAsync")
         },
         @{
             Text = "Generated assemblies use runtime stubs only."
-            Path = "src/SafeIR.Compiler/MethodEmitter.cs"
+            Path = "src/SafeIR.Compiler/Emitters/MethodEmitter.cs"
             Patterns = @("CompiledRuntime", "EmitCall")
         },
         @{
             Text = "Verifier implemented."
-            Path = "src/SafeIR.Verifier/GeneratedAssemblyVerifier.cs"
+            Path = "src/SafeIR.Verifier/Generated/GeneratedAssemblyVerifier.cs"
             Patterns = @("VerifyAsync", "VerificationResult")
         },
         @{
             Text = "Verifier malicious fixtures pass."
-            Path = "tests/SafeIR.Tests/VerifierAttackMatrixTests.cs"
+            Path = "tests/SafeIR.Tests/Verifier/Core/VerifierAttackMatrixTests.cs"
             Patterns = @("HttpClient", "ProcessStart", "Calli")
         },
         @{
             Text = "Compiled/interpreted differential tests pass."
-            Path = "tests/SafeIR.Tests/DifferentialFuzzTests.cs"
+            Path = "tests/SafeIR.Tests/Misc02/DifferentialFuzzTests.cs"
             Patterns = @("ExecutionMode\.Interpreted", "ExecutionMode\.Compiled")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/SafeIR.Tests/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
             Text = "DLL cache manifest implemented."
-            Path = "src/SafeIR.Verifier/VerificationModels.cs"
+            Path = "src/SafeIR.Verifier/Generated/VerificationModels.cs"
             Patterns = @("ArtifactManifest", "CacheKey")
         },
         @{
             Text = "Cache invalidation tests pass."
-            Path = "tests/SafeIR.Tests/CompiledCacheMetadataTests.cs"
+            Path = "tests/SafeIR.Tests/Compiled/Core/CompiledCacheMetadataTests.cs"
             Patterns = @("CacheKey", "quarantined_and_recompiled")
         },
         @{
             Text = "Cache corruption tests pass."
-            Path = "tests/SafeIR.Tests/CompiledMaterializationCacheTests.cs"
+            Path = "tests/SafeIR.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
             Patterns = @("MutatesSecondArtifactCompiler", "AssemblyBytes")
         },
         @{
             Text = '`AssemblyLoadContext` lifecycle tested.'
-            Path = "tests/SafeIR.Tests/CompiledMaterializationCacheTests.cs"
+            Path = "tests/SafeIR.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
             Patterns = @("WeakReference", "AssemblyLoadContext")
         },
         @{
@@ -224,23 +224,23 @@ function Assert-CompletedItemEvidence {
 
     $securitySectionEvidence = @{
         "User input" = @{
-            Path = "tests/SafeIR.Tests/JsonImporterTests.cs"
+            Path = "tests/SafeIR.Tests/Misc04/JsonImporterTests.cs"
             Patterns = @("unsupported_properties", "assemblyName")
         }
         "IR" = @{
-            Path = "tests/SafeIR.Tests/JsonImporterTests.cs"
+            Path = "tests/SafeIR.Tests/Misc04/JsonImporterTests.cs"
             Patterns = @("targetSandboxVersion", "reject")
         }
         "Type system" = @{
-            Path = "src/SafeIR.Core/SandboxType.cs"
+            Path = "src/SafeIR.Core/Sandbox/SandboxType.cs"
             Patterns = @("SandboxType", "OpaqueId")
         }
         "Bindings" = @{
-            Path = "tests/SafeIR.Tests/BindingRegistryHardeningTests.cs"
+            Path = "tests/SafeIR.Tests/Misc01/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING", "AuditLevel.PerCall")
         }
         "Capabilities/policy" = @{
-            Path = "tests/SafeIR.Tests/CapabilityRevocationTests.cs"
+            Path = "tests/SafeIR.Tests/Misc01/CapabilityRevocationTests.cs"
             Patterns = @("RevokeCapability", "CapabilityRevoked")
         }
         "Interpreter" = @{
@@ -248,23 +248,23 @@ function Assert-CompletedItemEvidence {
             Patterns = @("ChargeFuel", "ChargeLoopIteration")
         }
         "Compiler" = @{
-            Path = "src/SafeIR.Compiler/ReflectionEmitSandboxCompiler.cs"
+            Path = "src/SafeIR.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
             Patterns = @("CompileAsync", "Verification")
         }
         "Verifier" = @{
-            Path = "tests/SafeIR.Tests/VerifierTests.cs"
+            Path = "tests/SafeIR.Tests/Verifier/Generated/VerifierTests.cs"
             Patterns = @("PInvoke", "MutableStatic")
         }
         "Cache" = @{
-            Path = "tests/SafeIR.Tests/CompiledCacheTests.cs"
+            Path = "tests/SafeIR.Tests/Compiled/Core/CompiledCacheTests.cs"
             Patterns = @("Policy_hash_change", "Binding_manifest_change")
         }
         "Resource limits" = @{
-            Path = "tests/SafeIR.Tests/CompiledRuntimeQuotaTests.cs"
+            Path = "tests/SafeIR.Tests/Compiled/Generated/CompiledRuntimeQuotaTests.cs"
             Patterns = @("QuotaExceeded", "Fuel")
         }
         "Audit" = @{
-            Path = "tests/SafeIR.Tests/SafeLoggingTests.cs"
+            Path = "tests/SafeIR.Tests/Misc07/SafeLoggingTests.cs"
             Patterns = @("RunSummary", "redacted")
         }
     }

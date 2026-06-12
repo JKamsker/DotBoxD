@@ -156,8 +156,15 @@ internal sealed class QueueMutationCommands
         if (status == "duplicate")
         {
             string duplicateOf = commandLine.RequireOption("of");
-            repository.FindRequired(duplicateOf);
-            finding.Set("duplicate_of", duplicateOf);
+            Finding canonical = repository.FindRequired(duplicateOf);
+            if (string.Equals(canonical.Id, finding.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new AgentQueueException(
+                    $"Finding {finding.Id} must not duplicate itself.",
+                    ExitCodes.InvalidTransition);
+            }
+
+            finding.Set("duplicate_of", canonical.Id);
         }
 
         EnsureTransition(finding.Status, status);

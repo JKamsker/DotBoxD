@@ -152,7 +152,9 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             return true;
         }
 
-        return result.Value is null && result.Error is not null;
+        return result.Value is null &&
+               result.Error is not null &&
+               Enum.IsDefined(result.Error.Code);
     }
 
     private static bool WorkerResourceUsageMatches(ExecutionPlan plan, SandboxExecutionResult result)
@@ -213,7 +215,9 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         return WorkerRunSummaryMatches(plan, result, summaries[0]) &&
             (result.Succeeded
             ? summaries[0].ErrorCode is null
-            : summaries[0].ErrorCode == result.Error!.Code);
+            : summaries[0].ErrorCode == result.Error!.Code &&
+              summaries[0].ErrorCode is { } code &&
+              Enum.IsDefined(code));
     }
 
     private static bool WorkerRunSummaryMatches(

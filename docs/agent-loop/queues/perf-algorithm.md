@@ -4,6 +4,21 @@
 
 ## Open
 
+- [ ] `ALG-0001` high - JSON source map import repeatedly searches raw text
+  - File: `docs/agent-loop/findings/ALG-0001-json-source-map-import-repeatedly-searches-raw-text.md`
+  - Dedup: `algorithm/json-import/source-map/repeated-rawtext-search`
+- [ ] `ALG-0002` medium - Collection mutations copy whole containers per update
+  - File: `docs/agent-loop/findings/ALG-0002-collection-mutations-copy-whole-containers-per-update.md`
+  - Dedup: `algorithm/collections/mutation/whole-container-copy`
+- [ ] `ALG-0003` medium - Generated meter analysis repeatedly rescans predecessors
+  - File: `docs/agent-loop/findings/ALG-0003-generated-meter-analysis-repeatedly-rescans-predecessors.md`
+  - Dedup: `algorithm/verifier/generated-meter/predecessor-rescan`
+- [ ] `ALG-0004` medium - Plugin analyzer rescans helper call graph to propagate taint
+  - File: `docs/agent-loop/findings/ALG-0004-plugin-analyzer-rescans-helper-call-graph-to-propagate-taint.md`
+  - Dedup: `algorithm/plugin-analyzer/helper-callgraph/repeated-full-scan`
+- [ ] `ALG-0005` medium - Binding reference collection rewalks shared graphs per entrypoint
+  - File: `docs/agent-loop/findings/ALG-0005-binding-reference-collection-rewalks-shared-graphs-per-entrypoint.md`
+  - Dedup: `algorithm/binding-reference/per-entrypoint-graph-rewalk`
 
 ## Claimed
 

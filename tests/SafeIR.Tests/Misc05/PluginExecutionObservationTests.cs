@@ -31,4 +31,22 @@ public sealed class PluginExecutionObservationTests
         Assert.Null(handle.FallbackReason);
         Assert.Null(handle.MaterializationStatus);
     }
+
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted)]
+    [InlineData(ExecutionMode.Compiled)]
+    [InlineData(ExecutionMode.Auto)]
+    public async Task Server_execution_mode_controls_plugin_dispatch_request(ExecutionMode mode)
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages, executionMode: mode);
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+        server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
+
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 120, $"player-{mode}"));
+
+        Assert.Equal(2, kernel.ExecutionObservations.Count);
+        Assert.All(kernel.ExecutionObservations, observation =>
+            Assert.Equal(mode, observation.RequestedMode));
+    }
 }

@@ -103,6 +103,57 @@ public sealed class AgentQueueWorkflowTests
     }
 
     [Fact]
+    public void DuplicateRejectsSelfReference()
+    {
+        using AgentQueueHarness harness = new();
+        string bodyFile = harness.WriteBody("## Claim" + Environment.NewLine + "Example.");
+        Assert.Equal(0, harness.Run("append",
+            "--area", "correctness",
+            "--priority", "medium",
+            "--title", "Example bug",
+            "--dedup-key", "correctness/example/bug",
+            "--agent", "auditor",
+            "--body-file", bodyFile));
+
+        Assert.Equal(4, harness.Run(
+            "duplicate",
+            "COR-0001",
+            "--of",
+            "COR-0001",
+            "--agent",
+            "curator",
+            "--reason",
+            "same finding"));
+        Assert.Contains("must not duplicate itself", harness.LastError + harness.LastOutput);
+        Assert.Equal(0, harness.Run("doctor"));
+    }
+
+    [Fact]
+    public void DoctorRejectsSelfDuplicateFinding()
+    {
+        using AgentQueueHarness harness = new();
+        string bodyFile = harness.WriteBody("## Claim" + Environment.NewLine + "Example.");
+        Assert.Equal(0, harness.Run("append",
+            "--area", "correctness",
+            "--priority", "medium",
+            "--title", "Example bug",
+            "--dedup-key", "correctness/example/bug",
+            "--agent", "auditor",
+            "--body-file", bodyFile));
+
+        string findingFile = Directory.GetFiles(
+            Path.Combine(harness.Root, "docs", "agent-loop", "findings"),
+            "COR-0001-*.md").Single();
+        string content = File.ReadAllText(findingFile)
+            .Replace("status: open", "status: duplicate", StringComparison.Ordinal)
+            .Replace("duplicate_of: ", "duplicate_of: COR-0001", StringComparison.Ordinal);
+        File.WriteAllText(findingFile, content);
+
+        Assert.Equal(2, harness.Run("doctor"));
+        Assert.Contains("COR-0001 must not duplicate itself.", harness.LastOutput);
+    }
+
+    [Fact]
     public void RenderCheckDetectsManualQueueDrift()
     {
         using AgentQueueHarness harness = new();

@@ -105,6 +105,7 @@ dotnet test SafeIR.slnx --configuration Release --no-build
 .\scripts\check-csharp-file-lines.ps1
 .\scripts\check-spec-manifest.ps1
 .\scripts\check-release-readiness.ps1
+Remove-Item artifacts\packages\*.nupkg -Force -ErrorAction SilentlyContinue
 dotnet pack SafeIR.slnx --configuration Release --no-build --output artifacts/packages
 .\scripts\check-package-metadata.ps1 -PackageDirectory artifacts\packages -AllowPrereleaseVersions
 .\scripts\check-package-metadata.ps1 -PackageDirectory artifacts\packages -AllowedPrereleasePackageIds SafeIR.Transport.Ipc.ShaRpc

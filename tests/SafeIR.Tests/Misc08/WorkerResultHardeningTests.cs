@@ -120,6 +120,28 @@ public sealed class WorkerResultHardeningTests
     }
 
     [Fact]
+    public async Task Worker_result_with_undefined_failure_error_code_is_rejected()
+    {
+        var worker = new TestWorker
+        {
+            Succeeded = false,
+            ResultError = new SandboxError((SandboxErrorCode)123456, "undefined worker error")
+        };
+        var host = Host(worker);
+        var plan = await PrepareAsync(host, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            Input(),
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    [Fact]
     public async Task Compiled_worker_success_requires_runtime_envelope_fields()
     {
         var worker = new TestWorker
@@ -197,6 +219,8 @@ public sealed class WorkerResultHardeningTests
         public bool OmitSpecSummaryAliases { get; init; }
         public bool OmitCompiledEnvelopeFields { get; init; }
         public bool ReportExecutionDispatched { get; init; } = true;
+        public bool Succeeded { get; init; } = true;
+        public SandboxError? ResultError { get; init; }
         public ExecutionMode ResultMode { get; init; } = ExecutionMode.Interpreted;
         public string? ArtifactHash { get; init; }
         public string RuntimeForm { get; init; } = "LoadedAssembly";
@@ -247,13 +271,15 @@ public sealed class WorkerResultHardeningTests
                 runId,
                 "RunSummary",
                 DateTimeOffset.UtcNow,
-                true,
+                Succeeded,
                 ResourceId: $"module:{plan.ModuleHash}",
+                ErrorCode: ResultError?.Code,
                 Fields: fields));
             return new SandboxExecutionResult
             {
-                Succeeded = true,
-                Value = SandboxValue.FromInt32(35),
+                Succeeded = Succeeded,
+                Value = Succeeded ? SandboxValue.FromInt32(35) : null,
+                Error = ResultError,
                 ResourceUsage = usage,
                 AuditEvents = audit.Events,
                 ActualMode = ResultMode,

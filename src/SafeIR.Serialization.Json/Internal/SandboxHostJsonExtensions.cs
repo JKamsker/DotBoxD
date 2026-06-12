@@ -8,9 +8,8 @@ public static class SandboxHostJsonExtensions
         this SandboxHost host,
         string jsonIr,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(host);
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(SafeIrJsonImporter.Import(jsonIr));
-    }
+        => SafeIR.Serialization.Json.SandboxHostJsonExtensions.ImportJsonAsync(
+            host,
+            jsonIr,
+            cancellationToken);
 }

@@ -19,8 +19,18 @@ internal static class SafeHttpGrantValidator
                 "allowIpLiterals",
                 "allowPrivateNetwork"
             ]);
-        RequireCsv(grant, diagnostics, "allowedHosts");
-        RequireCsv(grant, diagnostics, "allowedSchemes");
+        RequireCsv(
+            grant,
+            diagnostics,
+            "allowedHosts",
+            SafeHttpGrantValueValidator.IsAllowedAuthority,
+            "a host or host:port authority");
+        RequireCsv(
+            grant,
+            diagnostics,
+            "allowedSchemes",
+            SafeHttpGrantValueValidator.IsAllowedScheme,
+            "http or https");
         RequireOptionalNonNegativeLong(grant, diagnostics, "maxRequestBytes");
         RequireNonNegativeLong(grant, diagnostics, "maxResponseBytes");
         RequireRangeLong(grant, diagnostics, "timeoutMs", min: 1, max: 60_000);
@@ -46,12 +56,26 @@ internal static class SafeHttpGrantValidator
     private static void RequireCsv(
         CapabilityGrant grant,
         ICollection<SandboxDiagnostic> diagnostics,
-        string key)
+        string key,
+        Func<string, bool> isValid,
+        string description)
     {
-        if (!grant.Parameters.TryGetValue(key, out var value) ||
-            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
+        if (!grant.Parameters.TryGetValue(key, out var value))
         {
             Add(diagnostics, grant, $"parameter '{key}' must contain at least one value");
+            return;
+        }
+
+        var values = value.Split(',', StringSplitOptions.TrimEntries);
+        if (values.Length == 0 || values.Any(item => string.IsNullOrWhiteSpace(item)))
+        {
+            Add(diagnostics, grant, $"parameter '{key}' must not contain empty values");
+            return;
+        }
+
+        if (values.Any(item => !isValid(item)))
+        {
+            Add(diagnostics, grant, $"parameter '{key}' must contain only {description} values");
         }
     }
 

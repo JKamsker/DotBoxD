@@ -1,0 +1,2 @@
+{"at":"2026-06-12T21:02:03.6410249\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
+{"at":"2026-06-12T21:02:31.5834674\u002B00:00","agent":"correctness-producer","type":"rejected","status":"rejected","message":"Invalid after recheck: multi-parameter entrypoint binding validates each element against the parameter type and does not use ListValue.ItemType, and input metering only measures shape."}

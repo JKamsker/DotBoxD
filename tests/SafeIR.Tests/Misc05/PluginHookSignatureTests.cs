@@ -49,6 +49,38 @@ public sealed class PluginHookSignatureTests
     }
 
     [Fact]
+    public async Task Direct_handle_rejects_unsubscribed_adapter_before_execution()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages);
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await kernel.HandleAsync(
+                new AdminDamageEventAdapter(),
+                new DamageEvent("fire", 120, "player-1")));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP031");
+        Assert.Empty(messages.Messages);
+        Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
+    public async Task Direct_should_handle_rejects_adapter_signature_mismatch_before_execution()
+    {
+        var server = PluginServer.Create();
+        var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await kernel.ShouldHandleAsync(
+                new MismatchedDamageEventAdapter(),
+                new DamageEvent("fire", 120, "player-1")));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP033");
+        Assert.Empty(kernel.ExecutionObservations);
+    }
+
+    [Fact]
     public void On_rejects_different_adapter_after_pipeline_exists()
     {
         var server = PluginServer.Create();
@@ -58,6 +90,24 @@ public sealed class PluginHookSignatureTests
             () => server.Hooks.On(new MismatchedDamageEventAdapter()));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "SGP034");
+    }
+
+    private sealed class AdminDamageEventAdapter : IPluginEventAdapter<DamageEvent>
+    {
+        public string EventName => "AdminEvent";
+
+        public IReadOnlyList<Parameter> Parameters { get; } = [
+            new("e_DamageType", SandboxType.String),
+            new("e_Amount", SandboxType.I32),
+            new("e_TargetId", SandboxType.String)
+        ];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(DamageEvent e)
+            => [
+                SandboxValue.FromString(e.DamageType),
+                SandboxValue.FromInt32(e.Amount),
+                SandboxValue.FromString(e.TargetId)
+            ];
     }
 
     private sealed class MismatchedDamageEventAdapter : IPluginEventAdapter<DamageEvent>

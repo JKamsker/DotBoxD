@@ -10,8 +10,24 @@
 
 ## Fixed pending verification
 
+- [~] `CMP-0005` high - Release readiness gate still references stale evidence paths after source layout changes
+  - File: `docs/agent-loop/findings/CMP-0005-release-readiness-gate-still-references-stale-evidence-paths-after-source-layout.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
+- [~] `CMP-0002` medium - Execution-mode example changes manifest mode instead of host dispatch mode
+  - File: `docs/agent-loop/findings/CMP-0002-execution-mode-example-changes-manifest-mode-instead-of-host-dispatch-mode.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
+- [~] `CMP-0003` medium - Runtime configuration example applies undeclared Enabled live setting
+  - File: `docs/agent-loop/findings/CMP-0003-runtime-configuration-example-applies-undeclared-enabled-live-setting.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
 
 ## Verified
 
+- [x] `CMP-0001` high - Release readiness gate references stale CanonicalModuleHasher path
+  - File: `docs/agent-loop/findings/CMP-0001-release-readiness-gate-references-stale-canonicalmodulehasher-path.md`
+- [x] `CMP-0004` high - CodeEnforcer gate fails on project-folder C# file-count violations
+  - File: `docs/agent-loop/findings/CMP-0004-codeenforcer-gate-fails-on-project-folder-c-file-count-violations.md`
 
 ## Rejected / duplicate / obsolete

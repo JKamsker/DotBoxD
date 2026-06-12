@@ -10,6 +10,14 @@
 
 ## Fixed pending verification
 
+- [~] `API-0001` medium - JSON host import extension is only exposed from an Internal namespace
+  - File: `docs/agent-loop/findings/API-0001-json-host-import-extension-is-only-exposed-from-an-internal-namespace.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
+- [~] `API-0002` medium - HTTP transport setup helpers are only exposed from an Internal namespace
+  - File: `docs/agent-loop/findings/API-0002-http-transport-setup-helpers-are-only-exposed-from-an-internal-namespace.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
 
 ## Verified
 

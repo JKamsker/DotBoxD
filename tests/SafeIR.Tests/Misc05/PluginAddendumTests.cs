@@ -36,6 +36,29 @@ public sealed class PluginAddendumTests
     }
 
     [Fact]
+    public async Task Runtime_configuration_example_settings_are_declared_by_fire_damage_package()
+    {
+        var settings = new Dictionary<string, object?>
+        {
+            ["DamageType"] = "ice",
+            ["MinDamage"] = 250
+        };
+        var package = FireDamagePluginPackage.Create();
+        var declared = package.Manifest.LiveSettings
+            .Select(setting => setting.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages);
+        var installed = await server.InstallAsync(package);
+
+        Assert.All(settings.Keys, key => Assert.Contains(key, declared));
+        await installed.ModifySettingsAsync(settings);
+
+        Assert.Equal("ice", installed.Value.Get<string>("DamageType"));
+        Assert.Equal(250, installed.Value.Get<int>("MinDamage"));
+    }
+
+    [Fact]
     public async Task Direct_kernel_value_updates_are_full_sync_by_default()
     {
         var messages = new InMemoryPluginMessageSink();

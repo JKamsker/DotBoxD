@@ -4,6 +4,30 @@
 
 ## Open
 
+- [ ] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
+  - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
+  - Dedup: `alloc/interpreter/expression-evaluation/evaluator-object-per-node`
+- [ ] `PAL-0002` medium - Live setting proxy reflects on every property access
+  - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
+  - Dedup: `alloc/plugins/live-context/proxy-reflection-per-access`
+- [ ] `PAL-0003` medium - Map validation and metering buffer reversed entries
+  - File: `docs/agent-loop/findings/PAL-0003-map-validation-and-metering-buffer-reversed-entries.md`
+  - Dedup: `alloc/sandbox/map-validation/reverse-buffer`
+- [ ] `PAL-0004` medium - Convention event adapter reflects and allocates per event
+  - File: `docs/agent-loop/findings/PAL-0004-convention-event-adapter-reflects-and-allocates-per-event.md`
+  - Dedup: `alloc/plugins/convention-event-adapter/reflection-array-per-event`
+- [ ] `PAL-0006` medium - Persistent artifact cache retains entry locks per cache key
+  - File: `docs/agent-loop/findings/PAL-0006-persistent-artifact-cache-retains-entry-locks-per-cache-key.md`
+  - Dedup: `alloc/compiler-cache/entry-locks/unbounded-key-retention`
+- [ ] `PAL-0007` medium - Compiled artifact guard copies assembly bytes repeatedly
+  - File: `docs/agent-loop/findings/PAL-0007-compiled-artifact-guard-copies-assembly-bytes-repeatedly.md`
+  - Dedup: `alloc/compiled-artifact/assembly-bytes/repeated-defensive-copies`
+- [ ] `PAL-0005` low - Generated stack verifier allocates while parsing call signatures
+  - File: `docs/agent-loop/findings/PAL-0005-generated-stack-verifier-allocates-while-parsing-call-signatures.md`
+  - Dedup: `alloc/verifier/generated-stack/call-signature-split-per-call`
+- [ ] `PAL-0008` low - HTTP grants are reparsed into sets per request
+  - File: `docs/agent-loop/findings/PAL-0008-http-grants-are-reparsed-into-sets-per-request.md`
+  - Dedup: `alloc/http-grants/runtime/csv-set-reparse-per-request`
 
 ## Claimed
 

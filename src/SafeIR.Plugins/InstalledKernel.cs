@@ -105,6 +105,7 @@ public sealed class InstalledKernel
         try
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
+            ValidateFor(adapter);
             var input = BuildInput(adapter, e);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             return AsShouldHandleResult(result);
@@ -124,6 +125,7 @@ public sealed class InstalledKernel
         try
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
+            ValidateFor(adapter);
             var input = BuildInput(adapter, e);
             _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
         }

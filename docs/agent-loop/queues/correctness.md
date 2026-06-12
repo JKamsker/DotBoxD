@@ -4,14 +4,41 @@
 
 ## Open
 
+- [ ] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits
+  - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
+  - Dedup: `correctness/agentqueue/status-case/doctor-render-mismatch`
+- [ ] `COR-0009` medium - Plugin adapter shape discovery crashes on explicit interface implementations
+  - File: `docs/agent-loop/findings/COR-0009-plugin-adapter-shape-discovery-crashes-on-explicit-interface-implementations.md`
+  - Dedup: `correctness/plugins/adapter-registry/explicit-interface-shape-crash`
 
 ## Claimed
 
 
 ## Fixed pending verification
 
+- [~] `COR-0004` high - HTTP allowlist entries can expand through comma-delimited grant serialization
+  - File: `docs/agent-loop/findings/COR-0004-http-allowlist-entries-can-expand-through-comma-delimited-grant-serialization.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
+- [~] `COR-0003` medium - Package metadata check fails on stale packages left in output directory
+  - File: `docs/agent-loop/findings/COR-0003-package-metadata-check-fails-on-stale-packages-left-in-output-directory.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
+- [~] `COR-0006` medium - Worker result validation accepts undefined failure error codes
+  - File: `docs/agent-loop/findings/COR-0006-worker-result-validation-accepts-undefined-failure-error-codes.md`
+  - Fixed by: `implementer`
+  - Commit: `working-tree`
 
 ## Verified
 
+- [x] `COR-0002` high - Direct plugin kernel invocation bypasses adapter whitelist validation
+  - File: `docs/agent-loop/findings/COR-0002-direct-plugin-kernel-invocation-bypasses-adapter-whitelist-validation.md`
+- [x] `COR-0005` high - Release package metadata gate splats named parameters as positional strings
+  - File: `docs/agent-loop/findings/COR-0005-release-package-metadata-gate-splats-named-parameters-as-positional-strings.md`
+- [x] `COR-0001` medium - AgentQueue allows self-duplicate findings
+  - File: `docs/agent-loop/findings/COR-0001-agentqueue-allows-self-duplicate-findings.md`
 
 ## Rejected / duplicate / obsolete
+
+- [-] `COR-0008` high - Plugin hook input treats heterogeneous parameters as a homogeneous list
+  - File: `docs/agent-loop/findings/COR-0008-plugin-hook-input-treats-heterogeneous-parameters-as-a-homogeneous-list.md`

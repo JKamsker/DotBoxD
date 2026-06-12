@@ -10,16 +10,12 @@ internal static class ExecutionModeExample
     {
         foreach (var mode in new[] { ExecutionMode.Interpreted, ExecutionMode.Compiled, ExecutionMode.Auto }) {
             var messages = new InMemoryPluginMessageSink();
-            var server = PluginServer.Create(messages);
-            await server.InstallAsync(WithMode(FireDamagePluginPackage.Create(), mode));
+            var server = PluginServer.Create(messages, executionMode: mode);
+            var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
             server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
             await server.Hooks.PublishAsync(new DamageEvent("fire", 120, $"player-{mode}"));
-            Console.WriteLine($"execution mode {mode}: messages={messages.Messages.Count}");
+            Console.WriteLine(
+                $"execution mode {mode}: messages={messages.Messages.Count}, requested={kernel.LastExecution?.RequestedMode}");
         }
     }
-
-    private static PluginPackage WithMode(PluginPackage package, ExecutionMode mode)
-        => package with {
-            Manifest = package.Manifest with { Mode = mode }
-        };
 }

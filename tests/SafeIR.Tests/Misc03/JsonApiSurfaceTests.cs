@@ -1,5 +1,6 @@
 using System.Reflection;
 using SafeIR.Hosting;
+using SafeIR.Serialization.Json;
 
 namespace SafeIR.Tests;
 

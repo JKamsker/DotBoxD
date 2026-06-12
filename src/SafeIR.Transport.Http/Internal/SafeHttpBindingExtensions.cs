@@ -8,8 +8,8 @@ public static class SafeHttpBindingExtensions
         this BindingRegistryBuilder builder,
         SafeInMemoryHttpMessageInvoker? invoker = null,
         SafeDnsResolver? dnsResolver = null)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        return builder.Add(SafeHttpBindings.GetText(invoker, dnsResolver));
-    }
+        => SafeIR.Transport.Http.SafeHttpBindingExtensions.AddNetworkBindings(
+            builder,
+            invoker,
+            dnsResolver);
 }
