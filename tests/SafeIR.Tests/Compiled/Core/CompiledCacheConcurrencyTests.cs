@@ -6,6 +6,32 @@ namespace SafeIR.Tests;
 public sealed class CompiledCacheConcurrencyTests
 {
     [Fact]
+    public async Task Completed_unique_cache_misses_do_not_retain_entry_locks()
+    {
+        using var temp = TempDirectory.Create();
+        var cache = new PersistentCompiledArtifactCache(temp.Path);
+        var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        for (var i = 0; i < 256; i++)
+        {
+            var cacheKey = i.ToString("x64", System.Globalization.CultureInfo.InvariantCulture);
+            var result = await cache.TryReadAsync(
+                cacheKey,
+                plan,
+                "main",
+                new GeneratedAssemblyVerifier(),
+                VerificationPolicy.BoxedValueDefaults(),
+                CancellationToken.None);
+
+            Assert.Equal(CompiledCacheStatus.Miss, result.Status);
+        }
+
+        Assert.Equal(0, EntryLockCount(cache));
+    }
+
+    [Fact]
     public async Task Same_key_cold_compiles_publish_one_valid_cache_entry()
     {
         using var temp = TempDirectory.Create();
@@ -111,6 +137,15 @@ public sealed class CompiledCacheConcurrencyTests
     {
         var key = CacheKeyBuilder.Build(plan, "main", VerificationPolicy.BoxedValueDefaults(), optimize: false);
         return Path.Combine(root, key[..2], key[2..4], key);
+    }
+
+    private static int EntryLockCount(PersistentCompiledArtifactCache cache)
+    {
+        var field = typeof(PersistentCompiledArtifactCache).GetField(
+            "_entryLocks",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var locks = field.GetValue(cache)!;
+        return (int)locks.GetType().GetProperty("Count")!.GetValue(locks)!;
     }
 
     private sealed class TempDirectory : IDisposable

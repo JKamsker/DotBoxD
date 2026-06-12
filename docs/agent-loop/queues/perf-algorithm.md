@@ -13,10 +13,6 @@
 
 ## Fixed pending verification
 
-- [~] `ALG-0005` medium - Binding reference collection rewalks shared graphs per entrypoint
-  - File: `docs/agent-loop/findings/ALG-0005-binding-reference-collection-rewalks-shared-graphs-per-entrypoint.md`
-  - Fixed by: `fixer`
-  - Commit: ``
 
 ## Verified
 
@@ -26,5 +22,7 @@
   - File: `docs/agent-loop/findings/ALG-0003-generated-meter-analysis-repeatedly-rescans-predecessors.md`
 - [x] `ALG-0004` medium - Plugin analyzer rescans helper call graph to propagate taint
   - File: `docs/agent-loop/findings/ALG-0004-plugin-analyzer-rescans-helper-call-graph-to-propagate-taint.md`
+- [x] `ALG-0005` medium - Binding reference collection rewalks shared graphs per entrypoint
+  - File: `docs/agent-loop/findings/ALG-0005-binding-reference-collection-rewalks-shared-graphs-per-entrypoint.md`
 
 ## Rejected / duplicate / obsolete

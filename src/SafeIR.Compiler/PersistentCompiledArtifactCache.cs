@@ -13,7 +13,7 @@ public sealed partial class PersistentCompiledArtifactCache
     };
 
     private readonly string _rootDirectory;
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _entryLocks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, EntryLock> _entryLocks = new(StringComparer.Ordinal);
 
     public PersistentCompiledArtifactCache(string rootDirectory)
     {
@@ -213,46 +213,6 @@ public sealed partial class PersistentCompiledArtifactCache
         stream.Flush(flushToDisk: true);
     }
 
-    private async ValueTask<T> WithEntryLockAsync<T>(
-        string cacheKey,
-        Func<ValueTask<T>> action,
-        CancellationToken cancellationToken)
-    {
-        var entryLock = _entryLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-        await entryLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await using var fileLock = await PersistentCacheEntryLock
-                .AcquireAsync(_rootDirectory, cacheKey, cancellationToken)
-                .ConfigureAwait(false);
-            return await action().ConfigureAwait(false);
-        }
-        finally
-        {
-            entryLock.Release();
-        }
-    }
-
-    private async ValueTask WithEntryLockAsync(
-        string cacheKey,
-        Func<ValueTask> action,
-        CancellationToken cancellationToken)
-    {
-        var entryLock = _entryLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-        await entryLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await using var fileLock = await PersistentCacheEntryLock
-                .AcquireAsync(_rootDirectory, cacheKey, cancellationToken)
-                .ConfigureAwait(false);
-            await action().ConfigureAwait(false);
-        }
-        finally
-        {
-            entryLock.Release();
-        }
-    }
-
     private void Quarantine(string entryPath)
     {
         if (!Directory.Exists(entryPath))
@@ -290,6 +250,7 @@ public sealed partial class PersistentCompiledArtifactCache
             ArgumentException => "InvalidMetadata",
             _ => exception.GetType().Name
         };
+
 }
 
 public sealed record CompiledCacheLookup(

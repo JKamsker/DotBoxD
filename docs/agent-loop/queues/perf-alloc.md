@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `PAL-0006` medium - Persistent artifact cache retains entry locks per cache key
-  - File: `docs/agent-loop/findings/PAL-0006-persistent-artifact-cache-retains-entry-locks-per-cache-key.md`
-  - Dedup: `alloc/compiler-cache/entry-locks/unbounded-key-retention`
 - [ ] `PAL-0007` medium - Compiled artifact guard copies assembly bytes repeatedly
   - File: `docs/agent-loop/findings/PAL-0007-compiled-artifact-guard-copies-assembly-bytes-repeatedly.md`
   - Dedup: `alloc/compiled-artifact/assembly-bytes/repeated-defensive-copies`
@@ -22,6 +19,10 @@
 
 ## Fixed pending verification
 
+- [~] `PAL-0006` medium - Persistent artifact cache retains entry locks per cache key
+  - File: `docs/agent-loop/findings/PAL-0006-persistent-artifact-cache-retains-entry-locks-per-cache-key.md`
+  - Fixed by: `fixer`
+  - Commit: ``
 
 ## Verified
 
