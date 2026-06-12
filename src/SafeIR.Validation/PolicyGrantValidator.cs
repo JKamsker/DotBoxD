@@ -11,8 +11,9 @@ internal static class PolicyGrantValidator
         IReadOnlySet<string> requiredCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
+        var now = policy.GrantClock;
         var activeGrants = policy.Grants
-            .Where(IsActive)
+            .Where(grant => IsActive(grant, now))
             .ToArray();
         foreach (var group in activeGrants.GroupBy(g => g.Id, StringComparer.Ordinal))
         {
@@ -30,8 +31,8 @@ internal static class PolicyGrantValidator
         }
     }
 
-    private static bool IsActive(CapabilityGrant grant)
-        => grant.ExpiresAt is null || grant.ExpiresAt > DateTimeOffset.UtcNow;
+    private static bool IsActive(CapabilityGrant grant, DateTimeOffset now)
+        => grant.ExpiresAt is null || grant.ExpiresAt > now;
 
     private static void ValidateGrant(
         CapabilityGrant grant,

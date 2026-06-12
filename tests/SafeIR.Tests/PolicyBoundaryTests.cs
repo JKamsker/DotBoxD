@@ -101,6 +101,31 @@ public sealed partial class PolicyBoundaryTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT");
     }
 
+    [Fact]
+    public async Task Deterministic_grant_validation_uses_policy_logical_clock()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var policy = new SandboxPolicy(
+            "logical-grant-clock",
+            SandboxEffects.Pure,
+            [
+                new CapabilityGrant(
+                    "vendor.secret",
+                    new Dictionary<string, string>(),
+                    ExpiresAt: new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero))
+            ],
+            new ResourceLimits(MaxFuel: 5_000),
+            Deterministic: true,
+            LogicalNow: new DateTimeOffset(1999, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            RandomSeed: 1);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
+            await host.PrepareAsync(module, policy));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT");
+    }
+
     [Theory]
     [InlineData("maxBytesPerRun", "not-a-number")]
     [InlineData("allowOverwrite", "maybe")]
