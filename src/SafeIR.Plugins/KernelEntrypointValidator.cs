@@ -45,7 +45,8 @@ internal static class KernelEntrypointValidator
 
         for (var i = 0; i < expected.Count; i++)
         {
-            if (function.Parameters[i].Type != expected[i].Type)
+            if (!string.Equals(function.Parameters[i].Name, expected[i].Name, StringComparison.Ordinal) ||
+                function.Parameters[i].Type != expected[i].Type)
             {
                 throw SignatureError(functionId);
             }

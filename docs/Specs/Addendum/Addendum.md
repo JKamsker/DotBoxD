@@ -272,6 +272,10 @@ server.Hooks.On<DamageEvent>()
 
 However, kernel classes are the preferred ergonomic model for real plugins.
 
+Hook kernel entrypoint parameters are name-bound. The verified IR entrypoints
+must declare the event adapter parameters first, followed by live setting
+parameters, with exact names, types, and order.
+
 ---
 
 # 6. Value Bindings
@@ -656,7 +660,8 @@ Example:
   "mode": "auto",
   "effects": [
     "Cpu",
-    "GameMessageWrite"
+    "GameStateWrite",
+    "Audit"
   ],
   "liveSettings": [
     {

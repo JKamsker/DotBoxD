@@ -18,9 +18,9 @@ public sealed class DamageEventAdapter : IPluginEventAdapter<DamageEvent>
     public string EventName => "DamageEvent";
 
     public IReadOnlyList<Parameter> Parameters { get; } = [
-        new("eventDamageType", SandboxType.String),
-        new("amount", SandboxType.I32),
-        new("targetId", SandboxType.String)
+        new("e_DamageType", SandboxType.String),
+        new("e_Amount", SandboxType.I32),
+        new("e_TargetId", SandboxType.String)
     ];
 
     public IReadOnlyList<SandboxValue> ToSandboxValues(DamageEvent e)

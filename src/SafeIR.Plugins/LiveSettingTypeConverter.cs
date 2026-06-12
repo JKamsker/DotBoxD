@@ -63,6 +63,19 @@ internal static class LiveSettingTypeConverter
     public static object? CoerceClr(Type targetType, object? value)
     {
         var actual = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        try {
+            return CoerceClrCore(actual, value);
+        }
+        catch (SandboxValidationException) {
+            throw;
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidCastException or OverflowException) {
+            throw Diagnostic($"Live setting value is not valid for type '{TypeName(actual)}'.");
+        }
+    }
+
+    private static object? CoerceClrCore(Type actual, object? value)
+    {
         if (value is null) {
             return actual == typeof(string) ? string.Empty : Activator.CreateInstance(actual);
         }
@@ -90,10 +103,10 @@ internal static class LiveSettingTypeConverter
         }
 
         if (actual == typeof(double)) {
-            return value is string text ? double.Parse(text, CultureInfo.InvariantCulture) : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            return FiniteDouble(value);
         }
 
-        throw Diagnostic($"Live setting type '{targetType.Name}' is not supported.");
+        throw Diagnostic($"Live setting type '{actual.Name}' is not supported.");
     }
 
     public static object? CoerceClr(string type, object? value)
@@ -108,11 +121,11 @@ internal static class LiveSettingTypeConverter
 
     public static SandboxValue ToSandboxValue(string type, object? value)
         => type switch {
-            "bool" => SandboxValue.FromBool(Convert.ToBoolean(value, CultureInfo.InvariantCulture)),
-            "int" => SandboxValue.FromInt32(Convert.ToInt32(value, CultureInfo.InvariantCulture)),
-            "long" => SandboxValue.FromInt64(Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-            "double" => SandboxValue.FromDouble(Convert.ToDouble(value, CultureInfo.InvariantCulture)),
-            "string" => SandboxValue.FromString(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty),
+            "bool" => SandboxValue.FromBool((bool)CoerceClr(typeof(bool), value)!),
+            "int" => SandboxValue.FromInt32((int)CoerceClr(typeof(int), value)!),
+            "long" => SandboxValue.FromInt64((long)CoerceClr(typeof(long), value)!),
+            "double" => SandboxValue.FromDouble((double)CoerceClr(typeof(double), value)!),
+            "string" => SandboxValue.FromString((string)CoerceClr(typeof(string), value)!),
             _ => throw Diagnostic($"Live setting type '{type}' is not supported.")
         };
 
@@ -156,5 +169,25 @@ internal static class LiveSettingTypeConverter
         => new SandboxValidationException([new SandboxDiagnostic("SGP020", message)]);
 
     private static double Number(object? value)
-        => Convert.ToDouble(value, CultureInfo.InvariantCulture);
+        => FiniteDouble(value);
+
+    private static double FiniteDouble(object? value)
+    {
+        var result = value is string text
+            ? double.Parse(text, CultureInfo.InvariantCulture)
+            : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+        if (!double.IsFinite(result)) {
+            throw Diagnostic("Live setting value must be a finite number.");
+        }
+
+        return result;
+    }
+
+    private static string TypeName(Type type)
+        => type == typeof(int) ? "int" :
+           type == typeof(long) ? "long" :
+           type == typeof(double) ? "double" :
+           type == typeof(bool) ? "bool" :
+           type == typeof(string) ? "string" :
+           type.Name;
 }
