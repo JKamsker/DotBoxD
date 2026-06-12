@@ -2,7 +2,7 @@ namespace SafeIR;
 
 public sealed class SandboxContext
 {
-    private Random? _random;
+    private DeterministicRandom? _deterministicRandom;
     private int _callDepth;
     private readonly BindingReturnCreditTracker _returnCredits = new();
 
@@ -237,19 +237,39 @@ public sealed class SandboxContext
                     "deterministic random requires a seed"));
             }
 
-            _random ??= new Random(SeedToInt32(Policy.RandomSeed.Value));
-            return _random.Next(minInclusive, maxExclusive);
+            _deterministicRandom ??= new DeterministicRandom(Policy.RandomSeed.Value);
+            return _deterministicRandom.Next(minInclusive, maxExclusive);
         }
 
         return Random.Shared.Next(minInclusive, maxExclusive);
     }
 
-    private static int SeedToInt32(ulong seed)
+    private sealed class DeterministicRandom(ulong seed)
     {
-        var value = seed + 0x9E3779B97F4A7C15UL;
-        value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
-        value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
-        value ^= value >> 31;
-        return unchecked((int)(value ^ (value >> 32)));
+        private ulong _state = seed;
+
+        public int Next(int minInclusive, int maxExclusive)
+        {
+            var range = (ulong)((long)maxExclusive - minInclusive);
+            var threshold = (1UL << 32) % range;
+            while (true)
+            {
+                var value = NextUInt32();
+                if (value >= threshold)
+                {
+                    return checked((int)(minInclusive + (long)(value % range)));
+                }
+            }
+        }
+
+        private uint NextUInt32()
+        {
+            _state += 0x9E3779B97F4A7C15UL;
+            var value = _state;
+            value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+            value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+            value ^= value >> 31;
+            return (uint)(value >> 32);
+        }
     }
 }

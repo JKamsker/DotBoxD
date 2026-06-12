@@ -25,7 +25,8 @@ public static class SafeTimeBindings
                 BindingId: "time.nowUnixMillis",
                 CapabilityId: "time.now",
                 Effect: SandboxEffect.Time,
-                ResourceId: "clock:utc"));
+                ResourceId: "clock:utc",
+                Fields: BindingAuditFields.Create("clock", timestamp)));
             return ValueTask.FromResult(SandboxValue.FromInt64(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

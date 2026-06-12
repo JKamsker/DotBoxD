@@ -27,7 +27,8 @@ public static class SafeRandomBindings
                 BindingId: "random.nextI32",
                 CapabilityId: "random",
                 Effect: SandboxEffect.Random,
-                ResourceId: "random:i32"));
+                ResourceId: "random:i32",
+                Fields: BindingAuditFields.Create("random", timestamp)));
             return ValueTask.FromResult(SandboxValue.FromInt32(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

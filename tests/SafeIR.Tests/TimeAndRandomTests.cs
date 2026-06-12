@@ -68,6 +68,28 @@ public sealed class TimeAndRandomTests
     }
 
     [Fact]
+    public void Deterministic_random_sequence_has_golden_values()
+    {
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantRandom()
+            .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 123)
+            .Build();
+        var context = new SandboxContext(
+            SandboxRunId.New(),
+            policy,
+            new ResourceMeter(policy.ResourceLimits),
+            new BindingRegistry([]),
+            new InMemoryAuditSink(),
+            CancellationToken.None);
+
+        var values = Enumerable.Range(0, 5)
+            .Select(_ => context.NextRandomInt32(0, 1000))
+            .ToArray();
+
+        Assert.Equal([692, 665, 201, 396, 300], values);
+    }
+
+    [Fact]
     public async Task Deterministic_random_policy_requires_seed()
     {
         var host = SandboxTestHost.Create();
