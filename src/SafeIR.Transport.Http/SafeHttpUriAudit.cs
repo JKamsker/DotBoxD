@@ -4,7 +4,7 @@ internal static class SafeHttpUriAudit
 {
     public static string Sanitize(string value)
         => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            ? $"{uri.Scheme}://{NormalizedAuthority(uri)}{uri.AbsolutePath}"
+            ? $"{uri.Scheme}://{NormalizedAuthority(uri)}{AuditTextSanitizer.RedactPathSegments(uri.AbsolutePath)}"
             : "invalid-uri";
 
     public static bool MatchesAllowedAuthority(string allowed, Uri uri)

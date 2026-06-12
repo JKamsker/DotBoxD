@@ -95,6 +95,67 @@ public sealed class PublicModelImmutabilityTests
         Assert.Single(map.Values);
     }
 
+    [Fact]
+    public void Validation_exception_copies_diagnostic_inputs()
+    {
+        var diagnostics = new List<SandboxDiagnostic>
+        {
+            new("E-ONE", "first")
+        };
+        var exception = new SandboxValidationException(diagnostics);
+        diagnostics.Add(new SandboxDiagnostic("E-TWO", "second"));
+
+        var diagnostic = Assert.Single(exception.Diagnostics);
+        Assert.Equal("E-ONE", diagnostic.Code);
+    }
+
+    [Fact]
+    public void Audit_event_and_sink_copy_field_inputs()
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["resourceKind"] = "network"
+        };
+        var auditEvent = new SandboxAuditEvent(
+            SandboxRunId.New(),
+            "BindingCall",
+            DateTimeOffset.UtcNow,
+            true,
+            Fields: fields);
+        fields["resourceKind"] = "mutated-before-write";
+
+        var sink = new InMemoryAuditSink();
+        sink.Write(auditEvent);
+        fields["resourceKind"] = "mutated-after-write";
+
+        Assert.Equal("network", auditEvent.Fields!["resourceKind"]);
+        Assert.Equal("network", sink.Events[0].Fields!["resourceKind"]);
+    }
+
+    [Fact]
+    public void Execution_result_copies_audit_event_list_inputs()
+    {
+        var events = new List<SandboxAuditEvent>
+        {
+            new(SandboxRunId.New(), "RunSummary", DateTimeOffset.UtcNow, true)
+        };
+        var result = new SandboxExecutionResult
+        {
+            Succeeded = true,
+            Value = SandboxValue.Unit,
+            ResourceUsage = new ResourceMeter(new ResourceLimits(MaxFuel: 1_000)).Snapshot(),
+            AuditEvents = events,
+            ActualMode = ExecutionMode.Interpreted,
+            ExecutionDispatched = true,
+            ModuleHash = "module",
+            PlanHash = "plan",
+            PolicyHash = "policy"
+        };
+        events.Clear();
+
+        Assert.Single(result.AuditEvents);
+    }
+
     private static SandboxModule EmptyModule()
         => new("module", SemVersion.One, SemVersion.One, [], [EmptyFunction()], new Dictionary<string, string>());
 

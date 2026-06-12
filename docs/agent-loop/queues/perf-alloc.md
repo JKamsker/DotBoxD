@@ -7,9 +7,30 @@
 - [ ] `PAL-0009` medium - Stack type verifier copies operand stack state per instruction
   - File: `docs/agent-loop/findings/PAL-0009-stack-type-verifier-copies-operand-stack-state-per-instruction.md`
   - Dedup: `alloc/verifier/generated-stack-type/state-copy-per-instruction`
+- [ ] `PAL-0012` medium - JSON exporters duplicate UTF-8 buffers before returning strings
+  - File: `docs/agent-loop/findings/PAL-0012-json-exporters-duplicate-utf-8-buffers-before-returning-strings.md`
+  - Dedup: `alloc/json-export/memorystream-toarray-string-copy`
+- [ ] `PAL-0013` medium - Compiled binding dispatch allocates argument arrays per call
+  - File: `docs/agent-loop/findings/PAL-0013-compiled-binding-dispatch-allocates-argument-arrays-per-call.md`
+  - Dedup: `alloc/compiled-runtime/binding-dispatch/argument-array-per-call`
+- [ ] `PAL-0016` medium - Compiler IL emission reflects runtime helpers per emitted call
+  - File: `docs/agent-loop/findings/PAL-0016-compiler-il-emission-reflects-runtime-helpers-per-emitted-call.md`
+  - Dedup: `alloc/compiler-il-emission/runtime-method-reflection-lookup`
+- [ ] `PAL-0017` medium - Verifier decodes member signatures across repeated metadata passes
+  - File: `docs/agent-loop/findings/PAL-0017-verifier-decodes-member-signatures-across-repeated-metadata-passes.md`
+  - Dedup: `alloc/verifier/metadata/member-signature-decode-repeated-pass`
+- [ ] `PAL-0018` medium - Binding return charging traverses large values repeatedly
+  - File: `docs/agent-loop/findings/PAL-0018-binding-return-charging-traverses-large-values-repeatedly.md`
+  - Dedup: `alloc/binding-return/quota/type-shape-triple-traversal`
 - [ ] `PAL-0010` low - Persistent compiled cache leaves lock files per cache key
   - File: `docs/agent-loop/findings/PAL-0010-persistent-compiled-cache-leaves-lock-files-per-cache-key.md`
   - Dedup: `alloc/compiler-cache/file-locks/persistent-key-files`
+- [ ] `PAL-0014` low - IPC convenience defaults bypass the low-allocation profile
+  - File: `docs/agent-loop/findings/PAL-0014-ipc-convenience-defaults-bypass-the-low-allocation-profile.md`
+  - Dedup: `alloc/ipc-sharpc/default-options/low-allocation-profile-disabled`
+- [ ] `PAL-0015` low - Compiled cache quarantine has no bounded cleanup policy
+  - File: `docs/agent-loop/findings/PAL-0015-compiled-cache-quarantine-has-no-bounded-cleanup-policy.md`
+  - Dedup: `alloc/compiler-cache/quarantine/unbounded-invalid-entry-retention`
 
 ## Claimed
 

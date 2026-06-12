@@ -2,6 +2,7 @@ namespace SafeIR.Hosting;
 
 using System.Collections.Concurrent;
 using SafeIR;
+using SafeIR.Runtime;
 
 public sealed partial class SandboxHost
 {
@@ -79,6 +80,7 @@ public sealed partial class SandboxHost
         var sanitized = new string(trimmed
             .Select(c => char.IsControl(c) ? ' ' : c)
             .ToArray());
+        sanitized = AuditTextSanitizer.SanitizeAndRedact(sanitized);
         return sanitized.Length <= 256 ? sanitized : sanitized[..256];
     }
 

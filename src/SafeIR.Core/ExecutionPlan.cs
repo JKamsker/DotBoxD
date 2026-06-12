@@ -110,11 +110,18 @@ public enum SandboxIsolation
 
 public sealed record SandboxExecutionResult
 {
+    private IReadOnlyList<SandboxAuditEvent> _auditEvents = [];
+
     public bool Succeeded { get; init; }
     public SandboxValue? Value { get; init; }
     public SandboxError? Error { get; init; }
     public required SandboxResourceUsage ResourceUsage { get; init; }
-    public required IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
+    public required IReadOnlyList<SandboxAuditEvent> AuditEvents
+    {
+        get => _auditEvents;
+        init => _auditEvents = ModelCopy.List(value);
+    }
+
     public ExecutionMode ActualMode { get; init; }
     public bool ExecutionDispatched { get; init; }
     public required string ModuleHash { get; init; }

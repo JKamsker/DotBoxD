@@ -10,6 +10,9 @@
 - [ ] `ALG-0006` medium - Plugin package JSON import reparses module subtree
   - File: `docs/agent-loop/findings/ALG-0006-plugin-package-json-import-reparses-module-subtree.md`
   - Dedup: `algorithm/plugin-package-json/import/module-subtree-reparse`
+- [ ] `ALG-0007` low - Plugin package validation rescans module functions for entrypoints
+  - File: `docs/agent-loop/findings/ALG-0007-plugin-package-validation-rescans-module-functions-for-entrypoints.md`
+  - Dedup: `algorithm/plugin-package-validation/entrypoint-function-rescans`
 
 ## Claimed
 

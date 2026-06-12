@@ -29,7 +29,15 @@ public sealed record SandboxAuditEvent(
     string? Message = null,
     long? Bytes = null,
     IReadOnlyDictionary<string, string>? Fields = null,
-    long SequenceNumber = 0);
+    long SequenceNumber = 0)
+{
+    private IReadOnlyDictionary<string, string>? _fields = CopyFields(Fields);
+
+    public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
+
+    private static IReadOnlyDictionary<string, string>? CopyFields(IReadOnlyDictionary<string, string>? fields)
+        => fields is null ? null : ModelCopy.StringDictionary(fields);
+}
 
 public interface IAuditSink
 {
@@ -51,7 +59,7 @@ public sealed class InMemoryAuditSink : IAuditSink
     private readonly List<SandboxAuditEvent> _events = [];
     private long _sequence;
 
-    public IReadOnlyList<SandboxAuditEvent> Events => _events;
+    public IReadOnlyList<SandboxAuditEvent> Events => _events.ToArray();
 
     public long EventsWritten => _sequence;
 

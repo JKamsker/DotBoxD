@@ -53,5 +53,6 @@ internal static class SafeFileAudit
             Fields: fields));
     }
 
-    private static string Sanitize(string value) => value.Replace('\\', '/');
+    private static string Sanitize(string value)
+        => AuditTextSanitizer.RedactPathSegments(value.Replace('\\', '/'));
 }

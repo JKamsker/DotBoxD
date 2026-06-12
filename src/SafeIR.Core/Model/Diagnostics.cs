@@ -19,7 +19,7 @@ public sealed class SandboxValidationException(
     IReadOnlyList<SandboxDiagnostic> diagnostics)
     : Exception(string.Join(Environment.NewLine, diagnostics.Select(d => $"{d.Code}: {d.Message}")))
 {
-    public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = diagnostics;
+    public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(diagnostics);
 }
 
 public sealed class SandboxRuntimeException : Exception

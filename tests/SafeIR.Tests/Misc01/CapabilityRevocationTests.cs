@@ -77,6 +77,32 @@ public sealed class CapabilityRevocationTests
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "CapabilityRevoked");
     }
 
+    [Fact]
+    public async Task Revoked_capability_audit_reason_redacts_secrets()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(PureModuleWithLoggingRequest());
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .GrantLogging()
+                .WithFuel(1_000)
+                .Build());
+
+        host.RevokeCapability("log.write", "token=abc123 Authorization: Bearer secret.jwt");
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "CapabilityRevoked");
+        Assert.DoesNotContain("abc123", audit.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret.jwt", audit.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("abc123", audit.Fields!["reason"], StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret.jwt", audit.Fields["reason"], StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void AssertRevoked(
         SandboxExecutionResult result,
         ExecutionMode expectedMode,

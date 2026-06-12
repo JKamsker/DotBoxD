@@ -13,6 +13,15 @@
 - [ ] `CMP-0008` medium - Release readiness does not verify evidence for completed documentation inventory items
   - File: `docs/agent-loop/findings/CMP-0008-release-readiness-does-not-verify-evidence-for-completed-documentation-inventory.md`
   - Dedup: `cmp-release-readiness-documentation-inventory-evidence-coverage`
+- [ ] `CMP-0009` medium - Checked error code reference lacks per-code operational guidance
+  - File: `docs/agent-loop/findings/CMP-0009-checked-error-code-reference-lacks-per-code-operational-guidance.md`
+  - Dedup: `docs/error-code-reference/checked-complete-without-per-code-reference`
+- [ ] `CMP-0010` medium - Manifest inspection example omits capability requests and setting ranges
+  - File: `docs/agent-loop/findings/CMP-0010-manifest-inspection-example-omits-capability-requests-and-setting-ranges.md`
+  - Dedup: `cmp/plugin-admin-review/manifest-inspection-omits-capabilities-and-ranges`
+- [ ] `CMP-0011` medium - README lacks a safe-default host baseline before IO examples
+  - File: `docs/agent-loop/findings/CMP-0011-readme-lacks-a-safe-default-host-baseline-before-io-examples.md`
+  - Dedup: `cmp/samples/safe-default-host-baseline-missing`
 
 ## Claimed
 

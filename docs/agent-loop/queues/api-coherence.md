@@ -7,6 +7,18 @@
 - [ ] `API-0003` medium - Plugin JSON upload helpers are omitted from package surface guidance
   - File: `docs/agent-loop/findings/API-0003-plugin-json-upload-helpers-are-omitted-from-package-surface-guidance.md`
   - Dedup: `api-plugin-json-upload-package-guidance`
+- [ ] `API-0004` medium - Public packages do not generate XML documentation files
+  - File: `docs/agent-loop/findings/API-0004-public-packages-do-not-generate-xml-documentation-files.md`
+  - Dedup: `api/package-xml-docs/not-generated-for-public-packages`
+- [ ] `API-0005` medium - Package metadata uses one generic description and tag set for all packages
+  - File: `docs/agent-loop/findings/API-0005-package-metadata-uses-one-generic-description-and-tag-set-for-all-packages.md`
+  - Dedup: `api/package-metadata/generic-description-tags-for-all-packages`
+- [ ] `API-0006` medium - Package release gates lack a clean NuGet consumer smoke test
+  - File: `docs/agent-loop/findings/API-0006-package-release-gates-lack-a-clean-nuget-consumer-smoke-test.md`
+  - Dedup: `api/package-consumer-smoke/missing-clean-nuget-consumer`
+- [ ] `API-0007` medium - NuGet package readme lacks install and package-composition guidance
+  - File: `docs/agent-loop/findings/API-0007-nuget-package-readme-lacks-install-and-package-composition-guidance.md`
+  - Dedup: `api/nuget-readme/missing-install-package-composition-guidance`
 
 ## Claimed
 
