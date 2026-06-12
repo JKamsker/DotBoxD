@@ -137,6 +137,35 @@ public sealed class PluginAnalyzerCompletenessTests
         Assert.Contains("F64(1D)", generated);
     }
 
+    [Fact]
+    public void Generator_lowers_supported_constant_relational_and_not_patterns()
+    {
+        var (result, outputCompilation, diagnostics) = RunGenerator("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId, string Message, long Sequence, double Ratio);
+
+            [GamePlugin("patterns")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => e.Message is "fire" && e.Sequence is > 0 && e.Ratio is not <= 1;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        var generated = Assert.Single(result.GeneratedTrees).GetText().ToString();
+        Assert.Contains("Eq(Var(\"e_Message\"), Str(\"fire\"))", generated);
+        Assert.Contains("Gt(Var(\"e_Sequence\"), I64(0L))", generated);
+        Assert.Contains("Not(Le(Var(\"e_Ratio\"), F64(1D)))", generated);
+    }
+
     [Theory]
     [InlineData("e.Missing == \"fire\"")]
     [InlineData("e.Amount > 0.5D")]
