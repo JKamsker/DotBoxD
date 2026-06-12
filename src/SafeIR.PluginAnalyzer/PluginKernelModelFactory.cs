@@ -60,22 +60,22 @@ internal static class PluginKernelModelFactory
 
             ValidateGeneratedParameterNames(eventProperties, liveSettings);
 
-            var eventParameterName = shouldHandle.ParameterList.Parameters
-                .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.EventIndex)
-                ?.Identifier.ValueText ??
-                SafeIrGenerationNames.DefaultEventParameterName;
-            var contextParameterName = shouldHandle.ParameterList.Parameters
-                .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.ContextIndex)
-                ?.Identifier.ValueText ??
-                SafeIrGenerationNames.DefaultContextParameterName;
-            var handleEventParameterName = handle.ParameterList.Parameters
-                .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.EventIndex)
-                ?.Identifier.ValueText ??
-                SafeIrGenerationNames.DefaultEventParameterName;
-            var handleContextParameterName = handle.ParameterList.Parameters
-                .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.ContextIndex)
-                ?.Identifier.ValueText ??
-                SafeIrGenerationNames.DefaultContextParameterName;
+            var eventParameterName = ParameterName(
+                shouldHandle,
+                SafeIrGenerationNames.KernelMethodParameters.EventIndex,
+                SafeIrGenerationNames.DefaultEventParameterName);
+            var contextParameterName = ParameterName(
+                shouldHandle,
+                SafeIrGenerationNames.KernelMethodParameters.ContextIndex,
+                SafeIrGenerationNames.DefaultContextParameterName);
+            var handleEventParameterName = ParameterName(
+                handle,
+                SafeIrGenerationNames.KernelMethodParameters.EventIndex,
+                SafeIrGenerationNames.DefaultEventParameterName);
+            var handleContextParameterName = ParameterName(
+                handle,
+                SafeIrGenerationNames.KernelMethodParameters.ContextIndex,
+                SafeIrGenerationNames.DefaultContextParameterName);
             var shouldHandleContext = new SafeIrExpressionLoweringContext(
                 eventParameterName,
                 eventProperties,
@@ -149,14 +149,7 @@ internal static class PluginKernelModelFactory
         string methodName,
         CancellationToken cancellationToken)
     {
-        var interfaceMember = type.AllInterfaces
-            .Where(i => string.Equals(
-                i.OriginalDefinition.ToDisplayString(),
-                SafeIrGenerationNames.Metadata.EventKernelInterface,
-                StringComparison.Ordinal))
-            .SelectMany(i => i.GetMembers(methodName))
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault();
+        var interfaceMember = InterfaceMethod(type, methodName);
         if (interfaceMember is null)
         {
             throw new NotSupportedException($"Kernel must implement IEventKernel.{methodName}.");
@@ -177,6 +170,35 @@ internal static class PluginKernelModelFactory
         }
 
         throw new NotSupportedException($"Kernel {methodName} must be declared in source.");
+    }
+
+    private static string ParameterName(MethodDeclarationSyntax method, int index, string fallback)
+        => method.ParameterList.Parameters.Count > index
+            ? method.ParameterList.Parameters[index].Identifier.ValueText
+            : fallback;
+
+    private static IMethodSymbol? InterfaceMethod(INamedTypeSymbol type, string methodName)
+    {
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (!string.Equals(
+                    @interface.OriginalDefinition.ToDisplayString(),
+                    SafeIrGenerationNames.Metadata.EventKernelInterface,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var member in @interface.GetMembers(methodName))
+            {
+                if (member is IMethodSymbol method)
+                {
+                    return method;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static string PackageName(string kernelName)

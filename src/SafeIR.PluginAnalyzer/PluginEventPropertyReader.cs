@@ -6,44 +6,88 @@ internal static class PluginEventPropertyReader
 {
     public static IPropertySymbol[] Read(INamedTypeSymbol eventType)
     {
-        var properties = ReadableProperties(eventType).ToArray();
+        var properties = ReadableProperties(eventType);
         ValidatePropertyNames(properties);
         return ConstructorPropertyOrder(eventType, properties) ?? properties;
     }
 
     private static void ValidatePropertyNames(IPropertySymbol[] properties)
     {
-        var duplicate = properties
-            .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Skip(1).Any());
-        if (duplicate is not null)
+        var names = new Dictionary<string, string>(properties.Length, StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < properties.Length; i++)
         {
-            throw new NotSupportedException(
-                $"Event property '{duplicate.First().Name}' is declared more than once or differs only by case.");
+            if (names.TryGetValue(properties[i].Name, out var firstName))
+            {
+                throw new NotSupportedException(
+                    $"Event property '{firstName}' is declared more than once or differs only by case.");
+            }
+
+            names.Add(properties[i].Name, properties[i].Name);
         }
     }
 
-    private static IEnumerable<IPropertySymbol> ReadableProperties(INamedTypeSymbol eventType)
+    private static IPropertySymbol[] ReadableProperties(INamedTypeSymbol eventType)
     {
-        var hierarchy = new Stack<INamedTypeSymbol>();
+        var hierarchy = EventTypeHierarchy(eventType);
+        var count = 0;
+        for (var i = 0; i < hierarchy.Length; i++)
+        {
+            foreach (var member in hierarchy[i].GetMembers())
+            {
+                if (member is IPropertySymbol property && IsReadableProperty(property))
+                {
+                    count++;
+                }
+            }
+        }
+
+        if (count == 0)
+        {
+            return Array.Empty<IPropertySymbol>();
+        }
+
+        var properties = new IPropertySymbol[count];
+        var index = 0;
+        for (var i = 0; i < hierarchy.Length; i++)
+        {
+            foreach (var member in hierarchy[i].GetMembers())
+            {
+                if (member is IPropertySymbol property && IsReadableProperty(property))
+                {
+                    properties[index++] = property;
+                }
+            }
+        }
+
+        return properties;
+    }
+
+    private static INamedTypeSymbol[] EventTypeHierarchy(INamedTypeSymbol eventType)
+    {
+        var count = 0;
         for (var current = eventType;
              current is not null && current.SpecialType != SpecialType.System_Object;
              current = current.BaseType)
         {
-            hierarchy.Push(current);
+            count++;
         }
 
-        while (hierarchy.Count > 0)
+        if (count == 0)
         {
-            var current = hierarchy.Pop();
-            foreach (var member in current.GetMembers())
-            {
-                if (member is IPropertySymbol property && IsReadableProperty(property))
-                {
-                    yield return property;
-                }
-            }
+            return Array.Empty<INamedTypeSymbol>();
         }
+
+        var hierarchy = new INamedTypeSymbol[count];
+        var index = count - 1;
+        for (var current = eventType;
+             current is not null && current.SpecialType != SpecialType.System_Object;
+             current = current.BaseType)
+        {
+            hierarchy[index] = current;
+            index--;
+        }
+
+        return hierarchy;
     }
 
     private static bool IsReadableProperty(IPropertySymbol property)

@@ -44,22 +44,6 @@ internal static class PluginSymbolReader
             SafeIrGenerationNames.Metadata.EventKernelInterface,
             StringComparison.Ordinal);
 
-    public static INamedTypeSymbol? EventType(INamedTypeSymbol kernelType)
-    {
-        foreach (var @interface in kernelType.AllInterfaces) {
-            if (string.Equals(
-                    @interface.OriginalDefinition.ToDisplayString(),
-                    SafeIrGenerationNames.Metadata.EventKernelInterface,
-                    StringComparison.Ordinal)) {
-                return @interface.TypeArguments.Length > 0
-                    ? @interface.TypeArguments[0] as INamedTypeSymbol
-                    : null;
-            }
-        }
-
-        return null;
-    }
-
     public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
     {
         var properties = PluginEventPropertyReader.Read(eventType);
@@ -105,10 +89,13 @@ internal static class PluginSymbolReader
     {
         for (var current = kernelType; current is not null; current = current.BaseType)
         {
-            foreach (var property in current.GetMembers().OfType<IPropertySymbol>().Where(IsLiveSetting))
+            foreach (var member in current.GetMembers())
             {
-                ValidateLiveSettingProperty(property);
-                yield return property;
+                if (member is IPropertySymbol property && IsLiveSetting(property))
+                {
+                    ValidateLiveSettingProperty(property);
+                    yield return property;
+                }
             }
         }
     }
@@ -125,10 +112,20 @@ internal static class PluginSymbolReader
     }
 
     private static bool IsLiveSetting(IPropertySymbol property)
-        => property.GetAttributes().Any(a => string.Equals(
-            a.AttributeClass?.ToDisplayString(),
-            SafeIrGenerationNames.Metadata.LiveSettingAttribute,
-            StringComparison.Ordinal));
+    {
+        foreach (var attribute in property.GetAttributes())
+        {
+            if (string.Equals(
+                    attribute.AttributeClass?.ToDisplayString(),
+                    SafeIrGenerationNames.Metadata.LiveSettingAttribute,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static void ValidateLiveSettingProperty(IPropertySymbol property)
     {
@@ -151,7 +148,7 @@ internal static class PluginSymbolReader
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var syntax = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) as PropertyDeclarationSyntax;
+        var syntax = DeclaringPropertySyntax(property, cancellationToken);
         var type = SafeIrTypeNameReader.SandboxTypeName(property.Type);
         var range = Range(property, type);
         return new LiveSettingModel(
@@ -162,12 +159,24 @@ internal static class PluginSymbolReader
             range.Max);
     }
 
+    private static PropertyDeclarationSyntax? DeclaringPropertySyntax(
+        IPropertySymbol property,
+        CancellationToken cancellationToken)
+    {
+        foreach (var reference in property.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax syntax)
+            {
+                return syntax;
+            }
+        }
+
+        return null;
+    }
+
     private static (string? Min, string? Max) Range(IPropertySymbol property, string type)
     {
-        var range = property.GetAttributes().FirstOrDefault(a => string.Equals(
-            a.AttributeClass?.ToDisplayString(),
-            SafeIrGenerationNames.Metadata.RangeAttribute,
-            StringComparison.Ordinal));
+        var range = RangeAttribute(property);
         if (range is null ||
             range.ConstructorArguments.Length < SafeIrGenerationNames.RangeAttributeArguments.NumericOverloadCount) {
             return (null, null);
@@ -187,6 +196,22 @@ internal static class PluginSymbolReader
         }
 
         return (LiteralReader.ObjectLiteral(values.Min), LiteralReader.ObjectLiteral(values.Max));
+    }
+
+    private static AttributeData? RangeAttribute(IPropertySymbol property)
+    {
+        foreach (var attribute in property.GetAttributes())
+        {
+            if (string.Equals(
+                    attribute.AttributeClass?.ToDisplayString(),
+                    SafeIrGenerationNames.Metadata.RangeAttribute,
+                    StringComparison.Ordinal))
+            {
+                return attribute;
+            }
+        }
+
+        return null;
     }
 
     private static (object? Min, object? Max) RangeValues(
