@@ -27,6 +27,8 @@ internal static class SafeIrExpressionModelFactory
             ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, context),
             PrefixUnaryExpressionSyntax unary => LowerUnary(unary, context),
             BinaryExpressionSyntax binary => LowerBinary(binary, context),
+            InvocationExpressionSyntax invocation =>
+                SafeIrInvocationExpressionLowerer.Lower(invocation, context, part => Lower(part, context)),
             IsPatternExpressionSyntax pattern => SafeIrPatternExpressionLowerer.Lower(pattern, context, part => Lower(part, context)),
             IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, context.LiveSettings),
             MemberAccessExpressionSyntax member => LowerMemberAccess(member, context),
