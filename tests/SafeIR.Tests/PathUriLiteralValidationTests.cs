@@ -98,7 +98,7 @@ public sealed class PathUriLiteralValidationTests
     public async Task Path_literals_count_toward_string_byte_quota()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(ModuleWithReturn("SandboxPath", """{ "path": "config/settings.json" }"""));
+        var module = await host.ImportJsonAsync(ModuleWithReturn("SandboxPath", """{ "path": "config/settings.json" }"""));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxTotalStringBytes(4).Build());
 
         var result = await host.ExecuteAsync(

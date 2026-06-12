@@ -17,7 +17,7 @@ public sealed class DifferentialFuzzTests
         for (var index = 0; index < 40; index++) {
             var expression = Expression(random, depth: 4);
             var json = ModuleJson(index, expression);
-            var module = await host.ParseJsonAsync(json);
+            var module = await host.ImportJsonAsync(json);
             var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(10_000).Build());
             var input = Input(random);
 

@@ -32,7 +32,7 @@ public sealed class FileExtensionPolicyTests
         string allowedExtensions)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
         var policy = SandboxPolicyBuilder.Create()
             .Grant(
                 "file.read",

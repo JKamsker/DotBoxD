@@ -91,6 +91,61 @@ public sealed class PluginPackageValidationTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "SGP042");
     }
 
+    [Fact]
+    public async Task Install_rejects_manifest_contract_that_does_not_match_subscription_event()
+    {
+        var server = PluginServer.Create();
+        var package = FireDamagePluginPackage.Create();
+        var invalid = package with { Manifest = package.Manifest with { Contract = "IItemFilter" } };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "SGP014" &&
+            d.Message.Contains("IEventKernel<TEvent>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_rejects_wrong_should_handle_return_type()
+    {
+        var server = PluginServer.Create();
+        var package = FireDamagePluginPackage.Create();
+        var shouldHandle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.ShouldHandle);
+        var span = new SourceSpan(1, 1);
+        var functions = package.Module.Functions
+            .Select(f => f.Id == shouldHandle.Id
+                ? f with
+                {
+                    ReturnType = SandboxType.I32,
+                    Body = [new ReturnStatement(new LiteralExpression(SandboxValue.FromInt32(1), span), span)]
+                }
+                : f)
+            .ToArray();
+        var invalid = package with { Module = package.Module with { Functions = functions } };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP033");
+    }
+
+    [Fact]
+    public async Task Install_rejects_live_setting_missing_from_entrypoint_parameters()
+    {
+        var server = PluginServer.Create();
+        var package = FireDamagePluginPackage.Create();
+        var handle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.Handle);
+        var functions = package.Module.Functions
+            .Select(f => f.Id == handle.Id
+                ? f with { Parameters = f.Parameters.Where(p => p.Name != "MinDamage").ToArray() }
+                : f)
+            .ToArray();
+        var invalid = package with { Module = package.Module with { Functions = functions } };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP034" || d.Code == "SGP035");
+    }
+
     private sealed class FailingCompiler : ISandboxCompiler
     {
         public int Calls { get; private set; }

@@ -15,6 +15,7 @@
     <Description>SafeIR sandbox components for validating, interpreting, compiling, hosting, serializing, and transporting restricted .NET workloads.</Description>
     <PackageTags>safe-ir;sandbox;ir;interpreter;compiler;serialization;transport</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/JKamsker/Safe-IR</RepositoryUrl>
   </PropertyGroup>

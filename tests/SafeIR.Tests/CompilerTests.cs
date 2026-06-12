@@ -10,7 +10,7 @@ public sealed class CompilerTests
     public async Task Compiled_pure_module_matches_interpreter_result()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(7), SandboxValue.FromInt32(3)]);
 
@@ -38,7 +38,7 @@ public sealed class CompilerTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.json"), "from-file");
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
         var policy = SandboxPolicyBuilder.Create().GrantFileRead(temp.Path, 1024).WithFuel(5_000).Build();
         var plan = await host.PrepareAsync(module, policy);
 
@@ -57,7 +57,7 @@ public sealed class CompilerTests
     public async Task Compiled_mode_ignores_unreachable_effectful_tail_after_return()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(DeadFileReadTailJson());
+        var module = await host.ImportJsonAsync(DeadFileReadTailJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(5_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -76,7 +76,7 @@ public sealed class CompilerTests
     public async Task Compiled_module_supports_internal_function_calls()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(InternalCallJson());
+        var module = await host.ImportJsonAsync(InternalCallJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(7), SandboxValue.FromInt32(3)]);
 
@@ -102,7 +102,7 @@ public sealed class CompilerTests
     public async Task Compiled_internal_calls_enforce_call_depth_limit()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(CallDepthJson());
+        var module = await host.ImportJsonAsync(CallDepthJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxCallDepth(2).Build());
 
         var result = await host.ExecuteAsync(
@@ -120,7 +120,7 @@ public sealed class CompilerTests
     public async Task Reflection_emit_compiler_returns_unmaterialized_loaded_artifact()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var compiler = new ReflectionEmitSandboxCompiler(new GeneratedAssemblyVerifier());
 

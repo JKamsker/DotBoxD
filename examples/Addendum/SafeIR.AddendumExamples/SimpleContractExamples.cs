@@ -1,9 +1,7 @@
 namespace SafeIR.AddendumExamples;
 
 using SafeIR.PluginIpc.Server.Abstractions;
-using SafeIR.Plugins;
 
-[GamePlugin("epic-items-only")]
 public sealed partial class EpicItemsOnly : IItemFilter
 {
     public bool Accept(ItemView item, PlayerView player)

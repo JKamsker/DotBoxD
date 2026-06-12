@@ -164,7 +164,7 @@ public sealed class BindingReturnCostTests
                 builder.UseCompilerIfAvailable();
             }
         });
-        var module = await host.ParseJsonAsync(ReturnBindingJson(binding.Id, returnType));
+        var module = await host.ImportJsonAsync(ReturnBindingJson(binding.Id, returnType));
         var plan = await host.PrepareAsync(module, policy);
         return await host.ExecuteAsync(
             plan,

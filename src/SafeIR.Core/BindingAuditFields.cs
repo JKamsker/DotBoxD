@@ -5,6 +5,21 @@ public static class BindingAuditFields
     public static IReadOnlyDictionary<string, string> Create(
         string resourceKind,
         DateTimeOffset startedAt,
+        string moduleHash,
+        string policyHash,
+        long? bytesRead = null,
+        long? bytesWritten = null)
+    {
+        var fields = Create(resourceKind, startedAt, bytesRead, bytesWritten)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        fields["moduleHash"] = moduleHash;
+        fields["policyHash"] = policyHash;
+        return fields;
+    }
+
+    public static IReadOnlyDictionary<string, string> Create(
+        string resourceKind,
+        DateTimeOffset startedAt,
         long? bytesRead = null,
         long? bytesWritten = null)
     {

@@ -10,7 +10,7 @@ public sealed class NetworkAuditTests
     {
         var rawBytes = new byte[] { 0xff };
         var host = SandboxTestHost.Create(networkInvoker: RawBytesInvoker(rawBytes));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)

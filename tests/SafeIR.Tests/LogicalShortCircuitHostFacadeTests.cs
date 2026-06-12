@@ -20,7 +20,7 @@ public sealed partial class LogicalShortCircuitTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ModuleJson(
+        var module = await host.ImportJsonAsync(ModuleJson(
             """{ "op": "and", "left": { "call": "test.bool", "args": [] }, "right": { "bool": false } }"""));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 

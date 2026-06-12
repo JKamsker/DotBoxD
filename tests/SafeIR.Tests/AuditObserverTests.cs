@@ -15,7 +15,7 @@ public sealed class AuditObserverTests
             builder.UseInterpreter();
             builder.ForwardAuditEventsTo(observed.Add);
         });
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -39,7 +39,7 @@ public sealed class AuditObserverTests
             builder.UseInterpreter();
             builder.ForwardAuditEventsTo(observed.Add);
         });
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(

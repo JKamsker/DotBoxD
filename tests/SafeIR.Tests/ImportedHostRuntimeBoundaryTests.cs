@@ -22,7 +22,7 @@ public sealed class ImportedHostRuntimeBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(StraightLineCancelModule());
+        var module = await host.ImportJsonAsync(StraightLineCancelModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -48,7 +48,7 @@ public sealed class ImportedHostRuntimeBoundaryTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SingleReturnModule());
+        var module = await host.ImportJsonAsync(SingleReturnModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -78,7 +78,7 @@ public sealed class ImportedHostRuntimeBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(LoopCancelModule());
+        var module = await host.ImportJsonAsync(LoopCancelModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -108,7 +108,7 @@ public sealed class ImportedHostRuntimeBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ReturnExpressionModule(
+        var module = await host.ImportJsonAsync(ReturnExpressionModule(
             """{ "call": "test.expensive", "args": [] }""",
             "I32"));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(5).Build());
@@ -133,7 +133,7 @@ public sealed class ImportedHostRuntimeBoundaryTests
     public async Task Compiled_loop_fuel_exhaustion_returns_quota_exceeded()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(InfiniteLoopModule());
+        var module = await host.ImportJsonAsync(InfiniteLoopModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(50).Build());
 
         var result = await host.ExecuteAsync(

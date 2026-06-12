@@ -11,7 +11,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <VersionSuffix>ci.0</VersionSuffix>
+    <VersionSuffix>sharpc-ci.20</VersionSuffix>
   </PropertyGroup>
 
 </Project>

@@ -81,7 +81,7 @@ public sealed class SafeLoggingTests
     public async Task Log_binding_requires_policy_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(LogJson(
+        var module = await host.ImportJsonAsync(LogJson(
             """{ "call": "log.info", "args": [{ "string": "denied" }] }"""));
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
@@ -94,7 +94,7 @@ public sealed class SafeLoggingTests
     public async Task Log_event_limit_is_enforced()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "log-test",
           "version": "1.0.0",
@@ -146,7 +146,7 @@ public sealed class SafeLoggingTests
     private static async Task<SandboxExecutionResult> ExecuteLogAsync(string expression, SandboxPolicy policy)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(LogJson(expression));
+        var module = await host.ImportJsonAsync(LogJson(expression));
         var plan = await host.PrepareAsync(module, policy);
         return await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
     }

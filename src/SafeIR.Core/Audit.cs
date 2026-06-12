@@ -92,7 +92,11 @@ public sealed class InMemoryAuditSink : IAuditSink
         if (auditEvent.Fields is null ||
             !auditEvent.Fields.TryGetValue("resourceKind", out var resourceKind) ||
             string.IsNullOrWhiteSpace(resourceKind) ||
-            !auditEvent.Fields.TryGetValue("durationMs", out var durationMs))
+            !auditEvent.Fields.TryGetValue("durationMs", out var durationMs) ||
+            !auditEvent.Fields.TryGetValue("moduleHash", out var moduleHash) ||
+            string.IsNullOrWhiteSpace(moduleHash) ||
+            !auditEvent.Fields.TryGetValue("policyHash", out var policyHash) ||
+            string.IsNullOrWhiteSpace(policyHash))
         {
             return false;
         }

@@ -52,5 +52,21 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
     private static bool WorkerResultMatches(ExecutionPlan plan, SandboxExecutionResult result)
         => string.Equals(result.ModuleHash, plan.ModuleHash, StringComparison.Ordinal) &&
            string.Equals(result.PlanHash, plan.PlanHash, StringComparison.Ordinal) &&
-           string.Equals(result.PolicyHash, plan.PolicyHash, StringComparison.Ordinal);
+           string.Equals(result.PolicyHash, plan.PolicyHash, StringComparison.Ordinal) &&
+           WorkerModeMatches(result);
+
+    private static bool WorkerModeMatches(SandboxExecutionResult result)
+    {
+        if (!Enum.IsDefined(result.ActualMode) || result.ActualMode == ExecutionMode.Auto)
+        {
+            return false;
+        }
+
+        if (result.ActualMode == ExecutionMode.Interpreted)
+        {
+            return string.IsNullOrWhiteSpace(result.ArtifactHash);
+        }
+
+        return !result.Succeeded || !string.IsNullOrWhiteSpace(result.ArtifactHash);
+    }
 }

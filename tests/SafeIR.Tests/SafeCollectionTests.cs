@@ -8,7 +8,7 @@ public sealed class SafeCollectionTests
     public async Task List_count_get_and_add_execute_with_allocation_accounting()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collections",
           "version": "1.0.0",
@@ -56,7 +56,7 @@ public sealed class SafeCollectionTests
     public async Task List_get_reports_out_of_range_as_safe_error()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collections",
           "version": "1.0.0",
@@ -94,7 +94,7 @@ public sealed class SafeCollectionTests
     public async Task List_add_rejects_wrong_item_type_during_validation()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collections",
           "version": "1.0.0",
@@ -131,7 +131,7 @@ public sealed class SafeCollectionTests
     public async Task List_growth_charges_allocation_quota()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collections",
           "version": "1.0.0",

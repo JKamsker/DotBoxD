@@ -17,7 +17,7 @@ public sealed class ExecutionModeSelectorTests
             builder.UseCompilerIfAvailable(new FailingCompiler());
             builder.UseExecutionModeSelector(selector);
         });
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
         var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 1 };
@@ -45,7 +45,7 @@ public sealed class ExecutionModeSelectorTests
             builder.UseCompilerIfAvailable(compiler);
             builder.UseExecutionModeSelector(selector);
         });
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
         var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 1 };

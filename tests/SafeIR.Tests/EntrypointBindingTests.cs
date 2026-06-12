@@ -8,7 +8,7 @@ public sealed class EntrypointBindingTests
     public async Task Compiled_single_list_parameter_receives_whole_input()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SingleListParameterJson());
+        var module = await host.ImportJsonAsync(SingleListParameterJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(2)]);
 
@@ -27,7 +27,7 @@ public sealed class EntrypointBindingTests
     public async Task Entrypoint_rejects_extra_multi_parameter_inputs(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([
             SandboxValue.FromInt32(1),
@@ -48,7 +48,7 @@ public sealed class EntrypointBindingTests
     public async Task Entrypoint_rejects_wrong_single_parameter_type(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SingleI32ParameterJson());
+        var module = await host.ImportJsonAsync(SingleI32ParameterJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await ExecuteAsync(host, plan, SandboxValue.FromString("wrong"), mode);

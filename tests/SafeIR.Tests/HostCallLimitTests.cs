@@ -9,7 +9,7 @@ public sealed class HostCallLimitTests
     public async Task Global_host_call_limit_is_enforced()
     {
         var host = CreateHost(TestBinding("test.ping"));
-        var module = await host.ParseJsonAsync(DoubleCallJson("test.ping"));
+        var module = await host.ImportJsonAsync(DoubleCallJson("test.ping"));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxHostCalls(1).Build());
 
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
@@ -23,7 +23,7 @@ public sealed class HostCallLimitTests
     public async Task Per_binding_call_limit_is_enforced()
     {
         var host = CreateHost(TestBinding("test.ping", maxCallsPerRun: 1));
-        var module = await host.ParseJsonAsync(DoubleCallJson("test.ping"));
+        var module = await host.ImportJsonAsync(DoubleCallJson("test.ping"));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxHostCalls(10).Build());
 
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);

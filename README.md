@@ -11,7 +11,7 @@ Interpreted mode executes verified IR directly. Compiled mode is only a runtime 
 - `SafeIR.Runtime`: safe host bindings for files, time, random, logging, strings, and math.
 - `SafeIR.Serialization.Json`: JSON IR importer and host parsing extensions.
 - `SafeIR.Transport.Http`: HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
-- `SafeIR.Transport.Ipc.ShaRpc`: MessagePack named-pipe IPC helpers built on the ShaRPC NuGet packages.
+- `SafeIR.Transport.Ipc.ShaRpc`: preview MessagePack named-pipe IPC helpers built on the prerelease ShaRPC NuGet packages.
 - `SafeIR.Interpreter`: direct IR execution backend.
 - `SafeIR.Compiler`: generated-runtime backend and persistent artifact cache.
 - `SafeIR.Verifier`: generated assembly verifier.
@@ -86,6 +86,8 @@ dotnet test SafeIR.slnx
 dotnet pack SafeIR.slnx --configuration Release --output artifacts/packages
 ```
 
+`SafeIR.Transport.Ipc.ShaRpc` is intentionally packed as a prerelease package while its upstream ShaRPC dependencies are prerelease-only. Stable release gates should reject that package until stable ShaRPC dependencies are available.
+
 ## Plugin Addendum Examples
 
 The addendum implementation lives in `src/SafeIR.Plugins`.
@@ -104,8 +106,15 @@ dotnet run --project examples\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.
 
 Run the real named-pipe IPC sample with the ShaRPC MessagePack addon:
 
+Terminal 1:
+
 ```powershell
 dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Server\SafeIR.PluginIpc.Server.csproj -- safe-ir-plugin-ipc
+```
+
+Terminal 2:
+
+```powershell
 dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Client\SafeIR.PluginIpc.Client.csproj -- safe-ir-plugin-ipc
 ```
 

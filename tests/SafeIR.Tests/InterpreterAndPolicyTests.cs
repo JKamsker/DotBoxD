@@ -8,7 +8,7 @@ public sealed class InterpreterAndPolicyTests
     public async Task Pure_json_module_executes_interpreted()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -27,7 +27,7 @@ public sealed class InterpreterAndPolicyTests
     public async Task File_read_is_denied_without_host_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(FileReadJson("config.json"));
         var policy = SandboxPolicyBuilder.Create().Build();
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () => await host.PrepareAsync(module, policy));
@@ -38,7 +38,7 @@ public sealed class InterpreterAndPolicyTests
     public async Task Fuel_exhaustion_stops_infinite_loop()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "loop",
           "version": "1.0.0",
@@ -78,7 +78,7 @@ public sealed class InterpreterAndPolicyTests
     public async Task Interpreted_debug_trace_reports_ir_statement_kinds()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -108,7 +108,7 @@ public sealed class InterpreterAndPolicyTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.json"), "trace-me");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(FileReadJson("config.json"));
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()

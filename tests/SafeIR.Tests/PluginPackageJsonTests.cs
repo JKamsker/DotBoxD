@@ -44,6 +44,25 @@ public sealed class PluginPackageJsonTests
     }
 
     [Theory]
+    [InlineData("\"pluginId\": \"json-fire-damage\"", "\"pluginId\": \"other\"")]
+    [InlineData("\"name\": \"DamageType\"", "\"name\": \"Other\"")]
+    [InlineData("\"event\": \"DamageEvent\"", "\"event\": \"OtherEvent\"")]
+    public void Import_rejects_duplicate_plugin_manifest_shapes(string first, string duplicate)
+    {
+        var json = JsonDamagePackage("""
+            { "name": "DamageType", "name": "Other", "type": "string", "defaultValue": "fire" }
+            """);
+        if (first != "\"name\": \"DamageType\"")
+        {
+            json = JsonDamagePackage().Replace(first, first + ", " + duplicate, StringComparison.Ordinal);
+        }
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-SCHEMA");
+    }
+
+    [Theory]
     [InlineData("Acme.Plugin.Kernel, Acme.Plugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")]
     [InlineData("RuntimeTypeHandle")]
     [InlineData("MetadataToken=06000001")]

@@ -12,7 +12,7 @@ public sealed class SafeFileSystemTests
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
 
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config/settings.json"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config/settings.json"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithFuel(5_000)
@@ -36,7 +36,7 @@ public sealed class SafeFileSystemTests
         var host = SandboxTestHost.Create();
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
-            await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path)));
+            await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson(path)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
@@ -47,7 +47,7 @@ public sealed class SafeFileSystemTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 5)
             .WithFuel(5_000)
@@ -67,7 +67,7 @@ public sealed class SafeFileSystemTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 4)
             .WithFuel(5_000)
@@ -86,7 +86,7 @@ public sealed class SafeFileSystemTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithMaxAllocatedBytes(4)
@@ -104,7 +104,7 @@ public sealed class SafeFileSystemTests
     public async Task File_write_is_denied_without_host_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("out/result.txt", "hello"));
+        var module = await host.ImportJsonAsync(FileWriteJson("out/result.txt", "hello"));
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
@@ -117,7 +117,7 @@ public sealed class SafeFileSystemTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("out/result.txt", "written"));
+        var module = await host.ImportJsonAsync(FileWriteJson("out/result.txt", "written"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileWrite(temp.Path, 1024)
             .WithFuel(5_000)
@@ -142,7 +142,7 @@ public sealed class SafeFileSystemTests
         var host = SandboxTestHost.Create();
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
-            await host.ParseJsonAsync(FileWriteJson(path, "blocked")));
+            await host.ImportJsonAsync(FileWriteJson(path, "blocked")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
@@ -153,7 +153,7 @@ public sealed class SafeFileSystemTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("existing.txt", "new"));
+        var module = await host.ImportJsonAsync(FileWriteJson("existing.txt", "new"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileWrite(temp.Path, 1024, allowOverwrite: false)
             .WithFuel(5_000)
@@ -172,7 +172,7 @@ public sealed class SafeFileSystemTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("too-large.txt", "0123456789"));
+        var module = await host.ImportJsonAsync(FileWriteJson("too-large.txt", "0123456789"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileWrite(temp.Path, maxBytesPerRun: 4)
             .WithFuel(5_000)
@@ -184,6 +184,26 @@ public sealed class SafeFileSystemTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
         Assert.False(File.Exists(Path.Combine(temp.Path, "too-large.txt")));
+    }
+
+    [Fact]
+    public async Task File_write_charges_encoded_buffer_allocation_before_writing()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(FileWriteJson("alloc-too-large.txt", "abcde"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileWrite(temp.Path, maxBytesPerRun: 1024)
+            .WithMaxAllocatedBytes(12)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "alloc-too-large.txt")));
     }
 
     private static string FileWriteJson(string path, string text)

@@ -83,6 +83,7 @@ public sealed class InstalledKernel
     public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
     {
         SynchronizeLiveStateForFlush();
+        _pendingLiveUpdates.ClearError();
         await _pendingLiveUpdates.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 

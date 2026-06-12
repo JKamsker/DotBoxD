@@ -54,7 +54,7 @@ public sealed class PinnedHttpTransportTests
     {
         var host = SandboxTestHost.Create(dnsResolver: StaticDns(IPAddress.Loopback));
         var uri = $"http://safe.test:{port}/config";
-        var module = await host.ParseJsonAsync(NetworkJson(uri));
+        var module = await host.ImportJsonAsync(NetworkJson(uri));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(
                 [$"safe.test:{port}"],

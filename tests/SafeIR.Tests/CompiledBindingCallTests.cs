@@ -18,7 +18,7 @@ public sealed class CompiledBindingCallTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "compiled-binding-call",
           "version": "1.0.0",
@@ -64,7 +64,7 @@ public sealed class CompiledBindingCallTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(CallBindingJson("test.throw"));
+        var module = await host.ImportJsonAsync(CallBindingJson("test.throw"));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var interpreted = await host.ExecuteAsync(
@@ -93,7 +93,7 @@ public sealed class CompiledBindingCallTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(new RogueBindingCompiler());
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "compiled-rogue-binding",
           "version": "1.0.0",
@@ -132,7 +132,7 @@ public sealed class CompiledBindingCallTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(new MalformedBindingArgumentCompiler());
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "compiled-binding-argument-shape",
           "version": "1.0.0",

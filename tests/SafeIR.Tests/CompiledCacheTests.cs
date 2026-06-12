@@ -18,7 +18,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
 
@@ -39,7 +39,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var firstPlan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var secondPlan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(2_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
@@ -58,7 +58,7 @@ public sealed class CompiledCacheTests
         using var temp = TempDirectory.Create();
         var defaultHost = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
         var extendedHost = HostWithExtraBinding(temp.Path);
-        var module = await defaultHost.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await defaultHost.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var defaultPlan = await defaultHost.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var extendedPlan = await extendedHost.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
@@ -77,7 +77,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -96,7 +96,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -114,7 +114,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -132,7 +132,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -150,7 +150,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -168,7 +168,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);
@@ -186,7 +186,7 @@ public sealed class CompiledCacheTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);

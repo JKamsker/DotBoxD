@@ -8,7 +8,7 @@ public sealed class FileDeadlineTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.txt"), "value");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("settings.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("settings.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithWallTime(TimeSpan.Zero)
@@ -27,7 +27,7 @@ public sealed class FileDeadlineTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("result.txt", "value"));
+        var module = await host.ImportJsonAsync(FileWriteJson("result.txt", "value"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileWrite(temp.Path, 1024)
             .WithWallTime(TimeSpan.Zero)

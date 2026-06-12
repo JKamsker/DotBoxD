@@ -16,7 +16,7 @@ public sealed class JsonDescriptorHardeningTests
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync(MinimalModule(
+        var module = await host.ImportJsonAsync(MinimalModule(
             $$"""
             "metadata": { "debug": "{{metadataValue}}" },
             """));
@@ -31,7 +31,7 @@ public sealed class JsonDescriptorHardeningTests
     public async Task Duplicate_capability_requests_are_rejected()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "duplicate-capability",
           "version": "1.0.0",

@@ -30,7 +30,7 @@ public sealed class NetworkRequestQuotaTests
     private static async Task<SandboxExecutionResult> ExecuteNetworkAsync(string uri, SandboxPolicy policy)
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson(uri));
+        var module = await host.ImportJsonAsync(NetworkJson(uri));
         var plan = await host.PrepareAsync(module, policy);
         return await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
     }

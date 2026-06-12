@@ -16,7 +16,7 @@ public sealed class BindingAuditEnforcementTests
     public async Task Audited_binding_without_binding_audit_fails(ExecutionMode mode)
     {
         var host = Host(TestBindingBehavior.MissingSuccessAudit);
-        var module = await host.ParseJsonAsync(ModuleJson());
+        var module = await host.ImportJsonAsync(ModuleJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -35,7 +35,7 @@ public sealed class BindingAuditEnforcementTests
     public async Task Audited_binding_with_binding_audit_succeeds(ExecutionMode mode)
     {
         var host = Host(TestBindingBehavior.WritesSuccessAudit);
-        var module = await host.ParseJsonAsync(ModuleJson());
+        var module = await host.ImportJsonAsync(ModuleJson());
         var plan = await host.PrepareAsync(module, Policy(TestBindingBehavior.WritesSuccessAudit));
 
         var result = await host.ExecuteAsync(
@@ -59,10 +59,11 @@ public sealed class BindingAuditEnforcementTests
     [InlineData(TestBindingBehavior.EmptyAuditEffect)]
     [InlineData(TestBindingBehavior.EmptyAuditResource)]
     [InlineData(TestBindingBehavior.EmptyAuditFields)]
+    [InlineData(TestBindingBehavior.MissingAuditCorrelation)]
     public async Task Malformed_binding_audit_does_not_satisfy_required_audit(TestBindingBehavior behavior)
     {
         var host = Host(behavior);
-        var module = await host.ParseJsonAsync(ModuleJson());
+        var module = await host.ImportJsonAsync(ModuleJson());
         var plan = await host.PrepareAsync(module, Policy(behavior));
 
         var result = await host.ExecuteAsync(
@@ -81,7 +82,7 @@ public sealed class BindingAuditEnforcementTests
     public async Task Audited_binding_failure_without_binding_audit_preserves_error_and_audits_failure(ExecutionMode mode)
     {
         var host = Host(TestBindingBehavior.ThrowsWithoutAudit);
-        var module = await host.ParseJsonAsync(ModuleJson());
+        var module = await host.ImportJsonAsync(ModuleJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -103,7 +104,7 @@ public sealed class BindingAuditEnforcementTests
     public async Task Debug_trace_does_not_satisfy_required_binding_audit()
     {
         var host = Host(TestBindingBehavior.MissingSuccessAudit);
-        var module = await host.ParseJsonAsync(ModuleJson());
+        var module = await host.ImportJsonAsync(ModuleJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -191,6 +192,11 @@ public sealed class BindingAuditEnforcementTests
                     WriteAudit(context, "BindingCall", null, SandboxEffect.Cpu, "test:audit", includeFields: false);
                 }
 
+                if (behavior == TestBindingBehavior.MissingAuditCorrelation)
+                {
+                    WriteAudit(context, "BindingCall", null, SandboxEffect.Cpu, "test:audit", includeCorrelation: false);
+                }
+
                 return ValueTask.FromResult(SandboxValue.FromInt32(7));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
@@ -212,7 +218,8 @@ public sealed class BindingAuditEnforcementTests
         string? capabilityId,
         SandboxEffect effect,
         string? resourceId,
-        bool includeFields = true)
+        bool includeFields = true,
+        bool includeCorrelation = true)
     {
         var timestamp = DateTimeOffset.UtcNow;
         context.Audit.Write(new SandboxAuditEvent(
@@ -224,7 +231,11 @@ public sealed class BindingAuditEnforcementTests
             CapabilityId: capabilityId,
             Effect: effect,
             ResourceId: resourceId,
-            Fields: includeFields ? BindingAuditFields.Create("test", timestamp) : null));
+            Fields: includeFields
+                ? includeCorrelation
+                    ? context.BindingAuditFields("test", timestamp)
+                    : BindingAuditFields.Create("test", timestamp)
+                : null));
     }
 
     public enum TestBindingBehavior
@@ -236,7 +247,8 @@ public sealed class BindingAuditEnforcementTests
         WrongCapability,
         EmptyAuditEffect,
         EmptyAuditResource,
-        EmptyAuditFields
+        EmptyAuditFields,
+        MissingAuditCorrelation
     }
 
     private static string ModuleJson()

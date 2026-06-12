@@ -207,8 +207,7 @@ internal static class GeneratedMethodShapeVerifier
                 continue;
             }
 
-            var previous = i > 0 ? analysis.Instructions[i - 1] : null;
-            if (previous?.Int32Value is > 0)
+            if (GeneratedMethodMeterAnalyzer.HasPositiveImmediateMeterAmount(analysis, i))
             {
                 continue;
             }
@@ -224,32 +223,12 @@ internal static class GeneratedMethodShapeVerifier
         GeneratedMethodFlow analysis,
         List<VerificationDiagnostic> diagnostics)
     {
-        var positiveMeters = analysis.Instructions.Count(i =>
-            IsReachable(analysis, i) &&
-            IsFuelMeter(i.CalledMember) &&
-            PreviousInt32Value(analysis, i) is > 0);
-        var workCalls = analysis.Instructions.Count(i =>
-            IsReachable(analysis, i) &&
-            (IsMeterDensityWorkCall(i.CalledMember) || i.IsLocalCall));
-        if (positiveMeters < workCalls)
+        if (GeneratedMethodMeterAnalyzer.HasUnmeteredWorkPath(analysis, IsFuelMeter, IsMeterDensityWorkCall))
         {
             diagnostics.Add(new VerificationDiagnostic(
                 "V-COMPILED-SHAPE",
                 $"method '{methodName}' must meter each runtime work call"));
         }
-    }
-
-    private static int? PreviousInt32Value(GeneratedMethodFlow analysis, GeneratedInstruction instruction)
-    {
-        for (var i = 0; i < analysis.Instructions.Count; i++)
-        {
-            if (analysis.Instructions[i].Offset == instruction.Offset)
-            {
-                return i > 0 ? analysis.Instructions[i - 1].Int32Value : null;
-            }
-        }
-
-        return null;
     }
 
     private static GeneratedMeterState StateFor(GeneratedInstruction instruction)

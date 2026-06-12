@@ -77,6 +77,24 @@ public sealed class PublicModelImmutabilityTests
         Assert.Single(manifest.Subscriptions);
     }
 
+    [Fact]
+    public void Sandbox_values_copy_collection_inputs()
+    {
+        var listBacking = new List<SandboxValue> { SandboxValue.FromInt32(1) };
+        var list = (ListValue)SandboxValue.FromList(listBacking);
+        listBacking.Add(SandboxValue.FromInt32(2));
+
+        var mapBacking = new Dictionary<SandboxValue, SandboxValue>
+        {
+            [SandboxValue.FromString("first")] = SandboxValue.FromInt32(1)
+        };
+        var map = (MapValue)SandboxValue.FromMap(mapBacking, SandboxType.String, SandboxType.I32);
+        mapBacking[SandboxValue.FromString("second")] = SandboxValue.FromInt32(2);
+
+        Assert.Single(list.Values);
+        Assert.Single(map.Values);
+    }
+
     private static SandboxModule EmptyModule()
         => new("module", SemVersion.One, SemVersion.One, [], [EmptyFunction()], new Dictionary<string, string>());
 

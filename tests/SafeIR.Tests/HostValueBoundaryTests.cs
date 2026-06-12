@@ -21,7 +21,7 @@ public sealed class HostValueBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "host-value-boundary",
           "version": "1.0.0",

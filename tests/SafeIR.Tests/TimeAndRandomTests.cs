@@ -8,7 +8,7 @@ public sealed class TimeAndRandomTests
     public async Task Time_binding_requires_host_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(TimeJson());
+        var module = await host.ImportJsonAsync(TimeJson());
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
@@ -21,7 +21,7 @@ public sealed class TimeAndRandomTests
     {
         var host = SandboxTestHost.Create();
         var logicalNow = DateTimeOffset.Parse("2026-06-11T10:15:30Z");
-        var module = await host.ParseJsonAsync(TimeJson());
+        var module = await host.ImportJsonAsync(TimeJson());
         var policy = SandboxPolicyBuilder.Create()
             .GrantTimeNow()
             .Deterministic(logicalNow, randomSeed: 1)
@@ -40,7 +40,7 @@ public sealed class TimeAndRandomTests
     public async Task Deterministic_random_replays_from_policy_seed()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(RandomSumJson());
+        var module = await host.ImportJsonAsync(RandomSumJson());
         var policy = SandboxPolicyBuilder.Create()
             .GrantRandom()
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 123)
@@ -55,7 +55,14 @@ public sealed class TimeAndRandomTests
         Assert.Equal(((I32Value)first.Value!).Value, ((I32Value)second.Value!).Value);
         Assert.All(
             first.AuditEvents.Where(e => e.BindingId == "random.nextI32"),
-            e => Assert.Equal(DateTimeOffset.UnixEpoch, e.Timestamp));
+            e =>
+            {
+                Assert.Equal(DateTimeOffset.UnixEpoch, e.Timestamp);
+                var durationMs = double.Parse(
+                    e.Fields!["durationMs"],
+                    System.Globalization.CultureInfo.InvariantCulture);
+                Assert.True(durationMs < 1_000);
+            });
     }
 
     [Fact]
@@ -93,7 +100,7 @@ public sealed class TimeAndRandomTests
     public async Task Deterministic_random_policy_requires_seed()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(RandomSumJson());
+        var module = await host.ImportJsonAsync(RandomSumJson());
         var policy = new SandboxPolicy(
             "deterministic-without-seed",
             SandboxEffects.Pure | SandboxEffect.Random,
@@ -132,7 +139,7 @@ public sealed class TimeAndRandomTests
     private static async Task<int> ExecuteRandomSumAsync(ulong seed)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(RandomSumJson());
+        var module = await host.ImportJsonAsync(RandomSumJson());
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()

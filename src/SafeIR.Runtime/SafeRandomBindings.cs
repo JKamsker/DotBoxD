@@ -15,6 +15,7 @@ public static class SafeRandomBindings
         AuditLevel.PerCall,
         BindingSafety.ReadOnlyExternal,
         (context, args, _) => {
+            var startedAt = DateTimeOffset.UtcNow;
             var min = ((I32Value)args[0]).Value;
             var max = ((I32Value)args[1]).Value;
             var value = context.NextRandomInt32(min, max);
@@ -28,7 +29,7 @@ public static class SafeRandomBindings
                 CapabilityId: "random",
                 Effect: SandboxEffect.Random,
                 ResourceId: "random:i32",
-                Fields: BindingAuditFields.Create("random", timestamp)));
+                Fields: context.BindingAuditFields("random", startedAt)));
             return ValueTask.FromResult(SandboxValue.FromInt32(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

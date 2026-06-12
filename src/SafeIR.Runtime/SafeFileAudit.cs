@@ -33,7 +33,7 @@ internal static class SafeFileAudit
         long? bytes,
         SandboxErrorCode? error)
     {
-        var fields = BindingAuditFields.Create(
+        var fields = context.BindingAuditFields(
             "file",
             startedAt,
             bytesRead: bindingId == "file.readText" ? bytes : null,

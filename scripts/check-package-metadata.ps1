@@ -88,6 +88,10 @@ foreach ($package in $packages) {
         [void] (RequiredText $metadata "authors" $package.Name)
         [void] (RequiredText $metadata "description" $package.Name)
         [void] (RequiredText $metadata "readme" $package.Name)
+        $license = $metadata.SelectSingleNode("*[local-name()='license']")
+        if ($null -eq $license -or [string]::IsNullOrWhiteSpace($license.InnerText)) {
+            throw "Package $($package.Name) must declare a license expression or file."
+        }
 
         $repository = $metadata.SelectSingleNode("*[local-name()='repository']")
         if ($null -eq $repository -or [string]::IsNullOrWhiteSpace($repository.url)) {

@@ -41,7 +41,9 @@ public static class PluginMessageBindings
                 var message = Sanitize(((StringValue)args[1]).Value);
                 await sink.SendAsync(targetId, message, cancellationToken).ConfigureAwait(false);
                 var timestamp = DateTimeOffset.UtcNow;
-                var fields = new Dictionary<string, string>(BindingAuditFields.Create("plugin-message", timestamp), StringComparer.Ordinal)
+                var fields = new Dictionary<string, string>(
+                    context.BindingAuditFields("plugin-message", timestamp),
+                    StringComparer.Ordinal)
                 {
                     ["messageLength"] = message.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 };

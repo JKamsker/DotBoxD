@@ -8,7 +8,7 @@ public sealed class ReachablePolicyAnalysisTests
     public async Task Private_unreachable_external_binding_does_not_require_policy_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(ModuleWithPrivateFileRead(privateIsEntrypoint: false));
+        var module = await host.ImportJsonAsync(ModuleWithPrivateFileRead(privateIsEntrypoint: false));
 
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var result = await host.ExecuteAsync(
@@ -25,7 +25,7 @@ public sealed class ReachablePolicyAnalysisTests
     public async Task Entrypoint_external_binding_still_requires_policy_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(ModuleWithPrivateFileRead(privateIsEntrypoint: true));
+        var module = await host.ImportJsonAsync(ModuleWithPrivateFileRead(privateIsEntrypoint: true));
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build()));

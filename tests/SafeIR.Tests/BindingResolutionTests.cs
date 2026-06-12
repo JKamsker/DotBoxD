@@ -11,7 +11,7 @@ public sealed class BindingResolutionTests
     public async Task Compiled_runtime_rejects_binding_referenced_only_by_dead_function()
     {
         var host = CreateHost(new RogueBindingCompiler());
-        var module = await host.ParseJsonAsync(DeadFunctionBindingJson());
+        var module = await host.ImportJsonAsync(DeadFunctionBindingJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await ExecuteCompiledAsync(host, plan);
@@ -23,7 +23,7 @@ public sealed class BindingResolutionTests
     public async Task User_function_calls_shadow_same_named_bindings()
     {
         var host = CreateHost();
-        var module = await host.ParseJsonAsync(ShadowedBindingJson());
+        var module = await host.ImportJsonAsync(ShadowedBindingJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var interpreted = await host.ExecuteAsync(
@@ -45,7 +45,7 @@ public sealed class BindingResolutionTests
     public async Task Compiled_runtime_rejects_binding_shadowed_by_user_function()
     {
         var host = CreateHost(new RogueBindingCompiler());
-        var module = await host.ParseJsonAsync(ShadowedBindingJson());
+        var module = await host.ImportJsonAsync(ShadowedBindingJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await ExecuteCompiledAsync(host, plan);

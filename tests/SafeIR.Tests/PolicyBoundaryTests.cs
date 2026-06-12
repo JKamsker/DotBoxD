@@ -11,7 +11,7 @@ public sealed partial class PolicyBoundaryTests
         using var activeRoot = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(expiredRoot.Path, "secret.txt"), "expired-secret");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("secret.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("secret.txt"));
         var policy = new SandboxPolicy(
             "grant-expiry",
             SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.FileRead,
@@ -32,7 +32,7 @@ public sealed partial class PolicyBoundaryTests
     public async Task Prepare_rejects_direct_policy_with_negative_resource_limit()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = new SandboxPolicy(
             "invalid-limits",
             SandboxEffects.Pure,
@@ -51,7 +51,7 @@ public sealed partial class PolicyBoundaryTests
         using var first = TempDirectory.Create();
         using var second = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
         var policy = new SandboxPolicy(
             "duplicate-grants",
             SandboxEffects.Pure | SandboxEffect.FileRead,
@@ -71,7 +71,7 @@ public sealed partial class PolicyBoundaryTests
     public async Task Prepare_rejects_unknown_grant_not_required_by_registered_binding()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = new SandboxPolicy(
             "unknown-grant",
             SandboxEffects.Pure,
@@ -88,7 +88,7 @@ public sealed partial class PolicyBoundaryTests
     public async Task Unknown_capability_request_cannot_be_satisfied_by_unknown_grant()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(UnknownCapabilityRequestJson());
+        var module = await host.ImportJsonAsync(UnknownCapabilityRequestJson());
         var policy = new SandboxPolicy(
             "unknown-request",
             SandboxEffects.Pure,
@@ -105,7 +105,7 @@ public sealed partial class PolicyBoundaryTests
     public async Task Deterministic_grant_validation_uses_policy_logical_clock()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = new SandboxPolicy(
             "logical-grant-clock",
             SandboxEffects.Pure,
@@ -134,7 +134,7 @@ public sealed partial class PolicyBoundaryTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("out.txt", "x"));
+        var module = await host.ImportJsonAsync(FileWriteJson("out.txt", "x"));
         var parameters = new Dictionary<string, string>
         {
             ["root"] = temp.Path,
@@ -178,9 +178,9 @@ public sealed partial class PolicyBoundaryTests
     public async Task Execute_rejects_tampered_unverified_plan()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
-        var unverifiedModule = await host.ParseJsonAsync(UnknownCallJson());
+        var unverifiedModule = await host.ImportJsonAsync(UnknownCallJson());
         var tampered = new ExecutionPlan(
             plan.ModuleHash, plan.PlanHash, plan.PlanSeal, plan.PolicyHash, plan.BindingManifestHash,
             unverifiedModule, plan.Policy, plan.Bindings, plan.Budget, plan.FunctionAnalysis);

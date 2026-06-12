@@ -11,7 +11,7 @@ public sealed class BindingResourceFuelTests
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.txt"), "hello");
 
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithFuel(5_000)
@@ -28,7 +28,7 @@ public sealed class BindingResourceFuelTests
     public async Task Http_get_charges_base_fuel_once_plus_raw_bytes()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("hello"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)

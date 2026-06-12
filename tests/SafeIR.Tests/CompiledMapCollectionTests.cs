@@ -191,7 +191,7 @@ public sealed class CompiledMapCollectionTests
         SandboxExecutionOptions options)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(moduleJson);
+        var module = await host.ImportJsonAsync(moduleJson);
         var plan = await host.PrepareAsync(module, policy);
         return await host.ExecuteAsync(plan, "main", SandboxValue.Unit, options);
     }

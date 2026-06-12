@@ -7,7 +7,6 @@ public sealed record SandboxError(
 
 public enum SandboxErrorCode
 {
-    ParseError,
     ValidationError,
     PolicyDenied,
     PermissionDenied,

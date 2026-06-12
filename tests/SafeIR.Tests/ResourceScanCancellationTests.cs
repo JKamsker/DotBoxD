@@ -10,7 +10,7 @@ public sealed class ResourceScanCancellationTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "cancelled-shape-scan",
           "version": "1.0.0",

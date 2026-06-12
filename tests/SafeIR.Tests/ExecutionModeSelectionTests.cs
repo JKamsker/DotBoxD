@@ -12,7 +12,7 @@ public sealed class ExecutionModeSelectionTests
     {
         var compiler = new FailingCompiler();
         var host = HostWithCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -33,7 +33,7 @@ public sealed class ExecutionModeSelectionTests
     {
         var compiler = new FailingCompiler();
         var host = HostWithCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -52,7 +52,7 @@ public sealed class ExecutionModeSelectionTests
     public async Task Auto_mode_promotes_to_compiled_after_hotness_threshold()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 2 };
         var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
@@ -70,7 +70,7 @@ public sealed class ExecutionModeSelectionTests
     public async Task Auto_mode_threshold_one_still_starts_interpreted()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var options = new SandboxExecutionOptions { Mode = ExecutionMode.Auto, AutoCompileThreshold = 1 };
         var input = SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]);
@@ -85,10 +85,55 @@ public sealed class ExecutionModeSelectionTests
     }
 
     [Fact]
+    public async Task Auto_mode_keeps_effectful_entrypoint_interpreted_after_hotness_threshold()
+    {
+        var compiler = new FailingCompiler();
+        var host = SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.AddLogBindings();
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable(compiler);
+        });
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "auto-effectful",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "log.write", "reason": "test" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [{ "op": "return", "value": { "call": "log.info", "args": [{ "string": "hello" }] } }]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().GrantLogging().WithFuel(1_000).Build());
+        var options = new SandboxExecutionOptions
+        {
+            Mode = ExecutionMode.Auto,
+            AutoCompileThreshold = 2,
+            AllowFallbackToInterpreter = false
+        };
+
+        var first = await host.ExecuteAsync(plan, "main", SandboxValue.Unit, options);
+        var second = await host.ExecuteAsync(plan, "main", SandboxValue.Unit, options);
+
+        Assert.True(first.Succeeded, first.Error?.SafeMessage);
+        Assert.True(second.Succeeded, second.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Interpreted, first.ActualMode);
+        Assert.Equal(ExecutionMode.Interpreted, second.ActualMode);
+        Assert.Equal(0, compiler.Calls);
+    }
+
+    [Fact]
     public async Task Compiled_mode_without_compiler_falls_back_when_allowed()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -106,7 +151,7 @@ public sealed class ExecutionModeSelectionTests
     public async Task Compiled_mode_without_compiler_fails_when_fallback_disabled()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -131,7 +176,7 @@ public sealed class ExecutionModeSelectionTests
     {
         var compiler = new FailingCompiler();
         var host = HostWithCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var invalidMode = (ExecutionMode)123;
 
@@ -156,7 +201,7 @@ public sealed class ExecutionModeSelectionTests
     {
         var compiler = new DynamicDelegateCompiler();
         var host = HostWithCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -178,9 +223,9 @@ public sealed class ExecutionModeSelectionTests
     [Fact]
     public async Task Compiled_mode_ignores_untrusted_loaded_assembly_delegate()
     {
-        var compiler = new TamperedLoadedAssemblyCompiler();
+        var compiler = new TamperedExecutionDelegateCompiler();
         var host = HostWithCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -199,7 +244,7 @@ public sealed class ExecutionModeSelectionTests
     public async Task Compiled_mode_compiler_sandbox_failure_returns_result_when_fallback_disabled()
     {
         var host = HostWithCompiler(new SandboxFailureCompiler(SandboxErrorCode.VerifierFailure));
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -221,7 +266,7 @@ public sealed class ExecutionModeSelectionTests
     public async Task Compiled_mode_unexpected_compiler_exception_returns_host_failure()
     {
         var host = HostWithCompiler(new UnexpectedFailureCompiler());
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -245,81 +290,4 @@ public sealed class ExecutionModeSelectionTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(compiler);
         });
-
-    private sealed class FailingCompiler : ISandboxCompiler
-    {
-        public int Calls { get; private set; }
-
-        public ValueTask<CompiledArtifact> CompileAsync(
-            ExecutionPlan plan,
-            CompileOptions options,
-            CancellationToken cancellationToken)
-        {
-            Calls++;
-            throw new InvalidOperationException("compiler must not be called");
-        }
-    }
-
-    private sealed class DynamicDelegateCompiler : ISandboxCompiler
-    {
-        public int Calls { get; private set; }
-        public bool DelegateExecuted { get; private set; }
-
-        public ValueTask<CompiledArtifact> CompileAsync(
-            ExecutionPlan plan,
-            CompileOptions options,
-            CancellationToken cancellationToken)
-        {
-            Calls++;
-            return ValueTask.FromResult(CompiledArtifactTestFactory.DynamicMethod(
-                plan,
-                (_, _) =>
-                {
-                    DelegateExecuted = true;
-                    return SandboxValue.FromInt32(123);
-                },
-                "delegate-artifact"));
-        }
-    }
-
-    private sealed class TamperedLoadedAssemblyCompiler : ISandboxCompiler
-    {
-        private readonly ReflectionEmitSandboxCompiler _inner = new(new GeneratedAssemblyVerifier());
-
-        public bool DelegateExecuted { get; private set; }
-
-        public async ValueTask<CompiledArtifact> CompileAsync(
-            ExecutionPlan plan,
-            CompileOptions options,
-            CancellationToken cancellationToken)
-        {
-            var artifact = await _inner.CompileAsync(plan, options, cancellationToken).ConfigureAwait(false);
-            return artifact with
-            {
-                Entrypoint = (_, _) =>
-                {
-                    DelegateExecuted = true;
-                    return SandboxValue.FromInt32(999);
-                }
-            };
-        }
-    }
-
-    private sealed class SandboxFailureCompiler(SandboxErrorCode code) : ISandboxCompiler
-    {
-        public ValueTask<CompiledArtifact> CompileAsync(
-            ExecutionPlan plan,
-            CompileOptions options,
-            CancellationToken cancellationToken)
-            => throw new SandboxRuntimeException(new SandboxError(code, "compiler failed"));
-    }
-
-    private sealed class UnexpectedFailureCompiler : ISandboxCompiler
-    {
-        public ValueTask<CompiledArtifact> CompileAsync(
-            ExecutionPlan plan,
-            CompileOptions options,
-            CancellationToken cancellationToken)
-            => throw new InvalidOperationException("compiler failed unexpectedly");
-    }
 }

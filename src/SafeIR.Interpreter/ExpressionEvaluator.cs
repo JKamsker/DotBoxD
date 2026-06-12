@@ -171,10 +171,11 @@ internal sealed class ExpressionEvaluator
             throw;
         }
 
-        using var timeout = _context.CreateWallTimeToken();
-        using var returnCredits = _context.BeginBindingReturnCreditScope();
+        CancellationTokenSource? timeout = null;
         try
         {
+            timeout = _context.CreateWallTimeToken();
+            using var returnCredits = _context.BeginBindingReturnCreditScope();
             var value = await descriptor.Invoke(_context, args, timeout.Token).ConfigureAwait(false);
             _context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
             return _context.ChargeBindingReturn(descriptor, value);
@@ -189,7 +190,7 @@ internal sealed class ExpressionEvaluator
             _context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
             _context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
@@ -206,6 +207,10 @@ internal sealed class ExpressionEvaluator
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
             _context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
             throw new SandboxRuntimeException(error);
+        }
+        finally
+        {
+            timeout?.Dispose();
         }
     }
 

@@ -16,7 +16,7 @@ public sealed partial class PolicyBoundaryTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson("out.txt", "x"));
+        var module = await host.ImportJsonAsync(FileWriteJson("out.txt", "x"));
         var policy = new SandboxPolicy(
             "bad-file-extensions",
             SandboxEffects.Pure | SandboxEffect.FileWrite | SandboxEffect.Audit,

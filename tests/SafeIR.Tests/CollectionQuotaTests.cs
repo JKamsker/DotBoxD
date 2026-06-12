@@ -71,7 +71,7 @@ public sealed class CollectionQuotaTests
     public async Task Total_collection_element_limit_counts_entrypoint_input()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithMaxTotalCollectionElements(1).Build());
 
         var result = await host.ExecuteAsync(
@@ -93,10 +93,10 @@ public sealed class CollectionQuotaTests
     }
 
     [Fact]
-    public async Task Cyclic_host_collection_input_is_rejected_safely()
+    public async Task Host_collection_input_is_snapshotted_before_later_mutation()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "cyclic-input",
           "version": "1.0.0",
@@ -118,15 +118,15 @@ public sealed class CollectionQuotaTests
 
         var result = await host.ExecuteAsync(plan, "main", input);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.InvalidInput, result.Error!.Code);
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(1, ((I32Value)result.Value!).Value);
     }
 
     [Fact]
     public async Task Deep_host_collection_input_fails_by_quota_without_recursion()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "deep-input",
           "version": "1.0.0",
@@ -158,7 +158,7 @@ public sealed class CollectionQuotaTests
     public async Task Single_list_entrypoint_input_is_validated_deeply()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "typed-list-input",
           "version": "1.0.0",
@@ -188,7 +188,7 @@ public sealed class CollectionQuotaTests
         SandboxPolicy policy)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "collection-quotas",
           "version": "1.0.0",

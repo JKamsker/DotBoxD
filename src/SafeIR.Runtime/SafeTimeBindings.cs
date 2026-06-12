@@ -15,6 +15,7 @@ public static class SafeTimeBindings
         AuditLevel.PerCall,
         BindingSafety.ReadOnlyExternal,
         (context, _, _) => {
+            var startedAt = DateTimeOffset.UtcNow;
             var timestamp = context.UtcNow();
             var value = timestamp.ToUnixTimeMilliseconds();
             context.Audit.Write(new SandboxAuditEvent(
@@ -26,7 +27,7 @@ public static class SafeTimeBindings
                 CapabilityId: "time.now",
                 Effect: SandboxEffect.Time,
                 ResourceId: "clock:utc",
-                Fields: BindingAuditFields.Create("clock", timestamp)));
+                Fields: context.BindingAuditFields("clock", startedAt)));
             return ValueTask.FromResult(SandboxValue.FromInt64(value));
         },
         CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));

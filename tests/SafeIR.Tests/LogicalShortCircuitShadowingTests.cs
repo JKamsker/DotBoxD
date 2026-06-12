@@ -15,7 +15,7 @@ public sealed partial class LogicalShortCircuitTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ShadowedBindingModuleJson());
+        var module = await host.ImportJsonAsync(ShadowedBindingModuleJson());
         var plan = await host.PrepareAsync(module, GameReadPolicy());
 
         var result = await host.ExecuteAsync(

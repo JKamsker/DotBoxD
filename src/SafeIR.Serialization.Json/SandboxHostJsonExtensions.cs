@@ -13,10 +13,4 @@ public static class SandboxHostJsonExtensions
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(SafeIrJsonImporter.Import(jsonIr));
     }
-
-    public static ValueTask<SandboxModule> ParseJsonAsync(
-        this SandboxHost host,
-        string jsonIr,
-        CancellationToken cancellationToken = default)
-        => host.ImportJsonAsync(jsonIr, cancellationToken);
 }

@@ -13,7 +13,7 @@ public sealed class LoopIterationLimitTests
     public async Task Loop_iteration_limit_is_enforced(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(InfiniteLoopModule());
+        var module = await host.ImportJsonAsync(InfiniteLoopModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
             .WithMaxLoopIterations(3)

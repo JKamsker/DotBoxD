@@ -34,7 +34,6 @@ public enum Rarity
     Legendary
 }
 
-[GamePlugin("epic-items-only")]
 public sealed partial class EpicItemsOnly : IItemFilter
 {
     public bool Accept(ItemView item, PlayerView player)
@@ -45,6 +44,8 @@ public sealed partial class EpicItemsOnly : IItemFilter
 ```
 
 Simple filters request CPU-only execution. They do not mutate server state and do not receive raw host services.
+This simple contract is host-side C# guidance today; the current SafeIR source generator only
+lowers `IEventKernel<TEvent>` kernels into plugin packages.
 
 ### 2. Implement A Kernel
 
@@ -192,8 +193,8 @@ Over IPC, send the same update as one request:
 ```csharp
 await service.ModifySettingsAsync(
     [
-        new LiveSettingUpdate { Name = "MinDamage", Value = "250" },
-        new LiveSettingUpdate { Name = "DamageType", Value = "ice" }
+        new LiveSettingUpdate("MinDamage", "250"),
+        new LiveSettingUpdate("DamageType", "ice")
     ],
     atomic: true);
 ```
@@ -219,6 +220,7 @@ The sample package requests:
 ```text
 Effects:
   Cpu
+  Alloc
   GameStateWrite
   Audit
 

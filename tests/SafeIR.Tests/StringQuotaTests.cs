@@ -112,7 +112,7 @@ public sealed class StringQuotaTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.txt"), "hello");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithMaxStringLength(4)
@@ -134,7 +134,7 @@ public sealed class StringQuotaTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.txt"), "hello");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(temp.Path, 1024)
             .WithMaxTotalStringBytes(30)
@@ -181,7 +181,7 @@ public sealed class StringQuotaTests
         bool compiler = false)
     {
         var host = SandboxTestHost.Create(compiler: compiler);
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "string-quotas",
           "version": "1.0.0",
@@ -206,7 +206,7 @@ public sealed class StringQuotaTests
         bool compiler = false)
     {
         var host = SandboxTestHost.Create(compiler: compiler);
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "string-input",
           "version": "1.0.0",

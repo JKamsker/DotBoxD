@@ -9,7 +9,7 @@ public sealed class DeterministicExecutionOptionTests
     public async Task Require_deterministic_rejects_non_deterministic_policy()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -31,7 +31,7 @@ public sealed class DeterministicExecutionOptionTests
     public async Task Require_deterministic_allows_deterministic_policy()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = SandboxPolicyBuilder.Create()
             .WithFuel(1_000)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
@@ -53,7 +53,7 @@ public sealed class DeterministicExecutionOptionTests
     {
         var compiler = new CountingCompiler();
         var host = SandboxHostForCompiler(compiler);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(

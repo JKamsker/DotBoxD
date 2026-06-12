@@ -170,7 +170,7 @@ public sealed class MathBindingTests
         bool compiler = false)
     {
         var host = SandboxTestHost.Create(compiler: compiler);
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "math-bindings",
           "version": "1.0.0",

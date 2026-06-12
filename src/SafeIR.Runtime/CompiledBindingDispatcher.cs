@@ -19,10 +19,11 @@ internal static class CompiledBindingDispatcher
             throw;
         }
 
-        using var timeout = context.CreateWallTimeToken();
-        using var returnCredits = context.BeginBindingReturnCreditScope();
+        CancellationTokenSource? timeout = null;
         try
         {
+            timeout = context.CreateWallTimeToken();
+            using var returnCredits = context.BeginBindingReturnCreditScope();
             var value = descriptor.Invoke(context, args, timeout.Token).AsTask().GetAwaiter().GetResult();
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
             return context.ChargeBindingReturn(descriptor, value);
@@ -37,7 +38,7 @@ internal static class CompiledBindingDispatcher
             context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, SandboxErrorCode.Cancelled);
             throw;
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, $"binding '{id}' timed out");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
@@ -54,6 +55,10 @@ internal static class CompiledBindingDispatcher
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
             throw new SandboxRuntimeException(error);
+        }
+        finally
+        {
+            timeout?.Dispose();
         }
     }
 

@@ -8,7 +8,7 @@ public sealed class ValidationHardeningTests
     public async Task Unreachable_tail_statements_are_still_validated()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "unreachable-tail",
           "version": "1.0.0",
@@ -37,7 +37,7 @@ public sealed class ValidationHardeningTests
     public async Task Nested_unreachable_tail_statements_are_still_validated()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "nested-unreachable-tail",
           "version": "1.0.0",
@@ -75,7 +75,7 @@ public sealed class ValidationHardeningTests
     public async Task Non_collection_calls_reject_generic_type()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "generic-type-smuggling",
           "version": "1.0.0",
@@ -111,7 +111,7 @@ public sealed class ValidationHardeningTests
     public async Task Non_collection_calls_reject_known_generic_type()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "known-generic-type-smuggling",
           "version": "1.0.0",
@@ -147,7 +147,7 @@ public sealed class ValidationHardeningTests
     public async Task Collection_calls_reject_generic_type_except_empty_factories()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collection-generic-type-smuggling",
           "version": "1.0.0",
@@ -182,7 +182,7 @@ public sealed class ValidationHardeningTests
     public async Task Valid_generic_sites_reject_forbidden_generic_type()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "generic-site-forbidden-type",
           "version": "1.0.0",
@@ -217,7 +217,7 @@ public sealed class ValidationHardeningTests
     public async Task Deterministic_policy_denies_file_io_effects()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead("root", 1024)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
@@ -233,7 +233,7 @@ public sealed class ValidationHardeningTests
     public async Task Deterministic_policy_denies_external_allowed_effects_even_for_pure_module()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead("root", 1024)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
@@ -249,7 +249,7 @@ public sealed class ValidationHardeningTests
     public async Task Policy_with_unknown_effect_bits_is_rejected()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var policy = new SandboxPolicy(
             "unknown-effects",
             SandboxEffects.Pure | (SandboxEffect)(1 << 20),

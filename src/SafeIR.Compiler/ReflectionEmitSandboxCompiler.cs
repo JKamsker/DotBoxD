@@ -113,7 +113,8 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         var assembly = new PersistedAssemblyBuilder(assemblyName, typeof(object).Assembly);
         var module = assembly.DefineDynamicModule("SafeIR.Generated.Module");
         var type = module.DefineType("SafeIR.Generated.Module_" + plan.ModuleHash[..16], TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
-        var functions = DefineFunctionMethods(type, plan.Module.Functions);
+        var reachableFunctions = ReachableFunctionCollector.Collect(plan, function);
+        var functions = DefineFunctionMethods(type, reachableFunctions);
         var methodReferences = functions.ToDictionary(p => p.Key, p => (MethodInfo)p.Value, StringComparer.Ordinal);
         var execute = type.DefineMethod(
             "Execute",
@@ -122,7 +123,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
             [typeof(SandboxContext), typeof(SandboxValue)]);
 
         EmitExecute(execute.GetILGenerator(), function, functions[function.Id]);
-        foreach (var item in plan.Module.Functions)
+        foreach (var item in reachableFunctions)
         {
             new MethodEmitter(
                 functions[item.Id].GetILGenerator(),

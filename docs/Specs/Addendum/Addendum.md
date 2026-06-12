@@ -735,6 +735,7 @@ Example:
   "mode": "auto",
   "effects": [
     "Cpu",
+    "Alloc",
     "GameStateWrite",
     "Audit"
   ],

@@ -9,7 +9,7 @@ public sealed class CustomEffectBindingTests
     public async Task Custom_effect_binding_requires_policy_grant()
     {
         var host = HostWithCounterBinding(_ => { });
-        var module = await host.ParseJsonAsync(CounterModule());
+        var module = await host.ImportJsonAsync(CounterModule());
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
@@ -22,7 +22,7 @@ public sealed class CustomEffectBindingTests
     {
         var observed = 0;
         var host = HostWithCounterBinding(value => observed += value);
-        var module = await host.ParseJsonAsync(CounterModule());
+        var module = await host.ImportJsonAsync(CounterModule());
         var plan = await host.PrepareAsync(
             module,
             GameWritePolicy());
@@ -39,7 +39,7 @@ public sealed class CustomEffectBindingTests
     public async Task Custom_effect_binding_compiled_mode_fails_without_interpreter_fallback()
     {
         var host = HostWithCounterBinding(_ => { });
-        var module = await host.ParseJsonAsync(CounterModule());
+        var module = await host.ImportJsonAsync(CounterModule());
         var plan = await host.PrepareAsync(
             module,
             GameWritePolicy());
@@ -60,7 +60,7 @@ public sealed class CustomEffectBindingTests
     {
         var observed = 0;
         var host = HostWithCounterBinding(value => observed += value);
-        var module = await host.ParseJsonAsync(CounterModule());
+        var module = await host.ImportJsonAsync(CounterModule());
         var plan = await host.PrepareAsync(
             module,
             GameWritePolicy());
@@ -81,7 +81,7 @@ public sealed class CustomEffectBindingTests
     {
         var observed = 0;
         var host = HostWithBinding(CapabilityGatedPureBinding(() => observed++));
-        var module = await host.ParseJsonAsync(CapabilityGatedPureModule());
+        var module = await host.ImportJsonAsync(CapabilityGatedPureModule());
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create().Grant("game.write", new { }).WithFuel(1_000).Build());
@@ -140,7 +140,7 @@ public sealed class CustomEffectBindingTests
                     CapabilityId: "game.write",
                     Effect: SandboxEffect.GameStateWrite,
                     ResourceId: "counter:test",
-                    Fields: BindingAuditFields.Create("counter", timestamp)));
+                    Fields: context.BindingAuditFields("counter", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromInt32(value));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),

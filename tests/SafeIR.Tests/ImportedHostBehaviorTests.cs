@@ -85,7 +85,7 @@ public sealed class ImportedHostBehaviorTests
     public async Task Prepared_plan_can_be_executed_with_different_inputs(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SumForRangeModule());
+        var module = await host.ImportJsonAsync(SumForRangeModule());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var options = new SandboxExecutionOptions {
             Mode = mode,
@@ -120,7 +120,7 @@ public sealed class ImportedHostBehaviorTests
         ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(json);
+        var module = await host.ImportJsonAsync(json);
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         return await host.ExecuteAsync(
             plan,

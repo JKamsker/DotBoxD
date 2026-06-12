@@ -29,7 +29,7 @@ public sealed class PluginMessageBindingTests
             builder.AddPluginMessageBindings(messages);
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "plugin-message-target",
           "version": "1.0.0",
@@ -78,7 +78,7 @@ public sealed class PluginMessageBindingTests
             builder.AddPluginMessageBindings(messages);
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "plugin-message-redaction",
           "version": "1.0.0",

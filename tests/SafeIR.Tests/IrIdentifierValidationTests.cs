@@ -7,7 +7,7 @@ public sealed class IrIdentifierValidationTests
     [Fact]
     public async Task Module_rejects_empty_identifier()
     {
-        var module = await Host.ParseJsonAsync("""
+        var module = await Host.ImportJsonAsync("""
         {
           "id": "",
           "version": "1.0.0",
@@ -32,7 +32,7 @@ public sealed class IrIdentifierValidationTests
     [Fact]
     public async Task Function_rejects_control_character_identifier()
     {
-        var module = await Host.ParseJsonAsync("""
+        var module = await Host.ImportJsonAsync("""
         {
           "id": "bad-function",
           "version": "1.0.0",
@@ -57,7 +57,7 @@ public sealed class IrIdentifierValidationTests
     [Fact]
     public async Task Statement_rejects_empty_local_name()
     {
-        var module = await Host.ParseJsonAsync("""
+        var module = await Host.ImportJsonAsync("""
         {
           "id": "bad-local",
           "version": "1.0.0",
@@ -85,7 +85,7 @@ public sealed class IrIdentifierValidationTests
     [Fact]
     public async Task Capability_reason_allows_human_text()
     {
-        var module = await Host.ParseJsonAsync("""
+        var module = await Host.ImportJsonAsync("""
         {
           "id": "reason-text",
           "version": "1.0.0",

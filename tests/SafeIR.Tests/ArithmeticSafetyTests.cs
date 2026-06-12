@@ -42,7 +42,7 @@ public sealed class ArithmeticSafetyTests
         ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "arithmetic-safety",
           "version": "1.0.0",

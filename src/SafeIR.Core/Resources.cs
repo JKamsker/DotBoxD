@@ -12,7 +12,12 @@ public sealed class ResourceMeter
     {
         ResourceLimitValidation.Validate(limits);
         Limits = limits;
-        _deadline = Stopwatch.GetTimestamp() + (long)(limits.EffectiveWallTime.TotalSeconds * Stopwatch.Frequency);
+        var now = Stopwatch.GetTimestamp();
+        var timeoutTicks = Math.Ceiling(limits.EffectiveWallTime.TotalSeconds * Stopwatch.Frequency);
+        var cappedTicks = timeoutTicks >= long.MaxValue - now
+            ? long.MaxValue - now
+            : (long)timeoutTicks;
+        _deadline = now + Math.Max(1, cappedTicks);
     }
 
     public ResourceLimits Limits { get; }
@@ -210,8 +215,13 @@ public sealed class ResourceMeter
             throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.Timeout, "wall-time budget exhausted"));
         }
 
-        var timespanTicks = (long)Math.Ceiling(stopwatchTicks * TimeSpan.TicksPerSecond / (double)Stopwatch.Frequency);
-        return TimeSpan.FromTicks(Math.Max(1, timespanTicks));
+        var timespanTicks = Math.Ceiling(stopwatchTicks / (double)Stopwatch.Frequency * TimeSpan.TicksPerSecond);
+        if (timespanTicks >= TimeSpan.MaxValue.Ticks)
+        {
+            return TimeSpan.MaxValue;
+        }
+
+        return TimeSpan.FromTicks(Math.Max(1L, (long)timespanTicks));
     }
 
     private static SandboxRuntimeException Quota(string message)

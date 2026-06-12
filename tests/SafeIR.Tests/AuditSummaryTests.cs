@@ -6,7 +6,7 @@ public sealed class AuditSummaryTests
     public async Task Interpreted_run_summary_includes_execution_hashes()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
             .WithPolicyId("summary-policy")
             .WithFuel(1_000)
@@ -34,7 +34,7 @@ public sealed class AuditSummaryTests
     public async Task Compiled_run_summary_includes_cache_and_execution_hashes()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
             .WithPolicyId("summary-policy")
             .WithFuel(1_000)

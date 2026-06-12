@@ -43,7 +43,10 @@ public abstract record SandboxValue
             : throw new ArgumentException("Sandbox URIs must be absolute and must not include user info.", nameof(value));
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
-        => new ListValue(values, values.Count == 0 ? SandboxType.Unit : values[0].Type);
+    {
+        var snapshot = ModelCopy.List(values);
+        return new ListValue(snapshot, snapshot.Count == 0 ? SandboxType.Unit : snapshot[0].Type);
+    }
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values, SandboxType itemType)
         => new ListValue(values, itemType);
@@ -112,6 +115,10 @@ public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
 
 public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue
 {
+    private IReadOnlyList<SandboxValue> _values = ModelCopy.List(Values);
+
+    public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = ModelCopy.List(value); }
+
     public override SandboxType Type => SandboxType.List(ItemType);
 }
 
@@ -120,5 +127,9 @@ public sealed record MapValue(
     SandboxType KeyType,
     SandboxType ValueType) : SandboxValue
 {
+    private IReadOnlyDictionary<SandboxValue, SandboxValue> _values = ModelCopy.ValueDictionary(Values);
+
+    public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = ModelCopy.ValueDictionary(value); }
+
     public override SandboxType Type => SandboxType.Map(KeyType, ValueType);
 }

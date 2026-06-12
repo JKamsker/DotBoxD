@@ -8,7 +8,7 @@ public sealed class CompiledFuelAccountingTests
     public async Task Compiled_expression_fuel_matches_interpreter()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(ExpressionModuleJson());
+        var module = await host.ImportJsonAsync(ExpressionModuleJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var interpreted = await ExecuteAsync(host, plan, ExecutionMode.Interpreted);
@@ -24,7 +24,7 @@ public sealed class CompiledFuelAccountingTests
     public async Task Compiled_expression_fuel_enforces_quota()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(ExpressionModuleJson());
+        var module = await host.ImportJsonAsync(ExpressionModuleJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(12).Build());
 
         var result = await ExecuteAsync(host, plan, ExecutionMode.Compiled);

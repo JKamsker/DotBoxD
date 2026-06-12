@@ -6,7 +6,7 @@ public sealed class ImportedValidationTests
     public async Task Valid_for_range_program_prepares_and_executes()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "sum-to-n",
           "version": "1.0.0",
@@ -162,7 +162,7 @@ public sealed class ImportedValidationTests
     private static async Task<SandboxValidationException> PrepareFailsAsync(string json)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(json);
+        var module = await host.ImportJsonAsync(json);
         return await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
     }

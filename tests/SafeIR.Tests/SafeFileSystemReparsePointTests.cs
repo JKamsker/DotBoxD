@@ -119,7 +119,7 @@ public sealed class SafeFileSystemReparsePointTests
     private static async Task<SandboxExecutionResult> ExecuteReadAsync(string root, string path)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson(path));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileRead(root, 1024)
             .WithFuel(5_000)
@@ -131,7 +131,7 @@ public sealed class SafeFileSystemReparsePointTests
     private static async Task<SandboxExecutionResult> ExecuteWriteAsync(string root, string path, string text)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(FileWriteJson(path, text));
+        var module = await host.ImportJsonAsync(FileWriteJson(path, text));
         var policy = SandboxPolicyBuilder.Create()
             .GrantFileWrite(root, 1024)
             .WithFuel(5_000)

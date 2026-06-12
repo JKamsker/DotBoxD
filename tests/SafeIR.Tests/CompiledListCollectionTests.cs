@@ -99,7 +99,7 @@ public sealed class CompiledListCollectionTests
         SandboxExecutionOptions options)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "compiled-list",
           "version": "1.0.0",
@@ -138,7 +138,7 @@ public sealed class CompiledListCollectionTests
         SandboxExecutionOptions options)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "compiled-list-return",
           "version": "1.0.0",

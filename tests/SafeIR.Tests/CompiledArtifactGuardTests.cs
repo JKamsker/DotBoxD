@@ -149,7 +149,7 @@ public sealed class CompiledArtifactGuardTests
 
     private static async Task<ExecutionPlan> PreparePurePlanAsync(SandboxHost host)
     {
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         return await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
     }
 

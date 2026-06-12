@@ -154,7 +154,7 @@ public sealed class JsonImporterTests
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "bad-params",
           "version": "1.0.0",
@@ -187,7 +187,7 @@ public sealed class JsonImporterTests
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync(MinimalModule(
+        var module = await host.ImportJsonAsync(MinimalModule(
             """
             "metadata": { "debug": "System.IO.File" },
             """));
@@ -208,7 +208,7 @@ public sealed class JsonImporterTests
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync(MinimalModule(
+        var module = await host.ImportJsonAsync(MinimalModule(
             $"""
             "targetSandboxVersion": "{targetSandboxVersion}",
             """));
@@ -237,7 +237,7 @@ public sealed class JsonImporterTests
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync(MinimalModule(""));
+        var module = await host.ImportJsonAsync(MinimalModule(""));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build());
 
         Assert.Equal(SandboxLanguage.CurrentVersion, plan.Module.TargetSandboxVersion);
@@ -247,7 +247,7 @@ public sealed class JsonImporterTests
     public async Task Forbidden_clr_call_is_rejected_before_execution()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "bad",
           "version": "1.0.0",

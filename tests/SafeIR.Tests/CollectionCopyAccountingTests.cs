@@ -1,4 +1,3 @@
-using System.Collections;
 using SafeIR;
 
 namespace SafeIR.Tests;
@@ -6,10 +5,10 @@ namespace SafeIR.Tests;
 public sealed class CollectionCopyAccountingTests
 {
     [Fact]
-    public async Task List_add_charges_projected_copy_allocation_before_enumerating_source()
+    public async Task List_add_charges_projected_copy_allocation_before_copying_source()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "list-copy-accounting",
           "version": "1.0.0",
@@ -34,9 +33,7 @@ public sealed class CollectionCopyAccountingTests
           ]
         }
         """);
-        var input = new ListValue(
-            new ThrowingEnumerableList([SandboxValue.FromInt32(1)]),
-            SandboxType.I32);
+        var input = SandboxValue.FromList([SandboxValue.FromInt32(1)], SandboxType.I32);
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create().WithMaxAllocatedBytes(16).Build());
@@ -46,17 +43,5 @@ public sealed class CollectionCopyAccountingTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
         Assert.Equal(32, result.ResourceUsage.AllocatedBytes);
-    }
-
-    private sealed class ThrowingEnumerableList(IReadOnlyList<SandboxValue> values) : IReadOnlyList<SandboxValue>
-    {
-        public int Count => values.Count;
-
-        public SandboxValue this[int index] => values[index];
-
-        public IEnumerator<SandboxValue> GetEnumerator()
-            => throw new InvalidOperationException("source should not be enumerated after quota denial");
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

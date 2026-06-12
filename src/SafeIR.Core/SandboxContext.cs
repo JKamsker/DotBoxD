@@ -13,7 +13,9 @@ public sealed class SandboxContext
         BindingRegistry bindings,
         IAuditSink audit,
         CancellationToken cancellationToken,
-        IReadOnlySet<string>? allowedBindingIds = null)
+        IReadOnlySet<string>? allowedBindingIds = null,
+        string? moduleHash = null,
+        string? policyHash = null)
     {
         RunId = runId;
         Policy = policy;
@@ -22,6 +24,8 @@ public sealed class SandboxContext
         Audit = audit;
         CancellationToken = cancellationToken;
         AllowedBindingIds = allowedBindingIds;
+        ModuleHash = moduleHash ?? "";
+        PolicyHash = policyHash ?? "";
     }
 
     public SandboxRunId RunId { get; }
@@ -30,6 +34,8 @@ public sealed class SandboxContext
     public BindingRegistry Bindings { get; }
     public IAuditSink Audit { get; }
     public CancellationToken CancellationToken { get; }
+    public string ModuleHash { get; }
+    public string PolicyHash { get; }
     private IReadOnlySet<string>? AllowedBindingIds { get; }
 
     public void RequireCapability(string capabilityId)
@@ -152,8 +158,21 @@ public sealed class SandboxContext
             ResourceId: $"binding:{descriptor.Id}",
             ErrorCode: errorCode,
             Message: "binding failed before emitting audit",
-            Fields: BindingAuditFields.Create("binding", timestamp)));
+            Fields: BindingAuditFields("binding", timestamp)));
     }
+
+    public IReadOnlyDictionary<string, string> BindingAuditFields(
+        string resourceKind,
+        DateTimeOffset startedAt,
+        long? bytesRead = null,
+        long? bytesWritten = null)
+        => SafeIR.BindingAuditFields.Create(
+            resourceKind,
+            startedAt,
+            ModuleHash,
+            PolicyHash,
+            bytesRead,
+            bytesWritten);
 
     public void ChargeBindingCall(BindingDescriptor descriptor)
     {

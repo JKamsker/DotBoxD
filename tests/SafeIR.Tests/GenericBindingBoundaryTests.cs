@@ -21,7 +21,7 @@ public sealed class GenericBindingBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ReturnExpressionModule(
+        var module = await host.ImportJsonAsync(ReturnExpressionModule(
             """{ "call": "test.slow", "args": [] }""",
             "I32"));
         var plan = await host.PrepareAsync(
@@ -50,7 +50,7 @@ public sealed class GenericBindingBoundaryTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ReturnExpressionModule(
+        var module = await host.ImportJsonAsync(ReturnExpressionModule(
             """{ "call": "test.spuriousCancel", "args": [] }""",
             "I32"));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());

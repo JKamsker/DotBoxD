@@ -17,7 +17,7 @@ public sealed class CompiledCacheAuditTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);

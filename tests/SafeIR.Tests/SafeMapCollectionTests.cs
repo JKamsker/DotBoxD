@@ -8,7 +8,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_set_get_and_contains_execute_with_allocation_accounting()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "maps",
           "version": "1.0.0",
@@ -69,7 +69,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_remove_returns_map_without_key()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "maps",
           "version": "1.0.0",
@@ -129,7 +129,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_get_reports_missing_key_as_safe_error()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "maps",
           "version": "1.0.0",
@@ -197,7 +197,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_operations_reject_type_mismatches_during_validation(string _, string expression)
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync($$"""
+        var module = await host.ImportJsonAsync($$"""
         {
           "id": "maps",
           "version": "1.0.0",
@@ -222,7 +222,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_empty_rejects_non_hashable_key_type()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "maps",
           "version": "1.0.0",
@@ -259,7 +259,7 @@ public sealed class SafeMapCollectionTests
     public async Task Map_growth_charges_allocation_quota()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "maps",
           "version": "1.0.0",

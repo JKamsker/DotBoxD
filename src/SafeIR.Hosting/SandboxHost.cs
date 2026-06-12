@@ -159,7 +159,9 @@ public sealed partial class SandboxHost : IDisposable
             options,
             new ModuleHotnessStats(count),
             SafeIR.Compiler.CompiledCacheStatus.None);
-        if (decision.Mode == ExecutionMode.Interpreted || decision.Mode == ExecutionMode.Auto)
+        if (decision.Mode == ExecutionMode.Interpreted ||
+            decision.Mode == ExecutionMode.Auto ||
+            !CanCompileEntrypoint(plan, entrypoint))
         {
             return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
@@ -231,7 +233,7 @@ public sealed partial class SandboxHost : IDisposable
         var audit = FallbackSecurityAudits(plan, runId, reason)
             .Concat([FallbackAudit(plan, runId, reason)])
             .Concat(result.AuditEvents)
-            .ToArray();
+            .ToSequencedArray();
         return result with { AuditEvents = audit };
     }
 
@@ -282,6 +284,10 @@ public sealed partial class SandboxHost : IDisposable
     private static bool CanFallback(SandboxExecutionOptions options, SandboxRuntimeException ex)
         => options.AllowFallbackToInterpreter &&
            ex.Error.Code is SandboxErrorCode.VerifierFailure or SandboxErrorCode.ValidationError;
+
+    private static bool CanCompileEntrypoint(ExecutionPlan plan, string entrypoint)
+        => plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis) &&
+           (analysis.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
 
     private static SandboxError CompilerUnavailableError()
         => new(SandboxErrorCode.ValidationError, "compiled execution is not available for this run");

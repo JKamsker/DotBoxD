@@ -9,7 +9,7 @@ public sealed class SafeFileAuditRedactionTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "file-path-input",
           "version": "1.0.0",

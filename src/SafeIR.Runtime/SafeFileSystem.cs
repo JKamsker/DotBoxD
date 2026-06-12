@@ -74,10 +74,12 @@ public static class SafeFileSystem
         {
             var resolved = ResolvePath(context, path, "file.write", "file.writeText");
             using var timeout = CreateWallTimeToken(context, cancellationToken);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
-            var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, bytes.Length);
-            context.Budget.ChargeFileWrite(bytes.Length);
-            context.ChargeFuel(bytes.Length);
+            var byteCount = Encoding.UTF8.GetByteCount(text);
+            var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, byteCount);
+            context.Budget.ChargeFileWrite(byteCount);
+            context.ChargeAllocation(byteCount);
+            context.ChargeFuel(byteCount);
+            var bytes = Encoding.UTF8.GetBytes(text);
 
             EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             SafeFileWritePublisher.EnsureParentDirectory(resolved.RootFull, resolved.FullPath, permission);
@@ -96,7 +98,7 @@ public static class SafeFileSystem
                 SafeFileWritePublisher.TryDelete(tempPath);
             }
 
-            SafeFileAudit.Write(context, startedAt, true, resolved.SanitizedPath, bytes.Length, null);
+            SafeFileAudit.Write(context, startedAt, true, resolved.SanitizedPath, byteCount, null);
         }
         catch (SandboxRuntimeException ex)
         {

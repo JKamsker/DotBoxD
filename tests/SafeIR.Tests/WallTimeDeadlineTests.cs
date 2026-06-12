@@ -13,7 +13,7 @@ public sealed class WallTimeDeadlineTests
     public async Task Pure_run_with_exhausted_wall_time_times_out_before_execution(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "wall-time-pure",
           "version": "1.0.0",

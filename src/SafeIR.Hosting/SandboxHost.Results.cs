@@ -303,3 +303,17 @@ public sealed partial class SandboxHost
             Fields: RunSummaryAuditFields.Create(plan, budget, mode, cacheStatus)));
     }
 }
+
+internal static class SandboxAuditEventSequence
+{
+    public static IReadOnlyList<SandboxAuditEvent> ToSequencedArray(this IEnumerable<SandboxAuditEvent> events)
+    {
+        var sink = new InMemoryAuditSink();
+        foreach (var auditEvent in events)
+        {
+            sink.Write(auditEvent);
+        }
+
+        return sink.Events.ToArray();
+    }
+}

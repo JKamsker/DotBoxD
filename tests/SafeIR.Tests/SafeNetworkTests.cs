@@ -10,7 +10,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_is_denied_without_host_grant()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
             await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
@@ -22,7 +22,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_allows_configured_https_host_and_audits_sanitized_url()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("remote-config"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config?token=secret"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config?token=secret"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -71,7 +71,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_allows_explicit_authority_and_audits_port()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com:8443/config?token=secret"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com:8443/config?token=secret"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com:8443"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -139,7 +139,7 @@ public sealed class SafeNetworkTests
         var host = SandboxTestHost.Create(
             networkInvoker: FakeInvoker("private"),
             dnsResolver: StaticDns(IPAddress.Loopback));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -158,7 +158,7 @@ public sealed class SafeNetworkTests
         var host = SandboxTestHost.Create(
             networkInvoker: FakeInvoker("empty"),
             dnsResolver: StaticDns());
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -177,7 +177,7 @@ public sealed class SafeNetworkTests
         var host = SandboxTestHost.Create(
             networkInvoker: FakeInvoker("private"),
             dnsResolver: StaticDns(IPAddress.Loopback));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], 1024, allowPrivateNetwork: true)
             .WithFuel(5_000)
@@ -197,7 +197,7 @@ public sealed class SafeNetworkTests
             "",
             HttpStatusCode.Redirect,
             "https://evil.example.com/config"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -214,7 +214,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_denies_invoker_that_already_followed_redirect()
     {
         var host = SandboxTestHost.Create(networkInvoker: RedirectFollowedInvoker());
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithFuel(5_000)
@@ -231,7 +231,7 @@ public sealed class SafeNetworkTests
     public async Task Direct_policy_negative_http_timeout_is_rejected_at_prepare()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = new SandboxPolicy(
             "bad-http-timeout",
             SandboxEffects.Pure | SandboxEffect.Network,
@@ -256,7 +256,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_enforces_response_byte_limit()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("too-large"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 3)
             .WithFuel(5_000)
@@ -273,7 +273,7 @@ public sealed class SafeNetworkTests
     public async Task Http_get_enforces_allocation_limit_while_streaming_body()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("too-large"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .WithMaxAllocatedBytes(4)
@@ -291,7 +291,7 @@ public sealed class SafeNetworkTests
     public async Task Deterministic_policy_denies_network_effects()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
             .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)

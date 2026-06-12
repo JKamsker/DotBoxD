@@ -57,7 +57,7 @@ public sealed class SandboxHost
 ```
 
 `ImportJsonAsync` is the preferred extension method provided by the JSON serialization addon.
-`ParseJsonAsync` remains a compatibility alias and does not imply a custom language parser.
+`ImportJsonAsync` remains a compatibility alias and does not imply a custom language parser.
 `RevokeCapability` is host-local and applies to already-prepared plans. A plan whose module
 requests or whose selected entrypoint reaches a revoked capability must fail before interpreted
 execution, compiler invocation, or compiled-cache lookup. The failed run emits a
@@ -384,7 +384,6 @@ public sealed record SandboxError(
 
 public enum SandboxErrorCode
 {
-    ParseError,
     ValidationError,
     PolicyDenied,
     PermissionDenied,
@@ -407,8 +406,8 @@ For first implementation, this is enough:
 ```csharp
 public sealed class Sandbox
 {
-    public PreparedScript PrepareJson(string jsonIr, SandboxPolicy policy);
-    public SandboxResult ExecuteInterpreted(PreparedScript script, SandboxValue input);
+    public ValueTask<ExecutionPlan> PrepareAsync(SandboxModule module, SandboxPolicy policy);
+    public ValueTask<SandboxExecutionResult> ExecuteAsync(ExecutionPlan plan, string entrypoint, SandboxValue input);
 }
 ```
 

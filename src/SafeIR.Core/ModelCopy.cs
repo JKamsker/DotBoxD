@@ -25,4 +25,12 @@ internal static class ModelCopy
         return new ReadOnlyDictionary<string, TValue>(
             new Dictionary<string, TValue>(values, StringComparer.Ordinal));
     }
+
+    public static IReadOnlyDictionary<SandboxValue, SandboxValue> ValueDictionary(
+        IReadOnlyDictionary<SandboxValue, SandboxValue> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return new ReadOnlyDictionary<SandboxValue, SandboxValue>(
+            new Dictionary<SandboxValue, SandboxValue>(values));
+    }
 }

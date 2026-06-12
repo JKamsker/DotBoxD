@@ -48,7 +48,7 @@ public sealed class CompiledCacheMetadataTests
     private static async Task<(SandboxHost Host, ExecutionPlan Plan, SandboxValue Input)> PrepareCachedEntryAsync(string cachePath)
     {
         var host = SandboxTestHost.Create(compiler: true, compilerCache: cachePath);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiled(host, plan, input);

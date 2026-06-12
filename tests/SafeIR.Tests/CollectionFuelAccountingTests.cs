@@ -14,7 +14,7 @@ public sealed class CollectionFuelAccountingTests
     public async Task List_add_charges_source_size_fuel(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "collection-fuel",
           "version": "1.0.0",

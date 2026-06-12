@@ -112,7 +112,7 @@ public sealed partial class LogicalShortCircuitTests
     public async Task And_prefers_cheaper_literal_over_collection_intrinsic(ExecutionMode mode)
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(ModuleJson("""
+        var module = await host.ImportJsonAsync(ModuleJson("""
         {
           "op": "and",
           "left": {
@@ -158,7 +158,7 @@ public sealed partial class LogicalShortCircuitTests
             builder.AddBinding(EffectfulBoolBinding(() => calls++));
             builder.UseInterpreter();
         });
-        var module = await host.ParseJsonAsync(ModuleJson(
+        var module = await host.ImportJsonAsync(ModuleJson(
             """{ "op": "and", "left": { "call": "test.effectfulBool", "args": [] }, "right": { "bool": false } }"""));
         var plan = await host.PrepareAsync(module, GameReadPolicy());
 
@@ -190,7 +190,7 @@ public sealed partial class LogicalShortCircuitTests
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
-        var module = await host.ParseJsonAsync(ModuleJson(expression));
+        var module = await host.ImportJsonAsync(ModuleJson(expression));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var result = await host.ExecuteAsync(
             plan,
@@ -245,7 +245,7 @@ public sealed partial class LogicalShortCircuitTests
                     CapabilityId: "game.read",
                     Effect: SandboxEffect.GameStateRead,
                     ResourceId: "game:test",
-                    Fields: BindingAuditFields.Create("game", timestamp)));
+                    Fields: context.BindingAuditFields("game", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromBool(true));
             },
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),

@@ -5,16 +5,32 @@ internal sealed class PendingLiveUpdateQueue
     private readonly object _gate = new();
     private readonly List<Task> _pending = [];
 
-    public Exception? LastError { get; private set; }
+    public Exception? LastError
+    {
+        get
+        {
+            lock (_gate) {
+                return _lastError;
+            }
+        }
+    }
+
+    private Exception? _lastError;
 
     public void Enqueue(Action update)
     {
         var task = Task.Run(() => {
             try {
                 update();
+                lock (_gate) {
+                    _lastError = null;
+                }
             }
             catch (Exception ex) {
-                LastError = ex;
+                lock (_gate) {
+                    _lastError = ex;
+                }
+
                 throw;
             }
         });
@@ -31,16 +47,31 @@ internal sealed class PendingLiveUpdateQueue
             TaskScheduler.Default);
     }
 
+    public void ClearError()
+    {
+        lock (_gate) {
+            _lastError = null;
+        }
+    }
+
     public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
     {
         Task[] pending;
         lock (_gate) {
+            _pending.RemoveAll(task => task.IsCompleted);
             pending = _pending.ToArray();
         }
 
-        await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false);
-        if (LastError is not null) {
+        try {
+            await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception) when (LastError is not null) {
             throw new InvalidOperationException("A fire-and-forget live setting update failed.", LastError);
+        }
+
+        var lastError = LastError;
+        if (lastError is not null) {
+            throw new InvalidOperationException("A fire-and-forget live setting update failed.", lastError);
         }
     }
 }

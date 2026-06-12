@@ -8,7 +8,7 @@ public sealed class WorkerIsolationTests
     public async Task Worker_process_isolation_request_fails_closed_when_unconfigured()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(
@@ -113,9 +113,53 @@ public sealed class WorkerIsolationTests
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
     }
 
+    [Fact]
+    public async Task Worker_process_isolation_rejects_worker_result_with_auto_actual_mode()
+    {
+        var worker = new CapturingWorker { ResultMode = ExecutionMode.Auto };
+        var host = HostWithWorker(worker);
+        var plan = await PrepareAsync(host);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            Input(),
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    [Fact]
+    public async Task Worker_process_isolation_rejects_compiled_success_without_artifact_hash()
+    {
+        var worker = new CapturingWorker { ResultMode = ExecutionMode.Compiled };
+        var host = HostWithWorker(worker);
+        var plan = await PrepareAsync(host);
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            Input(),
+            new SandboxExecutionOptions { Isolation = SandboxIsolation.WorkerProcess });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    private static SandboxHost HostWithWorker(CapturingWorker worker)
+        => SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.UseInterpreter();
+            builder.UseWorkerClient(worker, SandboxWorkerProfile.HardenedOutOfProcess);
+        });
+
     private static async ValueTask<ExecutionPlan> PrepareAsync(SandboxHost host)
     {
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         return await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
     }
 
@@ -127,6 +171,8 @@ public sealed class WorkerIsolationTests
         public int Calls { get; private set; }
         public SandboxExecutionOptions? Options { get; private set; }
         public bool ReturnWrongPlanIdentity { get; init; }
+        public ExecutionMode ResultMode { get; init; } = ExecutionMode.Interpreted;
+        public string? ResultArtifactHash { get; init; }
 
         public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
@@ -153,10 +199,11 @@ public sealed class WorkerIsolationTests
                 Value = input,
                 ResourceUsage = new ResourceMeter(plan.Budget).Snapshot(),
                 AuditEvents = [audit],
-                ActualMode = options.Mode,
+                ActualMode = ResultMode,
                 ModuleHash = ReturnWrongPlanIdentity ? "wrong-module" : plan.ModuleHash,
                 PlanHash = plan.PlanHash,
-                PolicyHash = plan.PolicyHash
+                PolicyHash = plan.PolicyHash,
+                ArtifactHash = ResultArtifactHash
             });
         }
     }

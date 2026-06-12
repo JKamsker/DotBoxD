@@ -63,4 +63,14 @@ public sealed class ResourceMeterTests
         Assert.Equal(0, meter.LoopIterations);
         Assert.Equal(0, meter.FuelUsed);
     }
+
+    [Fact]
+    public void Remaining_wall_time_handles_large_valid_budgets()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxWallTime: TimeSpan.FromDays(2)));
+
+        var remaining = meter.RemainingWallTime();
+
+        Assert.True(remaining > TimeSpan.FromDays(1));
+    }
 }

@@ -10,7 +10,7 @@ public sealed class CompiledFallbackAuditTests
     public async Task Compiled_mode_without_compiler_audits_interpreter_fallback()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await ExecuteCompiledAsync(host, plan);
@@ -24,7 +24,7 @@ public sealed class CompiledFallbackAuditTests
     public async Task Compiled_verifier_failure_audits_interpreter_fallback_reason()
     {
         var host = HostWithCompiler(new VerifierFailureCompiler());
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await ExecuteCompiledAsync(host, plan);
@@ -39,10 +39,25 @@ public sealed class CompiledFallbackAuditTests
     }
 
     [Fact]
+    public async Task Compiled_fallback_audit_events_are_sequenced()
+    {
+        var host = HostWithCompiler(new VerifierFailureCompiler());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+
+        var result = await ExecuteCompiledAsync(host, plan);
+
+        Assert.All(result.AuditEvents, e => Assert.True(e.SequenceNumber > 0));
+        Assert.Equal(
+            result.AuditEvents.Select(e => e.SequenceNumber).Order().ToArray(),
+            result.AuditEvents.Select(e => e.SequenceNumber).ToArray());
+    }
+
+    [Fact]
     public async Task Compiled_verifier_failure_without_fallback_emits_verifier_audit()
     {
         var host = HostWithCompiler(new VerifierFailureCompiler());
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         var result = await host.ExecuteAsync(

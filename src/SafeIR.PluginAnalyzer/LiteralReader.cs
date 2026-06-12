@@ -6,10 +6,19 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 internal static class LiteralReader
 {
-    public static string DefaultValue(ITypeSymbol type, ExpressionSyntax? expression)
+    public static string DefaultValue(
+        ITypeSymbol type,
+        ExpressionSyntax? expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
-        if (expression is LiteralExpressionSyntax literal) {
-            return ObjectLiteral(literal.Token.Value);
+        if (expression is not null) {
+            var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (!constant.HasValue) {
+                throw new NotSupportedException("Live setting defaults must be compile-time constants.");
+            }
+
+            return ObjectLiteral(constant.Value);
         }
 
         return type.SpecialType switch {

@@ -9,7 +9,7 @@ public sealed class CacheKeyIdentityTests
     public async Task Cache_key_changes_when_verifier_allowlist_changes()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var policy = VerificationPolicy.BoxedValueDefaults();
         var extendedPolicy = policy with
@@ -36,7 +36,7 @@ public sealed class CacheKeyIdentityTests
     public async Task Cache_key_changes_when_runtime_facade_identity_changes()
     {
         var host = SandboxTestHost.Create(compiler: true);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var policy = VerificationPolicy.BoxedValueDefaults();
         var changedPolicy = policy with

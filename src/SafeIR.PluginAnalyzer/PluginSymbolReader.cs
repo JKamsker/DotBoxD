@@ -21,17 +21,26 @@ internal static class PluginSymbolReader
             ?.TypeArguments.FirstOrDefault() as INamedTypeSymbol;
 
     public static IReadOnlyList<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
-        => eventType.GetMembers()
+    {
+        var properties = eventType.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic && p.GetMethod is not null)
-            .Select(p => new EventPropertyModel(p.Name, SandboxTypeName(p.Type)))
             .ToArray();
 
-    public static IReadOnlyList<LiveSettingModel> LiveSettings(INamedTypeSymbol kernelType)
+        properties = ConstructorPropertyOrder(eventType, properties) ?? properties;
+        return properties
+            .Select(p => new EventPropertyModel(p.Name, SandboxTypeName(p.Type)))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<LiveSettingModel> LiveSettings(
+        INamedTypeSymbol kernelType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
         => kernelType.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(IsLiveSetting)
-            .Select(ToLiveSetting)
+            .Select(property => ToLiveSetting(property, semanticModel, cancellationToken))
             .ToArray();
 
     private static bool IsLiveSetting(IPropertySymbol property)
@@ -40,16 +49,55 @@ internal static class PluginSymbolReader
             "SafeIR.Plugins.LiveSettingAttribute",
             StringComparison.Ordinal));
 
-    private static LiveSettingModel ToLiveSetting(IPropertySymbol property)
+    private static LiveSettingModel ToLiveSetting(
+        IPropertySymbol property,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         var syntax = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as PropertyDeclarationSyntax;
         var range = Range(property);
         return new LiveSettingModel(
             property.Name,
             SandboxTypeName(property.Type),
-            LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value),
+            LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value, semanticModel, cancellationToken),
             range.Min,
             range.Max);
+    }
+
+    private static IPropertySymbol[]? ConstructorPropertyOrder(
+        INamedTypeSymbol eventType,
+        IPropertySymbol[] properties)
+    {
+        var byName = properties.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        foreach (var constructor in eventType.InstanceConstructors.Where(c => c.DeclaredAccessibility == Accessibility.Public))
+        {
+            if (constructor.Parameters.Length == 0 || constructor.Parameters.Length != properties.Length)
+            {
+                continue;
+            }
+
+            var selected = new IPropertySymbol[constructor.Parameters.Length];
+            var matched = true;
+            for (var i = 0; i < constructor.Parameters.Length; i++)
+            {
+                var parameter = constructor.Parameters[i];
+                if (!byName.TryGetValue(parameter.Name, out var property) ||
+                    !SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
+                {
+                    matched = false;
+                    break;
+                }
+
+                selected[i] = property;
+            }
+
+            if (matched)
+            {
+                return selected;
+            }
+        }
+
+        return null;
     }
 
     private static (string? Min, string? Max) Range(IPropertySymbol property)

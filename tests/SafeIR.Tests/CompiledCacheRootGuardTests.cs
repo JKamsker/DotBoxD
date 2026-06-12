@@ -89,7 +89,7 @@ public sealed class CompiledCacheRootGuardTests
         using var temp = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         _ = await ExecuteCompiledAsync(host, plan, input);
@@ -116,7 +116,7 @@ public sealed class CompiledCacheRootGuardTests
     private static async Task<SandboxExecutionResult> ExecuteCompiledWithCacheAsync(string cachePath)
     {
         var host = SandboxTestHost.Create(compiler: true, compilerCache: cachePath);
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         var input = SandboxValue.FromList([SandboxValue.FromInt32(2), SandboxValue.FromInt32(1)]);
         return await ExecuteCompiledAsync(host, plan, input);

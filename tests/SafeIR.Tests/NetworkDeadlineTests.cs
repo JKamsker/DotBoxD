@@ -11,7 +11,7 @@ public sealed class NetworkDeadlineTests
     public async Task Http_get_caps_dns_timeout_to_remaining_wall_time()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("unused"), dnsResolver: SlowDns());
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = LongRequestShortWallPolicy();
         var plan = await host.PrepareAsync(module, policy);
         var elapsed = Stopwatch.StartNew();
@@ -28,7 +28,7 @@ public sealed class NetworkDeadlineTests
     public async Task Http_get_caps_send_timeout_to_remaining_wall_time()
     {
         var host = SandboxTestHost.Create(networkInvoker: SlowInvoker(), dnsResolver: StaticDns(IPAddress.Parse("93.184.216.34")));
-        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = LongRequestShortWallPolicy();
         var plan = await host.PrepareAsync(module, policy);
         var elapsed = Stopwatch.StartNew();

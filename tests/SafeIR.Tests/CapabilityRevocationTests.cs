@@ -10,7 +10,7 @@ public sealed class CapabilityRevocationTests
         using var temp = TempDirectory.Create();
         await File.WriteAllTextAsync(Path.Combine(temp.Path, "config.json"), "secret");
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.json"));
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()
@@ -33,7 +33,7 @@ public sealed class CapabilityRevocationTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync(PureModuleWithLoggingRequest());
+        var module = await host.ImportJsonAsync(PureModuleWithLoggingRequest());
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()
@@ -63,7 +63,7 @@ public sealed class CapabilityRevocationTests
     public async Task Revoked_unrelated_capability_does_not_deny_execution()
     {
         var host = SandboxTestHost.Create();
-        var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
 
         host.RevokeCapability("log.write", "unrelated");

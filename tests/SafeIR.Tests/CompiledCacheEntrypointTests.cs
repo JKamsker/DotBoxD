@@ -11,7 +11,7 @@ public sealed class CompiledCacheEntrypointTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "multi-entrypoint-cache",
           "version": "1.0.0",

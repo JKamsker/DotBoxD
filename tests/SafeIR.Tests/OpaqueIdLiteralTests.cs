@@ -30,7 +30,7 @@ public sealed class OpaqueIdLiteralTests
     public async Task Opaque_id_literal_can_be_used_as_map_key()
     {
         var host = SandboxTestHost.Create(compiler: false);
-        var module = await host.ParseJsonAsync("""
+        var module = await host.ImportJsonAsync("""
         {
           "id": "opaque-id-map-key",
           "version": "1.0.0",
@@ -90,7 +90,7 @@ public sealed class OpaqueIdLiteralTests
     private static async Task<SandboxExecutionResult> ExecuteAsync(string returnType, string literalJson)
     {
         var host = SandboxTestHost.Create(compiler: false);
-        var module = await host.ParseJsonAsync(Module(returnType, literalJson));
+        var module = await host.ImportJsonAsync(Module(returnType, literalJson));
         var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
         return await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
     }
