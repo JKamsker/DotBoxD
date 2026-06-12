@@ -25,6 +25,9 @@
 - [ ] `ALG-0012` medium - Function analysis clones full local scopes for every branch
   - File: `docs/agent-loop/findings/ALG-0012-function-analysis-clones-full-local-scopes-for-every-branch.md`
   - Dedup: `alg/function-analysis/scope-clone-per-branch`
+- [ ] `ALG-0013` medium - Execution plan integrity guard revalidates and reseals modules on every run
+  - File: `docs/agent-loop/findings/ALG-0013-execution-plan-integrity-guard-revalidates-and-reseals-modules-on-every-run.md`
+  - Dedup: `algorithm/execution-plan/integrity-guard/full-revalidation-per-run`
 - [ ] `ALG-0007` low - Plugin package validation rescans module functions for entrypoints
   - File: `docs/agent-loop/findings/ALG-0007-plugin-package-validation-rescans-module-functions-for-entrypoints.md`
   - Dedup: `algorithm/plugin-package-validation/entrypoint-function-rescans`

@@ -46,6 +46,12 @@
 - [ ] `PAL-0027` medium - Audit sanitizer clones and regex-scans clean log messages
   - File: `docs/agent-loop/findings/PAL-0027-audit-sanitizer-clones-and-regex-scans-clean-log-messages.md`
   - Dedup: `alloc/audit-sanitizer/clean-message-regex`
+- [ ] `PAL-0030` medium - Auto execution hotness retains states for every plan entrypoint
+  - File: `docs/agent-loop/findings/PAL-0030-auto-execution-hotness-retains-states-for-every-plan-entrypoint.md`
+  - Dedup: `alloc/auto-hotness/unbounded-plan-entrypoint-state`
+- [ ] `PAL-0031` medium - Compiled executable cache never evicts materialized artifacts
+  - File: `docs/agent-loop/findings/PAL-0031-compiled-executable-cache-never-evicts-materialized-artifacts.md`
+  - Dedup: `alloc/compiled-executable-cache/unbounded-materialized-artifacts`
 - [ ] `PAL-0028` medium - JSON import allocates schema validators per object
   - File: `docs/agent-loop/findings/PAL-0028-json-import-allocates-schema-validators-per-object.md`
   - Dedup: `alloc/json-import/property-schema-validation/per-object`

@@ -22,9 +22,21 @@
 - [ ] `COR-0029` high - VerificationPolicy allowlists can mutate after cache-key construction
   - File: `docs/agent-loop/findings/COR-0029-verificationpolicy-allowlists-can-mutate-after-cache-key-construction.md`
   - Dedup: `correctness/verifier/policy/mutable-allowlist-cache-verification-drift`
+- [ ] `COR-0033` high - SandboxPolicy grants can mutate after plan hashes are sealed
+  - File: `docs/agent-loop/findings/COR-0033-sandboxpolicy-grants-can-mutate-after-plan-hashes-are-sealed.md`
+  - Dedup: `correctness/policy/grants/mutable-array-plan-hash-drift`
+- [ ] `COR-0034` high - Binding descriptors can mutate after manifest hash construction
+  - File: `docs/agent-loop/findings/COR-0034-binding-descriptors-can-mutate-after-manifest-hash-construction.md`
+  - Dedup: `correctness/binding-registry/descriptor-parameters/mutable-after-manifest-hash`
+- [ ] `COR-0035` high - Package metadata gate allows unexpected NuGet payloads
+  - File: `docs/agent-loop/findings/COR-0035-package-metadata-gate-allows-unexpected-nuget-payloads.md`
+  - Dedup: `security/release-packaging/nuget/unexpected-package-payloads`
 - [ ] `COR-0030` high - Collection allocation accounting overflows before widening large counts
   - File: `docs/agent-loop/findings/COR-0030-collection-allocation-accounting-overflows-before-widening-large-counts.md`
   - Dedup: `correctness/resource-quota/collection-copy-allocation-int-overflow`
+- [ ] `COR-0032` high - Direct verifier success does not require manifest identity binding
+  - File: `docs/agent-loop/findings/COR-0032-direct-verifier-success-does-not-require-manifest-identity-binding.md`
+  - Dedup: `verifier/direct-api/manifest-identity-optional-for-tamper-evidence`
 - [ ] `COR-0010` medium - Compiled executable cache lets first caller cancellation poison shared materialization
   - File: `docs/agent-loop/findings/COR-0010-compiled-executable-cache-lets-first-caller-cancellation-poison-shared-materiali.md`
   - Dedup: `correctness/compiled-cache/shared-materialization/first-caller-cancellation-poisons-waiters`
