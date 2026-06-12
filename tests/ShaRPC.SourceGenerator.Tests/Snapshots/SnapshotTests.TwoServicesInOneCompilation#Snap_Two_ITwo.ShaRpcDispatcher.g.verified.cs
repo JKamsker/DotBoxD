@@ -29,8 +29,11 @@ namespace Snap.Two
             {
                 case "BAsync":
                 {
-                    var result = await _service.BAsync();
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = _service.BAsync();
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:
@@ -53,8 +56,11 @@ namespace Snap.Two
             {
                 case "BAsync":
                 {
-                    var result = await __inst.BAsync();
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = __inst.BAsync();
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:

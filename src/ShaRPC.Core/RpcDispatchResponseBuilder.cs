@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
@@ -11,17 +11,26 @@ namespace ShaRPC.Core;
 internal sealed class RpcDispatchResponseBuilder
 {
     private readonly ISerializer _serializer;
-    private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers;
+    private readonly IReadOnlyDictionary<string, IServiceDispatcher> _dispatchers;
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
+    private FrozenDictionary<string, IServiceDispatcher>? _frozenDispatchers;
 
     public RpcDispatchResponseBuilder(
         ISerializer serializer,
-        ConcurrentDictionary<string, IServiceDispatcher> dispatchers,
+        IReadOnlyDictionary<string, IServiceDispatcher> dispatchers,
         Func<Exception, RpcErrorInfo?>? exceptionTransformer = null)
     {
         _serializer = serializer;
         _dispatchers = dispatchers;
         _exceptionTransformer = exceptionTransformer;
+    }
+
+    public void FreezeDispatchers()
+    {
+        if (_frozenDispatchers is null)
+        {
+            _frozenDispatchers = _dispatchers.ToFrozenDictionary(StringComparer.Ordinal);
+        }
     }
 
     public async ValueTask<RpcDispatchResult> BuildAsync(
@@ -33,11 +42,10 @@ internal sealed class RpcDispatchResponseBuilder
         CancellationToken ct)
     {
         // request.ServiceName is remote-supplied and can deserialize to null from a hostile/malformed
-        // envelope (MessagePack nil). Guard before the dictionary lookup: ConcurrentDictionary throws
-        // ArgumentNullException on a null key, which would escape this method (the lookup is outside
-        // the try below) and be mis-reported as InternalError instead of a clean ServiceNotFound.
+        // envelope (MessagePack nil). Guard before the dictionary lookup so that malformed input is
+        // reported as ServiceNotFound instead of escaping as an internal lookup error.
         if (string.IsNullOrEmpty(request.ServiceName) ||
-            !_dispatchers.TryGetValue(request.ServiceName, out var dispatcher))
+            !TryGetDispatcher(request.ServiceName, out var dispatcher))
         {
             return new RpcDispatchResult(BuildErrorFrame(messageId, RpcErrors.ServiceNotFound()), stream: null);
         }
@@ -136,4 +144,15 @@ internal sealed class RpcDispatchResponseBuilder
                 ErrorType = error.Type,
             },
             ReadOnlySpan<byte>.Empty);
+
+    private bool TryGetDispatcher(string serviceName, out IServiceDispatcher dispatcher)
+    {
+        var frozenDispatchers = _frozenDispatchers;
+        if (frozenDispatchers is not null)
+        {
+            return frozenDispatchers.TryGetValue(serviceName, out dispatcher!);
+        }
+
+        return _dispatchers.TryGetValue(serviceName, out dispatcher!);
+    }
 }

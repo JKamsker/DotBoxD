@@ -1,39 +1,90 @@
-using System.Collections.Concurrent;
+using System.Diagnostics;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Client;
 
-internal sealed class ShaRpcPendingRequests
+internal sealed class ShaRpcPendingRequests : IDisposable
 {
-    private readonly ConcurrentDictionary<int, TaskCompletionSource<ReceivedResponse>> _requests = new();
+    private readonly object _requestsGate = new();
+    private readonly object _timeoutGate = new();
+    private readonly Dictionary<int, PendingResponse> _requests = new();
+    private readonly Timer _timeoutTimer;
+    private long _nextTimeoutTimestamp = long.MaxValue;
+    private int _disposed;
 
-    public int Count => _requests.Count;
-
-    public bool TryAdd(int messageId, out TaskCompletionSource<ReceivedResponse> tcs)
+    public ShaRpcPendingRequests()
     {
-        tcs = new TaskCompletionSource<ReceivedResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (_requests.TryAdd(messageId, tcs))
+        _timeoutTimer = new Timer(
+            static state => ((ShaRpcPendingRequests)state!).CancelExpired(),
+            this,
+            Timeout.Infinite,
+            Timeout.Infinite);
+    }
+
+    public int Count
+    {
+        get
         {
-            return true;
+            lock (_requestsGate)
+            {
+                return _requests.Count;
+            }
+        }
+    }
+
+    public bool TryAdd(int messageId, out PendingResponse pending)
+    {
+        pending = new PendingResponse(this, messageId);
+        lock (_requestsGate)
+        {
+            if (!_requests.ContainsKey(messageId))
+            {
+                _requests.Add(messageId, pending);
+                return true;
+            }
         }
 
-        tcs = null!;
+        pending = null!;
         return false;
     }
 
-    public void Remove(int messageId, Task<ReceivedResponse> task, bool consumed)
+    public void Remove(int messageId, PendingResponse pending, bool consumed)
     {
-        _requests.TryRemove(messageId, out _);
+        TryRemove(messageId, pending);
         if (!consumed)
         {
-            ReceivedResponse.DisposeWhenAvailable(task);
+            ReceivedResponse.DisposeWhenAvailable(pending.Task);
         }
     }
 
-    public bool TryTake(int messageId, out TaskCompletionSource<ReceivedResponse> tcs) =>
-        _requests.TryRemove(messageId, out tcs!);
+    public bool TryTake(int messageId, out PendingResponse pending)
+    {
+        lock (_requestsGate)
+        {
+            if (!_requests.TryGetValue(messageId, out pending!))
+            {
+                return false;
+            }
+
+            _requests.Remove(messageId);
+            return true;
+        }
+    }
+
+    public void StartTimeout(PendingResponse pending, TimeSpan timeout)
+    {
+        if (timeout == Timeout.InfiniteTimeSpan)
+        {
+            return;
+        }
+
+        var timeoutTicks = MillisecondsToStopwatchTicks((long)Math.Ceiling(timeout.TotalMilliseconds));
+        var deadline = Stopwatch.GetTimestamp() + timeoutTicks;
+        pending.SetTimeoutDeadline(deadline);
+        ScheduleTimeout(deadline);
+    }
 
     public bool TryComplete(
         int messageId,
@@ -42,13 +93,13 @@ internal sealed class ShaRpcPendingRequests
         Payload frame,
         RpcStreamReceiver? stream)
     {
-        if (!_requests.TryRemove(messageId, out var tcs))
+        if (!TryTake(messageId, out var completion))
         {
             return false;
         }
 
         var received = new ReceivedResponse(response, payload, frame, stream);
-        if (!tcs.TrySetResult(received))
+        if (!completion.TrySetResult(received))
         {
             received.Dispose();
         }
@@ -58,12 +109,12 @@ internal sealed class ShaRpcPendingRequests
 
     public bool TryFail(int messageId, Exception error)
     {
-        if (!_requests.TryRemove(messageId, out var tcs))
+        if (!TryTake(messageId, out var completion))
         {
             return false;
         }
 
-        tcs.TrySetException(error);
+        completion.TrySetException(error);
         return true;
     }
 
@@ -73,31 +124,176 @@ internal sealed class ShaRpcPendingRequests
     /// no-op. This lets a timeout and a response race on a single removal so a delivered response is
     /// never discarded as a spurious cancellation.
     /// </summary>
-    public bool TryCancel(int messageId)
+    public bool TryCancel(
+        int messageId,
+        PendingResponse pending,
+        PendingCancellationKind kind)
     {
-        if (!_requests.TryRemove(messageId, out var tcs))
+        if (!TryRemove(messageId, pending))
         {
             return false;
         }
 
-        tcs.TrySetCanceled();
+        pending.TrySetCanceled(kind);
         return true;
     }
 
     public void FailAll(Exception error)
     {
-        // Remove by exact key+value, not key alone: a teardown racing a brand-new request that reused a
-        // wrapped-around message id (the counter is a 32-bit Interlocked.Increment) must fail only the
-        // request captured in the snapshot, never the new request's different completion source. The
-        // ICollection<KeyValuePair> remover matches both key and value atomically (netstandard2.1 has no
-        // public ConcurrentDictionary.TryRemove(KeyValuePair) overload).
-        var entries = (ICollection<KeyValuePair<int, TaskCompletionSource<ReceivedResponse>>>)_requests;
-        foreach (var pair in _requests.ToArray())
+        PendingResponse[] pending;
+        lock (_requestsGate)
         {
-            if (entries.Remove(pair))
+            if (_requests.Count == 0)
             {
-                pair.Value.TrySetException(error);
+                return;
+            }
+
+            pending = new PendingResponse[_requests.Count];
+            _requests.Values.CopyTo(pending, 0);
+            _requests.Clear();
+        }
+
+        foreach (var request in pending)
+        {
+            request.TrySetException(error);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            _timeoutTimer.Dispose();
+        }
+    }
+
+    private void ScheduleTimeout(long deadline)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        lock (_timeoutGate)
+        {
+            if (_disposed != 0 || deadline >= _nextTimeoutTimestamp)
+            {
+                return;
+            }
+
+            _nextTimeoutTimestamp = deadline;
+            ScheduleTimerLocked();
+        }
+    }
+
+    private void CancelExpired()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        lock (_timeoutGate)
+        {
+            _nextTimeoutTimestamp = long.MaxValue;
+        }
+
+        var now = Stopwatch.GetTimestamp();
+        var next = long.MaxValue;
+        List<PendingResponse>? expired = null;
+        lock (_requestsGate)
+        {
+            foreach (var pair in _requests)
+            {
+                var deadline = pair.Value.TimeoutDeadline;
+                if (deadline == long.MaxValue)
+                {
+                    continue;
+                }
+
+                if (deadline <= now)
+                {
+                    expired ??= new List<PendingResponse>();
+                    expired.Add(pair.Value);
+                }
+                else if (deadline < next)
+                {
+                    next = deadline;
+                }
+            }
+
+            if (expired is not null)
+            {
+                for (var i = 0; i < expired.Count; i++)
+                {
+                    var pending = expired[i];
+                    TryRemoveCore(pending.MessageId, pending);
+                }
             }
         }
+
+        if (expired is not null)
+        {
+            for (var i = 0; i < expired.Count; i++)
+            {
+                expired[i].TrySetCanceled(PendingCancellationKind.Timeout);
+            }
+        }
+
+        lock (_timeoutGate)
+        {
+            if (_disposed != 0)
+            {
+                return;
+            }
+
+            if (next < _nextTimeoutTimestamp)
+            {
+                _nextTimeoutTimestamp = next;
+            }
+
+            ScheduleTimerLocked();
+        }
+    }
+
+    private void ScheduleTimerLocked()
+    {
+        if (_nextTimeoutTimestamp == long.MaxValue)
+        {
+            _timeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            return;
+        }
+
+        var remainingTicks = Math.Max(0, _nextTimeoutTimestamp - Stopwatch.GetTimestamp());
+        var dueMilliseconds = Math.Min(
+            int.MaxValue,
+            Math.Max(1, StopwatchTicksToMilliseconds(remainingTicks)));
+        _timeoutTimer.Change(dueMilliseconds, Timeout.Infinite);
+    }
+
+    private static long MillisecondsToStopwatchTicks(long milliseconds) =>
+        checked(milliseconds * Stopwatch.Frequency / 1000);
+
+    private static long StopwatchTicksToMilliseconds(long ticks) =>
+        ticks * 1000 / Stopwatch.Frequency;
+
+    private bool TryRemove(int messageId, PendingResponse pending)
+    {
+        lock (_requestsGate)
+        {
+            return TryRemoveCore(messageId, pending);
+        }
+    }
+
+    private bool TryRemoveCore(int messageId, PendingResponse pending)
+    {
+        if (!_requests.TryGetValue(messageId, out var current) ||
+            !ReferenceEquals(current, pending))
+        {
+            return false;
+        }
+
+        _requests.Remove(messageId);
+        return true;
     }
 }

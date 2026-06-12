@@ -30,8 +30,11 @@ namespace Snap.RefOut
                 case "GoodAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
-                    var result = await _service.GoodAsync(arg);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = _service.GoodAsync(arg);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:
@@ -55,8 +58,11 @@ namespace Snap.RefOut
                 case "GoodAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
-                    var result = await __inst.GoodAsync(arg);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = __inst.GoodAsync(arg);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:

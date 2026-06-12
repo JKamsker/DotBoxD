@@ -3,7 +3,7 @@ using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core;
 
-internal sealed class RpcDispatchResult : IDisposable
+internal struct RpcDispatchResult : IDisposable
 {
     private Payload? _payloadFrame;
     private PooledBufferWriter? _writerFrame;
@@ -42,7 +42,9 @@ internal sealed class RpcDispatchResult : IDisposable
 
     public void Dispose()
     {
-        Interlocked.Exchange(ref _payloadFrame, null)?.Dispose();
-        Interlocked.Exchange(ref _writerFrame, null)?.Dispose();
+        _payloadFrame?.Dispose();
+        _payloadFrame = null;
+        _writerFrame?.Dispose();
+        _writerFrame = null;
     }
 }

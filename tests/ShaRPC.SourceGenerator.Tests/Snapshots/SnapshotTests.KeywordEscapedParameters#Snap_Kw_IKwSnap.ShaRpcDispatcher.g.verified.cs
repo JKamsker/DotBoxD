@@ -30,8 +30,11 @@ namespace Snap.Kw
                 case "DoAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
-                    var result = await _service.DoAsync(args.Item1, args.Item2);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = _service.DoAsync(args.Item1, args.Item2);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:
@@ -55,8 +58,11 @@ namespace Snap.Kw
                 case "DoAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
-                    var result = await __inst.DoAsync(args.Item1, args.Item2);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = __inst.DoAsync(args.Item1, args.Item2);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:

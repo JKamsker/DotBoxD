@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using ShaRPC.Core.Buffers;
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Protocol;
@@ -11,8 +10,8 @@ namespace ShaRPC.Core;
 
 internal sealed class RpcPeerInboundDispatcher
 {
-    private readonly ConcurrentDictionary<string, IServiceDispatcher> _dispatchers = new();
-    private readonly ConcurrentDictionary<int, CancellationTokenSource> _activeInbound = new();
+    private readonly Dictionary<string, IServiceDispatcher> _dispatchers = new(StringComparer.Ordinal);
+    private readonly RpcPeerActiveInboundRequests _activeInbound = new();
     private readonly InstanceRegistry _registry = new();
     private readonly ISerializer _serializer;
     private readonly RpcPeerResponseBuilder _responseBuilder;
@@ -24,8 +23,10 @@ internal sealed class RpcPeerInboundDispatcher
     private readonly RpcPeerInboundRequestQueue? _queue;
     private TaskCompletionSource<bool>? _activeRequestsDrained;
     private TaskCompletionSource<bool>? _activeStreamsDrained;
+    private CancellationTokenRegistration _loopCancellation;
     private int _activeRequestCount;
     private int _activeStreamCount;
+    private int _dispatchersFrozen;
     private int _stopped;
 
     public RpcPeerInboundDispatcher(
@@ -63,6 +64,15 @@ internal sealed class RpcPeerInboundDispatcher
 
     public void Start(CancellationToken loopCt)
     {
+        _responseBuilder.FreezeDispatchers();
+        Volatile.Write(ref _dispatchersFrozen, 1);
+        if (loopCt.CanBeCanceled)
+        {
+            _loopCancellation = loopCt.Register(
+                static state => ((RpcPeerActiveInboundRequests)state!).CancelAll(),
+                _activeInbound);
+        }
+
         _queue?.Start(loopCt);
     }
 
@@ -70,10 +80,17 @@ internal sealed class RpcPeerInboundDispatcher
 
     public void AddDispatcher(IServiceDispatcher dispatcher)
     {
-        if (!_dispatchers.TryAdd(dispatcher.ServiceName, dispatcher))
+        if (Volatile.Read(ref _dispatchersFrozen) != 0)
+        {
+            throw new InvalidOperationException("Services must be added before the inbound dispatcher starts.");
+        }
+
+        if (_dispatchers.ContainsKey(dispatcher.ServiceName))
         {
             throw new InvalidOperationException($"Service '{dispatcher.ServiceName}' is already provided.");
         }
+
+        _dispatchers.Add(dispatcher.ServiceName, dispatcher);
     }
 
     public async ValueTask<bool> AcceptRequestAsync(
@@ -136,10 +153,7 @@ internal sealed class RpcPeerInboundDispatcher
 
     public void Cancel(int messageId)
     {
-        if (_activeInbound.TryGetValue(messageId, out var requestCts))
-        {
-            SafeCancel(requestCts);
-        }
+        _activeInbound.Cancel(messageId);
     }
 
     public async Task StopAsync()
@@ -149,10 +163,8 @@ internal sealed class RpcPeerInboundDispatcher
             return;
         }
 
-        foreach (var requestCts in _activeInbound.Values)
-        {
-            SafeCancel(requestCts);
-        }
+        _loopCancellation.Dispose();
+        _activeInbound.CancelAll();
 
         if (_queue is not null)
         {
@@ -191,7 +203,13 @@ internal sealed class RpcPeerInboundDispatcher
             return false;
         }
 
-        var requestCts = CancellationTokenSource.CreateLinkedTokenSource(loopCt);
+        if (loopCt.IsCancellationRequested)
+        {
+            protocolError = null;
+            return false;
+        }
+
+        var requestCts = new CancellationTokenSource();
         if (!_activeInbound.TryAdd(messageId, requestCts))
         {
             requestCts.Dispose();
@@ -199,11 +217,11 @@ internal sealed class RpcPeerInboundDispatcher
             return false;
         }
 
-        // Re-check after adding: if StopAsync ran between our initial check and TryAdd,
-        // the CTS was missed by StopAsync's cancellation loop.
-        if (Volatile.Read(ref _stopped) != 0)
+        // Re-check after adding: if StopAsync or loop cancellation ran between our initial checks
+        // and TryAdd, the CTS was missed by the active-request cancellation loop.
+        if (Volatile.Read(ref _stopped) != 0 || loopCt.IsCancellationRequested)
         {
-            _activeInbound.TryRemove(messageId, out _);
+            _activeInbound.Remove(messageId, requestCts);
             requestCts.Dispose();
             protocolError = null;
             return false;
@@ -216,7 +234,7 @@ internal sealed class RpcPeerInboundDispatcher
         }
         catch (ShaRpcProtocolException ex)
         {
-            _activeInbound.TryRemove(messageId, out _);
+            _activeInbound.Remove(messageId, requestCts);
             requestCts.Dispose();
             inbound = default;
             protocolError = ex.Message;
@@ -394,7 +412,7 @@ internal sealed class RpcPeerInboundDispatcher
             }
         }
 
-        _activeInbound.TryRemove(inbound.MessageId, out _);
+        _activeInbound.Remove(inbound.MessageId, inbound.RequestCts);
         inbound.RequestCts.Dispose();
     }
 
@@ -466,18 +484,6 @@ internal sealed class RpcPeerInboundDispatcher
         if (Interlocked.Decrement(ref count) == 0)
         {
             Volatile.Read(ref drained)?.TrySetResult(true);
-        }
-    }
-
-    private static void SafeCancel(CancellationTokenSource cts)
-    {
-        try
-        {
-            cts.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The request completed while the connection was closing.
         }
     }
 

@@ -30,8 +30,11 @@ namespace Snap.Renamed
                 case "Greet":
                 {
                     var arg = serializer.Deserialize<string>(payload);
-                    var result = await _service.HelloAsync(arg);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = _service.HelloAsync(arg);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:
@@ -55,8 +58,11 @@ namespace Snap.Renamed
                 case "Greet":
                 {
                     var arg = serializer.Deserialize<string>(payload);
-                    var result = await __inst.HelloAsync(arg);
-                    serializer.Serialize(output, result);
+                    var __sharpc_task = __inst.HelloAsync(arg);
+                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully
+                        ? __sharpc_task.Result
+                        : await __sharpc_task;
+                    serializer.Serialize(output, __sharpc_result);
                     return;
                 }
                 default:

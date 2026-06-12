@@ -220,15 +220,32 @@ internal static class DispatcherGenerator
                 break;
 
             case MethodReturnKind.Task:
-            case MethodReturnKind.ValueTask:
-                sb.AppendLine($"                    await {call};");
+                sb.AppendLine($"                    var __sharpc_task = {call};");
+                sb.AppendLine("                    if (!__sharpc_task.IsCompletedSuccessfully)");
+                sb.AppendLine("                    {");
+                sb.AppendLine("                        await __sharpc_task;");
+                sb.AppendLine("                    }");
                 sb.AppendLine("                    return;");
                 break;
 
-            case MethodReturnKind.TaskOf:
+            case MethodReturnKind.ValueTask:
+                sb.AppendLine($"                    var __sharpc_task = {call};");
+                sb.AppendLine("                    if (!__sharpc_task.IsCompletedSuccessfully)");
+                sb.AppendLine("                    {");
+                sb.AppendLine("                        await __sharpc_task;");
+                sb.AppendLine("                        return;");
+                sb.AppendLine("                    }");
+                sb.AppendLine("                    __sharpc_task.GetAwaiter().GetResult();");
+                sb.AppendLine("                    return;");
+                break;
+
             case MethodReturnKind.ValueTaskOf:
-                sb.AppendLine($"                    var result = await {call};");
-                sb.AppendLine("                    serializer.Serialize(output, result);");
+            case MethodReturnKind.TaskOf:
+                sb.AppendLine($"                    var __sharpc_task = {call};");
+                sb.AppendLine("                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully");
+                sb.AppendLine("                        ? __sharpc_task.Result");
+                sb.AppendLine("                        : await __sharpc_task;");
+                sb.AppendLine("                    serializer.Serialize(output, __sharpc_result);");
                 sb.AppendLine("                    return;");
                 break;
 
@@ -239,7 +256,10 @@ internal static class DispatcherGenerator
                 // it with the per-connection registry and ship back a ServiceHandle the
                 // client can wrap in a sub-proxy.
                 var info = method.SubService!;
-                sb.AppendLine($"                    var __sub = await {call};");
+                sb.AppendLine($"                    var __sharpc_task = {call};");
+                sb.AppendLine("                    var __sub = __sharpc_task.IsCompletedSuccessfully");
+                sb.AppendLine("                        ? __sharpc_task.Result");
+                sb.AppendLine("                        : await __sharpc_task;");
                 if (info.AllowsNull)
                 {
                     sb.AppendLine("                    if (__sub is null)");
@@ -300,8 +320,11 @@ internal static class DispatcherGenerator
             case MethodReturnKind.ValueTaskOfStream:
             case MethodReturnKind.TaskOfPipe:
             case MethodReturnKind.ValueTaskOfPipe:
-                sb.AppendLine($"                    var result = await {call};");
-                sb.AppendLine("                    streaming.SetResponse(result);");
+                sb.AppendLine($"                    var __sharpc_task = {call};");
+                sb.AppendLine("                    var __sharpc_result = __sharpc_task.IsCompletedSuccessfully");
+                sb.AppendLine("                        ? __sharpc_task.Result");
+                sb.AppendLine("                        : await __sharpc_task;");
+                sb.AppendLine("                    streaming.SetResponse(__sharpc_result);");
                 sb.AppendLine("                    return;");
                 break;
         }
