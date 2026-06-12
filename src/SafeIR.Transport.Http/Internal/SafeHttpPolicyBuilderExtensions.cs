@@ -1,4 +1,4 @@
-namespace SafeIR;
+namespace SafeIR.Transport.Http.Internal;
 
 using System.Globalization;
 

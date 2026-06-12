@@ -1,4 +1,4 @@
-namespace SafeIR.Interpreter;
+namespace SafeIR.Interpreter.Internal;
 
 using SafeIR;
 

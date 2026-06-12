@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace AgentQueue;
+namespace AgentQueue.Infrastructure;
 
 internal sealed class QueueDoctor
 {

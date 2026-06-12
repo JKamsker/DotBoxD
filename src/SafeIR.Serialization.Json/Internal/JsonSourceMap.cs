@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace SafeIR;
+namespace SafeIR.Serialization.Json.Internal;
 
 internal sealed class JsonSourceMap
 {

@@ -1,4 +1,4 @@
-namespace AgentQueue;
+namespace AgentQueue.Infrastructure;
 
 internal static class CommandLineExtensions
 {

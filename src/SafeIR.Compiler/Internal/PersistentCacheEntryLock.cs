@@ -1,4 +1,4 @@
-namespace SafeIR.Compiler;
+namespace SafeIR.Compiler.Internal;
 
 internal sealed class PersistentCacheEntryLock : IAsyncDisposable
 {

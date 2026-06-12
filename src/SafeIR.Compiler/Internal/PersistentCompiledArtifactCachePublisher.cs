@@ -1,4 +1,4 @@
-namespace SafeIR.Compiler;
+namespace SafeIR.Compiler.Internal;
 
 internal static class PersistentCompiledArtifactCachePublisher
 {

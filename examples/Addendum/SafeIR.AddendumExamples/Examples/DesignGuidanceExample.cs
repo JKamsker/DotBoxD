@@ -1,4 +1,4 @@
-namespace SafeIR.AddendumExamples;
+namespace SafeIR.AddendumExamples.Examples;
 
 using SafeIR.PluginIpc.Server.Abstractions;
 using SafeIR.Plugins;

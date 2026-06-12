@@ -1,4 +1,4 @@
-namespace SafeIR.Validation;
+namespace SafeIR.Validation.Internal;
 
 using SafeIR;
 

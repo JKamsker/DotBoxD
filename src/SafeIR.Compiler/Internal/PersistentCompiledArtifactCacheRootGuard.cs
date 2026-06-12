@@ -1,4 +1,4 @@
-namespace SafeIR.Compiler;
+namespace SafeIR.Compiler.Internal;
 
 using System.Runtime.Versioning;
 using System.Security.AccessControl;

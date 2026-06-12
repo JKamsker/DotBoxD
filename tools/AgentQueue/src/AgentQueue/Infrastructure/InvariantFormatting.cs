@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace AgentQueue;
+namespace AgentQueue.Infrastructure;
 
 internal static class InvariantFormatting
 {

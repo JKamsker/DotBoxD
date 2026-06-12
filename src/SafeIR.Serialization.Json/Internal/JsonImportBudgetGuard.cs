@@ -1,4 +1,4 @@
-namespace SafeIR;
+namespace SafeIR.Serialization.Json.Internal;
 
 using System.Text;
 using System.Text.Json;

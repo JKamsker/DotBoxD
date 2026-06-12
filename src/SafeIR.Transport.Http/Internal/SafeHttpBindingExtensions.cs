@@ -1,4 +1,4 @@
-namespace SafeIR.Runtime;
+namespace SafeIR.Transport.Http.Internal;
 
 using SafeIR;
 

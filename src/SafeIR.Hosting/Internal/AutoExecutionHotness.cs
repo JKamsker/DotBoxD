@@ -1,4 +1,4 @@
-namespace SafeIR.Hosting;
+namespace SafeIR.Hosting.Internal;
 
 using System.Collections.Concurrent;
 using SafeIR;
