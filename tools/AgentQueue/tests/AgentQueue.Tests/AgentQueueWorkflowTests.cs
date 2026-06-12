@@ -154,6 +154,56 @@ public sealed class AgentQueueWorkflowTests
     }
 
     [Fact]
+    public void DoctorRejectsNonCanonicalStatus()
+    {
+        using AgentQueueHarness harness = new();
+        string bodyFile = harness.WriteBody("## Claim" + Environment.NewLine + "Example.");
+        Assert.Equal(0, harness.Run("append",
+            "--area", "correctness",
+            "--priority", "medium",
+            "--title", "Example bug",
+            "--dedup-key", "correctness/example/bug",
+            "--agent", "auditor",
+            "--body-file", bodyFile));
+
+        string findingFile = Directory.GetFiles(
+            Path.Combine(harness.Root, "docs", "agent-loop", "findings"),
+            "COR-0001-*.md").Single();
+        string content = File.ReadAllText(findingFile)
+            .Replace("status: open", "status: Open", StringComparison.Ordinal);
+        File.WriteAllText(findingFile, content);
+        Assert.Equal(0, harness.Run("render"));
+
+        Assert.Equal(2, harness.Run("doctor"));
+        Assert.Contains("COR-0001 has invalid status 'Open'.", harness.LastOutput);
+    }
+
+    [Fact]
+    public void DoctorRejectsNonCanonicalPriority()
+    {
+        using AgentQueueHarness harness = new();
+        string bodyFile = harness.WriteBody("## Claim" + Environment.NewLine + "Example.");
+        Assert.Equal(0, harness.Run("append",
+            "--area", "correctness",
+            "--priority", "medium",
+            "--title", "Example bug",
+            "--dedup-key", "correctness/example/bug",
+            "--agent", "auditor",
+            "--body-file", bodyFile));
+
+        string findingFile = Directory.GetFiles(
+            Path.Combine(harness.Root, "docs", "agent-loop", "findings"),
+            "COR-0001-*.md").Single();
+        string content = File.ReadAllText(findingFile)
+            .Replace("priority: medium", "priority: Medium", StringComparison.Ordinal);
+        File.WriteAllText(findingFile, content);
+        Assert.Equal(0, harness.Run("render"));
+
+        Assert.Equal(2, harness.Run("doctor"));
+        Assert.Contains("COR-0001 has invalid priority 'Medium'.", harness.LastOutput);
+    }
+
+    [Fact]
     public void RenderCheckDetectsManualQueueDrift()
     {
         using AgentQueueHarness harness = new();

@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits
-  - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
-  - Dedup: `correctness/agentqueue/status-case/doctor-render-mismatch`
 - [ ] `COR-0009` medium - Plugin adapter shape discovery crashes on explicit interface implementations
   - File: `docs/agent-loop/findings/COR-0009-plugin-adapter-shape-discovery-crashes-on-explicit-interface-implementations.md`
   - Dedup: `correctness/plugins/adapter-registry/explicit-interface-shape-crash`
@@ -28,6 +25,10 @@
   - File: `docs/agent-loop/findings/COR-0006-worker-result-validation-accepts-undefined-failure-error-codes.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
+- [~] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits
+  - File: `docs/agent-loop/findings/COR-0007-agentqueue-doctor-accepts-statuses-the-renderer-omits.md`
+  - Fixed by: `fixer`
+  - Commit: ``
 
 ## Verified
 

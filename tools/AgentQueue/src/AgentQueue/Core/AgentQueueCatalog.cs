@@ -65,10 +65,10 @@ internal static class AgentQueueCatalog
     }
 
     public static bool IsPriority(string value) =>
-        Priorities.Contains(value, StringComparer.OrdinalIgnoreCase);
+        Priorities.Contains(value, StringComparer.Ordinal);
 
     public static bool IsStatus(string value) =>
-        Statuses.Contains(value, StringComparer.OrdinalIgnoreCase);
+        Statuses.Contains(value, StringComparer.Ordinal);
 
     public static bool IsFinalStatus(string status) =>
         status is "verified" or "rejected" or "duplicate" or "obsolete";
