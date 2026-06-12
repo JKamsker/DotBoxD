@@ -1,19 +1,19 @@
 ---
 id: COR-0044
 area: correctness
-status: claimed
+status: fixed_pending_verification
 priority: high
 title: Package-producing workflow emits unsigned unattested NuGet artifacts
 dedup_key: security/release-packaging/nuget/unsigned-unattested-artifacts
 created_at: 2026-06-12T23:04:43.7913439+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-12T23:22:17.2538613+00:00
+updated_at: 2026-06-12T23:24:59.4116234+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T23:22:17.2538613+00:00
 claim_branch: workflow-work
-fixed_by: 
-fixed_at: 
+fixed_by: worker
+fixed_at: 2026-06-12T23:24:59.4116234+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

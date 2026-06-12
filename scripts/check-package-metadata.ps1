@@ -103,6 +103,39 @@ function AssertNoZipEntryPrefix($zip, [string] $prefix, [string] $packageName) {
     }
 }
 
+function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [string] $packageName) {
+    $allowedExact = New-Object "System.Collections.Generic.HashSet[string]" ([StringComparer]::Ordinal)
+    [void] $allowedExact.Add("[Content_Types].xml")
+    [void] $allowedExact.Add("_rels/.rels")
+    [void] $allowedExact.Add("$id.nuspec")
+    [void] $allowedExact.Add($readme)
+    [void] $allowedExact.Add(".signature.p7s")
+
+    if ($id -eq "SafeIR.PluginAnalyzer") {
+        [void] $allowedExact.Add("analyzers/dotnet/cs/SafeIR.PluginAnalyzer.dll")
+    } else {
+        [void] $allowedExact.Add("lib/net10.0/$id.dll")
+    }
+
+    foreach ($entry in $zip.Entries) {
+        $name = $entry.FullName
+        if ($name.EndsWith("/", [StringComparison]::Ordinal)) {
+            continue
+        }
+
+        if ($allowedExact.Contains($name)) {
+            continue
+        }
+
+        if ($name.StartsWith("package/services/metadata/core-properties/", [StringComparison]::Ordinal) -and
+            $name.EndsWith(".psmdcp", [StringComparison]::Ordinal)) {
+            continue
+        }
+
+        throw "Package $packageName includes unexpected package entry '$name'."
+    }
+}
+
 function IsAllowedPrereleaseDependency([string] $packageId, [string] $dependencyId, [string] $dependencyVersion) {
     if (-not $allowedPrereleaseDependenciesByPackage.ContainsKey($packageId)) {
         return $false
@@ -224,6 +257,8 @@ foreach ($package in $packages) {
         } else {
             AssertZipEntry $zip "lib/net10.0/$id.dll" $package.Name
         }
+
+        AssertPackageEntryAllowlist $zip $id $readme $package.Name
 
         $dependencies = $metadata.SelectNodes(".//*[local-name()='dependency']")
         foreach ($dependency in $dependencies) {

@@ -1,19 +1,19 @@
 ---
 id: COR-0040
 area: correctness
-status: claimed
+status: fixed_pending_verification
 priority: high
 title: Release workflow uses mutable action tags for package-producing jobs
 dedup_key: security/release-workflow/actions/mutable-major-tags
 created_at: 2026-06-12T22:52:55.6002158+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-12T23:22:15.5691852+00:00
+updated_at: 2026-06-12T23:24:57.9724002+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T23:22:15.5691852+00:00
 claim_branch: workflow-work
-fixed_by: 
-fixed_at: 
+fixed_by: worker
+fixed_at: 2026-06-12T23:24:57.9724002+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 
