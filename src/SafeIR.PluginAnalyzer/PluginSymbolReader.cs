@@ -36,7 +36,7 @@ internal static class PluginSymbolReader
     public static IReadOnlyList<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
     {
         return PluginEventPropertyReader.Read(eventType)
-            .Select(p => new EventPropertyModel(p.Name, SandboxTypeName(p.Type)))
+            .Select(p => new EventPropertyModel(p.Name, SafeIrTypeNameReader.SandboxTypeName(p.Type)))
             .ToArray();
     }
 
@@ -96,7 +96,7 @@ internal static class PluginSymbolReader
         CancellationToken cancellationToken)
     {
         var syntax = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) as PropertyDeclarationSyntax;
-        var type = SandboxTypeName(property.Type);
+        var type = SafeIrTypeNameReader.SandboxTypeName(property.Type);
         var range = Range(property, type);
         return new LiveSettingModel(
             property.Name,
@@ -151,7 +151,7 @@ internal static class PluginSymbolReader
 
         if (range.ConstructorArguments.Length == SafeIrGenerationNames.RangeAttributeArguments.TypeAndStringOverloadCount &&
             range.ConstructorArguments[SafeIrGenerationNames.RangeAttributeArguments.ConversionTypeIndex].Value is INamedTypeSymbol conversionType &&
-            string.Equals(SandboxTypeName(conversionType), type, StringComparison.Ordinal))
+            string.Equals(SafeIrTypeNameReader.SandboxTypeName(conversionType), type, StringComparison.Ordinal))
         {
             return (
                 RangeValue(
@@ -251,13 +251,4 @@ internal static class PluginSymbolReader
     private static NotSupportedException RangeValueException(Exception? inner = null)
         => new("Live setting ranges must be finite numeric values matching the live setting type.", inner);
 
-    private static string SandboxTypeName(ITypeSymbol type)
-        => type.SpecialType switch {
-            SpecialType.System_Boolean => SafeIrGenerationNames.ManifestTypes.Bool,
-            SpecialType.System_Int32 => SafeIrGenerationNames.ManifestTypes.Int,
-            SpecialType.System_Int64 => SafeIrGenerationNames.ManifestTypes.Long,
-            SpecialType.System_Double => SafeIrGenerationNames.ManifestTypes.Double,
-            SpecialType.System_String => SafeIrGenerationNames.ManifestTypes.String,
-            _ => SafeIrGenerationNames.ManifestTypes.Unsupported
-        };
 }

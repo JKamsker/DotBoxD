@@ -80,11 +80,15 @@ internal static class PluginKernelModelFactory
                 .ElementAtOrDefault(SafeIrGenerationNames.KernelMethodParameters.ContextIndex)
                 ?.Identifier.ValueText ??
                 SafeIrGenerationNames.DefaultContextParameterName;
-            var shouldHandleExpression = SafeIrExpressionModelFactory.Create(
-                ReturnExpression(shouldHandle),
+            var shouldHandleContext = new SafeIrExpressionLoweringContext(
                 eventParameterName,
                 eventProperties,
-                liveSettings);
+                liveSettings,
+                context.SemanticModel,
+                cancellationToken);
+            var shouldHandleExpression = SafeIrExpressionModelFactory.Create(
+                ReturnExpression(shouldHandle),
+                shouldHandleContext);
             if (!string.Equals(shouldHandleExpression.Type, SafeIrGenerationNames.ManifestTypes.Bool, StringComparison.Ordinal))
             {
                 throw new NotSupportedException("Kernel ShouldHandle must lower to a bool expression.");
@@ -95,7 +99,9 @@ internal static class PluginKernelModelFactory
                 handleEventParameterName,
                 handleContextParameterName,
                 eventProperties,
-                liveSettings);
+                liveSettings,
+                context.SemanticModel,
+                cancellationToken);
             var model = new PluginKernelModel(
                 PluginId: validatedPluginId,
                 Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),

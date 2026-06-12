@@ -1,5 +1,6 @@
 namespace SafeIR.PluginAnalyzer;
 
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 internal static class SafeIrHandleModelFactory
@@ -9,20 +10,24 @@ internal static class SafeIrHandleModelFactory
         string eventParameterName,
         string contextParameterName,
         EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        EquatableArray<LiveSettingModel> liveSettings,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         var invocation = SingleSendInvocation(method, contextParameterName);
         var arguments = SendArguments(invocation);
+        var loweringContext = new SafeIrExpressionLoweringContext(
+            eventParameterName,
+            eventProperties,
+            liveSettings,
+            semanticModel,
+            cancellationToken);
         var target = SafeIrExpressionModelFactory.Create(
             arguments.Target,
-            eventParameterName,
-            eventProperties,
-            liveSettings);
+            loweringContext);
         var message = SafeIrExpressionModelFactory.Create(
             arguments.Message,
-            eventParameterName,
-            eventProperties,
-            liveSettings);
+            loweringContext);
         RequireString(target, "targetId");
         RequireString(message, "message");
         return new SafeIrHandleModel(target, message);

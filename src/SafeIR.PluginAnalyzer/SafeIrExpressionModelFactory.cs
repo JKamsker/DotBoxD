@@ -7,38 +7,43 @@ internal static class SafeIrExpressionModelFactory
 {
     public static SafeIrExpressionModel Create(
         ExpressionSyntax expression,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
-        => Lower(expression, eventParameterName, eventProperties, liveSettings);
+        SafeIrExpressionLoweringContext context)
+        => Lower(expression, context);
 
     private static SafeIrExpressionModel Lower(
         ExpressionSyntax expression,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
-        => expression switch {
-            ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, eventParameterName, eventProperties, liveSettings),
-            PrefixUnaryExpressionSyntax unary => LowerUnary(unary, eventParameterName, eventProperties, liveSettings),
-            BinaryExpressionSyntax binary => LowerBinary(binary, eventParameterName, eventProperties, liveSettings),
-            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, liveSettings),
-            MemberAccessExpressionSyntax member => LowerMemberAccess(member, eventParameterName, eventProperties, liveSettings),
+        SafeIrExpressionLoweringContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (SafeIrConstantExpressionLowerer.TryLower(
+                expression,
+                context.SemanticModel,
+                context.CancellationToken) is { } constant)
+        {
+            return constant;
+        }
+
+        return expression switch {
+            ParenthesizedExpressionSyntax parenthesized => Lower(parenthesized.Expression, context),
+            PrefixUnaryExpressionSyntax unary => LowerUnary(unary, context),
+            BinaryExpressionSyntax binary => LowerBinary(binary, context),
+            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, context.LiveSettings),
+            MemberAccessExpressionSyntax member => LowerMemberAccess(member, context),
             LiteralExpressionSyntax literal => SafeIrLiteralExpressionLowerer.Lower(literal),
             _ => Unsupported(expression)
         };
+    }
 
     private static SafeIrExpressionModel LowerUnary(
         PrefixUnaryExpressionSyntax unary,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
         if (SafeIrLiteralExpressionLowerer.TryLowerNegative(unary) is { } literal)
         {
             return literal;
         }
 
-        var operand = Lower(unary.Operand, eventParameterName, eventProperties, liveSettings);
+        var operand = Lower(unary.Operand, context);
         return unary.Kind() switch {
             SyntaxKind.LogicalNotExpression => Unary(
                 SafeIrGenerationNames.Helpers.Not,
@@ -69,12 +74,10 @@ internal static class SafeIrExpressionModelFactory
 
     private static SafeIrExpressionModel LowerBinary(
         BinaryExpressionSyntax binary,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
-        var left = Lower(binary.Left, eventParameterName, eventProperties, liveSettings);
-        var right = Lower(binary.Right, eventParameterName, eventProperties, liveSettings);
+        var left = Lower(binary.Left, context);
+        var right = Lower(binary.Right, context);
         var allocates = left.Allocates || right.Allocates;
 
         return binary.Kind() switch {
@@ -253,14 +256,12 @@ internal static class SafeIrExpressionModelFactory
 
     private static SafeIrExpressionModel LowerMemberAccess(
         MemberAccessExpressionSyntax member,
-        string eventParameterName,
-        EquatableArray<EventPropertyModel> eventProperties,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
         var memberName = member.Name.Identifier.ValueText;
         if (member.Expression is IdentifierNameSyntax identifier &&
-            string.Equals(identifier.Identifier.ValueText, eventParameterName, StringComparison.Ordinal)) {
-            var property = eventProperties.FirstOrDefault(p => string.Equals(p.Name, memberName, StringComparison.Ordinal));
+            string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
+            var property = context.EventProperties.FirstOrDefault(p => string.Equals(p.Name, memberName, StringComparison.Ordinal));
             if (property is null) {
                 throw new NotSupportedException($"Unknown event property '{memberName}'.");
             }
@@ -272,7 +273,7 @@ internal static class SafeIrExpressionModelFactory
         }
 
         if (member.Expression is ThisExpressionSyntax) {
-            return LowerIdentifier(memberName, liveSettings);
+            return LowerIdentifier(memberName, context.LiveSettings);
         }
 
         return Unsupported(member);
