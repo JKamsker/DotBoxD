@@ -10,11 +10,13 @@ public static class RunSummaryAuditFields
         string? runtimeForm = null,
         string? cacheKey = null,
         string? artifactHash = null,
-        string? materializationStatus = null)
+        string? materializationStatus = null,
+        bool executionDispatched = true)
     {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["mode"] = mode.ToString(),
+            ["executionDispatched"] = executionDispatched.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["cacheStatus"] = cacheStatus,
             ["moduleHash"] = plan.ModuleHash,
             ["planHash"] = plan.PlanHash,

@@ -26,6 +26,7 @@ public sealed class AuditSummaryTests
         Assert.Equal("Interpreted", summary.Fields!["mode"]);
         Assert.Equal(plan.PlanHash, summary.Fields["planHash"]);
         Assert.Equal("summary-policy", summary.Fields["policyId"]);
+        Assert.Equal("True", summary.Fields["executionDispatched"]);
         Assert.Equal("None", summary.Fields["cacheStatus"]);
         Assert.Equal("1000", summary.Fields["maxFuel"]);
     }
@@ -55,6 +56,7 @@ public sealed class AuditSummaryTests
         Assert.Equal("Compiled", summary.Fields!["mode"]);
         Assert.Equal("summary-policy", summary.Fields["policyId"]);
         Assert.Equal(plan.PolicyHash, summary.Fields["policyHash"]);
+        Assert.Equal("True", summary.Fields["executionDispatched"]);
         Assert.Equal(result.ArtifactHash, summary.Fields["artifactHash"]);
         Assert.Equal("LoadedAssembly", summary.Fields["runtimeForm"]);
     }

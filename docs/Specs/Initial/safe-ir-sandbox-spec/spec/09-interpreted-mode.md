@@ -189,11 +189,13 @@ Thresholds must be configurable.
 
 ## Hotness tracking
 
-Track by canonical execution-plan hash:
+Track by canonical execution-plan hash and entrypoint:
 
 ```text
 planHash
+entrypoint
 runCount
+completedRunCount
 averageDurationInterpreted
 averageFuelUsed
 lastRunAt
@@ -201,7 +203,8 @@ compileFailures
 compiledArtifactHash optional
 ```
 
-If interpretation becomes expensive, compile.
+`runCount` includes the current Auto selection attempt; the other fields summarize completed prior
+Auto attempts for the same plan and entrypoint. If interpretation becomes expensive, compile.
 
 ## Interpreter optimizations
 

@@ -104,8 +104,8 @@
     },
     {
       "path": "spec/09-interpreted-mode.md",
-      "sha256": "4d3863ff7cb0cc1477febd7b0b787758a2b9efaa00407445e79f094acb22420b",
-      "bytes": 6156
+      "sha256": "85e1dee2e4bd006c5e5985ced91c126b7365e76ffe7c4547e9bd2c916fc86b91",
+      "bytes": 6347
     },
     {
       "path": "spec/10-compiled-mode.md",
@@ -129,8 +129,8 @@
     },
     {
       "path": "spec/14-observability-audit.md",
-      "sha256": "2086367cb6cc71056814b05a3f45b14b824f0fea05f20c6f3e888da297bd58ae",
-      "bytes": 5387
+      "sha256": "db5d5e22cb89dde4f8a85337a4cfc2a34892951d5f3c2952f659d9b3949af39f",
+      "bytes": 5538
     },
     {
       "path": "spec/15-testing-red-team.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "spec/16-public-api.md",
-      "sha256": "cee7fba9c095a0cb74ca5d7d9b8255f7258e5cd1707cf296af783cd4b1b49927",
-      "bytes": 14172
+      "sha256": "99872317b36b77ba1a3d8c4af7594617f2837798dc0c3aad014d9eef11d1020f",
+      "bytes": 15311
     },
     {
       "path": "spec/17-implementation-plan.md",

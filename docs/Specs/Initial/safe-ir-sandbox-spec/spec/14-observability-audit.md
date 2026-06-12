@@ -25,6 +25,7 @@ moduleId/moduleHash
 policyId/policyHash
 bindingManifestHash
 executionMode
+executionDispatched
 cacheStatus
 timestamp
 success/failure
@@ -36,9 +37,11 @@ hostCalls
 artifactHash optional
 ```
 
-The current `RunSummary` event stores these as structured string fields where possible. Duration,
-completed-at timestamps, and capability-grant/use rollups are recommended operational extensions,
-not required fields in the current public `SandboxAuditEvent` shape.
+The current `RunSummary` event stores these as structured string fields where possible.
+`executionDispatched` is `false` for host-side denials that fail before interpreter, compiled
+runtime, or trusted worker dispatch. Duration, completed-at timestamps, and capability-grant/use
+rollups are recommended operational extensions, not required fields in the current public
+`SandboxAuditEvent` shape.
 Hosts can attach an operational audit observer with `SandboxHostBuilder.ForwardAuditEventsTo(...)`.
 The observer receives the same sequenced events returned in `SandboxExecutionResult.AuditEvents`,
 so callers can forward them to retention, metrics, tracing, and alerting pipelines without

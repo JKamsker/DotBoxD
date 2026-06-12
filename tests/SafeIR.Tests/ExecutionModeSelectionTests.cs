@@ -24,6 +24,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.Equal(35, ((I32Value)result.Value!).Value);
         Assert.Equal(ExecutionMode.Interpreted, result.ActualMode);
+        Assert.True(result.ExecutionDispatched);
         Assert.Null(result.ArtifactHash);
         Assert.Equal(0, compiler.Calls);
     }
@@ -163,12 +164,14 @@ public sealed class ExecutionModeSelectionTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.False(result.ExecutionDispatched);
         Assert.Null(result.ArtifactHash);
         Assert.Contains(result.AuditEvents, e => e.Kind == "CompilerUnavailable");
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
         Assert.False(summary.Success);
         Assert.Equal(SandboxErrorCode.ValidationError, summary.ErrorCode);
         Assert.Equal("Compiled", summary.Fields!["mode"]);
+        Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 
     [Fact]
@@ -189,11 +192,13 @@ public sealed class ExecutionModeSelectionTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
         Assert.Equal(invalidMode, result.ActualMode);
+        Assert.False(result.ExecutionDispatched);
         Assert.Equal(0, compiler.Calls);
         Assert.Contains(result.AuditEvents, e => e.Kind == "InvalidExecutionOptions");
         Assert.DoesNotContain(result.AuditEvents, e => e.Kind == "CompilerUnavailable");
         var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
         Assert.Equal("123", summary.Fields!["mode"]);
+        Assert.Equal("False", summary.Fields["executionDispatched"]);
     }
 
     [Fact]
@@ -213,6 +218,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.False(result.ExecutionDispatched);
         Assert.Null(result.ArtifactHash);
         Assert.Equal(1, compiler.Calls);
         Assert.False(compiler.DelegateExecuted);
@@ -256,6 +262,7 @@ public sealed class ExecutionModeSelectionTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.VerifierFailure, result.Error!.Code);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.False(result.ExecutionDispatched);
         Assert.Null(result.ArtifactHash);
         Assert.Contains(result.AuditEvents, e => e.Kind == "CompiledExecutionFailed");
         Assert.Contains(result.AuditEvents, e =>
@@ -278,11 +285,11 @@ public sealed class ExecutionModeSelectionTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.False(result.ExecutionDispatched);
         Assert.Null(result.ArtifactHash);
         Assert.Contains(result.AuditEvents, e =>
             e.Kind == "RunSummary" && !e.Success && e.ErrorCode == SandboxErrorCode.HostFailure);
     }
-
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
         => SandboxHost.Create(builder =>
         {

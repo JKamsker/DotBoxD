@@ -18,7 +18,31 @@ public sealed record ExecutionModeDecision(ExecutionMode Mode)
     public static ExecutionModeDecision Compiled { get; } = new(ExecutionMode.Compiled);
 }
 
-public sealed record ModuleHotnessStats(int RunCount);
+public sealed record ModuleHotnessStats(
+    string PlanHash,
+    string Entrypoint,
+    int RunCount,
+    int CompletedRunCount,
+    TimeSpan AverageInterpretedDuration,
+    long AverageFuelUsed,
+    DateTimeOffset? LastRunAt,
+    int CompileFailures,
+    string? LastCompiledArtifactHash)
+{
+    public ModuleHotnessStats(int runCount)
+        : this(
+            string.Empty,
+            string.Empty,
+            runCount,
+            0,
+            TimeSpan.Zero,
+            0,
+            null,
+            0,
+            null)
+    {
+    }
+}
 
 public sealed class HotnessExecutionModeSelector : IExecutionModeSelector
 {

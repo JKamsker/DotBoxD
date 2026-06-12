@@ -118,12 +118,21 @@ public sealed record SandboxExecutionResult
     public SandboxResourceUsage ResourceUsage { get; init; }
     public IReadOnlyList<SandboxAuditEvent> AuditEvents { get; init; }
     public ExecutionMode ActualMode { get; init; }
+    public bool ExecutionDispatched { get; init; }
     public string ModuleHash { get; init; }
     public string PlanHash { get; init; }
     public string PolicyHash { get; init; }
     public string? ArtifactHash { get; init; }
 }
 ```
+
+`ActualMode` reports the backend mode for runs that dispatched to a trusted execution backend.
+When execution is rejected before dispatch, for example invalid options, deterministic-mode
+requirements, revoked capabilities, unavailable worker isolation, or compiled mode with no
+compiler and fallback disabled, `ActualMode` retains the requested or effective mode for
+correlation and `ExecutionDispatched` is `false`. Fallback results report the backend that actually
+ran, so a compiled request that safely falls back to the interpreter has
+`ActualMode = Interpreted` and `ExecutionDispatched = true`.
 
 ## Policy builder
 
@@ -329,10 +338,23 @@ public interface IExecutionModeSelector
         ModuleHotnessStats hotness,
         CompiledCacheStatus cacheStatus);
 }
+
+public sealed record ModuleHotnessStats(
+    string PlanHash,
+    string Entrypoint,
+    int RunCount,
+    int CompletedRunCount,
+    TimeSpan AverageInterpretedDuration,
+    long AverageFuelUsed,
+    DateTimeOffset? LastRunAt,
+    int CompileFailures,
+    string? LastCompiledArtifactHash);
 ```
 
 The default selector uses `AutoCompileThreshold`, with a minimum threshold of two so Auto mode never
-compiles the first run. The current host passes `CompiledCacheStatus.None` before compiler/cache
+compiles the first run. `RunCount` is the Auto attempt count including the current selection
+attempt; the remaining hotness fields summarize previously completed Auto executions for the same
+plan hash and entrypoint. The current host passes `CompiledCacheStatus.None` before compiler/cache
 lookup; cache hit/miss status is emitted later in `RunSummary`.
 
 ## Fallback behavior
