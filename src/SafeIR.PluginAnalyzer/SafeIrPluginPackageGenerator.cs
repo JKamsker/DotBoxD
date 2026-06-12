@@ -18,9 +18,11 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
             .Select(static (result, _) => result!);
 
         var diagnostics = modelResults
-            .Where(static result => result.Diagnostic is not null);
-        context.RegisterSourceOutput(diagnostics, static (context, result) =>
-            context.ReportDiagnostic(result.Diagnostic!));
+            .Where(static result => result.Diagnostic is not null)
+            .Select(static (result, _) => result.Diagnostic!)
+            .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.DiagnosticResult);
+        context.RegisterSourceOutput(diagnostics, static (context, diagnostic) =>
+            context.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var models = modelResults
             .Where(static result => result.Model is not null)
@@ -52,7 +54,7 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
     {
         var duplicateIdentities = models
             .GroupBy(PackageIdentity, StringComparer.Ordinal)
-            .Where(group => group.Skip(1).Any())
+            .Where(group => group.Take(2).Count() > 1)
             .ToDictionary(group => group.Key, StringComparer.Ordinal);
         var diagnostics = duplicateIdentities.Values.Select(group => new GeneratedPluginPackageDiagnostic(
             $"Plugin package name '{group.First().PackageName}' is generated more than once in namespace '{NamespaceDisplay(group.First())}'."));
