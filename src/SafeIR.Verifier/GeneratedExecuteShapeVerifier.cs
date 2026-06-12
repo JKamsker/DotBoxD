@@ -1,27 +1,10 @@
 namespace SafeIR.Verifier;
 
 using System.Reflection.Metadata;
+using static SafeIR.Verifier.GeneratedMethodShapeSignatures;
 
 internal static class GeneratedExecuteShapeVerifier
 {
-    private const string Runtime = "SafeIR.Runtime.CompiledRuntime";
-    private const string Value = "SafeIR.SandboxValue";
-    private const string Int32 = "System.Int32";
-    private const string Void = "System.Void";
-    private const string SandboxType = "SafeIR.SandboxType";
-    private static readonly string ValidateInput = $"{Runtime}.ValidateEntrypointInput({Value},{Int32}):{Void}";
-    private static readonly string TypeScalar = $"{Runtime}.TypeScalar(System.String):{SandboxType}";
-    private static readonly string TypeList = $"{Runtime}.TypeList({SandboxType}):{SandboxType}";
-    private static readonly string TypeMap = $"{Runtime}.TypeMap({SandboxType},{SandboxType}):{SandboxType}";
-
-    private static readonly HashSet<string> AllowedCalls = new(StringComparer.Ordinal) {
-        ValidateInput,
-        $"{Runtime}.GetInputArgument({Value},{Int32},{Int32},{SandboxType}):{Value}",
-        TypeScalar,
-        TypeList,
-        TypeMap
-    };
-
     public static void Verify(GeneratedMethodFlow analysis, List<VerificationDiagnostic> diagnostics)
     {
         RequireReachable(analysis, ValidateInput, diagnostics, "Execute must validate entrypoint input shape");
@@ -48,7 +31,7 @@ internal static class GeneratedExecuteShapeVerifier
             {
                 VerifyLocalCall(analysis, instruction, diagnostics);
             }
-            else if (!AllowedCalls.Contains(instruction.CalledMember!))
+            else if (!ExecuteAllowedCalls.Contains(instruction.CalledMember!))
             {
                 diagnostics.Add(new VerificationDiagnostic("V-COMPILED-SHAPE", "Execute may only validate input and dispatch"));
             }
@@ -99,9 +82,6 @@ internal static class GeneratedExecuteShapeVerifier
             }
         }
     }
-
-    private static bool IsGeneratedFunctionCall(string? calledMember)
-        => calledMember is not null && calledMember.StartsWith("Fn_", StringComparison.Ordinal);
 
     private static void RequireReachable(
         GeneratedMethodFlow analysis,

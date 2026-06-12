@@ -65,6 +65,7 @@ public static class CompiledRuntime
     }
 
     public static int AsI32(SandboxValue value) => ((I32Value)value).Value;
+    public static long AsI64(SandboxValue value) => ((I64Value)value).Value;
     public static bool AsBool(SandboxValue value) => ((BoolValue)value).Value;
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
