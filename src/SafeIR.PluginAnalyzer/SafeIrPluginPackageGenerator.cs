@@ -54,7 +54,7 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
     {
         var duplicateIdentities = models
             .GroupBy(PackageIdentity, StringComparer.Ordinal)
-            .Where(group => group.Skip(1).Any())
+            .Where(group => group.Take(2).Count() > 1)
             .ToDictionary(group => group.Key, StringComparer.Ordinal);
         var diagnostics = duplicateIdentities.Values.Select(group => new GeneratedPluginPackageDiagnostic(
             $"Plugin package name '{group.First().PackageName}' is generated more than once in namespace '{NamespaceDisplay(group.First())}'."));
