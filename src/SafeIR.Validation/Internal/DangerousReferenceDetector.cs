@@ -111,15 +111,7 @@ internal static class DangerousReferenceDetector
 
     private static void CheckLiteral(LiteralExpression literal, List<SandboxDiagnostic> diagnostics)
     {
-        var text = literal.Value switch
-        {
-            StringValue value => value.Value,
-            OpaqueIdValue value => value.Value,
-            SandboxPathValue value => value.Value.RelativePath,
-            SandboxUriValue value => value.Value.Value,
-            _ => null
-        };
-        if (text is not null && IsDangerousReference(text))
+        if (LiteralValueSafety.ContainsDangerousReference(literal.Value))
         {
             diagnostics.Add(new SandboxDiagnostic("E-IR-CLR-REF", "forbidden CLR reference in literal", Span: literal.Span));
         }

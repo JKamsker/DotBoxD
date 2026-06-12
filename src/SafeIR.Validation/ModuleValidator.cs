@@ -12,12 +12,24 @@ public sealed class ModuleValidator
             return ModuleValidationResult.Failure(diagnostics);
         }
 
-        var analyzer = new FunctionAnalyzer(module, bindings, diagnostics);
-        var functions = analyzer.AnalyzeAll();
-        var requiredEffects = RequiredEffects(module, functions);
-        var bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
-        var requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
-        PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
+        IReadOnlyDictionary<string, FunctionAnalysis> functions;
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences;
+        IReadOnlySet<string> requiredCapabilities;
+        SandboxEffect requiredEffects;
+        try
+        {
+            var analyzer = new FunctionAnalyzer(module, bindings, diagnostics);
+            functions = analyzer.AnalyzeAll();
+            requiredEffects = RequiredEffects(module, functions);
+            bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+            requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
+            PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
+        }
+        catch (SandboxValidationException ex)
+        {
+            diagnostics.AddRange(ex.Diagnostics);
+            return ModuleValidationResult.Failure(diagnostics);
+        }
 
         return new ModuleValidationResult(
             HasNoErrors(diagnostics),
