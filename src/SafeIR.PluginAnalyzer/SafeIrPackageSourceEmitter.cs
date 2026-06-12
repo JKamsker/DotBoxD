@@ -24,7 +24,10 @@ internal static class SafeIrPackageSourceEmitter
     private static string HintName(PluginKernelModel model)
         => string.IsNullOrWhiteSpace(model.Namespace)
             ? model.PackageName + ".g.cs"
-            : model.Namespace + "." + model.PackageName + ".g.cs";
+            : HintNamePart(model.Namespace) + "." + model.PackageName + ".g.cs";
+
+    private static string HintNamePart(string value)
+        => value.Replace(SafeIrGenerationNames.CSharpIdentifiers.EscapePrefix, string.Empty);
 
     private static void EmitBody(StringBuilder builder, PluginKernelModel model)
     {

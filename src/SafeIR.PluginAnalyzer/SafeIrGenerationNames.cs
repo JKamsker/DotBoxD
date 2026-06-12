@@ -55,6 +55,11 @@ internal static class SafeIrGenerationNames
         public const string DoubleRoundTripFormat = "R";
     }
 
+    public static class CSharpIdentifiers
+    {
+        public const string EscapePrefix = "@";
+    }
+
     public static class ManifestTypes
     {
         public const string Bool = "bool";
