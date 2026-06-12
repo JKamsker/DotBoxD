@@ -159,10 +159,9 @@ public sealed class PluginAnalyzerGenerationTests
             """);
 
         var generated = Assert.Single(result.GeneratedTrees).GetText().ToString();
-        var eventParameters = generated[generated.IndexOf("EventParameters()", StringComparison.Ordinal)..];
         Assert.True(
-            eventParameters.IndexOf("e_DamageType", StringComparison.Ordinal) <
-            eventParameters.IndexOf("e_Amount", StringComparison.Ordinal));
+            generated.IndexOf("parameters[0] = new global::SafeIR.Parameter(\"e_DamageType\"", StringComparison.Ordinal) <
+            generated.IndexOf("parameters[1] = new global::SafeIR.Parameter(\"e_Amount\"", StringComparison.Ordinal));
     }
 
     [Fact]

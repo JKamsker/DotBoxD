@@ -83,6 +83,37 @@ public sealed class PluginAnalyzerCompletenessTests
     }
 
     [Fact]
+    public void Generator_emits_direct_parameter_array_construction_without_linq()
+    {
+        var (result, outputCompilation, diagnostics) = RunGenerator("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId, string Message);
+
+            [GamePlugin("direct-parameters")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                [LiveSetting]
+                public int MinDamage { get; set; } = 100;
+
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        var generated = Assert.Single(result.GeneratedTrees).GetText().ToString();
+        Assert.Contains("var parameters = Parameters(settings);", generated);
+        Assert.Contains("parameters[i + 2] = new global::SafeIR.Parameter(setting.Name, TypeOf(setting.Type));", generated);
+        Assert.DoesNotContain("global::System.Linq.Enumerable.", generated);
+    }
+
+    [Fact]
     public void Generator_lowers_i64_and_f64_equality()
     {
         var (result, outputCompilation, diagnostics) = RunGenerator("""
