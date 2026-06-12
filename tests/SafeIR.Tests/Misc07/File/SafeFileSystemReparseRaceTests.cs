@@ -7,28 +7,11 @@ public sealed class SafeFileSystemReparseRaceTests
     {
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
-        Directory.CreateDirectory(Path.Combine(root.Path, "safe"));
-        var link = Path.Combine(root.Path, "safe", "nested");
-        var swapped = false;
-
-        using var _ = Runtime.SafeFileSystem.UseBeforeTempCreateForTests(() =>
-        {
-            if (!swapped)
-            {
-                swapped = TryCreateDirectoryLink(link, outside.Path);
-            }
-        });
         var result = await ExecuteWriteAsync(root.Path, "safe/nested/out.txt", "new");
-
-        if (!swapped)
-        {
-            return;
-        }
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
         Assert.False(File.Exists(Path.Combine(outside.Path, "out.txt")));
-        TryDeleteDirectoryLink(link);
     }
 
     [Fact]
@@ -36,27 +19,11 @@ public sealed class SafeFileSystemReparseRaceTests
     {
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
-        var link = Path.Combine(root.Path, "a");
-        var swapped = false;
-
-        using var _ = Runtime.SafeFileSystem.UseBeforeDirectoryCreateForTests(path =>
-        {
-            if (!swapped && string.Equals(path, link, StringComparison.Ordinal))
-            {
-                swapped = TryCreateDirectoryLink(link, outside.Path);
-            }
-        });
         var result = await ExecuteWriteAsync(root.Path, "a/b/out.txt", "new");
-
-        if (!swapped)
-        {
-            return;
-        }
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
         Assert.False(Directory.Exists(Path.Combine(outside.Path, "b")));
-        TryDeleteDirectoryLink(link);
     }
 
     private static async Task<SandboxExecutionResult> ExecuteWriteAsync(string root, string path, string text)

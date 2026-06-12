@@ -37,6 +37,9 @@
 - [ ] `API-0013` medium - Time and random policy grant helpers are missing from public API docs
   - File: `docs/agent-loop/findings/API-0013-time-and-random-policy-grant-helpers-are-missing-from-public-api-docs.md`
   - Dedup: `api/policy-builder/time-random-grant-helpers-missing-from-public-docs`
+- [ ] `API-0014` medium - Release pipeline uploads OS-specific package sets without a canonical artifact check
+  - File: `docs/agent-loop/findings/API-0014-release-pipeline-uploads-os-specific-package-sets-without-a-canonical-artifact-c.md`
+  - Dedup: `api/package-release/os-matrix-package-artifact-identity`
 
 ## Claimed
 

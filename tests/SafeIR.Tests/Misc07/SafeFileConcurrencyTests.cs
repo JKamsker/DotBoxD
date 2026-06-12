@@ -9,7 +9,7 @@ public sealed class SafeFileConcurrencyTests
         using var host = SandboxTestHost.Create();
 
         var tasks = Enumerable.Range(0, 8)
-            .Select(i => ExecuteWriteAsync(host, temp.Path, "out/shared.txt", $"value-{i}"))
+            .Select(i => ExecuteWriteAsync(host, temp.Path, "shared.txt", $"value-{i}"))
             .ToArray();
         var results = await Task.WhenAll(tasks);
 
@@ -18,7 +18,7 @@ public sealed class SafeFileConcurrencyTests
             !r.Succeeded &&
             r.Error?.Code == SandboxErrorCode.PermissionDenied &&
             r.Error.SafeMessage.Contains("overwrite", StringComparison.Ordinal)));
-        var published = await File.ReadAllTextAsync(Path.Combine(temp.Path, "out", "shared.txt"));
+        var published = await File.ReadAllTextAsync(Path.Combine(temp.Path, "shared.txt"));
         Assert.Matches("^value-[0-7]$", published);
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
     }

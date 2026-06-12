@@ -22,6 +22,9 @@
 - [ ] `COR-0029` high - VerificationPolicy allowlists can mutate after cache-key construction
   - File: `docs/agent-loop/findings/COR-0029-verificationpolicy-allowlists-can-mutate-after-cache-key-construction.md`
   - Dedup: `correctness/verifier/policy/mutable-allowlist-cache-verification-drift`
+- [ ] `COR-0030` high - Collection allocation accounting overflows before widening large counts
+  - File: `docs/agent-loop/findings/COR-0030-collection-allocation-accounting-overflows-before-widening-large-counts.md`
+  - Dedup: `correctness/resource-quota/collection-copy-allocation-int-overflow`
 - [ ] `COR-0010` medium - Compiled executable cache lets first caller cancellation poison shared materialization
   - File: `docs/agent-loop/findings/COR-0010-compiled-executable-cache-lets-first-caller-cancellation-poison-shared-materiali.md`
   - Dedup: `correctness/compiled-cache/shared-materialization/first-caller-cancellation-poisons-waiters`
@@ -43,6 +46,9 @@
 - [ ] `COR-0025` medium - Verifier manifest and result models expose mutable collections
   - File: `docs/agent-loop/findings/COR-0025-verifier-manifest-and-result-models-expose-mutable-collections.md`
   - Dedup: `correctness/compiler/verifier-models/mutable-manifest-verification-collections`
+- [ ] `COR-0031` medium - Failed compiled worker results can carry malformed artifact hashes
+  - File: `docs/agent-loop/findings/COR-0031-failed-compiled-worker-results-can-carry-malformed-artifact-hashes.md`
+  - Dedup: `correctness/worker-result/failed-compiled-artifact-hash-unvalidated`
 
 ## Claimed
 

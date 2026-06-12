@@ -117,7 +117,7 @@ public sealed class SafeFileSystemTests
     {
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
-        var module = await host.ImportJsonAsync(FileWriteJson("out/result.txt", "written"));
+        var module = await host.ImportJsonAsync(FileWriteJson("result.txt", "written"));
         var policy = FilePolicyBuilder()
             .GrantFileWrite(temp.Path, 1024, allowCreate: true, allowOverwrite: false)
             .WithFuel(5_000)
@@ -127,7 +127,7 @@ public sealed class SafeFileSystemTests
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.True(result.Succeeded);
-        Assert.Equal("written", await File.ReadAllTextAsync(Path.Combine(temp.Path, "out", "result.txt")));
+        Assert.Equal("written", await File.ReadAllTextAsync(Path.Combine(temp.Path, "result.txt")));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.writeText" && e.Success);
         Assert.Equal("file", audit.Fields!["resourceKind"]);
@@ -191,6 +191,25 @@ public sealed class SafeFileSystemTests
         Assert.Equal(SandboxErrorCode.PermissionDenied, overwrite.Error!.Code);
         Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
         Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
+    }
+
+    [Fact]
+    public async Task File_write_denies_nested_paths_fail_closed()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(FileWriteJson("out/result.txt", "written"));
+        var policy = FilePolicyBuilder()
+            .GrantFileWrite(temp.Path, 1024, allowCreate: true, allowOverwrite: true)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "out")));
     }
 
     [Fact]

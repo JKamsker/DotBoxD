@@ -46,6 +46,12 @@
 - [ ] `PAL-0027` medium - Audit sanitizer clones and regex-scans clean log messages
   - File: `docs/agent-loop/findings/PAL-0027-audit-sanitizer-clones-and-regex-scans-clean-log-messages.md`
   - Dedup: `alloc/audit-sanitizer/clean-message-regex`
+- [ ] `PAL-0028` medium - JSON import allocates schema validators per object
+  - File: `docs/agent-loop/findings/PAL-0028-json-import-allocates-schema-validators-per-object.md`
+  - Dedup: `alloc/json-import/property-schema-validation/per-object`
+- [ ] `PAL-0029` medium - Policy grant setup reflects over parameters per grant
+  - File: `docs/agent-loop/findings/PAL-0029-policy-grant-setup-reflects-over-parameters-per-grant.md`
+  - Dedup: `alloc/policy-builder/generic-grant/parameter-reflection-per-grant`
 - [ ] `PAL-0010` low - Persistent compiled cache leaves lock files per cache key
   - File: `docs/agent-loop/findings/PAL-0010-persistent-compiled-cache-leaves-lock-files-per-cache-key.md`
   - Dedup: `alloc/compiler-cache/file-locks/persistent-key-files`
