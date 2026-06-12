@@ -1,22 +1,22 @@
 ---
 id: ALG-0004
 area: perf_algorithm
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Plugin analyzer rescans helper call graph to propagate taint
 dedup_key: algorithm/plugin-analyzer/helper-callgraph/repeated-full-scan
 created_at: 2026-06-12T21:00:45.7132641+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T21:42:30.2605486+00:00
+updated_at: 2026-06-12T21:44:56.3471060+00:00
 claimed_by: fixer
 claimed_at: 2026-06-12T21:39:15.2533115+00:00
 claim_branch: workflow-work
 fixed_by: fixer
 fixed_at: 2026-06-12T21:42:30.2605486+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: independent-verifier
+verified_at: 2026-06-12T21:44:56.3471060+00:00
 verified_commit: 
 duplicate_of: 
 ---

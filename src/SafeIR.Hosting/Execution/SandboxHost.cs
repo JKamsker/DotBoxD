@@ -56,7 +56,13 @@ public sealed partial class SandboxHost : IDisposable
             throw new SandboxValidationException(validation.Diagnostics);
         }
 
-        return ValueTask.FromResult(ExecutionPlanBuilder.Build(module, policy, _bindings, validation.Functions, _planSigningKey));
+        return ValueTask.FromResult(ExecutionPlanBuilder.Build(
+            module,
+            policy,
+            _bindings,
+            validation.Functions,
+            validation.BindingReferences,
+            _planSigningKey));
     }
 
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(

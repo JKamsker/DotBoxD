@@ -1,19 +1,19 @@
 ---
 id: ALG-0005
 area: perf_algorithm
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Binding reference collection rewalks shared graphs per entrypoint
 dedup_key: algorithm/binding-reference/per-entrypoint-graph-rewalk
 created_at: 2026-06-12T21:01:53.3117137+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T21:01:53.3117137+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T21:49:19.4059355+00:00
+claimed_by: fixer
+claimed_at: 2026-06-12T21:43:43.2753205+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-12T21:49:19.4059355+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

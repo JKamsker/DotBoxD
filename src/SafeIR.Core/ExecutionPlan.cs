@@ -14,7 +14,8 @@ public sealed class ExecutionPlan
         SandboxPolicy policy,
         BindingRegistry bindings,
         ResourceLimits budget,
-        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
+        IReadOnlyDictionary<string, IReadOnlySet<string>>? bindingReferences = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleHash);
         ArgumentException.ThrowIfNullOrWhiteSpace(planHash);
@@ -36,6 +37,7 @@ public sealed class ExecutionPlan
         Bindings = bindings;
         Budget = budget;
         FunctionAnalysis = ModelCopy.Dictionary(functionAnalysis);
+        BindingReferences = CopyBindingReferences(bindingReferences ?? BindingReferenceCollector.CollectByFunction(module, bindings));
     }
 
     public string ModuleHash { get; }
@@ -48,6 +50,18 @@ public sealed class ExecutionPlan
     public BindingRegistry Bindings { get; }
     public ResourceLimits Budget { get; }
     public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
+    public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
+
+    private static IReadOnlyDictionary<string, IReadOnlySet<string>> CopyBindingReferences(
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
+    {
+        var copy = new Dictionary<string, IReadOnlySet<string>>(bindingReferences.Count, StringComparer.Ordinal);
+        foreach (var item in bindingReferences) {
+            copy.Add(item.Key, new HashSet<string>(item.Value, StringComparer.Ordinal));
+        }
+
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlySet<string>>(copy);
+    }
 }
 
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>

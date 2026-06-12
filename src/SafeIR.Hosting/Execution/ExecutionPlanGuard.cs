@@ -36,7 +36,13 @@ internal static class ExecutionPlanGuard
         }
         else
         {
-            var expected = ExecutionPlanBuilder.Build(plan.Module, plan.Policy, hostBindings, validation.Functions, planSigningKey);
+            var expected = ExecutionPlanBuilder.Build(
+                plan.Module,
+                plan.Policy,
+                hostBindings,
+                validation.Functions,
+                validation.BindingReferences,
+                planSigningKey);
             ComparePlan(plan, expected, diagnostics);
         }
 
@@ -71,7 +77,8 @@ internal static class ExecutionPlanGuard
             plan.PlanHash != expected.PlanHash ||
             !plan.PlanSeal.Equals(expected.PlanSeal) ||
             plan.Budget != expected.Budget ||
-            !SameAnalysis(plan.FunctionAnalysis, expected.FunctionAnalysis))
+            !SameAnalysis(plan.FunctionAnalysis, expected.FunctionAnalysis) ||
+            !SameBindingReferences(plan.BindingReferences, expected.BindingReferences))
         {
             diagnostics.Add(new SandboxDiagnostic("E-PLAN-INTEGRITY", "execution plan does not match validated module, policy, and bindings"));
         }
@@ -82,4 +89,12 @@ internal static class ExecutionPlanGuard
         IReadOnlyDictionary<string, FunctionAnalysis> right)
         => left.Count == right.Count &&
            left.All(item => right.TryGetValue(item.Key, out var value) && value == item.Value);
+
+    private static bool SameBindingReferences(
+        IReadOnlyDictionary<string, IReadOnlySet<string>> left,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> right)
+        => left.Count == right.Count &&
+           left.All(item =>
+               right.TryGetValue(item.Key, out var value) &&
+               item.Value.SetEquals(value));
 }

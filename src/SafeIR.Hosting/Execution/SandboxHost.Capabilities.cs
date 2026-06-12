@@ -40,7 +40,12 @@ public sealed partial class SandboxHost
             plan.Module.CapabilityRequests.Select(request => request.Id),
             StringComparer.Ordinal);
 
-        foreach (var bindingId in BindingReferenceCollector.Collect(plan.Module, plan.Bindings, entrypoint))
+        if (!plan.BindingReferences.TryGetValue(entrypoint, out var bindingReferences))
+        {
+            return required;
+        }
+
+        foreach (var bindingId in bindingReferences)
         {
             if (plan.Bindings.TryGet(bindingId, out var binding) &&
                 binding.RequiredCapability is not null)

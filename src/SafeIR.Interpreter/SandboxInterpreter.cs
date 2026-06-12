@@ -14,7 +14,7 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         var runId = options.RunId ?? SandboxRunId.New();
         var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);
-        var allowedBindings = BindingReferenceCollector.Collect(plan.Module, plan.Bindings, entrypoint);
+        plan.BindingReferences.TryGetValue(entrypoint, out var allowedBindings);
         var context = new SandboxContext(
             runId,
             plan.Policy,

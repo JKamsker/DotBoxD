@@ -11,11 +11,12 @@ internal static class ExecutionPlanBuilder
         SandboxPolicy policy,
         BindingRegistry bindings,
         IReadOnlyDictionary<string, FunctionAnalysis> functions,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences,
         byte[] planSigningKey)
     {
         var moduleHash = CanonicalModuleHasher.Hash(module);
         var planHash = Hash("plan-v1", moduleHash, policy.Hash, bindings.ManifestHash);
-        var planSeal = Seal(planSigningKey, moduleHash, planHash, policy, bindings.ManifestHash, functions);
+        var planSeal = Seal(planSigningKey, moduleHash, planHash, policy, bindings.ManifestHash, functions, bindingReferences);
         return new ExecutionPlan(
             moduleHash,
             planHash,
@@ -26,7 +27,8 @@ internal static class ExecutionPlanBuilder
             policy,
             bindings,
             policy.ResourceLimits,
-            functions);
+            functions,
+            bindingReferences);
     }
 
     private static string Hash(params string[] parts)
@@ -38,7 +40,8 @@ internal static class ExecutionPlanBuilder
         string planHash,
         SandboxPolicy policy,
         string bindingManifestHash,
-        IReadOnlyDictionary<string, FunctionAnalysis> functions)
+        IReadOnlyDictionary<string, FunctionAnalysis> functions,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
         var parts = new List<string> {
             "plan-seal-v1",
@@ -70,6 +73,14 @@ internal static class ExecutionPlanBuilder
             parts.Add(item.Value.ReturnType.ToString());
             parts.Add(((int)item.Value.Effects).ToString(System.Globalization.CultureInfo.InvariantCulture));
             parts.Add(item.Value.CanReorder.ToString());
+        }
+        foreach (var item in bindingReferences.OrderBy(item => item.Key, StringComparer.Ordinal))
+        {
+            parts.Add(item.Key);
+            foreach (var bindingId in item.Value.Order(StringComparer.Ordinal))
+            {
+                parts.Add(bindingId);
+            }
         }
 
         return Convert

@@ -15,7 +15,8 @@ public sealed class ModuleValidator
         var analyzer = new FunctionAnalyzer(module, bindings, diagnostics);
         var functions = analyzer.AnalyzeAll();
         var requiredEffects = RequiredEffects(module, functions);
-        var requiredCapabilities = RequiredCapabilities(module, bindings);
+        var bindingReferences = BindingReferenceCollector.CollectByFunction(module, bindings);
+        var requiredCapabilities = RequiredCapabilities(module, bindings, bindingReferences);
         PolicyResolver.Validate(module, bindings, policy, requiredEffects, requiredCapabilities, diagnostics);
 
         return new ModuleValidationResult(
@@ -23,7 +24,8 @@ public sealed class ModuleValidator
             diagnostics,
             functions,
             requiredEffects,
-            requiredCapabilities);
+            requiredCapabilities,
+            bindingReferences);
     }
 
     private static SandboxEffect RequiredEffects(
@@ -42,7 +44,10 @@ public sealed class ModuleValidator
         return effects;
     }
 
-    private static IReadOnlySet<string> RequiredCapabilities(SandboxModule module, IBindingCatalog bindings)
+    private static IReadOnlySet<string> RequiredCapabilities(
+        SandboxModule module,
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
         foreach (var function in module.Functions)
@@ -52,7 +57,11 @@ public sealed class ModuleValidator
                 continue;
             }
 
-            foreach (var bindingId in BindingReferenceCollector.Collect(module, bindings, function.Id))
+            if (!bindingReferences.TryGetValue(function.Id, out var references)) {
+                continue;
+            }
+
+            foreach (var bindingId in references)
             {
                 if (bindings.TryGet(bindingId, out var binding) &&
                     binding.RequiredCapability is not null)
