@@ -9,7 +9,8 @@ public sealed class CompiledArtifactGuardTests
     [Fact]
     public async Task Compiled_artifact_manifest_mismatch_is_rejected_before_delegate_runs()
     {
-        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with {
+        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with
+        {
             Manifest = artifact.Manifest with { PlanHash = "other-plan" }
         });
         var host = HostWithCompiler(compiler);
@@ -25,7 +26,8 @@ public sealed class CompiledArtifactGuardTests
     [Fact]
     public async Task Compiled_artifact_runtime_form_mismatch_is_rejected_before_delegate_runs()
     {
-        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with {
+        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with
+        {
             RuntimeForm = CompiledRuntimeFormKind.DynamicMethod
         });
         var host = HostWithCompiler(compiler);
@@ -39,9 +41,29 @@ public sealed class CompiledArtifactGuardTests
     }
 
     [Fact]
-    public async Task Dynamic_method_artifact_is_rejected_before_delegate_runs()
+    public async Task Dynamic_method_artifact_executes_gated_delegate()
     {
         var compiler = new DynamicCompiler();
+        var host = HostWithCompiler(compiler);
+        var plan = await PreparePurePlanAsync(host);
+
+        var result = await ExecuteCompiledAsync(host, plan);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(123, ((I32Value)result.Value!).Value);
+        Assert.True(compiler.DelegateExecuted);
+        Assert.Contains(result.AuditEvents, e =>
+            e.Kind == "RunSummary" &&
+            e.Message?.Contains("runtimeForm=DynamicMethod", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Dynamic_method_artifact_with_stale_gate_version_is_rejected_before_delegate_runs()
+    {
+        var compiler = new DynamicCompiler(artifact => artifact with
+        {
+            Verification = artifact.Verification with { VerifierVersion = "stale-gate" }
+        });
         var host = HostWithCompiler(compiler);
         var plan = await PreparePurePlanAsync(host);
 
@@ -62,7 +84,8 @@ public sealed class CompiledArtifactGuardTests
     [InlineData("flags")]
     public async Task Stale_manifest_identity_is_rejected_before_delegate_runs(string staleField)
     {
-        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with {
+        var compiler = new TamperedLoadedAssemblyCompiler(artifact => artifact with
+        {
             Manifest = StaleManifest(artifact.Manifest, staleField)
         });
         var host = HostWithCompiler(compiler);
@@ -104,7 +127,8 @@ public sealed class CompiledArtifactGuardTests
     }
 
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
-        => SandboxHost.Create(builder => {
+        => SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(compiler);
@@ -126,7 +150,8 @@ public sealed class CompiledArtifactGuardTests
             new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
 
     private static ArtifactManifest StaleManifest(ArtifactManifest manifest, string field)
-        => field switch {
+        => field switch
+        {
             "cache" => manifest with { CacheKey = "stale-cache-key" },
             "compiler" => manifest with { CompilerVersion = "stale-compiler" },
             "verifier" => manifest with { VerifierVersion = "stale-verifier" },
@@ -149,7 +174,8 @@ public sealed class CompiledArtifactGuardTests
             var artifact = CompiledArtifactTestFactory.LoadedAssembly(
                 plan,
                 CompiledArtifactTestFactory.BuildI32Assembly(parameterCount: 2, value: 123),
-                (_, _) => {
+                (_, _) =>
+                {
                     DelegateExecuted = true;
                     return SandboxValue.FromInt32(123);
                 });
@@ -157,7 +183,7 @@ public sealed class CompiledArtifactGuardTests
         }
     }
 
-    private sealed class DynamicCompiler : ISandboxCompiler
+    private sealed class DynamicCompiler(Func<CompiledArtifact, CompiledArtifact>? tamper = null) : ISandboxCompiler
     {
         public bool DelegateExecuted { get; private set; }
 
@@ -165,12 +191,16 @@ public sealed class CompiledArtifactGuardTests
             ExecutionPlan plan,
             CompileOptions options,
             CancellationToken cancellationToken)
-            => ValueTask.FromResult(CompiledArtifactTestFactory.DynamicMethod(
+        {
+            var artifact = CompiledArtifactTestFactory.DynamicMethod(
                 plan,
-                (_, _) => {
+                (_, _) =>
+                {
                     DelegateExecuted = true;
                     return SandboxValue.FromInt32(123);
-                }));
+                });
+            return ValueTask.FromResult(tamper?.Invoke(artifact) ?? artifact);
+        }
     }
 
     private sealed class LoadedBytesCompiler(byte[] assemblyBytes) : ISandboxCompiler

@@ -18,16 +18,23 @@ internal static class CompiledArtifactGuard
         CancellationToken cancellationToken)
     {
         EnsureMatchesPlan(artifact, plan, entrypoint);
+        if (artifact.RuntimeForm == CompiledRuntimeFormKind.DynamicMethod)
+        {
+            return artifact;
+        }
+
         var assemblyBytes = artifact.AssemblyBytes.ToArray();
         var verification = await Verifier.VerifyAsync(assemblyBytes, artifact.Manifest, DefaultVerificationPolicy, cancellationToken)
             .ConfigureAwait(false);
-        if (!verification.Succeeded) {
+        if (!verification.Succeeded)
+        {
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.VerifierFailure,
                 "compiled artifact failed verification"));
         }
 
-        if (!StringComparer.Ordinal.Equals(artifact.AssemblyHash, verification.AssemblyHash)) {
+        if (!StringComparer.Ordinal.Equals(artifact.AssemblyHash, verification.AssemblyHash))
+        {
             throw Invalid("compiled artifact bytes do not match artifact hash");
         }
 
@@ -44,22 +51,27 @@ internal static class CompiledArtifactGuard
     private static void EnsureMatchesPlan(CompiledArtifact artifact, ExecutionPlan plan, string entrypoint)
     {
         var manifest = artifact.Manifest;
-        if (!Enum.IsDefined(artifact.RuntimeForm)) {
+        if (!Enum.IsDefined(artifact.RuntimeForm))
+        {
             throw Invalid("compiled artifact runtime form is not supported");
-        }
-
-        if (artifact.RuntimeForm != CompiledRuntimeFormKind.LoadedAssembly) {
-            throw Invalid("compiled artifact must expose verifiable loaded assembly bytes");
-        }
-
-        if (artifact.AssemblyBytes.Length == 0) {
-            throw Invalid("loaded compiled artifact did not include assembly bytes");
         }
 
         if (!artifact.Verification.Succeeded ||
             !StringComparer.Ordinal.Equals(artifact.AssemblyHash, artifact.Verification.AssemblyHash) ||
-            !StringComparer.Ordinal.Equals(artifact.AssemblyHash, manifest.AssemblyHash)) {
+            !StringComparer.Ordinal.Equals(artifact.Verification.VerifierVersion, DefaultVerificationPolicy.VerifierVersion) ||
+            !StringComparer.Ordinal.Equals(artifact.AssemblyHash, manifest.AssemblyHash))
+        {
             throw Invalid("compiled artifact verification does not match artifact hash");
+        }
+
+        if (artifact.RuntimeForm == CompiledRuntimeFormKind.LoadedAssembly && artifact.AssemblyBytes.Length == 0)
+        {
+            throw Invalid("loaded compiled artifact did not include assembly bytes");
+        }
+
+        if (artifact.RuntimeForm == CompiledRuntimeFormKind.DynamicMethod && artifact.AssemblyBytes.Length != 0)
+        {
+            throw Invalid("dynamic method artifact must not include assembly bytes");
         }
 
         if (manifest.ArtifactVersion != 1 ||
@@ -71,24 +83,28 @@ internal static class CompiledArtifactGuard
             manifest.VerifierVersion != DefaultVerificationPolicy.VerifierVersion ||
             manifest.RuntimeFacadeHash != CacheKeyBuilder.RuntimeFacadeHash ||
             manifest.LanguageVersion != CacheKeyBuilder.LanguageVersion ||
-            manifest.TargetFramework != CacheKeyBuilder.TargetFramework) {
+            manifest.TargetFramework != CacheKeyBuilder.TargetFramework)
+        {
             throw Invalid("compiled artifact manifest does not match execution plan");
         }
 
         var expectedFlags = ExpectedOptimizationFlags(manifest.CacheKey, plan, entrypoint);
         if (manifest.OptimizationFlags is null ||
-            !manifest.OptimizationFlags.SequenceEqual(expectedFlags, StringComparer.Ordinal)) {
+            !manifest.OptimizationFlags.SequenceEqual(expectedFlags, StringComparer.Ordinal))
+        {
             throw Invalid("compiled artifact optimization flags do not match cache key");
         }
     }
 
     private static string[] ExpectedOptimizationFlags(string cacheKey, ExecutionPlan plan, string entrypoint)
     {
-        if (cacheKey == CacheKeyBuilder.Build(plan, entrypoint, DefaultVerificationPolicy, optimize: false)) {
+        if (cacheKey == CacheKeyBuilder.Build(plan, entrypoint, DefaultVerificationPolicy, optimize: false))
+        {
             return ["boxed-values"];
         }
 
-        if (cacheKey == CacheKeyBuilder.Build(plan, entrypoint, DefaultVerificationPolicy, optimize: true)) {
+        if (cacheKey == CacheKeyBuilder.Build(plan, entrypoint, DefaultVerificationPolicy, optimize: true))
+        {
             return ["opt"];
         }
 

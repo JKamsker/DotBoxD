@@ -105,7 +105,7 @@ public sealed class ExecutionModeSelectionTests
     }
 
     [Fact]
-    public async Task Compiled_mode_rejects_dynamic_method_artifact_before_delegate_runs()
+    public async Task Compiled_mode_executes_gated_dynamic_method_artifact()
     {
         var compiler = new DynamicDelegateCompiler();
         var host = HostWithCompiler(compiler);
@@ -118,12 +118,12 @@ public sealed class ExecutionModeSelectionTests
             SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
             new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.ValidationError, result.Error!.Code);
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
-        Assert.Null(result.ArtifactHash);
+        Assert.Equal(123, ((I32Value)result.Value!).Value);
+        Assert.Equal("delegate-artifact", result.ArtifactHash);
         Assert.Equal(1, compiler.Calls);
-        Assert.False(compiler.DelegateExecuted);
+        Assert.True(compiler.DelegateExecuted);
     }
 
     [Fact]
@@ -186,7 +186,8 @@ public sealed class ExecutionModeSelectionTests
     }
 
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
-        => SandboxHost.Create(builder => {
+        => SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(compiler);
@@ -219,7 +220,8 @@ public sealed class ExecutionModeSelectionTests
             Calls++;
             return ValueTask.FromResult(CompiledArtifactTestFactory.DynamicMethod(
                 plan,
-                (_, _) => {
+                (_, _) =>
+                {
                     DelegateExecuted = true;
                     return SandboxValue.FromInt32(123);
                 },
@@ -239,8 +241,10 @@ public sealed class ExecutionModeSelectionTests
             CancellationToken cancellationToken)
         {
             var artifact = await _inner.CompileAsync(plan, options, cancellationToken).ConfigureAwait(false);
-            return artifact with {
-                Entrypoint = (_, _) => {
+            return artifact with
+            {
+                Entrypoint = (_, _) =>
+                {
                     DelegateExecuted = true;
                     return SandboxValue.FromInt32(999);
                 }
