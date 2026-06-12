@@ -12,16 +12,8 @@
   ],
   "folders": [
     {
-      "path": "src/SafeIR.Compiler",
-      "justification": "Existing compiler component folder over the folder limit. New compiler areas should use focused subdirectories."
-    },
-    {
       "path": "src/SafeIR.Core",
       "justification": "Existing core model folder over the folder limit. New core subsystems should be grouped into subdirectories."
-    },
-    {
-      "path": "src/SafeIR.Hosting",
-      "justification": "Existing hosting folder is one file over the limit. Keep future additions grouped by host concern."
     },
     {
       "path": "src/SafeIR.PluginAnalyzer",
@@ -38,17 +30,9 @@
     {
       "path": "tests/SafeIR.Tests",
       "justification": "Legacy monolithic test project folder. New tests should be split into focused subdirectories when practical."
-    },
-    {
-      "path": "tools/AgentQueue/src/AgentQueue",
-      "justification": "Existing small tool uses many focused files in one folder. Revisit if the tool grows further."
     }
   ],
   "rootFolders": [
-    {
-      "path": "examples/Addendum/SafeIR.AddendumExamples",
-      "justification": "Existing example project keeps scenarios as sibling files. New examples should use subdirectories when the root grows."
-    },
     {
       "path": "src/SafeIR.Compiler",
       "justification": "Existing compiler project root predates the project-folder limit. New compiler implementation files should move into subdirectories."
@@ -62,10 +46,6 @@
       "justification": "Existing hosting project root predates the project-folder limit. New hosting implementation files should be grouped by concern."
     },
     {
-      "path": "src/SafeIR.Interpreter",
-      "justification": "Existing interpreter project root has a small legacy overage. Split new interpreter concerns into subdirectories."
-    },
-    {
       "path": "src/SafeIR.PluginAnalyzer",
       "justification": "Existing analyzer project root predates the project-folder limit. New analyzer implementation files should be grouped into subdirectories."
     },
@@ -76,18 +56,6 @@
     {
       "path": "src/SafeIR.Runtime",
       "justification": "Existing runtime project root predates the project-folder limit. New runtime binding groups should move into subdirectories."
-    },
-    {
-      "path": "src/SafeIR.Serialization.Json",
-      "justification": "Existing JSON serialization project root predates the project-folder limit. New serialization concerns should be grouped into subdirectories."
-    },
-    {
-      "path": "src/SafeIR.Transport.Http",
-      "justification": "Existing HTTP transport project root predates the project-folder limit. New transport concerns should use subdirectories."
-    },
-    {
-      "path": "src/SafeIR.Validation",
-      "justification": "Existing validation project root predates the project-folder limit. New validation implementation files should be grouped into subdirectories."
     },
     {
       "path": "src/SafeIR.Verifier",
