@@ -39,15 +39,14 @@ internal static class PluginKernelModelFactory
         {
             var shouldHandle = InterfaceMethodSyntax(context, type, SafeIrGenerationNames.Entrypoints.ShouldHandle, cancellationToken);
             var handle = InterfaceMethodSyntax(context, type, SafeIrGenerationNames.Entrypoints.Handle, cancellationToken);
-            var eventProperties = new EquatableArray<EventPropertyModel>(PluginSymbolReader.EventProperties(eventType));
-            if (eventProperties.Any(p => p.Type == SafeIrGenerationNames.ManifestTypes.Unsupported))
+            var eventProperties = PluginSymbolReader.EventProperties(eventType);
+            if (ContainsUnsupported(eventProperties))
             {
                 throw new NotSupportedException("Kernel event properties must use supported scalar types.");
             }
 
-            var liveSettings = new EquatableArray<LiveSettingModel>(
-                PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken));
-            if (liveSettings.Any(s => s.Type == SafeIrGenerationNames.ManifestTypes.Unsupported))
+            var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
+            if (ContainsUnsupported(liveSettings))
             {
                 throw new NotSupportedException("Live settings must use supported scalar types.");
             }
@@ -152,6 +151,28 @@ internal static class PluginKernelModelFactory
             ? kernelName.Substring(0, kernelName.Length - SafeIrGenerationNames.KernelSuffix.Length) +
                 SafeIrGenerationNames.PluginPackageSuffix
             : kernelName + SafeIrGenerationNames.PluginPackageSuffix;
+
+    private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)
+    {
+        for (var i = 0; i < eventProperties.Count; i++) {
+            if (eventProperties[i].Type == SafeIrGenerationNames.ManifestTypes.Unsupported) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsUnsupported(EquatableArray<LiveSettingModel> liveSettings)
+    {
+        for (var i = 0; i < liveSettings.Count; i++) {
+            if (liveSettings[i].Type == SafeIrGenerationNames.ManifestTypes.Unsupported) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static ExpressionSyntax ReturnExpression(MethodDeclarationSyntax method)
     {

@@ -240,12 +240,14 @@ internal static class SafeIrExpressionModelFactory
         string name,
         EquatableArray<LiveSettingModel> liveSettings)
     {
-        var setting = liveSettings.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
-        if (setting is not null) {
-            return new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(name)})",
-                setting.Type,
-                false);
+        for (var i = 0; i < liveSettings.Count; i++) {
+            var setting = liveSettings[i];
+            if (string.Equals(setting.Name, name, StringComparison.Ordinal)) {
+                return new SafeIrExpressionModel(
+                    $"{SafeIrGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(name)})",
+                    setting.Type,
+                    false);
+            }
         }
 
         throw new NotSupportedException($"Unsupported plugin identifier '{name}'.");
@@ -260,15 +262,17 @@ internal static class SafeIrExpressionModelFactory
         var memberName = member.Name.Identifier.ValueText;
         if (member.Expression is IdentifierNameSyntax identifier &&
             string.Equals(identifier.Identifier.ValueText, eventParameterName, StringComparison.Ordinal)) {
-            var property = eventProperties.FirstOrDefault(p => string.Equals(p.Name, memberName, StringComparison.Ordinal));
-            if (property is null) {
-                throw new NotSupportedException($"Unknown event property '{memberName}'.");
+            for (var i = 0; i < eventProperties.Count; i++) {
+                var property = eventProperties[i];
+                if (string.Equals(property.Name, memberName, StringComparison.Ordinal)) {
+                    return new SafeIrExpressionModel(
+                        $"{SafeIrGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
+                        property.Type,
+                        false);
+                }
             }
 
-            return new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
-                property.Type,
-                false);
+            throw new NotSupportedException($"Unknown event property '{memberName}'.");
         }
 
         if (member.Expression is ThisExpressionSyntax) {

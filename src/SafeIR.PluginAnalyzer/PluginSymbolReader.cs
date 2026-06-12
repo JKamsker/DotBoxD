@@ -7,41 +7,77 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 internal static class PluginSymbolReader
 {
     public static string? PluginId(IReadOnlyList<AttributeData> attributes)
-        => attributes.FirstOrDefault(a => string.Equals(
-                a.AttributeClass?.ToDisplayString(),
-                SafeIrGenerationNames.Metadata.GamePluginAttribute,
-                StringComparison.Ordinal))
-            ?.ConstructorArguments.FirstOrDefault().Value as string;
-
-    public static INamedTypeSymbol? EventType(INamedTypeSymbol kernelType)
-        => kernelType.AllInterfaces
-            .FirstOrDefault(i => string.Equals(
-                i.OriginalDefinition.ToDisplayString(),
-                SafeIrGenerationNames.Metadata.EventKernelInterface,
-                StringComparison.Ordinal))
-            ?.TypeArguments.FirstOrDefault() as INamedTypeSymbol;
-
-    public static IReadOnlyList<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
     {
-        return PluginEventPropertyReader.Read(eventType)
-            .Select(p => new EventPropertyModel(p.Name, SandboxTypeName(p.Type)))
-            .ToArray();
+        for (var i = 0; i < attributes.Count; i++) {
+            var attribute = attributes[i];
+            if (string.Equals(
+                    attribute.AttributeClass?.ToDisplayString(),
+                    SafeIrGenerationNames.Metadata.GamePluginAttribute,
+                    StringComparison.Ordinal)) {
+                return attribute.ConstructorArguments.Length > 0
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null;
+            }
+        }
+
+        return null;
     }
 
-    public static IReadOnlyList<LiveSettingModel> LiveSettings(
+    public static INamedTypeSymbol? EventType(INamedTypeSymbol kernelType)
+    {
+        foreach (var @interface in kernelType.AllInterfaces) {
+            if (string.Equals(
+                    @interface.OriginalDefinition.ToDisplayString(),
+                    SafeIrGenerationNames.Metadata.EventKernelInterface,
+                    StringComparison.Ordinal)) {
+                return @interface.TypeArguments.Length > 0
+                    ? @interface.TypeArguments[0] as INamedTypeSymbol
+                    : null;
+            }
+        }
+
+        return null;
+    }
+
+    public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
+    {
+        var properties = PluginEventPropertyReader.Read(eventType);
+        if (properties.Length == 0) {
+            return default;
+        }
+
+        var models = new EventPropertyModel[properties.Length];
+        for (var i = 0; i < properties.Length; i++) {
+            var property = properties[i];
+            models[i] = new EventPropertyModel(property.Name, SandboxTypeName(property.Type));
+        }
+
+        return EquatableArray<EventPropertyModel>.FromOwned(models);
+    }
+
+    public static EquatableArray<LiveSettingModel> LiveSettings(
         INamedTypeSymbol kernelType,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var properties = LiveSettingProperties(kernelType).ToArray();
-        foreach (var group in properties.GroupBy(p => p.Name, StringComparer.Ordinal).Where(g => g.Skip(1).Any()))
-        {
-            throw new NotSupportedException($"Live setting '{group.Key}' is declared more than once.");
+        var count = CountLiveSettingProperties(kernelType);
+        if (count == 0) {
+            return default;
         }
 
-        return properties
-            .Select(property => ToLiveSetting(property, semanticModel, cancellationToken))
-            .ToArray();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var settings = new LiveSettingModel[count];
+        var index = 0;
+        foreach (var property in LiveSettingProperties(kernelType)) {
+            if (!names.Add(property.Name)) {
+                throw new NotSupportedException($"Live setting '{property.Name}' is declared more than once.");
+            }
+
+            settings[index] = ToLiveSetting(property, semanticModel, cancellationToken);
+            index++;
+        }
+
+        return EquatableArray<LiveSettingModel>.FromOwned(settings);
     }
 
     private static IEnumerable<IPropertySymbol> LiveSettingProperties(INamedTypeSymbol kernelType)
@@ -54,6 +90,17 @@ internal static class PluginSymbolReader
                 yield return property;
             }
         }
+    }
+
+    private static int CountLiveSettingProperties(INamedTypeSymbol kernelType)
+    {
+        var count = 0;
+        foreach (var property in LiveSettingProperties(kernelType)) {
+            _ = property;
+            count++;
+        }
+
+        return count;
     }
 
     private static bool IsLiveSetting(IPropertySymbol property)

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 internal static class PluginEventPropertyReader
 {
-    public static IReadOnlyList<IPropertySymbol> Read(INamedTypeSymbol eventType)
+    public static IPropertySymbol[] Read(INamedTypeSymbol eventType)
     {
         var properties = ReadableProperties(eventType).ToArray();
         return ConstructorPropertyOrder(eventType, properties) ?? properties;
@@ -23,9 +23,9 @@ internal static class PluginEventPropertyReader
         while (hierarchy.Count > 0)
         {
             var current = hierarchy.Pop();
-            foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
+            foreach (var member in current.GetMembers())
             {
-                if (IsReadableProperty(property))
+                if (member is IPropertySymbol property && IsReadableProperty(property))
                 {
                     yield return property;
                 }
@@ -43,35 +43,83 @@ internal static class PluginEventPropertyReader
         INamedTypeSymbol eventType,
         IPropertySymbol[] properties)
     {
-        var byName = properties.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
-        foreach (var constructor in eventType.InstanceConstructors.Where(c => c.DeclaredAccessibility == Accessibility.Public))
+        foreach (var constructor in eventType.InstanceConstructors)
         {
+            if (constructor.DeclaredAccessibility != Accessibility.Public)
+            {
+                continue;
+            }
+
             if (constructor.Parameters.Length == 0 || constructor.Parameters.Length != properties.Length)
             {
                 continue;
             }
 
-            var selected = new IPropertySymbol[constructor.Parameters.Length];
-            var matched = true;
-            for (var i = 0; i < constructor.Parameters.Length; i++)
+            if (MatchesDeclaredPropertyOrder(constructor, properties))
             {
-                var parameter = constructor.Parameters[i];
-                if (!byName.TryGetValue(parameter.Name, out var property) ||
-                    !SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
-                {
-                    matched = false;
-                    break;
-                }
-
-                selected[i] = property;
+                return properties;
             }
 
-            if (matched)
+            if (ReorderedConstructorProperties(constructor, properties) is { } reordered)
             {
-                return selected;
+                return reordered;
             }
         }
 
         return null;
     }
+
+    private static bool MatchesDeclaredPropertyOrder(IMethodSymbol constructor, IPropertySymbol[] properties)
+    {
+        for (var i = 0; i < properties.Length; i++)
+        {
+            var parameter = constructor.Parameters[i];
+            var property = properties[i];
+            if (!NameMatches(parameter.Name, property.Name) ||
+                !SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IPropertySymbol[]? ReorderedConstructorProperties(
+        IMethodSymbol constructor,
+        IPropertySymbol[] properties)
+    {
+        var selected = new IPropertySymbol[properties.Length];
+        for (var i = 0; i < constructor.Parameters.Length; i++)
+        {
+            var parameter = constructor.Parameters[i];
+            var property = FindProperty(properties, parameter);
+            if (property is null)
+            {
+                return null;
+            }
+
+            selected[i] = property;
+        }
+
+        return selected;
+    }
+
+    private static IPropertySymbol? FindProperty(IPropertySymbol[] properties, IParameterSymbol parameter)
+    {
+        for (var i = 0; i < properties.Length; i++)
+        {
+            var property = properties[i];
+            if (NameMatches(parameter.Name, property.Name) &&
+                SymbolEqualityComparer.Default.Equals(property.Type, parameter.Type))
+            {
+                return property;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool NameMatches(string parameterName, string propertyName)
+        => string.Equals(parameterName, propertyName, StringComparison.OrdinalIgnoreCase);
 }
