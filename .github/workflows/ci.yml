@@ -29,7 +29,7 @@ jobs:
         run: dotnet test SafeIR.slnx --configuration Release --no-build
 
       - name: Security boundary tests
-        run: dotnet test tests/SafeIR.Tests/SafeIR.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SafeFileSystemTests|FullyQualifiedName~FileExtensionPolicyTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~CompiledArtifactGuardTests|FullyQualifiedName~CompiledRuntimeQuotaTests|FullyQualifiedName~VerifierAttackMatrixTests|FullyQualifiedName~VerifierLoopMeteringTests|FullyQualifiedName~BindingRegistryHardeningTests|FullyQualifiedName~PluginPackageValidationTests|FullyQualifiedName~PluginRevocationTests|FullyQualifiedName~PinnedHttpTransportTests"
+        run: dotnet test tests/SafeIR.Tests/SafeIR.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SafeFileSystemTests|FullyQualifiedName~SafeFileSystemReparsePointTests|FullyQualifiedName~FileExtensionPolicyTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~CompiledArtifactGuardTests|FullyQualifiedName~CompiledRuntimeQuotaTests|FullyQualifiedName~VerifierAttackMatrixTests|FullyQualifiedName~VerifierLoopMeteringTests|FullyQualifiedName~BindingRegistryHardeningTests|FullyQualifiedName~PluginPackageValidationTests|FullyQualifiedName~PluginRevocationTests|FullyQualifiedName~PinnedHttpTransportTests|FullyQualifiedName~DifferentialFuzzTests"
 
       - name: Check C# file lengths
         shell: pwsh

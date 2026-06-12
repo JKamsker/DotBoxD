@@ -7,5 +7,5 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-SGP001 | SafeIR.Security | Error | File IO is not allowed in plugin kernels
+SGP001 | SafeIR.Security | Error | Forbidden host API is not allowed in plugin kernels
 SGP020 | SafeIR.Security | Error | Live setting type is not supported

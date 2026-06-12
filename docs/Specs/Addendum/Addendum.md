@@ -798,7 +798,7 @@ public bool ShouldHandle(DamageEvent e, HookContext ctx)
 Expected diagnostic:
 
 ```text
-SGP001: File IO is not allowed in this plugin contract.
+SGP001: Forbidden host API 'System.IO.File' is not allowed in this plugin contract.
 
 Contract:
   IEventKernel<DamageEvent>.ShouldHandle

@@ -99,7 +99,8 @@ public sealed record VerificationPolicy(
                 "System.IO.", "System.Net.", "System.Reflection.", "System.Runtime.Loader.",
                 "System.Runtime.InteropServices.", "System.Diagnostics.", "System.Threading.",
                 "System.Threading.Tasks.", "System.Activator", "System.Environment",
-                "System.GC", "System.Delegate", "System.Linq.Expressions.", "Microsoft.CSharp."
+                "System.GC", "System.Delegate", "System.IServiceProvider",
+                "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             "safe-ir-verifier-5");
 

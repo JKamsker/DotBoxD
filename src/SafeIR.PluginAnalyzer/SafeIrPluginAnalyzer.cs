@@ -8,14 +8,14 @@ using Microsoft.CodeAnalysis.Operations;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
 {
-    public static readonly DiagnosticDescriptor FileIoRule = new(
+    public static readonly DiagnosticDescriptor ForbiddenHostApiRule = new(
         "SGP001",
-        "File IO is not allowed in plugin kernels",
-        "File IO is not allowed in this plugin contract",
+        "Forbidden host API is not allowed in plugin kernels",
+        "Forbidden host API '{0}' is not allowed in this plugin contract",
         "SafeIR.Security",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Hook filters and kernel handlers must use approved safe facades instead of System.IO.File.");
+        description: "Hook filters and kernel handlers must use approved safe facades instead of host APIs.");
 
     public static readonly DiagnosticDescriptor LiveSettingTypeRule = new(
         "SGP020",
@@ -27,7 +27,7 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         description: "Live settings must use supported scalar types.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        => ImmutableArray.Create(FileIoRule, LiveSettingTypeRule);
+        => ImmutableArray.Create(ForbiddenHostApiRule, LiveSettingTypeRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -35,6 +35,9 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
         context.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
+        context.RegisterOperationAction(AnalyzeObjectCreation, OperationKind.ObjectCreation);
+        context.RegisterOperationAction(AnalyzePropertyReference, OperationKind.PropertyReference);
+        context.RegisterOperationAction(AnalyzeFieldReference, OperationKind.FieldReference);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
@@ -55,15 +58,38 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeInvocation(OperationAnalysisContext context)
     {
         var invocation = (IInvocationOperation)context.Operation;
-        if (!IsSystemFileCall(invocation.TargetMethod) || context.ContainingSymbol is not IMethodSymbol method) {
+        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
             return;
         }
 
-        if (!IsEventKernel(method.ContainingType)) {
+        ReportIfForbidden(context, invocation.TargetMethod.ContainingType);
+    }
+
+    private static void AnalyzeObjectCreation(OperationAnalysisContext context)
+    {
+        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
             return;
         }
 
-        context.ReportDiagnostic(Diagnostic.Create(FileIoRule, invocation.Syntax.GetLocation()));
+        ReportIfForbidden(context, ((IObjectCreationOperation)context.Operation).Type);
+    }
+
+    private static void AnalyzePropertyReference(OperationAnalysisContext context)
+    {
+        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+            return;
+        }
+
+        ReportIfForbidden(context, ((IPropertyReferenceOperation)context.Operation).Property.ContainingType);
+    }
+
+    private static void AnalyzeFieldReference(OperationAnalysisContext context)
+    {
+        if (context.ContainingSymbol is not IMethodSymbol method || !IsEventKernel(method.ContainingType)) {
+            return;
+        }
+
+        ReportIfForbidden(context, ((IFieldReferenceOperation)context.Operation).Field.ContainingType);
     }
 
     private static bool HasAttribute(ISymbol symbol, string metadataName)
@@ -72,8 +98,54 @@ public sealed class SafeIrPluginAnalyzer : DiagnosticAnalyzer
             metadataName,
             StringComparison.Ordinal));
 
-    private static bool IsSystemFileCall(IMethodSymbol method)
-        => string.Equals(method.ContainingType.ToDisplayString(), "System.IO.File", StringComparison.Ordinal);
+    private static void ReportIfForbidden(OperationAnalysisContext context, ITypeSymbol? type)
+    {
+        if (!IsForbiddenHostApi(type)) {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            ForbiddenHostApiRule,
+            context.Operation.Syntax.GetLocation(),
+            type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+    }
+
+    private static bool IsForbiddenHostApi(ITypeSymbol? type)
+    {
+        var name = type?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        if (string.IsNullOrWhiteSpace(name)) {
+            return false;
+        }
+
+        return IsForbiddenExactType(name!) || IsForbiddenNamespace(name!);
+    }
+
+    private static bool IsForbiddenExactType(string typeName)
+        => typeName is "System.Activator" or "System.Environment" or "System.GC"
+            or "System.Delegate" or "System.IServiceProvider";
+
+    private static bool IsForbiddenNamespace(string typeName)
+    {
+        ReadOnlySpan<string> prefixes = [
+            "System.IO.",
+            "System.Net.",
+            "System.Reflection.",
+            "System.Runtime.InteropServices.",
+            "System.Runtime.Loader.",
+            "System.Diagnostics.",
+            "System.Threading.",
+            "System.Threading.Tasks.",
+            "System.Linq.Expressions.",
+            "Microsoft.CSharp."
+        ];
+        foreach (var prefix in prefixes) {
+            if (typeName.StartsWith(prefix, StringComparison.Ordinal)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsEventKernel(INamedTypeSymbol? type)
         => type?.AllInterfaces.Any(i => string.Equals(

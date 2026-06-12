@@ -126,6 +126,7 @@ public sealed class PersistentCompiledArtifactCache
 
         var finalPath = EntryPath(cacheKey);
         var tempPath = Path.Combine(_rootDirectory, ".tmp-" + Guid.NewGuid().ToString("N"));
+        var previousPath = Path.Combine(_rootDirectory, ".old-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempPath);
 
         try
@@ -133,20 +134,27 @@ public sealed class PersistentCompiledArtifactCache
             await WriteBytesAsync(Path.Combine(tempPath, "module.dll"), assemblyBytes, cancellationToken).ConfigureAwait(false);
             await WriteJsonAsync(Path.Combine(tempPath, "manifest.json"), manifest, cancellationToken).ConfigureAwait(false);
             await WriteJsonAsync(Path.Combine(tempPath, "verification.json"), verification, cancellationToken).ConfigureAwait(false);
+            PersistentCompiledArtifactCachePublisher.ValidateEntryShape(tempPath);
+
             Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
-            if (Directory.Exists(finalPath))
+
+            var movedPrevious = PersistentCompiledArtifactCachePublisher.MoveExistingEntryAside(finalPath, previousPath);
+            try
             {
-                Directory.Delete(finalPath, recursive: true);
+                Directory.Move(tempPath, finalPath);
+                PersistentCompiledArtifactCachePublisher.ValidateEntryShape(finalPath);
+            }
+            catch
+            {
+                PersistentCompiledArtifactCachePublisher.RestorePreviousEntry(finalPath, previousPath, movedPrevious);
+                throw;
             }
 
-            Directory.Move(tempPath, finalPath);
+            PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(previousPath);
         }
         finally
         {
-            if (Directory.Exists(tempPath))
-            {
-                Directory.Delete(tempPath, recursive: true);
-            }
+            PersistentCompiledArtifactCachePublisher.DeleteEntryIfExists(tempPath);
         }
     }
 

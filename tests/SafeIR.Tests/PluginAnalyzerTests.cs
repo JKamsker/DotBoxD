@@ -55,6 +55,36 @@ public sealed class PluginAnalyzerTests
         Assert.Contains(diagnostics, d => d.Id == "SGP001");
     }
 
+    [Theory]
+    [InlineData("new System.Net.Http.HttpClient();")]
+    [InlineData("System.Diagnostics.Process.Start(\"cmd.exe\");")]
+    [InlineData("System.Threading.Tasks.Task.Run(() => { });")]
+    [InlineData("System.Threading.Thread.Sleep(1);")]
+    [InlineData("System.Environment.GetEnvironmentVariable(\"SECRET\");")]
+    [InlineData("((System.IServiceProvider)null!).GetService(typeof(string));")]
+    [InlineData("System.IO.Stream.Synchronized(null!);")]
+    [InlineData("System.Reflection.Assembly.Load(\"System.Private.CoreLib\");")]
+    public async Task Reports_forbidden_host_apis_inside_event_kernel(string statement)
+    {
+        var diagnostics = await AnalyzeAsync($$"""
+            using SafeIR.Plugins;
+
+            [GamePlugin("bad")]
+            public sealed class BadKernel : IEventKernel<string>
+            {
+                public bool ShouldHandle(string e, HookContext context)
+                {
+                    {{statement}}
+                    return true;
+                }
+
+                public void Handle(string e, HookContext context) { }
+            }
+            """);
+
+        Assert.Contains(diagnostics, d => d.Id == "SGP001");
+    }
+
     [Fact]
     public void Generates_fire_damage_plugin_package_from_kernel_class()
     {
