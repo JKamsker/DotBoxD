@@ -18,6 +18,38 @@ public class MessagePackRpcSerializerTests
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, roundTrip.Data.ToArray());
     }
 
+    [Fact]
+    public void RepeatedShortStrings_RoundTripToCachedReference()
+    {
+        var serializer = new MessagePackRpcSerializer();
+
+        var first = RoundTrip(serializer, "player-1");
+        var second = RoundTrip(serializer, "player-1");
+
+        Assert.Equal("player-1", first);
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void LongStrings_AreNotCached()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var value = new string('x', 300);
+
+        var first = RoundTrip(serializer, value);
+        var second = RoundTrip(serializer, value);
+
+        Assert.Equal(value, first);
+        Assert.Equal(value, second);
+        Assert.NotSame(first, second);
+    }
+
+    private static T RoundTrip<T>(MessagePackRpcSerializer serializer, T value)
+    {
+        using var payload = serializer.SerializeToPayload(value);
+        return serializer.Deserialize<T>(payload.Memory);
+    }
+
     public sealed class BinaryDto
     {
         public ReadOnlyMemory<byte> Data { get; set; }
