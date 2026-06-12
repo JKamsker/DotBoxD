@@ -57,6 +57,7 @@ internal static class ExecutionPlanBuilder
             policy.ResourceLimits.MaxFileBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
             policy.ResourceLimits.MaxFileBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
             policy.ResourceLimits.MaxNetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            policy.ResourceLimits.MaxNetworkBytesWritten.ToString(System.Globalization.CultureInfo.InvariantCulture),
             policy.ResourceLimits.MaxLogEvents.ToString(System.Globalization.CultureInfo.InvariantCulture),
             policy.ResourceLimits.MaxLogMessageLength.ToString(System.Globalization.CultureInfo.InvariantCulture),
             policy.ResourceLimits.MaxStringLength.ToString(System.Globalization.CultureInfo.InvariantCulture),

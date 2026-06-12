@@ -8,6 +8,8 @@ internal static class LiteralExpressionAnalyzer
 
     public static SandboxType Analyze(LiteralExpression literal, ref SandboxEffect effects)
     {
+        ValidateLiteralValue(literal.Value);
+
         if (literal.Value is StringValue text)
         {
             effects |= SandboxEffect.Alloc;
@@ -50,6 +52,11 @@ internal static class LiteralExpressionAnalyzer
             }
         }
 
+        if (literal.Value is ListValue or MapValue)
+        {
+            effects |= SandboxEffect.Alloc;
+        }
+
         return literal.Value.Type;
     }
 
@@ -67,6 +74,22 @@ internal static class LiteralExpressionAnalyzer
            Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
            !string.IsNullOrWhiteSpace(uri.Host) &&
            string.IsNullOrEmpty(uri.UserInfo);
+
+    private static void ValidateLiteralValue(SandboxValue value)
+    {
+        try
+        {
+            SandboxValueValidator.RequireType(
+                value,
+                value.Type,
+                SandboxErrorCode.ValidationError,
+                "literal constant is invalid");
+        }
+        catch (SandboxRuntimeException)
+        {
+            throw InvalidLiteral("E-CONST-VALUE", "literal constant is invalid");
+        }
+    }
 
     private static SandboxValidationException InvalidLiteral(string code, string message)
         => new([new SandboxDiagnostic(code, message)]);

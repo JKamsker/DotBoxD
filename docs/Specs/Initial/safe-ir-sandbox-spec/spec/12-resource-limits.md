@@ -43,6 +43,7 @@ public sealed class ResourceBudget
     public long MaxFileBytesRead { get; }
     public long MaxFileBytesWritten { get; }
     public long MaxNetworkBytesRead { get; }
+    public long MaxNetworkBytesWritten { get; }
     public int MaxLogEvents { get; }
     public int MaxLogMessageLength { get; }
     public int MaxStringLength { get; }
@@ -55,6 +56,8 @@ public sealed class ResourceBudget
     public void ChargeString(string value);
     public void ChargeLogEvent(string message);
     public void ChargeHostCall(string bindingId, int? maxCallsPerRun = null);
+    public void ChargeNetworkRead(long bytes);
+    public void ChargeNetworkWrite(long bytes);
 }
 ```
 

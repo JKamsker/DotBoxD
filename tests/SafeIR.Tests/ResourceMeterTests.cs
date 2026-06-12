@@ -16,6 +16,7 @@ public sealed class ResourceMeterTests
         Assert.Equal(0, meter.FileBytesRead);
         Assert.Equal(0, meter.FileBytesWritten);
         Assert.Equal(0, meter.NetworkBytesRead);
+        Assert.Equal(0, meter.NetworkBytesWritten);
     }
 
     public static TheoryData<Action<ResourceMeter>> NegativeByteCharges()
@@ -23,6 +24,18 @@ public sealed class ResourceMeterTests
             meter => meter.ChargeAllocation(-1),
             meter => meter.ChargeFileRead(-1),
             meter => meter.ChargeFileWrite(-1),
-            meter => meter.ChargeNetworkRead(-1)
+            meter => meter.ChargeNetworkRead(-1),
+            meter => meter.ChargeNetworkWrite(-1)
         };
+
+    [Fact]
+    public void Resource_meter_enforces_network_write_budget()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxNetworkBytesWritten: 3));
+
+        meter.ChargeNetworkWrite(3);
+
+        Assert.Equal(3, meter.NetworkBytesWritten);
+        Assert.Throws<SandboxRuntimeException>(() => meter.ChargeNetworkWrite(1));
+    }
 }

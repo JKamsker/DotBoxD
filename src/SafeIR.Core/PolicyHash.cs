@@ -34,6 +34,7 @@ internal static class PolicyHash
             Format(limits.MaxFileBytesRead),
             Format(limits.MaxFileBytesWritten),
             Format(limits.MaxNetworkBytesRead),
+            Format(limits.MaxNetworkBytesWritten),
             Format(limits.MaxLogEvents),
             Format(limits.MaxLogMessageLength),
             Format(limits.MaxStringLength),

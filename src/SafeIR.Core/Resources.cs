@@ -22,6 +22,7 @@ public sealed class ResourceMeter
     public long FileBytesRead { get; private set; }
     public long FileBytesWritten { get; private set; }
     public long NetworkBytesRead { get; private set; }
+    public long NetworkBytesWritten { get; private set; }
     public int LogEvents { get; private set; }
     public long CollectionElements { get; private set; }
     public long StringBytes { get; private set; }
@@ -35,6 +36,7 @@ public sealed class ResourceMeter
             FileBytesRead,
             FileBytesWritten,
             NetworkBytesRead,
+            NetworkBytesWritten,
             LogEvents,
             CollectionElements,
             StringBytes);
@@ -179,6 +181,16 @@ public sealed class ResourceMeter
         if (NetworkBytesRead > Limits.MaxNetworkBytesRead)
         {
             throw Quota("network read byte budget exhausted");
+        }
+    }
+
+    public void ChargeNetworkWrite(long bytes)
+    {
+        ThrowIfNegative(bytes, nameof(bytes));
+        NetworkBytesWritten = AddChecked(NetworkBytesWritten, bytes, "network write byte budget exhausted");
+        if (NetworkBytesWritten > Limits.MaxNetworkBytesWritten)
+        {
+            throw Quota("network write byte budget exhausted");
         }
     }
 

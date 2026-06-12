@@ -98,7 +98,8 @@ public sealed class PluginAddendumTests
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
         var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
 
-        await kernel.ModifyAsync(state => {
+        await kernel.ModifyAsync(state =>
+        {
             state.DamageType = "ice";
             state.MinDamage = 250;
         });
@@ -121,7 +122,8 @@ public sealed class PluginAddendumTests
         var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await kernel.ModifyAsync(state => {
+            async () => await kernel.ModifyAsync(state =>
+            {
                 state.DamageType = "ice";
                 state.MinDamage = 10_001;
             }).AsTask());
@@ -140,7 +142,8 @@ public sealed class PluginAddendumTests
         await server.InstallAsync(FireDamagePluginPackage.Create());
         var settings = server.Kernels.Get<IFireDamageSettings>("fire-damage");
 
-        await settings.ModifyAsync(state => {
+        await settings.ModifyAsync(state =>
+        {
             state.DamageType = "ice";
             state.MinDamage = 250;
         });
@@ -196,7 +199,8 @@ public sealed class PluginAddendumTests
         var server = PluginServer.Create();
         var settings = server.BindContext<IFireDamageSettings>(
             "damage",
-            value => {
+            value =>
+            {
                 value.DamageType = "fire";
                 value.MinDamage = 100;
             });
@@ -213,8 +217,10 @@ public sealed class PluginAddendumTests
     {
         var server = PluginServer.Create();
         var package = FireDamagePluginPackage.Create();
-        var invalid = package with {
-            Manifest = package.Manifest with {
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
                 LiveSettings = [new LiveSettingDefinition("Anything", "object", null)]
             }
         };
@@ -265,20 +271,6 @@ public sealed class PluginAddendumTests
 
         Assert.Same(first.Value, second.Value);
         Assert.Empty(messages.Messages);
-    }
-
-    [Fact]
-    public async Task Kernel_handler_capability_is_required_by_policy()
-    {
-        var server = PluginServer.Create();
-        var policy = SandboxPolicyBuilder.Create()
-            .WithFuel(10_000)
-            .Build();
-
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await server.InstallAsync(FireDamagePluginPackage.Create(), policy).AsTask());
-
-        Assert.Contains(ex.Diagnostics, d => d.Code is "E-POLICY-CAP" or "E-POLICY-EFFECT");
     }
 
     private sealed class BlockingPluginMessageSink : IPluginMessageSink

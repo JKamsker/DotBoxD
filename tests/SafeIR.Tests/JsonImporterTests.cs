@@ -149,7 +149,8 @@ public sealed class JsonImporterTests
     [Fact]
     public async Task Duplicate_parameter_names_return_validation_diagnostic()
     {
-        var host = SandboxHost.Create(builder => {
+        var host = SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
@@ -181,7 +182,8 @@ public sealed class JsonImporterTests
     [Fact]
     public async Task Metadata_rejects_forbidden_clr_references()
     {
-        var host = SandboxHost.Create(builder => {
+        var host = SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
@@ -201,7 +203,8 @@ public sealed class JsonImporterTests
     [InlineData("2.0.0")]
     public async Task Unsupported_target_sandbox_version_is_rejected(string targetSandboxVersion)
     {
-        var host = SandboxHost.Create(builder => {
+        var host = SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });
@@ -219,24 +222,18 @@ public sealed class JsonImporterTests
     [Theory]
     [InlineData("""{ "op": "pow", "left": { "i32": 2 }, "right": { "i32": 8 } }""")]
     [InlineData("""{ "unary": "bitwiseNot", "operand": { "i32": 1 } }""")]
-    public async Task Unknown_expression_operators_are_rejected_before_execution(string expression)
+    public void Unknown_expression_operators_are_rejected_during_import(string expression)
     {
-        var host = SandboxHost.Create(builder => {
-            builder.AddDefaultPureBindings();
-            builder.UseInterpreter();
-        });
-        var module = await host.ParseJsonAsync(MinimalModule("", expression));
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import(MinimalModule("", expression)));
 
-        var ex = await Assert.ThrowsAsync<SandboxValidationException>(async () =>
-            await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build()));
-
-        Assert.Contains(ex.Diagnostics, d => d.Code == "E-OP-UNKNOWN");
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-OP");
     }
 
     [Fact]
     public async Task Missing_target_sandbox_version_defaults_to_current_language_version()
     {
-        var host = SandboxHost.Create(builder => {
+        var host = SandboxHost.Create(builder =>
+        {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
         });

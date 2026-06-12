@@ -27,6 +27,29 @@ public sealed class FileWritePolicyTests
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
     }
 
+    [Fact]
+    public async Task File_write_fuel_failure_does_not_publish_side_effect()
+    {
+        using var temp = TempDirectory.Create();
+        var target = Path.Combine(temp.Path, "existing.txt");
+        await File.WriteAllTextAsync(target, "old");
+
+        var host = SandboxTestHost.Create();
+        var module = await host.ParseJsonAsync(FileWriteJson("existing.txt", new string('x', 1_000)));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantFileWrite(temp.Path, 2_000)
+            .WithFuel(200)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.Equal("old", await File.ReadAllTextAsync(target));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
+    }
+
     private static async Task<SandboxExecutionResult> ExecuteWriteAsync(
         string root,
         string path,
@@ -88,7 +111,8 @@ public sealed class FileWritePolicyTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Path)) {
+            if (Directory.Exists(Path))
+            {
                 Directory.Delete(Path, recursive: true);
             }
         }

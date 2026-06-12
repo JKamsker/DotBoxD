@@ -13,6 +13,7 @@ public sealed record ResourceLimits(
     long MaxFileBytesRead = 1_048_576,
     long MaxFileBytesWritten = 0,
     long MaxNetworkBytesRead = 1_048_576,
+    long MaxNetworkBytesWritten = 1_048_576,
     int MaxLogEvents = 100,
     int MaxLogMessageLength = 4_096,
     int MaxStringLength = 65_536,

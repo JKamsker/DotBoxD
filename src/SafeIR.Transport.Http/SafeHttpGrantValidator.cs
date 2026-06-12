@@ -13,6 +13,7 @@ internal static class SafeHttpGrantValidator
             [
                 "allowedHosts",
                 "allowedSchemes",
+                "maxRequestBytes",
                 "maxResponseBytes",
                 "timeoutMs",
                 "allowIpLiterals",
@@ -20,6 +21,7 @@ internal static class SafeHttpGrantValidator
             ]);
         RequireCsv(grant, diagnostics, "allowedHosts");
         RequireCsv(grant, diagnostics, "allowedSchemes");
+        RequireOptionalNonNegativeLong(grant, diagnostics, "maxRequestBytes");
         RequireNonNegativeLong(grant, diagnostics, "maxResponseBytes");
         RequireRangeLong(grant, diagnostics, "timeoutMs", min: 1, max: 60_000);
         RequireOptionalBool(grant, diagnostics, "allowIpLiterals");
@@ -32,8 +34,10 @@ internal static class SafeHttpGrantValidator
         IEnumerable<string> allowedKeys)
     {
         var allowed = allowedKeys.ToHashSet(StringComparer.Ordinal);
-        foreach (var key in grant.Parameters.Keys) {
-            if (!allowed.Contains(key)) {
+        foreach (var key in grant.Parameters.Keys)
+        {
+            if (!allowed.Contains(key))
+            {
                 Add(diagnostics, grant, $"parameter '{key}' is not supported");
             }
         }
@@ -45,7 +49,8 @@ internal static class SafeHttpGrantValidator
         string key)
     {
         if (!grant.Parameters.TryGetValue(key, out var value) ||
-            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0) {
+            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
+        {
             Add(diagnostics, grant, $"parameter '{key}' must contain at least one value");
         }
     }
@@ -55,6 +60,17 @@ internal static class SafeHttpGrantValidator
         ICollection<SandboxDiagnostic> diagnostics,
         string key)
         => RequireRangeLong(grant, diagnostics, key, min: 0, max: long.MaxValue);
+
+    private static void RequireOptionalNonNegativeLong(
+        CapabilityGrant grant,
+        ICollection<SandboxDiagnostic> diagnostics,
+        string key)
+    {
+        if (grant.Parameters.ContainsKey(key))
+        {
+            RequireNonNegativeLong(grant, diagnostics, key);
+        }
+    }
 
     private static void RequireRangeLong(
         CapabilityGrant grant,
@@ -66,7 +82,8 @@ internal static class SafeHttpGrantValidator
         if (!grant.Parameters.TryGetValue(key, out var value) ||
             !long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
             parsed < min ||
-            parsed > max) {
+            parsed > max)
+        {
             Add(diagnostics, grant, $"parameter '{key}' must be between {min} and {max}");
         }
     }
@@ -76,7 +93,8 @@ internal static class SafeHttpGrantValidator
         ICollection<SandboxDiagnostic> diagnostics,
         string key)
     {
-        if (grant.Parameters.TryGetValue(key, out var value) && !bool.TryParse(value, out _)) {
+        if (grant.Parameters.TryGetValue(key, out var value) && !bool.TryParse(value, out _))
+        {
             Add(diagnostics, grant, $"parameter '{key}' must be a boolean");
         }
     }

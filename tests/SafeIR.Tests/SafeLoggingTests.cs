@@ -36,6 +36,20 @@ public sealed class SafeLoggingTests
     }
 
     [Fact]
+    public async Task Log_message_redacts_secret_shaped_values()
+    {
+        var result = await ExecuteLogAsync(
+            """{ "call": "log.info", "args": [{ "string": "token=abc123 password: hunter2 ok" }] }""",
+            SandboxPolicyBuilder.Create().GrantLogging().Build());
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "SandboxLog");
+        Assert.DoesNotContain("abc123", audit.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("hunter2", audit.Message, StringComparison.Ordinal);
+        Assert.Equal("token=[redacted] password: [redacted] ok", audit.Message);
+    }
+
+    [Fact]
     public async Task Log_binding_requires_policy_grant()
     {
         var host = SandboxTestHost.Create();

@@ -8,6 +8,7 @@ public sealed record SandboxResourceUsage(
     long FileBytesRead,
     long FileBytesWritten,
     long NetworkBytesRead,
+    long NetworkBytesWritten,
     int LogEvents,
     long CollectionElements,
     long StringBytes);

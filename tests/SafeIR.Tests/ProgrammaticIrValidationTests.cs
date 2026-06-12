@@ -31,6 +31,55 @@ public sealed class ProgrammaticIrValidationTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-EXPR-UNKNOWN");
     }
 
+    [Fact]
+    public async Task Prepare_rejects_programmatic_collection_literal_type_mismatch()
+    {
+        var module = ModuleWithBody(
+            SandboxType.List(SandboxType.I32),
+            [
+                new ReturnStatement(
+                    new LiteralExpression(
+                        new ListValue([SandboxValue.FromString("wrong")], SandboxType.I32),
+                        new SourceSpan(0, 0)),
+                    new SourceSpan(0, 0))
+            ]);
+
+        var ex = await PrepareThrowsAsync(module);
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-CONST-VALUE");
+    }
+
+    [Fact]
+    public async Task Runtime_charges_programmatic_collection_literals_against_policy()
+    {
+        var host = SandboxTestHost.Create();
+        var module = ModuleWithBody(
+            SandboxType.List(SandboxType.I32),
+            [
+                new ReturnStatement(
+                    new LiteralExpression(
+                        new ListValue(
+                            [
+                                SandboxValue.FromInt32(1),
+                                SandboxValue.FromInt32(2),
+                                SandboxValue.FromInt32(3)
+                            ],
+                            SandboxType.I32),
+                        new SourceSpan(0, 0)),
+                    new SourceSpan(0, 0))
+            ]);
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .WithMaxListLength(2)
+                .Build());
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+    }
+
     private static async Task<SandboxValidationException> PrepareThrowsAsync(SandboxModule module)
     {
         var host = SandboxTestHost.Create();

@@ -7,8 +7,10 @@ public static class SafeIrJsonImporter
 {
     public static SandboxModule Import(string json)
     {
-        try {
-            using var document = JsonDocument.Parse(json, new JsonDocumentOptions {
+        try
+        {
+            using var document = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
                 AllowTrailingCommas = false,
                 CommentHandling = JsonCommentHandling.Disallow,
                 MaxDepth = 64
@@ -16,10 +18,12 @@ public static class SafeIrJsonImporter
 
             return ReadModule(document.RootElement);
         }
-        catch (JsonException ex) {
+        catch (JsonException ex)
+        {
             throw Error("E-JSON-INVALID", ex.Message);
         }
-        catch (FormatException ex) {
+        catch (FormatException ex)
+        {
             throw Error("E-JSON-VERSION", ex.Message);
         }
     }
@@ -45,13 +49,15 @@ public static class SafeIrJsonImporter
 
     private static IReadOnlyList<CapabilityRequest> ReadCapabilityRequests(JsonElement module)
     {
-        if (!module.TryGetProperty("capabilityRequests", out var array)) {
+        if (!module.TryGetProperty("capabilityRequests", out var array))
+        {
             return [];
         }
 
         RequireArray(array, "capabilityRequests");
         return array.EnumerateArray()
-            .Select(item => {
+            .Select(item =>
+            {
                 RequireAllowedProperties(item, "capability request", ["id", "reason"]);
                 return new CapabilityRequest(RequiredString(item, "id"), OptionalString(item, "reason"));
             })
@@ -69,7 +75,8 @@ public static class SafeIrJsonImporter
         RequireAllowedProperties(element, "function", ["id", "visibility", "parameters", "returnType", "body"]);
         RequireObject(element, "function");
         var visibility = OptionalString(element, "visibility") ?? "private";
-        if (visibility is not "entrypoint" and not "private") {
+        if (visibility is not "entrypoint" and not "private")
+        {
             throw Error("E-JSON-VISIBILITY", $"unsupported function visibility '{visibility}'");
         }
 
@@ -83,13 +90,15 @@ public static class SafeIrJsonImporter
 
     private static IReadOnlyList<Parameter> ReadParameters(JsonElement function)
     {
-        if (!function.TryGetProperty("parameters", out var array)) {
+        if (!function.TryGetProperty("parameters", out var array))
+        {
             return [];
         }
 
         RequireArray(array, "parameters");
         return array.EnumerateArray()
-            .Select(p => {
+            .Select(p =>
+            {
                 RequireAllowedProperties(p, "parameter", ["name", "type"]);
                 return new Parameter(RequiredString(p, "name"), ReadType(Required(p, "type")));
             })
@@ -103,7 +112,8 @@ public static class SafeIrJsonImporter
     {
         RequireObject(element, "statement");
         var op = RequiredString(element, "op");
-        return op switch {
+        return op switch
+        {
             "set" => ReadSetStatement(element),
             "return" => ReadReturnStatement(element),
             "expr" => ReadExpressionStatement(element),
@@ -168,34 +178,39 @@ public static class SafeIrJsonImporter
     private static Expression ReadExpression(JsonElement element)
     {
         RequireObject(element, "expression");
-        if (element.TryGetProperty("var", out var variable)) {
+        if (element.TryGetProperty("var", out var variable))
+        {
             RequireAllowedProperties(element, "variable expression", ["var"]);
             return new VariableExpression(ReadStringValue(variable, "var"), JsonSpan);
         }
 
-        if (JsonLiteralReader.TryRead(element, out var literal, out var literalName)) {
+        if (JsonLiteralReader.TryRead(element, out var literal, out var literalName))
+        {
             RequireAllowedProperties(element, "literal expression", [literalName]);
             return new LiteralExpression(literal, JsonSpan);
         }
 
-        if (element.TryGetProperty("call", out var call)) {
+        if (element.TryGetProperty("call", out var call))
+        {
             RequireAllowedProperties(element, "call expression", ["call", "args", "genericType"]);
             return ReadCall(element, ReadStringValue(call, "call"));
         }
 
-        if (element.TryGetProperty("unary", out var unary)) {
+        if (element.TryGetProperty("unary", out var unary))
+        {
             RequireAllowedProperties(element, "unary expression", ["unary", "operand"]);
             return new UnaryExpression(
-                NormalizeOperator(ReadStringValue(unary, "unary")),
+                JsonOperatorReader.NormalizeUnary(ReadStringValue(unary, "unary")),
                 ReadExpression(Required(element, "operand")),
                 JsonSpan);
         }
 
-        if (element.TryGetProperty("op", out var binary)) {
+        if (element.TryGetProperty("op", out var binary))
+        {
             RequireAllowedProperties(element, "binary expression", ["op", "left", "right"]);
             return new BinaryExpression(
                 ReadExpression(Required(element, "left")),
-                NormalizeOperator(ReadStringValue(binary, "op")),
+                JsonOperatorReader.NormalizeBinary(ReadStringValue(binary, "op")),
                 ReadExpression(Required(element, "right")),
                 JsonSpan);
         }
@@ -222,9 +237,11 @@ public static class SafeIrJsonImporter
 
     private static SandboxType ReadType(JsonElement element)
     {
-        if (element.ValueKind == JsonValueKind.String) {
+        if (element.ValueKind == JsonValueKind.String)
+        {
             var name = element.GetString() ?? "";
-            if (name.Contains('<', StringComparison.Ordinal) || name.Contains('>', StringComparison.Ordinal)) {
+            if (name.Contains('<', StringComparison.Ordinal) || name.Contains('>', StringComparison.Ordinal))
+            {
                 throw Error("E-JSON-TYPE", "generic types must be JSON objects, not strings");
             }
 
@@ -247,7 +264,8 @@ public static class SafeIrJsonImporter
 
     private static IReadOnlyDictionary<string, string> ReadMetadata(JsonElement module)
     {
-        if (!module.TryGetProperty("metadata", out var metadata)) {
+        if (!module.TryGetProperty("metadata", out var metadata))
+        {
             return new Dictionary<string, string>();
         }
 
@@ -256,24 +274,5 @@ public static class SafeIrJsonImporter
         return metadata.EnumerateObject()
             .ToDictionary(p => p.Name, p => ReadStringValue(p.Value, $"metadata.{p.Name}"), StringComparer.Ordinal);
     }
-
-    private static string NormalizeOperator(string op)
-        => op switch {
-            "add" => "+",
-            "sub" => "-",
-            "mul" => "*",
-            "div" => "/",
-            "rem" => "%",
-            "eq" => "==",
-            "ne" => "!=",
-            "lt" => "<",
-            "lte" => "<=",
-            "gt" => ">",
-            "gte" => ">=",
-            "and" => "&&",
-            "or" => "||",
-            "not" => "!",
-            _ => op
-        };
 
 }

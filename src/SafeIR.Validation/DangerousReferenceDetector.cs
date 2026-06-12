@@ -100,6 +100,7 @@ internal static class DangerousReferenceDetector
         var text = literal.Value switch
         {
             StringValue value => value.Value,
+            OpaqueIdValue value => value.Value,
             SandboxPathValue value => value.Value.RelativePath,
             SandboxUriValue value => value.Value.Value,
             _ => null

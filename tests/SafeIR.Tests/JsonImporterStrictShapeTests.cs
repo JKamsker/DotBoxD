@@ -58,4 +58,60 @@ public sealed class JsonImporterStrictShapeTests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-STATEMENT");
     }
+
+    [Theory]
+    [InlineData("+")]
+    [InlineData("==")]
+    [InlineData("&&")]
+    public void Symbolic_json_binary_operators_are_rejected(string op)
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import($$"""
+        {
+          "id": "bad-binary-op",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "I32",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "op": "{{op}}",
+                    "left": { "i32": 1 },
+                    "right": { "i32": 2 }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-OP");
+    }
+
+    [Fact]
+    public void Symbolic_json_not_operator_is_rejected()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => SafeIrJsonImporter.Import("""
+        {
+          "id": "bad-unary-op",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Bool",
+              "body": [{ "op": "return", "value": { "unary": "!", "operand": { "bool": true } } }]
+            }
+          ]
+        }
+        """));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-OP");
+    }
 }

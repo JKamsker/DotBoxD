@@ -1,8 +1,9 @@
 namespace SafeIR.Runtime;
 
+using System.Text.RegularExpressions;
 using SafeIR;
 
-public static class SafeLogBindings
+public static partial class SafeLogBindings
 {
     public static BindingDescriptor Info { get; } = Create("log.info", "info");
 
@@ -19,7 +20,8 @@ public static class SafeLogBindings
             BindingCostModel.Fixed(2),
             AuditLevel.PerCall,
             BindingSafety.SideEffectingExternal,
-            (context, args, _) => {
+            (context, args, _) =>
+            {
                 Write(context, id, level, ((StringValue)args[0]).Value);
                 return ValueTask.FromResult(SandboxValue.Unit);
             },
@@ -37,18 +39,23 @@ public static class SafeLogBindings
             CapabilityId: "log.write",
             Effect: SandboxEffect.Audit,
             ResourceId: $"log:{level}",
-            Message: Sanitize(message)));
+            Message: SanitizeAndRedact(message)));
     }
 
-    private static string Sanitize(string message)
+    private static string SanitizeAndRedact(string message)
     {
         var chars = message.ToCharArray();
-        for (var i = 0; i < chars.Length; i++) {
-            if (char.IsControl(chars[i])) {
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (char.IsControl(chars[i]))
+            {
                 chars[i] = ' ';
             }
         }
 
-        return new string(chars);
+        return SecretPattern().Replace(new string(chars), match => match.Groups["key"].Value + "[redacted]");
     }
+
+    [GeneratedRegex("(?i)(?<key>\\b(?:password|passwd|pwd|secret|token|api[_-]?key|authorization)\\s*[:=]\\s*)(?<value>[^\\s,;]+)")]
+    private static partial Regex SecretPattern();
 }

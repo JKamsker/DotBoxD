@@ -83,7 +83,8 @@ public sealed class SandboxPolicyBuilder
     {
         _allowedEffects |= allowedEffects;
         _grants.Add(new CapabilityGrant(capabilityId, ParameterReader.Read(parameters)));
-        if (configureLimits is not null) {
+        if (configureLimits is not null)
+        {
             _limits = configureLimits(_limits);
         }
 
@@ -94,11 +95,12 @@ public sealed class SandboxPolicyBuilder
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
         _allowedEffects |= SandboxEffect.FileRead;
-        _grants.Add(new CapabilityGrant("file.read", new Dictionary<string, string> {
+        _grants.Add(new CapabilityGrant("file.read", new Dictionary<string, string>
+        {
             ["root"] = root,
             ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture)
         }));
-        _limits = _limits with { MaxFileBytesRead = Math.Max(_limits.MaxFileBytesRead, maxBytesPerRun) };
+        _limits = _limits with { MaxFileBytesRead = maxBytesPerRun };
         return this;
     }
 
@@ -110,7 +112,8 @@ public sealed class SandboxPolicyBuilder
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
         _allowedEffects |= SandboxEffect.FileWrite | SandboxEffect.Audit;
-        _grants.Add(new CapabilityGrant("file.write", new Dictionary<string, string> {
+        _grants.Add(new CapabilityGrant("file.write", new Dictionary<string, string>
+        {
             ["root"] = root,
             ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["allowCreate"] = allowCreate.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -238,7 +241,8 @@ public sealed class SandboxPolicyBuilder
 
     private static void ThrowIfNegative(long value, string paramName)
     {
-        if (value < 0) {
+        if (value < 0)
+        {
             throw new ArgumentOutOfRangeException(paramName);
         }
     }
@@ -248,7 +252,8 @@ internal static class ParameterReader
 {
     public static IReadOnlyDictionary<string, string> Read(object parameters)
     {
-        if (parameters is IReadOnlyDictionary<string, string> values) {
+        if (parameters is IReadOnlyDictionary<string, string> values)
+        {
             return new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(values, StringComparer.Ordinal));
         }
 

@@ -31,6 +31,13 @@ public static class PluginMessageBindings
             async (context, args, cancellationToken) =>
             {
                 var targetId = ((StringValue)args[0]).Value;
+                if (!SandboxLiteralConstraints.IsOpaqueId(targetId))
+                {
+                    throw new SandboxRuntimeException(new SandboxError(
+                        SandboxErrorCode.InvalidInput,
+                        "game.message.send denied: target ID is invalid"));
+                }
+
                 var message = Sanitize(((StringValue)args[1]).Value);
                 await sink.SendAsync(targetId, message, cancellationToken).ConfigureAwait(false);
                 context.Audit.Write(new SandboxAuditEvent(

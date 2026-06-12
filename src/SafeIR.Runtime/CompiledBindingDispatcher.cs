@@ -10,6 +10,7 @@ internal static class CompiledBindingDispatcher
         var auditCheckpoint = context.AuditCheckpoint();
         try
         {
+            ValidateArguments(descriptor, args);
             context.ChargeBindingCall(descriptor);
         }
         catch (SandboxRuntimeException ex)
@@ -52,6 +53,25 @@ internal static class CompiledBindingDispatcher
             var error = new SandboxError(SandboxErrorCode.BindingFailure, $"binding '{id}' failed");
             context.EnsureRequiredBindingFailureAudit(descriptor, auditCheckpoint, error.Code);
             throw new SandboxRuntimeException(error);
+        }
+    }
+
+    private static void ValidateArguments(BindingDescriptor descriptor, IReadOnlyList<SandboxValue> args)
+    {
+        if (args.Count != descriptor.Parameters.Count)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.ValidationError,
+                $"binding '{descriptor.Id}' argument count does not match verified plan"));
+        }
+
+        for (var i = 0; i < descriptor.Parameters.Count; i++)
+        {
+            SandboxValueValidator.RequireType(
+                args[i],
+                descriptor.Parameters[i],
+                SandboxErrorCode.ValidationError,
+                $"binding '{descriptor.Id}' argument type does not match verified plan");
         }
     }
 }

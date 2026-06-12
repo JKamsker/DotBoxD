@@ -54,6 +54,8 @@ public sealed class TypeAndLiteralValidationTests
     [InlineData("String", """{ "string": "IL_0001: calli" }""")]
     [InlineData("SandboxPath", """{ "path": "System.IO.File" }""")]
     [InlineData("SandboxUri", """{ "uri": "https://api.example.com/0x06000001" }""")]
+    [InlineData("PlayerId", """{ "playerId": "0x06000001" }""")]
+    [InlineData("PlayerId", """{ "playerId": "System.Type" }""")]
     public async Task Literals_reject_clr_and_il_payloads(string returnType, string literalJson)
     {
         var host = SandboxTestHost.Create();
