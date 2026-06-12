@@ -23,7 +23,7 @@ internal static class SafeIrExpressionModelFactory
             BinaryExpressionSyntax binary => LowerBinary(binary, eventParameterName, eventProperties, liveSettings),
             IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, liveSettings),
             MemberAccessExpressionSyntax member => LowerMemberAccess(member, eventParameterName, eventProperties, liveSettings),
-            LiteralExpressionSyntax literal => LowerLiteral(literal),
+            LiteralExpressionSyntax literal => SafeIrLiteralExpressionLowerer.Lower(literal),
             _ => Unsupported(expression)
         };
 
@@ -33,6 +33,11 @@ internal static class SafeIrExpressionModelFactory
         EquatableArray<EventPropertyModel> eventProperties,
         EquatableArray<LiveSettingModel> liveSettings)
     {
+        if (SafeIrLiteralExpressionLowerer.TryLowerNegative(unary) is { } literal)
+        {
+            return literal;
+        }
+
         var operand = Lower(unary.Operand, eventParameterName, eventProperties, liveSettings);
         return unary.Kind() switch {
             SyntaxKind.LogicalNotExpression => Unary(
@@ -251,36 +256,6 @@ internal static class SafeIrExpressionModelFactory
 
         return Unsupported(member);
     }
-
-    private static SafeIrExpressionModel LowerLiteral(LiteralExpressionSyntax literal)
-        => literal.Token.Value switch {
-            bool value => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.Bool}({BoolLiteral(value)})",
-                SafeIrGenerationNames.ManifestTypes.Bool,
-                false),
-            int value => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(value)})",
-                SafeIrGenerationNames.ManifestTypes.Int,
-                false),
-            long value => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(value)})",
-                SafeIrGenerationNames.ManifestTypes.Long,
-                false),
-            double value when !double.IsNaN(value) && !double.IsInfinity(value) => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.F64}({LiteralReader.ObjectLiteral(value)})",
-                SafeIrGenerationNames.ManifestTypes.Double,
-                false),
-            string value => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.Str}({LiteralReader.StringLiteral(value)})",
-                SafeIrGenerationNames.ManifestTypes.String,
-                true),
-            _ => Unsupported(literal)
-        };
-
-    private static string BoolLiteral(bool value)
-        => value
-            ? SafeIrGenerationNames.CSharpLiterals.True
-            : SafeIrGenerationNames.CSharpLiterals.False;
 
     public static string EventVariable(string name) => SafeIrGenerationNames.GeneratedVariables.EventPrefix + name;
 
