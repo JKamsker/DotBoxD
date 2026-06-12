@@ -8,8 +8,9 @@ internal static class LiteralExpressionAnalyzer
 
     public static SandboxType Analyze(LiteralExpression literal, ref SandboxEffect effects)
     {
+        var allocates = LiteralValueSafety.Validate(literal.Value);
         ValidateLiteralValue(literal.Value);
-        if (LiteralValueSafety.Validate(literal.Value))
+        if (allocates)
         {
             effects |= SandboxEffect.Alloc;
         }

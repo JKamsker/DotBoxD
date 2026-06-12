@@ -31,6 +31,7 @@ public static class SandboxValueValidator
                 throw Error(errorCode, message);
             }
 
+            RequireScalarInvariants(frame.Value, errorCode, message);
             switch (frame.Value)
             {
                 case OpaqueIdValue id:
@@ -110,6 +111,34 @@ public static class SandboxValueValidator
     private static bool IsKnownValueKind(SandboxValue value)
         => value is UnitValue or BoolValue or I32Value or I64Value or F64Value or StringValue or OpaqueIdValue
             or SandboxPathValue or SandboxUriValue or ListValue or MapValue;
+
+    internal static void RequireScalarInvariants(
+        SandboxValue value,
+        SandboxErrorCode errorCode,
+        string message)
+    {
+        switch (value)
+        {
+            case F64Value number when !double.IsFinite(number.Value):
+                throw Error(errorCode, message);
+            case SandboxPathValue path:
+                if (path.Value?.RelativePath is not { } relativePath ||
+                    !SandboxLiteralConstraints.IsPortableRelativePath(relativePath))
+                {
+                    throw Error(errorCode, message);
+                }
+
+                break;
+            case SandboxUriValue uri:
+                if (uri.Value?.Value is not { } valueText ||
+                    !SandboxLiteralConstraints.IsSandboxUri(valueText))
+                {
+                    throw Error(errorCode, message);
+                }
+
+                break;
+        }
+    }
 
     private static void RequireOpaqueId(
         OpaqueIdValue id,

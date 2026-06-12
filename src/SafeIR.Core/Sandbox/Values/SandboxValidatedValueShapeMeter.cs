@@ -33,6 +33,7 @@ internal static class SandboxValidatedValueShapeMeter
             }
 
             ValidateKnownType(frame.Value, frame.ExpectedType, errorCode, message);
+            SandboxValueValidator.RequireScalarInvariants(frame.Value, errorCode, message);
             switch (frame.Value)
             {
                 case StringValue text:
