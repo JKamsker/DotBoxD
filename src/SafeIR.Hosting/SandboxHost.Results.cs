@@ -43,7 +43,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Compiled, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Compiled, error, false);
 
         return new SandboxExecutionResult
         {
@@ -52,6 +52,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = ExecutionMode.Compiled,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -76,7 +77,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
 
         return new SandboxExecutionResult
         {
@@ -85,6 +86,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = options.Mode,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -113,7 +115,7 @@ public sealed partial class SandboxHost
             audit.Write(VerifierFailureAudit(plan, runId, error));
         }
 
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Compiled, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, ExecutionMode.Compiled, error, false);
 
         return new SandboxExecutionResult
         {
@@ -122,6 +124,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = ExecutionMode.Compiled,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -143,7 +146,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
 
         return new SandboxExecutionResult
         {
@@ -152,6 +155,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = options.Mode,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -185,7 +189,7 @@ public sealed partial class SandboxHost
                 ["reason"] = revoked.Reason,
                 ["revokedAt"] = revoked.RevokedAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture)
             }));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
 
         return new SandboxExecutionResult
         {
@@ -194,6 +198,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = options.Mode,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -223,7 +228,7 @@ public sealed partial class SandboxHost
             ErrorCode: error.Code,
             Message: error.SafeMessage,
             Fields: profile?.ToAuditFields()));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
 
         return new SandboxExecutionResult
         {
@@ -232,6 +237,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = options.Mode,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -255,7 +261,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: error.SafeMessage));
-        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error);
+        WriteFailedRunSummary(audit, runId, startedAt, plan, budget, options.Mode, error, false);
 
         return new SandboxExecutionResult
         {
@@ -264,6 +270,7 @@ public sealed partial class SandboxHost
             ResourceUsage = budget.Snapshot(),
             AuditEvents = audit.Events,
             ActualMode = options.Mode,
+            ExecutionDispatched = false,
             ModuleHash = plan.ModuleHash,
             PlanHash = plan.PlanHash,
             PolicyHash = plan.PolicyHash
@@ -290,7 +297,8 @@ public sealed partial class SandboxHost
         ExecutionPlan plan,
         ResourceMeter budget,
         ExecutionMode mode,
-        SandboxError error)
+        SandboxError error,
+        bool executionDispatched)
     {
         var cacheStatus = "None";
         audit.Write(new SandboxAuditEvent(
@@ -303,7 +311,12 @@ public sealed partial class SandboxHost
             Message: $"mode={mode.ToString().ToLowerInvariant()} cacheStatus={cacheStatus} " +
                      $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} " +
                      $"bindings={plan.BindingManifestHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
-            Fields: RunSummaryAuditFields.Create(plan, budget, mode, cacheStatus)));
+            Fields: RunSummaryAuditFields.Create(
+                plan,
+                budget,
+                mode,
+                cacheStatus,
+                executionDispatched: executionDispatched)));
     }
 
     private static DateTimeOffset AuditTime(ExecutionPlan plan)

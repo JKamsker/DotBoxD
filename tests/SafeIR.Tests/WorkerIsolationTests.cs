@@ -22,8 +22,8 @@ public sealed class WorkerIsolationTests
                 Mode = ExecutionMode.Auto,
                 Isolation = SandboxIsolation.WorkerProcess
             });
-
         Assert.False(result.Succeeded);
+        Assert.False(result.ExecutionDispatched);
         Assert.Equal(SandboxErrorCode.PolicyDenied, result.Error!.Code);
         Assert.Null(result.ArtifactHash);
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationUnavailable");
@@ -87,8 +87,8 @@ public sealed class WorkerIsolationTests
                 Mode = ExecutionMode.Compiled,
                 Isolation = SandboxIsolation.WorkerProcess
             });
-
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.True(result.ExecutionDispatched);
         Assert.Equal(1, worker.Calls);
         Assert.Equal(SandboxIsolation.InProcess, worker.Options!.Isolation);
         Assert.Equal(ExecutionMode.Compiled, worker.Options.Mode);
