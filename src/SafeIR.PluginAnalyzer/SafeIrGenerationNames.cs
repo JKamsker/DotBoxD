@@ -112,6 +112,7 @@ internal static class SafeIrGenerationNames
     {
         public const string Var = "Var";
         public const string Str = "Str";
+        public const string ConcatString = "ConcatString";
         public const string I32 = "I32";
         public const string I64 = "I64";
         public const string F64 = "F64";
@@ -131,6 +132,11 @@ internal static class SafeIrGenerationNames
         public const string Mul = "Mul";
         public const string Div = "Div";
         public const string Mod = "Mod";
+    }
+
+    public static class BindingIds
+    {
+        public const string StringConcatBudgeted = "string.concatBudgeted";
     }
 
     public static class GeneratedVariables

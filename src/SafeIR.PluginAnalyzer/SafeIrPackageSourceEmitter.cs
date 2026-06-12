@@ -162,6 +162,7 @@ internal static class SafeIrPackageSourceEmitter
             SafeIrGenerationNames.Helpers.Str,
             Parameter(SafeIrGenerationNames.CSharpTypes.String, "value"),
             "new global::SafeIR.LiteralExpression(global::SafeIR.SandboxValue.FromString(value), Span)");
+        EmitStringConcatHelper(builder);
         EmitHelper(
             builder,
             SafeIrGenerationNames.Helpers.I32,
@@ -207,6 +208,15 @@ internal static class SafeIrPackageSourceEmitter
             .Append(") => ")
             .Append(expression)
             .AppendLine(";");
+
+    private static void EmitStringConcatHelper(StringBuilder builder)
+        => EmitHelper(
+            builder,
+            SafeIrGenerationNames.Helpers.ConcatString,
+            "global::SafeIR.Expression left, global::SafeIR.Expression right",
+            "new global::SafeIR.CallExpression(" +
+            LiteralReader.StringLiteral(SafeIrGenerationNames.BindingIds.StringConcatBudgeted) +
+            ", [left, right], null, Span)");
 
     private static string Parameter(string type, string name) => type + " " + name;
 

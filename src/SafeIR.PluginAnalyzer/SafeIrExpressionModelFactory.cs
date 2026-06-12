@@ -130,13 +130,7 @@ internal static class SafeIrExpressionModelFactory
                 left,
                 right,
                 allocates),
-            SyntaxKind.AddExpression => IntBinary(
-                SafeIrGenerationNames.Helpers.Add,
-                SafeIrGenerationNames.Operators.Add,
-                left,
-                right,
-                SafeIrGenerationNames.ManifestTypes.Int,
-                allocates),
+            SyntaxKind.AddExpression => AddBinary(left, right, allocates),
             SyntaxKind.SubtractExpression => IntBinary(
                 SafeIrGenerationNames.Helpers.Sub,
                 SafeIrGenerationNames.Operators.Minus,
@@ -167,6 +161,33 @@ internal static class SafeIrExpressionModelFactory
                 allocates),
             _ => Unsupported(binary)
         };
+    }
+
+    private static SafeIrExpressionModel AddBinary(
+        SafeIrExpressionModel left,
+        SafeIrExpressionModel right,
+        bool allocates)
+    {
+        if (IsString(left) && IsString(right))
+        {
+            return new SafeIrExpressionModel(
+                $"{SafeIrGenerationNames.Helpers.ConcatString}({left.Source}, {right.Source})",
+                SafeIrGenerationNames.ManifestTypes.String,
+                true);
+        }
+
+        if (IsString(left) || IsString(right))
+        {
+            throw new NotSupportedException("Operator '+' requires both operands to be strings or both operands to be ints.");
+        }
+
+        return IntBinary(
+            SafeIrGenerationNames.Helpers.Add,
+            SafeIrGenerationNames.Operators.Add,
+            left,
+            right,
+            SafeIrGenerationNames.ManifestTypes.Int,
+            allocates);
     }
 
     private static SafeIrExpressionModel SameType(
@@ -265,6 +286,9 @@ internal static class SafeIrExpressionModelFactory
             throw new NotSupportedException($"{context} requires {expected} operands.");
         }
     }
+
+    private static bool IsString(SafeIrExpressionModel expression)
+        => string.Equals(expression.Type, SafeIrGenerationNames.ManifestTypes.String, StringComparison.Ordinal);
 
     private static SafeIrExpressionModel Unsupported(ExpressionSyntax expression)
         => throw new NotSupportedException($"Unsupported plugin expression '{expression}'.");
