@@ -54,7 +54,40 @@ public sealed class PluginAnalyzerHintNameTests
         Assert.Contains("Beta.DamagePluginPackage.g.cs", hintNames);
     }
 
-    private static GeneratorDriverRunResult RunGenerator(string source)
+    [Fact]
+    public void Generator_reports_duplicate_package_names_in_same_namespace()
+    {
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            [GamePlugin("damage")]
+            public sealed partial class Damage : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, "damage");
+            }
+
+            [GamePlugin("damage-kernel")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, "kernel");
+            }
+            """, expectGeneratorErrors: true);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "SGP100");
+        Assert.Empty(result.GeneratedTrees);
+    }
+
+    private static GeneratorDriverRunResult RunGenerator(string source, bool expectGeneratorErrors = false)
     {
         var compilation = CSharpCompilation.Create(
             "SafeIrPluginHintNameTest",
@@ -71,7 +104,11 @@ public sealed class PluginAnalyzerHintNameTests
             out var outputCompilation,
             out var diagnostics);
 
-        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        if (!expectGeneratorErrors)
+        {
+            Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        }
+
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
         return driver.GetRunResult();
     }

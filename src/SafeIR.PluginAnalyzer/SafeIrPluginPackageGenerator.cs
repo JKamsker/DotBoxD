@@ -1,5 +1,6 @@
 namespace SafeIR.PluginAnalyzer;
 
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -27,11 +28,46 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.ModelResult);
 
         var packages = models
-            .Select(static (model, _) => SafeIrPackageSourceEmitter.Emit(model))
+            .Collect()
+            .Select(static (models, _) => CreatePackageBatch(models))
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.PackageResult);
 
-        context.RegisterSourceOutput(packages, static (context, package) => {
-            context.AddSource(package.HintName, package.Source);
+        context.RegisterSourceOutput(packages, static (context, batch) => {
+            foreach (var diagnostic in batch.Diagnostics)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
+                    Location.None,
+                    diagnostic.Message));
+            }
+
+            foreach (var package in batch.Packages)
+            {
+                context.AddSource(package.HintName, package.Source);
+            }
         });
     }
+
+    private static GeneratedPluginPackageBatch CreatePackageBatch(ImmutableArray<PluginKernelModel> models)
+    {
+        var duplicateIdentities = models
+            .GroupBy(PackageIdentity, StringComparer.Ordinal)
+            .Where(group => group.Skip(1).Any())
+            .ToDictionary(group => group.Key, StringComparer.Ordinal);
+        var diagnostics = duplicateIdentities.Values.Select(group => new GeneratedPluginPackageDiagnostic(
+            $"Plugin package name '{group.First().PackageName}' is generated more than once in namespace '{NamespaceDisplay(group.First())}'."));
+        var packages = models
+            .Where(model => !duplicateIdentities.ContainsKey(PackageIdentity(model)))
+            .Select(SafeIrPackageSourceEmitter.Emit);
+
+        return new GeneratedPluginPackageBatch(
+            new EquatableArray<GeneratedPluginPackage>(packages),
+            new EquatableArray<GeneratedPluginPackageDiagnostic>(diagnostics));
+    }
+
+    private static string PackageIdentity(PluginKernelModel model)
+        => model.Namespace + "\0" + model.PackageName;
+
+    private static string NamespaceDisplay(PluginKernelModel model)
+        => string.IsNullOrWhiteSpace(model.Namespace) ? "<global>" : model.Namespace;
 }
