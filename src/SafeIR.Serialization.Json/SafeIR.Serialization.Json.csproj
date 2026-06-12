@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
     <ProjectReference Include="..\SafeIR.Hosting\SafeIR.Hosting.csproj" />
+    <ProjectReference Include="..\SafeIR.Plugins\SafeIR.Plugins.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

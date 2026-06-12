@@ -5,8 +5,8 @@ This branch implements the addendum as a hosting-layer plugin model:
 - `SafeIR.Plugins` exposes live values, typed live contexts, kernel state, hook pipelines, plugin manifests, and safe message bindings.
 - `SafeIR.PluginAnalyzer` provides local SDK diagnostics for forbidden File IO in kernels and unsupported live setting types.
 - `SafeIR.PluginIpc.Server.Abstractions` owns the server-side event contracts that plugin clients implement against.
-- Plugin packages carry Safe IR plus manifest metadata. The server validates manifest identity, declared effects, and the Safe IR module with the existing Safe IR validator before installation.
-- Hook handlers run through `SandboxHost.ExecuteAsync`. The local examples reference a generated package factory for trusted development-time convenience; a production upload path should accept package data, not load arbitrary plugin DLLs.
+- Plugin packages carry JSON Safe IR plus manifest metadata. The server validates manifest identity, declared effects, and the Safe IR module with the existing Safe IR validator before installation.
+- Hook handlers run through `SandboxHost.ExecuteAsync`. The local examples reference a generated package factory for trusted development-time convenience; production upload accepts serialized JSON package data and does not load arbitrary plugin DLLs.
 
 ## Recommended Documentation Walkthrough
 
@@ -233,7 +233,13 @@ This is the data a server owner needs to show settings, defaults, ranges, reques
 
 ### 7. Upload Or Install Package
 
-The server installs a plugin package by validating the manifest, preparing the Safe IR module with the current policy, and storing the live kernel state.
+The production server installs a plugin package from serialized JSON package data. The JSON envelope contains a manifest, entrypoint names if needed, and the Safe IR module. It does not contain an assembly path or plugin DLL reference.
+
+```csharp
+var kernel = await server.InstallJsonAsync(uploadedPackageJson);
+```
+
+The local generated factory is still useful for SDK examples and tests, but it is not the production upload boundary:
 
 ```csharp
 var package = FireDamagePluginPackage.Create();
@@ -251,7 +257,7 @@ SandboxPolicyBuilder.Create()
     .Build();
 ```
 
-If the policy does not grant `game.message.write`, package preparation fails closed with a policy diagnostic. The server still re-validates uploaded packages; local analyzer diagnostics are developer-experience feedback, not the trust boundary.
+If the policy does not grant `game.message.write`, package preparation fails closed with a policy diagnostic. The server still re-validates uploaded JSON packages; local analyzer diagnostics are developer-experience feedback, not the trust boundary.
 
 ## Flagship Fire Damage Example
 

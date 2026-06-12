@@ -22,8 +22,8 @@ The goal is to make plugin development feel like normal C# while preserving the 
 
 The local examples may reference a generated package factory from a plugin project to demonstrate
 the build-time lowering flow. That factory is trusted development-time code, not the production
-upload boundary. A production server should receive package data containing Safe IR plus manifest
-metadata and validate it before installation.
+upload boundary. A production server should receive serialized JSON package data containing Safe
+IR plus manifest metadata and validate it before installation.
 
 ---
 
@@ -64,7 +64,7 @@ Plugin developers reference that assembly and implement approved interfaces.
 
 The plugin developer does not upload arbitrary executable .NET code.
 
-They upload a safe plugin package containing verified plugin behavior.
+They upload a JSON safe plugin package containing verified plugin behavior.
 
 ---
 
@@ -648,6 +648,60 @@ The main documentation should lead with Level 3.
 ---
 
 # 14. Plugin Package Manifest Additions
+
+The production package is a JSON envelope with a manifest and a Safe IR module:
+
+```json
+{
+  "manifest": {
+    "pluginId": "fire-damage",
+    "contract": "IEventKernel<DamageEvent>",
+    "mode": "auto",
+    "effects": ["Cpu", "Alloc"],
+    "liveSettings": [],
+    "subscriptions": [
+      { "event": "DamageEvent", "kernel": "FireDamageKernel" }
+    ]
+  },
+  "entrypoints": {
+    "shouldHandle": "ShouldHandle",
+    "handle": "Handle"
+  },
+  "module": {
+    "id": "fire-damage",
+    "version": "1.0.0",
+    "targetSandboxVersion": "1.0.0",
+    "capabilityRequests": [],
+    "metadata": { "pluginId": "fire-damage" },
+    "functions": [
+      {
+        "id": "ShouldHandle",
+        "visibility": "entrypoint",
+        "parameters": [
+          { "name": "e_DamageType", "type": "String" },
+          { "name": "e_Amount", "type": "I32" },
+          { "name": "e_TargetId", "type": "String" }
+        ],
+        "returnType": "Bool",
+        "body": [{ "op": "return", "value": { "bool": true } }]
+      },
+      {
+        "id": "Handle",
+        "visibility": "entrypoint",
+        "parameters": [
+          { "name": "e_DamageType", "type": "String" },
+          { "name": "e_Amount", "type": "I32" },
+          { "name": "e_TargetId", "type": "String" }
+        ],
+        "returnType": "Unit",
+        "body": [{ "op": "return", "value": { "unit": true } }]
+      }
+    ]
+  }
+}
+```
+
+The envelope must not contain executable assembly paths, raw DLL bytes, CLR type names used as execution targets, or other host-code loading instructions. The server imports the JSON Safe IR module, validates it, and then runs the IR through the selected runtime mode.
 
 The plugin package manifest should include live state metadata.
 

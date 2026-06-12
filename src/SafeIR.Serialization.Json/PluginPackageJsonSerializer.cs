@@ -1,0 +1,156 @@
+namespace SafeIR.Plugins;
+
+using System.Text.Json;
+using static SafeIR.JsonImport;
+
+public static class PluginPackageJsonSerializer
+{
+    public static PluginPackage Import(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        try
+        {
+            using var document = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 64
+            });
+
+            return ReadPackage(document.RootElement);
+        }
+        catch (JsonException ex)
+        {
+            throw Error("E-JSON-INVALID", ex.Message);
+        }
+        catch (FormatException ex)
+        {
+            throw Error("E-JSON-VERSION", ex.Message);
+        }
+    }
+
+    private static PluginPackage ReadPackage(JsonElement element)
+    {
+        RequireAllowedProperties(element, "plugin package", ["manifest", "module", "entrypoints"]);
+        var manifest = ReadManifest(Required(element, "manifest"));
+        var module = SafeIrJsonImporter.Import(Required(element, "module").GetRawText());
+        var entrypoints = element.TryGetProperty("entrypoints", out var entrypointElement)
+            ? ReadEntrypoints(entrypointElement)
+            : null;
+
+        return PluginPackage.Create(manifest, module, entrypoints);
+    }
+
+    private static PluginManifest ReadManifest(JsonElement element)
+    {
+        RequireAllowedProperties(
+            element,
+            "plugin manifest",
+            ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions"]);
+
+        return new PluginManifest(
+            RequiredString(element, "pluginId"),
+            RequiredString(element, "contract"),
+            ReadExecutionMode(RequiredString(element, "mode")),
+            ReadStringArray(RequiredArray(element, "effects"), "effects"),
+            ReadLiveSettings(RequiredArray(element, "liveSettings")),
+            ReadSubscriptions(RequiredArray(element, "subscriptions")));
+    }
+
+    private static ExecutionMode ReadExecutionMode(string value)
+    {
+        if (!Enum.TryParse<ExecutionMode>(value, ignoreCase: true, out var mode) ||
+            !Enum.IsDefined(mode))
+        {
+            throw Error("E-JSON-MODE", $"unsupported execution mode '{value}'");
+        }
+
+        return mode;
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonElement array, string name)
+        => array.EnumerateArray()
+            .Select((item, index) => ReadStringValue(item, $"{name}[{index}]"))
+            .ToArray();
+
+    private static IReadOnlyList<LiveSettingDefinition> ReadLiveSettings(JsonElement array)
+        => array.EnumerateArray().Select(ReadLiveSetting).ToArray();
+
+    private static LiveSettingDefinition ReadLiveSetting(JsonElement element)
+    {
+        RequireAllowedProperties(element, "live setting", ["name", "type", "defaultValue", "min", "max"]);
+        var type = RequiredString(element, "type");
+        return new LiveSettingDefinition(
+            RequiredString(element, "name"),
+            type,
+            ReadLiveSettingValue(Required(element, "defaultValue"), type, "defaultValue"),
+            ReadOptionalLiveSettingValue(element, "min", type),
+            ReadOptionalLiveSettingValue(element, "max", type));
+    }
+
+    private static object? ReadOptionalLiveSettingValue(JsonElement element, string name, string type)
+        => element.TryGetProperty(name, out var value)
+            ? ReadLiveSettingValue(value, type, name)
+            : null;
+
+    private static object? ReadLiveSettingValue(JsonElement value, string type, string name)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return type switch
+        {
+            "bool" => ReadBoolValue(value, name),
+            "int" => ReadInt32Value(value, name),
+            "long" => ReadInt64Value(value, name),
+            "double" => ReadDoubleValue(value, name),
+            "string" => ReadStringValue(value, name),
+            _ => ReadJsonScalar(value, name)
+        };
+    }
+
+    private static object ReadJsonScalar(JsonElement value, string name)
+        => value.ValueKind switch
+        {
+            JsonValueKind.String => ReadStringValue(value, name),
+            JsonValueKind.True or JsonValueKind.False => value.GetBoolean(),
+            JsonValueKind.Number when value.TryGetInt64(out var integer) => integer,
+            JsonValueKind.Number => ReadDoubleValue(value, name),
+            _ => throw Error("E-JSON-TYPE", $"'{name}' must be a scalar value")
+        };
+
+    private static IReadOnlyList<HookSubscriptionManifest> ReadSubscriptions(JsonElement array)
+        => array.EnumerateArray().Select(ReadSubscription).ToArray();
+
+    private static HookSubscriptionManifest ReadSubscription(JsonElement element)
+    {
+        RequireAllowedProperties(element, "hook subscription", ["event", "kernel"]);
+        return new HookSubscriptionManifest(
+            RequiredString(element, "event"),
+            RequiredString(element, "kernel"));
+    }
+
+    private static KernelEntrypoints ReadEntrypoints(JsonElement element)
+    {
+        RequireAllowedProperties(element, "kernel entrypoints", ["shouldHandle", "handle"]);
+        return new KernelEntrypoints(
+            OptionalString(element, "shouldHandle") ?? "ShouldHandle",
+            OptionalString(element, "handle") ?? "Handle");
+    }
+}
+
+public static class PluginServerJsonExtensions
+{
+    public static ValueTask<InstalledKernel> InstallJsonAsync(
+        this PluginServer server,
+        string json,
+        SandboxPolicy? policy = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        cancellationToken.ThrowIfCancellationRequested();
+        return server.InstallAsync(PluginPackageJsonSerializer.Import(json), policy, cancellationToken);
+    }
+}
