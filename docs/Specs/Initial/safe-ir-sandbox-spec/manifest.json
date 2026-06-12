@@ -79,13 +79,13 @@
     },
     {
       "path": "spec/04-ir-language.md",
-      "sha256": "cf4bb5201b12f9759232739443ceaa4c758dee579a1b7f2f1bba548af1ce33b3",
-      "bytes": 5456
+      "sha256": "a93b97c6a6b6794fab6467554e7899e75244d70f542b540848bf2e1c218995c1",
+      "bytes": 6112
     },
     {
       "path": "spec/05-type-system.md",
-      "sha256": "0e5a2eaff10b2c6874f6e330c9cf6ddbe85812dfb54624871498f42e1dbf889f",
-      "bytes": 5856
+      "sha256": "1b1a16d6d0f617a60bdf92d8aff9a3081aec08c9673f7059b30abe4f5e58a350",
+      "bytes": 6036
     },
     {
       "path": "spec/06-effects-capabilities.md",

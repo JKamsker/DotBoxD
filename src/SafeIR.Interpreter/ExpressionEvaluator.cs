@@ -53,7 +53,7 @@ internal sealed class ExpressionEvaluator
         return unary.Operator switch
         {
             "!" => SandboxValue.FromBool(!((BoolValue)value).Value),
-            "-" => SandboxValue.FromInt32(SandboxInt32Math.Negate(((I32Value)value).Value)),
+            "-" => SandboxNumericOperations.Negate(value),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported unary operator"))
         };
     }
@@ -91,17 +91,17 @@ internal sealed class ExpressionEvaluator
         return binary.Operator switch
         {
             "+" when left is StringValue l && right is StringValue r => Concat(l.Value, r.Value),
-            "+" => SandboxValue.FromInt32(SandboxInt32Math.Add(((I32Value)left).Value, ((I32Value)right).Value)),
-            "-" => SandboxValue.FromInt32(SandboxInt32Math.Subtract(((I32Value)left).Value, ((I32Value)right).Value)),
-            "*" => SandboxValue.FromInt32(SandboxInt32Math.Multiply(((I32Value)left).Value, ((I32Value)right).Value)),
-            "/" => SandboxValue.FromInt32(SandboxInt32Math.Divide(((I32Value)left).Value, ((I32Value)right).Value)),
-            "%" => SandboxValue.FromInt32(SandboxInt32Math.Remainder(((I32Value)left).Value, ((I32Value)right).Value)),
+            "+" => SandboxNumericOperations.Add(left, right),
+            "-" => SandboxNumericOperations.Subtract(left, right),
+            "*" => SandboxNumericOperations.Multiply(left, right),
+            "/" => SandboxNumericOperations.Divide(left, right),
+            "%" => SandboxNumericOperations.Remainder(left, right),
             "==" => SandboxValue.FromBool(Equals(left, right)),
             "!=" => SandboxValue.FromBool(!Equals(left, right)),
-            "<" => SandboxValue.FromBool(((I32Value)left).Value < ((I32Value)right).Value),
-            "<=" => SandboxValue.FromBool(((I32Value)left).Value <= ((I32Value)right).Value),
-            ">" => SandboxValue.FromBool(((I32Value)left).Value > ((I32Value)right).Value),
-            ">=" => SandboxValue.FromBool(((I32Value)left).Value >= ((I32Value)right).Value),
+            "<" => SandboxNumericOperations.LessThan(left, right),
+            "<=" => SandboxNumericOperations.LessThanOrEqual(left, right),
+            ">" => SandboxNumericOperations.GreaterThan(left, right),
+            ">=" => SandboxNumericOperations.GreaterThanOrEqual(left, right),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"))
         };
     }

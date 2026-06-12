@@ -13,11 +13,7 @@ public static class CompiledRuntime
     public static void ValidateEntrypointInput(SandboxValue input, int parameterCount)
         => EntrypointBinder.ValidateInputShape(input, parameterCount);
 
-    public static SandboxValue GetInputArgument(
-        SandboxValue input,
-        int index,
-        int parameterCount,
-        SandboxType expectedType)
+    public static SandboxValue GetInputArgument(SandboxValue input, int index, int parameterCount, SandboxType expectedType)
         => EntrypointBinder.GetArgument(input, index, parameterCount, expectedType);
 
     public static SandboxValue RequireValueType(SandboxValue value, SandboxType expectedType)
@@ -30,9 +26,7 @@ public static class CompiledRuntime
     public static SandboxValue I32(int value) => SandboxValue.FromInt32(value);
     public static SandboxValue I64(long value) => SandboxValue.FromInt64(value);
     public static SandboxValue F64(double value)
-        => double.IsFinite(value)
-            ? SandboxValue.FromDouble(value)
-            : throw InvalidInput("f64 value must be finite");
+        => double.IsFinite(value) ? SandboxValue.FromDouble(value) : throw InvalidInput("f64 value must be finite");
     public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
     public static SandboxType TypeScalar(string name) => SandboxType.Scalar(name);
@@ -69,22 +63,18 @@ public static class CompiledRuntime
     public static bool AsBool(SandboxValue value) => ((BoolValue)value).Value;
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
-    public static SandboxValue AddI32(SandboxValue left, SandboxValue right)
-        => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
-
-    public static SandboxValue SubI32(SandboxValue left, SandboxValue right)
-        => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
-
-    public static SandboxValue MulI32(SandboxValue left, SandboxValue right)
-        => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
-
-    public static SandboxValue DivI32(SandboxValue left, SandboxValue right)
-        => I32(SandboxInt32Math.Divide(AsI32(left), AsI32(right)));
-
-    public static SandboxValue RemI32(SandboxValue left, SandboxValue right)
-        => I32(SandboxInt32Math.Remainder(AsI32(left), AsI32(right)));
-
+    public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
+    public static SandboxValue SubI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
+    public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
+    public static SandboxValue DivI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Divide(AsI32(left), AsI32(right)));
+    public static SandboxValue RemI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Remainder(AsI32(left), AsI32(right)));
     public static SandboxValue NegI32(SandboxValue value) => I32(SandboxInt32Math.Negate(AsI32(value)));
+    public static SandboxValue Neg(SandboxValue value) => SandboxNumericOperations.Negate(value);
+    public static SandboxValue Add(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Add(left, right);
+    public static SandboxValue Sub(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Subtract(left, right);
+    public static SandboxValue Mul(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Multiply(left, right);
+    public static SandboxValue Div(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Divide(left, right);
+    public static SandboxValue Rem(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Remainder(left, right);
 
     public static SandboxValue NotBool(SandboxValue value) => Bool(!AsBool(value));
 
@@ -93,13 +83,13 @@ public static class CompiledRuntime
     public static SandboxValue Ne(SandboxValue left, SandboxValue right) => Bool(!Equals(left, right));
 
     public static SandboxValue LtI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) < AsI32(right));
-
     public static SandboxValue LteI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) <= AsI32(right));
-
     public static SandboxValue GtI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) > AsI32(right));
-
     public static SandboxValue GteI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) >= AsI32(right));
-
+    public static SandboxValue Lt(SandboxValue left, SandboxValue right) => SandboxNumericOperations.LessThan(left, right);
+    public static SandboxValue Lte(SandboxValue left, SandboxValue right) => SandboxNumericOperations.LessThanOrEqual(left, right);
+    public static SandboxValue Gt(SandboxValue left, SandboxValue right) => SandboxNumericOperations.GreaterThan(left, right);
+    public static SandboxValue Gte(SandboxValue left, SandboxValue right) => SandboxNumericOperations.GreaterThanOrEqual(left, right);
     public static SandboxValue And(SandboxValue left, SandboxValue right) => Bool(AsBool(left) && AsBool(right));
 
     public static SandboxValue Or(SandboxValue left, SandboxValue right) => Bool(AsBool(left) || AsBool(right));

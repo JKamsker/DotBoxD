@@ -139,6 +139,16 @@ eq ne lt lte gt gte
 and or
 ```
 
+`add`, `sub`, `mul`, `div`, `rem`, unary `-`, and ordering comparisons operate on numeric
+values. Numeric operands must have the same sandbox type: `I32` with `I32`, `I64` with
+`I64`, or `F64` with `F64`. The IR does not implicitly widen or narrow numeric values.
+Arithmetic returns the operand type. Ordering comparisons return `Bool`.
+
+Integer arithmetic is checked. Integer overflow, division by zero, and the minimum-value
+divided or remaindered by `-1` overflow case fail the run with `InvalidInput`. `F64`
+arithmetic accepts only finite input values and must fail with `InvalidInput` if the result
+is `NaN`, positive infinity, or negative infinity.
+
 `and` and `or` are short-circuiting boolean operators. Implementations should evaluate
 the cheaper pure operand first when that can determine the result, even if that operand is
 authored on the right side. Operands with effects outside CPU/allocation preserve authored
