@@ -30,7 +30,9 @@ public static class PluginPackageJsonSerializer
                 MaxDepth = 64
             });
 
-            return ReadPackage(document.RootElement);
+            var package = ReadPackage(document.RootElement);
+            PluginPackageValidator.Validate(package);
+            return package;
         }
         catch (JsonException ex)
         {

@@ -45,6 +45,19 @@ public sealed class PluginPackageJsonTests
     }
 
     [Fact]
+    public void Import_rejects_manifest_module_mismatch_before_returning_package()
+    {
+        var json = JsonDamagePackage().Replace(
+            "\"id\": \"json-fire-damage\"",
+            "\"id\": \"other-plugin\"",
+            StringComparison.Ordinal);
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP011");
+    }
+
+    [Fact]
     public void Import_rejects_oversized_package_json_before_dom_parse()
     {
         var oversized = "{\"manifest\":\"" + new string('x', 1_048_577) + "\"}";

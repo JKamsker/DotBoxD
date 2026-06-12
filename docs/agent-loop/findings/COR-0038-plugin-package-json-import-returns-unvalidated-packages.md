@@ -1,19 +1,19 @@
 ---
 id: COR-0038
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: high
 title: Plugin package JSON import returns unvalidated packages
 dedup_key: security/plugin-package-json/import/unvalidated-package-object
 created_at: 2026-06-12T22:48:36.7805462+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-12T22:48:36.7805462+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T23:53:05.4056805+00:00
+claimed_by: worker
+claimed_at: 2026-06-12T23:51:47.1726452+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-12T23:53:05.4056805+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 
