@@ -51,7 +51,7 @@ function RequiredText($metadata, [string] $name, [string] $packageName) {
 }
 
 function IsPrereleaseVersion([string] $version) {
-    return $version.Contains("-", [StringComparison]::Ordinal)
+    return $version.IndexOf("-", [StringComparison]::Ordinal) -ge 0
 }
 
 function AssertZipEntry($zip, [string] $entryName, [string] $packageName) {
