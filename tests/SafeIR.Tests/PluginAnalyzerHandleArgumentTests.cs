@@ -34,6 +34,39 @@ public sealed class PluginAnalyzerHandleArgumentTests
         Assert.Equal("named message", message.Message);
     }
 
+    [Fact]
+    public async Task Generated_handle_allows_explicit_return_after_send()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record NamedSendEvent(string TargetId, string Message);
+
+            [GamePlugin("generated-return-after-send")]
+            public sealed partial class NamedSendKernel : IEventKernel<NamedSendEvent>
+            {
+                public bool ShouldHandle(NamedSendEvent e, HookContext ctx) => true;
+
+                public void Handle(NamedSendEvent e, HookContext ctx)
+                {
+                    ctx.Messages.Send(e.TargetId, e.Message);
+                    return;
+                }
+            }
+            """, "Sample.NamedSendPluginPackage");
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages);
+        var kernel = await server.InstallAsync(package);
+
+        await kernel.HandleAsync(new NamedSendEventAdapter(), new NamedSendEvent("player-1", "returned"));
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("player-1", message.TargetId);
+        Assert.Equal("returned", message.Message);
+    }
+
     private sealed record NamedSendEvent(string TargetId, string Message);
 
     private sealed class NamedSendEventAdapter : IPluginEventAdapter<NamedSendEvent>
