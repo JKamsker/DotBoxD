@@ -1,0 +1,168 @@
+using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using SafeIR.PluginAnalyzer;
+using SafeIR.Plugins;
+
+namespace SafeIR.Tests;
+
+public sealed class PluginAnalyzerGeneratedPackageTests
+{
+    private static readonly CSharpParseOptions ParseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+    [Fact]
+    public async Task Generated_package_installs_and_executes_lowered_ir()
+    {
+        var package = CreateGeneratedPackage("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(
+                string TargetId,
+                string Message,
+                string DamageType,
+                int Amount,
+                long Sequence,
+                double Ratio);
+
+            [GamePlugin("generated-runtime")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                [LiveSetting]
+                public bool Enabled { get; set; } = true;
+
+                [LiveSetting]
+                public string DamageType { get; set; } = "fire";
+
+                [LiveSetting]
+                public int MinDamage { get; set; } = 100;
+
+                [LiveSetting]
+                public long Sequence { get; set; } = 7L;
+
+                [LiveSetting]
+                public double Ratio { get; set; } = 1.5D;
+
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => Enabled &&
+                       e.DamageType == DamageType &&
+                       e.Amount >= MinDamage &&
+                       e.Sequence == Sequence &&
+                       e.Ratio == Ratio;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
+
+        Assert.Equal("generated-runtime", package.Manifest.PluginId);
+        Assert.Equal(["Cpu", "GameStateWrite", "Audit"], package.Manifest.Effects);
+        Assert.Collection(
+            package.Manifest.LiveSettings,
+            setting => AssertLiveSetting(setting, "Enabled", "bool", true),
+            setting => AssertLiveSetting(setting, "DamageType", "string", "fire"),
+            setting => AssertLiveSetting(setting, "MinDamage", "int", 100),
+            setting => AssertLiveSetting(setting, "Sequence", "long", 7L),
+            setting => AssertLiveSetting(setting, "Ratio", "double", 1.5D));
+
+        var messages = new InMemoryPluginMessageSink();
+        var server = PluginServer.Create(messages);
+        var kernel = await server.InstallAsync(package);
+        var adapter = new GeneratedDamageEventAdapter();
+
+        var matching = new GeneratedDamageEvent("player-1", "matched", "fire", 150, 7L, 1.5D);
+        var rejected = matching with { Amount = 99 };
+
+        Assert.False(await kernel.ShouldHandleAsync(adapter, rejected));
+        Assert.True(await kernel.ShouldHandleAsync(adapter, matching));
+
+        await kernel.HandleAsync(adapter, matching);
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("player-1", message.TargetId);
+        Assert.Equal("matched", message.Message);
+    }
+
+    private static PluginPackage CreateGeneratedPackage(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            "SafeIrGeneratedPackageRuntimeTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(GamePluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new SafeIrPluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var diagnostics);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+
+        using var assembly = new MemoryStream();
+        var emit = outputCompilation.Emit(assembly);
+        Assert.True(
+            emit.Success,
+            string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
+
+        var loaded = Assembly.Load(assembly.ToArray());
+        var factory = loaded.GetType("Sample.DamagePluginPackage", throwOnError: true)!;
+        var create = factory.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
+        return Assert.IsType<PluginPackage>(create.Invoke(null, null));
+    }
+
+    private static void AssertLiveSetting(
+        LiveSettingDefinition actual,
+        string name,
+        string type,
+        object expectedDefault)
+    {
+        Assert.Equal(name, actual.Name);
+        Assert.Equal(type, actual.Type);
+        Assert.Equal(expectedDefault, actual.DefaultValue);
+    }
+
+    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    {
+        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
+        return references.Select(reference => MetadataReference.CreateFromFile(reference));
+    }
+
+    private sealed record GeneratedDamageEvent(
+        string TargetId,
+        string Message,
+        string DamageType,
+        int Amount,
+        long Sequence,
+        double Ratio);
+
+    private sealed class GeneratedDamageEventAdapter : IPluginEventAdapter<GeneratedDamageEvent>
+    {
+        public string EventName => "DamageEvent";
+
+        public IReadOnlyList<Parameter> Parameters { get; } = [
+            new("e_TargetId", SandboxType.String),
+            new("e_Message", SandboxType.String),
+            new("e_DamageType", SandboxType.String),
+            new("e_Amount", SandboxType.I32),
+            new("e_Sequence", SandboxType.I64),
+            new("e_Ratio", SandboxType.F64)
+        ];
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(GeneratedDamageEvent e)
+            => [
+                SandboxValue.FromString(e.TargetId),
+                SandboxValue.FromString(e.Message),
+                SandboxValue.FromString(e.DamageType),
+                SandboxValue.FromInt32(e.Amount),
+                SandboxValue.FromInt64(e.Sequence),
+                SandboxValue.FromDouble(e.Ratio)
+            ];
+    }
+}
