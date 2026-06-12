@@ -161,19 +161,20 @@ internal sealed class ShaRpcPendingRequests : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        lock (_timeoutGate)
         {
+            if (_disposed != 0)
+            {
+                return;
+            }
+
+            _disposed = 1;
             _timeoutTimer.Dispose();
         }
     }
 
     private void ScheduleTimeout(long deadline)
     {
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            return;
-        }
-
         lock (_timeoutGate)
         {
             if (_disposed != 0 || deadline >= _nextTimeoutTimestamp)
@@ -188,13 +189,13 @@ internal sealed class ShaRpcPendingRequests : IDisposable
 
     private void CancelExpired()
     {
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            return;
-        }
-
         lock (_timeoutGate)
         {
+            if (_disposed != 0)
+            {
+                return;
+            }
+
             _nextTimeoutTimestamp = long.MaxValue;
         }
 
@@ -258,6 +259,8 @@ internal sealed class ShaRpcPendingRequests : IDisposable
 
     private void ScheduleTimerLocked()
     {
+        if (_disposed != 0) return;
+
         if (_nextTimeoutTimestamp == long.MaxValue)
         {
             _timeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);

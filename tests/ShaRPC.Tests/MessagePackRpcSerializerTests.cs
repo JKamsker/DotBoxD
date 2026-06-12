@@ -1,3 +1,6 @@
+using MessagePack;
+using MessagePack.Formatters;
+using MessagePack.Resolvers;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Serializers.MessagePack;
 using Xunit;
@@ -44,6 +47,18 @@ public class MessagePackRpcSerializerTests
         Assert.NotSame(first, second);
     }
 
+    [Fact]
+    public void CustomStringFormatter_TakesPrecedenceOverRpcStringCache()
+    {
+        var resolver = new CustomStringResolver();
+        var serializer = MessagePackRpcSerializer.CreateWithResolver(resolver);
+
+        var result = RoundTrip(serializer, "player-1");
+
+        Assert.Equal("custom:player-1", result);
+        Assert.Equal(1, resolver.Formatter.DeserializeCalls);
+    }
+
     private static T RoundTrip<T>(MessagePackRpcSerializer serializer, T value)
     {
         using var payload = serializer.SerializeToPayload(value);
@@ -53,5 +68,34 @@ public class MessagePackRpcSerializerTests
     public sealed class BinaryDto
     {
         public ReadOnlyMemory<byte> Data { get; set; }
+    }
+
+    private sealed class CustomStringResolver : IFormatterResolver
+    {
+        public CustomStringFormatter Formatter { get; } = new();
+
+        public IMessagePackFormatter<T>? GetFormatter<T>() =>
+            typeof(T) == typeof(string)
+                ? (IMessagePackFormatter<T>)(object)Formatter
+                : null;
+    }
+
+    private sealed class CustomStringFormatter : IMessagePackFormatter<string>
+    {
+        public int DeserializeCalls { get; private set; }
+
+        public void Serialize(
+            ref MessagePackWriter writer,
+            string value,
+            MessagePackSerializerOptions options) =>
+            writer.Write(value);
+
+        public string Deserialize(
+            ref MessagePackReader reader,
+            MessagePackSerializerOptions options)
+        {
+            DeserializeCalls++;
+            return "custom:" + reader.ReadString();
+        }
     }
 }

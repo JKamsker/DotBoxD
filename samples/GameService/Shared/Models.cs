@@ -45,7 +45,7 @@ public struct MoveRequest
     }
 
     [Key(0)]
-    public string PlayerId { get; set; } = string.Empty;
+    public string? PlayerId { get; set; } = string.Empty;
 
     [Key(1)]
     public float X { get; set; }

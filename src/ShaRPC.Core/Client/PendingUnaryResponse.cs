@@ -105,7 +105,7 @@ internal class PendingUnaryResponse<TResponse> :
             return;
         }
 
-        TrySetException(new OperationCanceledException());
+        TrySetCanceled();
     }
 
     protected virtual Exception CreateTimeoutException() =>

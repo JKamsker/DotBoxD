@@ -19,8 +19,10 @@ public class PeerRoundTripBenchmarks
         Z = 3
     };
 
+    // Combined hot-path profile: no peer timeouts, client pooled ValueTask<T> invocations,
+    // no non-streaming inbound cancellation, and immediate server dispatch.
     [Params(false, true)]
-    public bool LowAllocationMode { get; set; }
+    public bool EndToEndLowAllocationProfile { get; set; }
 
     [GlobalSetup]
     public async Task Setup()
@@ -58,15 +60,15 @@ public class PeerRoundTripBenchmarks
     private RpcPeerOptions CreateOptionsForClient() =>
         new()
         {
-            RequestTimeout = LowAllocationMode
+            RequestTimeout = EndToEndLowAllocationProfile
                 ? Timeout.InfiniteTimeSpan
                 : TimeSpan.FromSeconds(5),
-            EnableLowAllocationValueTaskInvocations = LowAllocationMode,
+            EnableLowAllocationValueTaskInvocations = EndToEndLowAllocationProfile,
         };
 
     private RpcPeerOptions CreateOptionsForServer()
     {
-        if (!LowAllocationMode)
+        if (!EndToEndLowAllocationProfile)
         {
             return new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) };
         }
@@ -90,7 +92,9 @@ public class PeerRoundTripBenchmarks
 
         public ValueTask<ActionResult> MovePlayerAsync(MoveRequest request, CancellationToken ct = default)
         {
-            var state = _players[request.PlayerId];
+            var playerId = request.PlayerId
+                ?? throw new InvalidOperationException("MoveRequest.PlayerId must not be null.");
+            var state = _players[playerId];
             state.PositionX = request.X;
             state.PositionY = request.Y;
             state.PositionZ = request.Z;

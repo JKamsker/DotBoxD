@@ -156,6 +156,7 @@ internal sealed partial class RpcPeerOutboundInvoker
             }
             catch (Exception ex)
             {
+                frame.Dispose();
                 _pending.Remove(messageId, pending, consumed: true);
                 ReleasePendingSlot();
                 pending.Abandon();

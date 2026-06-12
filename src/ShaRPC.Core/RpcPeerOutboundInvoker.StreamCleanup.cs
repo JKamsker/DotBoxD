@@ -1,5 +1,6 @@
 using ShaRPC.Core.Client;
 using ShaRPC.Core.Streaming;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 
 namespace ShaRPC.Core;
@@ -29,9 +30,17 @@ internal sealed partial class RpcPeerOutboundInvoker
         RpcStreamAttachment[]? streams,
         Exception error)
     {
-        await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
-        ExceptionDispatchInfo.Capture(error).Throw();
-        throw null!;
+        try
+        {
+            await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
+        }
+
+        ThrowOriginal(error);
+        return null!;
     }
 
     private static async Task<ReceivedResponse> CleanupOutboundSetupFailureAsync(
@@ -40,13 +49,32 @@ internal sealed partial class RpcPeerOutboundInvoker
         bool registeredStreams,
         Exception error)
     {
-        await outboundStreams.DisposeAsync().ConfigureAwait(false);
-        if (!registeredStreams)
+        try
         {
-            await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
+            await outboundStreams.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RpcDiagnostics.Report("Outbound stream cleanup failed", ex);
         }
 
-        ExceptionDispatchInfo.Capture(error).Throw();
-        throw null!;
+        if (!registeredStreams)
+        {
+            try
+            {
+                await DisposeStreamSourcesBestEffortAsync(streams).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                RpcDiagnostics.Report("Outbound stream source cleanup failed", ex);
+            }
+        }
+
+        ThrowOriginal(error);
+        return null!;
     }
+
+    [DoesNotReturn]
+    private static void ThrowOriginal(Exception error) =>
+        ExceptionDispatchInfo.Capture(error).Throw();
 }

@@ -50,8 +50,9 @@ internal sealed class PipeConnection :
         var remote = _remote ?? throw new InvalidOperationException("Pipe is not connected.");
         var frame = Payload.Rent(data.Length);
         data.Span.CopyTo(frame.Memory.Span);
-        remote.Enqueue(new RpcFrame(frame));
-        return default;
+        return remote.TryEnqueue(new RpcFrame(frame))
+            ? default
+            : new ValueTask(Task.FromException(new ObjectDisposedException(nameof(PipeConnection))));
     }
 
     public ValueTask SendFrameValueAsync(PooledBufferWriter frame, CancellationToken ct = default)
@@ -60,8 +61,9 @@ internal sealed class PipeConnection :
         ct.ThrowIfCancellationRequested();
 
         var remote = _remote ?? throw new InvalidOperationException("Pipe is not connected.");
-        remote.Enqueue(new RpcFrame(frame));
-        return default;
+        return remote.TryEnqueue(new RpcFrame(frame))
+            ? default
+            : new ValueTask(Task.FromException(new ObjectDisposedException(nameof(PipeConnection))));
     }
 
     public Task<Payload> ReceiveAsync(CancellationToken ct = default) =>
@@ -138,7 +140,7 @@ internal sealed class PipeConnection :
         ValueTaskSourceOnCompletedFlags flags) =>
         _receiver.OnCompleted(continuation, state, token, flags);
 
-    private void Enqueue(RpcFrame frame)
+    private bool TryEnqueue(RpcFrame frame)
     {
         var complete = false;
         lock (_gate)
@@ -146,7 +148,7 @@ internal sealed class PipeConnection :
             if (_disposed)
             {
                 frame.Dispose();
-                return;
+                return false;
             }
 
             if (_waiting)
@@ -164,6 +166,8 @@ internal sealed class PipeConnection :
         {
             _receiver.SetResult(frame);
         }
+
+        return true;
     }
 
     private void Complete()

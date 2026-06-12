@@ -5,6 +5,14 @@ namespace ShaRPC.Core.Transport;
 /// <summary>
 /// Owns one received wire frame. The frame can be backed by the legacy <see cref="Payload"/>
 /// owner or by a pooled writer transferred by a low-allocation transport.
+/// <para>
+/// This is a value type and may be copied. Ownership of the underlying <see cref="Payload"/> or
+/// <see cref="PooledBufferWriter"/> transfers only through <see cref="DetachPayload"/>; otherwise
+/// callers dispose it through <see cref="Dispose"/>. Follow the boolean contract returned by
+/// <c>RpcPeerFrameProcessor.ShouldDisposeAsync</c> inside <c>RpcPeerReadLoop</c>: <see langword="true"/>
+/// means the caller owns the frame, <see langword="false"/> means the read loop retained ownership
+/// (for example, a <c>StreamItem</c>). Both backing owners are idempotent, so double-dispose is safe.
+/// </para>
 /// </summary>
 public struct RpcFrame : IDisposable
 {

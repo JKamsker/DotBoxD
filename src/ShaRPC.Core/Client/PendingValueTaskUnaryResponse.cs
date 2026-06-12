@@ -21,6 +21,7 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     private int _messageId;
     private int _completed;
     private int _returned;
+    private int _valueTaskIssued;
 
     private PendingValueTaskUnaryResponse()
     {
@@ -54,8 +55,14 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         return pending;
     }
 
-    public ValueTask<TResponse> ValueTask =>
-        new(this, _source.Version);
+    public ValueTask<TResponse> ValueTask
+    {
+        get
+        {
+            Volatile.Write(ref _valueTaskIssued, 1);
+            return new ValueTask<TResponse>(this, _source.Version);
+        }
+    }
 
     public void SetTimeoutDeadline(long deadline)
     {
@@ -150,7 +157,18 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         ValueTaskSourceOnCompletedFlags flags) =>
         _source.OnCompleted(continuation, state, token, flags);
 
-    public void Abandon() => Return();
+    public void Abandon()
+    {
+        if (_source.GetStatus(_source.Version) == ValueTaskSourceStatus.Pending)
+        {
+            _source.SetException(new ShaRpcConnectionException("Request abandoned."));
+        }
+
+        if (Volatile.Read(ref _valueTaskIssued) == 0)
+        {
+            Return();
+        }
+    }
 
     private void Reset(int messageId)
     {
@@ -159,6 +177,7 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         _directOwner = null;
         _completed = 0;
         _returned = 0;
+        _valueTaskIssued = 0;
     }
 
     private void CompleteAndSetResult(TResponse response)

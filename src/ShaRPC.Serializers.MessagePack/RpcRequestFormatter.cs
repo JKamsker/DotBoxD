@@ -44,6 +44,8 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         var count = reader.ReadMapHeader();
         var request = new RpcRequest();
+        var seenServiceName = false;
+        var seenMethodName = false;
 
         for (var i = 0; i < count; i++)
         {
@@ -53,9 +55,11 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                     request.MessageId = reader.ReadInt32();
                     break;
                 case RpcRequestField.ServiceName:
+                    seenServiceName = true;
                     request.ServiceName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.MethodName:
+                    seenMethodName = true;
                     request.MethodName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.InstanceId:
@@ -68,6 +72,18 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
                     reader.Skip();
                     break;
             }
+        }
+
+        if (!seenServiceName || request.ServiceName is null)
+        {
+            throw new MessagePackSerializationException(
+                "RPC request is missing required ServiceName.");
+        }
+
+        if (!seenMethodName || request.MethodName is null)
+        {
+            throw new MessagePackSerializationException(
+                "RPC request is missing required MethodName.");
         }
 
         return request;

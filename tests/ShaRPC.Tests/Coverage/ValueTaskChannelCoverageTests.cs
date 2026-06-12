@@ -34,7 +34,9 @@ public sealed class ValueTaskChannelCoverageTests
         Assert.Equal(0, channel.ReceiveTaskCalls);
 
         await peer.DisposeAsync();
-        await Assert.ThrowsAnyAsync<Exception>(() => call.WaitAsync(Timeout));
+        var completed = await Task.WhenAny(call, Task.Delay(Timeout));
+        Assert.Same(call, completed);
+        await Assert.ThrowsAnyAsync<Exception>(async () => await call);
     }
 
     [Fact]
