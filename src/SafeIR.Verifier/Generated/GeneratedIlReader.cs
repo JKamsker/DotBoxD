@@ -5,6 +5,8 @@ using System.Reflection.Metadata.Ecma335;
 
 internal static class GeneratedIlReader
 {
+    private const int MaxSwitchTargets = 4096;
+
     public static IReadOnlyList<GeneratedInstruction> ReadInstructions(
         MetadataReader reader,
         MethodBodyBlock body,
@@ -92,14 +94,22 @@ internal static class GeneratedIlReader
                 throw new BadImageFormatException("switch table count is negative");
             }
 
-            var deltas = new int[count];
-            for (var i = 0; i < count; i++)
+            if (count > MaxSwitchTargets)
             {
-                deltas[i] = il.ReadInt32();
+                throw new BadImageFormatException("switch table count exceeds verifier limit");
             }
 
-            var nextOffset = il.Offset;
-            return new DecodedOperand(SwitchTargetsValue: deltas.Select(delta => nextOffset + delta).ToArray());
+            if (count > il.RemainingBytes / sizeof(int))
+            {
+                throw new BadImageFormatException("switch table exceeds remaining IL bytes");
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                _ = il.ReadInt32();
+            }
+
+            return DecodedOperand.None;
         }
 
         if (opcode.IsBranch())

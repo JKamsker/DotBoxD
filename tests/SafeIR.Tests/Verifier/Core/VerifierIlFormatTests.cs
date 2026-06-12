@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Reflection.Metadata;
@@ -24,6 +25,36 @@ public sealed class VerifierIlFormatTests
         var ilBytes = ReadExecuteIl(bytes);
         var ilStart = IndexOf(bytes, ilBytes);
         bytes[ilStart] = 0x20;
+
+        var result = await VerifierTestHelpers.VerifyAsync(bytes);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == "V-IL-FORMAT");
+    }
+
+    [Fact]
+    public async Task Verifier_reports_oversized_switch_table_as_il_format()
+    {
+        var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var method = type.DefineMethod(
+                "Execute",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext), typeof(SandboxValue)]);
+            var il = method.GetILGenerator();
+            for (var i = 0; i < 8; i++)
+            {
+                il.Emit(OpCodes.Nop);
+            }
+
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ret);
+        });
+        var ilBytes = ReadExecuteIl(bytes);
+        var ilStart = IndexOf(bytes, ilBytes);
+        bytes[ilStart] = 0x45;
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(ilStart + 1, sizeof(int)), int.MaxValue);
 
         var result = await VerifierTestHelpers.VerifyAsync(bytes);
 
