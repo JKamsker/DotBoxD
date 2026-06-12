@@ -124,7 +124,9 @@ function Get-RelativePath {
         [string] $TargetPath
     )
 
-    return [System.IO.Path]::GetRelativePath($BasePath, $TargetPath)
+    return [System.IO.Path]::GetRelativePath(
+        [System.IO.Path]::GetFullPath($BasePath),
+        [System.IO.Path]::GetFullPath($TargetPath))
 }
 
 $documentSets = @(

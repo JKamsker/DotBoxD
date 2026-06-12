@@ -201,12 +201,37 @@ public static class PluginPackageJsonSerializer
     }
 
     private static IReadOnlyList<string> ReadStringArray(JsonElement array, string name)
-        => array.EnumerateArray()
-            .Select((item, index) => ReadStringValue(item, $"{name}[{index}]"))
-            .ToArray();
+    {
+        var values = AllocateArray<string>(array, out var count);
+        if (count == 0) {
+            return values;
+        }
+
+        var index = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            values[index] = ReadStringValue(item, $"{name}[{index}]");
+            index++;
+        }
+
+        return values;
+    }
 
     private static IReadOnlyList<LiveSettingDefinition> ReadLiveSettings(JsonElement array)
-        => array.EnumerateArray().Select(ReadLiveSetting).ToArray();
+    {
+        var settings = AllocateArray<LiveSettingDefinition>(array, out var count);
+        if (count == 0) {
+            return settings;
+        }
+
+        var index = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            settings[index++] = ReadLiveSetting(item);
+        }
+
+        return settings;
+    }
 
     private static LiveSettingDefinition ReadLiveSetting(JsonElement element)
     {
@@ -254,7 +279,20 @@ public static class PluginPackageJsonSerializer
         };
 
     private static IReadOnlyList<HookSubscriptionManifest> ReadSubscriptions(JsonElement array)
-        => array.EnumerateArray().Select(ReadSubscription).ToArray();
+    {
+        var subscriptions = AllocateArray<HookSubscriptionManifest>(array, out var count);
+        if (count == 0) {
+            return subscriptions;
+        }
+
+        var index = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            subscriptions[index++] = ReadSubscription(item);
+        }
+
+        return subscriptions;
+    }
 
     private static HookSubscriptionManifest ReadSubscription(JsonElement element)
     {

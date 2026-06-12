@@ -164,6 +164,43 @@ function Start-IpcServer([string] $Project, [string] $PipeName) {
     }
 }
 
+function Invoke-IpcClient([string] $Project, [string] $PipeName) {
+    $outputPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-ipc-client-" + [Guid]::NewGuid().ToString("N") + ".out")
+    $errorPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-ipc-client-" + [Guid]::NewGuid().ToString("N") + ".err")
+    $arguments = @(
+        "run", "--project", $Project,
+        "--configuration", $Configuration,
+        "--no-build", "--", $PipeName)
+    $parameters = @{
+        FilePath = "dotnet"
+        ArgumentList = $arguments
+        RedirectStandardOutput = $outputPath
+        RedirectStandardError = $errorPath
+        PassThru = $true
+    }
+
+    if ($IsWindows) {
+        $parameters.WindowStyle = "Hidden"
+    }
+
+    $process = Start-Process @parameters
+    try {
+        if (-not $process.WaitForExit(30000)) {
+            Stop-ProcessTree $process
+            Write-CapturedOutput "IPC client example smoke test" $outputPath $errorPath
+            throw "IPC client example smoke test timed out after 30 seconds."
+        }
+
+        Write-CapturedOutput "IPC client example smoke test" $outputPath $errorPath
+        if ($process.ExitCode -ne 0) {
+            throw "IPC client example smoke test failed with exit code $($process.ExitCode)"
+        }
+    } finally {
+        $process.Dispose()
+        Remove-Item -LiteralPath $outputPath, $errorPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Wait-IpcServer([object] $Server) {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(30)
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
@@ -187,10 +224,7 @@ $ipcServer = Start-IpcServer $ipcServerExample $pipeName
 try {
     Wait-IpcServer $ipcServer
 
-    Invoke-DotNetProject "IPC client example smoke test" @(
-        "run", "--project", $ipcClientExample,
-        "--configuration", $Configuration,
-        "--no-build", "--", $pipeName)
+    Invoke-IpcClient $ipcClientExample $pipeName
 } finally {
     if (-not $ipcServer.Process.HasExited) {
         Stop-ProcessTree $ipcServer.Process
