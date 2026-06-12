@@ -10,7 +10,7 @@ internal readonly struct RpcPeerInboundRequest
         RpcRequest request,
         int messageId,
         ReadOnlyMemory<byte> body,
-        CancellationTokenSource requestCts)
+        CancellationTokenSource? requestCts)
     {
         Frame = frame;
         Request = request;
@@ -27,5 +27,11 @@ internal readonly struct RpcPeerInboundRequest
 
     public ReadOnlyMemory<byte> Body { get; }
 
-    public CancellationTokenSource RequestCts { get; }
+    public CancellationTokenSource? RequestCts { get; }
+
+    public CancellationToken CancellationToken =>
+        RequestCts?.Token ?? CancellationToken.None;
+
+    public bool IsCancellationRequested =>
+        RequestCts?.IsCancellationRequested == true;
 }

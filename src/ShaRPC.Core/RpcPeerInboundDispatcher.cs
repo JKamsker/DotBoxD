@@ -20,6 +20,7 @@ internal sealed class RpcPeerInboundDispatcher
     private readonly Action<int, MessageType, string, Exception?> _protocolError;
     private readonly Action<RpcPeerInboundRequest, Exception> _dispatchError;
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
+    private readonly bool _disableInboundRequestCancellation;
     private readonly RpcPeerInboundRequestQueue? _queue;
     private TaskCompletionSource<bool>? _activeRequestsDrained;
     private TaskCompletionSource<bool>? _activeStreamsDrained;
@@ -49,6 +50,7 @@ internal sealed class RpcPeerInboundDispatcher
         _protocolError = protocolError;
         _dispatchError = dispatchError;
         _exceptionTransformer = options.ExceptionTransformer;
+        _disableInboundRequestCancellation = options.DisableInboundRequestCancellation;
         if (options.InboundQueueCapacity is not { } capacity)
         {
             return;
@@ -209,10 +211,14 @@ internal sealed class RpcPeerInboundDispatcher
             return false;
         }
 
-        var requestCts = new CancellationTokenSource();
+        var requestCts = !_disableInboundRequestCancellation ||
+            request.Streams is not null ||
+            _responseBuilder.RequiresStreamingContext(request)
+                ? new CancellationTokenSource()
+                : null;
         if (!_activeInbound.TryAdd(messageId, requestCts))
         {
-            requestCts.Dispose();
+            requestCts?.Dispose();
             protocolError = "Duplicate request message id.";
             return false;
         }
@@ -222,7 +228,7 @@ internal sealed class RpcPeerInboundDispatcher
         if (Volatile.Read(ref _stopped) != 0 || loopCt.IsCancellationRequested)
         {
             _activeInbound.Remove(messageId, requestCts);
-            requestCts.Dispose();
+            requestCts?.Dispose();
             protocolError = null;
             return false;
         }
@@ -230,12 +236,12 @@ internal sealed class RpcPeerInboundDispatcher
         inbound = new RpcPeerInboundRequest(frame, request, messageId, payload, requestCts);
         try
         {
-            _streams.RegisterInbound(request.Streams, requestCts.Token);
+            _streams.RegisterInbound(request.Streams, inbound.CancellationToken);
         }
         catch (ShaRpcProtocolException ex)
         {
             _activeInbound.Remove(messageId, requestCts);
-            requestCts.Dispose();
+            requestCts?.Dispose();
             inbound = default;
             protocolError = ex.Message;
             protocolException = ex;
@@ -285,7 +291,7 @@ internal sealed class RpcPeerInboundDispatcher
                     ? new RpcStreamingContext(
                         _streams,
                         _serializer,
-                        inbound.RequestCts.Token,
+                        inbound.CancellationToken,
                         inbound.Request.Streams)
                     : RpcStreamingContext.Disabled;
                 using var response = await _responseBuilder.BuildAsync(
@@ -293,11 +299,11 @@ internal sealed class RpcPeerInboundDispatcher
                     inbound.MessageId,
                     inbound.Body,
                     streaming,
-                    inbound.RequestCts.Token).ConfigureAwait(false);
+                    inbound.CancellationToken).ConfigureAwait(false);
                 var responseStream = response.Stream;
                 try
                 {
-                    await _sendAsync(response.FrameMemory, inbound.RequestCts.Token).ConfigureAwait(false);
+                    await _sendAsync(response.FrameMemory, inbound.CancellationToken).ConfigureAwait(false);
                 }
                 catch
                 {
@@ -322,7 +328,7 @@ internal sealed class RpcPeerInboundDispatcher
                 }
             }
         }
-        catch (OperationCanceledException) when (inbound.RequestCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (inbound.IsCancellationRequested)
         {
             // Cancelled work sends no response frame.
         }
@@ -373,12 +379,12 @@ internal sealed class RpcPeerInboundDispatcher
         var registered = false;
         try
         {
-            await using var outbound = _streams.RegisterOutbound(stream, inbound.RequestCts.Token);
+            await using var outbound = _streams.RegisterOutbound(stream, inbound.CancellationToken);
             registered = true;
             outbound.Start();
             await outbound.WaitAsync().ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!registered || inbound.RequestCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (!registered || inbound.IsCancellationRequested)
         {
             if (!registered)
             {
@@ -415,7 +421,7 @@ internal sealed class RpcPeerInboundDispatcher
         }
 
         _activeInbound.Remove(inbound.MessageId, inbound.RequestCts);
-        inbound.RequestCts.Dispose();
+        inbound.RequestCts?.Dispose();
     }
 
     private bool TryEnterActiveRequest() =>
@@ -488,5 +494,4 @@ internal sealed class RpcPeerInboundDispatcher
             Volatile.Read(ref drained)?.TrySetResult(true);
         }
     }
-
 }

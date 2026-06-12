@@ -3,7 +3,7 @@ namespace ShaRPC.Core;
 internal sealed class RpcPeerActiveInboundRequests
 {
     private readonly object _gate = new();
-    private readonly Dictionary<int, CancellationTokenSource> _requests = new();
+    private readonly Dictionary<int, CancellationTokenSource?> _requests = new();
 
     public int Count
     {
@@ -16,7 +16,7 @@ internal sealed class RpcPeerActiveInboundRequests
         }
     }
 
-    public bool TryAdd(int messageId, CancellationTokenSource requestCts)
+    public bool TryAdd(int messageId, CancellationTokenSource? requestCts)
     {
         lock (_gate)
         {
@@ -56,9 +56,16 @@ internal sealed class RpcPeerActiveInboundRequests
                 return Array.Empty<CancellationTokenSource>();
             }
 
-            var snapshot = new CancellationTokenSource[_requests.Count];
-            _requests.Values.CopyTo(snapshot, 0);
-            return snapshot;
+            var snapshot = new List<CancellationTokenSource>(_requests.Count);
+            foreach (var requestCts in _requests.Values)
+            {
+                if (requestCts is not null)
+                {
+                    snapshot.Add(requestCts);
+                }
+            }
+
+            return snapshot.Count == 0 ? Array.Empty<CancellationTokenSource>() : snapshot.ToArray();
         }
     }
 
@@ -70,7 +77,7 @@ internal sealed class RpcPeerActiveInboundRequests
         }
     }
 
-    public void Remove(int messageId, CancellationTokenSource requestCts)
+    public void Remove(int messageId, CancellationTokenSource? requestCts)
     {
         lock (_gate)
         {

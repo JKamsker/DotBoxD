@@ -79,6 +79,20 @@ public sealed class RpcPeerOptions
     public bool RejectInboundCalls { get; init; }
 
     /// <summary>
+    /// When <see langword="true"/>, non-streaming inbound calls do not allocate per-request
+    /// cancellation state. The handler receives <see cref="CancellationToken.None"/> and inbound
+    /// Cancel frames for those calls are ignored. Streaming calls still allocate cancellation state so
+    /// stream cleanup and response-stream teardown remain cancellable.
+    /// </summary>
+    /// <remarks>
+    /// This is a low-allocation option for trusted peers and handlers whose work is short or bounded
+    /// elsewhere. Peer shutdown waits for those handlers instead of interrupting them. Leave it
+    /// disabled when callers must be able to stop in-flight handlers with a Cancel frame or when
+    /// handlers depend on the supplied cancellation token.
+    /// </remarks>
+    public bool DisableInboundRequestCancellation { get; init; }
+
+    /// <summary>
     /// Maximum queued inbound requests. The default applies bounded read-side backpressure. Null
     /// dispatches inbound requests immediately, does not cap concurrent dispatch work, and should
     /// only be used with trusted peers or externally bounded transports. In wait mode, request

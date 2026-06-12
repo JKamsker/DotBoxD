@@ -19,6 +19,9 @@ public class PeerRoundTripBenchmarks
         Z = 3
     };
 
+    [Params(false, true)]
+    public bool LowAllocationInbound { get; set; }
+
     [GlobalSetup]
     public async Task Setup()
     {
@@ -26,11 +29,14 @@ public class PeerRoundTripBenchmarks
         var serializer = new MessagePackRpcSerializer();
 
         _leftPeer = RpcPeer
-            .Over(leftConnection, serializer, new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
+            .Over(leftConnection, serializer, CreateOptionsForClient())
             .Start();
 
         _rightPeer = RpcPeer
-            .Over(rightConnection, serializer, new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
+            .Over(
+                rightConnection,
+                serializer,
+                CreateOptionsForServer())
             .Provide<IGameService>(new BenchmarkGameService())
             .Start();
 
@@ -48,6 +54,29 @@ public class PeerRoundTripBenchmarks
     [Benchmark]
     public Task<ActionResult> MovePlayerAsync() =>
         _service.MovePlayerAsync(_request);
+
+    private RpcPeerOptions CreateOptionsForClient() =>
+        new()
+        {
+            RequestTimeout = LowAllocationInbound
+                ? Timeout.InfiniteTimeSpan
+                : TimeSpan.FromSeconds(5),
+        };
+
+    private RpcPeerOptions CreateOptionsForServer()
+    {
+        if (!LowAllocationInbound)
+        {
+            return new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) };
+        }
+
+        return new RpcPeerOptions
+        {
+            DisableInboundRequestCancellation = true,
+            InboundQueueCapacity = null,
+            RequestTimeout = Timeout.InfiniteTimeSpan,
+        };
+    }
 
     private sealed class BenchmarkGameService : IGameService
     {
