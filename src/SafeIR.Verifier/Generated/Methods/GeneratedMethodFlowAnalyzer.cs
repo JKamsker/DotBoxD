@@ -9,16 +9,70 @@ internal static class GeneratedMethodFlowAnalyzer
         Func<GeneratedInstruction, GeneratedMeterState> stateFor)
     {
         var byOffset = instructions.ToDictionary(i => i.Offset);
+        var indexByOffset = InstructionIndexes(instructions);
+        var successorsByOffset = SuccessorMap(instructions, byOffset);
+        var predecessorsByOffset = PredecessorMap(instructions, successorsByOffset);
         var reachableCalls = new HashSet<string>(StringComparer.Ordinal);
         var returnStates = new List<GeneratedMeterState>();
         var states = ReachableStates(instructions, byOffset, reachableCalls, returnStates, stateFor);
         return new GeneratedMethodFlow(
             instructions,
             byOffset,
+            indexByOffset,
+            successorsByOffset,
+            predecessorsByOffset,
             reachableCalls,
             states,
             returnStates,
             HasUnmeteredCycle(instructions, byOffset, states.Keys));
+    }
+
+    private static Dictionary<int, int> InstructionIndexes(IReadOnlyList<GeneratedInstruction> instructions)
+    {
+        var indexes = new Dictionary<int, int>(instructions.Count);
+        for (var i = 0; i < instructions.Count; i++)
+        {
+            indexes[instructions[i].Offset] = i;
+        }
+
+        return indexes;
+    }
+
+    private static Dictionary<int, IReadOnlyList<int>> SuccessorMap(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        IReadOnlyDictionary<int, GeneratedInstruction> byOffset)
+    {
+        var successors = new Dictionary<int, IReadOnlyList<int>>(instructions.Count);
+        foreach (var instruction in instructions)
+        {
+            successors[instruction.Offset] = Successors(instructions, byOffset, instruction).ToArray();
+        }
+
+        return successors;
+    }
+
+    private static Dictionary<int, IReadOnlyList<GeneratedInstruction>> PredecessorMap(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> successorsByOffset)
+    {
+        var predecessors = new Dictionary<int, List<GeneratedInstruction>>();
+        foreach (var instruction in instructions)
+        {
+            foreach (var successor in successorsByOffset[instruction.Offset])
+            {
+                if (!predecessors.TryGetValue(successor, out var current))
+                {
+                    current = [];
+                    predecessors.Add(successor, current);
+                }
+
+                current.Add(instruction);
+            }
+        }
+
+        return predecessors.ToDictionary(
+            item => item.Key,
+            item => (IReadOnlyList<GeneratedInstruction>)item.Value.ToArray());
     }
 
     public static IEnumerable<int> Successors(

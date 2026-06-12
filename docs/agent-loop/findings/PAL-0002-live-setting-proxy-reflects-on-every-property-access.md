@@ -1,23 +1,23 @@
 ---
 id: PAL-0002
 area: perf_alloc
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Live setting proxy reflects on every property access
 dedup_key: alloc/plugins/live-context/proxy-reflection-per-access
 created_at: 2026-06-12T20:36:53.2906670+00:00
 created_by: perf-reviewer
 created_commit: 
-updated_at: 2026-06-12T21:26:59.1536883+00:00
+updated_at: 2026-06-12T21:29:04.1133732+00:00
 claimed_by: fixer
 claimed_at: 2026-06-12T21:25:31.1037206+00:00
 claim_branch: workflow-work
 fixed_by: fixer
 fixed_at: 2026-06-12T21:26:59.1536883+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: independent-verifier
+verified_at: 2026-06-12T21:29:04.1133732+00:00
+verified_commit: working-tree
 duplicate_of: 
 ---
 

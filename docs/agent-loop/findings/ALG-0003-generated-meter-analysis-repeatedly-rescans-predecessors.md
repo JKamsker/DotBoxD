@@ -1,19 +1,19 @@
 ---
 id: ALG-0003
 area: perf_algorithm
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Generated meter analysis repeatedly rescans predecessors
 dedup_key: algorithm/verifier/generated-meter/predecessor-rescan
 created_at: 2026-06-12T21:00:41.3695436+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T21:00:41.3695436+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T21:30:14.9551826+00:00
+claimed_by: fixer
+claimed_at: 2026-06-12T21:28:21.7534700+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-12T21:30:14.9551826+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

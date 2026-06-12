@@ -5,6 +5,9 @@ using System.Reflection.Metadata;
 internal sealed record GeneratedMethodFlow(
     IReadOnlyList<GeneratedInstruction> Instructions,
     IReadOnlyDictionary<int, GeneratedInstruction> ByOffset,
+    IReadOnlyDictionary<int, int> IndexByOffset,
+    IReadOnlyDictionary<int, IReadOnlyList<int>> SuccessorsByOffset,
+    IReadOnlyDictionary<int, IReadOnlyList<GeneratedInstruction>> PredecessorsByOffset,
     HashSet<string> ReachableCalls,
     IReadOnlyDictionary<int, GeneratedMeterState> EntryStates,
     IReadOnlyList<GeneratedMeterState> ReturnStates,

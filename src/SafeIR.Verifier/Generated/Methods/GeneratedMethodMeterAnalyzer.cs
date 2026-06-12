@@ -31,10 +31,7 @@ internal static class GeneratedMethodMeterAnalyzer
                 return true;
             }
 
-            foreach (var successor in GeneratedMethodFlowAnalyzer.Successors(
-                analysis.Instructions,
-                analysis.ByOffset,
-                instruction))
+            foreach (var successor in analysis.SuccessorsByOffset[instruction.Offset])
             {
                 if (!analysis.ByOffset.ContainsKey(successor))
                 {
@@ -61,8 +58,8 @@ internal static class GeneratedMethodMeterAnalyzer
 
         var instruction = analysis.Instructions[instructionIndex];
         var previous = analysis.Instructions[instructionIndex - 1];
-        var predecessors = Predecessors(analysis, instruction.Offset).ToArray();
-        return predecessors.Length == 1 &&
+        analysis.PredecessorsByOffset.TryGetValue(instruction.Offset, out var predecessors);
+        return predecessors is { Count: 1 } &&
                predecessors[0].Offset == previous.Offset &&
                previous.Int32Value is > 0 &&
                analysis.EntryStates.ContainsKey(previous.Offset);
@@ -92,10 +89,7 @@ internal static class GeneratedMethodMeterAnalyzer
                 return true;
             }
 
-            foreach (var successor in GeneratedMethodFlowAnalyzer.Successors(
-                analysis.Instructions,
-                analysis.ByOffset,
-                instruction))
+            foreach (var successor in analysis.SuccessorsByOffset[instruction.Offset])
             {
                 if (!analysis.ByOffset.ContainsKey(successor))
                 {
@@ -131,19 +125,7 @@ internal static class GeneratedMethodMeterAnalyzer
         GeneratedMethodFlow analysis,
         GeneratedInstruction instruction)
     {
-        for (var i = 0; i < analysis.Instructions.Count; i++)
-        {
-            if (analysis.Instructions[i].Offset == instruction.Offset)
-            {
-                return HasPositiveImmediateMeterAmount(analysis, i);
-            }
-        }
-
-        return false;
+        return analysis.IndexByOffset.TryGetValue(instruction.Offset, out var index) &&
+               HasPositiveImmediateMeterAmount(analysis, index);
     }
-
-    private static IEnumerable<GeneratedInstruction> Predecessors(GeneratedMethodFlow analysis, int offset)
-        => analysis.Instructions.Where(candidate =>
-            GeneratedMethodFlowAnalyzer.Successors(analysis.Instructions, analysis.ByOffset, candidate)
-                .Contains(offset));
 }

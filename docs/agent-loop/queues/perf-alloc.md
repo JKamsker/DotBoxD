@@ -28,14 +28,12 @@
 
 ## Fixed pending verification
 
-- [~] `PAL-0002` medium - Live setting proxy reflects on every property access
-  - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
-  - Fixed by: `fixer`
-  - Commit: ``
 
 ## Verified
 
 - [x] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
   - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
+- [x] `PAL-0002` medium - Live setting proxy reflects on every property access
+  - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
 
 ## Rejected / duplicate / obsolete

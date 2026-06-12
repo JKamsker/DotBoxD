@@ -7,9 +7,6 @@
 - [ ] `ALG-0002` medium - Collection mutations copy whole containers per update
   - File: `docs/agent-loop/findings/ALG-0002-collection-mutations-copy-whole-containers-per-update.md`
   - Dedup: `algorithm/collections/mutation/whole-container-copy`
-- [ ] `ALG-0003` medium - Generated meter analysis repeatedly rescans predecessors
-  - File: `docs/agent-loop/findings/ALG-0003-generated-meter-analysis-repeatedly-rescans-predecessors.md`
-  - Dedup: `algorithm/verifier/generated-meter/predecessor-rescan`
 - [ ] `ALG-0004` medium - Plugin analyzer rescans helper call graph to propagate taint
   - File: `docs/agent-loop/findings/ALG-0004-plugin-analyzer-rescans-helper-call-graph-to-propagate-taint.md`
   - Dedup: `algorithm/plugin-analyzer/helper-callgraph/repeated-full-scan`
@@ -22,6 +19,10 @@
 
 ## Fixed pending verification
 
+- [~] `ALG-0003` medium - Generated meter analysis repeatedly rescans predecessors
+  - File: `docs/agent-loop/findings/ALG-0003-generated-meter-analysis-repeatedly-rescans-predecessors.md`
+  - Fixed by: `fixer`
+  - Commit: ``
 
 ## Verified
 
