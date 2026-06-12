@@ -11,6 +11,7 @@ public sealed class SandboxHostBuilder
     private readonly BindingRegistryBuilder _bindings = new();
     private ISandboxInterpreter? _interpreter;
     private ISandboxCompiler? _compiler;
+    private IExecutionModeSelector _modeSelector = new HotnessExecutionModeSelector();
     private string? _compilerCacheDirectory;
     private bool _useCompiler;
 
@@ -69,6 +70,12 @@ public sealed class SandboxHostBuilder
         return this;
     }
 
+    public SandboxHostBuilder UseExecutionModeSelector(IExecutionModeSelector selector)
+    {
+        _modeSelector = selector ?? throw new ArgumentNullException(nameof(selector));
+        return this;
+    }
+
     internal SandboxHost Build()
     {
         _interpreter ??= new SandboxInterpreter();
@@ -76,7 +83,7 @@ public sealed class SandboxHostBuilder
             _compiler ??= CreateDefaultCompiler();
         }
 
-        return new SandboxHost(_bindings.Build(), _interpreter, _compiler);
+        return new SandboxHost(_bindings.Build(), _interpreter, _compiler, _modeSelector);
     }
 
     private ISandboxCompiler CreateDefaultCompiler()

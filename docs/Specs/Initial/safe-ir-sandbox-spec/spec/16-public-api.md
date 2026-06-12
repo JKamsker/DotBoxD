@@ -96,6 +96,8 @@ generated IL, and only after the compiler has produced a trusted runtime form su
 `DynamicMethod` or a verified generated assembly. The current host accepts verified loaded assembly
 artifacts and rejects `DynamicMethod` artifacts until an equivalent gate exists. `Auto` starts as
 interpreted until the hotness threshold promotes a plan to compiled mode.
+Hosts may replace the default `IExecutionModeSelector`; the first Auto run is still interpreted
+before selector decisions can promote subsequent runs.
 
 `Isolation = WorkerProcess` means the caller requires an out-of-process worker boundary. If the
 host has not configured a worker client, execution must fail closed with a policy error rather than
@@ -272,6 +274,10 @@ public interface IExecutionModeSelector
         CompiledCacheStatus cacheStatus);
 }
 ```
+
+The default selector uses `AutoCompileThreshold`, with a minimum threshold of two so Auto mode never
+compiles the first run. The current host passes `CompiledCacheStatus.None` before compiler/cache
+lookup; cache hit/miss status is emitted later in `RunSummary`.
 
 ## Worker process API optional
 

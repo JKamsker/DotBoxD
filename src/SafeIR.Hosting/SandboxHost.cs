@@ -12,14 +12,20 @@ public sealed partial class SandboxHost
     private readonly BindingRegistry _bindings;
     private readonly ISandboxInterpreter _interpreter;
     private readonly ISandboxCompiler? _compiler;
+    private readonly IExecutionModeSelector _modeSelector;
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly ConcurrentDictionary<string, int> _autoRuns = new(StringComparer.Ordinal);
 
-    internal SandboxHost(BindingRegistry bindings, ISandboxInterpreter interpreter, ISandboxCompiler? compiler)
+    internal SandboxHost(
+        BindingRegistry bindings,
+        ISandboxInterpreter interpreter,
+        ISandboxCompiler? compiler,
+        IExecutionModeSelector modeSelector)
     {
         _bindings = bindings;
         _interpreter = interpreter;
         _compiler = compiler;
+        _modeSelector = modeSelector;
     }
 
     public static SandboxHost Create(Action<SandboxHostBuilder>? configure = null)
@@ -100,12 +106,23 @@ public sealed partial class SandboxHost
         }
         var key = plan.PlanHash + "|" + entrypoint;
         var count = _autoRuns.AddOrUpdate(key, 1, (_, current) => current + 1);
-        var threshold = Math.Max(2, options.AutoCompileThreshold);
-        if (count < threshold)
+        if (count == 1)
         {
             return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
                 .ConfigureAwait(false);
         }
+
+        var decision = _modeSelector.Choose(
+            plan,
+            options,
+            new ModuleHotnessStats(count),
+            SafeIR.Compiler.CompiledCacheStatus.None);
+        if (decision.Mode == ExecutionMode.Interpreted || decision.Mode == ExecutionMode.Auto)
+        {
+            return await ExecuteInterpretedAsync(plan, entrypoint, input, options, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         return await ExecuteCompiledAsync(plan, entrypoint, input, options, cancellationToken)
             .ConfigureAwait(false);
     }
