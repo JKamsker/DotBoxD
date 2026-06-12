@@ -37,25 +37,25 @@ public static class SafeFileSystem
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Read(context, startedAt, false, path.RelativePath, null, ex.Error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
-            SafeFileAudit.Read(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.readText cancelled");
-            SafeFileAudit.Read(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.readText failed");
-            SafeFileAudit.Read(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
     }
@@ -97,25 +97,25 @@ public static class SafeFileSystem
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Write(context, startedAt, false, path.RelativePath, null, ex.Error.Code);
+            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
-            SafeFileAudit.Write(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.writeText cancelled");
-            SafeFileAudit.Write(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.writeText failed");
-            SafeFileAudit.Write(context, startedAt, false, path.RelativePath, null, error.Code);
+            SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
             throw new SandboxRuntimeException(error);
         }
     }
@@ -151,6 +151,11 @@ public static class SafeFileSystem
 
         return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
     }
+
+    private static string FailureResource(SandboxPath path, string capabilityId)
+        => SandboxLiteralConstraints.IsPortableRelativePath(path.RelativePath)
+            ? path.RelativePath
+            : $"sandbox://{capabilityId}/[invalid-path]";
 
     private static async ValueTask<byte[]> ReadLimitedBytesAsync(
         SandboxContext context,
