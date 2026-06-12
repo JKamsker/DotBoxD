@@ -64,7 +64,16 @@ internal sealed class RpcPeerReadLoop
     {
         while (!ct.IsCancellationRequested && _channel.IsConnected)
         {
-            var frame = await ReceiveFrameAsync(ct).ConfigureAwait(false);
+            Payload frame;
+            try
+            {
+                frame = await _channel.ReceiveAsync(ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+
             if (frame.Length == 0)
             {
                 frame.Dispose();
@@ -83,18 +92,6 @@ internal sealed class RpcPeerReadLoop
                     frame.Dispose();
                 }
             }
-        }
-    }
-
-    private async Task<Payload> ReceiveFrameAsync(CancellationToken ct)
-    {
-        try
-        {
-            return await _channel.ReceiveAsync(ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            return Payload.Empty;
         }
     }
 
