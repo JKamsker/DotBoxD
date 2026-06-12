@@ -41,6 +41,20 @@ internal static class SafeIrGenerationNames
         public const string String = ManifestTypes.String;
     }
 
+    public static class CSharpLiterals
+    {
+        public const string Null = "null";
+        public const string True = "true";
+        public const string False = "false";
+        public const string Int32Default = "0";
+        public const string Int64Default = "0L";
+        public const string DoubleDefault = "0D";
+        public const string StringDefault = "\"\"";
+        public const string Int64Suffix = "L";
+        public const string DoubleSuffix = "D";
+        public const string DoubleRoundTripFormat = "R";
+    }
+
     public static class ManifestTypes
     {
         public const string Bool = "bool";
@@ -113,6 +127,11 @@ internal static class SafeIrGenerationNames
         public const string Mul = "Mul";
         public const string Div = "Div";
         public const string Mod = "Mod";
+    }
+
+    public static class GeneratedVariables
+    {
+        public const string EventPrefix = "e_";
     }
 
     public static class ModuleMetadata

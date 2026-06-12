@@ -255,7 +255,7 @@ internal static class SafeIrExpressionModelFactory
     private static SafeIrExpressionModel LowerLiteral(LiteralExpressionSyntax literal)
         => literal.Token.Value switch {
             bool value => new SafeIrExpressionModel(
-                $"{SafeIrGenerationNames.Helpers.Bool}({(value ? "true" : "false")})",
+                $"{SafeIrGenerationNames.Helpers.Bool}({BoolLiteral(value)})",
                 SafeIrGenerationNames.ManifestTypes.Bool,
                 false),
             int value => new SafeIrExpressionModel(
@@ -277,7 +277,12 @@ internal static class SafeIrExpressionModelFactory
             _ => Unsupported(literal)
         };
 
-    public static string EventVariable(string name) => "e_" + name;
+    private static string BoolLiteral(bool value)
+        => value
+            ? SafeIrGenerationNames.CSharpLiterals.True
+            : SafeIrGenerationNames.CSharpLiterals.False;
+
+    public static string EventVariable(string name) => SafeIrGenerationNames.GeneratedVariables.EventPrefix + name;
 
     private static void RequireType(SafeIrExpressionModel expression, string expected, string context)
     {

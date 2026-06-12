@@ -22,40 +22,34 @@ internal static class LiteralReader
         }
 
         return type.SpecialType switch {
-            SpecialType.System_Boolean => "false",
-            SpecialType.System_Int32 => "0",
-            SpecialType.System_Int64 => "0L",
-            SpecialType.System_Double => "0D",
-            SpecialType.System_String => "\"\"",
-            _ => "null"
+            SpecialType.System_Boolean => SafeIrGenerationNames.CSharpLiterals.False,
+            SpecialType.System_Int32 => SafeIrGenerationNames.CSharpLiterals.Int32Default,
+            SpecialType.System_Int64 => SafeIrGenerationNames.CSharpLiterals.Int64Default,
+            SpecialType.System_Double => SafeIrGenerationNames.CSharpLiterals.DoubleDefault,
+            SpecialType.System_String => SafeIrGenerationNames.CSharpLiterals.StringDefault,
+            _ => SafeIrGenerationNames.CSharpLiterals.Null
         };
     }
 
     public static string ObjectLiteral(object? value)
         => value switch {
-            null => "null",
-            bool boolean => boolean ? "true" : "false",
+            null => SafeIrGenerationNames.CSharpLiterals.Null,
+            bool boolean => boolean
+                ? SafeIrGenerationNames.CSharpLiterals.True
+                : SafeIrGenerationNames.CSharpLiterals.False,
             int number => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            long number => number.ToString(System.Globalization.CultureInfo.InvariantCulture) + "L",
+            long number => number.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                SafeIrGenerationNames.CSharpLiterals.Int64Suffix,
             double number when !double.IsNaN(number) && !double.IsInfinity(number) =>
-                number.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "D",
+                number.ToString(
+                    SafeIrGenerationNames.CSharpLiterals.DoubleRoundTripFormat,
+                    System.Globalization.CultureInfo.InvariantCulture) +
+                SafeIrGenerationNames.CSharpLiterals.DoubleSuffix,
             double => throw new NotSupportedException("Double literal values must be finite."),
             string text => SymbolDisplay.FormatLiteral(text, quote: true),
-            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "null"
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ??
+                SafeIrGenerationNames.CSharpLiterals.Null
         };
 
     public static string StringLiteral(string value) => SymbolDisplay.FormatLiteral(value, quote: true);
-
-    public static string? LiteralExpression(ExpressionSyntax expression)
-        => expression switch {
-            LiteralExpressionSyntax literal => literal.Token.Value switch {
-                string text => $"Str({StringLiteral(text)})",
-                int number => $"I32({number.ToString(System.Globalization.CultureInfo.InvariantCulture)})",
-                bool boolean => $"Bool({(boolean ? "true" : "false")})",
-                _ => null
-            },
-            _ when expression.IsKind(SyntaxKind.TrueLiteralExpression) => "Bool(true)",
-            _ when expression.IsKind(SyntaxKind.FalseLiteralExpression) => "Bool(false)",
-            _ => null
-        };
 }

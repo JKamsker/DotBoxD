@@ -92,7 +92,7 @@ internal static class PluginSymbolReader
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var syntax = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as PropertyDeclarationSyntax;
+        var syntax = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) as PropertyDeclarationSyntax;
         var type = SandboxTypeName(property.Type);
         var range = Range(property, type);
         return new LiveSettingModel(

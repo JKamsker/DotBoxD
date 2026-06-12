@@ -62,7 +62,10 @@ internal static class SafeIrPackageSourceEmitter
             builder.Append(LiteralReader.StringLiteral(setting.Type)).Append(", ");
             builder.Append(setting.DefaultValue);
             if (setting.Min is not null || setting.Max is not null) {
-                builder.Append(", ").Append(setting.Min ?? "null").Append(", ").Append(setting.Max ?? "null");
+                builder.Append(", ")
+                    .Append(setting.Min ?? SafeIrGenerationNames.CSharpLiterals.Null)
+                    .Append(", ")
+                    .Append(setting.Max ?? SafeIrGenerationNames.CSharpLiterals.Null);
             }
 
             builder.AppendLine("),");
