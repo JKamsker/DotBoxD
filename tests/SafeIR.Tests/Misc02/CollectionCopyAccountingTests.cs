@@ -5,6 +5,16 @@ namespace SafeIR.Tests;
 public sealed class CollectionCopyAccountingTests
 {
     [Fact]
+    public void Collection_copy_allocation_widens_large_counts_before_multiplication()
+    {
+        Assert.Equal(34_359_738_368, SandboxCollectionFuel.AllocationBytes(
+            int.MaxValue,
+            addedCount: 1,
+            bytesPerElement: 16));
+        Assert.Equal(68_719_476_704, SandboxCollectionFuel.AllocationBytes(int.MaxValue, 32, minimumOne: true));
+    }
+
+    [Fact]
     public async Task List_add_charges_projected_copy_allocation_before_copying_source()
     {
         var host = SandboxTestHost.Create();

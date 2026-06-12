@@ -14,7 +14,7 @@ internal static class CollectionOperations
     public static SandboxValue BuildList(IReadOnlyList<SandboxValue> values, SandboxContext context)
     {
         context.ChargeFuel(SandboxCollectionFuel.Copy(values.Count));
-        context.ChargeAllocation(values.Count * 16);
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(values.Count, 16));
         return Charge(context, SandboxValue.FromList(values));
     }
 
@@ -43,7 +43,10 @@ internal static class CollectionOperations
         var source = AsList(list);
         RequireType(item, source.ItemType, "list item type mismatch");
         context.ChargeFuel(SandboxCollectionFuel.Copy(source.Values.Count, addedCount: 1));
-        context.ChargeAllocation((source.Values.Count + 1) * 16);
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(
+            source.Values.Count,
+            addedCount: 1,
+            bytesPerElement: 16));
         var values = source.Values.ToList();
         values.Add(item);
         return Charge(context, SandboxValue.FromList(values, source.ItemType));
@@ -91,7 +94,7 @@ internal static class CollectionOperations
         RequireType(value, typedMap.ValueType, "map value type mismatch");
         context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count, addedCount: 1));
         var count = typedMap.Values.ContainsKey(key) ? typedMap.Values.Count : typedMap.Values.Count + 1;
-        context.ChargeAllocation(Math.Max(1, count) * 32);
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
         var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values)
         {
             [key] = value
@@ -105,7 +108,7 @@ internal static class CollectionOperations
         RequireType(key, typedMap.KeyType, "map key type mismatch");
         context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count));
         var count = typedMap.Values.ContainsKey(key) ? typedMap.Values.Count - 1 : typedMap.Values.Count;
-        context.ChargeAllocation(Math.Max(1, count) * 32);
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
         var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values);
         values.Remove(key);
         return Charge(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));

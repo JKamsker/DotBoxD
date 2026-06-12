@@ -15,6 +15,19 @@ public static class SandboxCollectionFuel
     public static long Copy(int sourceCount, int addedCount = 0)
         => BaseCost + Math.Max(0, sourceCount) + Math.Max(0, addedCount);
 
+    internal static long AllocationBytes(int elementCount, int bytesPerElement, bool minimumOne = false)
+        => AllocationBytes((long)Math.Max(0, elementCount), bytesPerElement, minimumOne);
+
+    internal static long AllocationBytes(
+        int sourceCount,
+        int addedCount,
+        int bytesPerElement,
+        bool minimumOne = false)
+        => AllocationBytes(
+            (long)Math.Max(0, sourceCount) + Math.Max(0, addedCount),
+            bytesPerElement,
+            minimumOne);
+
     public static long EstimateCall(string callName, int argumentCount)
         => callName switch
         {
@@ -25,4 +38,19 @@ public static class SandboxCollectionFuel
             "map.remove" => Copy(argumentCount),
             _ => 0
         };
+
+    private static long AllocationBytes(long elementCount, int bytesPerElement, bool minimumOne)
+    {
+        var chargedElements = minimumOne ? Math.Max(1L, elementCount) : elementCount;
+        try
+        {
+            return checked(chargedElements * bytesPerElement);
+        }
+        catch (OverflowException)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.QuotaExceeded,
+                "collection copy allocation budget exhausted"));
+        }
+    }
 }
