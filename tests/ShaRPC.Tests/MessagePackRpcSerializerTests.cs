@@ -39,13 +39,29 @@ public class MessagePackRpcSerializerTests
     {
         var serializer = new MessagePackRpcSerializer();
 
-        var first = RoundTrip(serializer, CreateRequest(1));
-        var second = RoundTrip(serializer, CreateRequest(2));
+        var first = RoundTrip(serializer, CreateRequest(1, "GameService", "MovePlayerAsync"));
+        var second = RoundTrip(serializer, CreateRequest(2, "GameService", "MovePlayerAsync"));
 
         Assert.Equal("GameService", first.ServiceName);
         Assert.Equal("MovePlayerAsync", first.MethodName);
         Assert.Same(first.ServiceName, second.ServiceName);
         Assert.Same(first.MethodName, second.MethodName);
+    }
+
+    [Fact]
+    public void LongRpcRequestNames_AreNotCached()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var serviceName = new string('S', 300);
+        var methodName = new string('M', 300);
+
+        var first = RoundTrip(serializer, CreateRequest(1, serviceName, methodName));
+        var second = RoundTrip(serializer, CreateRequest(2, serviceName, methodName));
+
+        Assert.Equal(serviceName, first.ServiceName);
+        Assert.Equal(methodName, first.MethodName);
+        Assert.NotSame(first.ServiceName, second.ServiceName);
+        Assert.NotSame(first.MethodName, second.MethodName);
     }
 
     [Fact]
@@ -80,12 +96,12 @@ public class MessagePackRpcSerializerTests
         return serializer.Deserialize<T>(payload.Memory);
     }
 
-    private static RpcRequest CreateRequest(int messageId) =>
+    private static RpcRequest CreateRequest(int messageId, string serviceName, string methodName) =>
         new()
         {
             MessageId = messageId,
-            ServiceName = new string("GameService".ToCharArray()),
-            MethodName = new string("MovePlayerAsync".ToCharArray()),
+            ServiceName = new string(serviceName.ToCharArray()),
+            MethodName = new string(methodName.ToCharArray()),
         };
 
     public sealed class BinaryDto

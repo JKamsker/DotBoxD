@@ -1,5 +1,6 @@
 using ShaRPC.Core.Exceptions;
 using ShaRPC.Core.Buffers;
+using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Transport;
 
 namespace ShaRPC.Core;
@@ -99,6 +100,11 @@ internal sealed class RpcPeerSender : IDisposable
             frame.Dispose();
             throw new ShaRpcConnectionException("Connection closed.");
         }
+        catch
+        {
+            frame.Dispose();
+            throw;
+        }
 
         try
         {
@@ -107,6 +113,7 @@ internal sealed class RpcPeerSender : IDisposable
                 throw new ShaRpcConnectionException("Connection closed.");
             }
 
+            MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);
             await _frameChannel.SendFrameValueAsync(frame, ct).ConfigureAwait(false);
             frame = null!;
         }

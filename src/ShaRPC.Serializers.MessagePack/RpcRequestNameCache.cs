@@ -6,6 +6,7 @@ namespace ShaRPC.Serializers.MessagePack;
 internal static class RpcRequestNameCache
 {
     private const int MaxEntries = 128;
+    private const int MaxCachedUtf8Bytes = 256;
 
     private static readonly object Gate = new();
     private static Entry[] _entries = Array.Empty<Entry>();
@@ -22,6 +23,11 @@ internal static class RpcRequestNameCache
 
     public static string GetOrAdd(ReadOnlySpan<byte> utf8)
     {
+        if (utf8.Length > MaxCachedUtf8Bytes)
+        {
+            return Encoding.UTF8.GetString(utf8);
+        }
+
         var entries = Volatile.Read(ref _entries);
         for (var i = 0; i < entries.Length; i++)
         {
@@ -36,6 +42,11 @@ internal static class RpcRequestNameCache
 
     public static string GetOrAdd(string value)
     {
+        if (!CanCache(value))
+        {
+            return value;
+        }
+
         var entries = Volatile.Read(ref _entries);
         for (var i = 0; i < entries.Length; i++)
         {
@@ -68,6 +79,10 @@ internal static class RpcRequestNameCache
             return value;
         }
     }
+
+    private static bool CanCache(string value) =>
+        value.Length <= MaxCachedUtf8Bytes &&
+        Encoding.UTF8.GetByteCount(value) <= MaxCachedUtf8Bytes;
 
     private readonly struct Entry
     {
