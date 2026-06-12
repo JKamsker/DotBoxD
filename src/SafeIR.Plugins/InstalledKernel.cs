@@ -131,6 +131,11 @@ public sealed class InstalledKernel
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             if (AsShouldHandleResult(result))
             {
+                if (IsRevoked)
+                {
+                    return;
+                }
+
                 _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -249,7 +254,9 @@ public sealed class InstalledKernel
             _pendingLiveUpdates.Enqueue(update);
         }
 
-        return SandboxValue.FromList(values);
+        return values.Length == 0
+            ? SandboxValue.Unit
+            : values.Length == 1 ? values[0] : SandboxValue.FromList(values);
     }
 
     private void RefreshTypedValuesFromStore()

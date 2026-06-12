@@ -52,4 +52,15 @@ public sealed class ResourceMeterTests
         Assert.Equal(3, meter.LoopIterations);
         Assert.Equal(10, meter.FuelUsed);
     }
+
+    [Fact]
+    public void Resource_meter_rejects_non_positive_loop_fuel_before_charging_iteration()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxLoopIterations: 2, MaxFuel: 100));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => meter.ChargeLoopIteration(0));
+
+        Assert.Equal(0, meter.LoopIterations);
+        Assert.Equal(0, meter.FuelUsed);
+    }
 }

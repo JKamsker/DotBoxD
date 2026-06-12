@@ -26,6 +26,33 @@ public sealed class BindingRegistryHardeningTests
     }
 
     [Fact]
+    public void Binding_registry_rejects_effectful_binding_without_audit_even_when_safety_is_mislabeled()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
+            effects: SandboxEffect.FileRead,
+            requiredCapability: "file.read",
+            safety: BindingSafety.PureHostFacade)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-AUDIT");
+    }
+
+    [Fact]
+    public void Binding_registry_constructor_validates_descriptors()
+    {
+        var descriptors = new[]
+        {
+            TestBinding(
+                effects: SandboxEffect.FileRead,
+                requiredCapability: "file.read",
+                safety: BindingSafety.PureHostFacade)
+        };
+
+        var ex = Assert.Throws<SandboxValidationException>(() => new BindingRegistry(descriptors));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-AUDIT");
+    }
+
+    [Fact]
     public void Binding_registry_rejects_custom_capability_without_validator()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(

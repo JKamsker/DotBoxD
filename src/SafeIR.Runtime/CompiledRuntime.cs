@@ -249,8 +249,9 @@ public static class CompiledRuntime
             throw InvalidInput("array length must be non-negative");
         }
 
-        context.ChargeFuel(Math.Max(1, count));
-        context.ChargeAllocation(Math.Max(1, count) * 8);
+        var elementCount = Math.Max(1L, count);
+        context.ChargeFuel(elementCount);
+        context.ChargeAllocation(checked(elementCount * 8));
         return new SandboxValue[count];
     }
 

@@ -155,7 +155,7 @@ internal static class GeneratedMethodFlowAnalyzer
         HashSet<int> reachable,
         Dictionary<int, VisitColor> colors)
     {
-        if (!reachable.Contains(offset) || !byOffset.TryGetValue(offset, out var instruction) || IsFuelCharge(instruction))
+        if (!reachable.Contains(offset) || !byOffset.TryGetValue(offset, out var instruction) || IsLoopIterationCharge(instruction))
         {
             return false;
         }
@@ -178,9 +178,8 @@ internal static class GeneratedMethodFlowAnalyzer
         return false;
     }
 
-    private static bool IsFuelCharge(GeneratedInstruction instruction)
-        => instruction.CalledMember == GeneratedMethodShapeVerifier.ChargeFuelSignature ||
-           instruction.CalledMember == GeneratedMethodShapeVerifier.ChargeLoopIterationSignature;
+    private static bool IsLoopIterationCharge(GeneratedInstruction instruction)
+        => instruction.CalledMember == GeneratedMethodShapeVerifier.ChargeLoopIterationSignature;
 
     private static List<GeneratedInstruction> ReadInstructions(MetadataReader reader, MethodBodyBlock body)
     {

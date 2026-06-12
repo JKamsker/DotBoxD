@@ -30,8 +30,9 @@ public static class SafeHttpClient
                     timeout.Token)
                 .ConfigureAwait(false);
             using var message = new HttpRequestMessage(HttpMethod.Get, request.Uri);
-            using var response = await SafePinnedHttpTransport.SendAsync(invoker, message, addresses, timeout.Token)
+            using var pinnedResponse = await SafePinnedHttpTransport.SendAsync(invoker, message, addresses, timeout.Token)
                 .ConfigureAwait(false);
+            var response = pinnedResponse.Message;
             if (response.RequestMessage?.RequestUri is { } finalUri && !SafeHttpUriAudit.SameUri(finalUri, request.Uri))
             {
                 throw Error(SandboxErrorCode.PermissionDenied, "net.http.get denied: redirects are not allowed");

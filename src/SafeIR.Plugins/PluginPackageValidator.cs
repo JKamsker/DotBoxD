@@ -11,6 +11,17 @@ internal static class PluginPackageValidator
             diagnostics.Add(new SandboxDiagnostic("SGP010", "Plugin id is required."));
         }
 
+        if (!string.Equals(package.Manifest.PluginId, package.Module.Id, StringComparison.Ordinal)) {
+            diagnostics.Add(new SandboxDiagnostic("SGP011", "Plugin manifest id must match module id."));
+        }
+
+        if (!package.Module.Metadata.TryGetValue("pluginId", out var metadataPluginId) ||
+            !string.Equals(metadataPluginId, package.Manifest.PluginId, StringComparison.Ordinal)) {
+            diagnostics.Add(new SandboxDiagnostic("SGP012", "Plugin module metadata must bind to the manifest plugin id."));
+        }
+
+        ValidateManifestEffects(package.Manifest, diagnostics);
+        ValidateEntrypoints(package, diagnostics);
         foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal)) {
             if (group.Count() > 1) {
                 diagnostics.Add(new SandboxDiagnostic("SGP021", $"Live setting '{group.Key}' is declared more than once."));
@@ -25,7 +36,74 @@ internal static class PluginPackageValidator
             diagnostics.Add(new SandboxDiagnostic("SGP030", "At least one hook subscription is required."));
         }
 
+        foreach (var subscription in package.Manifest.Subscriptions) {
+            if (string.IsNullOrWhiteSpace(subscription.Event) || string.IsNullOrWhiteSpace(subscription.Kernel)) {
+                diagnostics.Add(new SandboxDiagnostic("SGP031", "Hook subscription event and kernel are required."));
+            }
+        }
+
         ThrowIfErrors(diagnostics);
+    }
+
+    public static void ValidatePrepared(PluginPackage package, ExecutionPlan plan)
+    {
+        var diagnostics = new List<SandboxDiagnostic>();
+        var manifestEffects = ValidateManifestEffects(package.Manifest, diagnostics);
+        var planEffects = plan.FunctionAnalysis.Values.Aggregate(
+            SandboxEffect.None,
+            (current, analysis) => current | analysis.Effects);
+        if (diagnostics.Count == 0 && manifestEffects != planEffects) {
+            diagnostics.Add(new SandboxDiagnostic(
+                "SGP041",
+                $"Plugin manifest effects '{manifestEffects}' do not match verified module effects '{planEffects}'."));
+        }
+
+        ThrowIfErrors(diagnostics);
+    }
+
+    private static void ValidateEntrypoints(PluginPackage package, List<SandboxDiagnostic> diagnostics)
+    {
+        ValidateEntrypoint(package, package.Entrypoints.ShouldHandle, "ShouldHandle", diagnostics);
+        ValidateEntrypoint(package, package.Entrypoints.Handle, "Handle", diagnostics);
+    }
+
+    private static void ValidateEntrypoint(
+        PluginPackage package,
+        string functionId,
+        string name,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (string.IsNullOrWhiteSpace(functionId)) {
+            diagnostics.Add(new SandboxDiagnostic("SGP032", $"Kernel {name} entrypoint is required."));
+            return;
+        }
+
+        if (!package.Module.Functions.Any(f => f.IsEntrypoint && string.Equals(f.Id, functionId, StringComparison.Ordinal))) {
+            diagnostics.Add(new SandboxDiagnostic("SGP032", $"Kernel entrypoint '{functionId}' is missing or not public."));
+        }
+    }
+
+    private static SandboxEffect ValidateManifestEffects(
+        PluginManifest manifest,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var effects = SandboxEffect.None;
+        foreach (var effect in manifest.Effects) {
+            if (!Enum.TryParse<SandboxEffect>(effect, ignoreCase: false, out var parsed) ||
+                parsed == SandboxEffect.None ||
+                !parsed.ContainsOnlyKnownBits()) {
+                diagnostics.Add(new SandboxDiagnostic("SGP040", $"Plugin manifest effect '{effect}' is not supported."));
+                continue;
+            }
+
+            effects |= parsed;
+        }
+
+        if (effects == SandboxEffect.None) {
+            diagnostics.Add(new SandboxDiagnostic("SGP040", "Plugin manifest must declare verified effects."));
+        }
+
+        return effects;
     }
 
     private static void ValidateSetting(LiveSettingDefinition setting, List<SandboxDiagnostic> diagnostics)

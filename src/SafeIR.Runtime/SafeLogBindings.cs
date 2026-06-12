@@ -33,7 +33,7 @@ public static partial class SafeLogBindings
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
             "SandboxLog",
-            DateTimeOffset.UtcNow,
+            context.UtcNow(),
             true,
             BindingId: bindingId,
             CapabilityId: "log.write",

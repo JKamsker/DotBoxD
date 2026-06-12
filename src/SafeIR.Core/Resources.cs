@@ -65,6 +65,8 @@ public sealed class ResourceMeter
 
     public void ChargeLoopIteration(long fuelAmount)
     {
+        if (fuelAmount <= 0) { throw new ArgumentOutOfRangeException(nameof(fuelAmount)); }
+
         LoopIterations = AddChecked(LoopIterations, 1, "loop iteration budget exhausted");
         if (LoopIterations > Limits.MaxLoopIterations)
         {

@@ -33,7 +33,7 @@ internal static class SafeIrPackageSourceEmitter
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
         builder.AppendLine($"            {LiteralReader.StringLiteral($"IEventKernel<{model.EventName}>")},");
         builder.AppendLine("            global::SafeIR.ExecutionMode.Auto,");
-        builder.AppendLine("            [\"Cpu\", \"GameStateWrite\", \"Audit\"],");
+        builder.AppendLine("            [\"Cpu\", \"Alloc\", \"GameStateWrite\", \"Audit\"],");
         builder.AppendLine("            settings,");
         builder.AppendLine($"            [new global::SafeIR.Plugins.HookSubscriptionManifest({LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})]);");
         builder.AppendLine("        return global::SafeIR.Plugins.PluginPackage.Create(manifest, CreateModule(settings));");

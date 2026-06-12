@@ -176,12 +176,12 @@ public static class SafeFileSystem
                 return memory.ToArray();
             }
 
+            context.Budget.ChargeFileRead(read);
             if (memory.Length + read > maxBytes)
             {
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
             }
 
-            context.Budget.ChargeFileRead(read);
             memory.Write(buffer, 0, read);
         }
     }

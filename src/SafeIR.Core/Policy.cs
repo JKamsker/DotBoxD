@@ -28,14 +28,12 @@ public sealed record SandboxPolicy(
 
     public bool GrantsCapability(string capabilityId)
     {
-        var now = DateTimeOffset.UtcNow;
-        return Grants.Any(g => IsActiveGrant(g, capabilityId, now));
+        return Grants.Any(g => IsActiveGrant(g, capabilityId, GrantClock()));
     }
 
     public CapabilityGrant GetGrant(string capabilityId)
     {
-        var now = DateTimeOffset.UtcNow;
-        return Grants.FirstOrDefault(g => IsActiveGrant(g, capabilityId, now)) ??
+        return Grants.FirstOrDefault(g => IsActiveGrant(g, capabilityId, GrantClock())) ??
            throw new SandboxRuntimeException(new SandboxError(
                SandboxErrorCode.PermissionDenied,
                $"capability {capabilityId} is not granted"));
@@ -44,6 +42,9 @@ public sealed record SandboxPolicy(
     private static bool IsActiveGrant(CapabilityGrant grant, string capabilityId, DateTimeOffset now)
         => StringComparer.Ordinal.Equals(grant.Id, capabilityId) &&
            (grant.ExpiresAt is null || grant.ExpiresAt > now);
+
+    private DateTimeOffset GrantClock()
+        => Deterministic && LogicalNow is not null ? LogicalNow.Value : DateTimeOffset.UtcNow;
 
     private string StableHash() => PolicyHash.Compute(this);
 }

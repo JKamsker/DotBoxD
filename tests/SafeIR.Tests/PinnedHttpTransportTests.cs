@@ -39,6 +39,17 @@ public sealed class PinnedHttpTransportTests
         await server.ResponseSent;
     }
 
+    [Fact]
+    public async Task Default_http_transport_keeps_pinned_handler_alive_until_body_is_read()
+    {
+        using var server = new LoopbackHttpServer("delayed-response", bodyDelay: TimeSpan.FromMilliseconds(100));
+        var result = await ExecutePinnedAsync(server.Port);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("delayed-response", ((StringValue)result.Value!).Value);
+        await server.ResponseSent;
+    }
+
     private static async Task<SandboxExecutionResult> ExecutePinnedAsync(int port)
     {
         var host = SandboxTestHost.Create(dnsResolver: StaticDns(IPAddress.Loopback));
@@ -61,11 +72,13 @@ public sealed class PinnedHttpTransportTests
     {
         private readonly TcpListener _listener;
         private readonly string _response;
+        private readonly TimeSpan _bodyDelay;
         private bool _disposed;
 
-        public LoopbackHttpServer(string response)
+        public LoopbackHttpServer(string response, TimeSpan? bodyDelay = null)
         {
             _response = response;
+            _bodyDelay = bodyDelay ?? TimeSpan.Zero;
             _listener = new TcpListener(IPAddress.Loopback, port: 0);
             _listener.Start();
             Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -94,13 +107,18 @@ public sealed class PinnedHttpTransportTests
                 using var client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false);
                 await using var stream = client.GetStream();
                 await ReadHeadersAsync(stream).ConfigureAwait(false);
-                var bytes = Encoding.ASCII.GetBytes(
+                var headers = Encoding.ASCII.GetBytes(
                     "HTTP/1.1 200 OK\r\n" +
                     "Content-Type: text/plain\r\n" +
                     $"Content-Length: {_response.Length}\r\n" +
-                    "Connection: close\r\n\r\n" +
-                    _response);
-                await stream.WriteAsync(bytes).ConfigureAwait(false);
+                    "Connection: close\r\n\r\n");
+                await stream.WriteAsync(headers).ConfigureAwait(false);
+                if (_bodyDelay > TimeSpan.Zero) {
+                    await Task.Delay(_bodyDelay).ConfigureAwait(false);
+                }
+
+                var body = Encoding.ASCII.GetBytes(_response);
+                await stream.WriteAsync(body).ConfigureAwait(false);
             }
             catch (ObjectDisposedException) when (_disposed) {
             }

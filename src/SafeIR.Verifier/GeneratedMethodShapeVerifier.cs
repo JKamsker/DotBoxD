@@ -91,7 +91,9 @@ internal static class GeneratedMethodShapeVerifier
             $"method '{methodName}' must meter every return path");
         if (analysis.HasUnmeteredCycle)
         {
-            diagnostics.Add(new VerificationDiagnostic("V-COMPILED-SHAPE", $"method '{methodName}' must charge fuel in every control-flow cycle"));
+            diagnostics.Add(new VerificationDiagnostic(
+                "V-COMPILED-SHAPE",
+                $"method '{methodName}' must charge loop iterations in every control-flow cycle"));
         }
 
         VerifyMeterOrder(methodName, analysis, diagnostics);

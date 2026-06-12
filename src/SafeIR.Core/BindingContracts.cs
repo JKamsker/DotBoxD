@@ -84,6 +84,12 @@ public sealed class BindingRegistry : IBindingCatalog
     public BindingRegistry(IEnumerable<BindingDescriptor> bindings)
     {
         var frozen = bindings.Select(Freeze).ToArray();
+        var diagnostics = BindingRegistryValidator.Validate(frozen);
+        if (diagnostics.Count > 0)
+        {
+            throw new SandboxValidationException(diagnostics);
+        }
+
         _bindings = frozen.ToDictionary(b => b.Id, StringComparer.Ordinal);
         _grantValidators = frozen
             .Where(b => !string.IsNullOrWhiteSpace(b.RequiredCapability) && b.GrantValidator is not null)

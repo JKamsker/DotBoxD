@@ -67,7 +67,7 @@ internal static class BindingRegistryValidator
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' has side effects but no capability"));
         }
 
-        if (IsExternal(binding.Safety))
+        if (ReachesOutsideSandbox(binding))
         {
             if (string.IsNullOrWhiteSpace(binding.RequiredCapability))
             {
@@ -133,6 +133,9 @@ internal static class BindingRegistryValidator
             diagnostics.Add(new SandboxDiagnostic(code, $"{description} '{value}' looks like a forbidden CLR reference"));
         }
     }
+
+    private static bool ReachesOutsideSandbox(BindingDescriptor binding)
+        => IsExternal(binding.Safety) || binding.Effects.RequiresCapability();
 
     private static bool IsExternal(BindingSafety safety)
         => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;

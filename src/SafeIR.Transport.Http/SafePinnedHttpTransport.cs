@@ -5,18 +5,26 @@ using System.Net.Sockets;
 
 internal static class SafePinnedHttpTransport
 {
-    public static async ValueTask<HttpResponseMessage> SendAsync(
+    public static async ValueTask<SafePinnedHttpResponse> SendAsync(
         SafeInMemoryHttpMessageInvoker? invoker,
         HttpRequestMessage message,
         IReadOnlyList<IPAddress> vettedAddresses,
         CancellationToken cancellationToken)
     {
         if (invoker is not null) {
-            return await invoker.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            var response = await invoker.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            return new SafePinnedHttpResponse(response, null);
         }
 
-        using var pinned = CreatePinnedInvoker(vettedAddresses);
-        return await pinned.SendAsync(message, cancellationToken).ConfigureAwait(false);
+        var pinned = CreatePinnedInvoker(vettedAddresses);
+        try {
+            var response = await pinned.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            return new SafePinnedHttpResponse(response, pinned);
+        }
+        catch {
+            pinned.Dispose();
+            throw;
+        }
     }
 
     private static HttpMessageInvoker CreatePinnedInvoker(IReadOnlyList<IPAddress> vettedAddresses)
@@ -43,5 +51,16 @@ internal static class SafePinnedHttpTransport
             }
         };
         return new HttpMessageInvoker(handler, disposeHandler: true);
+    }
+}
+
+internal sealed class SafePinnedHttpResponse(HttpResponseMessage message, IDisposable? owner) : IDisposable
+{
+    public HttpResponseMessage Message { get; } = message;
+
+    public void Dispose()
+    {
+        Message.Dispose();
+        owner?.Dispose();
     }
 }

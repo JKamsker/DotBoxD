@@ -36,6 +36,19 @@ public sealed class SafeLoggingTests
     }
 
     [Fact]
+    public async Task Deterministic_log_event_uses_logical_clock()
+    {
+        var logicalNow = new DateTimeOffset(2035, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var result = await ExecuteLogAsync(
+            """{ "call": "log.info", "args": [{ "string": "deterministic" }] }""",
+            SandboxPolicyBuilder.Create().GrantLogging().Deterministic(logicalNow, randomSeed: 1).Build());
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "SandboxLog");
+        Assert.Equal(logicalNow, audit.Timestamp);
+    }
+
+    [Fact]
     public async Task Log_message_redacts_secret_shaped_values()
     {
         var result = await ExecuteLogAsync(
