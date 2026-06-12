@@ -181,6 +181,9 @@ jobs:
           catch {
             Write-Host "Benchmark history unavailable: $_"
           }
+          finally {
+            $global:LASTEXITCODE = 0
+          }
 
       - name: Summarize benchmarks
         if: always()
