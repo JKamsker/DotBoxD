@@ -51,6 +51,74 @@ function Assert-DocsDoNotContain([string] $Pattern, [string] $Description) {
     }
 }
 
+function Read-TextIfExists([string] $Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return ""
+    }
+
+    return (Get-Content -LiteralPath $Path -Raw)
+}
+
+function Write-CapturedOutput([string] $Description, [string] $OutputPath, [string] $ErrorPath) {
+    $output = Read-TextIfExists $OutputPath
+    $errorOutput = Read-TextIfExists $ErrorPath
+
+    if (-not [string]::IsNullOrWhiteSpace($output)) {
+        Write-Host $output.TrimEnd()
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($errorOutput)) {
+        Write-Warning "$Description stderr:`n$($errorOutput.TrimEnd())"
+    }
+}
+
+function Stop-ProcessTree([System.Diagnostics.Process] $Process) {
+    if ($Process.HasExited) {
+        return
+    }
+
+    try {
+        $Process.Kill($true)
+    } catch {
+        $Process.Kill()
+    }
+
+    $Process.WaitForExit()
+}
+
+function Invoke-DotNetProject([string] $Description, [string[]] $Arguments, [int] $TimeoutSeconds = 60) {
+    $outputPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-smoke-" + [Guid]::NewGuid().ToString("N") + ".out")
+    $errorPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-smoke-" + [Guid]::NewGuid().ToString("N") + ".err")
+    $parameters = @{
+        FilePath = "dotnet"
+        ArgumentList = $Arguments
+        RedirectStandardOutput = $outputPath
+        RedirectStandardError = $errorPath
+        PassThru = $true
+    }
+
+    if ($IsWindows) {
+        $parameters.WindowStyle = "Hidden"
+    }
+
+    $process = Start-Process @parameters
+    try {
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            Stop-ProcessTree $process
+            Write-CapturedOutput $Description $outputPath $errorPath
+            throw "$Description timed out after $TimeoutSeconds seconds."
+        }
+
+        Write-CapturedOutput $Description $outputPath $errorPath
+        if ($process.ExitCode -ne 0) {
+            throw "$Description failed with exit code $($process.ExitCode)."
+        }
+    } finally {
+        $process.Dispose()
+        Remove-Item -LiteralPath $outputPath, $errorPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Test-DocumentCommands (Join-Path $root "README.md")
 Test-DocumentCommands (Join-Path $root "docs/Specs/Addendum/Examples.md")
 
@@ -60,14 +128,13 @@ Assert-DocsDoNotContain "Proposed Public C# API" "public API document is no long
 Assert-DocsDoNotContain "Proposed C# API surface" "public API index is no longer proposed"
 Assert-DocsDoNotContain "Add compiler/cache after the core model is proven" "compiled mode is implemented"
 
-& dotnet run --project $addendumExample --configuration $Configuration --no-build
-if ($LASTEXITCODE -ne 0) {
-    throw "Addendum example smoke test failed with exit code $LASTEXITCODE"
-}
+Invoke-DotNetProject "Addendum example smoke test" @("run", "--project", $addendumExample, "--configuration", $Configuration, "--no-build")
+Invoke-DotNetProject "Local plugin example smoke test" @("run", "--project", $localPluginExample, "--configuration", $Configuration, "--no-build")
 
-& dotnet run --project $localPluginExample --configuration $Configuration --no-build
-if ($LASTEXITCODE -ne 0) {
-    throw "Local plugin example smoke test failed with exit code $LASTEXITCODE"
+if (-not $IsWindows) {
+    Write-Host "Skipping named-pipe IPC smoke on non-Windows runners."
+    Write-Host "Docs/example smoke checks passed."
+    return
 }
 
 function Start-IpcServer([string] $Project, [string] $PipeName) {
@@ -120,14 +187,13 @@ $ipcServer = Start-IpcServer $ipcServerExample $pipeName
 try {
     Wait-IpcServer $ipcServer
 
-    & dotnet run --project $ipcClientExample --configuration $Configuration --no-build -- $pipeName
-    if ($LASTEXITCODE -ne 0) {
-        throw "IPC client example smoke test failed with exit code $LASTEXITCODE"
-    }
+    Invoke-DotNetProject "IPC client example smoke test" @(
+        "run", "--project", $ipcClientExample,
+        "--configuration", $Configuration,
+        "--no-build", "--", $pipeName)
 } finally {
     if (-not $ipcServer.Process.HasExited) {
-        $ipcServer.Process.Kill()
-        $ipcServer.Process.WaitForExit()
+        Stop-ProcessTree $ipcServer.Process
     }
 
     $ipcServer.Process.Dispose()
