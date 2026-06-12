@@ -144,8 +144,8 @@
     },
     {
       "path": "spec/16-public-api.md",
-      "sha256": "99872317b36b77ba1a3d8c4af7594617f2837798dc0c3aad014d9eef11d1020f",
-      "bytes": 15311
+      "sha256": "f021f5575f673877dcf4e6df724b7fa56f88d9030847b2216d21977b723cea9c",
+      "bytes": 19899
     },
     {
       "path": "spec/17-implementation-plan.md",
