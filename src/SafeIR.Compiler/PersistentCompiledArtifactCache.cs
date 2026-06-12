@@ -19,6 +19,7 @@ public sealed class PersistentCompiledArtifactCache
     {
         _rootDirectory = Path.GetFullPath(rootDirectory);
         Directory.CreateDirectory(_rootDirectory);
+        PersistentCompiledArtifactCacheRootGuard.Validate(_rootDirectory);
     }
 
     public bool EntryExists(string cacheKey) => Directory.Exists(EntryPath(cacheKey));

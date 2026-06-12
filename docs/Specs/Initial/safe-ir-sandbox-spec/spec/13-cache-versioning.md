@@ -167,6 +167,11 @@ Cache storage must be protected:
 - worker process preferably read-only after artifact creation
 - no shared writable cache across tenants unless carefully isolated
 
+The implementation validates the cache root before use: it must be a real directory rather than
+a reparse point, must allow exclusive host writes, and on Unix must not be group- or
+world-writable. Windows deployments should place the cache under a host-controlled profile or
+service directory with equivalent ACLs.
+
 ## Multi-tenant cache
 
 Options:
