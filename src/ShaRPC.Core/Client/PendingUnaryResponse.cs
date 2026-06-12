@@ -6,15 +6,12 @@ using ShaRPC.Core.Streaming;
 
 namespace ShaRPC.Core.Client;
 
-internal sealed class PendingUnaryResponse<TResponse> :
+internal class PendingUnaryResponse<TResponse> :
     TaskCompletionSource<TResponse>,
     IPendingResponse
 {
     private readonly ShaRpcPendingRequests _owner;
     private RpcPeerOutboundInvoker? _directOwner;
-    private string? _service;
-    private string? _method;
-    private long _timeoutDeadline = long.MaxValue;
     private int _cancellationKind;
     private int _completed;
 
@@ -27,15 +24,16 @@ internal sealed class PendingUnaryResponse<TResponse> :
 
     public int MessageId { get; }
 
-    public long TimeoutDeadline => Volatile.Read(ref _timeoutDeadline);
+    public virtual long TimeoutDeadline => long.MaxValue;
 
     public PendingCancellationKind CancellationKind =>
         (PendingCancellationKind)Volatile.Read(ref _cancellationKind);
 
     public bool RegistersStreamingResponse => false;
 
-    public void SetTimeoutDeadline(long deadline) =>
-        Volatile.Write(ref _timeoutDeadline, deadline);
+    public virtual void SetTimeoutDeadline(long deadline)
+    {
+    }
 
     public void CancelByCaller() =>
         _owner.TryCancel(MessageId, this, PendingCancellationKind.Caller);
@@ -47,13 +45,8 @@ internal sealed class PendingUnaryResponse<TResponse> :
     public void SetError(Exception error) =>
         CompleteAndSetException(error);
 
-    public void EnableDirectCompletion(
-        RpcPeerOutboundInvoker owner,
-        string service,
-        string method)
+    public void EnableDirectCompletion(RpcPeerOutboundInvoker owner)
     {
-        _service = service;
-        _method = method;
         Volatile.Write(ref _directOwner, owner);
 
         if (Task.IsCompleted)
@@ -111,13 +104,15 @@ internal sealed class PendingUnaryResponse<TResponse> :
         CompleteDirect(sendCancel: true);
         if (kind == PendingCancellationKind.Timeout)
         {
-            TrySetException(new ShaRpcTimeoutException(
-                $"Request to {_service}.{_method} timed out."));
+            TrySetException(CreateTimeoutException());
             return;
         }
 
         TrySetException(new OperationCanceledException());
     }
+
+    protected virtual Exception CreateTimeoutException() =>
+        new ShaRpcTimeoutException("Request timed out.");
 
     private bool IsDirectCompletion =>
         Volatile.Read(ref _directOwner) is not null;
@@ -151,4 +146,31 @@ internal sealed class PendingUnaryResponse<TResponse> :
 
         Volatile.Read(ref _directOwner)?.CompleteUnaryPending(this, sendCancel);
     }
+}
+
+internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
+    PendingUnaryResponse<TResponse>
+{
+    private readonly string _service;
+    private readonly string _method;
+    private long _timeoutDeadline = long.MaxValue;
+
+    public PendingUnaryResponseWithTimeout(
+        ShaRpcPendingRequests owner,
+        int messageId,
+        string service,
+        string method)
+        : base(owner, messageId)
+    {
+        _service = service;
+        _method = method;
+    }
+
+    public override long TimeoutDeadline => Volatile.Read(ref _timeoutDeadline);
+
+    public override void SetTimeoutDeadline(long deadline) =>
+        Volatile.Write(ref _timeoutDeadline, deadline);
+
+    protected override Exception CreateTimeoutException() =>
+        new ShaRpcTimeoutException($"Request to {_service}.{_method} timed out.");
 }

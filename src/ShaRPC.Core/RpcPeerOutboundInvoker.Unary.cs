@@ -19,7 +19,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             ValidateTarget(service, method);
             _ensureStarted();
-            pending = ReservePendingUnaryRequest<TResponse>(ct);
+            pending = ReservePendingUnaryRequest<TResponse>(service, method, ct);
         }
         catch (Exception ex)
         {
@@ -64,7 +64,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         {
             ValidateTarget(service, method);
             _ensureStarted();
-            pending = ReservePendingUnaryRequest<TResponse>(ct);
+            pending = ReservePendingUnaryRequest<TResponse>(service, method, ct);
         }
         catch (Exception ex)
         {
@@ -122,7 +122,7 @@ internal sealed partial class RpcPeerOutboundInvoker
         if (!ct.CanBeCanceled && sendTask.IsCompletedSuccessfully)
         {
             frame.Dispose();
-            pending.EnableDirectCompletion(this, service, method);
+            pending.EnableDirectCompletion(this);
             if (!pending.Task.IsCompleted)
             {
                 _pending.StartTimeout(pending, _timeout);

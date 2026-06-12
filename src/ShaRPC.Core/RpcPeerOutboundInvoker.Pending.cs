@@ -33,7 +33,10 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
-    private PendingUnaryResponse<TResponse> ReservePendingUnaryRequest<TResponse>(CancellationToken ct)
+    private PendingUnaryResponse<TResponse> ReservePendingUnaryRequest<TResponse>(
+        string service,
+        string method,
+        CancellationToken ct)
     {
         if (!TryEnterPendingSlot())
         {
@@ -46,7 +49,13 @@ internal sealed partial class RpcPeerOutboundInvoker
             {
                 ct.ThrowIfCancellationRequested();
                 var messageId = NextMessageId(ct);
-                if (messageId != 0 && _pending.TryAddUnary<TResponse>(messageId, out var pending))
+                if (messageId != 0 &&
+                    _pending.TryAddUnary<TResponse>(
+                        messageId,
+                        _timeout != Timeout.InfiniteTimeSpan,
+                        service,
+                        method,
+                        out var pending))
                 {
                     return pending;
                 }

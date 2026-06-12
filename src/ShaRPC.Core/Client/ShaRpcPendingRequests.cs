@@ -37,8 +37,19 @@ internal sealed class ShaRpcPendingRequests : IDisposable
     public bool TryAdd(int messageId, out PendingReceivedResponse pending) =>
         TryAddCore(messageId, new PendingReceivedResponse(this, messageId), out pending);
 
-    public bool TryAddUnary<TResponse>(int messageId, out PendingUnaryResponse<TResponse> pending) =>
-        TryAddCore(messageId, new PendingUnaryResponse<TResponse>(this, messageId), out pending);
+    public bool TryAddUnary<TResponse>(
+        int messageId,
+        bool captureTimeoutTarget,
+        string service,
+        string method,
+        out PendingUnaryResponse<TResponse> pending)
+    {
+        var candidate = captureTimeoutTarget
+            ? new PendingUnaryResponseWithTimeout<TResponse>(this, messageId, service, method)
+            : new PendingUnaryResponse<TResponse>(this, messageId);
+
+        return TryAddCore(messageId, candidate, out pending);
+    }
 
     private bool TryAddCore<TPending>(int messageId, TPending candidate, out TPending pending)
         where TPending : IPendingResponse
