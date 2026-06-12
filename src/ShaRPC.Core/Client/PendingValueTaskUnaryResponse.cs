@@ -172,7 +172,6 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
 
     private void Reset(int messageId)
     {
-        _source.Reset();
         _messageId = messageId;
         _directOwner = null;
         _completed = 0;
@@ -207,10 +206,20 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
             return;
         }
 
+        ClearForPool();
         lock (PoolGate)
         {
             _next = s_pool;
             s_pool = this;
         }
+    }
+
+    private void ClearForPool()
+    {
+        _source.Reset();
+        _messageId = 0;
+        _directOwner = null;
+        _completed = 0;
+        _valueTaskIssued = 0;
     }
 }

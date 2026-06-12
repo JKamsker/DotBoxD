@@ -1,6 +1,7 @@
 using MessagePack;
 using MessagePack.Formatters;
 using MessagePack.Resolvers;
+using ShaRPC.Core.Protocol;
 using ShaRPC.Core.Serialization;
 using ShaRPC.Serializers.MessagePack;
 using Xunit;
@@ -22,7 +23,7 @@ public class MessagePackRpcSerializerTests
     }
 
     [Fact]
-    public void RepeatedShortStrings_RoundTripToCachedReference()
+    public void RepeatedShortPayloadStrings_AreNotGloballyCached()
     {
         var serializer = new MessagePackRpcSerializer();
 
@@ -30,7 +31,21 @@ public class MessagePackRpcSerializerTests
         var second = RoundTrip(serializer, "player-1");
 
         Assert.Equal("player-1", first);
-        Assert.Same(first, second);
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void RpcRequestNames_RoundTripToCachedReference()
+    {
+        var serializer = new MessagePackRpcSerializer();
+
+        var first = RoundTrip(serializer, CreateRequest(1));
+        var second = RoundTrip(serializer, CreateRequest(2));
+
+        Assert.Equal("GameService", first.ServiceName);
+        Assert.Equal("MovePlayerAsync", first.MethodName);
+        Assert.Same(first.ServiceName, second.ServiceName);
+        Assert.Same(first.MethodName, second.MethodName);
     }
 
     [Fact]
@@ -48,7 +63,7 @@ public class MessagePackRpcSerializerTests
     }
 
     [Fact]
-    public void CustomStringFormatter_TakesPrecedenceOverRpcStringCache()
+    public void CustomStringFormatter_TakesPrecedenceOverDefaultResolvers()
     {
         var resolver = new CustomStringResolver();
         var serializer = MessagePackRpcSerializer.CreateWithResolver(resolver);
@@ -64,6 +79,14 @@ public class MessagePackRpcSerializerTests
         using var payload = serializer.SerializeToPayload(value);
         return serializer.Deserialize<T>(payload.Memory);
     }
+
+    private static RpcRequest CreateRequest(int messageId) =>
+        new()
+        {
+            MessageId = messageId,
+            ServiceName = new string("GameService".ToCharArray()),
+            MethodName = new string("MovePlayerAsync".ToCharArray()),
+        };
 
     public sealed class BinaryDto
     {

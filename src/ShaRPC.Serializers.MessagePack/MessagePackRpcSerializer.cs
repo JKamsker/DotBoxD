@@ -65,7 +65,7 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
 
         var extraCount = resolvers.Length;
-        var effectiveResolvers = new IFormatterResolver[extraCount + 3];
+        var effectiveResolvers = new IFormatterResolver[extraCount + 2];
         for (var i = 0; i < extraCount; i++)
         {
             // Reject null elements eagerly: a null slipped into CompositeResolver.Create otherwise
@@ -74,9 +74,8 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 ?? throw new ArgumentException("Resolvers must not contain null elements.", nameof(resolvers));
         }
 
-        effectiveResolvers[extraCount] = RpcStringFormatterResolver.Instance;
-        effectiveResolvers[extraCount + 1] = StandardResolver.Instance;
-        effectiveResolvers[extraCount + 2] = ContractlessStandardResolver.Instance;
+        effectiveResolvers[extraCount] = StandardResolver.Instance;
+        effectiveResolvers[extraCount + 1] = ContractlessStandardResolver.Instance;
 
         return MessagePackSerializerOptions.Standard
             .WithResolver(CompositeResolver.Create(
@@ -92,20 +91,6 @@ public sealed class MessagePackRpcSerializer : ISerializer
     private static MessagePackSerializerOptions CreateDefaultOptions()
     {
         return CreateOptions();
-    }
-
-    private sealed class RpcStringFormatterResolver : IFormatterResolver
-    {
-        public static readonly RpcStringFormatterResolver Instance = new();
-
-        private RpcStringFormatterResolver()
-        {
-        }
-
-        public IMessagePackFormatter<T>? GetFormatter<T>() =>
-            typeof(T) == typeof(string)
-                ? (IMessagePackFormatter<T>)(object)RpcStringFormatter.Instance
-                : null;
     }
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
