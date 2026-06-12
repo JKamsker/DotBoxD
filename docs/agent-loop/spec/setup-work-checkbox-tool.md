@@ -20,10 +20,12 @@ Agents are bad at preserving exact formatting in long Markdown lists. A script p
 
 ## Implementation location
 
-Prefer:
+This repository keeps the tool and its tests together under:
 
 ```text
 tools/AgentQueue/
+  src/AgentQueue/
+  tests/AgentQueue.Tests/
 ```
 
 For a .NET repo, implement as a .NET console app.
@@ -41,7 +43,7 @@ If the repository cannot use .NET tooling, implement the same command contract i
 During development:
 
 ```bash
-dotnet run --project tools/AgentQueue -- <command>
+dotnet run --project tools/AgentQueue/src/AgentQueue -- <command>
 ```
 
 Optional convenience wrapper later:
@@ -63,7 +65,7 @@ For docs and prompts, use `agentq` as the logical command.
 - [ ] Create `docs/agent-loop/active/`.
 - [ ] Create `docs/agent-loop/README.md`.
 - [ ] Create `docs/agent-loop/config.json`.
-- [ ] Create `tools/AgentQueue/`.
+- [ ] Create `tools/AgentQueue/src/AgentQueue/`.
 - [ ] Add the AgentQueue project to the solution if appropriate.
 - [ ] Add tests for AgentQueue.
 

@@ -145,7 +145,7 @@ docs/agent-loop/tmp/
 Create `scripts/agentq.ps1`:
 
 ```powershell
-dotnet run --project tools/AgentQueue -- @args
+dotnet run --project tools/AgentQueue/src/AgentQueue -- @args
 ```
 
 Create `scripts/agentq.sh`:
@@ -153,7 +153,7 @@ Create `scripts/agentq.sh`:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-dotnet run --project tools/AgentQueue -- "$@"
+dotnet run --project tools/AgentQueue/src/AgentQueue -- "$@"
 ```
 
 ## Done

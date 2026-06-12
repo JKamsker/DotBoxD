@@ -25,11 +25,11 @@
         <Project Path="benchmarks/SafeIR.Benchmarks/SafeIR.Benchmarks.csproj" />
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
         <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
     </Folder>
     <Folder Name="/tools/">
-        <Project Path="tools/AgentQueue/AgentQueue.csproj" />
+        <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
+        <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
     </Folder>
     <!-- Solution Items -->
 <!--

@@ -12,7 +12,7 @@ Read AGENTS.md if present. Then implement the AgentQueue workflow described in t
 
 Do not audit or fix library code yet.
 
-Implement a repo-local CLI named agentq under tools/AgentQueue.
+Implement a repo-local CLI named agentq under tools/AgentQueue/src/AgentQueue, with tests under tools/AgentQueue/tests.
 
 Done when:
 - agentq init works

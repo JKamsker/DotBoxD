@@ -1,1 +1,1 @@
-dotnet run --project tools/AgentQueue -- @args
+dotnet run --project tools/AgentQueue/src/AgentQueue -- @args

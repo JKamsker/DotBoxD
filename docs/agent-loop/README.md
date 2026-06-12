@@ -56,5 +56,5 @@ During development, use either wrapper:
 Or run the project directly:
 
 ```bash
-dotnet run --project tools/AgentQueue -- doctor
+dotnet run --project tools/AgentQueue/src/AgentQueue -- doctor
 ```
