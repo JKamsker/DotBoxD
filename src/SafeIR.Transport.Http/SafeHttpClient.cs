@@ -125,7 +125,7 @@ public static class SafeHttpClient
         while (true)
         {
             var remaining = maxBytes - memory.Length;
-            var readLimit = (int)Math.Min(buffer.Length, remaining + 1);
+            var readLimit = remaining >= buffer.Length ? buffer.Length : (int)remaining + 1;
             var read = await stream.ReadAsync(buffer.AsMemory(0, readLimit), cancellationToken)
                 .ConfigureAwait(false);
             if (read == 0)

@@ -265,7 +265,7 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: $"mode={mode.ToString().ToLowerInvariant()} cacheStatus={cacheStatus} " +
-                     $"plan={plan.PlanHash} policy={plan.PolicyHash} " +
+                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} " +
                      $"bindings={plan.BindingManifestHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
             Fields: RunSummaryAuditFields.Create(plan, budget, mode, cacheStatus)));
     }

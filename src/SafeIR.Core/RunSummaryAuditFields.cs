@@ -18,6 +18,7 @@ public static class RunSummaryAuditFields
             ["cacheStatus"] = cacheStatus,
             ["moduleHash"] = plan.ModuleHash,
             ["planHash"] = plan.PlanHash,
+            ["policyId"] = plan.Policy.PolicyId,
             ["policyHash"] = plan.PolicyHash,
             ["bindingManifestHash"] = plan.BindingManifestHash,
             ["fuelUsed"] = budget.FuelUsed.ToString(System.Globalization.CultureInfo.InvariantCulture),

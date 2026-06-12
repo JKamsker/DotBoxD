@@ -6,6 +6,24 @@ namespace SafeIR.Tests;
 public sealed class SafeNetworkStreamingTests
 {
     [Fact]
+    public async Task Http_get_unlimited_response_budget_does_not_overflow_read_limit()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
+        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: long.MaxValue)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("ok", Assert.IsType<StringValue>(result.Value).Value);
+        Assert.Equal(2, result.ResourceUsage.NetworkBytesRead);
+    }
+
+    [Fact]
     public async Task Http_get_unknown_length_response_reads_only_one_byte_past_limit()
     {
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("too-large"));

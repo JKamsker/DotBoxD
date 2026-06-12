@@ -94,7 +94,7 @@ internal static class CompiledExecutionRunner
             Message: $"mode=compiled runtimeForm={artifact.RuntimeForm} cacheStatus={cacheStatus} " +
                      $"materializationStatus={executable.MaterializationStatus} " +
                      $"cacheKey={artifact.Manifest.CacheKey} artifact={artifact.ArtifactHash} " +
-                     $"plan={plan.PlanHash} policy={plan.PolicyHash} bindings={plan.BindingManifestHash} " +
+                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} bindings={plan.BindingManifestHash} " +
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
             Fields: RunSummaryAuditFields.Create(
                 plan,

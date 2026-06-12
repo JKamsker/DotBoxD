@@ -7,7 +7,10 @@ public sealed class AuditSummaryTests
     {
         var host = SandboxTestHost.Create();
         var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .WithPolicyId("summary-policy")
+            .WithFuel(1_000)
+            .Build());
 
         var result = await host.ExecuteAsync(
             plan,
@@ -22,6 +25,7 @@ public sealed class AuditSummaryTests
         Assert.Contains("cacheStatus=None", summary.Message!);
         Assert.Equal("Interpreted", summary.Fields!["mode"]);
         Assert.Equal(plan.PlanHash, summary.Fields["planHash"]);
+        Assert.Equal("summary-policy", summary.Fields["policyId"]);
         Assert.Equal("None", summary.Fields["cacheStatus"]);
         Assert.Equal("1000", summary.Fields["maxFuel"]);
     }
@@ -31,7 +35,10 @@ public sealed class AuditSummaryTests
     {
         var host = SandboxTestHost.Create(compiler: true);
         var module = await host.ParseJsonAsync(SandboxTestHost.PureScoreJson());
-        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .WithPolicyId("summary-policy")
+            .WithFuel(1_000)
+            .Build());
 
         var result = await host.ExecuteAsync(
             plan,
@@ -46,6 +53,7 @@ public sealed class AuditSummaryTests
         Assert.Contains("cacheKey=", summary.Message!);
         Assert.Contains($"artifact={result.ArtifactHash}", summary.Message!);
         Assert.Equal("Compiled", summary.Fields!["mode"]);
+        Assert.Equal("summary-policy", summary.Fields["policyId"]);
         Assert.Equal(plan.PolicyHash, summary.Fields["policyHash"]);
         Assert.Equal(result.ArtifactHash, summary.Fields["artifactHash"]);
         Assert.Equal("LoadedAssembly", summary.Fields["runtimeForm"]);
@@ -55,6 +63,7 @@ public sealed class AuditSummaryTests
     {
         Assert.Contains($"plan={plan.PlanHash}", summary.Message!);
         Assert.Contains($"policy={plan.PolicyHash}", summary.Message!);
+        Assert.Contains($"policyId={plan.Policy.PolicyId}", summary.Message!);
         Assert.Contains($"bindings={plan.BindingManifestHash}", summary.Message!);
     }
 }
