@@ -26,19 +26,19 @@ policyId/policyHash
 bindingManifestHash
 executionMode
 cacheStatus
-startedAt
-completedAt
-duration
+timestamp
 success/failure
 errorCode optional
 fuelUsed
 maxFuel
 allocationCharged
 hostCalls
-capabilitiesGranted
-capabilitiesUsed
 artifactHash optional
 ```
+
+The current `RunSummary` event stores these as structured string fields where possible. Duration,
+completed-at timestamps, and capability-grant/use rollups are recommended operational extensions,
+not required fields in the current public `SandboxAuditEvent` shape.
 
 ## Binding audit events
 
@@ -53,7 +53,7 @@ effect
 resourceKind
 resourceId sanitized
 startedAt
-duration
+duration optional
 success/failure
 bytesRead/bytesWritten optional
 errorCode optional

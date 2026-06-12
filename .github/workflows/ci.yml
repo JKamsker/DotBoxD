@@ -29,13 +29,13 @@ jobs:
         run: dotnet test SafeIR.slnx --configuration Release --no-build
 
       - name: Security boundary tests
-        run: dotnet test tests/SafeIR.Tests/SafeIR.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SafeFileSystemTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~CompiledArtifactGuardTests|FullyQualifiedName~VerifierAttackMatrixTests"
+        run: dotnet test tests/SafeIR.Tests/SafeIR.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SafeFileSystemTests|FullyQualifiedName~FileExtensionPolicyTests|FullyQualifiedName~PathUriLiteralValidationTests|FullyQualifiedName~CompiledArtifactGuardTests|FullyQualifiedName~CompiledRuntimeQuotaTests|FullyQualifiedName~VerifierAttackMatrixTests|FullyQualifiedName~VerifierLoopMeteringTests|FullyQualifiedName~BindingRegistryHardeningTests|FullyQualifiedName~PluginPackageValidationTests|FullyQualifiedName~PluginRevocationTests|FullyQualifiedName~PinnedHttpTransportTests"
 
       - name: Check C# file lengths
         shell: pwsh
         run: ./scripts/check-csharp-file-lines.ps1
 
-      - name: Check release readiness checklist
+      - name: Report release readiness checklist
         shell: pwsh
         run: ./scripts/check-release-readiness.ps1
 

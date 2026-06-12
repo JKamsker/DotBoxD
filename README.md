@@ -1,8 +1,8 @@
 # Safe-IR
 
-Safe-IR is a restricted IR sandbox for .NET. User-authored work is represented as a safe IR model, optionally imported from JSON, validated against a capability policy, and then executed either by the IR interpreter or by compiler-owned runtime forms.
+Safe-IR is a restricted IR sandbox for .NET. User-authored work is represented as JSON IR, imported into a safe IR model, validated against a capability policy, and then executed either by the IR interpreter or by compiler-owned runtime forms.
 
-Interpreted mode executes verified IR directly. Compiled mode is only a runtime optimization: trusted compiler code emits a gated `DynamicMethod` or generated assembly, then the CLR executes that compiled form. User input never supplies C#, raw IL, CLR member names, assemblies, or arbitrary host calls.
+Interpreted mode executes verified IR directly. Compiled mode is only a runtime optimization: the current compiler emits a verified generated assembly and the CLR executes that loaded form. `DynamicMethod` is reserved for a future backend after an equivalent gate exists. User input never supplies C#, raw IL, CLR member names, assemblies, or arbitrary host calls.
 
 ## Current Packages
 

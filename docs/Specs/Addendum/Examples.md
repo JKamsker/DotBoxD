@@ -5,8 +5,8 @@ This branch implements the addendum as a hosting-layer plugin model:
 - `SafeIR.Plugins` exposes live values, typed live contexts, kernel state, hook pipelines, plugin manifests, and safe message bindings.
 - `SafeIR.PluginAnalyzer` provides local SDK diagnostics for forbidden File IO in kernels and unsupported live setting types.
 - `SafeIR.PluginIpc.Server.Abstractions` owns the server-side event contracts that plugin clients implement against.
-- Plugin packages carry Safe IR plus manifest metadata. The server validates the package with the existing Safe IR validator before installation.
-- Hook handlers run through `SandboxHost.ExecuteAsync`; the server does not load or execute plugin DLLs.
+- Plugin packages carry Safe IR plus manifest metadata. The server validates manifest identity, declared effects, and the Safe IR module with the existing Safe IR validator before installation.
+- Hook handlers run through `SandboxHost.ExecuteAsync`. The local examples reference a generated package factory for trusted development-time convenience; a production upload path should accept package data, not load arbitrary plugin DLLs.
 
 ## Recommended Documentation Walkthrough
 

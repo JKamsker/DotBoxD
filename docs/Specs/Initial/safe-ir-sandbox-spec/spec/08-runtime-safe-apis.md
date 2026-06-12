@@ -17,8 +17,8 @@ public sealed class SandboxContext
 {
     public SandboxRunId RunId { get; }
     public SandboxPolicy Policy { get; }
-    public ResourceBudget Budget { get; }
-    public BindingTable Bindings { get; }
+    public ResourceMeter Budget { get; }
+    public BindingRegistry Bindings { get; }
     public IAuditSink Audit { get; }
     public CancellationToken CancellationToken { get; }
 

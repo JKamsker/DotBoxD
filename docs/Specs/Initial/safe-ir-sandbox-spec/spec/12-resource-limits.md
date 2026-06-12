@@ -23,33 +23,38 @@ Host call count
 File bytes read/written
 Network bytes read/written
 Log events
-Generated commands
+Generated domain commands (future/domain extension)
 ```
 
 ## Budget model
 
 ```csharp
-public sealed class ResourceBudget
+public sealed record ResourceLimits
 {
-    public long MaxFuel { get; }
-    public TimeSpan MaxWallTime { get; }
-    public long MaxAllocatedBytes { get; }
-    public int MaxCallDepth { get; }
-    public int MaxHostCalls { get; }
-    public int MaxListLength { get; }
-    public int MaxMapEntries { get; }
-    public int MaxCollectionDepth { get; }
-    public long MaxTotalCollectionElements { get; }
-    public long MaxFileBytesRead { get; }
-    public long MaxFileBytesWritten { get; }
-    public long MaxNetworkBytesRead { get; }
-    public long MaxNetworkBytesWritten { get; }
-    public int MaxLogEvents { get; }
-    public int MaxLogMessageLength { get; }
-    public int MaxStringLength { get; }
-    public long MaxTotalStringBytes { get; }
+    public long MaxFuel { get; init; }
+    public long MaxLoopIterations { get; init; }
+    public TimeSpan? MaxWallTime { get; init; }
+    public long MaxAllocatedBytes { get; init; }
+    public int MaxCallDepth { get; init; }
+    public int MaxHostCalls { get; init; }
+    public int MaxListLength { get; init; }
+    public int MaxMapEntries { get; init; }
+    public int MaxCollectionDepth { get; init; }
+    public long MaxTotalCollectionElements { get; init; }
+    public long MaxFileBytesRead { get; init; }
+    public long MaxFileBytesWritten { get; init; }
+    public long MaxNetworkBytesRead { get; init; }
+    public long MaxNetworkBytesWritten { get; init; }
+    public int MaxLogEvents { get; init; }
+    public int MaxLogMessageLength { get; init; }
+    public int MaxStringLength { get; init; }
+    public long MaxTotalStringBytes { get; init; }
+}
 
+public sealed class ResourceMeter
+{
     public void ChargeFuel(long amount);
+    public void ChargeLoopIteration(long fuelAmount);
     public void ChargeAllocation(long bytes);
     public void ChargeCollection(SandboxValue value);
     public void ChargeValue(SandboxValue value);
@@ -242,9 +247,9 @@ File/network APIs must enforce:
 
 Never rely on script cooperation for IO limits.
 
-## Command limits
+## Future domain command limits
 
-If sandbox emits game/business commands, limit:
+If a host later adds game/business command emission, limit:
 
 - number of commands
 - command size

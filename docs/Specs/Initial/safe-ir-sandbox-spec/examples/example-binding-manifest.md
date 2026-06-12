@@ -19,8 +19,8 @@
       "safety": "PureIntrinsic",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "Sandbox.Runtime.CompiledRuntime",
-        "method": "Math_Sqrt_F64"
+        "type": "SafeIR.Runtime.CompiledRuntime",
+        "method": "SqrtF64"
       }
     },
     {
@@ -39,27 +39,27 @@
       "safety": "ReadOnlyExternal",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "Sandbox.Runtime.GeneratedBindingStubs",
-        "method": "File_ReadText"
+        "type": "SafeIR.Runtime.CompiledRuntime",
+        "method": "CallBinding"
       }
     },
     {
-      "id": "game.inventory.enqueueGrantItem",
+      "id": "game.message.send",
       "version": "1.0.0",
-      "parameters": ["PlayerId", "ItemId", "I32", "String"],
-      "returnType": "Command",
+      "parameters": ["String", "String"],
+      "returnType": "Unit",
       "effects": ["Cpu", "Alloc", "GameStateWrite", "Audit"],
-      "requiredCapability": "game.inventory.write",
+      "requiredCapability": "game.message.write",
       "costModel": {
-        "baseFuel": 25,
-        "maxCallsPerRun": 20
+        "baseFuel": 5,
+        "maxCallsPerRun": 100
       },
       "auditLevel": "PerCall",
       "safety": "SideEffectingExternal",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "Sandbox.Runtime.GeneratedBindingStubs",
-        "method": "Game_Inventory_EnqueueGrantItem"
+        "type": "SafeIR.Runtime.CompiledRuntime",
+        "method": "CallBinding"
       }
     }
   ]

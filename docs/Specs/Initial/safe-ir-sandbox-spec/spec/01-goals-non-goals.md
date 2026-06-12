@@ -85,7 +85,7 @@ The system must be able to answer:
 The host should expose a small C# API:
 
 ```csharp
-var module = sandbox.ParseJson(jsonIr);
+var module = await sandbox.ImportJsonAsync(jsonIr);
 var plan = sandbox.Prepare(module, policy);
 var result = await sandbox.ExecuteAsync(plan, input, options, cancellationToken);
 ```

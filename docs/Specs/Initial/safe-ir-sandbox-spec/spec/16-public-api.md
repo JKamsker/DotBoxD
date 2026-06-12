@@ -11,7 +11,7 @@ var sandbox = SandboxHost.Create(builder =>
     builder.UseCompilerIfAvailable();
 });
 
-var module = await sandbox.ParseJsonAsync(jsonIr, cancellationToken);
+var module = await sandbox.ImportJsonAsync(jsonIr, cancellationToken);
 var policy = SandboxPolicyBuilder.Create()
     .AllowPureComputation()
     .GrantFileRead(root: "tenant://123/config", maxBytesPerRun: 256_000)
@@ -53,7 +53,8 @@ public sealed class SandboxHost
 }
 ```
 
-`ParseJsonAsync` and `ImportJsonAsync` are extension methods provided by the JSON serialization addon.
+`ImportJsonAsync` is the preferred extension method provided by the JSON serialization addon.
+`ParseJsonAsync` remains a compatibility alias and does not imply a custom language parser.
 
 ### `SandboxExecutionOptions`
 
@@ -66,6 +67,7 @@ public sealed record SandboxExecutionOptions
     public bool AllowFallbackToInterpreter { get; init; } = true;
     public bool RequireDeterministic { get; init; }
     public SandboxRunId? RunId { get; init; }
+    public int AutoCompileThreshold { get; init; } = 20;
 }
 
 public enum ExecutionMode
@@ -85,8 +87,9 @@ public enum SandboxIsolation
 `Interpreted` means direct execution of the verified IR held by the `ExecutionPlan`; it must not
 compile to IL, create a `DynamicMethod`, or load a DLL. `Compiled` is the only mode that may execute
 generated IL, and only after the compiler has produced a trusted runtime form such as a gated
-`DynamicMethod` or a verified generated assembly. `Auto` starts as interpreted until a hotness/cache
-selector explicitly promotes a plan to compiled mode.
+`DynamicMethod` or a verified generated assembly. The current host accepts verified loaded assembly
+artifacts and rejects `DynamicMethod` artifacts until an equivalent gate exists. `Auto` starts as
+interpreted until the hotness threshold promotes a plan to compiled mode.
 
 `Isolation = WorkerProcess` means the caller requires an out-of-process worker boundary. If the
 host has not configured a worker client, execution must fail closed with a policy error rather than
@@ -164,15 +167,15 @@ Example:
 builder.Add(new BindingDescriptor(
     Id: "file.readText",
     Version: SemVersion.Parse("1.0.0"),
-    Parameters: [SandboxTypes.Path],
-    ReturnType: SandboxTypes.String,
+    Parameters: [SandboxType.SandboxPath],
+    ReturnType: SandboxType.String,
     Effects: SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.FileRead,
     RequiredCapability: "file.read",
     CostModel: BindingCostModel.PerByte(baseFuel: 50, perByteFuel: 1),
     AuditLevel: AuditLevel.PerResource,
     Safety: BindingSafety.ReadOnlyExternal,
-    Invoke: SafeFileBindings.ReadText,
-    Compiled: CompiledBinding.RuntimeStub("Sandbox.Runtime.GeneratedBindingStubs", "File_ReadText")));
+    Invoke: SafeFileBindings.ReadText.Invoke,
+    Compiled: CompiledBinding.RuntimeStub("SafeIR.Runtime.CompiledRuntime", "CallBinding")));
 ```
 
 ## Execution plan
@@ -186,8 +189,8 @@ public sealed record ExecutionPlan
     public string BindingManifestHash { get; init; }
     public SandboxModule Module { get; init; }
     public SandboxPolicy Policy { get; init; }
-    public BindingTable Bindings { get; init; }
-    public ResourceBudget Budget { get; init; }
+    public BindingRegistry Bindings { get; init; }
+    public ResourceLimits Budget { get; init; }
     public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; init; }
 }
 ```
@@ -280,6 +283,8 @@ public interface ISandboxWorkerClient
 
 Until a host wires an `ISandboxWorkerClient`, `SandboxIsolation.WorkerProcess` is an explicit
 deny-only mode. Use it for high-risk tenants only when the worker boundary is actually configured.
+This repository currently exposes the enum and fail-closed behavior only; no worker client wiring
+API is implemented yet.
 
 ## Error model
 

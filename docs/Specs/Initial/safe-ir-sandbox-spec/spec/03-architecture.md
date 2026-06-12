@@ -148,11 +148,13 @@ Contains:
 
 ### 1. Import IR
 
-Input may be:
+User-facing input is:
 
 - a JSON IR document through the JSON serialization addon
-- prebuilt IR from a visual editor
-- host-generated IR
+
+Trusted host tooling may also construct the same in-memory `SandboxModule` model directly, for
+example from a visual editor or build-time analyzer. That is not a second user-authored language
+and does not introduce a custom lexer/parser surface.
 
 Output is a raw module representation.
 
@@ -280,8 +282,9 @@ It must:
 
 ### 9B. Compile
 
-The compiler emits a compiled runtime form: either a gated `DynamicMethod` delegate or a
-verified .NET assembly/DLL loaded through controlled runtime code.
+The compiler emits a compiled runtime form. The current backend emits a verified .NET assembly/DLL
+loaded through controlled runtime code. A `DynamicMethod` backend is allowed only after an
+equivalent gate proves the same opcode/member/runtime-stub surface before delegate invocation.
 
 It must:
 
@@ -380,7 +383,7 @@ Reason:
 Suggested layers:
 
 ```text
-JSON IR        optional user-facing serialization format
+JSON IR        required user-facing serialization format
 Canonical IR   stable, typed, named operations interpreted directly
 IL artifact    compiled backend only, never user-facing or interpreted (`DynamicMethod` or DLL)
 ```

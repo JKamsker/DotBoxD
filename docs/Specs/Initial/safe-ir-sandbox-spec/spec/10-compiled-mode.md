@@ -187,9 +187,9 @@ public static class CompiledRuntime
 Verifier allowlist can then be small:
 
 ```text
-Sandbox.Runtime.CompiledRuntime.* exact allowed methods
-Sandbox.Runtime.SandboxContext exact allowed methods
-Sandbox.Runtime.SandboxValue exact allowed constructors/accessors
+SafeIR.Runtime.CompiledRuntime.* exact allowed methods
+SafeIR.SandboxContext exact allowed methods
+SafeIR.SandboxValue exact allowed constructors/accessors
 ```
 
 ## Typed fast path

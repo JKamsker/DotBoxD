@@ -235,7 +235,7 @@ Every execution should log:
 
 ```text
 executionMode: interpreted | compiled
-cacheStatus: none | hit | miss | invalid | recompiled
+cacheStatus: None | Hit | Miss | Invalid | Recompiled
 cacheKey optional
 assemblyHash optional
 planHash

@@ -98,8 +98,8 @@ Example:
   "safety": "ReadOnlyExternal",
   "compiledTarget": {
     "kind": "RuntimeStub",
-    "type": "Sandbox.Runtime.GeneratedBindings.FileBindings",
-    "method": "ReadText"
+    "type": "SafeIR.Runtime.CompiledRuntime",
+    "method": "CallBinding"
   }
 }
 ```
@@ -155,7 +155,7 @@ A smaller surface is better:
 
 ```text
 Generated code may call:
-  Sandbox.Runtime.GeneratedBindingStubs.Call(ctx, bindingSlot, args)
+  SafeIR.Runtime.CompiledRuntime.CallBinding(ctx, bindingId, args)
 
 Generated code may not call:
   MyGameServer.PlayerService.Whatever(...)
@@ -358,7 +358,7 @@ resourceId/path/url/entityId sanitized
 effect
 startedAt
 completedAt
-duration
+duration optional
 success/failure
 bytesRead/bytesWritten optional
 ```

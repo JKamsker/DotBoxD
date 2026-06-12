@@ -263,6 +263,10 @@ Required gates before release:
 - cache invalidation tests
 - security checklist review
 
+The normal CI workflow may report open checklist items while implementation is still in progress.
+Release branches or release jobs must run `scripts/check-release-readiness.ps1 -RequireComplete`
+and may only pass when the release and security checklists are fully closed.
+
 ## Red-team scenarios
 
 ### Scenario 1: API escape

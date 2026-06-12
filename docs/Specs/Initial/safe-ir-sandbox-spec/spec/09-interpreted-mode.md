@@ -237,7 +237,7 @@ If compiled mode fails because of:
 The host may fall back to interpreted mode only if:
 
 - the same verified execution plan is used
-- policy allows interpreted fallback
+- execution options allow interpreted fallback
 - audit records fallback reason
 
 Never fall back to a less restrictive validation path.

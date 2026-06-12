@@ -59,11 +59,11 @@ Primitive types may use strings:
 Composite types must use JSON objects:
 
 ```json
-{ "name": "List", "arguments": ["Command"] }
+{ "name": "List", "arguments": ["String"] }
 { "name": "Map", "arguments": ["String", "I32"] }
 ```
 
-Generic type strings such as `"List<Command>"` are rejected to avoid a separate type-expression parser.
+Generic type strings such as `"List<String>"` are rejected to avoid a separate type-expression parser.
 
 ## Statements
 
@@ -163,7 +163,7 @@ Generic calls use `genericType`:
 ```json
 {
   "call": "list.empty",
-  "genericType": "Command",
+  "genericType": "String",
   "args": []
 }
 ```

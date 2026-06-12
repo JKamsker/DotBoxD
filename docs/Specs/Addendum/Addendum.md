@@ -20,6 +20,11 @@ The goal is to make plugin development feel like normal C# while preserving the 
 > The server never executes arbitrary plugin DLLs.
 > Plugin code is lowered into Safe IR, verified by the server, and executed through approved runtime modes.
 
+The local examples may reference a generated package factory from a plugin project to demonstrate
+the build-time lowering flow. That factory is trusted development-time code, not the production
+upload boundary. A production server should receive package data containing Safe IR plus manifest
+metadata and validate it before installation.
+
 ---
 
 # 1. High-Level Model
@@ -995,7 +1000,7 @@ The server can update settings at runtime.
 
 Future events use the latest settings.
 
-The server never executes arbitrary plugin DLLs.
+The production server never executes arbitrary plugin DLLs; it installs validated Safe IR package data.
 ```
 
 This gives the system a more ergonomic, game/server-friendly plugin model while preserving the original security and execution model.

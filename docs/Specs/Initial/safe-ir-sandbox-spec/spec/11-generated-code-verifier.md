@@ -61,7 +61,7 @@ Example allowlist:
 
 ```text
 System.Private.CoreLib
-Sandbox.Runtime
+SafeIR.Runtime
 ```
 
 Depending on backend, other framework assemblies may be required. Keep the list minimal.
@@ -75,9 +75,9 @@ Allow only exact approved runtime types.
 Allowed example:
 
 ```text
-Sandbox.Runtime.SandboxContext
-Sandbox.Runtime.SandboxValue
-Sandbox.Runtime.CompiledRuntime
+SafeIR.SandboxContext
+SafeIR.SandboxValue
+SafeIR.Runtime.CompiledRuntime
 System.Int32
 System.Boolean
 System.String
@@ -111,10 +111,10 @@ Allow exact approved members only.
 Prefer exact method signatures:
 
 ```text
-Sandbox.Runtime.CompiledRuntime.ChargeFuel(SandboxContext, Int32)
-Sandbox.Runtime.CompiledRuntime.CallBinding(SandboxContext, Int32, SandboxValue[])
-Sandbox.Runtime.SandboxValue.FromInt32(Int32)
-Sandbox.Runtime.SandboxValue.AsInt32()
+SafeIR.Runtime.CompiledRuntime.ChargeFuel(SandboxContext, Int32)
+SafeIR.Runtime.CompiledRuntime.CallBinding(SandboxContext, String, SandboxValue[])
+SafeIR.SandboxValue.FromInt32(Int32)
+SafeIR.Runtime.CompiledRuntime.AsI32(SandboxValue)
 ```
 
 Reject all other method/field references.
