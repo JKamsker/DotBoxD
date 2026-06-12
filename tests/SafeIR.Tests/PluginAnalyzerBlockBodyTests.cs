@@ -17,7 +17,7 @@ public sealed class PluginAnalyzerBlockBodyTests
     [Fact]
     public void Generated_should_handle_lowers_if_else_return_body_to_ir_branch()
     {
-        var package = CreatePackage();
+        var package = CreatePackage(guardReturn: false);
         var shouldHandle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.ShouldHandle);
 
         var branch = Assert.IsType<IfStatement>(Assert.Single(shouldHandle.Body));
@@ -30,9 +30,34 @@ public sealed class PluginAnalyzerBlockBodyTests
     public async Task Generated_should_handle_executes_selected_if_else_return_branch(
         ExecutionMode mode)
     {
-        var skippedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: false, mode);
-        var selectedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: true, mode);
-        var selectedMatch = await ExecuteShouldHandleAsync(amount: 10, enabled: true, mode);
+        var skippedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: false, mode, guardReturn: false);
+        var selectedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: true, mode, guardReturn: false);
+        var selectedMatch = await ExecuteShouldHandleAsync(amount: 10, enabled: true, mode, guardReturn: false);
+
+        AssertBool(skippedFault, expected: true, mode);
+        AssertInvalidInput(selectedFault, mode);
+        AssertBool(selectedMatch, expected: true, mode);
+    }
+
+    [Fact]
+    public void Generated_should_handle_lowers_guard_return_body_to_ir_branch()
+    {
+        var package = CreatePackage(guardReturn: true);
+        var shouldHandle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.ShouldHandle);
+
+        var branch = Assert.IsType<IfStatement>(Assert.Single(shouldHandle.Body));
+        Assert.NotEmpty(branch.Then);
+        Assert.NotEmpty(branch.Else);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modes))]
+    public async Task Generated_should_handle_executes_selected_guard_return_branch(
+        ExecutionMode mode)
+    {
+        var skippedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: false, mode, guardReturn: true);
+        var selectedFault = await ExecuteShouldHandleAsync(amount: 0, enabled: true, mode, guardReturn: true);
+        var selectedMatch = await ExecuteShouldHandleAsync(amount: 10, enabled: true, mode, guardReturn: true);
 
         AssertBool(skippedFault, expected: true, mode);
         AssertInvalidInput(selectedFault, mode);
@@ -42,9 +67,10 @@ public sealed class PluginAnalyzerBlockBodyTests
     private static async Task<SandboxExecutionResult> ExecuteShouldHandleAsync(
         int amount,
         bool enabled,
-        ExecutionMode mode)
+        ExecutionMode mode,
+        bool guardReturn)
     {
-        var package = CreatePackage();
+        var package = CreatePackage(guardReturn);
         var host = SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(new InMemoryPluginMessageSink());
@@ -65,8 +91,10 @@ public sealed class PluginAnalyzerBlockBodyTests
             new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
     }
 
-    private static PluginPackage CreatePackage()
-        => PluginAnalyzerGeneratedPackageFactory.Create("""
+    private static PluginPackage CreatePackage(bool guardReturn)
+        => PluginAnalyzerGeneratedPackageFactory.Create(guardReturn ? GuardReturnSource : IfElseSource);
+
+    private const string IfElseSource = """
             using SafeIR.Plugins;
 
             namespace Sample;
@@ -91,7 +119,32 @@ public sealed class PluginAnalyzerBlockBodyTests
                 public void Handle(DamageEvent e, HookContext ctx)
                     => ctx.Messages.Send(e.TargetId, e.Message);
             }
-            """);
+            """;
+
+    private const string GuardReturnSource = """
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId, string Message, int Amount, bool Enabled);
+
+            [GamePlugin("generated-block-body")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                {
+                    if (e.Enabled)
+                    {
+                        return 100 / e.Amount > 0;
+                    }
+
+                    return e.Amount == 0;
+                }
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """;
 
     private static SandboxValue Input(int amount, bool enabled)
         => SandboxValue.FromList([

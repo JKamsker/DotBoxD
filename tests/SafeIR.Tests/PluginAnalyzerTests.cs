@@ -212,12 +212,8 @@ public sealed class PluginAnalyzerTests
             {
                 public bool ShouldHandle(DamageEvent e, HookContext ctx)
                 {
-                    if (e.DamageType == "ice")
-                    {
-                        return false;
-                    }
-
-                    return true;
+                    var matched = e.DamageType == "fire";
+                    return matched;
                 }
 
                 public void Handle(DamageEvent e, HookContext ctx)
