@@ -20,10 +20,6 @@
       "justification": "Existing analyzer implementation folder over the folder limit. New analyzer pieces should be grouped by concern."
     },
     {
-      "path": "src/SafeIR.Plugins",
-      "justification": "Existing plugin runtime folder over the folder limit. New plugin runtime areas should move into subdirectories."
-    },
-    {
       "path": "tests/SafeIR.Tests",
       "justification": "Legacy monolithic test project folder. New tests should be split into focused subdirectories when practical."
     }
@@ -36,10 +32,6 @@
     {
       "path": "src/SafeIR.PluginAnalyzer",
       "justification": "Existing analyzer project root predates the project-folder limit. New analyzer implementation files should be grouped into subdirectories."
-    },
-    {
-      "path": "src/SafeIR.Plugins",
-      "justification": "Existing plugin project root predates the project-folder limit. New plugin implementation files should use subdirectories."
     },
     {
       "path": "tests/SafeIR.Tests",
