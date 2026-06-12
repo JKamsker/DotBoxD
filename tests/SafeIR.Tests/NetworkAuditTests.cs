@@ -20,11 +20,13 @@ public sealed class NetworkAuditTests
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal(rawBytes.Length, result.ResourceUsage.NetworkBytesRead);
+        Assert.True(result.ResourceUsage.NetworkBytesRead > rawBytes.Length);
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "net.http.get" && e.Success);
-        Assert.Equal(rawBytes.Length, audit.Bytes);
+        Assert.Equal(result.ResourceUsage.NetworkBytesRead, audit.Bytes);
         Assert.Equal("network", audit.Fields!["resourceKind"]);
-        Assert.Equal(rawBytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), audit.Fields["bytesRead"]);
+        Assert.Equal(
+            result.ResourceUsage.NetworkBytesRead.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            audit.Fields["bytesRead"]);
         Assert.True(double.Parse(audit.Fields["durationMs"], System.Globalization.CultureInfo.InvariantCulture) >= 0);
     }
 

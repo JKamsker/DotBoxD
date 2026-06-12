@@ -44,8 +44,18 @@ public static class SafeHttpClient
             }
 
             response.EnsureSuccessStatusCode();
-            var body = await ReadLimitedTextAsync(context, response, request.MaxResponseBytes, timeout.Token).ConfigureAwait(false);
-            Audit(context, startedAt, true, resource, body.BytesRead, null);
+            var metadataBytes = SafeHttpResponseAccounting.ChargeMetadata(
+                context,
+                response,
+                request.MaxResponseBytes);
+            var body = await ReadLimitedTextAsync(
+                    context,
+                    response,
+                    request.MaxResponseBytes - metadataBytes,
+                    timeout.Token)
+                .ConfigureAwait(false);
+            var responseBytes = metadataBytes + body.BytesRead;
+            Audit(context, startedAt, true, resource, responseBytes, null);
             return body.Text;
         }
         catch (SandboxRuntimeException ex)

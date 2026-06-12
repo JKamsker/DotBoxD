@@ -20,7 +20,7 @@ public sealed class SafeNetworkStreamingTests
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.Equal("ok", Assert.IsType<StringValue>(result.Value).Value);
-        Assert.Equal(2, result.ResourceUsage.NetworkBytesRead);
+        Assert.True(result.ResourceUsage.NetworkBytesRead > 2);
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public sealed class SafeNetworkStreamingTests
         var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("too-large"));
         var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
         var policy = SandboxPolicyBuilder.Create()
-            .GrantHttpGet(["api.example.com"], maxResponseBytes: 3)
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 22)
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
@@ -38,6 +38,24 @@ public sealed class SafeNetworkStreamingTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.Equal(4, result.ResourceUsage.NetworkBytesRead);
+        Assert.Equal(23, result.ResourceUsage.NetworkBytesRead);
+    }
+
+    [Fact]
+    public async Task Http_get_response_headers_count_toward_response_limit()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker(""));
+        var module = await host.ParseJsonAsync(NetworkJson("https://api.example.com/config"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.True(result.ResourceUsage.NetworkBytesRead > 1);
     }
 }
