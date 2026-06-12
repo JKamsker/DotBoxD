@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
-  - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
-  - Dedup: `alloc/interpreter/expression-evaluation/evaluator-object-per-node`
 - [ ] `PAL-0002` medium - Live setting proxy reflects on every property access
   - File: `docs/agent-loop/findings/PAL-0002-live-setting-proxy-reflects-on-every-property-access.md`
   - Dedup: `alloc/plugins/live-context/proxy-reflection-per-access`
@@ -34,6 +31,10 @@
 
 ## Fixed pending verification
 
+- [~] `PAL-0001` medium - Interpreter allocates ExpressionEvaluator per expression
+  - File: `docs/agent-loop/findings/PAL-0001-interpreter-allocates-expressionevaluator-per-expression.md`
+  - Fixed by: `fixer`
+  - Commit: ``
 
 ## Verified
 

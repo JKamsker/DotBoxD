@@ -9,6 +9,7 @@ internal sealed class InterpreterEvaluator
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
     private readonly string _moduleHash;
+    private readonly ExpressionEvaluator _expressions;
 
     public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
     {
@@ -17,6 +18,7 @@ internal sealed class InterpreterEvaluator
         _moduleHash = plan.ModuleHash;
         _functions = plan.Module.Functions.ToDictionary(f => f.Id, StringComparer.Ordinal);
         _functionAnalysis = plan.FunctionAnalysis;
+        _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -143,5 +145,5 @@ internal sealed class InterpreterEvaluator
     }
 
     private ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash).EvaluateAsync(expression, frame);
+        => _expressions.EvaluateAsync(expression, frame);
 }

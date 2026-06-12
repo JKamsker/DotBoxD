@@ -1,19 +1,19 @@
 ---
 id: PAL-0001
 area: perf_alloc
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Interpreter allocates ExpressionEvaluator per expression
 dedup_key: alloc/interpreter/expression-evaluation/evaluator-object-per-node
 created_at: 2026-06-12T20:36:51.9474993+00:00
 created_by: perf-reviewer
 created_commit: 
-updated_at: 2026-06-12T20:36:51.9474993+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T21:24:35.0964382+00:00
+claimed_by: fixer
+claimed_at: 2026-06-12T21:23:02.3143324+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-12T21:24:35.0964382+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 
