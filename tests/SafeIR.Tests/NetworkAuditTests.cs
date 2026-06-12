@@ -23,6 +23,9 @@ public sealed class NetworkAuditTests
         Assert.Equal(rawBytes.Length, result.ResourceUsage.NetworkBytesRead);
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "net.http.get" && e.Success);
         Assert.Equal(rawBytes.Length, audit.Bytes);
+        Assert.Equal("network", audit.Fields!["resourceKind"]);
+        Assert.Equal(rawBytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), audit.Fields["bytesRead"]);
+        Assert.True(double.Parse(audit.Fields["durationMs"], System.Globalization.CultureInfo.InvariantCulture) >= 0);
     }
 
     private static SafeInMemoryHttpMessageInvoker RawBytesInvoker(byte[] rawBytes)

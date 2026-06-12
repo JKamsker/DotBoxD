@@ -23,7 +23,9 @@ public sealed class SafeFileSystemTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("tenant-settings", ((StringValue)result.Value!).Value);
-        Assert.Contains(result.AuditEvents, e => e.BindingId == "file.readText" && e.Success);
+        var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.readText" && e.Success);
+        Assert.Equal("file", audit.Fields!["resourceKind"]);
+        Assert.Equal("15", audit.Fields["bytesRead"]);
     }
 
     [Theory]
@@ -107,7 +109,9 @@ public sealed class SafeFileSystemTests
         Assert.True(result.Succeeded);
         Assert.Equal("written", await File.ReadAllTextAsync(Path.Combine(temp.Path, "out", "result.txt")));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
-        Assert.Contains(result.AuditEvents, e => e.BindingId == "file.writeText" && e.Success);
+        var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.writeText" && e.Success);
+        Assert.Equal("file", audit.Fields!["resourceKind"]);
+        Assert.Equal("7", audit.Fields["bytesWritten"]);
     }
 
     [Theory]

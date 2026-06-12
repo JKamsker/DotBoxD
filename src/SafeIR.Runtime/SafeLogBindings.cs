@@ -30,16 +30,18 @@ public static partial class SafeLogBindings
     private static void Write(SandboxContext context, string bindingId, string level, string message)
     {
         context.ChargeLogEvent(message);
+        var timestamp = context.UtcNow();
         context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
             "SandboxLog",
-            context.UtcNow(),
+            timestamp,
             true,
             BindingId: bindingId,
             CapabilityId: "log.write",
             Effect: SandboxEffect.Audit,
             ResourceId: $"log:{level}",
-            Message: SanitizeAndRedact(message)));
+            Message: SanitizeAndRedact(message),
+            Fields: BindingAuditFields.Create("log", timestamp)));
     }
 
     private static string SanitizeAndRedact(string message)

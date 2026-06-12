@@ -17,6 +17,8 @@ public sealed class SafeLoggingTests
         Assert.Equal("log.write", audit.CapabilityId);
         Assert.Equal("log:info", audit.ResourceId);
         Assert.Equal("first second ok", audit.Message);
+        Assert.Equal("log", audit.Fields!["resourceKind"]);
+        Assert.True(double.Parse(audit.Fields["durationMs"], System.Globalization.CultureInfo.InvariantCulture) >= 0);
         Assert.Equal(1, result.ResourceUsage.LogEvents);
     }
 

@@ -240,7 +240,8 @@ public static class SafeHttpClient
             Effect: SandboxEffect.Network,
             ResourceId: resource,
             ErrorCode: error,
-            Bytes: bytes));
+            Bytes: bytes,
+            Fields: BindingAuditFields.Create("network", startedAt, bytesRead: bytes)));
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 

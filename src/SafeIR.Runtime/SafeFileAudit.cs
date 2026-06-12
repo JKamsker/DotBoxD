@@ -32,7 +32,14 @@ internal static class SafeFileAudit
         string resource,
         long? bytes,
         SandboxErrorCode? error)
-        => context.Audit.Write(new SandboxAuditEvent(
+    {
+        var fields = BindingAuditFields.Create(
+            "file",
+            startedAt,
+            bytesRead: bindingId == "file.readText" ? bytes : null,
+            bytesWritten: bindingId == "file.writeText" ? bytes : null);
+
+        context.Audit.Write(new SandboxAuditEvent(
             context.RunId,
             "BindingCall",
             startedAt,
@@ -42,7 +49,9 @@ internal static class SafeFileAudit
             Effect: effect,
             ResourceId: Sanitize(resource),
             ErrorCode: error,
-            Bytes: bytes));
+            Bytes: bytes,
+            Fields: fields));
+    }
 
     private static string Sanitize(string value) => value.Replace('\\', '/');
 }
