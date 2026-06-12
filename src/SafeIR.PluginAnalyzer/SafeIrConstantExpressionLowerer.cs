@@ -9,6 +9,13 @@ internal static class SafeIrConstantExpressionLowerer
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
+        => TryLower(expression, semanticModel, cancellationToken, targetType: null);
+
+    public static SafeIrExpressionModel? TryLower(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string? targetType)
     {
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
         if (!constant.HasValue)
@@ -22,7 +29,7 @@ internal static class SafeIrConstantExpressionLowerer
             throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.");
         }
 
-        return Lower(expression, constant.Value, SafeIrTypeNameReader.SandboxTypeName(type));
+        return Lower(expression, constant.Value, targetType ?? SafeIrTypeNameReader.SandboxTypeName(type));
     }
 
     private static SafeIrExpressionModel Lower(ExpressionSyntax expression, object? value, string type)
@@ -30,7 +37,10 @@ internal static class SafeIrConstantExpressionLowerer
         {
             SafeIrGenerationNames.ManifestTypes.Bool when value is bool boolean => Bool(boolean),
             SafeIrGenerationNames.ManifestTypes.Int when value is int number => Int32(number),
+            SafeIrGenerationNames.ManifestTypes.Long when value is int number => Int64(number),
             SafeIrGenerationNames.ManifestTypes.Long when value is long number => Int64(number),
+            SafeIrGenerationNames.ManifestTypes.Double when value is int number => Float64(number),
+            SafeIrGenerationNames.ManifestTypes.Double when value is long number => Float64(number),
             SafeIrGenerationNames.ManifestTypes.Double when value is double number && IsFinite(number) => Float64(number),
             SafeIrGenerationNames.ManifestTypes.String when value is string text => String(text),
             _ => throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.")

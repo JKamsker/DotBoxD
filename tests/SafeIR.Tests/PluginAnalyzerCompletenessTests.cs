@@ -107,9 +107,39 @@ public sealed class PluginAnalyzerCompletenessTests
         Assert.Contains("F64(1.5D)", generated);
     }
 
+    [Fact]
+    public void Generator_promotes_numeric_constants_to_supported_operand_type()
+    {
+        var (result, outputCompilation, diagnostics) = RunGenerator("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId, string Message, long Sequence, double Ratio);
+
+            [GamePlugin("promoted-numeric-constants")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => e.Sequence + 1 > -1 && e.Ratio * 2 >= 1;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        var generated = Assert.Single(result.GeneratedTrees).GetText().ToString();
+        Assert.Contains("I64(1L)", generated);
+        Assert.Contains("I64(-1L)", generated);
+        Assert.Contains("F64(2D)", generated);
+        Assert.Contains("F64(1D)", generated);
+    }
+
     [Theory]
     [InlineData("e.Missing == \"fire\"")]
-    [InlineData("e.Amount > 0")]
+    [InlineData("e.Amount > 0.5D")]
     public void Generator_rejects_csharp_that_cannot_lower_to_valid_ir(string shouldHandleExpression)
     {
         var (result, _, diagnostics) = RunGenerator($$"""

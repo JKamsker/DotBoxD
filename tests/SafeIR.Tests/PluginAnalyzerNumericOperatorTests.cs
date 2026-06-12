@@ -5,6 +5,9 @@ namespace SafeIR.Tests;
 
 public sealed class PluginAnalyzerNumericOperatorTests
 {
+    private const int FuelLimit = 100_000;
+    private const int HostCallLimit = 1_000;
+
     [Fact]
     public async Task Generated_should_handle_lowers_i64_and_f64_numeric_operators_in_compiled_mode()
     {
@@ -39,8 +42,8 @@ public sealed class PluginAnalyzerNumericOperatorTests
         });
         var policy = SandboxPolicyBuilder.Create()
             .GrantGameMessageWrite()
-            .WithFuel(100_000)
-            .WithMaxHostCalls(1_000)
+            .WithFuel(FuelLimit)
+            .WithMaxHostCalls(HostCallLimit)
             .Build();
         var plan = await host.PrepareAsync(package.Module, policy);
 
@@ -48,6 +51,46 @@ public sealed class PluginAnalyzerNumericOperatorTests
         await AssertShouldHandleAsync(host, plan, package, Input(6L, 1.5D, 1), expected: false);
         await AssertShouldHandleAsync(host, plan, package, Input(7L, 1.0D, 1), expected: false);
         await AssertShouldHandleAsync(host, plan, package, Input(7L, 1.5D, 0), expected: false);
+    }
+
+    [Fact]
+    public async Task Generated_should_handle_promotes_numeric_constants_in_compiled_mode()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using SafeIR.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId, string Message, long Sequence, double Ratio, int Amount);
+
+            [GamePlugin("generated-promoted-numeric-constants")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => e.Sequence + 1 > 7 &&
+                       e.Ratio * 2 >= 3 &&
+                       e.Amount > 0;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
+        var host = SandboxHost.Create(builder => {
+            builder.AddDefaultPureBindings();
+            builder.AddPluginMessageBindings(new InMemoryPluginMessageSink());
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable();
+        });
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantGameMessageWrite()
+            .WithFuel(FuelLimit)
+            .WithMaxHostCalls(HostCallLimit)
+            .Build();
+        var plan = await host.PrepareAsync(package.Module, policy);
+
+        await AssertShouldHandleAsync(host, plan, package, Input(7L, 1.5D, 1), expected: true);
+        await AssertShouldHandleAsync(host, plan, package, Input(6L, 1.5D, 1), expected: false);
+        await AssertShouldHandleAsync(host, plan, package, Input(7L, 1.0D, 1), expected: false);
     }
 
     private static async Task AssertShouldHandleAsync(

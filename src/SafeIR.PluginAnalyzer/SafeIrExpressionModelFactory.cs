@@ -78,6 +78,7 @@ internal static class SafeIrExpressionModelFactory
     {
         var left = Lower(binary.Left, context);
         var right = Lower(binary.Right, context);
+        SafeIrNumericConstantPromoter.Promote(binary, context, ref left, ref right);
         var allocates = left.Allocates || right.Allocates;
 
         return binary.Kind() switch {
