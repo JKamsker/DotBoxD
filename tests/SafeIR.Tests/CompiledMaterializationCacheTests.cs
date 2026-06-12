@@ -62,6 +62,34 @@ public sealed class CompiledMaterializationCacheTests
         Assert.False(weakContext.IsAlive);
     }
 
+    [Fact]
+    public async Task Dispose_during_materialization_rejects_inflight_get_and_disposes_result()
+    {
+        using var host = HostWithCompiler(new ReusingLoadedAssemblyCompiler());
+        var plan = await PreparePurePlanAsync(host);
+        var artifact = CompiledArtifactTestFactory.LoadedAssembly(
+            plan,
+            CompiledArtifactTestFactory.BuildI32Assembly(parameterCount: 2, value: 123));
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        MaterializedCompiledArtifact? materialized = null;
+        var cache = new CompiledExecutableCache(async (candidate, _, _, _) =>
+        {
+            started.SetResult();
+            await release.Task;
+            materialized = new MaterializedCompiledArtifact(candidate, null);
+            return materialized;
+        });
+        var getTask = cache.GetAsync(artifact, plan, "main", CancellationToken.None).AsTask();
+
+        await started.Task;
+        cache.Dispose();
+        release.SetResult();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await getTask);
+        Assert.True(materialized?.IsDisposed);
+    }
+
     private static SandboxHost HostWithCompiler(ISandboxCompiler compiler)
         => SandboxHost.Create(builder =>
         {

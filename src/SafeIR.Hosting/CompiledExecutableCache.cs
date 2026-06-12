@@ -8,7 +8,21 @@ internal sealed class CompiledExecutableCache : IDisposable
 {
     private readonly ConcurrentDictionary<string, Lazy<Task<MaterializedCompiledArtifact>>> _entries =
         new(StringComparer.Ordinal);
+    private readonly Func<CompiledArtifact, ExecutionPlan, string, CancellationToken, ValueTask<MaterializedCompiledArtifact>> _materialize;
+    private readonly object _gate = new();
     private int _disposed;
+
+    public CompiledExecutableCache()
+        : this(CompiledArtifactGuard.MaterializeExecutableAsync)
+    {
+    }
+
+    internal CompiledExecutableCache(
+        Func<CompiledArtifact, ExecutionPlan, string, CancellationToken, ValueTask<MaterializedCompiledArtifact>> materialize)
+    {
+        ArgumentNullException.ThrowIfNull(materialize);
+        _materialize = materialize;
+    }
 
     public async ValueTask<CompiledExecutable> GetAsync(
         CompiledArtifact artifact,
@@ -16,19 +30,30 @@ internal sealed class CompiledExecutableCache : IDisposable
         string entrypoint,
         CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         cancellationToken.ThrowIfCancellationRequested();
         CompiledArtifactGuard.ValidateExecutableEnvelope(artifact, plan, entrypoint);
         var key = Key(artifact);
         var candidate = new Lazy<Task<MaterializedCompiledArtifact>>(
-            () => CompiledArtifactGuard.MaterializeExecutableAsync(artifact, plan, entrypoint, CancellationToken.None).AsTask(),
+            () => _materialize(artifact, plan, entrypoint, CancellationToken.None).AsTask(),
             LazyThreadSafetyMode.ExecutionAndPublication);
-        var lazy = _entries.GetOrAdd(key, candidate);
+        Lazy<Task<MaterializedCompiledArtifact>> lazy;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            lazy = _entries.GetOrAdd(key, candidate);
+        }
+
         var status = ReferenceEquals(lazy, candidate) ? "Miss" : "Hit";
 
         try
         {
             var materialized = await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                materialized.Dispose();
+                throw new ObjectDisposedException(nameof(CompiledExecutableCache));
+            }
+
             return new CompiledExecutable(WithCurrentMetadata(materialized.Artifact, artifact), status);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -44,17 +69,22 @@ internal sealed class CompiledExecutableCache : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        Lazy<Task<MaterializedCompiledArtifact>>[] entries;
+        lock (_gate)
         {
-            return;
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            entries = _entries.Values.ToArray();
+            _entries.Clear();
         }
 
-        foreach (var lazy in _entries.Values)
+        foreach (var lazy in entries)
         {
             DisposeWhenMaterialized(lazy);
         }
-
-        _entries.Clear();
     }
 
     private static string Key(CompiledArtifact artifact)
