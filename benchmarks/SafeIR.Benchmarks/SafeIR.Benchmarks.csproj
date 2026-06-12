@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\SafeIR.PluginAnalyzer\SafeIR.PluginAnalyzer.csproj" />
     <ProjectReference Include="..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
     <ProjectReference Include="..\..\src\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\src\SafeIR.Verifier\SafeIR.Verifier.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

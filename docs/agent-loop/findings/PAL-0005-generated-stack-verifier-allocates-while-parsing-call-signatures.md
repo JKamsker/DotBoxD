@@ -1,19 +1,19 @@
 ---
 id: PAL-0005
 area: perf_alloc
-status: open
+status: fixed_pending_verification
 priority: low
 title: Generated stack verifier allocates while parsing call signatures
 dedup_key: alloc/verifier/generated-stack/call-signature-split-per-call
 created_at: 2026-06-12T21:01:52.0467908+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T21:01:52.0467908+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-12T21:59:52.6736906+00:00
+claimed_by: fixer
+claimed_at: 2026-06-12T21:58:14.8525073+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-12T21:59:52.6736906+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 
