@@ -8,10 +8,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
-$project = Join-Path $root "tools/CodeEnforcer/src/CodeEnforcer/CodeEnforcer.csproj"
-$targetFramework = "net10.0"
-$configuration = "Release"
-$assembly = Join-Path $root "tools/CodeEnforcer/src/CodeEnforcer/bin/$configuration/$targetFramework/CodeEnforcer.dll"
+$toolPackage = "CodeEnforcer"
+$toolVersion = "0.1.0-ci.6"
+$toolManifest = Join-Path $root ".config/dotnet-tools.json"
 $arguments = @(
     "--root", $root
 )
@@ -32,17 +31,34 @@ if ($PSBoundParameters.ContainsKey("MaxFilesInProjectFolder")) {
     $arguments += @("--max-files-per-root-dir", $MaxFilesInProjectFolder)
 }
 
-if (-not (Test-Path -LiteralPath $assembly)) {
-    Write-Host "CodeEnforcer is not compiled. Building $configuration..."
-    & dotnet build $project --configuration $configuration
+Push-Location $root
+try {
+    if (-not (Test-Path -LiteralPath $toolManifest)) {
+        & dotnet new tool-manifest
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
+
+    $toolList = & dotnet tool list --local
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
-}
 
-Push-Location $root
-try {
-    & dotnet $assembly @arguments
+    if (-not ($toolList -match "(?im)^\s*codeenforcer\s+")) {
+        Write-Host "Installing local CodeEnforcer tool $toolVersion..."
+        & dotnet tool install $toolPackage --version $toolVersion --local
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
+
+    & dotnet tool restore
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & dotnet tool run code-enforcer -- @arguments
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

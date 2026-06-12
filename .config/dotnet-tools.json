@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "codeenforcer": {
+      "version": "0.1.0-ci.6",
+      "commands": [
+        "code-enforcer"
+      ],
+      "rollForward": false
+    }
+  }
+}
