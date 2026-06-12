@@ -8,7 +8,7 @@ internal static class PolicyResolver
         SandboxModule module,
         IBindingCatalog bindings,
         SandboxPolicy? policy,
-        IReadOnlyDictionary<string, FunctionAnalysis> functions,
+        SandboxEffect requiredEffects,
         IReadOnlySet<string> requiredCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
@@ -34,7 +34,6 @@ internal static class PolicyResolver
             }
         }
 
-        var requiredEffects = functions.Values.Aggregate(SandboxEffect.None, (current, next) => current | next.Effects);
         var deniedEffects = requiredEffects & ~policy.AllowedEffects;
         if (deniedEffects != SandboxEffect.None) {
             diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", $"policy denies effects {deniedEffects}"));
