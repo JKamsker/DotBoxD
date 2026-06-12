@@ -2,7 +2,7 @@ using SafeIR;
 
 namespace SafeIR.Tests;
 
-public sealed class PolicyBoundaryTests
+public sealed partial class PolicyBoundaryTests
 {
     [Fact]
     public async Task Expired_grant_parameters_are_not_used_at_runtime()
@@ -110,7 +110,8 @@ public sealed class PolicyBoundaryTests
         using var temp = TempDirectory.Create();
         var host = SandboxTestHost.Create();
         var module = await host.ParseJsonAsync(FileWriteJson("out.txt", "x"));
-        var parameters = new Dictionary<string, string> {
+        var parameters = new Dictionary<string, string>
+        {
             ["root"] = temp.Path,
             ["maxBytesPerRun"] = "1024",
             ["allowCreate"] = "true",
@@ -132,7 +133,8 @@ public sealed class PolicyBoundaryTests
     [Fact]
     public void Policy_snapshots_grant_parameter_dictionaries()
     {
-        var parameters = new Dictionary<string, string> {
+        var parameters = new Dictionary<string, string>
+        {
             ["root"] = "original",
             ["maxBytesPerRun"] = "1"
         };
@@ -168,7 +170,8 @@ public sealed class PolicyBoundaryTests
     private static CapabilityGrant FileReadGrant(string root, DateTimeOffset expiresAt)
         => new(
             "file.read",
-            new Dictionary<string, string> {
+            new Dictionary<string, string>
+            {
                 ["root"] = root,
                 ["maxBytesPerRun"] = "1024"
             },
@@ -256,7 +259,8 @@ public sealed class PolicyBoundaryTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Path)) {
+            if (Directory.Exists(Path))
+            {
                 Directory.Delete(Path, recursive: true);
             }
         }

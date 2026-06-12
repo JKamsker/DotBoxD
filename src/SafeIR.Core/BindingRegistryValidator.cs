@@ -24,14 +24,20 @@ internal static class BindingRegistryValidator
         "RoundF64"
     };
 
+    private static readonly HashSet<string> BuiltInCapabilities = new(StringComparer.Ordinal) {
+        "file.read", "file.write", "time.now", "random", "log.write"
+    };
+
     public static IReadOnlyList<SandboxDiagnostic> Validate(IReadOnlyList<BindingDescriptor> bindings)
     {
         var diagnostics = new List<SandboxDiagnostic>();
-        foreach (var group in bindings.GroupBy(b => b.Id, StringComparer.Ordinal).Where(g => g.Count() > 1)) {
+        foreach (var group in bindings.GroupBy(b => b.Id, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-DUP", $"duplicate binding id '{group.Key}'"));
         }
 
-        foreach (var binding in bindings) {
+        foreach (var binding in bindings)
+        {
             ValidateBinding(binding, diagnostics);
         }
 
@@ -41,26 +47,59 @@ internal static class BindingRegistryValidator
     private static void ValidateBinding(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
         ValidateIdentifier(binding.Id, "binding id", "E-BINDING-ID", diagnostics);
-        if (binding.RequiredCapability is not null) {
+        if (binding.RequiredCapability is not null)
+        {
             ValidateIdentifier(binding.RequiredCapability, "required capability", "E-BINDING-CAP", diagnostics);
         }
 
-        if (!binding.Effects.ContainsOnlyKnownBits()) {
+        if (!binding.Effects.ContainsOnlyKnownBits())
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares an unknown effect"));
         }
 
-        if (binding.Effects.RequiresCapability() && string.IsNullOrWhiteSpace(binding.RequiredCapability)) {
+        if (binding.Effects == SandboxEffect.None)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-EFFECT", $"binding '{binding.Id}' declares no effects"));
+        }
+
+        if (binding.Effects.RequiresCapability() && string.IsNullOrWhiteSpace(binding.RequiredCapability))
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' has side effects but no capability"));
         }
 
-        if (binding.Safety == BindingSafety.DangerousRequiresReview) {
+        if (IsExternal(binding.Safety))
+        {
+            if (string.IsNullOrWhiteSpace(binding.RequiredCapability))
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-BINDING-CAP", $"binding '{binding.Id}' reaches outside the sandbox but has no capability"));
+            }
+
+            if (binding.AuditLevel == AuditLevel.None)
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-BINDING-AUDIT", $"binding '{binding.Id}' reaches outside the sandbox but is not audited"));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(binding.RequiredCapability) &&
+            !BuiltInCapabilities.Contains(binding.RequiredCapability) &&
+            binding.GrantValidator is null)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-BINDING-GRANT",
+                $"binding '{binding.Id}' uses custom capability '{binding.RequiredCapability}' without a grant validator"));
+        }
+
+        if (binding.Safety == BindingSafety.DangerousRequiresReview)
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-DANGER", $"binding '{binding.Id}' is dangerous and cannot be enabled by default"));
         }
 
         ValidateCostModel(binding, diagnostics);
         ValidateCompiledTarget(binding, diagnostics);
-        foreach (var type in binding.Parameters.Append(binding.ReturnType)) {
-            if (!type.IsKnown() || type.IsForbidden()) {
+        foreach (var type in binding.Parameters.Append(binding.ReturnType))
+        {
+            if (!type.IsKnown() || type.IsForbidden())
+            {
                 diagnostics.Add(new SandboxDiagnostic("E-BINDING-TYPE", $"binding '{binding.Id}' exposes forbidden or unknown type '{type}'"));
             }
         }
@@ -69,7 +108,8 @@ internal static class BindingRegistryValidator
     private static void ValidateCostModel(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
         var cost = binding.CostModel;
-        if (cost.BaseFuel < 0 || cost.PerByteFuel < 0 || cost.MaxCallsPerRun is < 0) {
+        if (cost.BaseFuel < 0 || cost.PerByteFuel < 0 || cost.MaxCallsPerRun is < 0)
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COST", $"binding '{binding.Id}' declares a negative resource cost or call limit"));
         }
     }
@@ -80,37 +120,46 @@ internal static class BindingRegistryValidator
         string code,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl)) {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl))
+        {
             diagnostics.Add(new SandboxDiagnostic(
                 code,
                 $"{description} must be non-empty and must not contain control characters"));
             return;
         }
 
-        if (ForbiddenReferenceFragments.Any(fragment => value.Contains(fragment, StringComparison.Ordinal))) {
+        if (ForbiddenReferenceFragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+        {
             diagnostics.Add(new SandboxDiagnostic(code, $"{description} '{value}' looks like a forbidden CLR reference"));
         }
     }
 
+    private static bool IsExternal(BindingSafety safety)
+        => safety is BindingSafety.ReadOnlyExternal or BindingSafety.SideEffectingExternal;
+
     private static void ValidateCompiledTarget(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
     {
-        if (binding.Compiled.Kind != RuntimeStubKind) {
+        if (binding.Compiled.Kind != RuntimeStubKind)
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' has unsupported compiled target kind"));
         }
 
         if (string.IsNullOrWhiteSpace(binding.Compiled.Type) ||
-            string.IsNullOrWhiteSpace(binding.Compiled.Method)) {
+            string.IsNullOrWhiteSpace(binding.Compiled.Method))
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' has an incomplete compiled target"));
             return;
         }
 
         if (binding.Compiled.Type != ApprovedCompiledRuntimeType ||
-            !ApprovedCompiledRuntimeMethods.Contains(binding.Compiled.Method)) {
+            !ApprovedCompiledRuntimeMethods.Contains(binding.Compiled.Method))
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' points compiled code outside the approved runtime stub surface"));
             return;
         }
 
-        if (binding.Compiled.Method != GenericBindingStub && binding.Safety != BindingSafety.PureIntrinsic) {
+        if (binding.Compiled.Method != GenericBindingStub && binding.Safety != BindingSafety.PureIntrinsic)
+        {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' uses a direct compiled runtime method but is not a pure intrinsic"));
         }
     }

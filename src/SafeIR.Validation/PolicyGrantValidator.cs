@@ -14,15 +14,18 @@ internal static class PolicyGrantValidator
         var activeGrants = policy.Grants
             .Where(IsActive)
             .ToArray();
-        foreach (var group in activeGrants.GroupBy(g => g.Id, StringComparer.Ordinal)) {
-            if (group.Count() > 1) {
+        foreach (var group in activeGrants.GroupBy(g => g.Id, StringComparer.Ordinal))
+        {
+            if (group.Count() > 1)
+            {
                 diagnostics.Add(new SandboxDiagnostic(
                     "E-POLICY-GRANT",
                     $"capability '{group.Key}' has multiple active grants"));
             }
         }
 
-        foreach (var grant in activeGrants) {
+        foreach (var grant in activeGrants)
+        {
             ValidateGrant(grant, bindings, requiredCapabilities, diagnostics);
         }
     }
@@ -36,7 +39,8 @@ internal static class PolicyGrantValidator
         IReadOnlySet<string> requiredCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
-        switch (grant.Id) {
+        switch (grant.Id)
+        {
             case "file.read":
                 ValidateFileGrant(grant, diagnostics, allowWriteFlags: false);
                 break;
@@ -47,12 +51,14 @@ internal static class PolicyGrantValidator
                 RequireAllowedKeys(grant, diagnostics, []);
                 break;
             default:
-                if (bindings.TryGetCapabilityGrantValidator(grant.Id, out var validator)) {
+                if (bindings.TryGetCapabilityGrantValidator(grant.Id, out var validator))
+                {
                     validator(grant, diagnostics);
                     return;
                 }
 
-                if (!requiredCapabilities.Contains(grant.Id)) {
+                if (!requiredCapabilities.Contains(grant.Id))
+                {
                     diagnostics.Add(new SandboxDiagnostic(
                         "E-POLICY-GRANT",
                         $"grant '{grant.Id}' is not supported by the prepared module"));
@@ -73,7 +79,9 @@ internal static class PolicyGrantValidator
         RequireAllowedKeys(grant, diagnostics, allowed);
         RequireNonEmpty(grant, diagnostics, "root");
         RequireNonNegativeLong(grant, diagnostics, "maxBytesPerRun");
-        if (allowWriteFlags) {
+        RequireAllowedExtensions(grant, diagnostics);
+        if (allowWriteFlags)
+        {
             RequireOptionalBool(grant, diagnostics, "allowCreate");
             RequireOptionalBool(grant, diagnostics, "allowOverwrite");
         }
@@ -85,8 +93,10 @@ internal static class PolicyGrantValidator
         IEnumerable<string> allowedKeys)
     {
         var allowed = allowedKeys.ToHashSet(StringComparer.Ordinal);
-        foreach (var key in grant.Parameters.Keys) {
-            if (!allowed.Contains(key)) {
+        foreach (var key in grant.Parameters.Keys)
+        {
+            if (!allowed.Contains(key))
+            {
                 Add(diagnostics, grant, $"parameter '{key}' is not supported");
             }
         }
@@ -97,7 +107,8 @@ internal static class PolicyGrantValidator
         List<SandboxDiagnostic> diagnostics,
         string key)
     {
-        if (!grant.Parameters.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)) {
+        if (!grant.Parameters.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+        {
             Add(diagnostics, grant, $"parameter '{key}' is required");
         }
     }
@@ -108,8 +119,39 @@ internal static class PolicyGrantValidator
         string key)
     {
         if (!grant.Parameters.TryGetValue(key, out var value) ||
-            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0) {
+            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
+        {
             Add(diagnostics, grant, $"parameter '{key}' must contain at least one value");
+        }
+    }
+
+    private static void RequireAllowedExtensions(CapabilityGrant grant, List<SandboxDiagnostic> diagnostics)
+    {
+        const string key = "allowedExtensions";
+        if (!grant.Parameters.TryGetValue(key, out var value))
+        {
+            return;
+        }
+
+        var extensions = value.Split(',', StringSplitOptions.TrimEntries);
+        if (extensions.Length == 0 || extensions.All(string.IsNullOrWhiteSpace))
+        {
+            Add(diagnostics, grant, $"parameter '{key}' must contain at least one extension");
+            return;
+        }
+
+        foreach (var extension in extensions)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                Add(diagnostics, grant, $"parameter '{key}' must not contain empty values");
+                continue;
+            }
+
+            if (!IsValidExtension(extension))
+            {
+                Add(diagnostics, grant, $"parameter '{key}' contains invalid extension '{extension}'");
+            }
         }
     }
 
@@ -129,7 +171,8 @@ internal static class PolicyGrantValidator
         if (!grant.Parameters.TryGetValue(key, out var value) ||
             !long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
             parsed < min ||
-            parsed > max) {
+            parsed > max)
+        {
             Add(diagnostics, grant, $"parameter '{key}' must be between {min} and {max}");
         }
     }
@@ -139,7 +182,8 @@ internal static class PolicyGrantValidator
         List<SandboxDiagnostic> diagnostics,
         string key)
     {
-        if (grant.Parameters.TryGetValue(key, out var value) && !bool.TryParse(value, out _)) {
+        if (grant.Parameters.TryGetValue(key, out var value) && !bool.TryParse(value, out _))
+        {
             Add(diagnostics, grant, $"parameter '{key}' must be a boolean");
         }
     }
@@ -148,4 +192,9 @@ internal static class PolicyGrantValidator
         => diagnostics.Add(new SandboxDiagnostic(
             "E-POLICY-GRANT-PARAM",
             $"grant '{grant.Id}' {message}"));
+
+    private static bool IsValidExtension(string extension)
+        => extension.Length > 1 &&
+           extension[0] == '.' &&
+           extension.Skip(1).All(c => !char.IsControl(c) && !char.IsWhiteSpace(c) && c is not '/' and not '\\' and not '.');
 }

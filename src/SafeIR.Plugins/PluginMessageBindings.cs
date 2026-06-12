@@ -28,7 +28,8 @@ public static class PluginMessageBindings
             new BindingCostModel(5, MaxCallsPerRun: 100),
             AuditLevel.PerResource,
             BindingSafety.SideEffectingExternal,
-            async (context, args, cancellationToken) => {
+            async (context, args, cancellationToken) =>
+            {
                 var targetId = ((StringValue)args[0]).Value;
                 var message = Sanitize(((StringValue)args[1]).Value);
                 await sink.SendAsync(targetId, message, cancellationToken).ConfigureAwait(false);
@@ -44,13 +45,26 @@ public static class PluginMessageBindings
                     Message: message));
                 return SandboxValue.Unit;
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            ValidateGrant);
+
+    private static void ValidateGrant(CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var key in grant.Parameters.Keys)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT-PARAM",
+                $"grant '{grant.Id}' parameter '{key}' is not supported"));
+        }
+    }
 
     private static string Sanitize(string value)
     {
         var chars = value.ToCharArray();
-        for (var i = 0; i < chars.Length; i++) {
-            if (char.IsControl(chars[i])) {
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (char.IsControl(chars[i]))
+            {
                 chars[i] = ' ';
             }
         }

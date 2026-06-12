@@ -5,6 +5,7 @@ public sealed record FunctionAnalysis(SandboxType ReturnType, SandboxEffect Effe
 public sealed record ExecutionPlan(
     string ModuleHash,
     string PlanHash,
+    string PlanSeal,
     string PolicyHash,
     string BindingManifestHash,
     SandboxModule Module,

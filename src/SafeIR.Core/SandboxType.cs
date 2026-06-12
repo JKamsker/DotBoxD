@@ -5,8 +5,13 @@ namespace SafeIR;
 public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)
 {
     private static readonly HashSet<string> AllowedScalars = new(StringComparer.Ordinal) {
-        "Unit", "Bool", "I32", "I64", "F32", "F64", "Decimal", "String", "Bytes",
-        "SandboxPath", "SandboxUri", "PlayerId", "ItemId", "QuestId", "MapId", "Command"
+        "Unit", "Bool", "I32", "I64", "F64", "String",
+        "SandboxPath", "SandboxUri", "PlayerId", "ItemId", "QuestId", "MapId"
+    };
+
+    private static readonly HashSet<string> MapKeyScalars = new(StringComparer.Ordinal) {
+        "Bool", "I32", "I64", "String", "SandboxPath", "SandboxUri",
+        "PlayerId", "ItemId", "QuestId", "MapId"
     };
 
     private static readonly HashSet<string> ForbiddenNames = new(StringComparer.OrdinalIgnoreCase) {
@@ -26,7 +31,6 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
     public static SandboxType F64 { get; } = Scalar("F64");
     public static SandboxType String { get; } = Scalar("String");
     public static SandboxType SandboxPath { get; } = Scalar("SandboxPath");
-    public static SandboxType Command { get; } = Scalar("Command");
 
     public static SandboxType Scalar(string name) => new(name, []);
 
@@ -43,6 +47,9 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public bool IsForbidden() => IsForbidden(this);
 
+    public bool IsValidMapKey()
+        => Arguments.Count == 0 && MapKeyScalars.Contains(Name);
+
     public bool Equals(SandboxType? other)
         => other is not null &&
            StringComparer.Ordinal.Equals(Name, other.Name) &&
@@ -52,7 +59,8 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
     {
         var hash = new HashCode();
         hash.Add(Name, StringComparer.Ordinal);
-        foreach (var argument in Arguments) {
+        foreach (var argument in Arguments)
+        {
             hash.Add(argument);
         }
 
@@ -61,7 +69,8 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     public override string ToString()
     {
-        if (Arguments.Count == 0) {
+        if (Arguments.Count == 0)
+        {
             return Name;
         }
 
@@ -74,18 +83,22 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
 
     private static bool IsKnown(SandboxType type, int depth, int maxDepth)
     {
-        if (depth > maxDepth || IsForbiddenName(type.Name)) {
+        if (depth > maxDepth || IsForbiddenName(type.Name))
+        {
             return false;
         }
 
-        if (AllowedScalars.Contains(type.Name)) {
+        if (AllowedScalars.Contains(type.Name))
+        {
             return type.Arguments.Count == 0;
         }
 
-        return type.Name switch {
-            "Option" or "List" => type.Arguments.Count == 1 && type.Arguments.All(a => IsKnown(a, depth + 1, maxDepth)),
-            "Result" or "Map" => type.Arguments.Count == 2 && type.Arguments.All(a => IsKnown(a, depth + 1, maxDepth)),
-            "Tuple" => type.Arguments.Count is >= 2 and <= 8 && type.Arguments.All(a => IsKnown(a, depth + 1, maxDepth)),
+        return type.Name switch
+        {
+            "List" => type.Arguments.Count == 1 && type.Arguments.All(a => IsKnown(a, depth + 1, maxDepth)),
+            "Map" => type.Arguments.Count == 2 &&
+                type.Arguments[0].IsValidMapKey() &&
+                type.Arguments.All(a => IsKnown(a, depth + 1, maxDepth)),
             _ => false
         };
     }

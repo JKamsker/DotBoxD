@@ -22,36 +22,39 @@ Unit
 Bool
 I32
 I64
-F32
 F64
-Decimal optional
 String
-Bytes optional
+SandboxPath
+SandboxUri
+PlayerId
+ItemId
+QuestId
+MapId
 ```
 
 Notes:
 
 - `String` is a sandbox string value, not permission to use arbitrary `System.String` APIs.
-- `Bytes` should be quota-controlled and immutable unless using safe buffers.
-- `Decimal` is useful for money/economy logic but can be added later.
+- `F32`, `Decimal`, and `Bytes` are not recognized type IDs until the runtime has matching
+  sandbox values, quota rules, and interpreter/compiler support.
 
 ## Composite types
 
 ```text
-Option<T>
-Result<TOk, TError>
 List<T>
 Map<TKey, TValue>
-Record { field: Type, ... }
-Tuple<T1, T2, ...> optional
 ```
 
 Restrictions:
 
-- `TKey` for maps must be hashable in sandbox semantics.
+- `TKey` for maps must be a scalar with stable sandbox hash/equality semantics:
+  `Bool`, `I32`, `I64`, `String`, `SandboxPath`, `SandboxUri`, `PlayerId`, `ItemId`,
+  `QuestId`, or `MapId`.
 - collection sizes are budgeted.
 - no arbitrary `IEnumerable<T>` from CLR.
 - no arbitrary LINQ.
+- `Option<T>`, `Result<TOk,TError>`, `Tuple<...>`, and record types are deferred. They are
+  invalid type IDs until their value representation and runtime semantics are implemented.
 
 ## Domain/reference types
 
@@ -70,6 +73,7 @@ SandboxUri
 ```
 
 A `PlayerId` is data. It is not a `Player` object with methods.
+Domain IDs are opaque sandbox scalars. They must not expose host object references or CLR handles.
 
 ## Forbidden types
 
@@ -288,8 +292,10 @@ Reject a module if:
 - a type is marked host-internal
 - a function exposes a forbidden type
 - a binding exposes a forbidden type
+- a `Map<TKey,TValue>` uses a key type outside the supported scalar key set
 - a conversion is not explicitly defined
-- a nullable-like value is used without `Option<T>` or equivalent
+- a deferred type family such as `Option`, `Result`, `Tuple`, `Record`, `Bytes`, or `Decimal`
+  appears before it has explicit runtime support
 
 ## Versioning
 

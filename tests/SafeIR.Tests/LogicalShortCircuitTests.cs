@@ -3,7 +3,7 @@ using SafeIR.Runtime;
 
 namespace SafeIR.Tests;
 
-public sealed class LogicalShortCircuitTests
+public sealed partial class LogicalShortCircuitTests
 {
     public static TheoryData<ExecutionMode> Modes()
         => new() {
@@ -111,7 +111,8 @@ public sealed class LogicalShortCircuitTests
     public async Task Cheap_first_does_not_reorder_side_effecting_operands()
     {
         var calls = 0;
-        var host = SandboxHost.Create(builder => {
+        var host = SandboxHost.Create(builder =>
+        {
             builder.AddBinding(EffectfulBoolBinding(() => calls++));
             builder.UseInterpreter();
         });
@@ -137,8 +138,10 @@ public sealed class LogicalShortCircuitTests
         ExecutionMode mode)
     {
         var calls = 0;
-        var host = SandboxHost.Create(builder => {
-            builder.AddBinding(BoolBinding(() => {
+        var host = SandboxHost.Create(builder =>
+        {
+            builder.AddBinding(BoolBinding(() =>
+            {
                 calls++;
                 return bindingReturn;
             }));
@@ -151,7 +154,8 @@ public sealed class LogicalShortCircuitTests
             plan,
             "main",
             SandboxValue.Unit,
-            new SandboxExecutionOptions {
+            new SandboxExecutionOptions
+            {
                 Mode = mode,
                 AllowFallbackToInterpreter = false
             });
@@ -179,23 +183,44 @@ public sealed class LogicalShortCircuitTests
             SemVersion.One,
             [],
             SandboxType.Bool,
-            SandboxEffect.Cpu | SandboxEffect.GameStateRead,
+            SandboxEffect.Cpu | SandboxEffect.GameStateRead | SandboxEffect.Audit,
             "game.read",
             BindingCostModel.Fixed(1),
-            AuditLevel.None,
+            AuditLevel.PerCall,
             BindingSafety.SideEffectingExternal,
-            (_, _, _) => {
+            (context, _, _) =>
+            {
                 invoke();
+                context.Audit.Write(new SandboxAuditEvent(
+                    context.RunId,
+                    "BindingCall",
+                    DateTimeOffset.UtcNow,
+                    true,
+                    BindingId: "test.effectfulBool",
+                    CapabilityId: "game.read",
+                    Effect: SandboxEffect.GameStateRead,
+                    ResourceId: "game:test"));
                 return ValueTask.FromResult(SandboxValue.FromBool(true));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            NoParameterGrant);
 
     private static SandboxPolicy GameReadPolicy()
         => new(
             "game-read",
-            SandboxEffect.Cpu | SandboxEffect.GameStateRead,
+            SandboxEffect.Cpu | SandboxEffect.GameStateRead | SandboxEffect.Audit,
             [new CapabilityGrant("game.read", new Dictionary<string, string>())],
             new ResourceLimits(MaxFuel: 1_000));
+
+    private static void NoParameterGrant(CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var key in grant.Parameters.Keys)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT-PARAM",
+                $"grant '{grant.Id}' parameter '{key}' is not supported"));
+        }
+    }
 
     private static string ModuleJson(string expression)
         => $$"""
@@ -213,4 +238,5 @@ public sealed class LogicalShortCircuitTests
           ]
         }
         """;
+
 }

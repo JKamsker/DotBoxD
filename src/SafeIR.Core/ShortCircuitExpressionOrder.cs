@@ -9,13 +9,15 @@ public static class ShortCircuitExpressionOrder
         IBindingCatalog bindings,
         IReadOnlyDictionary<string, FunctionAnalysis> functions)
     {
-        if (expression.Operator is not ("&&" or "||")) {
+        if (expression.Operator is not ("&&" or "||"))
+        {
             return new ShortCircuitOperands(expression.Left, expression.Right, Reordered: false);
         }
 
         var left = Estimate(expression.Left, bindings, functions);
         var right = Estimate(expression.Right, bindings, functions);
-        if (left.CanReorder && right.CanReorder && right.Cost < left.Cost) {
+        if (left.CanReorder && right.CanReorder && right.Cost < left.Cost)
+        {
             return new ShortCircuitOperands(expression.Right, expression.Left, Reordered: true);
         }
 
@@ -26,7 +28,8 @@ public static class ShortCircuitExpressionOrder
         Expression expression,
         IBindingCatalog bindings,
         IReadOnlyDictionary<string, FunctionAnalysis> functions)
-        => expression switch {
+        => expression switch
+        {
             LiteralExpression => CostEstimate.Pure(0),
             VariableExpression => CostEstimate.Pure(1),
             UnaryExpression unary => Estimate(unary.Operand, bindings, functions).Add(1),
@@ -43,18 +46,21 @@ public static class ShortCircuitExpressionOrder
         IReadOnlyDictionary<string, FunctionAnalysis> functions)
     {
         var estimate = CostEstimate.Pure(8);
-        foreach (var argument in call.Arguments) {
+        foreach (var argument in call.Arguments)
+        {
             estimate = estimate.Combine(Estimate(argument, bindings, functions));
         }
 
-        if (bindings.TryGet(call.Name, out var binding)) {
+        if (functions.TryGetValue(call.Name, out var function))
+        {
+            return estimate.Combine(new CostEstimate(20, IsPure(function.Effects)));
+        }
+
+        if (bindings.TryGet(call.Name, out var binding))
+        {
             return estimate.Combine(new CostEstimate(
                 Math.Max(0, binding.CostModel.BaseFuel),
                 IsPure(binding.Effects)));
-        }
-
-        if (functions.TryGetValue(call.Name, out var function)) {
-            return estimate.Combine(new CostEstimate(20, IsPure(function.Effects)));
         }
 
         return estimate.Combine(CostEstimate.NotReorderable(long.MaxValue / 4));

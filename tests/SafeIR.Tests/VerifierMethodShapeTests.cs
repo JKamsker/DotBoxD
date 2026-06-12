@@ -6,6 +6,15 @@ namespace SafeIR.Tests;
 
 public sealed class VerifierMethodShapeTests
 {
+    [Fact]
+    public async Task Verifier_rejects_module_level_methods()
+    {
+        var result = await VerifyAsync(AssemblyWithGlobalMethod());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == "V-MODULE-SURFACE");
+    }
+
     [Theory]
     [InlineData("Helper")]
     [InlineData("Fn_alpha")]
@@ -52,6 +61,30 @@ public sealed class VerifierMethodShapeTests
             TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
         DefineVoidMethod(type, "Execute", MethodAttributes.Public | MethodAttributes.Static);
         DefineVoidMethod(type, methodName, MethodAttributes.Private | MethodAttributes.Static);
+        type.CreateType();
+
+        using var stream = new MemoryStream();
+        assembly.Save(stream);
+        return stream.ToArray();
+    }
+
+    private static byte[] AssemblyWithGlobalMethod()
+    {
+        var assembly = new PersistedAssemblyBuilder(
+            new AssemblyName("GlobalMethoded" + Guid.NewGuid().ToString("N")),
+            typeof(object).Assembly);
+        var module = assembly.DefineDynamicModule("GlobalMethodedModule");
+        var global = module.DefineGlobalMethod(
+            "Global_0",
+            MethodAttributes.Public | MethodAttributes.Static,
+            typeof(void),
+            []);
+        global.GetILGenerator().Emit(OpCodes.Ret);
+        module.CreateGlobalFunctions();
+        var type = module.DefineType(
+            "SafeIR.Generated.Module_0123456789abcdef",
+            TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+        VerifierTestHelpers.DefineValidExecute(type);
         type.CreateType();
 
         using var stream = new MemoryStream();

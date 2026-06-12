@@ -6,11 +6,6 @@ internal delegate SandboxType ExpressionAnalyzer(Expression expression, Function
 
 internal sealed class CollectionCallAnalyzer
 {
-    private static readonly HashSet<string> MapKeyTypes = new(StringComparer.Ordinal) {
-        "Bool", "I32", "I64", "String", "SandboxPath", "SandboxUri",
-        "PlayerId", "ItemId", "QuestId", "MapId"
-    };
-
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly ExpressionAnalyzer _analyzeExpression;
 
@@ -22,12 +17,14 @@ internal sealed class CollectionCallAnalyzer
 
     public bool TryAnalyze(CallExpression call, FunctionScope scope, ref SandboxEffect effects, out SandboxType type)
     {
-        if (!IsCollectionCall(call.Name)) {
+        if (!IsCollectionCall(call.Name))
+        {
             type = SandboxType.Unit;
             return false;
         }
 
-        type = call.Name switch {
+        type = call.Name switch
+        {
             "list.empty" => AnalyzeListEmpty(call, ref effects),
             "list.of" => AnalyzeListOf(call, scope, ref effects),
             "list.count" => AnalyzeListCount(call, scope, ref effects),
@@ -46,11 +43,13 @@ internal sealed class CollectionCallAnalyzer
     private SandboxType AnalyzeListEmpty(CallExpression call, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 0) {
+        if (call.Arguments.Count != 0)
+        {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-ARITY", "list.empty expects 0 arguments", Span: call.Span));
         }
 
-        if (call.GenericType is null) {
+        if (call.GenericType is null)
+        {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", "list.empty requires genericType", Span: call.Span));
             return SandboxType.List(SandboxType.Unit);
         }
@@ -63,7 +62,8 @@ internal sealed class CollectionCallAnalyzer
     {
         effects |= SandboxEffect.Alloc;
         SandboxType? itemType = null;
-        foreach (var arg in call.Arguments) {
+        foreach (var arg in call.Arguments)
+        {
             var current = _analyzeExpression(arg, scope, ref effects);
             itemType ??= current;
             Require(current, itemType, arg.Span);
@@ -74,7 +74,8 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType AnalyzeListCount(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
-        if (call.Arguments.Count != 1) {
+        if (call.Arguments.Count != 1)
+        {
             Arity(call, 1);
             return SandboxType.I32;
         }
@@ -85,7 +86,8 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType AnalyzeListGet(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
-        if (call.Arguments.Count != 2) {
+        if (call.Arguments.Count != 2)
+        {
             Arity(call, 2);
             return SandboxType.Unit;
         }
@@ -98,14 +100,16 @@ internal sealed class CollectionCallAnalyzer
     private SandboxType AnalyzeListAdd(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 2) {
+        if (call.Arguments.Count != 2)
+        {
             Arity(call, 2);
             return SandboxType.List(SandboxType.Unit);
         }
 
         var listType = RequireList(_analyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
         var itemType = _analyzeExpression(call.Arguments[1], scope, ref effects);
-        if (listType is null) {
+        if (listType is null)
+        {
             return SandboxType.List(itemType);
         }
 
@@ -116,7 +120,8 @@ internal sealed class CollectionCallAnalyzer
     private SandboxType AnalyzeMapEmpty(CallExpression call, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 0) {
+        if (call.Arguments.Count != 0)
+        {
             Arity(call, 0);
         }
 
@@ -126,14 +131,16 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType AnalyzeMapContainsKey(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
-        if (call.Arguments.Count != 2) {
+        if (call.Arguments.Count != 2)
+        {
             Arity(call, 2);
             return SandboxType.Bool;
         }
 
         var mapType = RequireMap(_analyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
         var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects);
-        if (mapType is not null) {
+        if (mapType is not null)
+        {
             Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         }
 
@@ -142,14 +149,16 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType AnalyzeMapGet(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
-        if (call.Arguments.Count != 2) {
+        if (call.Arguments.Count != 2)
+        {
             Arity(call, 2);
             return SandboxType.Unit;
         }
 
         var mapType = RequireMap(_analyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
         var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects);
-        if (mapType is null) {
+        if (mapType is null)
+        {
             return SandboxType.Unit;
         }
 
@@ -160,7 +169,8 @@ internal sealed class CollectionCallAnalyzer
     private SandboxType AnalyzeMapSet(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 3) {
+        if (call.Arguments.Count != 3)
+        {
             Arity(call, 3);
             return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
         }
@@ -168,7 +178,8 @@ internal sealed class CollectionCallAnalyzer
         var mapType = RequireMap(_analyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
         var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects);
         var valueType = _analyzeExpression(call.Arguments[2], scope, ref effects);
-        if (mapType is null) {
+        if (mapType is null)
+        {
             return SandboxType.Map(keyType, valueType);
         }
 
@@ -180,14 +191,16 @@ internal sealed class CollectionCallAnalyzer
     private SandboxType AnalyzeMapRemove(CallExpression call, FunctionScope scope, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
-        if (call.Arguments.Count != 2) {
+        if (call.Arguments.Count != 2)
+        {
             Arity(call, 2);
             return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
         }
 
         var mapType = RequireMap(_analyzeExpression(call.Arguments[0], scope, ref effects), call.Arguments[0].Span);
         var keyType = _analyzeExpression(call.Arguments[1], scope, ref effects);
-        if (mapType is not null) {
+        if (mapType is not null)
+        {
             Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         }
 
@@ -196,7 +209,8 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType? RequireList(SandboxType actual, SourceSpan span)
     {
-        if (actual.Name == "List" && actual.Arguments.Count == 1) {
+        if (actual.Name == "List" && actual.Arguments.Count == 1)
+        {
             return actual;
         }
 
@@ -206,7 +220,8 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType? RequireMap(SandboxType actual, SourceSpan span)
     {
-        if (actual.Name == "Map" && actual.Arguments.Count == 2) {
+        if (actual.Name == "Map" && actual.Arguments.Count == 2)
+        {
             RequireMapKey(actual.Arguments[0], span);
             return actual;
         }
@@ -217,7 +232,8 @@ internal sealed class CollectionCallAnalyzer
 
     private SandboxType? RequireMapGeneric(CallExpression call)
     {
-        if (call.GenericType is null) {
+        if (call.GenericType is null)
+        {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", "map.empty requires Map<K,V> genericType", Span: call.Span));
             return null;
         }
@@ -228,7 +244,8 @@ internal sealed class CollectionCallAnalyzer
 
     private void RequireMapKey(SandboxType keyType, SourceSpan span)
     {
-        if (keyType.Arguments.Count == 0 && MapKeyTypes.Contains(keyType.Name)) {
+        if (keyType.IsValidMapKey())
+        {
             return;
         }
 
@@ -237,7 +254,8 @@ internal sealed class CollectionCallAnalyzer
 
     private void Require(SandboxType actual, SandboxType expected, SourceSpan span)
     {
-        if (actual != expected) {
+        if (actual != expected)
+        {
             _diagnostics.Add(new SandboxDiagnostic("E-TYPE-MISMATCH", $"expected {expected}, got {actual}", Span: span));
         }
     }
@@ -250,7 +268,8 @@ internal sealed class CollectionCallAnalyzer
 
     private void CheckKnownType(SandboxType type, SourceSpan span)
     {
-        if (!type.IsKnown() || type.IsForbidden()) {
+        if (!type.IsKnown() || type.IsForbidden())
+        {
             _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{type}'", Span: span));
         }
     }

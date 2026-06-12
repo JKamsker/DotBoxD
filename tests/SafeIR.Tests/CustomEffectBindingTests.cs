@@ -77,7 +77,8 @@ public sealed class CustomEffectBindingTests
     }
 
     private static SandboxHost HostWithCounterBinding(Action<int> record)
-        => SandboxHost.Create(builder => {
+        => SandboxHost.Create(builder =>
+        {
             builder.AddBinding(CounterBinding(record));
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
@@ -86,7 +87,7 @@ public sealed class CustomEffectBindingTests
     private static SandboxPolicy GameWritePolicy()
         => new(
             "game-write",
-            SandboxEffect.Cpu | SandboxEffect.GameStateWrite,
+            SandboxEffect.Cpu | SandboxEffect.GameStateWrite | SandboxEffect.Audit,
             [new CapabilityGrant("game.write", new Dictionary<string, string>())],
             new ResourceLimits(MaxFuel: 1_000));
 
@@ -96,17 +97,38 @@ public sealed class CustomEffectBindingTests
             SemVersion.One,
             [SandboxType.I32],
             SandboxType.I32,
-            SandboxEffect.Cpu | SandboxEffect.GameStateWrite,
+            SandboxEffect.Cpu | SandboxEffect.GameStateWrite | SandboxEffect.Audit,
             "game.write",
             BindingCostModel.Fixed(1),
-            AuditLevel.None,
+            AuditLevel.PerCall,
             BindingSafety.SideEffectingExternal,
-            (_, args, _) => {
+            (context, args, _) =>
+            {
                 var value = ((I32Value)args[0]).Value;
                 record(value);
+                context.Audit.Write(new SandboxAuditEvent(
+                    context.RunId,
+                    "BindingCall",
+                    DateTimeOffset.UtcNow,
+                    true,
+                    BindingId: "app.counter",
+                    CapabilityId: "game.write",
+                    Effect: SandboxEffect.GameStateWrite,
+                    ResourceId: "counter:test"));
                 return ValueTask.FromResult(SandboxValue.FromInt32(value));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            NoParameterGrant);
+
+    private static void NoParameterGrant(CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var key in grant.Parameters.Keys)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT-PARAM",
+                $"grant '{grant.Id}' parameter '{key}' is not supported"));
+        }
+    }
 
     private static string CounterModule()
         => """

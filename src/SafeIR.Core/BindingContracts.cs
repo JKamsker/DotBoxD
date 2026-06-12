@@ -88,7 +88,10 @@ public sealed class BindingRegistry : IBindingCatalog
         _grantValidators = frozen
             .Where(b => !string.IsNullOrWhiteSpace(b.RequiredCapability) && b.GrantValidator is not null)
             .GroupBy(b => b.RequiredCapability!, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.First().GrantValidator!, StringComparer.Ordinal);
+            .ToDictionary(
+                g => g.Key,
+                g => ComposeGrantValidators(g.Select(b => b.GrantValidator!).ToArray()),
+                StringComparer.Ordinal);
         ManifestHash = ComputeManifestHash(Signatures);
     }
 
@@ -100,7 +103,8 @@ public sealed class BindingRegistry : IBindingCatalog
 
     public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
     {
-        if (_grantValidators.TryGetValue(capabilityId, out var found)) {
+        if (_grantValidators.TryGetValue(capabilityId, out var found))
+        {
             validator = found;
             return true;
         }
@@ -111,7 +115,8 @@ public sealed class BindingRegistry : IBindingCatalog
 
     public bool TryGet(string id, out BindingSignature binding)
     {
-        if (_bindings.TryGetValue(id, out var descriptor)) {
+        if (_bindings.TryGetValue(id, out var descriptor))
+        {
             binding = descriptor.Signature;
             return true;
         }
@@ -131,6 +136,15 @@ public sealed class BindingRegistry : IBindingCatalog
 
     private static BindingDescriptor Freeze(BindingDescriptor binding)
         => binding with { Parameters = binding.Parameters.ToArray() };
+
+    private static CapabilityGrantValidator ComposeGrantValidators(IReadOnlyList<CapabilityGrantValidator> validators)
+        => (grant, diagnostics) =>
+        {
+            foreach (var validator in validators)
+            {
+                validator(grant, diagnostics);
+            }
+        };
 
     private static string BindingRecord(BindingSignature binding)
     {
@@ -182,7 +196,8 @@ public sealed class BindingRegistryBuilder
     public BindingRegistry Build()
     {
         var diagnostics = BindingRegistryValidator.Validate(_bindings);
-        if (diagnostics.Count > 0) {
+        if (diagnostics.Count > 0)
+        {
             throw new SandboxValidationException(diagnostics);
         }
 
