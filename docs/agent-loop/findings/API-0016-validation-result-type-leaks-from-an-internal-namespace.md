@@ -1,19 +1,19 @@
 ---
 id: API-0016
 area: api_coherence
-status: claimed
+status: fixed_pending_verification
 priority: medium
 title: Validation result type leaks from an Internal namespace
 dedup_key: api/validation/module-validation-result/internal-namespace-leak
 created_at: 2026-06-12T22:29:17.5418844+00:00
 created_by: completeness-api-producer
 created_commit: 
-updated_at: 2026-06-13T05:55:19.5030479+00:00
+updated_at: 2026-06-13T05:57:54.5530223+00:00
 claimed_by: worker
 claimed_at: 2026-06-13T05:55:19.5030479+00:00
 claim_branch: workflow-work
-fixed_by: 
-fixed_at: 
+fixed_by: worker
+fixed_at: 2026-06-13T05:57:54.5530223+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

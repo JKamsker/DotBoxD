@@ -1,4 +1,4 @@
-namespace SafeIR.Validation.Internal;
+namespace SafeIR.Validation;
 
 using System.Collections.Frozen;
 using System.Collections.ObjectModel;

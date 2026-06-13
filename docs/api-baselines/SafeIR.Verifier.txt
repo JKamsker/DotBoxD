@@ -17,6 +17,9 @@ public const string StringName = "System.String"
 public const string VoidName = "System.Void"
 public interface IGeneratedAssemblyVerifier
 public IReadOnlyList<int> SwitchTargets => SwitchTargetsValue ?? []
+public IReadOnlyList<string> OptimizationFlags
+public IReadOnlyList<string>? OptimizationFlags
+public IReadOnlyList<VerificationDiagnostic> Diagnostics
 public IReadOnlySet<string> AllowedAssemblies { get => _allowedAssemblies; init => _allowedAssemblies = Freeze(value); }
 public IReadOnlySet<string> AllowedAssemblyIdentities { get => _allowedAssemblyIdentities; init => _allowedAssemblyIdentities = Freeze(value); }
 public IReadOnlySet<string> AllowedMembers { get => _allowedMembers; init => _allowedMembers = Freeze(value); }

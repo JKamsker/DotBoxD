@@ -7,7 +7,9 @@ Interpreted mode executes verified IR directly. Compiled mode is only a runtime 
 ## Current Packages
 
 - `SafeIR.Core`: IR model, policy model, resource metering, canonical hashing.
-- `SafeIR.Validation`: structural, type, effect, policy, and binding validation.
+- `SafeIR.Validation`: structural, type, effect, policy, and binding validation. `ModuleValidator`
+  returns the public `ModuleValidationResult` evidence shape with diagnostics, function analysis,
+  module effects, required capabilities, and binding references.
 - `SafeIR.Runtime`: safe host bindings for files, time, random, logging, strings, and math.
 - `SafeIR.Serialization.Json`: JSON IR importer and host import extensions.
 - `SafeIR.Transport.Http`: HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.

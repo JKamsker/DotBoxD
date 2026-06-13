@@ -91,13 +91,13 @@ public sealed record VerificationResult(
 
 internal static class VerificationModelCopy
 {
-    public static IReadOnlyList<T> List<T>(IEnumerable<T> values)
+    internal static IReadOnlyList<T> List<T>(IEnumerable<T> values)
     {
         ArgumentNullException.ThrowIfNull(values);
         return new ReadOnlyCollection<T>(values.ToArray());
     }
 
-    public static IReadOnlyList<T>? NullableList<T>(IEnumerable<T>? values)
+    internal static IReadOnlyList<T>? NullableList<T>(IEnumerable<T>? values)
         => values is null ? null : List(values);
 }
 

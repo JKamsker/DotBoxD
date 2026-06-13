@@ -1,11 +1,25 @@
 using SafeIR.Compiler;
-using SafeIR.Validation.Internal;
+using SafeIR.Validation;
 using SafeIR.Verifier;
 
 namespace SafeIR.Tests;
 
 public sealed class PublicEvidenceImmutabilityTests
 {
+    private static readonly SourceSpan Span = new(1, 1);
+    private static readonly Expression Literal = new LiteralExpression(SandboxValue.FromInt32(1), Span);
+
+    [Fact]
+    public void Module_validation_result_is_named_from_public_validation_namespace()
+    {
+        ModuleValidationResult result = new ModuleValidator().Validate(
+            EmptyModule(),
+            new BindingRegistryBuilder().Build());
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Fact]
     public void Module_validation_failure_snapshots_diagnostics()
     {
@@ -144,4 +158,10 @@ public sealed class PublicEvidenceImmutabilityTests
             flags,
             artifactHash,
             DateTimeOffset.UtcNow);
+
+    private static SandboxModule EmptyModule()
+        => new("module", SemVersion.One, SemVersion.One, [], [EmptyFunction()], new Dictionary<string, string>());
+
+    private static SandboxFunction EmptyFunction()
+        => new("main", true, [], SandboxType.I32, [new ReturnStatement(Literal, Span)]);
 }
