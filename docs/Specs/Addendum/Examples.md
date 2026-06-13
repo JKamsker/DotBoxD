@@ -405,6 +405,38 @@ This is the contract documented in `docs/Specs/Initial/safe-ir-sandbox-spec/spec
 observer failures are isolated and do not change the returned `SandboxExecutionResult` or prevent
 later observers from receiving the same sequenced audit events.
 
+## Resource Limits Example
+
+`WithFuel(...)` is only one of the public quota knobs. `SandboxPolicyBuilder` also exposes
+`WithMaxLoopIterations`, `WithMaxHostCalls`, `WithWallTime`, `WithMaxCallDepth`, `WithMaxAllocatedBytes`,
+the collection-shape limits (`WithMaxListLength`, `WithMaxMapEntries`, `WithMaxCollectionDepth`,
+`WithMaxTotalCollectionElements`), the log limits (`WithMaxLogEvents`, `WithMaxLogMessageLength`), and the
+string limits (`WithMaxStringLength`, `WithMaxTotalStringBytes`). The runnable proof lives in
+`examples\Addendum\SafeIR.AddendumExamples\Examples\Capabilities\ResourceLimitsExample.cs` and is
+exercised by the addendum example run and the docs smoke script.
+
+The example runs small JSON IR modules under intentionally tight non-fuel limits and prints the public
+result code plus the matching `SandboxResourceUsage` counter for each case:
+
+```csharp
+var policy = SandboxPolicyBuilder.Create()
+    .WithFuel(10_000)
+    .WithMaxLoopIterations(3)
+    .Build();
+
+var plan = await host.PrepareAsync(module, policy);
+var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+// result.Error?.Code is SandboxErrorCode.QuotaExceeded and
+// result.ResourceUsage.LoopIterations reports the metered iterations.
+```
+
+The walkthrough covers loop-iteration exhaustion, host-call exhaustion, wall-time timeout
+(`SandboxErrorCode.Timeout`, not `QuotaExceeded`), list-shape rejection, and string-shape rejection.
+Each case asserts the documented `SandboxErrorCode` and the corresponding `SandboxResourceUsage` field so
+integrators can recognize a denied run and read back what the runtime metered, matching the resource-usage
+contract in `docs/Specs/Initial/safe-ir-sandbox-spec/spec/16-public-api.md`.
+
 ## Flagship Fire Damage Example
 
 The flagship example is implemented in:

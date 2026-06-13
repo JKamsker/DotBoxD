@@ -44,8 +44,13 @@ public abstract record SandboxValue
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
     {
-        var snapshot = ModelCopy.List(values);
-        return new ListValue(snapshot, snapshot.Count == 0 ? SandboxType.Unit : snapshot[0].Type);
+        ArgumentNullException.ThrowIfNull(values);
+
+        // Infer the item type from the original list and take exactly one defensive
+        // snapshot via the owned-array path, instead of copying once here and again in
+        // the ListValue constructor.
+        var itemType = values.Count == 0 ? SandboxType.Unit : values[0].Type;
+        return FromOwnedList(values.ToArray(), itemType);
     }
 
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values, SandboxType itemType)

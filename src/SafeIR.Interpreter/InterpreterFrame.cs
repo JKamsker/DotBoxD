@@ -4,23 +4,43 @@ using SafeIR;
 
 internal sealed class InterpreterFrame
 {
-    private InterpreterFrame(string functionId, Dictionary<string, SandboxValue> locals)
+    private readonly FunctionFrameLayout _layout;
+    private readonly SandboxValue?[] _slots;
+
+    private InterpreterFrame(FunctionFrameLayout layout, SandboxValue?[] slots)
     {
-        FunctionId = functionId;
-        Locals = locals;
+        _layout = layout;
+        _slots = slots;
     }
 
-    public string FunctionId { get; }
+    public string FunctionId => _layout.FunctionId;
 
-    public Dictionary<string, SandboxValue> Locals { get; }
-
-    public static InterpreterFrame Create(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+    public SandboxValue Read(string name)
     {
-        var locals = new Dictionary<string, SandboxValue>(StringComparer.Ordinal);
+        var slot = _layout.GetSlot(name);
+        return _slots[slot]
+            ?? throw new SandboxRuntimeException(
+                new SandboxError(SandboxErrorCode.ValidationError, $"local '{name}' read before assignment"));
+    }
+
+    public void Write(string name, SandboxValue value)
+        => _slots[_layout.GetSlot(name)] = value;
+
+    public static InterpreterFrame Create(
+        FunctionFrameLayout layout,
+        SandboxFunction function,
+        IReadOnlyList<SandboxValue> args)
+    {
+        var slots = layout.SlotCount == 0
+            ? System.Array.Empty<SandboxValue?>()
+            : new SandboxValue?[layout.SlotCount];
+
+        // Parameters occupy the leading slots in declaration order (see
+        // FunctionFrameLayout.Build), so positional arguments map directly.
         for (var i = 0; i < function.Parameters.Count; i++) {
-            locals[function.Parameters[i].Name] = args[i];
+            slots[i] = args[i];
         }
 
-        return new InterpreterFrame(function.Id, locals);
+        return new InterpreterFrame(layout, slots);
     }
 }

@@ -24,7 +24,11 @@ internal sealed class ExpressionEvaluator
         _moduleHash = moduleHash;
     }
 
-    public async ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
+    // Non-async dispatch: literals, variables, arithmetic, and pure helper calls all
+    // complete synchronously, so they return a finished ValueTask without ever
+    // allocating an async state machine. Only genuinely asynchronous work (a host
+    // binding whose ValueTask is still pending) walks the async continuation path.
+    public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
     {
         _context.ChargeFuel(1);
         InterpreterTrace.Write(
@@ -35,60 +39,116 @@ internal sealed class ExpressionEvaluator
             "expression",
             expression.GetType().Name,
             expression.Span);
-        var value = expression switch
+        return expression switch
         {
-            LiteralExpression literal => ChargeLiteral(literal.Value),
-            VariableExpression variable => frame.Locals[variable.Name],
-            UnaryExpression unary => await EvaluateUnaryAsync(unary, frame).ConfigureAwait(false),
-            BinaryExpression binary => await EvaluateBinaryAsync(binary, frame).ConfigureAwait(false),
-            CallExpression call => await EvaluateCallAsync(call, frame).ConfigureAwait(false),
+            LiteralExpression literal => new ValueTask<SandboxValue>(ChargeLiteral(literal.Value)),
+            VariableExpression variable => new ValueTask<SandboxValue>(frame.Read(variable.Name)),
+            UnaryExpression unary => EvaluateUnary(unary, frame),
+            BinaryExpression binary => EvaluateBinary(binary, frame),
+            CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
-        return value;
     }
 
-    private async ValueTask<SandboxValue> EvaluateUnaryAsync(UnaryExpression unary, InterpreterFrame frame)
+    private ValueTask<SandboxValue> EvaluateUnary(UnaryExpression unary, InterpreterFrame frame)
     {
-        var value = await EvaluateAsync(unary.Operand, frame).ConfigureAwait(false);
-        return unary.Operator switch
+        var operand = EvaluateAsync(unary.Operand, frame);
+        return operand.IsCompletedSuccessfully
+            ? new ValueTask<SandboxValue>(ApplyUnary(unary, operand.Result))
+            : AwaitUnary(unary, operand);
+    }
+
+    private async ValueTask<SandboxValue> AwaitUnary(UnaryExpression unary, ValueTask<SandboxValue> operand)
+        => ApplyUnary(unary, await operand.ConfigureAwait(false));
+
+    private SandboxValue ApplyUnary(UnaryExpression unary, SandboxValue value)
+        => unary.Operator switch
         {
             "!" => SandboxValue.FromBool(!((BoolValue)value).Value),
             "-" => SandboxNumericOperations.Negate(value),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported unary operator"))
         };
+
+    private ValueTask<SandboxValue> EvaluateBinary(BinaryExpression binary, InterpreterFrame frame)
+    {
+        if (binary.Operator is "&&" or "||")
+        {
+            return EvaluateShortCircuit(binary, frame);
+        }
+
+        var leftTask = EvaluateAsync(binary.Left, frame);
+        if (!leftTask.IsCompletedSuccessfully)
+        {
+            return AwaitBinary(binary, leftTask, frame);
+        }
+
+        var rightTask = EvaluateAsync(binary.Right, frame);
+        if (!rightTask.IsCompletedSuccessfully)
+        {
+            return AwaitBinaryRight(binary, leftTask.Result, rightTask);
+        }
+
+        return new ValueTask<SandboxValue>(ApplyBinary(binary, leftTask.Result, rightTask.Result));
     }
 
-    private async ValueTask<SandboxValue> EvaluateBinaryAsync(BinaryExpression binary, InterpreterFrame frame)
+    private async ValueTask<SandboxValue> AwaitBinary(
+        BinaryExpression binary,
+        ValueTask<SandboxValue> leftTask,
+        InterpreterFrame frame)
     {
-        if (binary.Operator == "&&")
-        {
-            var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
-            var first = (BoolValue)await EvaluateAsync(order.First, frame).ConfigureAwait(false);
-            if (!first.Value)
-            {
-                return SandboxValue.FromBool(false);
-            }
-
-            var second = (BoolValue)await EvaluateAsync(order.Second, frame).ConfigureAwait(false);
-            return SandboxValue.FromBool(second.Value);
-        }
-
-        if (binary.Operator == "||")
-        {
-            var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
-            var first = (BoolValue)await EvaluateAsync(order.First, frame).ConfigureAwait(false);
-            if (first.Value)
-            {
-                return SandboxValue.FromBool(true);
-            }
-
-            var second = (BoolValue)await EvaluateAsync(order.Second, frame).ConfigureAwait(false);
-            return SandboxValue.FromBool(second.Value);
-        }
-
-        var left = await EvaluateAsync(binary.Left, frame).ConfigureAwait(false);
+        var left = await leftTask.ConfigureAwait(false);
         var right = await EvaluateAsync(binary.Right, frame).ConfigureAwait(false);
-        return binary.Operator switch
+        return ApplyBinary(binary, left, right);
+    }
+
+    private async ValueTask<SandboxValue> AwaitBinaryRight(
+        BinaryExpression binary,
+        SandboxValue left,
+        ValueTask<SandboxValue> rightTask)
+        => ApplyBinary(binary, left, await rightTask.ConfigureAwait(false));
+
+    private ValueTask<SandboxValue> EvaluateShortCircuit(BinaryExpression binary, InterpreterFrame frame)
+    {
+        var shortCircuitOn = binary.Operator == "||";
+        var order = ShortCircuitExpressionOrder.Choose(binary, _context.Bindings, _functionAnalysis);
+        var firstTask = EvaluateAsync(order.First, frame);
+        if (!firstTask.IsCompletedSuccessfully)
+        {
+            return AwaitShortCircuit(order, shortCircuitOn, firstTask, frame);
+        }
+
+        if (((BoolValue)firstTask.Result).Value == shortCircuitOn)
+        {
+            return new ValueTask<SandboxValue>(SandboxValue.FromBool(shortCircuitOn));
+        }
+
+        var secondTask = EvaluateAsync(order.Second, frame);
+        return secondTask.IsCompletedSuccessfully
+            ? new ValueTask<SandboxValue>(SandboxValue.FromBool(((BoolValue)secondTask.Result).Value))
+            : AwaitShortCircuitSecond(secondTask);
+    }
+
+    private async ValueTask<SandboxValue> AwaitShortCircuit(
+        ShortCircuitOperands order,
+        bool shortCircuitOn,
+        ValueTask<SandboxValue> firstTask,
+        InterpreterFrame frame)
+    {
+        var first = (BoolValue)await firstTask.ConfigureAwait(false);
+        if (first.Value == shortCircuitOn)
+        {
+            return SandboxValue.FromBool(shortCircuitOn);
+        }
+
+        var second = (BoolValue)await EvaluateAsync(order.Second, frame).ConfigureAwait(false);
+        return SandboxValue.FromBool(second.Value);
+    }
+
+    private static async ValueTask<SandboxValue> AwaitShortCircuitSecond(ValueTask<SandboxValue> secondTask)
+        => SandboxValue.FromBool(((BoolValue)await secondTask.ConfigureAwait(false)).Value);
+
+    private SandboxValue ApplyBinary(BinaryExpression binary, SandboxValue left, SandboxValue right)
+        => binary.Operator switch
         {
             "+" when left is StringValue l && right is StringValue r => Concat(l.Value, r.Value),
             "+" => SandboxNumericOperations.Add(left, right),
@@ -104,29 +164,60 @@ internal sealed class ExpressionEvaluator
             ">=" => SandboxNumericOperations.GreaterThanOrEqual(left, right),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported binary operator"))
         };
-    }
 
-    private async ValueTask<SandboxValue> EvaluateCallAsync(CallExpression call, InterpreterFrame frame)
+    private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
     {
-        var args = new List<SandboxValue>(call.Arguments.Count);
-        foreach (var arg in call.Arguments)
+        var arguments = call.Arguments;
+        var argCount = arguments.Count;
+        // Evaluated arguments are passed to callees as a fixed read-only list, so
+        // size the backing array exactly and reuse the shared empty array for the
+        // common zero-argument call instead of allocating a growable List per call.
+        var args = argCount == 0 ? System.Array.Empty<SandboxValue>() : new SandboxValue[argCount];
+        for (var i = 0; i < argCount; i++)
         {
-            args.Add(await EvaluateAsync(arg, frame).ConfigureAwait(false));
+            var argTask = EvaluateAsync(arguments[i], frame);
+            if (!argTask.IsCompletedSuccessfully)
+            {
+                return AwaitCallArguments(call, args, i, argTask, frame);
+            }
+
+            args[i] = argTask.Result;
         }
 
+        return DispatchCall(call, args, frame);
+    }
+
+    private async ValueTask<SandboxValue> AwaitCallArguments(
+        CallExpression call,
+        SandboxValue[] args,
+        int pending,
+        ValueTask<SandboxValue> pendingTask,
+        InterpreterFrame frame)
+    {
+        args[pending] = await pendingTask.ConfigureAwait(false);
+        for (var i = pending + 1; i < args.Length; i++)
+        {
+            args[i] = await EvaluateAsync(call.Arguments[i], frame).ConfigureAwait(false);
+        }
+
+        return await DispatchCall(call, args, frame).ConfigureAwait(false);
+    }
+
+    private ValueTask<SandboxValue> DispatchCall(CallExpression call, SandboxValue[] args, InterpreterFrame frame)
+    {
         if (TryEvaluateCollectionCall(call, args, out var collectionValue))
         {
-            return collectionValue;
+            return new ValueTask<SandboxValue>(collectionValue);
         }
 
         if (_interpreter.TryGetFunction(call.Name, out var function))
         {
-            return await _interpreter.InvokeFunctionAsync(function, args).ConfigureAwait(false);
+            return _interpreter.InvokeFunctionAsync(function, args);
         }
 
         if (_context.Bindings.Contains(call.Name))
         {
-            return await CallBindingAsync(call.Name, args, frame.FunctionId).ConfigureAwait(false);
+            return CallBindingAsync(call.Name, args, frame.FunctionId);
         }
 
         throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown call '{call.Name}' at runtime"));
@@ -157,8 +248,8 @@ internal sealed class ExpressionEvaluator
             or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
     }
 
-    public async ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
-        => await _interpreter.InvokeFunctionAsync(function, args).ConfigureAwait(false);
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+        => _interpreter.InvokeFunctionAsync(function, args);
 
     private async ValueTask<SandboxValue> CallBindingAsync(
         string id,

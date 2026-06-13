@@ -26,7 +26,7 @@ internal static class PluginPackageValidator
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
         ValidateManifestMode(package.Manifest, diagnostics);
         ValidateManifestEffects(package.Manifest, diagnostics);
-        ValidateEntrypoints(package, diagnostics);
+        ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
         foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal)) {
             if (group.Skip(1).Any()) {
                 diagnostics.Add(new SandboxDiagnostic("SGP021", $"Live setting '{group.Key}' is declared more than once."));
@@ -79,15 +79,18 @@ internal static class PluginPackageValidator
         return metadataKernel;
     }
 
-    private static void ValidateEntrypoints(PluginPackage package, List<SandboxDiagnostic> diagnostics)
+    private static void ValidateEntrypoints(
+        PluginPackage package,
+        PluginEntrypointIndex entrypointIndex,
+        List<SandboxDiagnostic> diagnostics)
     {
         ValidateEntrypoint(
-            package,
+            entrypointIndex,
             package.Entrypoints.ShouldHandle,
             PluginManifestNames.Entrypoints.ShouldHandle,
             diagnostics);
         ValidateEntrypoint(
-            package,
+            entrypointIndex,
             package.Entrypoints.Handle,
             PluginManifestNames.Entrypoints.Handle,
             diagnostics);
@@ -102,7 +105,7 @@ internal static class PluginPackageValidator
     }
 
     private static void ValidateEntrypoint(
-        PluginPackage package,
+        PluginEntrypointIndex entrypointIndex,
         string functionId,
         string name,
         List<SandboxDiagnostic> diagnostics)
@@ -114,7 +117,7 @@ internal static class PluginPackageValidator
 
         ValidateManifestText(functionId, $"kernel {name} entrypoint", diagnostics);
 
-        if (!package.Module.Functions.Any(f => f.IsEntrypoint && string.Equals(f.Id, functionId, StringComparison.Ordinal))) {
+        if (!entrypointIndex.Contains(functionId)) {
             diagnostics.Add(new SandboxDiagnostic("SGP032", $"Kernel entrypoint '{functionId}' is missing or not public."));
         }
     }

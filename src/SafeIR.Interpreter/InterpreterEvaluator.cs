@@ -10,6 +10,8 @@ internal sealed class InterpreterEvaluator
     private readonly SandboxExecutionOptions _options;
     private readonly string _moduleHash;
     private readonly ExpressionEvaluator _expressions;
+    private readonly StatementExecutor _statements;
+    private readonly Dictionary<string, FunctionFrameLayout> _frameLayouts = new(StringComparer.Ordinal);
 
     public InterpreterEvaluator(ExecutionPlan plan, SandboxContext context, SandboxExecutionOptions options)
     {
@@ -19,6 +21,7 @@ internal sealed class InterpreterEvaluator
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
+        _statements = new StatementExecutor(_context, _expressions, _options, _moduleHash);
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -34,16 +37,65 @@ internal sealed class InterpreterEvaluator
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
 
-    public async ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
+    // Non-async invocation: a function whose body is fully synchronous (no pending
+    // host binding) completes without ever allocating an async state machine, so a
+    // helper called inside a loop costs only its indexed frame object per call.
+    public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)
     {
         _context.EnterCall();
+        var exited = false;
         try
         {
             _context.ChargeFuel(1);
-            var frame = InterpreterFrame.Create(function, args);
-            foreach (var statement in function.Body)
+            var frame = InterpreterFrame.Create(GetFrameLayout(function), function, args);
+            var body = function.Body;
+            for (var i = 0; i < body.Count; i++)
             {
-                var result = await ExecuteStatementAsync(statement, frame).ConfigureAwait(false);
+                var statementTask = _statements.ExecuteStatementAsync(body[i], frame);
+                if (!statementTask.IsCompletedSuccessfully)
+                {
+                    exited = true;
+                    return AwaitInvoke(function, statementTask, frame, i + 1);
+                }
+
+                var result = statementTask.Result;
+                if (result is not null)
+                {
+                    EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
+                    return new ValueTask<SandboxValue>(result);
+                }
+            }
+
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"function '{function.Id}' returned no value"));
+        }
+        finally
+        {
+            if (!exited)
+            {
+                _context.ExitCall();
+            }
+        }
+    }
+
+    private async ValueTask<SandboxValue> AwaitInvoke(
+        SandboxFunction function,
+        ValueTask<SandboxValue?> pendingTask,
+        InterpreterFrame frame,
+        int nextStatement)
+    {
+        try
+        {
+            var result = await pendingTask.ConfigureAwait(false);
+            if (result is not null)
+            {
+                EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
+                return result;
+            }
+
+            var body = function.Body;
+            for (var i = nextStatement; i < body.Count; i++)
+            {
+                result = await _statements.ExecuteStatementAsync(body[i], frame).ConfigureAwait(false);
                 if (result is not null)
                 {
                     EntrypointBinder.RequireType(result, function.ReturnType, "function return type mismatch");
@@ -59,91 +111,17 @@ internal sealed class InterpreterEvaluator
         }
     }
 
-    private async ValueTask<SandboxValue?> ExecuteStatementAsync(Statement statement, InterpreterFrame frame)
+    // The function set is fixed for the lifetime of an evaluator, so each function's
+    // local slot layout is resolved once and reused across every invocation instead
+    // of rebuilding a string-keyed local map per call.
+    private FunctionFrameLayout GetFrameLayout(SandboxFunction function)
     {
-        _context.ChargeFuel(1);
-        InterpreterTrace.Write(
-            _context,
-            _options,
-            _moduleHash,
-            frame.FunctionId,
-            "statement",
-            statement.GetType().Name,
-            statement.Span);
-        switch (statement)
+        if (!_frameLayouts.TryGetValue(function.Id, out var layout))
         {
-            case AssignmentStatement assignment:
-                frame.Locals[assignment.Name] = await EvaluateAsync(assignment.Value, frame).ConfigureAwait(false);
-                return null;
-            case ReturnStatement ret:
-                return await EvaluateAsync(ret.Value, frame).ConfigureAwait(false);
-            case ExpressionStatement expression:
-                _ = await EvaluateAsync(expression.Value, frame).ConfigureAwait(false);
-                return null;
-            case IfStatement branch:
-                return await ExecuteIfAsync(branch, frame).ConfigureAwait(false);
-            case WhileStatement loop:
-                return await ExecuteWhileAsync(loop, frame).ConfigureAwait(false);
-            case ForRangeStatement range:
-                return await ExecuteForAsync(range, frame).ConfigureAwait(false);
-            default:
-                throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported statement"));
-        }
-    }
-
-    private async ValueTask<SandboxValue?> ExecuteIfAsync(IfStatement statement, InterpreterFrame frame)
-    {
-        var condition = (BoolValue)await EvaluateAsync(statement.Condition, frame).ConfigureAwait(false);
-        return await ExecuteBlockAsync(condition.Value ? statement.Then : statement.Else, frame).ConfigureAwait(false);
-    }
-
-    private async ValueTask<SandboxValue?> ExecuteWhileAsync(WhileStatement statement, InterpreterFrame frame)
-    {
-        while (((BoolValue)await EvaluateAsync(statement.Condition, frame).ConfigureAwait(false)).Value)
-        {
-            _context.ChargeLoopIteration(5);
-            var value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
-            if (value is not null)
-            {
-                return value;
-            }
+            layout = FunctionFrameLayout.Build(function);
+            _frameLayouts[function.Id] = layout;
         }
 
-        return null;
+        return layout;
     }
-
-    private async ValueTask<SandboxValue?> ExecuteForAsync(ForRangeStatement statement, InterpreterFrame frame)
-    {
-        var start = ((I32Value)await EvaluateAsync(statement.Start, frame).ConfigureAwait(false)).Value;
-        var end = ((I32Value)await EvaluateAsync(statement.End, frame).ConfigureAwait(false)).Value;
-        for (var i = start; i < end; i++)
-        {
-            _context.ChargeLoopIteration(5);
-            frame.Locals[statement.LocalName] = SandboxValue.FromInt32(i);
-            var value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
-            if (value is not null)
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private async ValueTask<SandboxValue?> ExecuteBlockAsync(IReadOnlyList<Statement> statements, InterpreterFrame frame)
-    {
-        foreach (var statement in statements)
-        {
-            var value = await ExecuteStatementAsync(statement, frame).ConfigureAwait(false);
-            if (value is not null)
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
-        => _expressions.EvaluateAsync(expression, frame);
 }

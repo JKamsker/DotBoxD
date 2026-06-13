@@ -61,7 +61,7 @@ public sealed partial class SandboxContext
         Audit.Write(new SandboxAuditEvent(
             RunId,
             "PolicyDenied",
-            DateTimeOffset.UtcNow,
+            AuditTimestamp(),
             Success: false,
             CapabilityId: capabilityId,
             ResourceId: $"capability:{capabilityId}",

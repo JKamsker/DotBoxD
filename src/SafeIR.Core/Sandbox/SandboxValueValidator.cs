@@ -11,6 +11,16 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
+        // Scalars have no nested structure, so they can never form a cycle and need
+        // no traversal bookkeeping. Validate them inline to avoid allocating the
+        // HashSet/Stack the recursive collection walk requires; this is the hot path
+        // for every function return and binding argument check.
+        if (value is not ListValue and not MapValue)
+        {
+            RequireScalarType(value, expectedType, errorCode, message);
+            return;
+        }
+
         var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var stack = new Stack<Frame>();
         stack.Push(new Frame(value, expectedType, Exit: false));
@@ -44,6 +54,27 @@ public static class SandboxValueValidator
                     PushMap(map, frame.ExpectedType, active, stack, errorCode, message);
                     break;
             }
+        }
+    }
+
+    private static void RequireScalarType(
+        SandboxValue value,
+        SandboxType expectedType,
+        SandboxErrorCode errorCode,
+        string message)
+    {
+        if (!IsKnownValueKind(value) ||
+            value.Type != expectedType ||
+            !expectedType.IsKnown() ||
+            expectedType.IsForbidden())
+        {
+            throw Error(errorCode, message);
+        }
+
+        RequireScalarInvariants(value, errorCode, message);
+        if (value is OpaqueIdValue id)
+        {
+            RequireOpaqueId(id, errorCode, message);
         }
     }
 

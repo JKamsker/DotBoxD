@@ -79,8 +79,9 @@ internal static class PluginPreparedPackageValidator
         string? contractEvent,
         List<SandboxDiagnostic> diagnostics)
     {
-        if (!TryGetEntrypoint(package, package.Entrypoints.ShouldHandle, out var shouldHandle) ||
-            !TryGetEntrypoint(package, package.Entrypoints.Handle, out var handle))
+        var entrypointIndex = PluginEntrypointIndex.Build(package);
+        if (!entrypointIndex.TryGet(package.Entrypoints.ShouldHandle, out var shouldHandle) ||
+            !entrypointIndex.TryGet(package.Entrypoints.Handle, out var handle))
         {
             return;
         }
@@ -165,13 +166,6 @@ internal static class PluginPreparedPackageValidator
                     $"Kernel entrypoint '{function.Id}' must declare live setting '{setting.Name}' as trailing parameter with type '{expected}'."));
             }
         }
-    }
-
-    private static bool TryGetEntrypoint(PluginPackage package, string functionId, out SandboxFunction function)
-    {
-        function = package.Module.Functions.FirstOrDefault(f =>
-            f.IsEntrypoint && string.Equals(f.Id, functionId, StringComparison.Ordinal))!;
-        return function is not null;
     }
 
     private static bool ParametersMatch(IReadOnlyList<Parameter> first, IReadOnlyList<Parameter> second)

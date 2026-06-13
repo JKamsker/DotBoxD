@@ -277,6 +277,11 @@ public sealed partial class PersistentCompiledArtifactCache
             Path.GetFileName(entryPath) + "-" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "-" + Guid.NewGuid().ToString("N"));
         PersistentCompiledArtifactCachePathGuard.ValidateEntryPath(_rootDirectory, target);
         Directory.Move(entryPath, target);
+
+        // Bound the quarantine tree so repeated corruption cannot grow disk usage and directory-scan
+        // cost without limit. Runs after the move, so cleanup cost stays proportional to the current
+        // quarantine size rather than every entry ever quarantined.
+        PersistentCompiledArtifactCacheQuarantine.Prune(quarantineRoot);
     }
 
     private static FileStream DurableCreate(string path)
