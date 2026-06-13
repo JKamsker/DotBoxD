@@ -84,13 +84,13 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker result payload was malformed");
-        if (!WorkerPayloadMatches(plan, entrypoint, result))
+        if (!WorkerPayloadMatches(plan, entrypoint, result, out var resultShapeUsage))
         {
             return false;
         }
 
         error = new SandboxError(SandboxErrorCode.HostFailure, "worker resource usage was malformed");
-        if (!WorkerResourceUsageMatches(plan, result))
+        if (!WorkerResourceUsageMatches(plan, result, resultShapeUsage))
         {
             return false;
         }
@@ -128,8 +128,13 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             : string.IsNullOrWhiteSpace(result.ArtifactHash) || IsHexSha256(result.ArtifactHash);
     }
 
-    private static bool WorkerPayloadMatches(ExecutionPlan plan, string entrypoint, SandboxExecutionResult result)
+    private static bool WorkerPayloadMatches(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxExecutionResult result,
+        out SandboxResourceUsage? resultShapeUsage)
     {
+        resultShapeUsage = null;
         if (result.Succeeded)
         {
             if (result.Value is null || result.Error is not null)
@@ -145,6 +150,9 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             try
             {
                 EntrypointBinder.RequireType(result.Value, analysis.ReturnType, "worker result return type mismatch");
+                var meter = new ResourceMeter(plan.Budget);
+                meter.ChargeValue(result.Value);
+                resultShapeUsage = meter.Snapshot();
             }
             catch (SandboxRuntimeException)
             {
@@ -158,7 +166,10 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                WorkerEnvelopeValidators.ErrorMatches(result.Error);
     }
 
-    private static bool WorkerResourceUsageMatches(ExecutionPlan plan, SandboxExecutionResult result)
+    private static bool WorkerResourceUsageMatches(
+        ExecutionPlan plan,
+        SandboxExecutionResult result,
+        SandboxResourceUsage? resultShapeUsage)
     {
         var usage = result.ResourceUsage;
         return usage.MaxFuel == plan.Budget.MaxFuel &&
@@ -183,8 +194,18 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                usage.CollectionElements >= 0 &&
                usage.CollectionElements <= plan.Budget.MaxTotalCollectionElements &&
                usage.StringBytes >= 0 &&
-               usage.StringBytes <= plan.Budget.MaxTotalStringBytes;
+               usage.StringBytes <= plan.Budget.MaxTotalStringBytes &&
+               WorkerResultShapeUsageMatches(usage, resultShapeUsage);
     }
+
+    private static bool WorkerResultShapeUsageMatches(
+        SandboxResourceUsage usage,
+        SandboxResourceUsage? resultShapeUsage)
+        => resultShapeUsage is not { } shape ||
+           (usage.FuelUsed >= shape.FuelUsed &&
+            usage.AllocatedBytes >= shape.AllocatedBytes &&
+            usage.CollectionElements >= shape.CollectionElements &&
+            usage.StringBytes >= shape.StringBytes);
 
     private static bool WorkerAuditMatches(
         ExecutionPlan plan,
