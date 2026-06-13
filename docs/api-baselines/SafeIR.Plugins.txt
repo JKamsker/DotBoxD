@@ -16,6 +16,14 @@ public const string SendBindingId = "game.message.send"
 public enum LiveUpdateMode
 public enum LiveUpdateMode.AsyncSet = 1
 public enum LiveUpdateMode.Sync = 0
+public enum PluginDiagnosticAudience
+public enum PluginDiagnosticAudience.HostOperator
+public enum PluginDiagnosticAudience.PluginAuthor
+public enum PluginDiagnosticPhase
+public enum PluginDiagnosticPhase.LiveSetting
+public enum PluginDiagnosticPhase.PackageValidation
+public enum PluginDiagnosticPhase.PreparedPackageValidation
+public enum PluginDiagnosticPhase.RuntimeEntrypoint
 public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError
 public Exception? LastAsyncUpdateError => Kernel.LastAsyncUpdateError
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
@@ -71,19 +79,23 @@ public sealed class KernelRegistry
 public sealed class LiveContext<T> where T : class
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LiveSettingStore
-public sealed class LiveValue<T> : ILiveSetting
+public sealed class LiveValue<T> : ICoercibleLiveSetting
 public sealed class PluginEventAdapterRegistry
 public sealed class PluginServer
 public sealed class TypedInstalledKernel<TSettings> where TSettings : class
 public sealed record HookSubscriptionManifest(string Event, string Kernel)
 public sealed record KernelEntrypoints(string ShouldHandle, string Handle)
 public sealed record LiveSettingDefinition( string Name, string Type, object? DefaultValue, object? Min = null, object? Max = null)
+public sealed record PluginDiagnosticReference( string Code, PluginDiagnosticPhase Phase, PluginDiagnosticAudience Audience, string Meaning, string LikelyCause, string Remediation)
 public sealed record PluginExecutionObservation( string Entrypoint, ExecutionMode RequestedMode, ExecutionMode ActualMode, bool Succeeded, SandboxErrorCode? ErrorCode, SandboxErrorCode? FallbackReason, string CacheStatus, string? RuntimeForm, string? CacheKey, string? ArtifactHash, string? MaterializationStatus)
 public sealed record PluginManifest( string PluginId, string Contract, ExecutionMode Mode, IReadOnlyList<string> Effects, IReadOnlyList<LiveSettingDefinition> LiveSettings, IReadOnlyList<HookSubscriptionManifest> Subscriptions)
 public sealed record PluginMessage(string TargetId, string Message)
 public sealed record PluginPackage( PluginManifest Manifest, SandboxModule Module, KernelEntrypoints Entrypoints)
 public static BindingDescriptor CreateSend(IPluginMessageSink sink)
+public static bool TryGetReference(string code, out PluginDiagnosticReference reference)
+public static class PluginDiagnosticCodes
 public static class PluginMessageBindings
+public static IReadOnlyList<PluginDiagnosticReference> All => References
 public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
 public static PluginServer Create( IPluginMessageSink? messages = null, Action<SandboxHostBuilder>? configureHost = null, SandboxPolicy? defaultPolicy = null, ExecutionMode executionMode = ExecutionMode.Auto)
 public static SandboxHostBuilder AddPluginMessageBindings( this SandboxHostBuilder builder, IPluginMessageSink sink)

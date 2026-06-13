@@ -53,8 +53,9 @@ Common namespaces:
 - `SafeIR`, `SafeIR.Hosting`, and `SafeIR.Runtime` for host setup and execution.
 - `SafeIR.Serialization.Json` for `ImportJsonAsync`, `SafeIrJsonImporter`, and `SafeIrJsonExporter` (the module export side of the JSON IR round trip).
 - `SafeIR.Transport.Http` for HTTP binding registration and `GrantHttpGet`.
-- `SafeIR.Plugins` for plugin manifests, `PluginPackage`, and the plugin-facing JSON upload/export helper types
-  supplied by the `SafeIR.Serialization.Json` package.
+- `SafeIR.Plugins` for plugin manifests and `PluginPackage`; use
+  `SafeIR.Serialization.Json.PluginPackageJsonSerializer` from the `SafeIR.Serialization.Json`
+  package for production JSON plugin upload/import and export.
 - `SafeIR.Transport.Ipc` for the preview ShaRPC MessagePack IPC addon.
 
 ## Minimal Host Usage
