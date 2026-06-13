@@ -33,6 +33,78 @@ public sealed class HookChainRuntimeTests
         }
         """;
 
+    // A one-parameter Where (no context) lowers and runs exactly like the (e, ctx) form.
+    private const string OneParamChainSource = """
+        using SafeIR.Plugins;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::SafeIR.Tests.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 5)
+                    .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+        }
+        """;
+
+    [Fact]
+    public async Task A_lowered_one_parameter_Where_chain_runs_only_when_its_condition_holds()
+    {
+        var assembly = Compile(OneParamChainSource, enableInterceptors: true);
+        var packageType = assembly.GetTypes().Single(type =>
+            type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
+            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+        var package = (PluginPackage)packageType
+            .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, null)!;
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));   // 3 <= 5 → fires
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-2", 10));  // 10 > 5 → skipped
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("monster-1", message.TargetId);
+        Assert.Equal("calm", message.Message);
+    }
+
+    [Fact]
+    public async Task Element_only_runtime_overloads_filter_and_run_without_a_context_parameter()
+    {
+        // The native (non-lowered) path: the new element-only Where / InvokeLocal overloads forward to
+        // the (element, context) forms, so a stage need not take the context it doesn't use.
+        var collected = new List<string>();
+        using var server = PluginServer.Create(defaultPolicy: ChainPolicy());
+        server.Hooks.On<ChainAggroEvent>()
+            .Where(e => e.Distance <= 5)
+            .InvokeLocal(e => collected.Add(e.MonsterId));
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-2", 10));
+
+        Assert.Equal(["monster-1"], collected);
+    }
+
+    [Fact]
+    public async Task Element_only_Select_and_stage_overloads_project_without_a_context_parameter()
+    {
+        // HookStage element-only Select / Where / InvokeLocal: each stage independently omits the context.
+        var collected = new List<int>();
+        using var server = PluginServer.Create(defaultPolicy: ChainPolicy());
+        server.Hooks.On<ChainAggroEvent>()
+            .Select(e => e.Distance)
+            .Where(distance => distance <= 5)
+            .InvokeLocal(distance => collected.Add(distance));
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-2", 10));
+
+        Assert.Equal([3], collected);
+    }
+
     [Fact]
     public async Task A_lowered_Where_chain_runs_only_when_its_condition_holds()
     {

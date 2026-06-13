@@ -121,6 +121,117 @@ public sealed class PluginAnalyzerHookChainTests
             tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Lowers_a_simple_one_parameter_Where_chain()
+    {
+        // Where(e => ...) — element only, simple lambda (no parens), no context — lowers like (e, ctx) =>.
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_parenthesized_single_parameter_Where_chain()
+    {
+        // Where((e) => ...) — parenthesized single parameter.
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where((e) => e.Distance <= 5)
+                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_one_parameter_Select_and_Where_chain()
+    {
+        // Select(e => ...) and Where(gap => ...) — both element-only — lower with the projection.
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Select(e => e.MonsterLevel - e.PlayerLevel)
+                        .Where(gap => gap >= 3)
+                        .InvokeKernel((gap, ctx) => ctx.Messages.Send("monster", "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_chain_mixing_one_and_two_parameter_stages_independently()
+    {
+        // Each stage independently chooses its arity: 1-param Where, 2-param Where, 1-param Select.
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance, int MonsterLevel);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Where((e, ctx) => e.MonsterLevel >= 3)
+                        .Select(e => e.MonsterId)
+                        .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
     private static GeneratorDriverRunResult RunGenerator(string source)
     {
         var compilation = CSharpCompilation.Create(

@@ -129,6 +129,20 @@ public sealed class HookPipeline<TEvent>
         return this;
     }
 
+    /// <summary>Element-only filter — the same as the (element, context) overload with the context
+    /// discarded. Both arities are always available so a stage need not take the context it doesn't use.</summary>
+    public HookPipeline<TEvent> Where(Func<TEvent, bool> filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return Where((e, _) => filter(e));
+    }
+
+    public HookPipeline<TEvent> Where(Func<TEvent, ValueTask<bool>> filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return Where((e, _) => filter(e));
+    }
+
     public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTask> handler)
     {
         lock (_gate)
@@ -146,11 +160,29 @@ public sealed class HookPipeline<TEvent>
             return ValueTask.CompletedTask;
         });
 
+    public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InvokeHostHandler((e, _) => handler(e));
+    }
+
+    public HookPipeline<TEvent> InvokeHostHandler(Action<TEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InvokeHostHandler((e, _) => handler(e));
+    }
+
     /// <summary>Native host terminal — runs in-process (NOT sandboxed). Use sparingly.</summary>
     public HookPipeline<TEvent> InvokeLocal(Func<TEvent, HookContext, ValueTask> handler)
         => InvokeHostHandler(handler);
 
     public HookPipeline<TEvent> InvokeLocal(Action<TEvent, HookContext> handler)
+        => InvokeHostHandler(handler);
+
+    public HookPipeline<TEvent> InvokeLocal(Func<TEvent, ValueTask> handler)
+        => InvokeHostHandler(handler);
+
+    public HookPipeline<TEvent> InvokeLocal(Action<TEvent> handler)
         => InvokeHostHandler(handler);
 
     /// <summary>Projects the flowing element to a new type for downstream Where/terminal stages.</summary>
@@ -162,6 +194,12 @@ public sealed class HookPipeline<TEvent>
             (e, ctx) => ValueTask.FromResult((true, projection(e, ctx))));
     }
 
+    public HookStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        return Select((e, _) => projection(e));
+    }
+
     /// <summary>
     /// The terminal the analyzer lowers to verified IR. It never runs as host code: un-lowered it
     /// throws, so plugin logic cannot accidentally execute unsandboxed.
@@ -170,6 +208,12 @@ public sealed class HookPipeline<TEvent>
         => throw HookLowering.NotLowered();
 
     public HookPipeline<TEvent> InvokeKernel(Action<TEvent, HookContext> handler)
+        => throw HookLowering.NotLowered();
+
+    public HookPipeline<TEvent> InvokeKernel(Func<TEvent, ValueTask> handler)
+        => throw HookLowering.NotLowered();
+
+    public HookPipeline<TEvent> InvokeKernel(Action<TEvent> handler)
         => throw HookLowering.NotLowered();
 
     public HookPipeline<TEvent> UseKernel(InstalledKernel kernel)
@@ -205,89 +249,4 @@ public sealed class HookPipeline<TEvent>
             await handler(e, context).ConfigureAwait(false);
         }
     }
-}
-
-/// <summary>
-/// A re-typed stage in a hook chain after a <see cref="HookPipeline{TEvent}.Select{TNext}"/>. It
-/// carries a composed projection of the original event to the element currently flowing
-/// (<typeparamref name="TCurrent"/>) plus a short-circuit flag, so <c>Where</c>/<c>Select</c> compose
-/// without re-keying the pipeline (it stays keyed by <typeparamref name="TEvent"/>). Terminals
-/// re-run the projection per publish and short-circuit when a <c>Where</c> rejected the element.
-/// </summary>
-public sealed class HookStage<TEvent, TCurrent>
-{
-    private readonly HookPipeline<TEvent> _root;
-    private readonly Func<TEvent, HookContext, ValueTask<(bool Ok, TCurrent Value)>> _project;
-
-    internal HookStage(
-        HookPipeline<TEvent> root,
-        Func<TEvent, HookContext, ValueTask<(bool Ok, TCurrent Value)>> project)
-    {
-        _root = root;
-        _project = project;
-    }
-
-    public HookStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
-    {
-        ArgumentNullException.ThrowIfNull(filter);
-        var project = _project;
-        return new HookStage<TEvent, TCurrent>(_root, async (e, ctx) =>
-        {
-            var (ok, value) = await project(e, ctx).ConfigureAwait(false);
-            return (ok && filter(value, ctx), value);
-        });
-    }
-
-    public HookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
-    {
-        ArgumentNullException.ThrowIfNull(projection);
-        var project = _project;
-        return new HookStage<TEvent, TNext>(_root, async (e, ctx) =>
-        {
-            var (ok, value) = await project(e, ctx).ConfigureAwait(false);
-            return ok ? (true, projection(value, ctx)) : (false, default!);
-        });
-    }
-
-    /// <summary>Native host terminal over the projected element (NOT sandboxed).</summary>
-    public HookPipeline<TEvent> InvokeLocal(Func<TCurrent, HookContext, ValueTask> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-        var project = _project;
-        return _root.InvokeLocal(async (e, ctx) =>
-        {
-            var (ok, value) = await project(e, ctx).ConfigureAwait(false);
-            if (ok)
-            {
-                await handler(value, ctx).ConfigureAwait(false);
-            }
-        });
-    }
-
-    public HookPipeline<TEvent> InvokeLocal(Action<TCurrent, HookContext> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-        return InvokeLocal((value, ctx) =>
-        {
-            handler(value, ctx);
-            return ValueTask.CompletedTask;
-        });
-    }
-
-    /// <summary>The terminal the analyzer lowers to verified IR; un-lowered it throws (never native).</summary>
-    public HookPipeline<TEvent> InvokeKernel(Func<TCurrent, HookContext, ValueTask> handler)
-        => throw HookLowering.NotLowered();
-
-    public HookPipeline<TEvent> InvokeKernel(Action<TCurrent, HookContext> handler)
-        => throw HookLowering.NotLowered();
-}
-
-internal static class HookLowering
-{
-    public static SandboxValidationException NotLowered()
-        => new([
-            new SandboxDiagnostic(
-                "SGP062",
-                "InvokeKernel(lambda) must be lowered to verified IR by SafeIR.PluginAnalyzer and cannot run as host code.")
-        ]);
 }

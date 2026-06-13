@@ -258,31 +258,49 @@ internal static class HookChainModelFactory
         return isPipeline || string.Equals(original, HookStageOriginal, StringComparison.Ordinal);
     }
 
-    private static bool TryLambda(InvocationExpressionSyntax invocation, out ParenthesizedLambdaExpressionSyntax lambda)
+    // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
+    // and the simple form e => …. Arity is resolved later by LambdaParameters, so every stage
+    // independently chooses element-only or element+context regardless of what neighbouring stages used.
+    private static bool TryLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
     {
         lambda = null!;
         var arguments = invocation.ArgumentList.Arguments;
         if (arguments.Count != 1 ||
-            arguments[0].Expression is not ParenthesizedLambdaExpressionSyntax parenthesized)
+            arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
         {
             return false;
         }
 
-        lambda = parenthesized;
+        lambda = lambdaExpression;
         return true;
     }
 
-    private static (string? ElementParam, string? ContextParam) LambdaParameters(ParenthesizedLambdaExpressionSyntax lambda)
+    // Element-only lambdas (e =>, (e) =>) yield (element, null); element+context lambdas ((e, ctx) =>)
+    // yield (element, context). A null element means an unsupported shape (zero or 3+ parameters) — the
+    // caller fails safe. The context being null is fine for Where/Select (they never reference ctx); the
+    // terminal Send separately requires a non-null context, so an element-only terminal won't lower.
+    private static (string? ElementParam, string? ContextParam) LambdaParameters(LambdaExpressionSyntax lambda)
     {
-        var parameters = lambda.ParameterList.Parameters;
-        return parameters.Count == 2
-            ? (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText)
-            : (null, null);
+        switch (lambda)
+        {
+            case SimpleLambdaExpressionSyntax simple:
+                return (simple.Parameter.Identifier.ValueText, null);
+            case ParenthesizedLambdaExpressionSyntax parenthesized:
+                var parameters = parenthesized.ParameterList.Parameters;
+                return parameters.Count switch
+                {
+                    1 => (parameters[0].Identifier.ValueText, null),
+                    2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText),
+                    _ => (null, null),
+                };
+            default:
+                return (null, null);
+        }
     }
 
     private readonly struct Stage
     {
-        public Stage(bool isSelect, ParenthesizedLambdaExpressionSyntax lambda)
+        public Stage(bool isSelect, LambdaExpressionSyntax lambda)
         {
             IsSelect = isSelect;
             Lambda = lambda;
@@ -290,6 +308,6 @@ internal static class HookChainModelFactory
 
         public bool IsSelect { get; }
 
-        public ParenthesizedLambdaExpressionSyntax Lambda { get; }
+        public LambdaExpressionSyntax Lambda { get; }
     }
 }
