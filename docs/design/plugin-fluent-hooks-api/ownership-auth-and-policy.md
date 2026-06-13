@@ -153,7 +153,7 @@ internal void Add(InstalledKernel kernel)
             && existing.OwnerId != kernel.OwnerId)
         {
             throw new SandboxValidationException([ new SandboxDiagnostic(
-                "SGP050",
+                "SGP060",
                 $"plugin id '{kernel.Manifest.PluginId}' is owned by another session and cannot be replaced.") ]);
         }
         _kernels[kernel.Manifest.PluginId] = kernel;   // same-owner reinstall (hot reload) still allowed

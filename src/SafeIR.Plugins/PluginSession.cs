@@ -63,7 +63,7 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
             {
                 throw new SandboxValidationException([
                     new SandboxDiagnostic(
-                        "SGP051",
+                        "SGP061",
                         $"plugin id '{pluginId}' is not owned by this session.")
                 ]);
             }

@@ -162,6 +162,14 @@ public static class PluginDiagnosticCodes
             "A manifest text value is empty, contains control characters, or looks like a forbidden CLR/IL descriptor.",
             "A manifest identifier is blank, has control characters, or resembles a forbidden CLR or IL descriptor.",
             "Use non-empty manifest text without control characters or CLR/IL descriptor-like content."),
+        new("SGP060", PluginDiagnosticPhase.RuntimeEntrypoint, PluginDiagnosticAudience.HostOperator,
+            "A plugin id is already owned by a different session and cannot be replaced.",
+            "Two connections tried to install a kernel with the same plugin id; ids are owned by the installing session.",
+            "Use a distinct plugin id per owner, or uninstall the existing kernel from its owning session first."),
+        new("SGP061", PluginDiagnosticPhase.RuntimeEntrypoint, PluginDiagnosticAudience.HostOperator,
+            "A session attempted to update settings for a plugin id it does not own.",
+            "An UpdateSettings call referenced a plugin id installed by a different session.",
+            "Only update live settings for kernels installed by the same session that owns them."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =

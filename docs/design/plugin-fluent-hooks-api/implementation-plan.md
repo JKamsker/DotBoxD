@@ -38,7 +38,7 @@ claims the reviews corrected (noted inline there).
 | Service contract | `interface IFooService : IEventKernel<TEvent>`; kernels implement the contract. Event detection is free (transitive `AllInterfaces`); emitting the **contract name** into the manifest is a new analyzer output (`ServiceContract` field — additive; existing `Contract` stays `IEventKernel<…>`). |
 | Wiring | internal **shape-based** non-generic path (no `ResolveByEventName`, no `On(adapter)` non-generic). Deletes `WireHook`'s switch. |
 | Adapters | convention adapter (already exists) is the default; **delete** the example's hand-written adapters and **rewrite** `WireHook`/`Program` that reference `.Instance`. |
-| Ownership | `PluginSession` (the object **is** the identity/`OwnerId`); owner-checked `KernelRegistry` (fail-closed `SGP050`); owner-checked settings; revoke-on-disconnect; the four concurrency fixes. |
+| Ownership | `PluginSession` (the object **is** the identity/`OwnerId`); owner-checked `KernelRegistry` (fail-closed `SGP060`); owner-checked settings; revoke-on-disconnect; the four concurrency fixes. |
 | Typed access | `Get<TKernel>()` (plugin-side), `Get(string)` (both), `GetAll<TService>()` primary server-side (per-user → many), `Get<TService>()` singleton-only (throws on ambiguity). `SetValuesAsync(Action<T>)` over a generated **draft factory** (no `new()` constraint). |
 | Capabilities | hierarchical ids + wildcard **grants**; `[Capability]` on ctx bindings & event properties; analyzer-derived `RequiredCapabilities`; **deny at install** + runtime backstop → configurable disconnect+unload. Default-allow (unannotated = open). |
 | Auth/signing/policy-resolver | **deferred appendix** — not built now. |
@@ -66,7 +66,7 @@ No framework/API changes; keeps the current functional install path working.
    path (`PluginEventAdapterRegistry.TryResolveShape` + a new `UseKernelByShape(InstalledKernel, shape)`
    on `HookRegistry`). Keep `On<TEvent>()` for the chain.
 2. **Ownership** (`src/SafeIR.Plugins`):
-   - `OwnerId` on `InstalledKernel` (ctor); `KernelRegistry.Add` fail-closed on cross-owner id (`SGP050`),
+   - `OwnerId` on `InstalledKernel` (ctor); `KernelRegistry.Add` fail-closed on cross-owner id (`SGP060`),
      same-owner reinstall revokes the prior incumbent (capture in-lock, revoke out-of-lock).
    - `PluginSession : IDisposable` (+ `IAsyncDisposable`), the object is the `OwnerId`; `CreateSession`,
      `InstallOwnedAsync`, `UninstallOwned`; install/dispose atomic via a session gate.

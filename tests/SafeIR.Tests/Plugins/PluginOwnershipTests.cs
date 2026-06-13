@@ -21,7 +21,7 @@ public sealed class PluginOwnershipTests
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await ownerB.InstallAsync(FireDamagePluginPackage.Create()).AsTask());
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP050");
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP060");
         Assert.False(kernelA.IsRevoked);
         Assert.True(server.Kernels.TryGet("fire-damage", out var current));
         Assert.Same(kernelA, current);
@@ -68,7 +68,7 @@ public sealed class PluginOwnershipTests
                 .UpdateSettingsAsync("fire-damage", new Dictionary<string, object?> { ["DamageType"] = "ice" })
                 .AsTask());
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP051");
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP061");
     }
 
     [Fact]
