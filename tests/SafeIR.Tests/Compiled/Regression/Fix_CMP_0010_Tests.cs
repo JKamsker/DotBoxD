@@ -6,7 +6,7 @@ namespace SafeIR.Tests;
 
 /// <summary>
 /// Regression coverage for CMP-0010: the runnable manifest/admin inspection example
-/// (<c>examples/Addendum/SafeIR.AddendumExamples/Examples/ManifestInspectionExample.cs</c>) is the
+/// (<c>examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/Examples/ManifestInspectionExample.cs</c>) is the
 /// operator's pre-install review surface, yet it prints only live-setting name/type/default, effects,
 /// and subscriptions. The docs say server owners must also review requested capabilities and live
 /// setting numeric range bounds before enabling a plugin.
@@ -19,7 +19,7 @@ namespace SafeIR.Tests;
 public sealed class Fix_CMP_0010_Tests
 {
     private const string ExampleRelativePath =
-        "examples/Addendum/SafeIR.AddendumExamples/Examples/ManifestInspectionExample.cs";
+        "examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/Examples/ManifestInspectionExample.cs";
 
     [Fact]
     public void Generated_package_exposes_capability_request_and_setting_range_for_review()

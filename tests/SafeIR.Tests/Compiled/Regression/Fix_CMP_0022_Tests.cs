@@ -8,7 +8,7 @@ namespace SafeIR.Tests;
 // package-backed public example or docs smoke that registers a custom binding, grants the matching
 // capability, executes JSON IR against it, and inspects the expected audit/resource result. The
 // runnable walkthrough now lives in
-// examples/Addendum/SafeIR.AddendumExamples/Examples/CustomBindingExample.cs (exercised by the docs
+// examples/Capabilities/SafeIR.Example.Capabilities/Examples/CustomBindingExample.cs (exercised by the docs
 // smoke). These tests lock the public custom-binding boundary that walkthrough demonstrates so the
 // example cannot silently drift from the descriptor/policy/grant-validator contract it documents.
 public sealed class Fix_CMP_0022_Tests

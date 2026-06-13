@@ -54,8 +54,8 @@ public sealed class PluginAdapterDocumentationTests
             File.ReadAllText(Path.Combine(
                 root,
                 "examples",
-                "Addendum",
-                "SafeIR.AddendumExamples",
+                "PluginAuthoring",
+                "SafeIR.Example.PluginAuthoring",
                 "Examples",
                 "KernelClassExample.cs")));
     }

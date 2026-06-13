@@ -43,8 +43,8 @@ public sealed class Fix_CMP_0016_Tests
         var example = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "examples",
-            "Addendum",
-            "SafeIR.AddendumExamples",
+            "PluginAuthoring",
+            "SafeIR.Example.PluginAuthoring",
             "Examples",
             "SimpleContractExamples.cs"));
 
