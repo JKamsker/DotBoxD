@@ -5,7 +5,15 @@ namespace SafeIR;
 public sealed record SemVersion(int Major, int Minor, int Patch)
     : IComparable<SemVersion>
 {
+    private int _major = RequireNonNegative(Major, nameof(Major));
+    private int _minor = RequireNonNegative(Minor, nameof(Minor));
+    private int _patch = RequireNonNegative(Patch, nameof(Patch));
+
     public static SemVersion One { get; } = new(1, 0, 0);
+
+    public int Major { get => _major; init => _major = RequireNonNegative(value, nameof(Major)); }
+    public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
+    public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nameof(Patch)); }
 
     public static SemVersion Parse(string text)
     {
@@ -57,4 +65,14 @@ public sealed record SemVersion(int Major, int Minor, int Patch)
     }
 
     public override string ToString() => $"{Major}.{Minor}.{Patch}";
+
+    private static int RequireNonNegative(int value, string paramName)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, "semantic version components must be non-negative.");
+        }
+
+        return value;
+    }
 }

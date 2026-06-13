@@ -102,8 +102,11 @@ public int AutoCompileThreshold { get; init; } = 20
 public int CompareTo(SemVersion? other)
 public int HostCalls { get; private set; }
 public int LogEvents { get; private set; }
+public int Major { get => _major; init => _major = RequireNonNegative(value, nameof(Major)); }
+public int Minor { get => _minor; init => _minor = RequireNonNegative(value, nameof(Minor)); }
 public int Next(int minInclusive, int maxExclusive)
 public int NextRandomInt32(int minInclusive, int maxExclusive)
+public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nameof(Patch)); }
 public interface IAuditSink
 public interface IBindingCatalog
 public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = ModelCopy.ValueDictionary(value); }

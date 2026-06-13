@@ -2,6 +2,21 @@ namespace SafeIR.Tests;
 
 public sealed class ProgrammaticIrValidationTests
 {
+    [Theory]
+    [InlineData(-1, 0, 0)]
+    [InlineData(1, -1, 0)]
+    [InlineData(1, 0, -1)]
+    public void SemVersion_rejects_negative_components(int major, int minor, int patch)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SemVersion(major, minor, patch));
+    }
+
+    [Fact]
+    public void SemVersion_with_rejects_negative_components()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => SemVersion.One with { Patch = -1 });
+    }
+
     [Fact]
     public async Task Prepare_rejects_unknown_programmatic_statement_shape()
     {
