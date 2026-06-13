@@ -1,6 +1,5 @@
 namespace SafeIR.Runtime;
 
-using System.Globalization;
 using System.Text;
 using SafeIR;
 
@@ -22,7 +21,8 @@ public static partial class SafeFileSystem
                 throw Error(SandboxErrorCode.NotFound, "file.readText denied: file was not found");
             }
 
-            var maxBytes = ReadLong(resolved.Grant, "maxBytesPerRun", context.Budget.Limits.MaxFileBytesRead);
+            var maxBytes = SafeFileGrantReader.Read(resolved.Grant).MaxBytesPerRun
+                ?? context.Budget.Limits.MaxFileBytesRead;
             if (info.Length > maxBytes)
             {
                 throw Error(SandboxErrorCode.QuotaExceeded, "file.readText denied: file exceeds read limit");
@@ -256,14 +256,14 @@ public static partial class SafeFileSystem
 
     private static void EnsureExtensionAllowed(CapabilityGrant grant, string fullPath)
     {
-        if (!grant.Parameters.TryGetValue("allowedExtensions", out var allowed) || string.IsNullOrWhiteSpace(allowed))
+        var allowed = SafeFileGrantReader.Read(grant).AllowedExtensions;
+        if (allowed is null)
         {
             return;
         }
 
         var extension = Path.GetExtension(fullPath);
-        var values = allowed.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (!values.Any(v => StringComparer.OrdinalIgnoreCase.Equals(v, extension)))
+        if (!allowed.Contains(extension))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "file.readText denied: extension is not allowed");
         }
@@ -281,21 +281,6 @@ public static partial class SafeFileSystem
         var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(remaining);
         return timeout;
-    }
-
-    private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value))
-        {
-            return fallback;
-        }
-
-        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0)
-        {
-            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
-        }
-
-        return parsed;
     }
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));

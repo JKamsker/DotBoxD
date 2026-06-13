@@ -22,14 +22,19 @@ internal static class PolicyResolver
 
         PolicyGrantValidator.Validate(policy, bindings, requiredCapabilities, diagnostics);
 
+        // Capture the grant clock once so every membership probe in this validation pass
+        // shares a single consistent snapshot instead of re-reading DateTimeOffset.UtcNow
+        // per requested/required capability over the cached grant index.
+        var now = policy.GrantClock;
+
         foreach (var request in module.CapabilityRequests) {
-            if (!policy.GrantsCapability(request.Id)) {
+            if (!policy.GrantsCapability(request.Id, now)) {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"requested capability '{request.Id}' is not granted"));
             }
         }
 
         foreach (var capability in requiredCapabilities) {
-            if (!policy.GrantsCapability(capability)) {
+            if (!policy.GrantsCapability(capability, now)) {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-CAP", $"required capability '{capability}' is not granted"));
             }
         }

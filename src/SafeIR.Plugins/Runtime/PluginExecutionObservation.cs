@@ -42,15 +42,14 @@ internal sealed class PluginExecutionObserver
 
     public void Record(string entrypoint, ExecutionMode requestedMode, SandboxExecutionResult result)
     {
-        var summary = result.AuditEvents.LastOrDefault(e => e.Kind == "RunSummary")?.Fields;
-        var fallback = result.AuditEvents.FirstOrDefault(e => e.Kind == "ExecutionFallback");
+        ExtractMarkers(result.AuditEvents, out var summary, out var fallbackReason);
         var observation = new PluginExecutionObservation(
             entrypoint,
             requestedMode,
             result.ActualMode,
             result.Succeeded,
             result.Error?.Code,
-            fallback?.ErrorCode,
+            fallbackReason,
             Field(summary, "cacheStatus") ?? "None",
             Field(summary, "runtimeForm"),
             Field(summary, "cacheKey"),
@@ -61,6 +60,35 @@ internal sealed class PluginExecutionObserver
         {
             _observations.Add(observation);
             _last = observation;
+        }
+    }
+
+    // Walks the audit-event list a single time to recover the two telemetry markers the
+    // observation needs: the last RunSummary's fields and the first ExecutionFallback's
+    // error code. This replaces two independent full-list LINQ scans, so extraction stays
+    // a single pass over the events even as audit volume grows.
+    private static void ExtractMarkers(
+        IReadOnlyList<SandboxAuditEvent> auditEvents,
+        out IReadOnlyDictionary<string, string>? summary,
+        out SandboxErrorCode? fallbackReason)
+    {
+        summary = null;
+        fallbackReason = null;
+        var fallbackFound = false;
+
+        for (var i = 0; i < auditEvents.Count; i++)
+        {
+            var auditEvent = auditEvents[i];
+            switch (auditEvent.Kind)
+            {
+                case "RunSummary":
+                    summary = auditEvent.Fields;
+                    break;
+                case "ExecutionFallback" when !fallbackFound:
+                    fallbackReason = auditEvent.ErrorCode;
+                    fallbackFound = true;
+                    break;
+            }
         }
     }
 

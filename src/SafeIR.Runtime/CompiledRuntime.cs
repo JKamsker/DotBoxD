@@ -205,11 +205,7 @@ public static class CompiledRuntime
     }
 
     public static SandboxValue MapEmpty(SandboxContext context, SandboxType keyType, SandboxType valueType)
-    {
-        context.ChargeFuel(SandboxCollectionFuel.Empty());
-        context.ChargeAllocation(16);
-        return ChargeValue(context, SandboxValue.FromMap(new Dictionary<SandboxValue, SandboxValue>(), keyType, valueType));
-    }
+        => CompiledMapRuntime.Empty(context, keyType, valueType);
 
     public static SandboxValue MapLiteral(
         SandboxContext context,
@@ -227,56 +223,16 @@ public static class CompiledRuntime
         => CompiledLiteralRuntime.MapLiteralValue(keyType, valueType, keys, values);
 
     public static SandboxValue MapContainsKey(SandboxContext context, SandboxValue map, SandboxValue key)
-    {
-        var typedMap = AsMapReadOnly(map);
-        RequireType(key, typedMap.KeyType, "map key type mismatch");
-        context.ChargeFuel(SandboxCollectionFuel.Read(typedMap.Values.Count));
-        return Bool(typedMap.Values.ContainsKey(key));
-    }
+        => CompiledMapRuntime.ContainsKey(context, map, key);
 
     public static SandboxValue MapGet(SandboxContext context, SandboxValue map, SandboxValue key)
-    {
-        var typedMap = AsMapReadOnly(map);
-        RequireType(key, typedMap.KeyType, "map key type mismatch");
-        context.ChargeFuel(SandboxCollectionFuel.Read(typedMap.Values.Count));
-        if (!typedMap.Values.TryGetValue(key, out var value))
-        {
-            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.NotFound, "map key was not found"));
-        }
-
-        return value;
-    }
+        => CompiledMapRuntime.Get(context, map, key);
 
     public static SandboxValue MapSet(SandboxContext context, SandboxValue map, SandboxValue key, SandboxValue value)
-    {
-        var typedMap = AsMap(map);
-        RequireType(key, typedMap.KeyType, "map key type mismatch");
-        context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count, addedCount: 1));
-        RequireType(value, typedMap.ValueType, "map value type mismatch");
-        var addedCount = typedMap.Values.ContainsKey(key) ? 0 : 1;
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(
-            typedMap.Values.Count,
-            addedCount,
-            bytesPerElement: 32,
-            minimumOne: true));
-        var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values)
-        {
-            [key] = value
-        };
-        return ChargeValue(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
-    }
+        => CompiledMapRuntime.Set(context, map, key, value);
 
     public static SandboxValue MapRemove(SandboxContext context, SandboxValue map, SandboxValue key)
-    {
-        var typedMap = AsMap(map);
-        RequireType(key, typedMap.KeyType, "map key type mismatch");
-        context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count));
-        var count = typedMap.Values.ContainsKey(key) ? typedMap.Values.Count - 1 : typedMap.Values.Count;
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
-        var values = new Dictionary<SandboxValue, SandboxValue>(typedMap.Values);
-        values.Remove(key);
-        return ChargeValue(context, SandboxValue.FromMap(values, typedMap.KeyType, typedMap.ValueType));
-    }
+        => CompiledMapRuntime.Remove(context, map, key);
 
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
         => CompiledBindingDispatcher.CallBinding(context, id, args);
@@ -291,6 +247,18 @@ public static class CompiledRuntime
         var elementCount = Math.Max(1L, count);
         context.ChargeFuel(elementCount);
         context.ChargeAllocation(checked(elementCount * 8));
+
+        // Zero-argument compiled binding calls do not need a fresh heap array:
+        // the emitter never stores into it (no Stelem_Ref is emitted for an empty
+        // argument list) and an empty array is immutable, so the shared singleton
+        // is safe to reuse even though it escapes into the BindingInvoker delegate.
+        // Fuel and allocation charges above are intentionally unchanged so the
+        // observable resource accounting stays identical to allocating the array.
+        if (count == 0)
+        {
+            return Array.Empty<SandboxValue>();
+        }
+
         return new SandboxValue[count];
     }
 
@@ -304,13 +272,6 @@ public static class CompiledRuntime
         return list;
     }
 
-    private static MapValue AsMap(SandboxValue value)
-    {
-        var map = value as MapValue ?? throw InvalidInput("expected map value");
-        SandboxValueValidator.RequireType(map, map.Type, "map entry type mismatch");
-        return map;
-    }
-
     // Read-only collection operations only need the runtime kind, not a recursive
     // re-walk of every element. Collection contents are already validated against
     // their declared element types at trust boundaries (entrypoint inputs via
@@ -318,15 +279,6 @@ public static class CompiledRuntime
     // through every internal constructor, so reads can trust the snapshotted value.
     private static ListValue AsListReadOnly(SandboxValue value)
         => value as ListValue ?? throw InvalidInput("expected list value");
-
-    private static MapValue AsMapReadOnly(SandboxValue value)
-        => value as MapValue ?? throw InvalidInput("expected map value");
-
-    private static SandboxValue RequireType(SandboxValue value, SandboxType expected, string message)
-    {
-        SandboxValueValidator.RequireType(value, expected, message);
-        return value;
-    }
 
     private static SandboxValue ChargeValue(SandboxContext context, SandboxValue value)
     {

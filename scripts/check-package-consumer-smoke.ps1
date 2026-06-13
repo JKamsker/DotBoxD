@@ -126,6 +126,7 @@ using SafeIR.Plugins;
 using SafeIR.Serialization.Json;
 using SafeIR.Transport.Http;
 using SafeIR.Transport.Ipc;
+using SafeIR.PackageConsumerSmoke;
 
 var host = SandboxHost.Create(builder =>
 {
@@ -144,9 +145,56 @@ var policy = SandboxPolicyBuilder.Create()
 var moduleImporter = typeof(SafeIrJsonImporter);
 var pluginUpload = typeof(PluginPackageJsonSerializer);
 var ipc = typeof(SafeIrShaRpcMessagePackIpc);
-Console.WriteLine($"{host.GetType().Name}:{policy.Hash}:{moduleImporter.Name}:{pluginUpload.Name}:{ipc.Name}");
+
+// Prove the packaged SafeIR.PluginAnalyzer source generator produced a callable
+// *PluginPackage.Create() factory for the [GamePlugin] kernel defined below. If the
+// analyzer asset is missing from the package, the generator fails to initialize, or the
+// generated factory cannot build a valid PluginPackage, this consumer will not compile or
+// the runtime assertions below will throw, failing the smoke.
+var package = SmokePluginPackage.Create();
+if (package.Manifest.PluginId != "package-consumer-smoke")
+{
+    throw new InvalidOperationException(`$"Unexpected generated plugin id: {package.Manifest.PluginId}");
+}
+
+if (package.Manifest.Subscriptions.Count != 1 ||
+    package.Manifest.Subscriptions[0].Event != "SmokeEvent" ||
+    package.Manifest.Subscriptions[0].Kernel != "SmokeKernel")
+{
+    throw new InvalidOperationException("Generated manifest is missing the expected SmokeEvent/SmokeKernel subscription.");
+}
+
+if (!package.Module.Functions.Any(f => f.Id == package.Entrypoints.ShouldHandle) ||
+    !package.Module.Functions.Any(f => f.Id == package.Entrypoints.Handle))
+{
+    throw new InvalidOperationException("Generated module is missing the ShouldHandle/Handle entrypoints.");
+}
+
+Console.WriteLine($"{host.GetType().Name}:{policy.Hash}:{moduleImporter.Name}:{pluginUpload.Name}:{ipc.Name}:{package.Manifest.PluginId}");
 "@
 Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "Program.cs") -Value $program
+
+$kernel = @"
+namespace SafeIR.PackageConsumerSmoke;
+
+using SafeIR.Plugins;
+
+public sealed record SmokeEvent(string TargetId, string Message, int Amount);
+
+[GamePlugin("package-consumer-smoke")]
+public sealed partial class SmokeKernel : IEventKernel<SmokeEvent>
+{
+    [LiveSetting]
+    public int MinAmount { get; set; } = 1;
+
+    public bool ShouldHandle(SmokeEvent e, HookContext ctx)
+        => e.Amount >= MinAmount;
+
+    public void Handle(SmokeEvent e, HookContext ctx)
+        => ctx.Messages.Send(e.TargetId, e.Message);
+}
+"@
+Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "SmokeKernel.cs") -Value $kernel
 
 dotnet restore $resolvedWorkRoot --configfile (Join-Path $resolvedWorkRoot "NuGet.config")
 if ($LASTEXITCODE -ne 0) {

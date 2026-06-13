@@ -124,7 +124,7 @@ internal sealed class ExpressionEvaluator
             return await _interpreter.InvokeFunctionAsync(function, args).ConfigureAwait(false);
         }
 
-        if (_context.Bindings.TryGet(call.Name, out _))
+        if (_context.Bindings.Contains(call.Name))
         {
             return await CallBindingAsync(call.Name, args, frame.FunctionId).ConfigureAwait(false);
         }

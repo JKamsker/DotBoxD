@@ -96,6 +96,7 @@ public sealed record BindingDescriptor(
 public interface IBindingCatalog
 {
     bool TryGet(string id, out BindingSignature binding);
+    bool Contains(string id);
     bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator);
     IReadOnlyList<BindingSignature> Signatures { get; }
     string ManifestHash { get; }
@@ -139,6 +140,8 @@ public sealed class BindingRegistry : IBindingCatalog
     public string ManifestHash { get; }
 
     public BindingDescriptor GetDescriptor(string id) => _bindings[id];
+
+    public bool Contains(string id) => _bindings.ContainsKey(id);
 
     public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
     {

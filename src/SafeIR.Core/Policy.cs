@@ -67,12 +67,21 @@ public sealed record SandboxPolicy(
 
     public bool GrantsCapability(string capabilityId)
     {
-        return TryGetActiveGrant(capabilityId, out _);
+        return TryGetActiveGrant(capabilityId, GrantClock, out _);
+    }
+
+    // Membership check against an explicit validation-pass clock. Lets a single
+    // validation pass capture GrantClock once (which is DateTimeOffset.UtcNow for
+    // nondeterministic policies) and reuse it for every capability probe instead of
+    // re-reading the wall clock per capability, keeping the pass internally consistent.
+    public bool GrantsCapability(string capabilityId, DateTimeOffset now)
+    {
+        return TryGetActiveGrant(capabilityId, now, out _);
     }
 
     public CapabilityGrant GetGrant(string capabilityId)
     {
-        return TryGetActiveGrant(capabilityId, out var grant)
+        return TryGetActiveGrant(capabilityId, GrantClock, out var grant)
             ? grant
             : throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.PermissionDenied,
@@ -80,18 +89,18 @@ public sealed record SandboxPolicy(
     }
 
     public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
-        => TryGetActiveGrant(capabilityId, out grant);
+        => TryGetActiveGrant(capabilityId, GrantClock, out grant);
 
     // Single O(1) indexed lookup by capability id, then a per-id active-grant check
-    // (typically one candidate). Expiry is still evaluated against the live GrantClock
-    // so time-bounded grants keep their original call-time semantics, and the first
+    // (typically one candidate). Expiry is evaluated against the supplied clock so the
+    // runtime path keeps its original call-time semantics (passing live GrantClock),
+    // while a validation pass can pass one captured clock for every probe. The first
     // matching grant in original list order is returned to preserve FirstOrDefault order.
-    private bool TryGetActiveGrant(string capabilityId, out CapabilityGrant grant)
+    private bool TryGetActiveGrant(string capabilityId, DateTimeOffset now, out CapabilityGrant grant)
     {
         var index = (_grantIndex ??= CreateGrantIndexCache()).Value;
         if (index.TryGetValue(capabilityId, out var candidates))
         {
-            var now = GrantClock;
             for (var i = 0; i < candidates.Length; i++)
             {
                 var candidate = candidates[i];

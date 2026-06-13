@@ -3,7 +3,7 @@ namespace SafeIR.Tests;
 /// <summary>
 /// Regression coverage for ALG-0009: capability lookups must resolve through a single
 /// immutable per-policy index instead of rescanning the whole grant list on every
-/// <see cref="SandboxPolicy.GrantsCapability"/>/<see cref="SandboxPolicy.GetGrant"/> call.
+/// <see cref="SandboxPolicy.GrantsCapability(string)"/>/<see cref="SandboxPolicy.GetGrant"/> call.
 /// These tests pin the observable semantics the index must preserve exactly:
 /// first-match-by-list-order resolution, call-time expiry evaluation against
 /// <c>GrantClock</c>, fail-closed denial, and index rebuild on <c>with</c> copies.

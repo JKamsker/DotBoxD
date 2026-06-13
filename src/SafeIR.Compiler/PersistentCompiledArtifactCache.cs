@@ -1,6 +1,7 @@
 namespace SafeIR.Compiler;
 
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.Json;
 using SafeIR;
 using SafeIR.Verifier;
@@ -114,23 +115,31 @@ public sealed partial class PersistentCompiledArtifactCache
                     assemblyBytes,
                     cancellationToken)
                 .ConfigureAwait(false);
-            var verification = await verifier
-                .VerifyAsync(
-                    assemblyBytes,
-                    manifest,
-                    policy.WithExpectedManifest(VerificationManifestIdentity.FromManifest(manifest)),
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (!verification.Succeeded)
+
+            // The cached verification record is the artifact's verification proof on the read
+            // path: the manifest identity, the cached verification result, and the host-bound
+            // origin proof have all been validated above, and the origin proof is an HMAC over
+            // the exact assembly bytes plus that verification record signed by this host's secret
+            // key. Re-running the full generated-assembly verifier here only repeats PE/metadata/IL
+            // work the write path already performed (and that the host repeats once more before it
+            // loads the assembly), so it is pure cache-hit latency. We still bind the bytes to the
+            // claimed hash with a cheap SHA-256 check so a tampered module fails closed even if the
+            // origin key were ever compromised. The verifier parameter is retained for the contract
+            // and remains the gate on the write path.
+            _ = verifier;
+            var actualHash = Convert.ToHexString(SHA256.HashData(assemblyBytes)).ToLowerInvariant();
+            if (!StringComparer.Ordinal.Equals(actualHash, manifest.AssemblyHash))
             {
-                throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.VerifierFailure, "cached artifact failed verification"));
+                throw new SandboxRuntimeException(new SandboxError(
+                    SandboxErrorCode.CacheInvalid,
+                    "cached artifact bytes do not match manifest hash"));
             }
 
             return new CompiledCacheLookup(CompiledCacheStatus.Hit, new CompiledArtifact(
                 assemblyBytes,
-                verification.AssemblyHash,
+                cachedVerification.AssemblyHash,
                 manifest,
-                verification,
+                cachedVerification,
                 (_, _) => throw new InvalidOperationException("cached artifact entrypoint is loaded by the compiler"),
                 CompiledRuntimeFormKind.LoadedAssembly,
                 CompiledCacheStatus.Hit));

@@ -1,6 +1,5 @@
 namespace SafeIR.Runtime;
 
-using System.Globalization;
 using SafeIR;
 
 internal static class SafeFileWritePublisher
@@ -10,23 +9,22 @@ internal static class SafeFileWritePublisher
         string fullPath,
         long byteCount)
     {
-        var allowCreate = ReadBool(grant, "allowCreate", fallback: false);
-        var allowOverwrite = ReadBool(grant, "allowOverwrite", fallback: false);
+        var options = SafeFileGrantReader.Read(grant);
         var exists = File.Exists(fullPath);
-        if (exists && !allowOverwrite) {
+        if (exists && !options.AllowOverwrite) {
             throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: overwrite is not allowed");
         }
 
-        if (!exists && !allowCreate) {
+        if (!exists && !options.AllowCreate) {
             throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: create is not allowed");
         }
 
-        var maxBytes = ReadLong(grant, "maxBytesPerRun", long.MaxValue);
+        var maxBytes = options.MaxBytesPerRun ?? long.MaxValue;
         if (byteCount > maxBytes) {
             throw Error(SandboxErrorCode.QuotaExceeded, "file.writeText denied: content exceeds write limit");
         }
 
-        return new SafeFileWritePermission(allowCreate, allowOverwrite);
+        return new SafeFileWritePermission(options.AllowCreate, options.AllowOverwrite);
     }
 
     public static void EnsureParentDirectory(
@@ -113,32 +111,6 @@ internal static class SafeFileWritePublisher
         }
         catch (UnauthorizedAccessException) {
         }
-    }
-
-    private static long ReadLong(CapabilityGrant grant, string key, long fallback)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value)) {
-            return fallback;
-        }
-
-        if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
-            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
-        }
-
-        return parsed;
-    }
-
-    private static bool ReadBool(CapabilityGrant grant, string key, bool fallback)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value)) {
-            return fallback;
-        }
-
-        if (!bool.TryParse(value, out var parsed)) {
-            throw Error(SandboxErrorCode.PermissionDenied, $"file grant denied: parameter '{key}' is invalid");
-        }
-
-        return parsed;
     }
 
     private static SandboxRuntimeException Error(SandboxErrorCode code, string message)

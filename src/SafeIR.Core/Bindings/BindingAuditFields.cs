@@ -11,8 +11,9 @@ public static class BindingAuditFields
         long? bytesRead = null,
         long? bytesWritten = null)
     {
-        var fields = Create(resourceKind, startedAt, deterministic, bytesRead, bytesWritten)
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        // Reserve capacity for the two base fields, the optional byte fields, and the
+        // module/policy hashes so the final dictionary is built once with no intermediate copy.
+        var fields = BuildBaseFields(resourceKind, startedAt, deterministic, bytesRead, bytesWritten, extraCapacity: 2);
         fields["moduleHash"] = moduleHash;
         fields["policyHash"] = policyHash;
         return fields;
@@ -24,8 +25,21 @@ public static class BindingAuditFields
         bool deterministic = false,
         long? bytesRead = null,
         long? bytesWritten = null)
+        => BuildBaseFields(resourceKind, startedAt, deterministic, bytesRead, bytesWritten, extraCapacity: 0);
+
+    private static Dictionary<string, string> BuildBaseFields(
+        string resourceKind,
+        DateTimeOffset startedAt,
+        bool deterministic,
+        long? bytesRead,
+        long? bytesWritten,
+        int extraCapacity)
     {
-        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        const int baseFieldCount = 2;
+        var optionalByteFields = (bytesRead is null ? 0 : 1) + (bytesWritten is null ? 0 : 1);
+        var capacity = baseFieldCount + optionalByteFields + extraCapacity;
+
+        var fields = new Dictionary<string, string>(capacity, StringComparer.Ordinal)
         {
             ["resourceKind"] = resourceKind,
             ["durationMs"] = deterministic ? "0.000" : DurationMs(startedAt)
