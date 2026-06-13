@@ -4,13 +4,13 @@
   "files": [
     {
       "path": "../Addendum/Addendum.md",
-      "sha256": "603128015744e4eb12c2189c13e4a5467a60b0b8538ffce7c0856414dedb8f29",
-      "bytes": 27565
+      "sha256": "4c39f8903e13f68b962b9c5d10736a0825ffdfc3e8e64315a8d7898401ee3764",
+      "bytes": 27773
     },
     {
       "path": "../Addendum/Examples.md",
-      "sha256": "18c3b7a10f472ba1c0c55bb0b96268b684ae87f4b1daeb1ddd79a843b40c7cc6",
-      "bytes": 22476
+      "sha256": "dc617988c9cf0a2cb5fe00bb25afcbb237bfe08dadfc34537876baba48629bf4",
+      "bytes": 22852
     },
     {
       "path": "adr/0001-restricted-ir-not-csharp.md",
@@ -39,7 +39,7 @@
     },
     {
       "path": "examples/example-binding-manifest.md",
-      "sha256": "a75ac231333be282a4537c961acc315d70fbbb9750d5860601c0b7ccf6715fe2",
+      "sha256": "25a182743e6fb8cf08e2a523177626d74c7a79ea89f3467ddf382987798826d5",
       "bytes": 1928
     },
     {
@@ -99,7 +99,7 @@
     },
     {
       "path": "spec/06-effects-capabilities.md",
-      "sha256": "b51fee3f7677b5c5671d86131e6d1a63a09a374d3ec1e2afc2e4caef23da1bbd",
+      "sha256": "040b7645635775e659ecd3a0427bd8bd53da63c0f2e13cfeecfd213be14d6724",
       "bytes": 6278
     },
     {
