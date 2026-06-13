@@ -170,6 +170,10 @@ public static class PluginDiagnosticCodes
             "A session attempted to update settings for a plugin id it does not own.",
             "An UpdateSettings call referenced a plugin id installed by a different session.",
             "Only update live settings for kernels installed by the same session that owns them."),
+        new("SGP062", PluginDiagnosticPhase.RuntimeEntrypoint, PluginDiagnosticAudience.PluginAuthor,
+            "An InvokeKernel(lambda) hook terminal was not lowered to verified IR and cannot run as host code.",
+            "InvokeKernel(lambda) was invoked at runtime without the SafeIR analyzer lowering it (analyzer not referenced, or an unsupported construct in the chain).",
+            "Reference SafeIR.PluginAnalyzer so InvokeKernel chains are lowered, or bind a kernel class with UseKernel/Register instead."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =
