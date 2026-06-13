@@ -153,8 +153,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
 
         return result.Value is null &&
-               result.Error is not null &&
-               Enum.IsDefined(result.Error.Code);
+               WorkerEnvelopeValidators.ErrorMatches(result.Error);
     }
 
     private static bool WorkerResourceUsageMatches(ExecutionPlan plan, SandboxExecutionResult result)
@@ -244,7 +243,6 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             !FieldEquals(summary, "policyHash", plan.PolicyHash) ||
             !FieldEquals(summary, "bindingManifestHash", plan.BindingManifestHash) ||
             !FieldEquals(summary, "fuelUsed", result.ResourceUsage.FuelUsed) ||
-            !FieldEquals(summary, "maxFuel", result.ResourceUsage.MaxFuel) ||
             !FieldEquals(summary, "loopIterations", result.ResourceUsage.LoopIterations) ||
             !FieldEquals(summary, "allocatedBytes", result.ResourceUsage.AllocatedBytes) ||
             !FieldEquals(summary, "allocationCharged", result.ResourceUsage.AllocatedBytes) ||
@@ -256,6 +254,11 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             !FieldEquals(summary, "logEvents", result.ResourceUsage.LogEvents) ||
             !FieldEquals(summary, "collectionElements", result.ResourceUsage.CollectionElements) ||
             !FieldEquals(summary, "stringBytes", result.ResourceUsage.StringBytes))
+        {
+            return false;
+        }
+
+        if (!WorkerEnvelopeValidators.BudgetFieldsMatch(plan, summary))
         {
             return false;
         }
