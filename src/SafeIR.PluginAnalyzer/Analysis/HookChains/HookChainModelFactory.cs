@@ -2,6 +2,7 @@ namespace SafeIR.PluginAnalyzer;
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
@@ -24,7 +25,7 @@ internal static class HookChainModelFactory
     private const string HookPipelineOriginal = "SafeIR.Plugins.HookPipeline<TEvent>";
     private const string HookStageOriginal = "SafeIR.Plugins.HookStage<TEvent, TCurrent>";
 
-    public static PluginKernelModelResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
+    public static HookChainResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (context.Node is not InvocationExpressionSyntax invocation)
@@ -42,14 +43,14 @@ internal static class HookChainModelFactory
         }
     }
 
-    private static PluginKernelModelResult? TryCreate(
+    private static HookChainResult? TryCreate(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             !string.Equals(terminalAccess.Name.Identifier.ValueText, InvokeKernelMethod, StringComparison.Ordinal) ||
-            !IsHookChainType(model, terminalAccess.Expression, cancellationToken))
+            !IsHookChainType(model, terminalAccess.Expression, cancellationToken, out var receiverIsPipeline))
         {
             return null;
         }
@@ -151,7 +152,43 @@ internal static class HookChainModelFactory
             Handle: handle,
             ManifestEffects: SafeIrManifestEffectModel.Create(shouldHandle, handle));
 
-        return new PluginKernelModelResult(modelResult, null);
+        return new HookChainResult(modelResult, Interception(invocation, model, eventType, modelResult, receiverIsPipeline, cancellationToken));
+    }
+
+    private static HookChainInterception? Interception(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        INamedTypeSymbol eventType,
+        PluginKernelModel chainModel,
+        bool receiverIsPipeline,
+        CancellationToken cancellationToken)
+    {
+        // Only HookPipeline<TEvent> terminals get an interceptor in the MVP (a HookStage after a Select
+        // has a second type parameter the non-generic interceptor cannot name).
+        if (!receiverIsPipeline)
+        {
+            return null;
+        }
+
+        var location = model.GetInterceptableLocation(invocation, cancellationToken);
+        if (location is null)
+        {
+            return null;
+        }
+
+        var handlerIsAction = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
+            method.Parameters.Length == 1 &&
+            method.Parameters[0].Type.OriginalDefinition.ToDisplayString().StartsWith("System.Action", StringComparison.Ordinal);
+
+        var packageFullName = string.IsNullOrEmpty(chainModel.Namespace)
+            ? "global::" + chainModel.PackageName
+            : "global::" + chainModel.Namespace + "." + chainModel.PackageName;
+
+        return new HookChainInterception(
+            location.GetInterceptsLocationAttributeSyntax(),
+            eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            packageFullName,
+            handlerIsAction);
     }
 
     private static SafeIrExpressionLoweringContext Context(
@@ -192,16 +229,21 @@ internal static class HookChainModelFactory
         return null;
     }
 
-    private static bool IsHookChainType(SemanticModel model, ExpressionSyntax receiver, CancellationToken cancellationToken)
+    private static bool IsHookChainType(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        out bool isPipeline)
     {
+        isPipeline = false;
         if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol type)
         {
             return false;
         }
 
         var original = type.OriginalDefinition.ToDisplayString();
-        return string.Equals(original, HookPipelineOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, HookStageOriginal, StringComparison.Ordinal);
+        isPipeline = string.Equals(original, HookPipelineOriginal, StringComparison.Ordinal);
+        return isPipeline || string.Equals(original, HookStageOriginal, StringComparison.Ordinal);
     }
 
     private static bool TryLambda(InvocationExpressionSyntax invocation, out ParenthesizedLambdaExpressionSyntax lambda)

@@ -11,37 +11,43 @@ namespace SafeIR.Tests;
 public sealed record ChainAggroEvent(string MonsterId, int Distance);
 
 /// <summary>
-/// End-to-end runtime proof of the Phase C lowering + hook-up: a real inline chain is lowered by the
-/// generator, compiled, loaded, installed via <see cref="HookPipeline{TEvent}.UseGeneratedChain"/>, and
-/// the lowered verified IR executes — its <c>Where</c> gates and its <c>Send</c> runs exactly as the
-/// source described. This is what a generated interceptor at the <c>InvokeKernel</c> call site performs.
+/// End-to-end runtime proof of the Phase C lowering + interceptor hook-up: a real inline chain is
+/// lowered by the generator, compiled, loaded, and the lowered verified IR executes correctly — its
+/// <c>Where</c> gates and its <c>Send</c> runs. One test installs the package directly via
+/// <see cref="HookPipeline{TEvent}.UseGeneratedChain"/>; the other proves the generated C# interceptor
+/// does it automatically at the <c>InvokeKernel</c> call site (no manual wiring).
 /// </summary>
 public sealed class HookChainRuntimeTests
 {
-    private static readonly CSharpParseOptions ParseOptions =
-        CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+    private const string ChainSource = """
+        using SafeIR.Plugins;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::SafeIR.Tests.ChainAggroEvent>()
+                    .Where((e, ctx) => e.Distance <= 5)
+                    .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+        }
+        """;
 
     [Fact]
     public async Task A_lowered_Where_chain_runs_only_when_its_condition_holds()
     {
-        var package = LoadChainPackage("""
-            using SafeIR.Plugins;
-
-            namespace ChainSample;
-
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<global::SafeIR.Tests.ChainAggroEvent>()
-                        .Where((e, ctx) => e.Distance <= 5)
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
-            }
-            """);
+        // Interceptors enabled so the generated interceptor file compiles; this test still installs the
+        // package directly (UseGeneratedChain) rather than through the interceptor.
+        var assembly = Compile(ChainSource, enableInterceptors: true);
+        var packageType = assembly.GetTypes().Single(type =>
+            type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
+            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+        var package = (PluginPackage)packageType
+            .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, null)!;
 
         var messages = new InMemoryPluginMessageSink();
         using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
-
-        // What the generated interceptor does at the InvokeKernel call site:
         server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
 
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));   // 3 <= 5 → fires
@@ -52,11 +58,40 @@ public sealed class HookChainRuntimeTests
         Assert.Equal("calm", message.Message);
     }
 
-    private static PluginPackage LoadChainPackage(string source)
+    [Fact]
+    public async Task The_generated_interceptor_installs_the_chain_at_the_InvokeKernel_call_site()
     {
+        // With interceptors enabled, the generated [InterceptsLocation] method replaces the
+        // InvokeKernel(lambda) call inside Configure with UseGeneratedChain — so running Configure
+        // installs the lowered chain instead of throwing SGP062.
+        var assembly = Compile(ChainSource, enableInterceptors: true);
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        var configure = assembly.GetType("ChainSample.Usage")!
+            .GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!;
+        configure.Invoke(null, [server.Hooks]);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-2", 10));
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("monster-1", message.TargetId);
+        Assert.Equal("calm", message.Message);
+    }
+
+    private static Assembly Compile(string source, bool enableInterceptors)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (enableInterceptors)
+        {
+            parseOptions = parseOptions.WithFeatures(
+                [new KeyValuePair<string, string>("InterceptorsNamespaces", "SafeIR.Plugins.Generated")]);
+        }
+
         var compilation = CSharpCompilation.Create(
             "SafeIrChainRuntimeTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
@@ -65,7 +100,7 @@ public sealed class HookChainRuntimeTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new SafeIrPluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: ParseOptions);
+            parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
@@ -74,13 +109,7 @@ public sealed class HookChainRuntimeTests
         using var stream = new MemoryStream();
         var emit = output.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
-
-        var loaded = Assembly.Load(stream.ToArray());
-        var packageType = loaded.GetTypes().Single(type =>
-            type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
-            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
-        var create = packageType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
-        return (PluginPackage)create.Invoke(null, null)!;
+        return Assembly.Load(stream.ToArray());
     }
 
     private static SandboxPolicy ChainPolicy()

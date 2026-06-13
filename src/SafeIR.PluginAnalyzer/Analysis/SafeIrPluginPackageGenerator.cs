@@ -29,23 +29,33 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
             .Select(static (result, _) => result.Model!)
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.ModelResult);
 
-        // Phase C: lower inline On<TEvent>().Where?(lambda).InvokeKernel(lambda) chains to the same
-        // PluginKernelModel a kernel class produces. Unsupported shapes fail safe (null).
-        var chainModels = context.SyntaxProvider
+        // Phase C: lower inline On<TEvent>().Where?(lambda).Select?(lambda).InvokeKernel(lambda) chains
+        // to the same PluginKernelModel a kernel class produces. Unsupported shapes fail safe (null).
+        var chainResults = context.SyntaxProvider
             .CreateSyntaxProvider(
                 static (node, _) => node is InvocationExpressionSyntax
                 {
                     Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeKernel" }
                 },
                 static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
-            .Where(static result => result?.Model is not null)
-            .Select(static (result, _) => result!.Model!);
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
 
         var packages = models
             .Collect()
-            .Combine(chainModels.Collect())
+            .Combine(chainResults.Select(static (result, _) => result.Model).Collect())
             .Select(static (pair, _) => CreatePackageBatch(pair.Left.AddRange(pair.Right)))
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.PackageResult);
+
+        // Emit a C# interceptor per lowered chain so the InvokeKernel call site installs + wires its
+        // generated package (UseGeneratedChain) instead of throwing SGP062.
+        var interceptions = chainResults
+            .Where(static result => result.Interception is not null)
+            .Select(static (result, _) => result.Interception!)
+            .Collect();
+        context.RegisterSourceOutput(
+            interceptions,
+            static (sourceContext, items) => SafeIrHookChainInterceptorEmitter.Emit(sourceContext, items));
 
         context.RegisterSourceOutput(packages, static (context, batch) => {
             foreach (var diagnostic in batch.Diagnostics)
