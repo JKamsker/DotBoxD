@@ -127,7 +127,7 @@ internal static class PolicyGrantValidator
                     return;
                 }
 
-                if (!requiredCapabilities.Contains(grant.Id))
+                if (!SupportsAnyRequired(grant.Id, requiredCapabilities))
                 {
                     diagnostics.Add(new SandboxDiagnostic(
                         "E-POLICY-GRANT",
@@ -136,6 +136,31 @@ internal static class PolicyGrantValidator
 
                 break;
         }
+    }
+
+    // A grant supports the module if it is exactly a required capability, or a wildcard pattern
+    // (e.g. "game.world.monster.*") that authorizes at least one concrete required capability.
+    private static bool SupportsAnyRequired(string grantId, IReadOnlySet<string> requiredCapabilities)
+    {
+        if (requiredCapabilities.Contains(grantId))
+        {
+            return true;
+        }
+
+        if (!CapabilityPattern.IsWildcard(grantId))
+        {
+            return false;
+        }
+
+        foreach (var required in requiredCapabilities)
+        {
+            if (CapabilityPattern.Matches(grantId, required))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void ValidateFileGrant(
