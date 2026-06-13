@@ -21,6 +21,9 @@ internal static class SafeIrConditionBodyModelFactory
     /// <summary>An unconditional <c>return true</c> body — used by lowered hook chains with no Where.</summary>
     public static SafeIrStatementBodyModel AlwaysTrue() => ReturnBool(value: true);
 
+    /// <summary>An unconditional <c>return false</c> body — the AND-compose false branch for chains.</summary>
+    public static SafeIrStatementBodyModel AlwaysFalse() => ReturnBool(value: false);
+
     private static SafeIrStatementBodyModel LowerCondition(
         ExpressionSyntax expression,
         SafeIrStatementBodyModel whenTrue,

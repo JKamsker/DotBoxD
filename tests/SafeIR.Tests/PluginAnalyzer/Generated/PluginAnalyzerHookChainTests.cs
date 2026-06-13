@@ -67,6 +67,60 @@ public sealed class PluginAnalyzerHookChainTests
             tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Lowers_a_multi_Where_plus_Select_chain_substituting_the_projection()
+    {
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where((e, ctx) => e.Distance <= 5)
+                        .Select((e, ctx) => e.MonsterLevel - e.PlayerLevel)
+                        .Where((gap, ctx) => gap >= 3)
+                        .InvokeKernel((gap, ctx) => ctx.Messages.Send("monster", "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_Select_projection_used_as_the_terminal_send_target()
+    {
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Select((e, ctx) => e.MonsterId)
+                        .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "SGP100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
     private static GeneratorDriverRunResult RunGenerator(string source)
     {
         var compilation = CSharpCompilation.Create(

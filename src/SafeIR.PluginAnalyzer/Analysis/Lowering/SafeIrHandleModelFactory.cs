@@ -40,14 +40,17 @@ internal static class SafeIrHandleModelFactory
         EquatableArray<LiveSettingModel> liveSettings,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
+        => CreateFromSend(
+            sendInvocation,
+            new SafeIrExpressionLoweringContext(
+                eventParameterName, eventProperties, liveSettings, semanticModel, cancellationToken));
+
+    /// <summary>Lowers a send using a prebuilt context (e.g. one carrying a Select-projected element).</summary>
+    public static SafeIrHandleModel CreateFromSend(
+        InvocationExpressionSyntax sendInvocation,
+        SafeIrExpressionLoweringContext loweringContext)
     {
         var arguments = SendArguments(sendInvocation);
-        var loweringContext = new SafeIrExpressionLoweringContext(
-            eventParameterName,
-            eventProperties,
-            liveSettings,
-            semanticModel,
-            cancellationToken);
         var target = SafeIrExpressionModelFactory.Create(arguments.Target, loweringContext);
         var message = SafeIrExpressionModelFactory.Create(arguments.Message, loweringContext);
         RequireString(target, "targetId");

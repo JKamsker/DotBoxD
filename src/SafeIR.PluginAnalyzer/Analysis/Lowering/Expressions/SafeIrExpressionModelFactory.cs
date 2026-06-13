@@ -30,7 +30,7 @@ internal static class SafeIrExpressionModelFactory
             InvocationExpressionSyntax invocation =>
                 SafeIrInvocationExpressionLowerer.Lower(invocation, context, part => Lower(part, context)),
             IsPatternExpressionSyntax pattern => SafeIrPatternExpressionLowerer.Lower(pattern, context, part => Lower(part, context)),
-            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, context.LiveSettings),
+            IdentifierNameSyntax identifier => LowerIdentifier(identifier.Identifier.ValueText, context),
             MemberAccessExpressionSyntax member
                 when SafeIrStringExpressionLowerer.TryLowerMember(member, context, part => Lower(part, context)) is { } lowered =>
                 lowered,
@@ -225,8 +225,17 @@ internal static class SafeIrExpressionModelFactory
 
     private static SafeIrExpressionModel LowerIdentifier(
         string name,
-        EquatableArray<LiveSettingModel> liveSettings)
+        SafeIrExpressionLoweringContext context)
     {
+        // A Select-projected element: inline its already-lowered IR wherever the downstream lambda
+        // names it (compile-time substitution; the projection's event-property refs ride along).
+        if (context.ProjectedElementName is { } projectedName &&
+            string.Equals(projectedName, name, StringComparison.Ordinal))
+        {
+            return context.ProjectedElement!;
+        }
+
+        var liveSettings = context.LiveSettings;
         for (var i = 0; i < liveSettings.Count; i++) {
             var setting = liveSettings[i];
             if (string.Equals(setting.Name, name, StringComparison.Ordinal)) {
@@ -261,7 +270,7 @@ internal static class SafeIrExpressionModelFactory
         }
 
         if (member.Expression is ThisExpressionSyntax) {
-            return LowerIdentifier(memberName, context.LiveSettings);
+            return LowerIdentifier(memberName, context);
         }
 
         return Unsupported(member);

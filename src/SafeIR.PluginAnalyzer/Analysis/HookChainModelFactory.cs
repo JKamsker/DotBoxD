@@ -1,22 +1,28 @@
 namespace SafeIR.PluginAnalyzer;
 
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
-/// Phase C lowering of an inline hook chain — <c>On&lt;TEvent&gt;().Where?(lambda).InvokeKernel(lambda)</c>
-/// — into the same <see cref="PluginKernelModel"/> a kernel class produces, so the existing emitter +
-/// verifier path applies unchanged. MVP subset: a single optional <c>Where</c> (no <c>Select</c>),
-/// expression-body lambdas, and an <c>InvokeKernel</c> terminal that is a single
-/// <c>ctx.Messages.Send(targetId, message)</c>. Any other shape fails safe (returns <c>null</c>, no
-/// package), leaving the runtime terminal to throw SGP062 / the analyzer to flag SGP110.
+/// Phase C lowering of an inline hook chain —
+/// <c>On&lt;TEvent&gt;().Where*(lambda).Select*(lambda).InvokeKernel(lambda)</c> — into the same
+/// <see cref="PluginKernelModel"/> a kernel class produces, so the existing emitter + verifier path
+/// applies unchanged. The <c>Where</c>s AND-compose into <c>ShouldHandle</c>; a <c>Select</c> projects
+/// the flowing element and downstream lambdas substitute that projection at compile time (via the
+/// lowering context's projected-element binding); the <c>InvokeKernel</c> terminal's single
+/// <c>ctx.Messages.Send(targetId, message)</c> becomes <c>Handle</c>. Supported subset: expression-body
+/// lambdas and a single Send terminal. Any other shape fails safe (returns <c>null</c>, no package),
+/// leaving the runtime terminal to throw SGP062 / the analyzer to flag SGP110.
 /// </summary>
 internal static class HookChainModelFactory
 {
     private const string InvokeKernelMethod = "InvokeKernel";
     private const string WhereMethod = "Where";
+    private const string SelectMethod = "Select";
     private const string OnMethod = "On";
     private const string HookPipelineOriginal = "SafeIR.Plugins.HookPipeline<TEvent>";
+    private const string HookStageOriginal = "SafeIR.Plugins.HookStage<TEvent, TCurrent>";
 
     public static PluginKernelModelResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
@@ -42,14 +48,8 @@ internal static class HookChainModelFactory
         CancellationToken cancellationToken)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            !string.Equals(terminalAccess.Name.Identifier.ValueText, InvokeKernelMethod, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var receiver = terminalAccess.Expression;
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
-            !string.Equals(receiverType.OriginalDefinition.ToDisplayString(), HookPipelineOriginal, StringComparison.Ordinal))
+            !string.Equals(terminalAccess.Name.Identifier.ValueText, InvokeKernelMethod, StringComparison.Ordinal) ||
+            !IsHookChainType(model, terminalAccess.Expression, cancellationToken))
         {
             return null;
         }
@@ -60,17 +60,21 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        var (terminalEventParam, terminalContextParam) = LambdaParameters(terminalLambda);
-        if (terminalEventParam is null || terminalContextParam is null ||
+        var (terminalElementParam, terminalContextParam) = LambdaParameters(terminalLambda);
+        if (terminalElementParam is null || terminalContextParam is null ||
             !SafeIrHandleModelFactory.IsContextSend(sendInvocation.Expression, terminalContextParam))
         {
             return null;
         }
 
-        if (!TryWalkToSeed(receiver, out var whereLambda, out var seed))
+        var stages = new List<Stage>();
+        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        if (seed is null)
         {
             return null;
         }
+
+        stages.Reverse(); // seed-to-terminal order
 
         if (model.GetTypeInfo(seed, cancellationToken).Type is not INamedTypeSymbol pipelineType ||
             pipelineType.TypeArguments.Length != 1 ||
@@ -85,11 +89,49 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        var (shouldHandle, shouldHandleEventParam, shouldHandleContextParam) =
-            LowerShouldHandle(whereLambda, eventProperties, model, cancellationToken);
+        // Forward pass: track the projected-element binding; record each Where with the context that
+        // was current at its position (event mode, or projected after a Select).
+        var whereStages = new List<(ExpressionSyntax Body, SafeIrExpressionLoweringContext Context)>();
+        SafeIrExpressionModel? projected = null;
+        var shouldHandleEventParam = SafeIrGenerationNames.DefaultEventParameterName;
 
-        var handle = SafeIrHandleModelFactory.CreateFromSend(
-            sendInvocation, terminalEventParam, eventProperties, default, model, cancellationToken);
+        foreach (var stage in stages)
+        {
+            var (elementParam, _) = LambdaParameters(stage.Lambda);
+            if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
+            {
+                return null;
+            }
+
+            var context = Context(elementParam, eventProperties, projected, model, cancellationToken);
+            if (stage.IsSelect)
+            {
+                projected = SafeIrExpressionModelFactory.Create(body, context);
+            }
+            else
+            {
+                whereStages.Add((body, context));
+                if (projected is null)
+                {
+                    shouldHandleEventParam = elementParam;
+                }
+            }
+        }
+
+        // AND-compose the Where conditions in source order: fold from the last so the first Where is
+        // the outermost branch (if w0 then (if w1 then ... else false) else false).
+        var shouldHandle = SafeIrConditionBodyModelFactory.AlwaysTrue();
+        for (var i = whereStages.Count - 1; i >= 0; i--)
+        {
+            shouldHandle = SafeIrConditionBodyModelFactory.CreateBranch(
+                whereStages[i].Body,
+                shouldHandle,
+                SafeIrConditionBodyModelFactory.AlwaysFalse(),
+                whereStages[i].Context);
+        }
+
+        var handleContext = Context(terminalElementParam, eventProperties, projected, model, cancellationToken);
+        var handle = SafeIrHandleModelFactory.CreateFromSend(sendInvocation, handleContext);
 
         var chainId = HookChainIdentity.Compute(invocation);
         var kernelName = "HookChain_" + chainId;
@@ -100,8 +142,8 @@ internal static class HookChainModelFactory
             PackageName: kernelName + "PluginPackage",
             EventName: eventType.MetadataName,
             EventParameterName: shouldHandleEventParam,
-            ContextParameterName: shouldHandleContextParam,
-            HandleEventParameterName: terminalEventParam,
+            ContextParameterName: terminalContextParam,
+            HandleEventParameterName: terminalElementParam,
             HandleContextParameterName: terminalContextParam,
             EventProperties: eventProperties,
             LiveSettings: default,
@@ -112,42 +154,19 @@ internal static class HookChainModelFactory
         return new PluginKernelModelResult(modelResult, null);
     }
 
-    private static (SafeIrStatementBodyModel Body, string EventParam, string ContextParam) LowerShouldHandle(
-        ParenthesizedLambdaExpressionSyntax? whereLambda,
+    private static SafeIrExpressionLoweringContext Context(
+        string elementParam,
         EquatableArray<EventPropertyModel> eventProperties,
+        SafeIrExpressionModel? projected,
         SemanticModel model,
         CancellationToken cancellationToken)
+        => projected is null
+            ? new SafeIrExpressionLoweringContext(elementParam, eventProperties, default, model, cancellationToken)
+            : new SafeIrExpressionLoweringContext(
+                elementParam, eventProperties, default, model, cancellationToken, elementParam, projected);
+
+    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<Stage> stages)
     {
-        if (whereLambda is null)
-        {
-            return (
-                SafeIrConditionBodyModelFactory.AlwaysTrue(),
-                SafeIrGenerationNames.DefaultEventParameterName,
-                SafeIrGenerationNames.DefaultContextParameterName);
-        }
-
-        if (whereLambda.ExpressionBody is not { } whereBody)
-        {
-            throw new NotSupportedException("Hook chain Where must be an expression-body lambda.");
-        }
-
-        var (eventParam, contextParam) = LambdaParameters(whereLambda);
-        if (eventParam is null || contextParam is null)
-        {
-            throw new NotSupportedException("Hook chain Where lambda must take (element, context).");
-        }
-
-        var context = new SafeIrExpressionLoweringContext(eventParam, eventProperties, default, model, cancellationToken);
-        return (SafeIrConditionBodyModelFactory.Create(whereBody, context), eventParam, contextParam);
-    }
-
-    private static bool TryWalkToSeed(
-        ExpressionSyntax receiver,
-        out ParenthesizedLambdaExpressionSyntax? whereLambda,
-        out InvocationExpressionSyntax seed)
-    {
-        whereLambda = null;
-        seed = null!;
         var current = receiver;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
@@ -155,27 +174,34 @@ internal static class HookChainModelFactory
             var name = access.Name.Identifier.ValueText;
             if (string.Equals(name, OnMethod, StringComparison.Ordinal))
             {
-                seed = invocation;
-                return true;
+                return invocation;
             }
 
-            if (string.Equals(name, WhereMethod, StringComparison.Ordinal))
+            var isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
+            if ((isSelect || string.Equals(name, WhereMethod, StringComparison.Ordinal)) &&
+                TryLambda(invocation, out var lambda))
             {
-                // MVP: a single Where. A second Where (already captured) is unsupported.
-                if (whereLambda is not null || !TryLambda(invocation, out var lambda))
-                {
-                    return false;
-                }
-
-                whereLambda = lambda;
+                stages.Add(new Stage(isSelect, lambda));
                 current = access.Expression;
                 continue;
             }
 
+            return null;
+        }
+
+        return null;
+    }
+
+    private static bool IsHookChainType(SemanticModel model, ExpressionSyntax receiver, CancellationToken cancellationToken)
+    {
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol type)
+        {
             return false;
         }
 
-        return false;
+        var original = type.OriginalDefinition.ToDisplayString();
+        return string.Equals(original, HookPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, HookStageOriginal, StringComparison.Ordinal);
     }
 
     private static bool TryLambda(InvocationExpressionSyntax invocation, out ParenthesizedLambdaExpressionSyntax lambda)
@@ -192,11 +218,24 @@ internal static class HookChainModelFactory
         return true;
     }
 
-    private static (string? EventParam, string? ContextParam) LambdaParameters(ParenthesizedLambdaExpressionSyntax lambda)
+    private static (string? ElementParam, string? ContextParam) LambdaParameters(ParenthesizedLambdaExpressionSyntax lambda)
     {
         var parameters = lambda.ParameterList.Parameters;
         return parameters.Count == 2
             ? (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText)
             : (null, null);
+    }
+
+    private readonly struct Stage
+    {
+        public Stage(bool isSelect, ParenthesizedLambdaExpressionSyntax lambda)
+        {
+            IsSelect = isSelect;
+            Lambda = lambda;
+        }
+
+        public bool IsSelect { get; }
+
+        public ParenthesizedLambdaExpressionSyntax Lambda { get; }
     }
 }
