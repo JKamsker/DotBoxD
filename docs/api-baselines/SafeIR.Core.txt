@@ -19,7 +19,7 @@ public bool Equals(ExecutionPlanSeal? other)
 public bool Equals(SandboxType? other)
 public bool ExecutionDispatched { get; init; }
 public bool GrantsCapability(string capabilityId)
-public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxRunId runId, string moduleHash, string policyHash)
+public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxErrorCode? expectedErrorCode, SandboxRunId runId, string moduleHash, string policyHash)
 public bool IsForbidden() => IsForbidden(this)
 public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth)
 public bool IsValidMapKey()

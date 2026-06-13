@@ -49,6 +49,7 @@ public interface IAuditSink
         BindingDescriptor descriptor,
         long checkpoint,
         bool success,
+        SandboxErrorCode? expectedErrorCode,
         SandboxRunId runId,
         string moduleHash,
         string policyHash);
@@ -73,6 +74,7 @@ public sealed class InMemoryAuditSink : IAuditSink
         BindingDescriptor descriptor,
         long checkpoint,
         bool success,
+        SandboxErrorCode? expectedErrorCode,
         SandboxRunId runId,
         string moduleHash,
         string policyHash)
@@ -86,7 +88,7 @@ public sealed class InMemoryAuditSink : IAuditSink
             EffectMatches(e, descriptor) &&
             !string.IsNullOrWhiteSpace(e.ResourceId) &&
             HasRequiredFields(e, moduleHash, policyHash) &&
-            (success || e.ErrorCode is not null));
+            ResultMatches(e, success, expectedErrorCode));
 
     private static bool IsBindingAuditKind(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
@@ -107,6 +109,11 @@ public sealed class InMemoryAuditSink : IAuditSink
         return nonCpuEffects == SandboxEffect.None ||
                (auditEvent.Effect & nonCpuEffects) != SandboxEffect.None;
     }
+
+    private static bool ResultMatches(SandboxAuditEvent auditEvent, bool success, SandboxErrorCode? expectedErrorCode)
+        => success
+            ? auditEvent.ErrorCode is null
+            : auditEvent.ErrorCode is not null && auditEvent.ErrorCode == expectedErrorCode;
 
     private static bool HasRequiredFields(SandboxAuditEvent auditEvent, string moduleHash, string policyHash)
     {

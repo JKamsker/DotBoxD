@@ -1,20 +1,20 @@
 ---
 id: COR-0045
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Capability-denial audits omit worker-required resource identity
 dedup_key: correctness/runtime/policy-denied-audit-resource-id-schema-mismatch
 created_at: 2026-06-12T23:10:16.6303170+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T23:10:16.6303170+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T00:32:57.3325071+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T00:28:58.0363304+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T00:32:57.3325071+00:00
+fixed_commit: pending
 verified_by: 
 verified_at: 
 verified_commit: 

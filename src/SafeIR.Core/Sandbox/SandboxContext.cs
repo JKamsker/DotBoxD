@@ -48,6 +48,7 @@ public sealed class SandboxContext
                 DateTimeOffset.UtcNow,
                 Success: false,
                 CapabilityId: capabilityId,
+                ResourceId: $"capability:{capabilityId}",
                 ErrorCode: SandboxErrorCode.PermissionDenied,
                 Message: $"capability {capabilityId} denied"));
             throw new SandboxRuntimeException(new SandboxError(
@@ -149,7 +150,7 @@ public sealed class SandboxContext
     public void EnsureRequiredBindingSuccessAudit(BindingDescriptor descriptor, long checkpoint)
     {
         if (descriptor.AuditLevel == AuditLevel.None ||
-            Audit.HasBindingAuditSince(descriptor, checkpoint, success: true, RunId, ModuleHash, PolicyHash))
+            Audit.HasBindingAuditSince(descriptor, checkpoint, success: true, null, RunId, ModuleHash, PolicyHash))
         {
             return;
         }
@@ -165,7 +166,7 @@ public sealed class SandboxContext
         SandboxErrorCode errorCode)
     {
         if (descriptor.AuditLevel == AuditLevel.None ||
-            Audit.HasBindingAuditSince(descriptor, checkpoint, success: false, RunId, ModuleHash, PolicyHash))
+            Audit.HasBindingAuditSince(descriptor, checkpoint, success: false, errorCode, RunId, ModuleHash, PolicyHash))
         {
             return;
         }
