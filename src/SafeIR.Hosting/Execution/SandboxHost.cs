@@ -17,6 +17,7 @@ public sealed partial class SandboxHost : IDisposable
     private readonly byte[] _planSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly AutoExecutionHotness _autoHotness = new();
     private readonly CompiledExecutableCache _compiledExecutables = new();
+    private readonly PreparedPlanIntegrityCache _preparedPlans = new();
     private int _disposed;
 
     internal SandboxHost(
@@ -56,13 +57,15 @@ public sealed partial class SandboxHost : IDisposable
             throw new SandboxValidationException(validation.Diagnostics);
         }
 
-        return ValueTask.FromResult(ExecutionPlanBuilder.Build(
+        var plan = ExecutionPlanBuilder.Build(
             module,
             policy,
             _bindings,
             validation.Functions,
             validation.BindingReferences,
-            _planSigningKey));
+            _planSigningKey);
+        _preparedPlans.Register(plan);
+        return ValueTask.FromResult(plan);
     }
 
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(
@@ -74,7 +77,7 @@ public sealed partial class SandboxHost : IDisposable
     {
         ThrowIfDisposed();
         options ??= new SandboxExecutionOptions();
-        ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey);
+        ExecutionPlanGuard.EnsurePrepared(plan, _bindings, _planSigningKey, _preparedPlans);
         if (!Enum.IsDefined(options.Mode))
         {
             return Publish(InvalidExecutionOptionsResult(

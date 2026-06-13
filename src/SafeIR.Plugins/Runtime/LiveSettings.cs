@@ -11,7 +11,18 @@ public interface ILiveSetting
     void SetObject(object? value);
 }
 
-public sealed class LiveValue<T> : ILiveSetting
+// Splits validation from storage so a value is coerced and range-validated exactly once
+// per update. The store coerces through <see cref="Coerce"/> when it needs the trusted typed
+// value up front (atomic batch checks) and then stores it through <see cref="ApplyCoerced"/>,
+// which never re-runs conversion or range checks. Single updates still flow through the
+// public <see cref="ILiveSetting.SetObject(object?)"/>, the one coercion site for the slot.
+internal interface ICoercibleLiveSetting : ILiveSetting
+{
+    object? Coerce(object? value);
+    void ApplyCoerced(object? coercedValue);
+}
+
+public sealed class LiveValue<T> : ICoercibleLiveSetting
 {
     private readonly object _gate = new();
     private T _value;
@@ -50,7 +61,18 @@ public sealed class LiveValue<T> : ILiveSetting
         => LiveSettingTypeConverter.ToSandboxValue(Definition.Type, Value);
 
     public void SetObject(object? value)
-        => Value = (T)LiveSettingTypeConverter.CoerceClr(typeof(T), value)!;
+        => Value = (T)Coerce(value)!;
+
+    object? ICoercibleLiveSetting.Coerce(object? value) => Coerce(value);
+
+    void ICoercibleLiveSetting.ApplyCoerced(object? coercedValue) => Value = (T)coercedValue!;
+
+    private object? Coerce(object? value)
+    {
+        var coerced = LiveSettingTypeConverter.CoerceClr(typeof(T), value);
+        LiveSettingTypeConverter.ValidateRangeValue(Definition, coerced);
+        return coerced;
+    }
 }
 
 public sealed class LiveSettingStore
@@ -112,17 +134,40 @@ public sealed class LiveSettingStore
     public void SetObject(string name, object? value)
     {
         lock (_gate) {
-            var coerced = CoerceAndValidate(name, value);
-            coerced.Setting.SetObject(coerced.Value);
+            // The slot is the single coercion/validation site; hand it the raw caller value
+            // so conversion and range checks run exactly once instead of once here and again
+            // inside the slot.
+            Resolve(name).SetObject(value);
         }
     }
 
     public void SetMany(IReadOnlyDictionary<string, object?> values)
     {
         lock (_gate) {
-            var coerced = CoerceAndValidate(values);
-            foreach (var item in coerced) {
-                _settings[item.Key].SetObject(item.Value);
+            // Resolve every slot first so an unknown setting fails before any value is applied,
+            // preserving the all-or-nothing batch contract.
+            var resolved = new (ILiveSetting Setting, object? Value)[values.Count];
+            var index = 0;
+            foreach (var item in values) {
+                resolved[index++] = (Resolve(item.Key), item.Value);
+            }
+
+            // Coerce and range-validate the whole batch up front for slots that support the
+            // validate/store split, again preserving atomicity: a single invalid value aborts
+            // the batch before anything is stored. Trusted typed values are then applied without
+            // re-coercing. Foreign slots keep their own single coercion site via SetObject.
+            for (var i = 0; i < resolved.Length; i++) {
+                if (resolved[i].Setting is ICoercibleLiveSetting coercible) {
+                    resolved[i] = (coercible, coercible.Coerce(resolved[i].Value));
+                }
+            }
+
+            foreach (var (setting, value) in resolved) {
+                if (setting is ICoercibleLiveSetting coercible) {
+                    coercible.ApplyCoerced(value);
+                } else {
+                    setting.SetObject(value);
+                }
             }
         }
     }
@@ -194,28 +239,12 @@ public sealed class LiveSettingStore
         return new LiveSettingStore(settings);
     }
 
-    private Dictionary<string, object?> CoerceAndValidate(IReadOnlyDictionary<string, object?> values)
-    {
-        var coerced = new Dictionary<string, object?>(values.Count, StringComparer.Ordinal);
-        foreach (var item in values) {
-            coerced[item.Key] = CoerceAndValidate(item.Key, item.Value).Value;
-        }
+    private ILiveSetting Resolve(string name)
+        => _settings.TryGetValue(name, out var setting)
+            ? setting
+            : throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
 
-        return coerced;
-    }
-
-    private (ILiveSetting Setting, object? Value) CoerceAndValidate(string name, object? value)
-    {
-        if (!_settings.TryGetValue(name, out var setting)) {
-            throw new KeyNotFoundException($"Live setting '{name}' is not registered.");
-        }
-
-        var coerced = LiveSettingTypeConverter.CoerceClr(setting.Definition.Type, value);
-        LiveSettingTypeConverter.ValidateRangeValue(setting.Definition, coerced);
-        return (setting, coerced);
-    }
-
-    private sealed class LiveSettingSlot(LiveSettingDefinition definition, object? value) : ILiveSetting
+    private sealed class LiveSettingSlot(LiveSettingDefinition definition, object? value) : ICoercibleLiveSetting
     {
         private readonly object _gate = new();
         private object? _value = value;
@@ -236,6 +265,9 @@ public sealed class LiveSettingStore
             => LiveSettingTypeConverter.ToSandboxValue(definition.Type, CurrentValue);
 
         public void SetObject(object? value)
+            => ApplyCoerced(Coerce(value));
+
+        public object? Coerce(object? value)
         {
             var coerced = definition.Type switch {
                 PluginManifestNames.LiveSettingTypes.Bool => LiveSettingTypeConverter.CoerceClr(typeof(bool), value),
@@ -246,8 +278,13 @@ public sealed class LiveSettingStore
                 _ => throw LiveSettingTypeConverter.Diagnostic($"Live setting type '{definition.Type}' is not supported.")
             };
             LiveSettingTypeConverter.ValidateRangeValue(definition, coerced);
+            return coerced;
+        }
+
+        public void ApplyCoerced(object? coercedValue)
+        {
             lock (_gate) {
-                _value = coerced;
+                _value = coercedValue;
             }
         }
     }

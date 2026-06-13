@@ -6,6 +6,8 @@ public sealed record FunctionAnalysis(SandboxType ReturnType, SandboxEffect Effe
 
 public sealed class ExecutionPlan
 {
+    private FrozenDictionary<string, SandboxFunction>? _functionLookup;
+
     public ExecutionPlan(
         string moduleHash,
         string planHash,
@@ -53,6 +55,19 @@ public sealed class ExecutionPlan
     public ResourceLimits Budget { get; }
     public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
     public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
+
+    // The module function set is immutable for the lifetime of a prepared plan, so the id->function
+    // index is built once and reused across every interpreted run instead of being rebuilt per
+    // execution. Lazy + Volatile keeps construction race-free without locking on the hot path.
+    public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
+        => Volatile.Read(ref _functionLookup) ?? BuildFunctionLookup();
+
+    private FrozenDictionary<string, SandboxFunction> BuildFunctionLookup()
+    {
+        var lookup = Module.Functions.ToFrozenDictionary(f => f.Id, StringComparer.Ordinal);
+        Volatile.Write(ref _functionLookup, lookup);
+        return lookup;
+    }
 
     private static IReadOnlyDictionary<string, IReadOnlySet<string>> CopyBindingReferences(
         IReadOnlyDictionary<string, IReadOnlySet<string>> bindingReferences)

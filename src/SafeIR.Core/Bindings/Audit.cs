@@ -88,17 +88,46 @@ public sealed class InMemoryAuditSink : IAuditSink
         SandboxRunId runId,
         string moduleHash,
         string policyHash)
-        => _events.Any(e =>
-            e.SequenceNumber > checkpoint &&
-            e.RunId == runId &&
-            e.Success == success &&
-            IsBindingAuditKind(e.Kind) &&
-            StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
-            CapabilityMatches(e, descriptor) &&
-            EffectMatches(e, descriptor) &&
-            !string.IsNullOrWhiteSpace(e.ResourceId) &&
-            HasRequiredFields(e, moduleHash, policyHash) &&
-            ResultMatches(e, success, expectedErrorCode));
+    {
+        // Sequence numbers are assigned monotonically on append (Write sets
+        // SequenceNumber = ++_sequence) and _events is never reordered or
+        // pruned, so _events[i].SequenceNumber == i + 1. A checkpoint is the
+        // sequence count recorded before the current binding call, which means
+        // the first event with SequenceNumber > checkpoint lives at list index
+        // checkpoint. Start enumeration there instead of rescanning prior
+        // events, avoiding O(N^2) enforcement work over a run.
+        for (var index = StartIndexAfter(checkpoint); index < _events.Count; index++)
+        {
+            var e = _events[index];
+            if (e.RunId == runId &&
+                e.Success == success &&
+                IsBindingAuditKind(e.Kind) &&
+                StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
+                CapabilityMatches(e, descriptor) &&
+                EffectMatches(e, descriptor) &&
+                !string.IsNullOrWhiteSpace(e.ResourceId) &&
+                HasRequiredFields(e, moduleHash, policyHash) &&
+                ResultMatches(e, success, expectedErrorCode))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int StartIndexAfter(long checkpoint)
+    {
+        // Fail closed against an out-of-range checkpoint: a negative checkpoint
+        // means "scan all events", and one beyond the recorded count yields an
+        // empty range. The bounded clamp keeps the index a valid list offset.
+        if (checkpoint <= 0)
+        {
+            return 0;
+        }
+
+        return checkpoint >= _events.Count ? _events.Count : (int)checkpoint;
+    }
 
     private static bool IsBindingAuditKind(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";

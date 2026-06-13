@@ -11,7 +11,7 @@ Interpreted mode executes verified IR directly. Compiled mode is only a runtime 
   returns the public `ModuleValidationResult` evidence shape with diagnostics, function analysis,
   module effects, required capabilities, and binding references.
 - `SafeIR.Runtime`: safe host bindings for files, time, random, logging, strings, and math.
-- `SafeIR.Serialization.Json`: JSON IR importer, host import extensions, and plugin package JSON upload helpers.
+- `SafeIR.Serialization.Json`: JSON IR importer and exporter, host import extensions, and plugin package JSON upload helpers.
 - `SafeIR.Transport.Http`: HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
 - `SafeIR.Transport.Ipc.ShaRpc`: preview MessagePack IPC addon built on ShaRPC generic transports, with named-pipe convenience helpers.
 - `SafeIR.Interpreter`: direct IR execution backend.
@@ -51,7 +51,7 @@ dotnet add package SafeIR.Transport.Ipc.ShaRpc --prerelease
 Common namespaces:
 
 - `SafeIR`, `SafeIR.Hosting`, and `SafeIR.Runtime` for host setup and execution.
-- `SafeIR.Serialization.Json` for `ImportJsonAsync` and `SafeIrJsonImporter`.
+- `SafeIR.Serialization.Json` for `ImportJsonAsync`, `SafeIrJsonImporter`, and `SafeIrJsonExporter` (the module export side of the JSON IR round trip).
 - `SafeIR.Transport.Http` for HTTP binding registration and `GrantHttpGet`.
 - `SafeIR.Plugins` for plugin manifests, `PluginPackage`, and the plugin-facing JSON upload/export helper types
   supplied by the `SafeIR.Serialization.Json` package.
@@ -114,6 +114,21 @@ var result = await host.ExecuteAsync(
 }
 ```
 
+## JSON IR Round Trip
+
+Tooling that builds or transforms `SandboxModule` instances can serialize them back to JSON IR
+with `SafeIrJsonExporter` and re-import the result with `SafeIrJsonImporter`, both from the
+`SafeIR.Serialization.Json` package:
+
+```csharp
+using SafeIR;
+using SafeIR.Serialization.Json;
+
+var json = SafeIrJsonExporter.Export(module, indented: true);
+var roundTripped = SafeIrJsonImporter.Import(json);
+var plan = await host.PrepareAsync(roundTripped, policy);
+```
+
 ## Local Verification
 
 ```powershell
@@ -166,6 +181,48 @@ production pinned transport; only the invoker is swapped for determinism.
 
 ```powershell
 dotnet run --project examples\HttpTransport\SafeIR.HttpTransportExample\SafeIR.HttpTransportExample.csproj
+```
+
+## Logging Example
+
+Logging is a user-facing safe API with an explicit capability boundary: a host must both register
+the bindings at setup with `AddLogBindings()` and grant `log.write` in the policy with
+`GrantLogging()`. Without both, a module that calls `log.info`/`log.warn` is denied with the
+`E-POLICY-CAP` diagnostic. Granted log messages are audited as sanitized `SandboxLog` events
+(secret-shaped tokens are redacted before they reach the sink), and `ResourceUsage.LogEvents`
+reports how many log calls ran. `WithMaxLogEvents` and `WithMaxLogMessageLength` are the quota
+controls; exceeding either returns a `QuotaExceeded` failure.
+
+```csharp
+using SafeIR;
+using SafeIR.Hosting;
+using SafeIR.Runtime;
+using SafeIR.Serialization.Json;
+
+using var host = SandboxHost.Create(builder => {
+    builder.AddDefaultPureBindings();
+    builder.AddLogBindings();
+    builder.UseInterpreter();
+});
+
+var module = await host.ImportJsonAsync(loggingJsonIr);
+var policy = SandboxPolicyBuilder.Create()
+    .GrantLogging()
+    .WithMaxLogEvents(8)
+    .WithMaxLogMessageLength(256)
+    .Build();
+
+var plan = await host.PrepareAsync(module, policy);
+var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+// result.ResourceUsage.LogEvents and the sanitized "SandboxLog" audit events expose the output.
+```
+
+The runnable standalone walkthrough lives in
+`examples/Addendum/SafeIR.AddendumExamples/Examples/SafeLoggingExample.cs` and is exercised by the
+docs smoke. It runs the granted path and a tight `WithMaxLogEvents` quota denial:
+
+```powershell
+dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
 ```
 
 ## Plugin Addendum Examples

@@ -5,7 +5,7 @@ using SafeIR;
 internal sealed class InterpreterEvaluator
 {
     private readonly SandboxContext _context;
-    private readonly Dictionary<string, SandboxFunction> _functions;
+    private readonly IReadOnlyDictionary<string, SandboxFunction> _functions;
     private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly SandboxExecutionOptions _options;
     private readonly string _moduleHash;
@@ -16,7 +16,7 @@ internal sealed class InterpreterEvaluator
         _context = context;
         _options = options;
         _moduleHash = plan.ModuleHash;
-        _functions = plan.Module.Functions.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
     }

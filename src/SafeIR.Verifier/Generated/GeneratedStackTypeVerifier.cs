@@ -20,33 +20,41 @@ internal static class GeneratedStackTypeVerifier
         }
 
         var signature = GeneratedMethodSignatureReader.Read(reader, method, body);
-        var stacks = new Dictionary<int, IReadOnlyList<string>>();
+        var stacks = new Dictionary<int, string[]>();
         var queue = new Queue<int>();
         stacks[analysis.Instructions[0].Offset] = [];
         queue.Enqueue(analysis.Instructions[0].Offset);
+
+        // Reused mutable working buffer for the transfer of each instruction.
+        // The stored per-offset snapshots stay immutable, so refilling this
+        // buffer from the incoming snapshot avoids cloning the whole stack on
+        // every reachable instruction.
+        var stack = new List<string>();
 
         while (queue.Count > 0)
         {
             var offset = queue.Dequeue();
             var instruction = analysis.ByOffset[offset];
-            var output = Transfer(instruction, stacks[offset], signature, diagnostics);
+            Transfer(instruction, stacks[offset], stack, signature, diagnostics);
             foreach (var successor in GeneratedMethodFlowAnalyzer.Successors(
                          analysis.Instructions,
                          analysis.ByOffset,
                          instruction))
             {
-                TrackSuccessor(successor, output, analysis.ByOffset, stacks, queue, diagnostics);
+                TrackSuccessor(successor, stack, analysis.ByOffset, stacks, queue, diagnostics);
             }
         }
     }
 
-    private static IReadOnlyList<string> Transfer(
+    private static void Transfer(
         GeneratedInstruction instruction,
         IReadOnlyList<string> input,
+        List<string> stack,
         GeneratedMethodSignature signature,
         List<VerificationDiagnostic> diagnostics)
     {
-        var stack = input.ToList();
+        stack.Clear();
+        stack.AddRange(input);
         switch (instruction.Opcode)
         {
             case ILOpCode.Ldarg or ILOpCode.Ldarg_s or ILOpCode.Ldarg_0 or ILOpCode.Ldarg_1
@@ -118,8 +126,6 @@ internal static class GeneratedStackTypeVerifier
                 Return(instruction, stack, signature.ReturnType, diagnostics);
                 break;
         }
-
-        return stack;
     }
 
     private static string IndexedType(
@@ -152,9 +158,9 @@ internal static class GeneratedStackTypeVerifier
 
     private static void TrackSuccessor(
         int successor,
-        IReadOnlyList<string> output,
+        List<string> output,
         IReadOnlyDictionary<int, GeneratedInstruction> byOffset,
-        Dictionary<int, IReadOnlyList<string>> stacks,
+        Dictionary<int, string[]> stacks,
         Queue<int> queue,
         List<VerificationDiagnostic> diagnostics)
     {

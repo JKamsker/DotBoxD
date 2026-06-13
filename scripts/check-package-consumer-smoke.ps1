@@ -146,6 +146,45 @@ var moduleImporter = typeof(SafeIrJsonImporter);
 var pluginUpload = typeof(PluginPackageJsonSerializer);
 var ipc = typeof(SafeIrShaRpcMessagePackIpc);
 
+// Prove the packaged SafeIrJsonExporter module-export surface is reachable and that the
+// documented JSON IR round trip (export -> import -> prepare) works through the public
+// package references and namespaces. If the exporter is dropped from the package, lands in
+// the wrong namespace, or loses a transitive dependency, this consumer fails to compile or
+// the prepared-plan assertion throws, failing the smoke.
+var roundTripModule = new SandboxModule(
+    "package-consumer-roundtrip",
+    SemVersion.One,
+    SemVersion.One,
+    new CapabilityRequest[0],
+    new[]
+    {
+        new SandboxFunction(
+            "main",
+            true,
+            new Parameter[0],
+            SandboxType.I32,
+            new Statement[]
+            {
+                new ReturnStatement(
+                    new LiteralExpression(SandboxValue.FromInt32(7), new SourceSpan(1, 1)),
+                    new SourceSpan(1, 1))
+            })
+    },
+    new Dictionary<string, string>());
+
+var exportedJson = SafeIrJsonExporter.Export(roundTripModule, indented: true);
+var reimported = SafeIrJsonImporter.Import(exportedJson);
+if (reimported.Id != "package-consumer-roundtrip")
+{
+    throw new InvalidOperationException(`$"Unexpected round-tripped module id: {reimported.Id}");
+}
+
+var roundTripPlan = await host.PrepareAsync(reimported, policy);
+if (!roundTripPlan.Module.Functions.Any(f => f.Id == "main"))
+{
+    throw new InvalidOperationException("Round-tripped module is missing its entrypoint after prepare.");
+}
+
 // Prove the packaged SafeIR.PluginAnalyzer source generator produced a callable
 // *PluginPackage.Create() factory for the [GamePlugin] kernel defined below. If the
 // analyzer asset is missing from the package, the generator fails to initialize, or the

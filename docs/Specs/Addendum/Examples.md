@@ -300,6 +300,75 @@ foreach (var observation in kernel.ExecutionObservations) {
 
 Each observation includes the entrypoint name, requested mode, actual mode, success flag, safe fallback reason when present, cache/materialization status, and compiled runtime envelope fields when compiled execution was used.
 
+## Custom Host Binding Example
+
+Host-owned bindings are the main extensibility point for exposing product-specific data and
+services to verified Safe IR. The runnable example lives in
+`examples\Addendum\SafeIR.AddendumExamples\Examples\CustomBindingExample.cs` and is exercised by
+the addendum example run and the docs smoke script.
+
+The example authors a `tenant.lookup` binding and shows every field a binding author must decide:
+
+```csharp
+new BindingDescriptor(
+    "tenant.lookup",
+    SemVersion.One,
+    [SandboxType.I32],
+    SandboxType.I32,
+    // Read-only external access still emits audit, so include the Audit effect.
+    SandboxEffect.Cpu | SandboxEffect.DatabaseRead | SandboxEffect.Audit,
+    "tenant.read",                       // required capability (custom, so a grant validator is mandatory)
+    BindingCostModel.Fixed(8),           // deterministic cost: one host call, flat fuel
+    AuditLevel.PerCall,                  // external bindings must be audited
+    BindingSafety.ReadOnlyExternal,      // safety classification
+    InvokeTenantLookup,                  // BindingInvoker
+    CompiledBinding.RuntimeStub(         // compiled-mode dispatch stub
+        typeof(CompiledRuntime).FullName!,
+        nameof(CompiledRuntime.CallBinding)),
+    ValidateTenantReadGrant);            // CapabilityGrantValidator
+```
+
+Register it, grant the capability, import JSON IR that calls it, and inspect the value and audit:
+
+```csharp
+using var host = SandboxHost.Create(builder =>
+{
+    builder.AddBinding(TenantLookupBinding());
+    builder.UseInterpreter();
+    builder.UseCompilerIfAvailable();
+});
+
+var module = await host.ImportJsonAsync(tenantLookupJsonIr);
+var policy = SandboxPolicyBuilder.Create()
+    .Grant("tenant.read", new { maxTenantId = 100 },
+        SandboxEffect.Cpu | SandboxEffect.DatabaseRead | SandboxEffect.Audit)
+    .WithFuel(10_000)
+    .WithMaxHostCalls(16)
+    .Build();
+
+var plan = await host.PrepareAsync(module, policy);
+var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+var value = ((I32Value)result.Value!).Value;
+var audit = result.AuditEvents.Single(e => e.BindingId == "tenant.lookup");
+```
+
+Safe defaults a binding author should follow:
+
+- **Required capability**: any binding that reaches outside pure CPU must declare a capability;
+  a custom (non-built-in) capability also requires a `CapabilityGrantValidator` that fails closed
+  on unsupported or invalid grant parameters.
+- **Deterministic cost model**: prefer `BindingCostModel.Fixed(...)` or `PerByte(...)` so fuel and
+  host-call accounting are predictable.
+- **Audit level**: external bindings must use at least `AuditLevel.PerCall` and emit a `BindingCall`
+  audit event populated with `context.BindingAuditFields(...)`.
+- **Safety classification**: pick the narrowest `BindingSafety` that fits; `ReadOnlyExternal` for
+  reads, `SideEffectingExternal` for writes.
+- **Resource charging**: the host charges the declared cost and one host call per invocation, visible
+  through `result.ResourceUsage.HostCalls`.
+- **Compiled runtime stub**: custom bindings dispatch through
+  `CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))`.
+
 ## Flagship Fire Damage Example
 
 The flagship example is implemented in:
