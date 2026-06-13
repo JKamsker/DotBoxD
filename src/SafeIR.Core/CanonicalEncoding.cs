@@ -11,11 +11,15 @@ internal static class CanonicalEncoding
     public static string Record(IEnumerable<string?> fields)
     {
         var builder = new StringBuilder();
+        AppendRecord(builder, fields);
+        return builder.ToString();
+    }
+
+    public static void AppendRecord(StringBuilder builder, IEnumerable<string?> fields)
+    {
         foreach (var field in fields) {
             AppendField(builder, field);
         }
-
-        return builder.ToString();
     }
 
     public static string HashRecords(IEnumerable<string> records)

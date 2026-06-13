@@ -71,7 +71,7 @@ internal static class PluginKernelInputBuilder
         }
 
         value.CopySandboxValues(liveSettings, values, eventValues.Count);
-        return SandboxValue.FromList(values, values[0].Type);
+        return SandboxValue.FromOwnedList(values, values[0].Type);
     }
 
     private static SandboxValue BuildList<TEvent>(
@@ -88,6 +88,6 @@ internal static class PluginKernelInputBuilder
             value.CopySandboxValues(liveSettings, values, eventValueCount);
         }
 
-        return SandboxValue.FromList(values, values[0].Type);
+        return SandboxValue.FromOwnedList(values, values[0].Type);
     }
 }

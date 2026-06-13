@@ -136,7 +136,8 @@ public static partial class SafeFileSystem
 
     private static ResolvedPath ResolvePath(SandboxContext context, SandboxPath path, string capabilityId, string bindingId)
     {
-        context.RequireCapability(capabilityId);
+        // GetCapability performs the authorization (and denial audit) in one indexed
+        // lookup, so a preceding RequireCapability would only repeat the same scan.
         var grant = context.GetCapability(capabilityId);
         if (!grant.Parameters.TryGetValue("root", out var root) || string.IsNullOrWhiteSpace(root))
         {

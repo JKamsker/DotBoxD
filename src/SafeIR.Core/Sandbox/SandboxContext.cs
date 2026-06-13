@@ -1,6 +1,6 @@
 namespace SafeIR;
 
-public sealed class SandboxContext
+public sealed partial class SandboxContext
 {
     private DeterministicRandom? _deterministicRandom;
     private int _callDepth;
@@ -42,25 +42,34 @@ public sealed class SandboxContext
     {
         if (!Policy.GrantsCapability(capabilityId))
         {
-            Audit.Write(new SandboxAuditEvent(
-                RunId,
-                "PolicyDenied",
-                DateTimeOffset.UtcNow,
-                Success: false,
-                CapabilityId: capabilityId,
-                ResourceId: $"capability:{capabilityId}",
-                ErrorCode: SandboxErrorCode.PermissionDenied,
-                Message: $"capability {capabilityId} denied"));
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.PermissionDenied,
-                $"capability {capabilityId} is not granted"));
+            throw DenyCapability(capabilityId);
         }
     }
 
     public CapabilityGrant GetCapability(string capabilityId)
     {
-        RequireCapability(capabilityId);
-        return Policy.GetGrant(capabilityId);
+        // Single indexed lookup: resolve the grant once and reuse it for the
+        // permission decision instead of scanning the grant list twice (once to
+        // authorize, once to fetch). The denial audit and error stay identical.
+        return Policy.TryGetGrant(capabilityId, out var grant)
+            ? grant
+            : throw DenyCapability(capabilityId);
+    }
+
+    private SandboxRuntimeException DenyCapability(string capabilityId)
+    {
+        Audit.Write(new SandboxAuditEvent(
+            RunId,
+            "PolicyDenied",
+            DateTimeOffset.UtcNow,
+            Success: false,
+            CapabilityId: capabilityId,
+            ResourceId: $"capability:{capabilityId}",
+            ErrorCode: SandboxErrorCode.PermissionDenied,
+            Message: $"capability {capabilityId} denied"));
+        return new SandboxRuntimeException(new SandboxError(
+            SandboxErrorCode.PermissionDenied,
+            $"capability {capabilityId} is not granted"));
     }
 
     public void ChargeFuel(long amount)
@@ -274,77 +283,6 @@ public sealed class SandboxContext
             throw new SandboxRuntimeException(new SandboxError(
                 SandboxErrorCode.QuotaExceeded,
                 "string byte budget exhausted"));
-        }
-    }
-
-    public DateTimeOffset UtcNow()
-    {
-        if (Policy.Deterministic)
-        {
-            return Policy.LogicalNow ?? throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.PolicyDenied,
-                "deterministic time requires a logical clock"));
-        }
-
-        return DateTimeOffset.UtcNow;
-    }
-
-    public DateTimeOffset AuditTimestamp()
-        => Policy.Deterministic
-            ? Policy.LogicalNow ?? DateTimeOffset.UnixEpoch
-            : DateTimeOffset.UtcNow;
-
-    public int NextRandomInt32(int minInclusive, int maxExclusive)
-    {
-        if (minInclusive >= maxExclusive)
-        {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.InvalidInput,
-                "random range is invalid"));
-        }
-
-        if (Policy.Deterministic)
-        {
-            if (Policy.RandomSeed is null)
-            {
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.PolicyDenied,
-                    "deterministic random requires a seed"));
-            }
-
-            _deterministicRandom ??= new DeterministicRandom(Policy.RandomSeed.Value);
-            return _deterministicRandom.Next(minInclusive, maxExclusive);
-        }
-
-        return Random.Shared.Next(minInclusive, maxExclusive);
-    }
-
-    private sealed class DeterministicRandom(ulong seed)
-    {
-        private ulong _state = seed;
-
-        public int Next(int minInclusive, int maxExclusive)
-        {
-            var range = (ulong)((long)maxExclusive - minInclusive);
-            var threshold = (1UL << 32) % range;
-            while (true)
-            {
-                var value = NextUInt32();
-                if (value >= threshold)
-                {
-                    return checked((int)(minInclusive + (long)(value % range)));
-                }
-            }
-        }
-
-        private uint NextUInt32()
-        {
-            _state += 0x9E3779B97F4A7C15UL;
-            var value = _state;
-            value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
-            value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
-            value ^= value >> 31;
-            return (uint)(value >> 32);
         }
     }
 }

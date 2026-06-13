@@ -51,6 +51,14 @@ public abstract record SandboxValue
     public static SandboxValue FromList(IReadOnlyList<SandboxValue> values, SandboxType itemType)
         => new ListValue(values, itemType);
 
+    /// <summary>
+    /// Builds a list value from an array the caller has just allocated, fully populated,
+    /// and will not retain or mutate, avoiding the defensive copy that <see cref="FromList(IReadOnlyList{SandboxValue})"/>
+    /// performs. Internal because the owned-array contract cannot be enforced externally.
+    /// </summary>
+    internal static SandboxValue FromOwnedList(SandboxValue[] values, SandboxType itemType)
+        => ListValue.FromOwnedValues(values, itemType);
+
     public static SandboxValue FromMap(
         IReadOnlyDictionary<SandboxValue, SandboxValue> values,
         SandboxType keyType,
@@ -115,9 +123,33 @@ public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
 
 public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue
 {
-    private IReadOnlyList<SandboxValue> _values = ModelCopy.List(Values);
+    private IReadOnlyList<SandboxValue> _values = Snapshot(Values);
 
-    public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = ModelCopy.List(value); }
+    public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
+
+    /// <summary>
+    /// Constructs a list value over an array the caller has just allocated, fully
+    /// populated, and will not expose for mutation, avoiding a second defensive copy.
+    /// Internal because the owned-array contract cannot be enforced for external callers.
+    /// </summary>
+    internal static ListValue FromOwnedValues(SandboxValue[] values, SandboxType itemType)
+        => new(new OwnedSnapshot(ModelCopy.WrapOwned(values)), itemType);
+
+    private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> values)
+        => values is OwnedSnapshot owned ? owned.Values : ModelCopy.List(values);
+
+    private sealed class OwnedSnapshot(IReadOnlyList<SandboxValue> values) : IReadOnlyList<SandboxValue>
+    {
+        public IReadOnlyList<SandboxValue> Values { get; } = values;
+
+        public SandboxValue this[int index] => Values[index];
+
+        public int Count => Values.Count;
+
+        public IEnumerator<SandboxValue> GetEnumerator() => Values.GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 
     public override SandboxType Type => SandboxType.List(ItemType);
 

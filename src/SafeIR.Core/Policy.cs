@@ -36,6 +36,12 @@ public sealed record SandboxPolicy(
     // preserving the original recompute-on-change semantics while removing redundant work.
     private Lazy<string>? _hash;
 
+    // Immutable capability index built at most once per distinct policy instance and
+    // shared across the lifetime of the run. Keyed by capability id so each lookup is
+    // a single O(1) probe plus an O(candidates) active-grant check (typically one
+    // candidate) instead of an O(grant-count) scan. Reset when the grant list changes.
+    private Lazy<Dictionary<string, CapabilityGrant[]>>? _grantIndex;
+
     public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 
     public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
@@ -43,7 +49,7 @@ public sealed record SandboxPolicy(
     public IReadOnlyList<CapabilityGrant> Grants
     {
         get => _grants;
-        init { _grants = ModelCopy.List(value); ResetHash(); }
+        init { _grants = ModelCopy.List(value); _grantIndex = null; ResetHash(); }
     }
 
     public ResourceLimits ResourceLimits { get => _resourceLimits; init { _resourceLimits = value; ResetHash(); } }
@@ -61,293 +67,77 @@ public sealed record SandboxPolicy(
 
     public bool GrantsCapability(string capabilityId)
     {
-        return Grants.Any(g => IsActiveGrant(g, capabilityId, GrantClock));
+        return TryGetActiveGrant(capabilityId, out _);
     }
 
     public CapabilityGrant GetGrant(string capabilityId)
     {
-        return Grants.FirstOrDefault(g => IsActiveGrant(g, capabilityId, GrantClock)) ??
-           throw new SandboxRuntimeException(new SandboxError(
-               SandboxErrorCode.PermissionDenied,
-               $"capability {capabilityId} is not granted"));
+        return TryGetActiveGrant(capabilityId, out var grant)
+            ? grant
+            : throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.PermissionDenied,
+                $"capability {capabilityId} is not granted"));
     }
 
-    private static bool IsActiveGrant(CapabilityGrant grant, string capabilityId, DateTimeOffset now)
-        => StringComparer.Ordinal.Equals(grant.Id, capabilityId) &&
-           (grant.ExpiresAt is null || grant.ExpiresAt > now);
+    public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
+        => TryGetActiveGrant(capabilityId, out grant);
+
+    // Single O(1) indexed lookup by capability id, then a per-id active-grant check
+    // (typically one candidate). Expiry is still evaluated against the live GrantClock
+    // so time-bounded grants keep their original call-time semantics, and the first
+    // matching grant in original list order is returned to preserve FirstOrDefault order.
+    private bool TryGetActiveGrant(string capabilityId, out CapabilityGrant grant)
+    {
+        var index = (_grantIndex ??= CreateGrantIndexCache()).Value;
+        if (index.TryGetValue(capabilityId, out var candidates))
+        {
+            var now = GrantClock;
+            for (var i = 0; i < candidates.Length; i++)
+            {
+                var candidate = candidates[i];
+                if (candidate.ExpiresAt is null || candidate.ExpiresAt > now)
+                {
+                    grant = candidate;
+                    return true;
+                }
+            }
+        }
+
+        grant = null!;
+        return false;
+    }
+
+    private Lazy<Dictionary<string, CapabilityGrant[]>> CreateGrantIndexCache()
+        => new(() => BuildGrantIndex(_grants), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static Dictionary<string, CapabilityGrant[]> BuildGrantIndex(IReadOnlyList<CapabilityGrant> grants)
+    {
+        var buckets = new Dictionary<string, List<CapabilityGrant>>(StringComparer.Ordinal);
+        for (var i = 0; i < grants.Count; i++)
+        {
+            var grant = grants[i];
+            if (!buckets.TryGetValue(grant.Id, out var bucket))
+            {
+                bucket = [];
+                buckets.Add(grant.Id, bucket);
+            }
+
+            bucket.Add(grant);
+        }
+
+        var index = new Dictionary<string, CapabilityGrant[]>(buckets.Count, StringComparer.Ordinal);
+        foreach (var (id, bucket) in buckets)
+        {
+            index.Add(id, bucket.ToArray());
+        }
+
+        return index;
+    }
 
     private void ResetHash() => _hash = null;
 
     private Lazy<string> CreateHashCache()
         => new(() => PolicyHash.Compute(this), LazyThreadSafetyMode.ExecutionAndPublication);
-}
-
-public sealed class SandboxPolicyBuilder
-{
-    private readonly List<CapabilityGrant> _grants = [];
-    private SandboxEffect _allowedEffects = SandboxEffects.Pure;
-    private ResourceLimits _limits = new();
-    private bool _deterministic;
-    private DateTimeOffset? _logicalNow;
-    private ulong? _randomSeed;
-    private string _policyId = "default";
-
-    public static SandboxPolicyBuilder Create() => new();
-
-    public SandboxPolicyBuilder WithPolicyId(string policyId)
-    {
-        _policyId = policyId;
-        return this;
-    }
-
-    public SandboxPolicyBuilder AllowPureComputation()
-    {
-        _allowedEffects |= SandboxEffects.Pure;
-        return this;
-    }
-
-    public SandboxPolicyBuilder Grant(string capabilityId, object parameters)
-        => Grant(capabilityId, parameters, SandboxEffect.None);
-
-    public SandboxPolicyBuilder Grant(
-        string capabilityId,
-        object parameters,
-        SandboxEffect allowedEffects,
-        Func<ResourceLimits, ResourceLimits>? configureLimits = null)
-    {
-        _allowedEffects |= allowedEffects;
-        _grants.Add(new CapabilityGrant(capabilityId, ParameterReader.Read(parameters)));
-        if (configureLimits is not null)
-        {
-            _limits = configureLimits(_limits);
-        }
-
-        return this;
-    }
-
-    public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
-    {
-        ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
-        var normalizedRoot = NormalizeFileRoot(root, nameof(root));
-        _allowedEffects |= SandboxEffect.FileRead;
-        _grants.Add(new CapabilityGrant("file.read", new Dictionary<string, string>
-        {
-            ["root"] = normalizedRoot,
-            ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        }));
-        _limits = _limits with { MaxFileBytesRead = maxBytesPerRun };
-        return this;
-    }
-
-    public SandboxPolicyBuilder GrantFileWrite(
-        string root,
-        long maxBytesPerRun,
-        bool allowCreate = false,
-        bool allowOverwrite = false)
-    {
-        ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
-        var normalizedRoot = NormalizeFileRoot(root, nameof(root));
-        _allowedEffects |= SandboxEffect.FileWrite | SandboxEffect.Audit;
-        _grants.Add(new CapabilityGrant("file.write", new Dictionary<string, string>
-        {
-            ["root"] = normalizedRoot,
-            ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["allowCreate"] = allowCreate.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["allowOverwrite"] = allowOverwrite.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        }));
-        _limits = _limits with { MaxFileBytesWritten = Math.Max(_limits.MaxFileBytesWritten, maxBytesPerRun) };
-        return this;
-    }
-
-    public SandboxPolicyBuilder GrantTimeNow()
-    {
-        _allowedEffects |= SandboxEffect.Time;
-        _grants.Add(new CapabilityGrant("time.now", new Dictionary<string, string>()));
-        return this;
-    }
-
-    public SandboxPolicyBuilder GrantRandom()
-    {
-        _allowedEffects |= SandboxEffect.Random;
-        _grants.Add(new CapabilityGrant("random", new Dictionary<string, string>()));
-        return this;
-    }
-
-    public SandboxPolicyBuilder GrantLogging()
-    {
-        _allowedEffects |= SandboxEffect.Audit;
-        _grants.Add(new CapabilityGrant("log.write", new Dictionary<string, string>()));
-        return this;
-    }
-    public SandboxPolicyBuilder GrantGameMessageWrite()
-        => GrantGameMessageWrite(allowedTargets: null, targetPrefixes: null, maxMessageLength: null);
-
-    public SandboxPolicyBuilder GrantGameMessageWrite(
-        IEnumerable<string>? allowedTargets = null,
-        IEnumerable<string>? targetPrefixes = null,
-        int? maxMessageLength = null)
-    {
-        _allowedEffects |= SandboxEffect.GameStateWrite | SandboxEffect.Audit;
-        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
-        AddCsvParameter(parameters, "allowedTargets", allowedTargets);
-        AddCsvParameter(parameters, "targetPrefixes", targetPrefixes);
-        if (maxMessageLength is { } limit)
-        {
-            ThrowIfNegative(limit, nameof(maxMessageLength));
-            parameters["maxMessageLength"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        _grants.Add(new CapabilityGrant("game.message.write", parameters));
-        return this;
-    }
-
-    private static void AddCsvParameter(
-        IDictionary<string, string> parameters,
-        string key,
-        IEnumerable<string>? values)
-    {
-        if (values is null) return;
-
-        var normalized = values
-            .Select(value => (value ?? "").Trim())
-            .Where(value => value.Length > 0)
-            .ToArray();
-        if (normalized.Length == 0) return;
-
-        if (normalized.Any(value => value.Contains(',')))
-        {
-            throw new ArgumentException($"{key} values must not contain commas", key);
-        }
-
-        parameters[key] = string.Join(',', normalized);
-    }
-    public SandboxPolicyBuilder WithFuel(long maxFuel)
-    {
-        _limits = _limits with { MaxFuel = maxFuel };
-        return this;
-    }
-    public SandboxPolicyBuilder WithMaxLoopIterations(long iterations)
-    {
-        _limits = _limits with { MaxLoopIterations = iterations };
-        return this;
-    }
-    public SandboxPolicyBuilder WithMaxHostCalls(int calls)
-    {
-        _limits = _limits with { MaxHostCalls = calls };
-        return this;
-    }
-    public SandboxPolicyBuilder WithMaxCallDepth(int depth)
-    {
-        _limits = _limits with { MaxCallDepth = depth };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithWallTime(TimeSpan maxWallTime)
-    {
-        _limits = _limits with { MaxWallTime = maxWallTime };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxAllocatedBytes(long bytes)
-    {
-        _limits = _limits with { MaxAllocatedBytes = bytes };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxListLength(int length)
-    {
-        _limits = _limits with { MaxListLength = length };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxMapEntries(int entries)
-    {
-        _limits = _limits with { MaxMapEntries = entries };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxCollectionDepth(int depth)
-    {
-        _limits = _limits with { MaxCollectionDepth = depth };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxTotalCollectionElements(long elements)
-    {
-        _limits = _limits with { MaxTotalCollectionElements = elements };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxLogEvents(int events)
-    {
-        _limits = _limits with { MaxLogEvents = events };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxLogMessageLength(int length)
-    {
-        _limits = _limits with { MaxLogMessageLength = length };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxStringLength(int length)
-    {
-        _limits = _limits with { MaxStringLength = length };
-        return this;
-    }
-
-    public SandboxPolicyBuilder WithMaxTotalStringBytes(long bytes)
-    {
-        _limits = _limits with { MaxTotalStringBytes = bytes };
-        return this;
-    }
-
-    public SandboxPolicyBuilder Deterministic(DateTimeOffset logicalNow, ulong randomSeed)
-    {
-        _deterministic = true;
-        _logicalNow = logicalNow;
-        _randomSeed = randomSeed;
-        return this;
-    }
-
-    public SandboxPolicy Build()
-    {
-        ResourceLimitValidation.Validate(_limits);
-        return new SandboxPolicy(_policyId, _allowedEffects, _grants.ToArray(), _limits, _deterministic, _logicalNow, _randomSeed);
-    }
-
-    private static void ThrowIfNegative(long value, string paramName)
-    {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(paramName);
-        }
-    }
-
-    private static string NormalizeFileRoot(string root, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root))
-        {
-            throw new ArgumentException("file grant root must be an absolute canonical path", paramName);
-        }
-
-        var fullPath = Path.GetFullPath(root);
-        if (!PathsEqual(NormalizeRootForCompare(root), NormalizeRootForCompare(fullPath)))
-        {
-            throw new ArgumentException("file grant root must be an absolute canonical path", paramName);
-        }
-
-        return fullPath;
-    }
-
-    private static string NormalizeRootForCompare(string path)
-        => Path.TrimEndingDirectorySeparator(path);
-
-    private static bool PathsEqual(string left, string right)
-        => string.Equals(
-            left,
-            right,
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }
 
 internal static class ParameterReader

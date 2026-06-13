@@ -168,7 +168,8 @@ public static class PluginPackageJsonSerializer
     {
         RequireAllowedProperties(element, "plugin package", ["manifest", "module", "entrypoints"]);
         var manifest = ReadManifest(Required(element, "manifest"));
-        var module = SafeIrJsonImporter.Import(Required(element, "module").GetRawText());
+        var moduleElement = Required(element, "module");
+        var module = SafeIrJsonImporter.Import(moduleElement, moduleElement.GetRawText());
         var entrypoints = element.TryGetProperty("entrypoints", out var entrypointElement)
             ? ReadEntrypoints(entrypointElement)
             : null;

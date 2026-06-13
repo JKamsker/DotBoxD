@@ -14,10 +14,20 @@ public sealed class ArmorAdjustedDamageFormula : IDamageFormula
         => Math.Max(0, input.BaseDamage - input.Armor);
 }
 
+// Host-side contract design guidance only. IItemFilter and IDamageFormula are NOT package-backed
+// SafeIR surfaces: the current SDK generator only lowers IEventKernel<TEvent> kernels into plugin
+// packages. The example below runs the implementations as ordinary host C# objects. It deliberately
+// does not export a package, import package JSON, install it into the plugin server, or execute it
+// through the sandbox host, because filters/formulas cannot ship through the SafeIR
+// upload/install/execute path today.
+// For a runnable package-backed surface, see KernelClassExample.cs and JsonUploadExample.cs.
 internal static class SimpleContractExamples
 {
     public static void Run()
     {
+        Console.WriteLine(
+            "simple filter/formula: host-side contract design guidance only (not a SafeIR plugin package)");
+
         IItemFilter filter = new EpicItemsOnly();
         IDamageFormula formula = new ArmorAdjustedDamageFormula();
 

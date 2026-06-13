@@ -10,6 +10,18 @@ internal static class ModelCopy
         return new ReadOnlyCollection<T>(values.ToArray());
     }
 
+    /// <summary>
+    /// Wraps an array the caller has just allocated, fully populated, and will never
+    /// expose for mutation in a read-only view without an extra defensive copy.
+    /// Only use this for arrays owned by the immediate caller; never for arrays that
+    /// originate outside the current call.
+    /// </summary>
+    public static IReadOnlyList<T> WrapOwned<T>(T[] values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return new ReadOnlyCollection<T>(values);
+    }
+
     public static IReadOnlyDictionary<string, string> StringDictionary(
         IReadOnlyDictionary<string, string> values)
     {

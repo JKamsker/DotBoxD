@@ -179,10 +179,12 @@ public static class CanonicalModuleHasher
 
     private static string Type(SandboxType type)
     {
-        var fields = new List<string?>(2 + type.Arguments.Count) { "type", type.Name };
+        var fields = new string?[2 + type.Arguments.Count];
+        fields[0] = "type";
+        fields[1] = type.Name;
         for (var i = 0; i < type.Arguments.Count; i++)
         {
-            fields.Add(Type(type.Arguments[i]));
+            fields[2 + i] = Type(type.Arguments[i]);
         }
 
         return Node(fields);
@@ -190,14 +192,13 @@ public static class CanonicalModuleHasher
 
     private static string Call(CallExpression call)
     {
-        var fields = new List<string?>(3 + call.Arguments.Count) {
-            "call",
-            call.Name,
-            call.GenericType is null ? null : Type(call.GenericType)
-        };
+        var fields = new string?[3 + call.Arguments.Count];
+        fields[0] = "call";
+        fields[1] = call.Name;
+        fields[2] = call.GenericType is null ? null : Type(call.GenericType);
         for (var i = 0; i < call.Arguments.Count; i++)
         {
-            fields.Add(Expr(call.Arguments[i]));
+            fields[3 + i] = Expr(call.Arguments[i]);
         }
 
         return Node(fields);
@@ -205,10 +206,12 @@ public static class CanonicalModuleHasher
 
     private static string ListLiteral(ListValue list)
     {
-        var fields = new List<string?>(2 + list.Values.Count) { "list", Type(list.ItemType) };
+        var fields = new string?[2 + list.Values.Count];
+        fields[0] = "list";
+        fields[1] = Type(list.ItemType);
         for (var i = 0; i < list.Values.Count; i++)
         {
-            fields.Add(Value(list.Values[i]));
+            fields[2 + i] = Value(list.Values[i]);
         }
 
         return Node(fields);
@@ -224,10 +227,13 @@ public static class CanonicalModuleHasher
         }
 
         Array.Sort(entries, StringComparer.Ordinal);
-        var fields = new List<string?>(3 + entries.Length) { "map", Type(map.KeyType), Type(map.ValueType) };
+        var fields = new string?[3 + entries.Length];
+        fields[0] = "map";
+        fields[1] = Type(map.KeyType);
+        fields[2] = Type(map.ValueType);
         for (var i = 0; i < entries.Length; i++)
         {
-            fields.Add(entries[i]);
+            fields[3 + i] = entries[i];
         }
 
         return Node(fields);
@@ -236,16 +242,13 @@ public static class CanonicalModuleHasher
     private static string Node(params string?[] fields)
         => CanonicalEncoding.Record(fields);
 
-    private static string Node(IEnumerable<string?> fields)
-        => CanonicalEncoding.Record(fields);
-
     private sealed class CanonicalWriter
     {
         private readonly System.Text.StringBuilder _builder = new();
 
         public void Write(params string[] fields)
         {
-            _builder.Append(CanonicalEncoding.Record(fields));
+            CanonicalEncoding.AppendRecord(_builder, fields);
             _builder.Append('\n');
         }
 

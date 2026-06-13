@@ -124,8 +124,8 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         }
 
         return result.Succeeded
-            ? IsHexSha256(result.ArtifactHash)
-            : string.IsNullOrWhiteSpace(result.ArtifactHash) || IsHexSha256(result.ArtifactHash);
+            ? WorkerRunSummaryValidator.IsHexSha256(result.ArtifactHash)
+            : string.IsNullOrWhiteSpace(result.ArtifactHash) || WorkerRunSummaryValidator.IsHexSha256(result.ArtifactHash);
     }
 
     private static bool WorkerPayloadMatches(
@@ -224,122 +224,41 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             return false;
         }
 
-        if (result.AuditEvents.Any(e => e.RunId != runId))
-        {
-            return false;
-        }
-
+        // Single pass over the audit envelope: enforce a common run id, run per-event
+        // safety/schema validation, and capture the one required run summary without
+        // allocating an intermediate summary array.
+        SandboxAuditEvent? summary = null;
+        var summaryCount = 0;
         foreach (var auditEvent in result.AuditEvents)
         {
-            if (!WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
+            if (auditEvent.RunId != runId ||
+                !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
             {
                 return false;
             }
+
+            if (auditEvent.Kind == "RunSummary")
+            {
+                summaryCount++;
+                if (summaryCount > 1)
+                {
+                    return false;
+                }
+
+                summary = auditEvent;
+            }
         }
 
-        var summaries = result.AuditEvents.Where(e => e.Kind == "RunSummary").ToArray();
-        if (summaries.Length != 1 || summaries[0].Success != result.Succeeded)
+        if (summaryCount != 1 || summary!.Success != result.Succeeded)
         {
             return false;
         }
 
-        return WorkerRunSummaryMatches(plan, result, summaries[0]) &&
+        return WorkerRunSummaryValidator.RunSummaryMatches(plan, result, summary) &&
             (result.Succeeded
-            ? summaries[0].ErrorCode is null
-            : summaries[0].ErrorCode == result.Error!.Code &&
-              summaries[0].ErrorCode is { } code &&
+            ? summary.ErrorCode is null
+            : summary.ErrorCode == result.Error!.Code &&
+              summary.ErrorCode is { } code &&
               Enum.IsDefined(code));
     }
-
-    private static bool WorkerRunSummaryMatches(
-        ExecutionPlan plan,
-        SandboxExecutionResult result,
-        SandboxAuditEvent summary)
-    {
-        if (summary.Fields is null ||
-            !FieldEquals(summary, "mode", result.ActualMode.ToString()) ||
-            !FieldEquals(summary, "executionMode", result.ActualMode.ToString()) ||
-            !FieldEquals(summary, "executionDispatched", true) ||
-            !HasNonEmptyField(summary, "cacheStatus") ||
-            !FieldEquals(summary, "moduleHash", plan.ModuleHash) ||
-            !FieldEquals(summary, "planHash", plan.PlanHash) ||
-            !FieldEquals(summary, "policyHash", plan.PolicyHash) ||
-            !FieldEquals(summary, "bindingManifestHash", plan.BindingManifestHash) ||
-            !FieldEquals(summary, "fuelUsed", result.ResourceUsage.FuelUsed) ||
-            !FieldEquals(summary, "loopIterations", result.ResourceUsage.LoopIterations) ||
-            !FieldEquals(summary, "allocatedBytes", result.ResourceUsage.AllocatedBytes) ||
-            !FieldEquals(summary, "allocationCharged", result.ResourceUsage.AllocatedBytes) ||
-            !FieldEquals(summary, "hostCalls", result.ResourceUsage.HostCalls) ||
-            !FieldEquals(summary, "fileBytesRead", result.ResourceUsage.FileBytesRead) ||
-            !FieldEquals(summary, "fileBytesWritten", result.ResourceUsage.FileBytesWritten) ||
-            !FieldEquals(summary, "networkBytesRead", result.ResourceUsage.NetworkBytesRead) ||
-            !FieldEquals(summary, "networkBytesWritten", result.ResourceUsage.NetworkBytesWritten) ||
-            !FieldEquals(summary, "logEvents", result.ResourceUsage.LogEvents) ||
-            !FieldEquals(summary, "collectionElements", result.ResourceUsage.CollectionElements) ||
-            !FieldEquals(summary, "stringBytes", result.ResourceUsage.StringBytes))
-        {
-            return false;
-        }
-
-        if (!WorkerEnvelopeValidators.BudgetFieldsMatch(plan, summary))
-        {
-            return false;
-        }
-
-        if (result.ActualMode != ExecutionMode.Compiled)
-        {
-            return !summary.Fields.ContainsKey("artifactHash") &&
-                   !summary.Fields.ContainsKey("runtimeForm") &&
-                   !summary.Fields.ContainsKey("cacheKey");
-        }
-
-        if (!result.Succeeded)
-        {
-            return FailedCompiledEnvelopeMatches(result, summary);
-        }
-
-        if (!IsHexSha256(result.ArtifactHash))
-        {
-            return false;
-        }
-
-        var artifactHash = result.ArtifactHash!;
-        return FieldEquals(summary, "artifactHash", artifactHash) &&
-               FieldEquals(summary, "runtimeForm", "LoadedAssembly") &&
-               HasHexSha256Field(summary, "cacheKey");
-    }
-
-    private static bool FailedCompiledEnvelopeMatches(SandboxExecutionResult result, SandboxAuditEvent summary)
-    {
-        var hasResultArtifact = !string.IsNullOrWhiteSpace(result.ArtifactHash);
-        if (!hasResultArtifact)
-        {
-            return !summary.Fields!.ContainsKey("artifactHash") &&
-                   !summary.Fields.ContainsKey("runtimeForm") &&
-                   !summary.Fields.ContainsKey("cacheKey");
-        }
-
-        return IsHexSha256(result.ArtifactHash) &&
-               FieldEquals(summary, "artifactHash", result.ArtifactHash!);
-    }
-
-    private static bool FieldEquals(SandboxAuditEvent summary, string key, string value)
-        => summary.Fields!.TryGetValue(key, out var actual) &&
-           string.Equals(actual, value, StringComparison.Ordinal);
-
-    private static bool FieldEquals(SandboxAuditEvent summary, string key, long value)
-        => FieldEquals(summary, key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-    private static bool FieldEquals(SandboxAuditEvent summary, string key, bool value)
-        => FieldEquals(summary, key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-    private static bool HasNonEmptyField(SandboxAuditEvent summary, string key)
-        => summary.Fields!.TryGetValue(key, out var value) &&
-           !string.IsNullOrWhiteSpace(value);
-
-    private static bool HasHexSha256Field(SandboxAuditEvent summary, string key)
-        => summary.Fields!.TryGetValue(key, out var value) && IsHexSha256(value);
-
-    private static bool IsHexSha256(string? value)
-        => value is { Length: 64 } && value.All(Uri.IsHexDigit);
 }

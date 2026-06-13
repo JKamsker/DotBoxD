@@ -1,9 +1,17 @@
 namespace SafeIR.Plugins;
 
+using System.Collections.Concurrent;
 using System.Reflection;
 
 internal static class LiveKernelValueFactory
 {
+    // The live-property shape of a state type is derived purely from immutable
+    // type metadata, so it is stable for the lifetime of the process. Cache the
+    // discovered PropertyInfo[] per type so the hot synchronization paths
+    // (draft, extract, copy, pull, push) skip repeated GetProperties and
+    // Attribute.IsDefined work without changing observable behavior.
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<PropertyInfo>> LivePropertyCache = new();
+
     public static T Create<T>(InstalledKernel kernel) where T : class
     {
         if (typeof(T).IsInterface) {
@@ -52,6 +60,9 @@ internal static class LiveKernelValueFactory
         => PullFromStore(kernel, state, LiveProperties(state.GetType()));
 
     private static IReadOnlyList<PropertyInfo> LiveProperties(Type type)
+        => LivePropertyCache.GetOrAdd(type, DiscoverLiveProperties);
+
+    private static IReadOnlyList<PropertyInfo> DiscoverLiveProperties(Type type)
     {
         var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
         var marked = FilterLiveProperties(properties, requireAttribute: true);

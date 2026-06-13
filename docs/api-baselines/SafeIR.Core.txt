@@ -29,6 +29,7 @@ public bool RequireDeterministic { get; init; }
 public bool Succeeded { get; init; }
 public bool TryGet(string id, out BindingSignature binding)
 public bool TryGetCapabilityGrantValidator(string capabilityId, out CapabilityGrantValidator validator)
+public bool TryGetGrant(string capabilityId, out CapabilityGrant grant)
 public CancellationToken CancellationToken { get; }
 public CancellationTokenSource CreateWallTimeToken()
 public CapabilityGrant GetCapability(string capabilityId)

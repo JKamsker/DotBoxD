@@ -90,7 +90,8 @@ public static class SafeHttpClient
 
     private static SafeHttpRequest ResolveRequest(SandboxContext context, SandboxUri sandboxUri)
     {
-        context.RequireCapability("net.http.get");
+        // GetCapability authorizes and audits denial in a single indexed lookup,
+        // so the prior RequireCapability call would just repeat the same work.
         var grant = context.GetCapability("net.http.get");
         var grantOptions = SafeHttpGrantReader.Read(grant);
         if (!Uri.TryCreate(sandboxUri.Value, UriKind.Absolute, out var uri) || string.IsNullOrWhiteSpace(uri.Host))
