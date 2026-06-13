@@ -245,6 +245,14 @@ This is the data a server owner needs to show settings, defaults, ranges, reques
 
 The production server installs a plugin package from serialized JSON package data. The JSON envelope contains a manifest, entrypoint names if needed, and the Safe IR module. It does not contain an assembly path or plugin DLL reference.
 
+Reference the `SafeIR.Serialization.Json` package for `PluginPackageJsonSerializer` and the
+`InstallJsonAsync` extension. The helper types are plugin-facing APIs used from the
+`SafeIR.Plugins` namespace:
+
+```csharp
+using SafeIR.Plugins;
+```
+
 ```csharp
 var package = FireDamagePluginPackage.Create();
 var uploadJson = PluginPackageJsonSerializer.Export(package);

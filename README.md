@@ -11,7 +11,7 @@ Interpreted mode executes verified IR directly. Compiled mode is only a runtime 
   returns the public `ModuleValidationResult` evidence shape with diagnostics, function analysis,
   module effects, required capabilities, and binding references.
 - `SafeIR.Runtime`: safe host bindings for files, time, random, logging, strings, and math.
-- `SafeIR.Serialization.Json`: JSON IR importer and host import extensions.
+- `SafeIR.Serialization.Json`: JSON IR importer, host import extensions, and plugin package JSON upload helpers.
 - `SafeIR.Transport.Http`: HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
 - `SafeIR.Transport.Ipc.ShaRpc`: preview MessagePack IPC addon built on ShaRPC generic transports, with named-pipe convenience helpers.
 - `SafeIR.Interpreter`: direct IR execution backend.
@@ -50,7 +50,8 @@ Common namespaces:
 - `SafeIR`, `SafeIR.Hosting`, and `SafeIR.Runtime` for host setup and execution.
 - `SafeIR.Serialization.Json` for `ImportJsonAsync` and `SafeIrJsonImporter`.
 - `SafeIR.Transport.Http` for HTTP binding registration and `GrantHttpGet`.
-- `SafeIR.Plugins` for plugin manifests, `PluginPackage`, and `PluginPackageJsonSerializer` upload/export helpers.
+- `SafeIR.Plugins` for plugin manifests, `PluginPackage`, and the plugin-facing JSON upload/export helper types
+  supplied by the `SafeIR.Serialization.Json` package.
 - `SafeIR.Transport.Ipc` for the preview ShaRPC MessagePack IPC addon.
 
 ## Minimal Host Usage

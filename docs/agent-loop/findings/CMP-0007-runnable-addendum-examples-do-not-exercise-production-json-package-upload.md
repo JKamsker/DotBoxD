@@ -1,19 +1,19 @@
 ---
 id: CMP-0007
 area: completeness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Runnable addendum examples do not exercise production JSON package upload
 dedup_key: cmp-runnable-addendum-json-upload-example-coverage
 created_at: 2026-06-12T22:03:19.7712527+00:00
 created_by: Codex completeness auditor
 created_commit: 
-updated_at: 2026-06-12T22:03:19.7712527+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-13T06:13:56.8791192+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T06:12:06.6519887+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T06:13:56.8791192+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

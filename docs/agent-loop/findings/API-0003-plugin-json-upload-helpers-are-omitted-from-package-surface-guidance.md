@@ -1,19 +1,19 @@
 ---
 id: API-0003
 area: api_coherence
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Plugin JSON upload helpers are omitted from package surface guidance
 dedup_key: api-plugin-json-upload-package-guidance
 created_at: 2026-06-12T22:03:17.1496862+00:00
 created_by: Codex completeness auditor
 created_commit: 
-updated_at: 2026-06-12T22:03:17.1496862+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
+updated_at: 2026-06-13T06:13:55.4213922+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T06:12:05.3697182+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T06:13:55.4213922+00:00
 fixed_commit: 
 verified_by: 
 verified_at: 

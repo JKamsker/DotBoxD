@@ -14,6 +14,7 @@ The project maps the examples in `docs\Specs\Addendum\Addendum.md` to runnable c
 - context bindings: `ContextBindingExample.cs`
 - kernel classes and live state: `KernelExamples.cs` and `KernelClassExample.cs`
 - manifest/admin inspection: `ManifestInspectionExample.cs`
+- production JSON package upload: `JsonUploadExample.cs`
 - runtime configuration: `RuntimeConfigurationExample.cs`
 - hook subscriptions: `HookSubscriptionExample.cs`
 - execution modes: `ExecutionModeExample.cs`

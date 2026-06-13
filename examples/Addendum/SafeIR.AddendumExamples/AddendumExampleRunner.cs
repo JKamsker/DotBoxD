@@ -11,6 +11,7 @@ internal static class AddendumExampleRunner
         await ContextBindingExample.RunAsync();
         await KernelClassExample.RunAsync();
         ManifestInspectionExample.Run();
+        await JsonUploadExample.RunAsync();
         await RuntimeConfigurationExample.RunAsync();
         await HookSubscriptionExample.RunAsync();
         await ExecutionModeExample.RunAsync();
