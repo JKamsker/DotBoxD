@@ -224,3 +224,11 @@ lowers, ships, and runs sandboxed.
 Land **A** first (visible request, low risk, green CI). Then **B** (fluent API + auto-install;
 delete the Phase-A `KernelPackageCatalog`). Then **C** in sub-phases C-0 → C-3. Each phase is a
 separate commit/PR with its own green build + tests.
+
+## Round-2 design (review feedback)
+A second review round added five requirements on top of this plan — fluent `Where`/`Select` gating
+instead of a `UseKernel(filter:)` parameter, kernel **ownership/lifecycle** (sessions, revoke on
+disconnect), **inferred** event adapters, **per-plugin authentication + signing + policy**, and a
+server `Program` class. Their design lives in
+[ownership-auth-and-policy.md](ownership-auth-and-policy.md); the walkthroughs reflect the
+API-visible parts.
