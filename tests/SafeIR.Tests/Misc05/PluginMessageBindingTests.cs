@@ -118,4 +118,56 @@ public sealed class PluginMessageBindingTests
         Assert.Equal("token=[redacted] Bearer [redacted]", audit.Message);
         Assert.Equal("32", audit.Fields!["messageLength"]);
     }
+
+    [Fact]
+    public async Task Plugin_message_binding_redacts_audit_target_without_changing_sink_target()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var host = Hosting.SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.AddPluginMessageBindings(messages);
+            builder.UseInterpreter();
+        });
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "plugin-message-target-redaction",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "game.message.write" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "call": "game.message.send",
+                    "args": [
+                      { "string": "token:abc123" },
+                      { "string": "message" }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .GrantGameMessageWrite()
+            .WithFuel(10_000)
+            .Build());
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("token:abc123", Assert.Single(messages.Messages).TargetId);
+        var audit = Assert.Single(result.AuditEvents, e => e.Kind == "PluginMessage");
+        Assert.Equal("player:[redacted]", audit.ResourceId);
+        Assert.DoesNotContain("abc123", audit.ResourceId);
+        Assert.DoesNotContain("token:", audit.ResourceId);
+    }
 }

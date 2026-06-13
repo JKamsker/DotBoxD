@@ -150,10 +150,46 @@ public sealed class SandboxPolicyBuilder
         return this;
     }
     public SandboxPolicyBuilder GrantGameMessageWrite()
+        => GrantGameMessageWrite(allowedTargets: null, targetPrefixes: null, maxMessageLength: null);
+
+    public SandboxPolicyBuilder GrantGameMessageWrite(
+        IEnumerable<string>? allowedTargets = null,
+        IEnumerable<string>? targetPrefixes = null,
+        int? maxMessageLength = null)
     {
         _allowedEffects |= SandboxEffect.GameStateWrite | SandboxEffect.Audit;
-        _grants.Add(new CapabilityGrant("game.message.write", new Dictionary<string, string>()));
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
+        AddCsvParameter(parameters, "allowedTargets", allowedTargets);
+        AddCsvParameter(parameters, "targetPrefixes", targetPrefixes);
+        if (maxMessageLength is { } limit)
+        {
+            ThrowIfNegative(limit, nameof(maxMessageLength));
+            parameters["maxMessageLength"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        _grants.Add(new CapabilityGrant("game.message.write", parameters));
         return this;
+    }
+
+    private static void AddCsvParameter(
+        IDictionary<string, string> parameters,
+        string key,
+        IEnumerable<string>? values)
+    {
+        if (values is null) return;
+
+        var normalized = values
+            .Select(value => (value ?? "").Trim())
+            .Where(value => value.Length > 0)
+            .ToArray();
+        if (normalized.Length == 0) return;
+
+        if (normalized.Any(value => value.Contains(',')))
+        {
+            throw new ArgumentException($"{key} values must not contain commas", key);
+        }
+
+        parameters[key] = string.Join(',', normalized);
     }
     public SandboxPolicyBuilder WithFuel(long maxFuel)
     {
