@@ -22,9 +22,6 @@ internal sealed class PendingLiveUpdateQueue
         var task = Task.Run(() => {
             try {
                 update();
-                lock (_gate) {
-                    _lastError = null;
-                }
             }
             catch (Exception ex) {
                 lock (_gate) {
@@ -40,6 +37,10 @@ internal sealed class PendingLiveUpdateQueue
 
         _ = task.ContinueWith(
             completed => {
+                if (!completed.IsCompletedSuccessfully) {
+                    return;
+                }
+
                 lock (_gate) {
                     _pending.Remove(completed);
                 }
@@ -58,20 +59,26 @@ internal sealed class PendingLiveUpdateQueue
     {
         Task[] pending;
         lock (_gate) {
-            _pending.RemoveAll(task => task.IsCompleted);
+            _pending.RemoveAll(task => task.IsCompletedSuccessfully);
             pending = _pending.ToArray();
         }
 
         try {
             await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception) when (LastError is not null) {
-            throw new InvalidOperationException("A fire-and-forget live setting update failed.", LastError);
+        catch (Exception ex) when (ex is not OperationCanceledException || LastError is not null) {
+            var failure = LastError ?? ex;
+            lock (_gate) {
+                _pending.RemoveAll(task => task.IsCompleted);
+                _lastError = failure;
+            }
+
+            throw new InvalidOperationException("A fire-and-forget live setting update failed.", failure);
         }
 
-        var lastError = LastError;
-        if (lastError is not null) {
-            throw new InvalidOperationException("A fire-and-forget live setting update failed.", lastError);
+        lock (_gate) {
+            _pending.RemoveAll(task => task.IsCompleted);
+            _lastError = null;
         }
     }
 }
