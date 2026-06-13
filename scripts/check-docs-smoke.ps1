@@ -12,6 +12,8 @@ $httpTransportExample = Join-Path $root "examples/HttpTransport/SafeIR.HttpTrans
 $localPluginExample = Join-Path $root "examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj"
 $ipcServerExample = Join-Path $root "examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj"
 $ipcClientExample = Join-Path $root "examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj"
+$gameServerExample = Join-Path $root "examples/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj"
+$gameHostExample = Join-Path $root "examples/GameServer/SafeIR.Game.PluginHost/SafeIR.Game.PluginHost.csproj"
 
 function Resolve-RepoPath([string] $Path) {
     $normalized = $Path.Trim().Trim('"').Replace('\', [System.IO.Path]::DirectorySeparatorChar)
@@ -239,5 +241,60 @@ try {
     $ipcServer.Process.Dispose()
     Remove-Item -LiteralPath $ipcServer.OutputPath, $ipcServer.ErrorPath -Force -ErrorAction SilentlyContinue
 }
+
+# Game server golden example: the server self-launches the plugin host child process, so the smoke
+# only needs to run the server once and assert exit 0. Point the server at the built host dll so it
+# can launch it under --no-build.
+function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
+    $outputPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-game-" + [Guid]::NewGuid().ToString("N") + ".out")
+    $errorPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-game-" + [Guid]::NewGuid().ToString("N") + ".err")
+    $arguments = @(
+        "run", "--project", $ServerProject,
+        "--configuration", $Configuration,
+        "--no-build")
+    $parameters = @{
+        FilePath = "dotnet"
+        ArgumentList = $arguments
+        RedirectStandardOutput = $outputPath
+        RedirectStandardError = $errorPath
+        PassThru = $true
+    }
+
+    if ($IsWindows) {
+        $parameters.WindowStyle = "Hidden"
+    }
+
+    # Start-Process inherits the parent environment; set the host dll for the launched server.
+    $previousHostDll = $env:SAFEIR_GAME_PLUGINHOST_DLL
+    $env:SAFEIR_GAME_PLUGINHOST_DLL = $HostDll
+    try {
+        $process = Start-Process @parameters
+    } finally {
+        $env:SAFEIR_GAME_PLUGINHOST_DLL = $previousHostDll
+    }
+
+    try {
+        if (-not $process.WaitForExit(60000)) {
+            Stop-ProcessTree $process
+            Write-CapturedOutput "Game server example smoke test" $outputPath $errorPath
+            throw "Game server example smoke test timed out after 60 seconds."
+        }
+
+        Write-CapturedOutput "Game server example smoke test" $outputPath $errorPath
+        if ($process.ExitCode -ne 0) {
+            throw "Game server example smoke test failed with exit code $($process.ExitCode)."
+        }
+    } finally {
+        $process.Dispose()
+        Remove-Item -LiteralPath $outputPath, $errorPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$gameHostDll = Join-Path $root "examples/GameServer/SafeIR.Game.PluginHost/bin/$Configuration/net10.0/SafeIR.Game.PluginHost.dll"
+if (-not (Test-Path -LiteralPath $gameHostDll)) {
+    throw "Game server smoke prerequisite missing: $gameHostDll (build the solution first)."
+}
+
+Invoke-GameServer $gameServerExample $gameHostDll
 
 Write-Host "Docs/example smoke checks passed."

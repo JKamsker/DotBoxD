@@ -277,6 +277,21 @@ dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Client\SafeIR.PluginIpc
 
 See `docs\Specs\Addendum\Examples.md` for details.
 
+## Game Server Plugin Example (golden)
+
+The golden example runs an aggro/combat simulation server that exposes hooks and events, and a
+separate plugin host that authors kernels, previews them locally, ships them as opaque verified IR
+over IPC, and tunes live settings. The server runs the untrusted kernels sandboxed; they change game
+behavior only through an example-defined command sink (the plugin's sole sandbox capability stays
+`game.message.write`, while the game semantics live in the example, not in core). The server
+self-launches the plugin host child process, so a single command drives the whole demo: it prints a
+baseline phase where monsters bully low-level players, the host's local preview and ship/settings
+logs, and a with-plugin phase where guardian/retaliation kernels keep the weak players alive.
+
+```powershell
+dotnet run --project examples\GameServer\SafeIR.Game.Server\SafeIR.Game.Server.csproj
+```
+
 ## Plugin Runtime Diagnostics
 
 The `SafeIR.Plugins` package emits stable `SGP*` `SandboxDiagnostic` codes when an uploaded or

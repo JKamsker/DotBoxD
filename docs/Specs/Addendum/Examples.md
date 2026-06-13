@@ -496,3 +496,59 @@ dotnet run --project examples\PluginIpc\SafeIR.PluginIpc.Client\SafeIR.PluginIpc
 ```
 
 The client reads settings, publishes a matching event, changes live settings over IPC, and publishes again to prove the server-side hook pipeline uses the updated state.
+
+## Game Server Golden Example
+
+The golden example combines every layer of the plugin model into one runnable scenario. It lives in:
+
+- `examples\GameServer\SafeIR.Game.Server.Abstractions` — the shared contract: the
+  `MonsterAggroEvent` and `AttackEvent` records with their `IPluginEventAdapter<T>` adapters, the
+  `[ShaRpcService] IGamePluginControlService` IPC contract with MessagePack DTOs, and the
+  plugin -> server command DSL helpers in `GameCommands`.
+- `examples\GameServer\SafeIR.Game.PluginHost` — the child process that authors two kernels
+  (`GuardianKernel`, `RetaliationKernel`), previews them locally, and ships them over IPC.
+- `examples\GameServer\SafeIR.Game.Server` — the parent process: a deterministic 1D simulation, the
+  example-defined command sink, the IPC service, and the orchestration entrypoint.
+
+### Filter + projection + invoke
+
+Each kernel's `ShouldHandle` is the server-side filter and `Handle` is the approved action. The
+generator lowers arithmetic and comparisons in `ShouldHandle` and a single string-concat
+`ctx.Messages.Send(...)` in `Handle`:
+
+```csharp
+[GamePlugin("guardian")]
+public sealed partial class GuardianKernel : IEventKernel<MonsterAggroEvent>
+{
+    public bool ShouldHandle(MonsterAggroEvent e, HookContext ctx)
+        => e.MonsterLevel - e.PlayerLevel >= LevelGap &&
+           e.Distance <= AggroRange &&
+           e.PlayerLevel <= ProtectMaxLevel;
+
+    public void Handle(MonsterAggroEvent e, HookContext ctx)
+        => ctx.Messages.Send(e.MonsterId, "calm:" + e.PlayerId + ":" + CalmStrength);
+}
+```
+
+The plugin host runs the same filter/projection/invoke pipeline in-process first (a local preview)
+so the author sees which events match and which command payloads the kernels emit before shipping
+anything. The server then runs the identical lowered IR — never the kernel source.
+
+### Settings binding, IPC, and the example-defined capability
+
+The host ships each kernel as opaque verified IR with `PluginPackageJsonSerializer.Export(...)` plus
+`InstallPluginAsync(json)`, then tunes live settings over IPC with one atomic
+`UpdateSettingsAsync("guardian", [...], atomic: true)` batch. The server installs the IR with
+`server.InstallJsonAsync(...)` and wires the hook for whichever event the kernel's manifest
+subscription declares.
+
+The plugin's only sandbox capability is `game.message.write`. The *meaning* of those messages is
+defined by the example, not by SafeIR core: `Simulation\GameCommandSink.cs` implements
+`IPluginMessageSink`, parses the `calm:`/`taunt:` DSL, validates it (known verb, known/opaque entity
+ids, clamped strength), and applies it to the world. Invalid or unknown commands are ignored safely
+and never throw back into the sandbox. The server contrasts a baseline phase (no plugins) with a
+with-plugin phase to show the untrusted kernels measurably changing game behavior.
+
+```powershell
+dotnet run --project examples\GameServer\SafeIR.Game.Server\SafeIR.Game.Server.csproj
+```

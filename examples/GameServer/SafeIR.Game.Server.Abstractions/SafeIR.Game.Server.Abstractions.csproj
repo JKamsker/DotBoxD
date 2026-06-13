@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="ShaRPC" Version="1.0.0-ci.30" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

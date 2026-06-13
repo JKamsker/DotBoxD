@@ -9,8 +9,8 @@
     },
     {
       "path": "../Addendum/Examples.md",
-      "sha256": "3e6d1ceb2c5a8f2f08967661ce1f9c1b0feba9224e1350aab55908ea9f46cee8",
-      "bytes": 19500
+      "sha256": "18c3b7a10f472ba1c0c55bb0b96268b684ae87f4b1daeb1ddd79a843b40c7cc6",
+      "bytes": 22476
     },
     {
       "path": "adr/0001-restricted-ir-not-csharp.md",
