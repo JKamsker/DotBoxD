@@ -130,7 +130,10 @@ public sealed class SandboxPolicyBuilder
             .Select(value => (value ?? "").Trim())
             .Where(value => value.Length > 0)
             .ToArray();
-        if (normalized.Length == 0) return;
+        if (normalized.Length == 0)
+        {
+            throw new ArgumentException($"{key} must contain at least one non-empty value", key);
+        }
 
         if (normalized.Any(value => value.Contains(',')))
         {

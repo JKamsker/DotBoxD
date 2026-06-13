@@ -4,13 +4,13 @@
   "files": [
     {
       "path": "../Addendum/Addendum.md",
-      "sha256": "062c67a71d39b1f38f153860c9d3f6802c8ceada5384795d631190189e772ae1",
-      "bytes": 26474
+      "sha256": "603128015744e4eb12c2189c13e4a5467a60b0b8538ffce7c0856414dedb8f29",
+      "bytes": 27565
     },
     {
       "path": "../Addendum/Examples.md",
-      "sha256": "d1baa169181995131cbeb46cd986643c44356a284d9186af60b973024138c3ed",
-      "bytes": 11828
+      "sha256": "bb13ece3499da8ea7e2b93e55a18a5d6e2db2b037e15bcbb255e245e935b6b72",
+      "bytes": 15778
     },
     {
       "path": "adr/0001-restricted-ir-not-csharp.md",

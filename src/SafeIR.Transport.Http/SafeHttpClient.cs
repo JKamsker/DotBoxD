@@ -9,6 +9,9 @@ public delegate ValueTask<IReadOnlyList<IPAddress>> SafeDnsResolver(string host,
 
 public static class SafeHttpClient
 {
+    private const int ReadBufferSize = 4096;
+    private const int InitialBodyBufferCapacity = 256;
+
     public static async ValueTask<string> GetTextAsync(
         SandboxContext context,
         SandboxUri uri,
@@ -137,7 +140,7 @@ public static class SafeHttpClient
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        var readBuffer = ArrayPool<byte>.Shared.Rent(4096);
+        var readBuffer = ArrayPool<byte>.Shared.Rent(ReadBufferSize);
         var bodyBuffer = ArrayPool<byte>.Shared.Rent(InitialBodyCapacity(response.Content.Headers.ContentLength, maxBytes));
         var bodyLength = 0;
         try
@@ -180,12 +183,10 @@ public static class SafeHttpClient
 
     private static int InitialBodyCapacity(long? contentLength, long maxBytes)
     {
-        if (contentLength is > 0)
-        {
-            return CheckedLength(contentLength.Value);
-        }
-
-        return maxBytes is > 0 and < 256 ? CheckedLength(maxBytes) : 256;
+        var expectedLength = contentLength is > 0 ? contentLength.Value : maxBytes;
+        return expectedLength is > 0 and < InitialBodyBufferCapacity
+            ? CheckedLength(expectedLength)
+            : InitialBodyBufferCapacity;
     }
 
     private static void EnsureBodyCapacity(ref byte[] buffer, int required)

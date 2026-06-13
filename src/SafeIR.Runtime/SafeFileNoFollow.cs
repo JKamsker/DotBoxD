@@ -141,14 +141,30 @@ internal static partial class SafeFileNoFollow
 
     private static FileStream CreateNewWriteUnix(string fullPath)
     {
-        var fd = open(fullPath, UnixCreateFlags(), mode: Convert.ToUInt32("600", 8));
+        var fd = open(fullPath, UnixCreateFlags(), mode: UnixOwnerReadWriteMode);
         if (fd == -1)
         {
             throw UnixCreateError(Marshal.GetLastWin32Error());
         }
 
-        var handle = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
-        return new FileStream(handle, FileAccess.Write, BufferSize, isAsync: false);
+        try
+        {
+            if (fchmod(fd, UnixOwnerReadWriteMode) == -1)
+            {
+                throw UnixCreateError(Marshal.GetLastWin32Error());
+            }
+
+            var handle = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
+            fd = -1;
+            return new FileStream(handle, FileAccess.Write, BufferSize, isAsync: false);
+        }
+        finally
+        {
+            if (fd != -1)
+            {
+                close(fd);
+            }
+        }
     }
 
     private static int UnixOpenFlags()

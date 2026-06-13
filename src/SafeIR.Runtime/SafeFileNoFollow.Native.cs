@@ -28,6 +28,7 @@ internal static partial class SafeFileNoFollow
     private const int WindowsErrorAlreadyExists = 183;
 
     private const int UnixOpenWriteOnly = 0x1;
+    private const uint UnixOwnerReadWriteMode = 384; // 0600
     private const int LinuxOpenNoFollow = 0x20000;
     private const int LinuxOpenCloseOnExec = 0x80000;
     private const int LinuxOpenCreate = 0x40;
@@ -61,6 +62,12 @@ internal static partial class SafeFileNoFollow
 
     [DllImport("libc", SetLastError = true, EntryPoint = "open")]
     private static extern int open(string pathname, int flags, uint mode);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "fchmod")]
+    private static extern int fchmod(int fd, uint mode);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "close")]
+    private static extern int close(int fd);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation

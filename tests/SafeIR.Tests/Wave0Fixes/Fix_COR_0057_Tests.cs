@@ -135,6 +135,26 @@ public sealed class Fix_COR_0057_Tests
         Assert.Equal("anything", Assert.Single(messages.Messages).TargetId);
     }
 
+    [Theory]
+    [MemberData(nameof(EmptyRecipientScopes))]
+    public void Empty_allowed_target_scope_is_rejected(string[] allowedTargets)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            SandboxPolicyBuilder.Create().GrantGameMessageWrite(allowedTargets: allowedTargets));
+
+        Assert.Equal("allowedTargets", ex.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(EmptyRecipientScopes))]
+    public void Empty_target_prefix_scope_is_rejected(string[] targetPrefixes)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            SandboxPolicyBuilder.Create().GrantGameMessageWrite(targetPrefixes: targetPrefixes));
+
+        Assert.Equal("targetPrefixes", ex.ParamName);
+    }
+
     [Fact]
     public async Task Unsupported_grant_parameter_is_rejected_during_preparation()
     {
@@ -168,6 +188,14 @@ public sealed class Fix_COR_0057_Tests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT-PARAM");
     }
+
+    public static TheoryData<string[]> EmptyRecipientScopes()
+        => new()
+        {
+            Array.Empty<string>(),
+            new[] { "" },
+            new[] { " ", null! }
+        };
 
     private static Hosting.SandboxHost CreateHost(IPluginMessageSink sink)
         => Hosting.SandboxHost.Create(builder =>
