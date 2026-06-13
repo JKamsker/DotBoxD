@@ -49,16 +49,24 @@ internal sealed class QueueMutationCommands
     public int Claim(CommandLine commandLine)
     {
         string agent = commandLine.RequireOption("agent");
+        string branch = commandLine.GetOption("branch") ?? string.Empty;
         Finding finding = commandLine.Positionals.Count > 0
             ? repository.FindRequired(commandLine.Positionals[0])
             : FindNextOpen(commandLine.RequireOption("area"));
+
+        if (finding.Status == "claimed")
+        {
+            EnsureClaimIsIdempotent(finding, agent, branch);
+            WriteFindingResult(commandLine, "CLAIMED", finding);
+            return ExitCodes.Success;
+        }
 
         EnsureTransition(finding.Status, "claimed");
         DateTimeOffset now = clock.UtcNow;
         finding.Status = "claimed";
         finding.Set("claimed_by", agent);
         finding.Set("claimed_at", now.ToString("O"));
-        finding.Set("claim_branch", commandLine.GetOption("branch") ?? string.Empty);
+        finding.Set("claim_branch", branch);
         finding.Set("updated_at", now.ToString("O"));
         repository.Save(finding);
         AppendEvent(finding.Id, agent, "claimed", "claimed", commandLine.GetOption("commit") ?? string.Empty, "Claimed finding");
@@ -239,6 +247,19 @@ internal sealed class QueueMutationCommands
         {
             throw new AgentQueueException($"Invalid status transition {current} -> {next}.", ExitCodes.InvalidTransition);
         }
+    }
+
+    private static void EnsureClaimIsIdempotent(Finding finding, string agent, string branch)
+    {
+        if (string.Equals(finding.Get("claimed_by"), agent, StringComparison.Ordinal) &&
+            string.Equals(finding.Get("claim_branch"), branch, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new AgentQueueException(
+            $"Finding {finding.Id} is already claimed by {finding.Get("claimed_by")} on branch {finding.Get("claim_branch")}.",
+            ExitCodes.InvalidTransition);
     }
 
     private static string BuildFindingBody(string id, string title, string body) =>

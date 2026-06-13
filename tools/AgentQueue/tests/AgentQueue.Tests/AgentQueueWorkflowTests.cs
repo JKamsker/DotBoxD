@@ -103,6 +103,42 @@ public sealed class AgentQueueWorkflowTests
     }
 
     [Fact]
+    public void ClaimRejectsDifferentOwnerForAlreadyClaimedFinding()
+    {
+        using AgentQueueHarness harness = new();
+        string bodyFile = harness.WriteBody("## Claim" + Environment.NewLine + "Example.");
+        Assert.Equal(0, harness.Run("append",
+            "--area", "correctness",
+            "--priority", "medium",
+            "--title", "Example bug",
+            "--dedup-key", "correctness/example/bug",
+            "--agent", "auditor",
+            "--body-file", bodyFile));
+        Assert.Equal(0, harness.Run("claim",
+            "COR-0001",
+            "--agent", "fixer-a",
+            "--branch", "fix/a"));
+
+        Assert.Equal(0, harness.Run("claim",
+            "COR-0001",
+            "--agent", "fixer-a",
+            "--branch", "fix/a"));
+        Assert.Equal(4, harness.Run("claim",
+            "COR-0001",
+            "--agent", "fixer-b",
+            "--branch", "fix/b"));
+
+        string findingFile = Directory.GetFiles(
+            Path.Combine(harness.Root, "docs", "agent-loop", "findings"),
+            "COR-0001-*.md").Single();
+        string finding = File.ReadAllText(findingFile);
+        Assert.Contains("claimed_by: fixer-a", finding);
+        Assert.Contains("claim_branch: fix/a", finding);
+        Assert.Contains("already claimed by fixer-a", harness.LastError + harness.LastOutput);
+        Assert.Equal(0, harness.Run("doctor"));
+    }
+
+    [Fact]
     public void DuplicateRejectsSelfReference()
     {
         using AgentQueueHarness harness = new();
