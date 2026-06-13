@@ -16,19 +16,11 @@ internal static class PersistentCompiledArtifactCacheOrigin
     private const string ProofAlgorithm = "HMAC-SHA256";
 
     private static readonly SemaphoreSlim OriginKeyGate = new(1, 1);
-    private static readonly AsyncLocal<string?> OriginKeyPathOverride = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
-
-    internal static IDisposable UseOriginKeyPathForCurrentAsyncFlow(string keyPath)
-    {
-        var previous = OriginKeyPathOverride.Value;
-        OriginKeyPathOverride.Value = Path.GetFullPath(keyPath);
-        return new OriginKeyPathOverrideScope(previous);
-    }
 
     public static async ValueTask WriteProofAsync(
         string entryPath,
@@ -202,7 +194,7 @@ internal static class PersistentCompiledArtifactCacheOrigin
         await OriginKeyGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var keyPath = OriginKeyPath();
+            var keyPath = PersistentCompiledArtifactCacheOriginKeyPath.Get();
             var keyDirectory = Path.GetDirectoryName(keyPath)!;
             Directory.CreateDirectory(keyDirectory);
             PersistentCompiledArtifactCacheOriginKeyGuard.HardenDirectory(keyDirectory);
@@ -221,25 +213,84 @@ internal static class PersistentCompiledArtifactCacheOrigin
         }
     }
 
-    private static string OriginKeyPath()
+    private static async ValueTask<byte[]?> TryAdoptExistingKeyAsync(string keyPath, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(OriginKeyPathOverride.Value))
+        if (!File.Exists(keyPath))
         {
-            return OriginKeyPathOverride.Value;
+            return null;
         }
 
-        var baseDirectory = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(baseDirectory))
+        try
         {
-            baseDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            // Fail closed before trusting the key: a key file readable or replaceable by a
+            // broad principal lets that actor forge valid origin proofs or rotate the signing
+            // root. A key whose permissions cannot be verified, or that is otherwise
+            // inaccessible, is treated as untrusted rather than fatal so a stale or corrupted
+            // file does not permanently brick compiled-cache writes.
+            PersistentCompiledArtifactCacheOriginKeyGuard.ValidateFile(keyPath);
+            var existingKey = await File.ReadAllBytesAsync(keyPath, cancellationToken).ConfigureAwait(false);
+            if (existingKey.Length == OriginKeyByteLength)
+            {
+                return existingKey;
+            }
+        }
+        catch (Exception ex) when (ex is SandboxRuntimeException or IOException or UnauthorizedAccessException)
+        {
+            // Untrusted or unreadable key: fall through to scrub and recreate.
         }
 
-        if (string.IsNullOrWhiteSpace(baseDirectory))
+        TryScrubFile(keyPath);
+        return null;
+    }
+
+    private static async ValueTask<byte[]> CreateOriginKeyAsync(string keyPath, CancellationToken cancellationToken)
+    {
+        // A pre-existing file may linger if adoption left it in place (for example a key with
+        // an ACL that locked out the current principal). DurableCreate uses FileMode.CreateNew
+        // and would throw, so scrub any residue first.
+        TryScrubFile(keyPath);
+
+        var key = RandomNumberGenerator.GetBytes(OriginKeyByteLength);
+        await using (var stream = DurableCreate(keyPath))
         {
-            throw CacheInvalid("compiled cache origin key directory is unavailable");
+            await stream.WriteAsync(key, cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
         }
 
-        return Path.Combine(baseDirectory, "SafeIR", "compiled-cache-origin.key");
+        PersistentCompiledArtifactCacheOriginKeyGuard.HardenFile(keyPath);
+        PersistentCompiledArtifactCacheOriginKeyGuard.ValidateFile(keyPath);
+        return key;
+    }
+
+    private static void TryScrubFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(path);
+            return;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The file's ACL may have locked out the current principal. Restore owner access
+            // before retrying the delete so a previously corrupted key can be replaced.
+        }
+
+        try
+        {
+            PersistentCompiledArtifactCacheOriginKeyGuard.RestoreOwnerAccess(path);
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best effort: if the file still cannot be removed, DurableCreate will surface the
+            // failure to the caller, which fails the compiled-cache write closed.
+        }
     }
 
     private static bool FixedTimeHexEquals(string expected, string actual)
@@ -268,11 +319,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
 
     private static SandboxRuntimeException CacheInvalid(string message)
         => new(new SandboxError(SandboxErrorCode.CacheInvalid, message));
-
-    private sealed class OriginKeyPathOverrideScope(string? previous) : IDisposable
-    {
-        public void Dispose() => OriginKeyPathOverride.Value = previous;
-    }
 
     private sealed record CacheOriginProof(int Version, string Algorithm, string Signature);
 }

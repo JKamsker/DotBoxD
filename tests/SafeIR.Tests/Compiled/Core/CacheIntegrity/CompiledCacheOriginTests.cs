@@ -19,7 +19,7 @@ public sealed class CompiledCacheOriginTests
     public async Task Verifier_safe_cache_entry_with_stale_origin_proof_is_quarantined_and_recompiled()
     {
         using var temp = TempDirectory.Create();
-        using var originKey = PersistentCompiledArtifactCacheOrigin.UseOriginKeyPathForCurrentAsyncFlow(
+        using var originKey = PersistentCompiledArtifactCacheOriginKeyPath.UseForCurrentAsyncFlow(
             Path.Combine(temp.Path, "compiled-cache-origin.key"));
         var host = SandboxTestHost.Create(compiler: true, compilerCache: temp.Path);
         var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
