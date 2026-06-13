@@ -1,4 +1,4 @@
-namespace SafeIR.Game.PluginHost;
+namespace SafeIR.Game.Plugin;
 
 using System.ComponentModel.DataAnnotations;
 

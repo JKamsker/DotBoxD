@@ -512,8 +512,8 @@ The golden example combines every layer of the plugin model into one runnable sc
   `MonsterAggroEvent` and `AttackEvent` records with their `IPluginEventAdapter<T>` adapters, the
   `[ShaRpcService] IGamePluginControlService` IPC contract with MessagePack DTOs, and the
   plugin -> server command DSL helpers in `GameCommands`.
-- `examples\GameServer\SafeIR.Game.PluginHost` — the child process that authors two kernels
-  (`GuardianKernel`, `RetaliationKernel`), previews them locally, and ships them over IPC.
+- `examples\GameServer\SafeIR.Game.Plugin` — the child process that authors two kernels
+  (`GuardianKernel`, `RetaliationKernel`) and ships them over IPC.
 - `examples\GameServer\SafeIR.Game.Server` — the parent process: a deterministic 1D simulation, the
   example-defined command sink, the IPC service, and the orchestration entrypoint.
 

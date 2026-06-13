@@ -13,7 +13,7 @@ $localPluginExample = Join-Path $root "examples/LocalPlugin/SafeIR.PluginLocal/S
 $ipcServerExample = Join-Path $root "examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj"
 $ipcClientExample = Join-Path $root "examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj"
 $gameServerExample = Join-Path $root "examples/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj"
-$gameHostExample = Join-Path $root "examples/GameServer/SafeIR.Game.PluginHost/SafeIR.Game.PluginHost.csproj"
+$gamePluginExample = Join-Path $root "examples/GameServer/SafeIR.Game.Plugin/SafeIR.Game.Plugin.csproj"
 
 function Resolve-RepoPath([string] $Path) {
     $normalized = $Path.Trim().Trim('"').Replace('\', [System.IO.Path]::DirectorySeparatorChar)
@@ -242,8 +242,8 @@ try {
     Remove-Item -LiteralPath $ipcServer.OutputPath, $ipcServer.ErrorPath -Force -ErrorAction SilentlyContinue
 }
 
-# Game server golden example: the server self-launches the plugin host child process, so the smoke
-# only needs to run the server once and assert exit 0. Point the server at the built host dll so it
+# Game server golden example: the server self-launches the plugin child process, so the smoke
+# only needs to run the server once and assert exit 0. Point the server at the built plugin dll so it
 # can launch it under --no-build.
 function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
     $outputPath = Join-Path ([System.IO.Path]::GetTempPath()) ("safe-ir-game-" + [Guid]::NewGuid().ToString("N") + ".out")
@@ -265,12 +265,12 @@ function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
     }
 
     # Start-Process inherits the parent environment; set the host dll for the launched server.
-    $previousHostDll = $env:SAFEIR_GAME_PLUGINHOST_DLL
-    $env:SAFEIR_GAME_PLUGINHOST_DLL = $HostDll
+    $previousHostDll = $env:SAFEIR_GAME_PLUGIN_DLL
+    $env:SAFEIR_GAME_PLUGIN_DLL = $HostDll
     try {
         $process = Start-Process @parameters
     } finally {
-        $env:SAFEIR_GAME_PLUGINHOST_DLL = $previousHostDll
+        $env:SAFEIR_GAME_PLUGIN_DLL = $previousHostDll
     }
 
     try {
@@ -290,11 +290,11 @@ function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
     }
 }
 
-$gameHostDll = Join-Path $root "examples/GameServer/SafeIR.Game.PluginHost/bin/$Configuration/net10.0/SafeIR.Game.PluginHost.dll"
-if (-not (Test-Path -LiteralPath $gameHostDll)) {
-    throw "Game server smoke prerequisite missing: $gameHostDll (build the solution first)."
+$gamePluginDll = Join-Path $root "examples/GameServer/SafeIR.Game.Plugin/bin/$Configuration/net10.0/SafeIR.Game.Plugin.dll"
+if (-not (Test-Path -LiteralPath $gamePluginDll)) {
+    throw "Game server smoke prerequisite missing: $gamePluginDll (build the solution first)."
 }
 
-Invoke-GameServer $gameServerExample $gameHostDll
+Invoke-GameServer $gameServerExample $gamePluginDll
 
 Write-Host "Docs/example smoke checks passed."

@@ -3,27 +3,27 @@ namespace SafeIR.Game.Server;
 using System.Diagnostics;
 
 /// <summary>
-/// Launches the plugin host child process and forwards its stdout/stderr so the demo shows the
-/// host's local preview and ship logs inline. Resolves the host dll for both <c>dotnet run</c>
-/// (dev) and <c>--no-build</c> smoke runs.
+/// Launches the plugin child process and forwards its stdout/stderr so the demo shows the plugin's
+/// ship logs inline. Resolves the plugin dll for both <c>dotnet run</c> (dev) and <c>--no-build</c>
+/// smoke runs.
 /// </summary>
-internal static class PluginHostLauncher
+internal static class PluginLauncher
 {
-    private const string HostDllEnvVar = "SAFEIR_GAME_PLUGINHOST_DLL";
-    private const string HostProjectDir = "SafeIR.Game.PluginHost";
+    private const string PluginDllEnvVar = "SAFEIR_GAME_PLUGIN_DLL";
+    private const string PluginProjectDir = "SafeIR.Game.Plugin";
     private const string ServerProjectDir = "SafeIR.Game.Server";
-    private const string HostDllName = "SafeIR.Game.PluginHost.dll";
+    private const string PluginDllName = "SafeIR.Game.Plugin.dll";
 
     public static Process Launch(string pipeName)
     {
-        var hostDll = ResolveHostDll();
+        var pluginDll = ResolvePluginDll();
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        startInfo.ArgumentList.Add(hostDll);
+        startInfo.ArgumentList.Add(pluginDll);
         startInfo.ArgumentList.Add(pipeName);
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -43,35 +43,35 @@ internal static class PluginHostLauncher
         }
     }
 
-    private static string ResolveHostDll()
+    private static string ResolvePluginDll()
     {
-        var configured = Environment.GetEnvironmentVariable(HostDllEnvVar);
+        var configured = Environment.GetEnvironmentVariable(PluginDllEnvVar);
         if (!string.IsNullOrWhiteSpace(configured))
         {
             if (!File.Exists(configured))
             {
                 throw new FileNotFoundException(
-                    $"{HostDllEnvVar} points to a missing host dll: {configured}");
+                    $"{PluginDllEnvVar} points to a missing plugin dll: {configured}");
             }
 
             return configured;
         }
 
         // Server base dir: .../examples/GameServer/SafeIR.Game.Server/bin/<Config>/net10.0/
-        // Sibling host:    .../examples/GameServer/SafeIR.Game.PluginHost/bin/<Config>/net10.0/<dll>
+        // Sibling plugin:  .../examples/GameServer/SafeIR.Game.Plugin/bin/<Config>/net10.0/<dll>
         var serverBase = AppContext.BaseDirectory;
-        var candidate = SiblingHostPath(serverBase);
+        var candidate = SiblingPluginPath(serverBase);
         if (candidate is not null && File.Exists(candidate))
         {
             return candidate;
         }
 
         throw new FileNotFoundException(
-            "Could not resolve the plugin host dll. Build the solution or set " +
-            $"{HostDllEnvVar} to {HostDllName}. Looked beside: {serverBase}");
+            "Could not resolve the plugin dll. Build the solution or set " +
+            $"{PluginDllEnvVar} to {PluginDllName}. Looked beside: {serverBase}");
     }
 
-    private static string? SiblingHostPath(string serverBaseDirectory)
+    private static string? SiblingPluginPath(string serverBaseDirectory)
     {
         var trimmed = serverBaseDirectory.TrimEnd(
             Path.DirectorySeparatorChar,
@@ -99,6 +99,6 @@ internal static class PluginHostLauncher
             return null;
         }
 
-        return Path.Combine(gameServerRoot, HostProjectDir, "bin", config, tfm, HostDllName);
+        return Path.Combine(gameServerRoot, PluginProjectDir, "bin", config, tfm, PluginDllName);
     }
 }
