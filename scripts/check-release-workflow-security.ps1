@@ -13,6 +13,20 @@ if (-not (Test-Path -LiteralPath $lineGuardPath)) {
 
 $workflow = Get-Content -Raw -LiteralPath $workflowPath
 $lineGuard = Get-Content -Raw -LiteralPath $lineGuardPath
+
+function Get-WorkflowJobBlock([string] $jobId) {
+    $escaped = [regex]::Escape($jobId)
+    $match = [regex]::Match($workflow, "(?ms)^  ${escaped}:\s*\r?\n.*?(?=^  [A-Za-z0-9_-]+:\s*\r?\n|\z)")
+    if (-not $match.Success) {
+        throw "Workflow job '$jobId' does not exist."
+    }
+
+    return $match.Value
+}
+
+$buildJob = Get-WorkflowJobBlock "build-test-pack"
+$attestationJob = Get-WorkflowJobBlock "attest-package-artifacts"
+
 $usesMatches = [regex]::Matches($workflow, "(?m)^\s*uses:\s*(?<action>[^@\s]+)@(?<ref>[^\s#]+)")
 foreach ($match in $usesMatches) {
     $action = $match.Groups["action"].Value
@@ -22,15 +36,40 @@ foreach ($match in $usesMatches) {
     }
 }
 
-if ($workflow -notmatch "(?ms)build-test-pack:.*?permissions:\s*\r?\n\s+contents:\s+read\s*\r?\n\s+id-token:\s+write\s*\r?\n\s+attestations:\s+write") {
-    throw "Package-producing job must declare explicit least-privilege permissions for contents read and package attestation."
+if ($buildJob -notmatch "(?ms)^\s{4}permissions:\s*\r?\n\s{6}contents:\s+read\s*(?:\r?\n|$)") {
+    throw "Build/test/package job must declare explicit contents: read permissions."
+}
+
+if ($buildJob -match "(?m)^\s+(id-token|attestations):\s+write\s*$") {
+    throw "Build/test/package job must not receive OIDC or attestation write permissions."
+}
+
+if ($buildJob -match "actions/attest-build-provenance@") {
+    throw "Build/test/package job must not perform release attestation."
+}
+
+if ($attestationJob -notmatch "(?m)^\s{4}if:\s+\$\{\{\s*startsWith\(github\.ref,\s*'refs/heads/release/'\)\s*\|\|\s*startsWith\(github\.ref,\s*'refs/tags/'\)\s*\}\}\s*$") {
+    throw "Attestation job must be restricted to release branches and tags."
+}
+
+if ($attestationJob -notmatch "(?m)^\s{4}needs:\s+build-test-pack\s*$") {
+    throw "Attestation job must depend on successful build/test/package completion."
+}
+
+if ($attestationJob -notmatch "(?ms)^\s{4}permissions:\s*\r?\n\s{6}contents:\s+read\s*\r?\n\s{6}id-token:\s+write\s*\r?\n\s{6}attestations:\s+write") {
+    throw "Attestation job must declare contents read plus OIDC and attestation write permissions."
+}
+
+if ($attestationJob -match "(?im)^\s+run:\s*" -or
+    $attestationJob -match "(?im)^\s+uses:\s+actions/(checkout|setup-dotnet)@") {
+    throw "Attestation job must only download package artifacts and attest them."
 }
 
 if ($workflow -match "(?m)^\s+contents:\s+write\s*$") {
     throw "Package-producing workflow must not grant contents: write."
 }
 
-if ($workflow -notmatch "actions/attest-build-provenance@[0-9a-fA-F]{40}") {
+if ($attestationJob -notmatch "actions/attest-build-provenance@[0-9a-fA-F]{40}") {
     throw "Release package workflow must attest package artifacts with a pinned attest-build-provenance action."
 }
 
@@ -46,11 +85,11 @@ if ($workflow -notmatch "(?ms)- name: Upload package artifacts.*?name:\s+package
     throw "Package upload step must publish the canonical package artifact set as 'packages-canonical'."
 }
 
-if ($workflow -notmatch "artifacts/packages/\*\.nupkg") {
+if ($attestationJob -notmatch "artifacts/packages/\*\.nupkg") {
     throw "Package attestation must cover every .nupkg in artifacts/packages."
 }
 
-if ($workflow -notmatch "artifacts/packages/\*\.snupkg") {
+if ($attestationJob -notmatch "artifacts/packages/\*\.snupkg") {
     throw "Package attestation must cover every .snupkg in artifacts/packages."
 }
 

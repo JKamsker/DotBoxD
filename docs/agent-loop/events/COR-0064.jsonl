@@ -1,0 +1,3 @@
+{"at":"2026-06-13T06:39:11.8197162\u002B00:00","agent":"security-producer","type":"created","status":"open","message":"Created finding"}
+{"at":"2026-06-13T07:19:38.7274060\u002B00:00","agent":"implementer","type":"claimed","status":"claimed","message":"Claimed finding"}
+{"at":"2026-06-13T07:21:53.4345105\u002B00:00","agent":"implementer","type":"fixed","status":"fixed_pending_verification","message":"Moved OIDC and attestation write permissions from the build/test/package matrix job into a release-only attestation job that downloads the canonical package artifact, and updated the workflow security gate to enforce that split."}

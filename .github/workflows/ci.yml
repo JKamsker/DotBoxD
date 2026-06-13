@@ -12,8 +12,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -137,14 +135,6 @@ jobs:
 
           ./scripts/check-package-metadata.ps1 @metadataArgs
 
-      - name: Attest package artifacts
-        if: ${{ matrix.os == 'ubuntu-latest' && (startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/')) }}
-        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45
-        with:
-          subject-path: |
-            artifacts/packages/*.nupkg
-            artifacts/packages/*.snupkg
-
       - name: Upload package artifacts
         if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -154,3 +144,27 @@ jobs:
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
           if-no-files-found: error
+
+  attest-package-artifacts:
+    name: Attest Package Artifacts
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/') }}
+    needs: build-test-pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: packages-canonical
+          path: artifacts/packages
+
+      - name: Attest package artifacts
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45
+        with:
+          subject-path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
