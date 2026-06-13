@@ -44,7 +44,7 @@ internal static class PersistentCompiledArtifactCachePublisher
     public static void ValidateEntryShape(string entryPath)
     {
         var required = new HashSet<string>(StringComparer.Ordinal) {
-            "module.dll", "manifest.json", "verification.json"
+            "module.dll", "manifest.json", "verification.json", PersistentCompiledArtifactCacheOrigin.ProofFileName
         };
         foreach (var file in Directory.EnumerateFiles(entryPath)) {
             if (!required.Remove(Path.GetFileName(file))) {

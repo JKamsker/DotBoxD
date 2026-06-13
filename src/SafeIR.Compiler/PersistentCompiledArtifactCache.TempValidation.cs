@@ -32,5 +32,16 @@ public sealed partial class PersistentCompiledArtifactCache
                 SandboxErrorCode.CacheInvalid,
                 "temporary cache artifact hash does not match manifest"));
         }
+
+        await PersistentCompiledArtifactCacheOrigin.ValidateProofAsync(
+                tempPath,
+                cacheKey,
+                plan,
+                entrypoint,
+                tempManifest,
+                tempVerification,
+                tempAssembly,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 }

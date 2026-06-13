@@ -104,6 +104,16 @@ public sealed partial class PersistentCompiledArtifactCache
             PersistentCompiledArtifactCacheValidator.ValidateVerification(manifest, cachedVerification, policy);
             var assemblyBytes = await File.ReadAllBytesAsync(Path.Combine(entryPath, "module.dll"), cancellationToken)
                 .ConfigureAwait(false);
+            await PersistentCompiledArtifactCacheOrigin.ValidateProofAsync(
+                    entryPath,
+                    cacheKey,
+                    plan,
+                    entrypoint,
+                    manifest,
+                    cachedVerification,
+                    assemblyBytes,
+                    cancellationToken)
+                .ConfigureAwait(false);
             var verification = await verifier
                 .VerifyAsync(
                     assemblyBytes,
@@ -156,6 +166,16 @@ public sealed partial class PersistentCompiledArtifactCache
             await WriteBytesAsync(Path.Combine(tempPath, "module.dll"), assemblyBytes, cancellationToken).ConfigureAwait(false);
             await WriteJsonAsync(Path.Combine(tempPath, "manifest.json"), manifest, cancellationToken).ConfigureAwait(false);
             await WriteJsonAsync(Path.Combine(tempPath, "verification.json"), verification, cancellationToken).ConfigureAwait(false);
+            await PersistentCompiledArtifactCacheOrigin.WriteProofAsync(
+                    tempPath,
+                    cacheKey,
+                    plan,
+                    entrypoint,
+                    manifest,
+                    verification,
+                    assemblyBytes,
+                    cancellationToken)
+                .ConfigureAwait(false);
             PersistentCompiledArtifactCachePublisher.ValidateEntryShape(tempPath);
             await ValidateTempEntryAsync(
                     tempPath,
