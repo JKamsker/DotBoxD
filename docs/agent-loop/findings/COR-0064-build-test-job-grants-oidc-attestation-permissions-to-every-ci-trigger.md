@@ -1,23 +1,23 @@
 ---
 id: COR-0064
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Build/test job grants OIDC attestation permissions to every CI trigger
 dedup_key: security/release-workflow/oidc-attestation/job-wide-pr-trigger
 created_at: 2026-06-13T06:39:11.8155014+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-13T07:21:53.4312678+00:00
+updated_at: 2026-06-13T07:24:46.1072051+00:00
 claimed_by: implementer
 claimed_at: 2026-06-13T07:19:38.7239816+00:00
 claim_branch: 
 fixed_by: implementer
 fixed_at: 2026-06-13T07:21:53.4312678+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: verifier
+verified_at: 2026-06-13T07:24:46.1072051+00:00
+verified_commit: 72a3ab3
 duplicate_of: 
 ---
 

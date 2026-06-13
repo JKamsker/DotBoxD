@@ -1,20 +1,20 @@
 ---
 id: API-0018
 area: api_coherence
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Verifier package lacks public diagnostic code reference
 dedup_key: api/verifier/diagnostic-reference/missing-public-docs
 created_at: 2026-06-12T23:12:05.7202659+00:00
 created_by: completeness-api-producer
 created_commit: 
-updated_at: 2026-06-12T23:12:05.7202659+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T07:49:31.4882949+00:00
+claimed_by: fixer
+claimed_at: 2026-06-13T07:49:31.3551910+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-13T07:49:31.4882949+00:00
+fixed_commit: b14fd0a
 verified_by: 
 verified_at: 
 verified_commit: 

@@ -1,20 +1,20 @@
 ---
 id: ALG-0018
 area: perf_algorithm
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Direct plugin kernel dispatch revalidates adapter shape per call
 dedup_key: algorithm/plugins/direct-kernel-dispatch/adapter-shape-validation-per-call
 created_at: 2026-06-12T23:32:23.3047353+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T23:32:23.3047353+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T07:49:32.0958619+00:00
+claimed_by: fixer
+claimed_at: 2026-06-13T07:49:31.9697571+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-13T07:49:32.0958619+00:00
+fixed_commit: b14fd0a
 verified_by: 
 verified_at: 
 verified_commit: 

@@ -1,20 +1,20 @@
 ---
 id: ALG-0017
 area: perf_algorithm
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Compiled executable cache rehashes artifacts before cache hits
 dedup_key: algorithm/compiled-executable-cache/full-artifact-validation-before-cache-hit
 created_at: 2026-06-12T23:21:29.0889897+00:00
 created_by: performance-producer
 created_commit: 
-updated_at: 2026-06-12T23:21:29.0889897+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T07:49:32.4270308+00:00
+claimed_by: fixer
+claimed_at: 2026-06-13T07:49:32.2840738+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-13T07:49:32.4270308+00:00
+fixed_commit: b14fd0a
 verified_by: 
 verified_at: 
 verified_commit: 

@@ -8,13 +8,13 @@ dedup_key: security/compiled-cache/origin-key-permissions
 created_at: 2026-06-13T06:24:27.5233123+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-13T07:27:39.5389135+00:00
-claimed_by: implementer
-claimed_at: 2026-06-13T07:23:10.8362876+00:00
-claim_branch: 
-fixed_by: implementer
-fixed_at: 2026-06-13T07:27:39.5389135+00:00
-fixed_commit: 
+updated_at: 2026-06-13T07:49:31.1743921+00:00
+claimed_by: fixer
+claimed_at: 2026-06-13T07:49:31.0323976+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-13T07:49:31.1743921+00:00
+fixed_commit: b14fd0a
 verified_by: 
 verified_at: 
 verified_commit: 

@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `API-0008` medium - Plugin analyzer package lacks public diagnostic reference
-  - File: `docs/agent-loop/findings/API-0008-plugin-analyzer-package-lacks-public-diagnostic-reference.md`
-  - Dedup: `api/plugin-analyzer/diagnostic-reference/missing-public-docs`
 - [ ] `API-0012` medium - Worker-process isolation has no shippable worker host surface
   - File: `docs/agent-loop/findings/API-0012-worker-process-isolation-has-no-shippable-worker-host-surface.md`
   - Dedup: `api/worker-process/missing-shipped-worker-host-sample`
@@ -19,15 +16,39 @@
 - [ ] `API-0017` medium - Plugin server hides owned SandboxHost lifetime with no dispose surface
   - File: `docs/agent-loop/findings/API-0017-plugin-server-hides-owned-sandboxhost-lifetime-with-no-dispose-surface.md`
   - Dedup: `api/plugins/plugin-server/owned-host-dispose-missing`
-- [ ] `API-0018` medium - Verifier package lacks public diagnostic code reference
-  - File: `docs/agent-loop/findings/API-0018-verifier-package-lacks-public-diagnostic-code-reference.md`
-  - Dedup: `api/verifier/diagnostic-reference/missing-public-docs`
 - [ ] `API-0019` medium - Plugin runtime diagnostics lack public code reference
   - File: `docs/agent-loop/findings/API-0019-plugin-runtime-diagnostics-lack-public-code-reference.md`
   - Dedup: `api/plugins/runtime-sgp-diagnostics/missing-public-reference`
 - [ ] `API-0020` medium - File write grant docs omit create and overwrite policy controls
   - File: `docs/agent-loop/findings/API-0020-file-write-grant-docs-omit-create-and-overwrite-policy-controls.md`
   - Dedup: `api:file-write-grant-create-overwrite-docs`
+- [ ] `API-0021` medium - Module JSON exporter is omitted from public package guidance and smoke coverage
+  - File: `docs/agent-loop/findings/API-0021-module-json-exporter-is-omitted-from-public-package-guidance-and-smoke-coverage.md`
+  - Dedup: `api/json/module-exporter/package-guidance-smoke`
+- [ ] `API-0023` medium - Plugin analyzer NuGet smoke does not prove generated package factory
+  - File: `docs/agent-loop/findings/API-0023-plugin-analyzer-nuget-smoke-does-not-prove-generated-package-factory.md`
+  - Dedup: `api/plugin-analyzer/nuget-source-generation-smoke`
+- [ ] `API-0024` medium - SandboxHostBuilder exposes fluent setup without a public Build terminal
+  - File: `docs/agent-loop/findings/API-0024-sandboxhostbuilder-exposes-fluent-setup-without-a-public-build-terminal.md`
+  - Dedup: `api/hosting/sandbox-host-builder/public-build-terminal-missing`
+- [ ] `API-0025` medium - Compiled optimization option has no effective hosted execution surface
+  - File: `docs/agent-loop/findings/API-0025-compiled-optimization-option-has-no-effective-hosted-execution-surface.md`
+  - Dedup: `api/compiler/compile-options-optimize-not-effective`
+- [ ] `API-0026` medium - Plugin package construction hides required manifest names behind internal constants
+  - File: `docs/agent-loop/findings/API-0026-plugin-package-construction-hides-required-manifest-names-behind-internal-consta.md`
+  - Dedup: `api/plugins/package-construction/public-manifest-contract-names`
+- [ ] `API-0027` medium - SandboxResourceUsage omits call-depth and wall-time usage
+  - File: `docs/agent-loop/findings/API-0027-sandboxresourceusage-omits-call-depth-and-wall-time-usage.md`
+  - Dedup: `api/core/resource-usage/call-depth-wall-time-telemetry-missing`
+- [ ] `API-0028` medium - Capability revocation is write-only on SandboxHost
+  - File: `docs/agent-loop/findings/API-0028-capability-revocation-is-write-only-on-sandboxhost.md`
+  - Dedup: `api/hosting/capability-revocation/write-only-control-plane`
+- [ ] `API-0029` medium - LiveValue range metadata is hidden behind internal construction
+  - File: `docs/agent-loop/findings/API-0029-livevalue-range-metadata-is-hidden-behind-internal-construction.md`
+  - Dedup: `api/plugins/live-settings/ranged-live-value-authoring-missing`
+- [ ] `API-0030` medium - VerificationPolicy exposes raw allowlist strings without public signature builders
+  - File: `docs/agent-loop/findings/API-0030-verificationpolicy-exposes-raw-allowlist-strings-without-public-signature-builde.md`
+  - Dedup: `api/verifier/policy-allowlist/public-signature-builder-missing`
 
 ## Claimed
 
@@ -38,6 +59,10 @@
   - File: `docs/agent-loop/findings/API-0009-public-packages-lack-an-api-compatibility-baseline-gate.md`
   - Fixed by: `worker`
   - Commit: `pending`
+- [~] `API-0022` high - Public API baseline gate records members of internal types
+  - File: `docs/agent-loop/findings/API-0022-public-api-baseline-gate-records-members-of-internal-types.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 - [~] `API-0001` medium - JSON host import extension is only exposed from an Internal namespace
   - File: `docs/agent-loop/findings/API-0001-json-host-import-extension-is-only-exposed-from-an-internal-namespace.md`
   - Fixed by: `implementer`
@@ -66,6 +91,10 @@
   - File: `docs/agent-loop/findings/API-0007-nuget-package-readme-lacks-install-and-package-composition-guidance.md`
   - Fixed by: `worker`
   - Commit: ``
+- [~] `API-0008` medium - Plugin analyzer package lacks public diagnostic reference
+  - File: `docs/agent-loop/findings/API-0008-plugin-analyzer-package-lacks-public-diagnostic-reference.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 - [~] `API-0010` medium - Public packages do not ship symbol/source-link artifacts
   - File: `docs/agent-loop/findings/API-0010-public-packages-do-not-ship-symbol-source-link-artifacts.md`
   - Fixed by: `worker`
@@ -82,6 +111,10 @@
   - File: `docs/agent-loop/findings/API-0014-release-pipeline-uploads-os-specific-package-sets-without-a-canonical-artifact-c.md`
   - Fixed by: `worker`
   - Commit: ``
+- [~] `API-0018` medium - Verifier package lacks public diagnostic code reference
+  - File: `docs/agent-loop/findings/API-0018-verifier-package-lacks-public-diagnostic-code-reference.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 
 ## Verified
 

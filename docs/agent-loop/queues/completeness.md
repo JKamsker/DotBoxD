@@ -16,9 +16,6 @@
 - [ ] `CMP-0012` medium - Public JSON ingestion lacks a versioned schema artifact
   - File: `docs/agent-loop/findings/CMP-0012-public-json-ingestion-lacks-a-versioned-schema-artifact.md`
   - Dedup: `completeness/json-ingestion/versioned-schema-artifact-missing`
-- [ ] `CMP-0013` medium - HTTP transport lacks a runnable docs-smoke example
-  - File: `docs/agent-loop/findings/CMP-0013-http-transport-lacks-a-runnable-docs-smoke-example.md`
-  - Dedup: `completeness/http-transport/runnable-example-smoke-missing`
 - [ ] `CMP-0014` medium - Transport-agnostic IPC addon lacks a public generic-transport example
   - File: `docs/agent-loop/findings/CMP-0014-transport-agnostic-ipc-addon-lacks-a-public-generic-transport-example.md`
   - Dedup: `completeness/ipc-sharpc/generic-transport-example-missing`
@@ -40,6 +37,9 @@
 - [ ] `CMP-0021` medium - Plugin server lacks a public installed-kernel inventory surface
   - File: `docs/agent-loop/findings/CMP-0021-plugin-server-lacks-a-public-installed-kernel-inventory-surface.md`
   - Dedup: `completeness/plugins/admin-inventory/installed-kernel-enumeration`
+- [ ] `CMP-0022` medium - Custom host binding authoring lacks a package-backed public example
+  - File: `docs/agent-loop/findings/CMP-0022-custom-host-binding-authoring-lacks-a-package-backed-public-example.md`
+  - Dedup: `completeness/bindings/custom-host-binding/package-backed-example`
 
 ## Claimed
 
@@ -66,6 +66,10 @@
   - File: `docs/agent-loop/findings/CMP-0007-runnable-addendum-examples-do-not-exercise-production-json-package-upload.md`
   - Fixed by: `worker`
   - Commit: ``
+- [~] `CMP-0013` medium - HTTP transport lacks a runnable docs-smoke example
+  - File: `docs/agent-loop/findings/CMP-0013-http-transport-lacks-a-runnable-docs-smoke-example.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 
 ## Verified
 

@@ -4,9 +4,52 @@
 
 ## Open
 
+- [ ] `COR-0060` medium - Live setting numeric validation rounds integers and loses long range precision
+  - File: `docs/agent-loop/findings/COR-0060-live-setting-numeric-validation-rounds-integers-and-loses-long-range-precision.md`
+  - Dedup: `correctness:live-settings-type-exact-numeric-validation`
+- [ ] `COR-0061` medium - Capability denial audits bypass deterministic audit clock
+  - File: `docs/agent-loop/findings/COR-0061-capability-denial-audits-bypass-deterministic-audit-clock.md`
+  - Dedup: `correctness:capability-denial-audit-deterministic-clock`
+- [ ] `COR-0066` medium - Plugin package validation omits live-setting default range checks
+  - File: `docs/agent-loop/findings/COR-0066-plugin-package-validation-omits-live-setting-default-range-checks.md`
+  - Dedup: `correctness/plugins/live-settings/default-range-validation`
+- [ ] `COR-0067` medium - Compiled artifact envelopes accept undefined cache statuses
+  - File: `docs/agent-loop/findings/COR-0067-compiled-artifact-envelopes-accept-undefined-cache-statuses.md`
+  - Dedup: `correctness/compiled-artifact/cache-status/undefined-enum`
+- [ ] `COR-0068` medium - Worker run summaries accept forged cache telemetry
+  - File: `docs/agent-loop/findings/COR-0068-worker-run-summaries-accept-forged-cache-telemetry.md`
+  - Dedup: `correctness/worker-run-summary/cache-materialization-status/forged-telemetry`
+- [ ] `COR-0069` medium - Null scalar payloads crash value-boundary validation before fail-closed errors
+  - File: `docs/agent-loop/findings/COR-0069-null-scalar-payloads-crash-value-boundary-validation-before-fail-closed-errors.md`
+  - Dedup: `correctness/runtime-value-boundaries/null-scalar-payload-prevalidation-crash`
+- [ ] `COR-0070` medium - Worker run summaries do not verify policy identity fields
+  - File: `docs/agent-loop/findings/COR-0070-worker-run-summaries-do-not-verify-policy-identity-fields.md`
+  - Dedup: `correctness/worker-run-summary/policy-id/forged-or-missing`
+- [ ] `COR-0071` medium - WorkerExecution audit events can contradict accepted worker results
+  - File: `docs/agent-loop/findings/COR-0071-workerexecution-audit-events-can-contradict-accepted-worker-results.md`
+  - Dedup: `correctness/hosting/worker-audit/worker-execution-result-mismatch`
+- [ ] `COR-0072` medium - Worker run summaries accept forged deterministic logicalNow fields
+  - File: `docs/agent-loop/findings/COR-0072-worker-run-summaries-accept-forged-deterministic-logicalnow-fields.md`
+  - Dedup: `correctness/hosting/worker-run-summary/logical-now-forgery`
+- [ ] `COR-0073` medium - RunSummaryAuditFields exposes a mutable dictionary result
+  - File: `docs/agent-loop/findings/COR-0073-runsummaryauditfields-exposes-a-mutable-dictionary-result.md`
+  - Dedup: `correctness/core/run-summary-audit-fields/mutable-result`
+- [ ] `COR-0074` medium - Worker isolation rejects valid debug trace audit events
+  - File: `docs/agent-loop/findings/COR-0074-worker-isolation-rejects-valid-debug-trace-audit-events.md`
+  - Dedup: `correctness/hosting/worker-debug-trace/valid-events-rejected`
+- [ ] `COR-0075` medium - BindingAuditFields exposes mutable dictionary results
+  - File: `docs/agent-loop/findings/COR-0075-bindingauditfields-exposes-mutable-dictionary-results.md`
+  - Dedup: `correctness/core/binding-audit-fields/mutable-results`
+- [ ] `COR-0076` medium - Structural validation dereferences null public model members
+  - File: `docs/agent-loop/findings/COR-0076-structural-validation-dereferences-null-public-model-members.md`
+  - Dedup: `correctness/validation/structural-null-public-model-members`
 
 ## Claimed
 
+- [>] `COR-0062` medium - Plugin message sink exposes mutable message history
+  - File: `docs/agent-loop/findings/COR-0062-plugin-message-sink-exposes-mutable-message-history.md`
+  - Owner: `implementer`
+  - Branch: ``
 
 ## Fixed pending verification
 
@@ -57,6 +100,14 @@
 - [~] `COR-0051` high - Release file-length gate executes an unlocked restored dotnet tool
   - File: `docs/agent-loop/findings/COR-0051-release-file-length-gate-executes-an-unlocked-restored-dotnet-tool.md`
   - Fixed by: `worker`
+  - Commit: ``
+- [~] `COR-0058` high - Compiled cache origin key is created without permission hardening
+  - File: `docs/agent-loop/findings/COR-0058-compiled-cache-origin-key-is-created-without-permission-hardening.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
+- [~] `COR-0065` high - Worker success payloads bypass result value budget validation
+  - File: `docs/agent-loop/findings/COR-0065-worker-success-payloads-bypass-result-value-budget-validation.md`
+  - Fixed by: `implementer`
   - Commit: ``
 - [~] `COR-0003` medium - Package metadata check fails on stale packages left in output directory
   - File: `docs/agent-loop/findings/COR-0003-package-metadata-check-fails-on-stale-packages-left-in-output-directory.md`
@@ -155,6 +206,14 @@
   - File: `docs/agent-loop/findings/COR-0048-persistent-compiled-cache-accepts-verifier-safe-artifacts-without-compiler-origi.md`
 - [x] `COR-0049` high - Runtime value boundaries accept malformed scalar records
   - File: `docs/agent-loop/findings/COR-0049-runtime-value-boundaries-accept-malformed-scalar-records.md`
+- [x] `COR-0057` high - Game message write grants cannot scope recipients or payload size
+  - File: `docs/agent-loop/findings/COR-0057-game-message-write-grants-cannot-scope-recipients-or-payload-size.md`
+- [x] `COR-0059` high - Collection equality validates but compares backing collection identity
+  - File: `docs/agent-loop/findings/COR-0059-collection-equality-validates-but-compares-backing-collection-identity.md`
+- [x] `COR-0063` high - Plugin message target IDs bypass audit redaction
+  - File: `docs/agent-loop/findings/COR-0063-plugin-message-target-ids-bypass-audit-redaction.md`
+- [x] `COR-0064` high - Build/test job grants OIDC attestation permissions to every CI trigger
+  - File: `docs/agent-loop/findings/COR-0064-build-test-job-grants-oidc-attestation-permissions-to-every-ci-trigger.md`
 - [x] `COR-0001` medium - AgentQueue allows self-duplicate findings
   - File: `docs/agent-loop/findings/COR-0001-agentqueue-allows-self-duplicate-findings.md`
 - [x] `COR-0007` medium - AgentQueue doctor accepts statuses the renderer omits

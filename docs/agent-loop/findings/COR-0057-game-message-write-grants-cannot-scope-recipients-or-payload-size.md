@@ -1,23 +1,23 @@
 ---
 id: COR-0057
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Game message write grants cannot scope recipients or payload size
 dedup_key: security/plugins/game-message-write/unscoped-recipient-payload
 created_at: 2026-06-13T06:24:26.0787229+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-13T07:17:23.9787048+00:00
+updated_at: 2026-06-13T07:22:20.2079993+00:00
 claimed_by: implementer
 claimed_at: 2026-06-13T07:12:48.6057894+00:00
 claim_branch: 
 fixed_by: implementer
 fixed_at: 2026-06-13T07:17:23.9787048+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: verifier
+verified_at: 2026-06-13T07:22:20.2079993+00:00
+verified_commit: 4a92761
 duplicate_of: 
 ---
 

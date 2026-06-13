@@ -1,23 +1,23 @@
 ---
 id: COR-0063
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Plugin message target IDs bypass audit redaction
 dedup_key: security/plugins/message-audit/target-id-redaction
 created_at: 2026-06-13T06:31:54.2914811+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-13T07:17:25.1202281+00:00
+updated_at: 2026-06-13T07:22:21.5657677+00:00
 claimed_by: implementer
 claimed_at: 2026-06-13T07:12:49.8073757+00:00
 claim_branch: 
 fixed_by: implementer
 fixed_at: 2026-06-13T07:17:25.1202281+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: verifier
+verified_at: 2026-06-13T07:22:21.5657677+00:00
+verified_commit: 4a92761
 duplicate_of: 
 ---
 

@@ -1,22 +1,22 @@
 ---
 id: COR-0059
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Collection equality validates but compares backing collection identity
 dedup_key: correctness:collection-equality-backing-identity
 created_at: 2026-06-13T06:28:36.4765420+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-13T07:31:36.0966848+00:00
+updated_at: 2026-06-13T07:35:16.6990084+00:00
 claimed_by: implementer
 claimed_at: 2026-06-13T07:29:19.5461124+00:00
 claim_branch: 
 fixed_by: implementer
 fixed_at: 2026-06-13T07:31:36.0966848+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-13T07:35:16.6990084+00:00
 verified_commit: 
 duplicate_of: 
 ---

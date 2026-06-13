@@ -1,20 +1,20 @@
 ---
 id: CMP-0013
 area: completeness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: HTTP transport lacks a runnable docs-smoke example
 dedup_key: completeness/http-transport/runnable-example-smoke-missing
 created_at: 2026-06-12T22:28:01.7742059+00:00
 created_by: completeness-api-producer
 created_commit: 
-updated_at: 2026-06-12T22:28:01.7742059+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T07:49:33.0393137+00:00
+claimed_by: fixer
+claimed_at: 2026-06-13T07:49:32.9130277+00:00
+claim_branch: workflow-work
+fixed_by: fixer
+fixed_at: 2026-06-13T07:49:33.0393137+00:00
+fixed_commit: b14fd0a
 verified_by: 
 verified_at: 
 verified_commit: 

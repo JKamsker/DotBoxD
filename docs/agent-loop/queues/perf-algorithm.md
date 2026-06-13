@@ -37,12 +37,18 @@
 - [ ] `ALG-0016` medium - Worker audit validation rescans audit events before accepting results
   - File: `docs/agent-loop/findings/ALG-0016-worker-audit-validation-rescans-audit-events-before-accepting-results.md`
   - Dedup: `algorithm/worker-audit-validation/result-event-rescans`
-- [ ] `ALG-0017` medium - Compiled executable cache rehashes artifacts before cache hits
-  - File: `docs/agent-loop/findings/ALG-0017-compiled-executable-cache-rehashes-artifacts-before-cache-hits.md`
-  - Dedup: `algorithm/compiled-executable-cache/full-artifact-validation-before-cache-hit`
-- [ ] `ALG-0018` medium - Direct plugin kernel dispatch revalidates adapter shape per call
-  - File: `docs/agent-loop/findings/ALG-0018-direct-plugin-kernel-dispatch-revalidates-adapter-shape-per-call.md`
-  - Dedup: `algorithm/plugins/direct-kernel-dispatch/adapter-shape-validation-per-call`
+- [ ] `ALG-0019` medium - Live setting updates coerce and validate values twice
+  - File: `docs/agent-loop/findings/ALG-0019-live-setting-updates-coerce-and-validate-values-twice.md`
+  - Dedup: `algorithm/plugins/live-settings/update-double-coerce-validate`
+- [ ] `ALG-0020` medium - Persistent compiled cache re-verifies cached assemblies on every read
+  - File: `docs/agent-loop/findings/ALG-0020-persistent-compiled-cache-re-verifies-cached-assemblies-on-every-read.md`
+  - Dedup: `algorithm/compiler-cache/read/reverify-cached-assembly`
+- [ ] `ALG-0021` medium - Entrypoint input charging traverses values again during argument binding
+  - File: `docs/agent-loop/findings/ALG-0021-entrypoint-input-charging-traverses-values-again-during-argument-binding.md`
+  - Dedup: `algorithm/entrypoint-input/boundary/charge-then-validate-traversal`
+- [ ] `ALG-0022` medium - JSON import preflights tokenize full payload before parsing again
+  - File: `docs/agent-loop/findings/ALG-0022-json-import-preflights-tokenize-full-payload-before-parsing-again.md`
+  - Dedup: `algorithm/json-import/preflight-tokenizes-before-parse`
 - [ ] `ALG-0007` low - Plugin package validation rescans module functions for entrypoints
   - File: `docs/agent-loop/findings/ALG-0007-plugin-package-validation-rescans-module-functions-for-entrypoints.md`
   - Dedup: `algorithm/plugin-package-validation/entrypoint-function-rescans`
@@ -52,6 +58,14 @@
 
 ## Fixed pending verification
 
+- [~] `ALG-0017` medium - Compiled executable cache rehashes artifacts before cache hits
+  - File: `docs/agent-loop/findings/ALG-0017-compiled-executable-cache-rehashes-artifacts-before-cache-hits.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
+- [~] `ALG-0018` medium - Direct plugin kernel dispatch revalidates adapter shape per call
+  - File: `docs/agent-loop/findings/ALG-0018-direct-plugin-kernel-dispatch-revalidates-adapter-shape-per-call.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 
 ## Verified
 

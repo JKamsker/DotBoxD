@@ -25,9 +25,6 @@
 - [ ] `PAL-0020` medium - Policy hash recomputes canonical grant records on every access
   - File: `docs/agent-loop/findings/PAL-0020-policy-hash-recomputes-canonical-grant-records-on-every-access.md`
   - Dedup: `alloc/policy-hash/recompute-per-access`
-- [ ] `PAL-0021` medium - Execution result audit events are copied multiple times
-  - File: `docs/agent-loop/findings/PAL-0021-execution-result-audit-events-are-copied-multiple-times.md`
-  - Dedup: `alloc/audit-events/result-double-copy`
 - [ ] `PAL-0022` medium - File grants are reparsed on every file binding call
   - File: `docs/agent-loop/findings/PAL-0022-file-grants-are-reparsed-on-every-file-binding-call.md`
   - Dedup: `alloc/file-grants/runtime/parameter-reparse-per-call`
@@ -76,6 +73,54 @@
 - [ ] `PAL-0037` medium - Compiled binding dispatch boxes synchronous ValueTasks into Tasks
   - File: `docs/agent-loop/findings/PAL-0037-compiled-binding-dispatch-boxes-synchronous-valuetasks-into-tasks.md`
   - Dedup: `alloc/compiled-binding-dispatch/valuetask-astask`
+- [ ] `PAL-0038` medium - Interpreter call evaluation allocates argument lists per call
+  - File: `docs/agent-loop/findings/PAL-0038-interpreter-call-evaluation-allocates-argument-lists-per-call.md`
+  - Dedup: `alloc/interpreter/call-evaluation/argument-list-per-call`
+- [ ] `PAL-0039` medium - Binding dispatch creates wall-time cancellation sources per host call
+  - File: `docs/agent-loop/findings/PAL-0039-binding-dispatch-creates-wall-time-cancellation-sources-per-host-call.md`
+  - Dedup: `alloc/binding-dispatch/wall-time-linked-cts-per-call`
+- [ ] `PAL-0040` medium - Plugin kernel input building double-copies multi-value inputs
+  - File: `docs/agent-loop/findings/PAL-0040-plugin-kernel-input-building-double-copies-multi-value-inputs.md`
+  - Dedup: `alloc/plugins/kernel-input/multivalue-double-copy`
+- [ ] `PAL-0041` medium - Untyped SandboxValue.FromList snapshots values twice
+  - File: `docs/agent-loop/findings/PAL-0041-untyped-sandboxvalue-fromlist-snapshots-values-twice.md`
+  - Dedup: `alloc/sandbox-value/list/fromlist-double-snapshot`
+- [ ] `PAL-0042` medium - Interpreter frames allocate local dictionaries per function call
+  - File: `docs/agent-loop/findings/PAL-0042-interpreter-frames-allocate-local-dictionaries-per-function-call.md`
+  - Dedup: `alloc/interpreter/function-invocation/local-dictionary-per-call`
+- [ ] `PAL-0043` medium - Interpreted runs rebuild function lookup dictionaries per execution
+  - File: `docs/agent-loop/findings/PAL-0043-interpreted-runs-rebuild-function-lookup-dictionaries-per-execution.md`
+  - Dedup: `alloc/interpreter/execution/function-lookup-dictionary-per-run`
+- [ ] `PAL-0044` medium - Compiled collection literals allocate value arrays per execution
+  - File: `docs/agent-loop/findings/PAL-0044-compiled-collection-literals-allocate-value-arrays-per-execution.md`
+  - Dedup: `alloc/compiled-runtime/collection-literals/value-array-per-execution`
+- [ ] `PAL-0045` medium - Scalar value charging allocates traversal state per charge
+  - File: `docs/agent-loop/findings/PAL-0045-scalar-value-charging-allocates-traversal-state-per-charge.md`
+  - Dedup: `alloc/resource-meter/scalar-value-charge/traversal-state`
+- [ ] `PAL-0046` medium - Compiled executable cache hits allocate unused miss Lazy
+  - File: `docs/agent-loop/findings/PAL-0046-compiled-executable-cache-hits-allocate-unused-miss-lazy.md`
+  - Dedup: `alloc/compiled-executable-cache/cache-hit/unused-lazy-candidate`
+- [ ] `PAL-0047` medium - Plugin live-state sync allocates deferred update lists per input
+  - File: `docs/agent-loop/findings/PAL-0047-plugin-live-state-sync-allocates-deferred-update-lists-per-input.md`
+  - Dedup: `alloc/plugins/live-state-sync/deferred-updates-list-per-input`
+- [ ] `PAL-0048` medium - Auto execution hotness allocates attempt stats per run
+  - File: `docs/agent-loop/findings/PAL-0048-auto-execution-hotness-allocates-attempt-stats-per-run.md`
+  - Dedup: `alloc/hosting/auto-execution/hotness-attempt-stats-per-run`
+- [ ] `PAL-0049` medium - Validated binding returns allocate traversal state for scalar values
+  - File: `docs/agent-loop/findings/PAL-0049-validated-binding-returns-allocate-traversal-state-for-scalar-values.md`
+  - Dedup: `alloc/binding-return/validated-meter/scalar-traversal-state`
+- [ ] `PAL-0050` medium - Async live-state updates allocate task continuations per input
+  - File: `docs/agent-loop/findings/PAL-0050-async-live-state-updates-allocate-task-continuations-per-input.md`
+  - Dedup: `alloc/plugins/live-state-async/task-continuation-per-update`
+- [ ] `PAL-0051` medium - Plugin kernel inputs re-coerce live settings per dispatch
+  - File: `docs/agent-loop/findings/PAL-0051-plugin-kernel-inputs-re-coerce-live-settings-per-dispatch.md`
+  - Dedup: `alloc/plugins/live-settings/input-recoerce-sandbox-values`
+- [ ] `PAL-0052` medium - Runtime type access rebuilds SandboxType graphs on hot paths
+  - File: `docs/agent-loop/findings/PAL-0052-runtime-type-access-rebuilds-sandboxtype-graphs-on-hot-paths.md`
+  - Dedup: `alloc/runtime/sandbox-type/rebuild-graphs-on-hot-path`
+- [ ] `PAL-0053` medium - Verification policy hashes sort and rehash allowlists per cache-key use
+  - File: `docs/agent-loop/findings/PAL-0053-verification-policy-hashes-sort-and-rehash-allowlists-per-cache-key-use.md`
+  - Dedup: `alloc/verifier-policy/hash/recompute-per-cache-key`
 - [ ] `PAL-0010` low - Persistent compiled cache leaves lock files per cache key
   - File: `docs/agent-loop/findings/PAL-0010-persistent-compiled-cache-leaves-lock-files-per-cache-key.md`
   - Dedup: `alloc/compiler-cache/file-locks/persistent-key-files`
@@ -91,6 +136,10 @@
 
 ## Fixed pending verification
 
+- [~] `PAL-0021` medium - Execution result audit events are copied multiple times
+  - File: `docs/agent-loop/findings/PAL-0021-execution-result-audit-events-are-copied-multiple-times.md`
+  - Fixed by: `fixer`
+  - Commit: `b14fd0a`
 - [~] `PAL-0005` low - Generated stack verifier allocates while parsing call signatures
   - File: `docs/agent-loop/findings/PAL-0005-generated-stack-verifier-allocates-while-parsing-call-signatures.md`
   - Fixed by: `fixer`
