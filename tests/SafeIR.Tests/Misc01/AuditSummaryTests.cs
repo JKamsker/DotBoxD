@@ -90,11 +90,36 @@ public sealed class AuditSummaryTests
         Assert.Equal("summary-policy", summary.Fields["policyId"]);
     }
 
+    [Fact]
+    public async Task Run_summary_redacts_unsafe_policy_id()
+    {
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(SandboxTestHost.PureScoreJson());
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .WithPolicyId("tenant-prod-api-key=abc123\nnext")
+            .WithFuel(1_000)
+            .Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromList([SandboxValue.FromInt32(1), SandboxValue.FromInt32(1)]),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        var summary = Assert.Single(result.AuditEvents, e => e.Kind == "RunSummary");
+        Assert.Equal("[redacted]", summary.Fields!["policyId"]);
+        Assert.Contains("policyId=[redacted]", summary.Message!);
+        Assert.DoesNotContain("abc123", summary.Message!, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-key", summary.Message!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain('\n', summary.Message!);
+    }
+
     private static void AssertSummaryContainsExecutionHashes(SandboxAuditEvent summary, ExecutionPlan plan)
     {
         Assert.Contains($"plan={plan.PlanHash}", summary.Message!);
         Assert.Contains($"policy={plan.PolicyHash}", summary.Message!);
-        Assert.Contains($"policyId={plan.Policy.PolicyId}", summary.Message!);
+        Assert.Contains($"policyId={summary.Fields!["policyId"]}", summary.Message!);
         Assert.Contains($"bindings={plan.BindingManifestHash}", summary.Message!);
     }
 }

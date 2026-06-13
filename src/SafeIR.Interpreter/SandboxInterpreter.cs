@@ -83,7 +83,9 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
         ResourceMeter budget,
         bool success,
         SandboxError? error)
-        => audit.Write(new SandboxAuditEvent(
+    {
+        var fields = RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None");
+        audit.Write(new SandboxAuditEvent(
             runId,
             "RunSummary",
             startedAt,
@@ -91,9 +93,10 @@ public sealed class SandboxInterpreter : ISandboxInterpreter
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error?.Code,
             Message: $"mode=interpreted cacheStatus=None plan={plan.PlanHash} " +
-                     $"policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} bindings={plan.BindingManifestHash} " +
+                     $"policy={plan.PolicyHash} policyId={fields["policyId"]} bindings={plan.BindingManifestHash} " +
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
-            Fields: RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None")));
+            Fields: fields));
+    }
 
     private static DateTimeOffset AuditTime(ExecutionPlan plan)
         => plan.Policy.Deterministic

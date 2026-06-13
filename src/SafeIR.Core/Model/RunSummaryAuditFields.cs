@@ -21,7 +21,7 @@ public static class RunSummaryAuditFields
             ["cacheStatus"] = cacheStatus,
             ["moduleHash"] = plan.ModuleHash,
             ["planHash"] = plan.PlanHash,
-            ["policyId"] = plan.Policy.PolicyId,
+            ["policyId"] = SafePolicyId(plan.Policy.PolicyId),
             ["policyHash"] = plan.PolicyHash,
             ["bindingManifestHash"] = plan.BindingManifestHash,
             ["fuelUsed"] = budget.FuelUsed.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -62,5 +62,48 @@ public static class RunSummaryAuditFields
         {
             fields[key] = value;
         }
+    }
+
+    private static string SafePolicyId(string? policyId)
+    {
+        if (string.IsNullOrWhiteSpace(policyId))
+        {
+            return "[redacted]";
+        }
+
+        var sanitized = new string(policyId.Select(c => char.IsControl(c) ? ' ' : c).ToArray()).Trim();
+        if (sanitized.Length is 0 or > 128 ||
+            ContainsSecretMarker(sanitized) ||
+            sanitized.Contains("://", StringComparison.Ordinal) ||
+            sanitized.Contains('/') ||
+            sanitized.Contains('\\') ||
+            sanitized.Any(c => !IsPolicyIdChar(c)))
+        {
+            return "[redacted]";
+        }
+
+        return sanitized;
+    }
+
+    private static bool IsPolicyIdChar(char c)
+        => char.IsAsciiLetterOrDigit(c) ||
+           c is '-' or '_' or '.' or ':';
+
+    private static bool ContainsSecretMarker(string value)
+    {
+        var normalized = value.ToLowerInvariant();
+        return normalized.Contains("authorization", StringComparison.Ordinal) ||
+               normalized.Contains("bearer", StringComparison.Ordinal) ||
+               normalized.Contains("password", StringComparison.Ordinal) ||
+               normalized.Contains("passwd", StringComparison.Ordinal) ||
+               normalized.Contains("secret", StringComparison.Ordinal) ||
+               normalized.Contains("token", StringComparison.Ordinal) ||
+               normalized.Contains("api-key", StringComparison.Ordinal) ||
+               normalized.Contains("apikey", StringComparison.Ordinal) ||
+               normalized.Contains("client_key", StringComparison.Ordinal) ||
+               normalized.Contains("client-secret", StringComparison.Ordinal) ||
+               normalized.Contains("client_secret", StringComparison.Ordinal) ||
+               normalized.Contains("private-key", StringComparison.Ordinal) ||
+               normalized.Contains("private_key", StringComparison.Ordinal);
     }
 }

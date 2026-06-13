@@ -301,6 +301,12 @@ public sealed partial class SandboxHost
         bool executionDispatched)
     {
         var cacheStatus = "None";
+        var fields = RunSummaryAuditFields.Create(
+            plan,
+            budget,
+            mode,
+            cacheStatus,
+            executionDispatched: executionDispatched);
         audit.Write(new SandboxAuditEvent(
             runId,
             "RunSummary",
@@ -309,14 +315,9 @@ public sealed partial class SandboxHost
             ResourceId: $"module:{plan.ModuleHash}",
             ErrorCode: error.Code,
             Message: $"mode={mode.ToString().ToLowerInvariant()} cacheStatus={cacheStatus} " +
-                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} " +
+                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={fields["policyId"]} " +
                      $"bindings={plan.BindingManifestHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
-            Fields: RunSummaryAuditFields.Create(
-                plan,
-                budget,
-                mode,
-                cacheStatus,
-                executionDispatched: executionDispatched)));
+            Fields: fields));
     }
 
     private static DateTimeOffset AuditTime(ExecutionPlan plan)

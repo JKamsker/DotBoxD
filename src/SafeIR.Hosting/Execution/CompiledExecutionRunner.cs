@@ -94,6 +94,15 @@ internal static class CompiledExecutionRunner
     {
         var artifact = executable.Artifact;
         var cacheStatus = artifact.CacheStatus.ToString();
+        var fields = RunSummaryAuditFields.Create(
+            plan,
+            budget,
+            ExecutionMode.Compiled,
+            cacheStatus,
+            artifact.RuntimeForm.ToString(),
+            artifact.Manifest.CacheKey,
+            artifact.ArtifactHash,
+            executable.MaterializationStatus);
         audit.Write(new SandboxAuditEvent(
             runId,
             "RunSummary",
@@ -104,17 +113,9 @@ internal static class CompiledExecutionRunner
             Message: $"mode=compiled runtimeForm={artifact.RuntimeForm} cacheStatus={cacheStatus} " +
                      $"materializationStatus={executable.MaterializationStatus} " +
                      $"cacheKey={artifact.Manifest.CacheKey} artifact={artifact.ArtifactHash} " +
-                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={plan.Policy.PolicyId} bindings={plan.BindingManifestHash} " +
+                     $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={fields["policyId"]} bindings={plan.BindingManifestHash} " +
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
-            Fields: RunSummaryAuditFields.Create(
-                plan,
-                budget,
-                ExecutionMode.Compiled,
-                cacheStatus,
-                artifact.RuntimeForm.ToString(),
-                artifact.Manifest.CacheKey,
-                artifact.ArtifactHash,
-                executable.MaterializationStatus)));
+            Fields: fields));
     }
 
     private static void WriteCacheInvalidated(
