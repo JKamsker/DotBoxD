@@ -75,6 +75,15 @@ public sealed class ResourceMeterTests
     }
 
     [Fact]
+    public void Resource_limits_reject_wall_time_above_supported_cancel_after_range()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ResourceLimitValidation.Validate(new ResourceLimits(MaxWallTime: TimeSpan.MaxValue)));
+
+        Assert.Equal(nameof(ResourceLimits.MaxWallTime), ex.ParamName);
+    }
+
+    [Fact]
     public void Shape_scan_charges_fuel_for_large_collections()
     {
         var meter = new ResourceMeter(new ResourceLimits(MaxFuel: 0));

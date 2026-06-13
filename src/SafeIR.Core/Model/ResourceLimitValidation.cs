@@ -2,6 +2,8 @@ namespace SafeIR;
 
 public static class ResourceLimitValidation
 {
+    private static readonly TimeSpan MaxSupportedWallTime = TimeSpan.FromMilliseconds(int.MaxValue);
+
     public static void Validate(ResourceLimits limits)
     {
         ArgumentNullException.ThrowIfNull(limits);
@@ -22,7 +24,8 @@ public static class ResourceLimitValidation
         ThrowIfNegative(limits.MaxLogMessageLength, nameof(ResourceLimits.MaxLogMessageLength));
         ThrowIfNegative(limits.MaxStringLength, nameof(ResourceLimits.MaxStringLength));
         ThrowIfNegative(limits.MaxTotalStringBytes, nameof(ResourceLimits.MaxTotalStringBytes));
-        if (limits.MaxWallTime is not null && limits.MaxWallTime.Value < TimeSpan.Zero)
+        if (limits.MaxWallTime is not null &&
+            (limits.MaxWallTime.Value < TimeSpan.Zero || limits.MaxWallTime.Value > MaxSupportedWallTime))
         {
             throw new ArgumentOutOfRangeException(nameof(ResourceLimits.MaxWallTime));
         }

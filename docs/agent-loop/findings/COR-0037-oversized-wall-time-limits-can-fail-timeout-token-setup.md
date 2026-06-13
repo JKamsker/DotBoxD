@@ -1,20 +1,20 @@
 ---
 id: COR-0037
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Oversized wall-time limits can fail timeout token setup
 dedup_key: correctness:oversized-walltime-cancelafter-hostfailure
 created_at: 2026-06-12T22:48:35.4106981+00:00
 created_by: codex-correctness-producer
 created_commit: 
-updated_at: 2026-06-12T22:48:35.4106981+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T00:42:14.9635530+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T00:40:55.3683317+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T00:42:14.9635530+00:00
+fixed_commit: pending
 verified_by: 
 verified_at: 
 verified_commit: 
