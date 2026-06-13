@@ -29,9 +29,22 @@ public sealed class SafeIrPluginPackageGenerator : IIncrementalGenerator
             .Select(static (result, _) => result.Model!)
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.ModelResult);
 
+        // Phase C: lower inline On<TEvent>().Where?(lambda).InvokeKernel(lambda) chains to the same
+        // PluginKernelModel a kernel class produces. Unsupported shapes fail safe (null).
+        var chainModels = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => node is InvocationExpressionSyntax
+                {
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeKernel" }
+                },
+                static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
+            .Where(static result => result?.Model is not null)
+            .Select(static (result, _) => result!.Model!);
+
         var packages = models
             .Collect()
-            .Select(static (models, _) => CreatePackageBatch(models))
+            .Combine(chainModels.Collect())
+            .Select(static (pair, _) => CreatePackageBatch(pair.Left.AddRange(pair.Right)))
             .WithTrackingName(SafeIrPluginPackageGeneratorTrackingNames.PackageResult);
 
         context.RegisterSourceOutput(packages, static (context, batch) => {

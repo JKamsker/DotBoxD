@@ -21,25 +21,43 @@ internal static class SafeIrHandleModelFactory
         EquatableArray<LiveSettingModel> liveSettings,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
+        => CreateFromSend(
+            SingleSendInvocation(method, contextParameterName),
+            eventParameterName,
+            eventProperties,
+            liveSettings,
+            semanticModel,
+            cancellationToken);
+
+    /// <summary>
+    /// Lowers a single <c>ctx.Messages.Send(targetId, message)</c> invocation to a handle model. Shared
+    /// by kernel <c>Handle</c> methods and lowered hook-chain <c>InvokeKernel</c> terminals.
+    /// </summary>
+    public static SafeIrHandleModel CreateFromSend(
+        InvocationExpressionSyntax sendInvocation,
+        string eventParameterName,
+        EquatableArray<EventPropertyModel> eventProperties,
+        EquatableArray<LiveSettingModel> liveSettings,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
-        var invocation = SingleSendInvocation(method, contextParameterName);
-        var arguments = SendArguments(invocation);
+        var arguments = SendArguments(sendInvocation);
         var loweringContext = new SafeIrExpressionLoweringContext(
             eventParameterName,
             eventProperties,
             liveSettings,
             semanticModel,
             cancellationToken);
-        var target = SafeIrExpressionModelFactory.Create(
-            arguments.Target,
-            loweringContext);
-        var message = SafeIrExpressionModelFactory.Create(
-            arguments.Message,
-            loweringContext);
+        var target = SafeIrExpressionModelFactory.Create(arguments.Target, loweringContext);
+        var message = SafeIrExpressionModelFactory.Create(arguments.Message, loweringContext);
         RequireString(target, "targetId");
         RequireString(message, "message");
         return new SafeIrHandleModel(target, message);
     }
+
+    /// <summary>Whether an expression is a <c>&lt;context&gt;.Messages.Send</c> member access.</summary>
+    public static bool IsContextSend(ExpressionSyntax expression, string contextParameterName)
+        => IsContextMessageSend(expression, contextParameterName);
 
     private static SendArgumentExpressions SendArguments(InvocationExpressionSyntax invocation)
     {
