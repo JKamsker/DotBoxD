@@ -236,21 +236,23 @@ var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 ```
 
 The runnable standalone walkthrough lives in
-`examples/Addendum/SafeIR.AddendumExamples/Examples/SafeLoggingExample.cs` and is exercised by the
+`examples/Capabilities/SafeIR.Example.Capabilities/Examples/SafeLoggingExample.cs` and is exercised by the
 docs smoke. It runs the granted path and a tight `WithMaxLogEvents` quota denial:
 
 ```powershell
-dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
+dotnet run --project examples\Capabilities\SafeIR.Example.Capabilities\SafeIR.Example.Capabilities.csproj
 ```
 
 ## Plugin Addendum Examples
 
 The addendum implementation lives in `src/SafeIR.Plugins`.
 
-Run the complete addendum example set:
+The addendum examples are split into three topic projects:
 
 ```powershell
-dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
+dotnet run --project examples\Capabilities\SafeIR.Example.Capabilities\SafeIR.Example.Capabilities.csproj
+dotnet run --project examples\Hosting\SafeIR.Example.Hosting\SafeIR.Example.Hosting.csproj
+dotnet run --project examples\PluginAuthoring\SafeIR.Example.PluginAuthoring\SafeIR.Example.PluginAuthoring.csproj
 ```
 
 Run the local live-kernel example:

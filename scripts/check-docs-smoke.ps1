@@ -5,7 +5,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$addendumExample = Join-Path $root "examples/Addendum/SafeIR.AddendumExamples/SafeIR.AddendumExamples.csproj"
+$capabilitiesExample = Join-Path $root "examples/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj"
+$hostingExample = Join-Path $root "examples/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj"
+$pluginAuthoringExample = Join-Path $root "examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj"
 $httpTransportExample = Join-Path $root "examples/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj"
 $localPluginExample = Join-Path $root "examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj"
 $ipcServerExample = Join-Path $root "examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj"
@@ -129,7 +131,9 @@ Assert-DocsDoNotContain "Proposed Public C# API" "public API document is no long
 Assert-DocsDoNotContain "Proposed C# API surface" "public API index is no longer proposed"
 Assert-DocsDoNotContain "Add compiler/cache after the core model is proven" "compiled mode is implemented"
 
-Invoke-DotNetProject "Addendum example smoke test" @("run", "--project", $addendumExample, "--configuration", $Configuration, "--no-build")
+Invoke-DotNetProject "Capabilities example smoke test" @("run", "--project", $capabilitiesExample, "--configuration", $Configuration, "--no-build")
+Invoke-DotNetProject "Hosting example smoke test" @("run", "--project", $hostingExample, "--configuration", $Configuration, "--no-build")
+Invoke-DotNetProject "Plugin authoring example smoke test" @("run", "--project", $pluginAuthoringExample, "--configuration", $Configuration, "--no-build")
 Invoke-DotNetProject "HTTP transport example smoke test" @("run", "--project", $httpTransportExample, "--configuration", $Configuration, "--no-build")
 Invoke-DotNetProject "Local plugin example smoke test" @("run", "--project", $localPluginExample, "--configuration", $Configuration, "--no-build")
 

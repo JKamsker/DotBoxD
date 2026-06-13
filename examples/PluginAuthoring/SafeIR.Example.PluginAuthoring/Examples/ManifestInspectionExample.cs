@@ -1,4 +1,4 @@
-namespace SafeIR.AddendumExamples.Examples;
+namespace SafeIR.Example.PluginAuthoring;
 
 internal static class ManifestInspectionExample
 {

@@ -14,7 +14,9 @@
         <Project Path="src/SafeIR.Verifier/SafeIR.Verifier.csproj" />
     </Folder>
     <Folder Name="/examples/">
-        <Project Path="examples/Addendum/SafeIR.AddendumExamples/SafeIR.AddendumExamples.csproj" />
+        <Project Path="examples/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj" />
+        <Project Path="examples/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj" />
+        <Project Path="examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj" />
         <Project Path="examples/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj" />
         <Project Path="examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
         <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />

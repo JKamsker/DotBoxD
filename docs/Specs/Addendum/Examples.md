@@ -304,8 +304,8 @@ Each observation includes the entrypoint name, requested mode, actual mode, succ
 
 Host-owned bindings are the main extensibility point for exposing product-specific data and
 services to verified Safe IR. The runnable example lives in
-`examples\Addendum\SafeIR.AddendumExamples\Examples\CustomBindingExample.cs` and is exercised by
-the addendum example run and the docs smoke script.
+`examples\Capabilities\SafeIR.Example.Capabilities\Examples\CustomBindingExample.cs` and is exercised by
+the capabilities example run and the docs smoke script.
 
 The example authors a `tenant.lookup` binding and shows every field a binding author must decide:
 
@@ -373,8 +373,8 @@ Safe defaults a binding author should follow:
 
 `SandboxHostBuilder.ForwardAuditEventsTo(...)` is the public host integration point for operational
 audit streaming (telemetry, billing, incident review, compliance export). The runnable example lives
-in `examples\Addendum\SafeIR.AddendumExamples\Examples\AuditObserverExample.cs` and is exercised by
-the addendum example run and the docs smoke script.
+in `examples\Capabilities\SafeIR.Example.Capabilities\Examples\AuditObserverExample.cs` and is exercised by
+the capabilities example run and the docs smoke script.
 
 The example registers two observers and runs a minimal module:
 
@@ -412,8 +412,8 @@ later observers from receiving the same sequenced audit events.
 the collection-shape limits (`WithMaxListLength`, `WithMaxMapEntries`, `WithMaxCollectionDepth`,
 `WithMaxTotalCollectionElements`), the log limits (`WithMaxLogEvents`, `WithMaxLogMessageLength`), and the
 string limits (`WithMaxStringLength`, `WithMaxTotalStringBytes`). The runnable proof lives in
-`examples\Addendum\SafeIR.AddendumExamples\Examples\Capabilities\ResourceLimitsExample.cs` and is
-exercised by the addendum example run and the docs smoke script.
+`examples\Capabilities\SafeIR.Example.Capabilities\Examples\ResourceLimitsExample.cs` and is
+exercised by the capabilities example run and the docs smoke script.
 
 The example runs small JSON IR modules under intentionally tight non-fuel limits and prints the public
 result code plus the matching `SandboxResourceUsage` counter for each case:
@@ -457,10 +457,12 @@ The server executes verified Safe IR, not arbitrary plugin DLLs.
 
 ## Local Kernel Example
 
-Run the complete addendum example set:
+Run the complete addendum example set, split across three topic projects:
 
 ```powershell
-dotnet run --project examples\Addendum\SafeIR.AddendumExamples\SafeIR.AddendumExamples.csproj
+dotnet run --project examples\Capabilities\SafeIR.Example.Capabilities\SafeIR.Example.Capabilities.csproj
+dotnet run --project examples\Hosting\SafeIR.Example.Hosting\SafeIR.Example.Hosting.csproj
+dotnet run --project examples\PluginAuthoring\SafeIR.Example.PluginAuthoring\SafeIR.Example.PluginAuthoring.csproj
 ```
 
 Run:

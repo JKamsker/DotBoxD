@@ -1,4 +1,4 @@
-namespace SafeIR.AddendumExamples.Examples;
+namespace SafeIR.Example.Capabilities;
 
 using SafeIR;
 using SafeIR.Hosting;
