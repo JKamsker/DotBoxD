@@ -1,23 +1,23 @@
 ---
 id: CMP-0018
 area: completeness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: Addendum plugin examples omit explicit message-write policy
 dedup_key: docs/addendum/plugin-message-policy/examples-missing-explicit-grant
 created_at: 2026-06-12T23:19:39.3939858+00:00
 created_by: completeness-api-producer
 created_commit: 
-updated_at: 2026-06-13T00:10:34.1774675+00:00
+updated_at: 2026-06-13T00:21:33.9274350+00:00
 claimed_by: worker
 claimed_at: 2026-06-13T00:05:57.1897557+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-13T00:10:34.1774675+00:00
 fixed_commit: pending
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: verifier
+verified_at: 2026-06-13T00:21:33.9274350+00:00
+verified_commit: 4fa49f1
 duplicate_of: 
 ---
 

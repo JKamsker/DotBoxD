@@ -1,22 +1,22 @@
 ---
 id: COR-0049
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Runtime value boundaries accept malformed scalar records
 dedup_key: correctness/runtime-value-boundaries/malformed-scalar-records
 created_at: 2026-06-12T23:24:10.9645141+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T23:34:02.1028849+00:00
+updated_at: 2026-06-12T23:41:38.8507428+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T23:30:15.0302821+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-12T23:34:02.1028849+00:00
 fixed_commit: 
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-12T23:41:38.8507428+00:00
 verified_commit: 
 duplicate_of: 
 ---

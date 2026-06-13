@@ -1,23 +1,23 @@
 ---
 id: COR-0048
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: high
 title: Persistent compiled cache accepts verifier-safe artifacts without compiler-origin proof
 dedup_key: security/compiled-cache/artifact-origin/semantic-tamper-evidence-missing
 created_at: 2026-06-12T23:19:13.0618379+00:00
 created_by: security-producer
 created_commit: 
-updated_at: 2026-06-13T00:03:02.7757501+00:00
+updated_at: 2026-06-13T00:21:26.1933797+00:00
 claimed_by: worker
 claimed_at: 2026-06-12T23:55:21.3523868+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-13T00:03:02.7757501+00:00
 fixed_commit: pending
-verified_by: 
-verified_at: 
-verified_commit: 
+verified_by: codex-verifier
+verified_at: 2026-06-13T00:21:26.1933797+00:00
+verified_commit: 24668a7
 duplicate_of: 
 ---
 

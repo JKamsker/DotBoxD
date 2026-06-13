@@ -1,3 +1,4 @@
 {"at":"2026-06-12T23:24:10.9696216\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
 {"at":"2026-06-12T23:30:15.0339096\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
 {"at":"2026-06-12T23:34:02.1061306\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","message":"Runtime boundary validation now enforces finite F64, portable sandbox path, and safe sandbox URI invariants for entrypoint inputs, binding arguments, and binding returns."}
+{"at":"2026-06-12T23:41:38.8540747\u002B00:00","agent":"verifier","type":"verified","status":"verified","message":"Verified shared scalar invariant validation rejects malformed F64, SandboxPath, and SandboxUri records at entrypoint and binding-return boundaries; focused HostValueBoundaryTests passed."}

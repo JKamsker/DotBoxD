@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `CMP-0006` high - Plugin setup docs rely on implicit event adapter discovery instead of explicit server whitelist
-  - File: `docs/agent-loop/findings/CMP-0006-plugin-setup-docs-rely-on-implicit-event-adapter-discovery-instead-of-explicit-s.md`
-  - Dedup: `cmp-plugin-explicit-event-adapter-whitelist-setup-docs`
 - [ ] `CMP-0007` medium - Runnable addendum examples do not exercise production JSON package upload
   - File: `docs/agent-loop/findings/CMP-0007-runnable-addendum-examples-do-not-exercise-production-json-package-upload.md`
   - Dedup: `cmp-runnable-addendum-json-upload-example-coverage`
@@ -40,9 +37,15 @@
 - [ ] `CMP-0017` medium - Audit observer surface lacks a runnable user-facing example
   - File: `docs/agent-loop/findings/CMP-0017-audit-observer-surface-lacks-a-runnable-user-facing-example.md`
   - Dedup: `completeness/audit-observer/user-facing-example/missing-smoke`
-- [ ] `CMP-0018` medium - Addendum plugin examples omit explicit message-write policy
-  - File: `docs/agent-loop/findings/CMP-0018-addendum-plugin-examples-omit-explicit-message-write-policy.md`
-  - Dedup: `docs/addendum/plugin-message-policy/examples-missing-explicit-grant`
+- [ ] `CMP-0019` medium - Non-fuel resource limits lack a runnable consumer-facing proof
+  - File: `docs/agent-loop/findings/CMP-0019-non-fuel-resource-limits-lack-a-runnable-consumer-facing-proof.md`
+  - Dedup: `completeness/resource-limits/non-fuel-runnable-proof`
+- [ ] `CMP-0020` medium - Logging bindings lack a standalone public capability walkthrough
+  - File: `docs/agent-loop/findings/CMP-0020-logging-bindings-lack-a-standalone-public-capability-walkthrough.md`
+  - Dedup: `completeness/logging/standalone-capability-walkthrough`
+- [ ] `CMP-0021` medium - Plugin server lacks a public installed-kernel inventory surface
+  - File: `docs/agent-loop/findings/CMP-0021-plugin-server-lacks-a-public-installed-kernel-inventory-surface.md`
+  - Dedup: `completeness/plugins/admin-inventory/installed-kernel-enumeration`
 
 ## Claimed
 
@@ -68,5 +71,9 @@
   - File: `docs/agent-loop/findings/CMP-0001-release-readiness-gate-references-stale-canonicalmodulehasher-path.md`
 - [x] `CMP-0004` high - CodeEnforcer gate fails on project-folder C# file-count violations
   - File: `docs/agent-loop/findings/CMP-0004-codeenforcer-gate-fails-on-project-folder-c-file-count-violations.md`
+- [x] `CMP-0006` high - Plugin setup docs rely on implicit event adapter discovery instead of explicit server whitelist
+  - File: `docs/agent-loop/findings/CMP-0006-plugin-setup-docs-rely-on-implicit-event-adapter-discovery-instead-of-explicit-s.md`
+- [x] `CMP-0018` medium - Addendum plugin examples omit explicit message-write policy
+  - File: `docs/agent-loop/findings/CMP-0018-addendum-plugin-examples-omit-explicit-message-write-policy.md`
 
 ## Rejected / duplicate / obsolete

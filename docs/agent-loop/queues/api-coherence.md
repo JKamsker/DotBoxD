@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `API-0009` high - Public packages lack an API compatibility baseline gate
-  - File: `docs/agent-loop/findings/API-0009-public-packages-lack-an-api-compatibility-baseline-gate.md`
-  - Dedup: `api/package-release/public-api-compatibility-baseline-missing`
 - [ ] `API-0003` medium - Plugin JSON upload helpers are omitted from package surface guidance
   - File: `docs/agent-loop/findings/API-0003-plugin-json-upload-helpers-are-omitted-from-package-surface-guidance.md`
   - Dedup: `api-plugin-json-upload-package-guidance`
@@ -37,9 +34,6 @@
 - [ ] `API-0013` medium - Time and random policy grant helpers are missing from public API docs
   - File: `docs/agent-loop/findings/API-0013-time-and-random-policy-grant-helpers-are-missing-from-public-api-docs.md`
   - Dedup: `api/policy-builder/time-random-grant-helpers-missing-from-public-docs`
-- [ ] `API-0016` medium - Validation result type leaks from an Internal namespace
-  - File: `docs/agent-loop/findings/API-0016-validation-result-type-leaks-from-an-internal-namespace.md`
-  - Dedup: `api/validation/module-validation-result/internal-namespace-leak`
 - [ ] `API-0014` medium - Release pipeline uploads OS-specific package sets without a canonical artifact check
   - File: `docs/agent-loop/findings/API-0014-release-pipeline-uploads-os-specific-package-sets-without-a-canonical-artifact-c.md`
   - Dedup: `api/package-release/os-matrix-package-artifact-identity`
@@ -55,12 +49,23 @@
 - [ ] `API-0019` medium - Plugin runtime diagnostics lack public code reference
   - File: `docs/agent-loop/findings/API-0019-plugin-runtime-diagnostics-lack-public-code-reference.md`
   - Dedup: `api/plugins/runtime-sgp-diagnostics/missing-public-reference`
+- [ ] `API-0020` medium - File write grant docs omit create and overwrite policy controls
+  - File: `docs/agent-loop/findings/API-0020-file-write-grant-docs-omit-create-and-overwrite-policy-controls.md`
+  - Dedup: `api:file-write-grant-create-overwrite-docs`
 
 ## Claimed
 
+- [>] `API-0016` medium - Validation result type leaks from an Internal namespace
+  - File: `docs/agent-loop/findings/API-0016-validation-result-type-leaks-from-an-internal-namespace.md`
+  - Owner: `worker`
+  - Branch: `workflow-work`
 
 ## Fixed pending verification
 
+- [~] `API-0009` high - Public packages lack an API compatibility baseline gate
+  - File: `docs/agent-loop/findings/API-0009-public-packages-lack-an-api-compatibility-baseline-gate.md`
+  - Fixed by: `worker`
+  - Commit: `pending`
 - [~] `API-0001` medium - JSON host import extension is only exposed from an Internal namespace
   - File: `docs/agent-loop/findings/API-0001-json-host-import-extension-is-only-exposed-from-an-internal-namespace.md`
   - Fixed by: `implementer`

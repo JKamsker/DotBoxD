@@ -1,3 +1,4 @@
 {"at":"2026-06-12T22:02:33.0334059\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
 {"at":"2026-06-13T00:15:36.1358675\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
 {"at":"2026-06-13T00:16:55.1309006\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","commit":"pending","message":"Rejected non-idempotent reclaims of already claimed findings and added AgentQueue workflow coverage for owner preservation."}
+{"at":"2026-06-13T00:19:23.7665316\u002B00:00","agent":"verifier","type":"verified","status":"verified","message":"Verified claim takeover is rejected, idempotent retry preserves ownership, and targeted regression passes."}

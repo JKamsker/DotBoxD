@@ -40,6 +40,9 @@
 - [ ] `ALG-0017` medium - Compiled executable cache rehashes artifacts before cache hits
   - File: `docs/agent-loop/findings/ALG-0017-compiled-executable-cache-rehashes-artifacts-before-cache-hits.md`
   - Dedup: `algorithm/compiled-executable-cache/full-artifact-validation-before-cache-hit`
+- [ ] `ALG-0018` medium - Direct plugin kernel dispatch revalidates adapter shape per call
+  - File: `docs/agent-loop/findings/ALG-0018-direct-plugin-kernel-dispatch-revalidates-adapter-shape-per-call.md`
+  - Dedup: `algorithm/plugins/direct-kernel-dispatch/adapter-shape-validation-per-call`
 - [ ] `ALG-0007` low - Plugin package validation rescans module functions for entrypoints
   - File: `docs/agent-loop/findings/ALG-0007-plugin-package-validation-rescans-module-functions-for-entrypoints.md`
   - Dedup: `algorithm/plugin-package-validation/entrypoint-function-rescans`

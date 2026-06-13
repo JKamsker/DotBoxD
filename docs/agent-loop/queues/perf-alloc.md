@@ -73,6 +73,9 @@
 - [ ] `PAL-0036` medium - Plugin kernel execution links cancellation tokens per entrypoint
   - File: `docs/agent-loop/findings/PAL-0036-plugin-kernel-execution-links-cancellation-tokens-per-entrypoint.md`
   - Dedup: `alloc/plugins/kernel-execution/linked-cancellation-source-per-entrypoint`
+- [ ] `PAL-0037` medium - Compiled binding dispatch boxes synchronous ValueTasks into Tasks
+  - File: `docs/agent-loop/findings/PAL-0037-compiled-binding-dispatch-boxes-synchronous-valuetasks-into-tasks.md`
+  - Dedup: `alloc/compiled-binding-dispatch/valuetask-astask`
 - [ ] `PAL-0010` low - Persistent compiled cache leaves lock files per cache key
   - File: `docs/agent-loop/findings/PAL-0010-persistent-compiled-cache-leaves-lock-files-per-cache-key.md`
   - Dedup: `alloc/compiler-cache/file-locks/persistent-key-files`

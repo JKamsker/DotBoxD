@@ -1,22 +1,22 @@
 ---
 id: COR-0011
 area: correctness
-status: fixed_pending_verification
+status: verified
 priority: medium
 title: AgentQueue same-status claim overwrites existing owner
 dedup_key: correctness/agentqueue/transitions/same-status-claim-overwrites-owner
 created_at: 2026-06-12T22:02:33.0290692+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-13T00:16:55.1276642+00:00
+updated_at: 2026-06-13T00:19:23.7630979+00:00
 claimed_by: worker
 claimed_at: 2026-06-13T00:15:36.1327057+00:00
 claim_branch: workflow-work
 fixed_by: worker
 fixed_at: 2026-06-13T00:16:55.1276642+00:00
 fixed_commit: pending
-verified_by: 
-verified_at: 
+verified_by: verifier
+verified_at: 2026-06-13T00:19:23.7630979+00:00
 verified_commit: 
 duplicate_of: 
 ---
