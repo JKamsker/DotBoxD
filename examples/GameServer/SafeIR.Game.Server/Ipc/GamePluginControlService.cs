@@ -83,10 +83,10 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         switch (subscription)
         {
             case "MonsterAggroEvent":
-                _server.Hooks.On(MonsterAggroEventAdapter.Instance).UseKernel(kernel);
+                _server.Hooks.On<MonsterAggroEvent>().UseKernel(kernel);
                 break;
             case "AttackEvent":
-                _server.Hooks.On(AttackEventAdapter.Instance).UseKernel(kernel);
+                _server.Hooks.On<AttackEvent>().UseKernel(kernel);
                 break;
             default:
                 throw new InvalidOperationException(

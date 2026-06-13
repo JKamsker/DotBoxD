@@ -1,11 +1,10 @@
 namespace SafeIR.Game.Server.Abstractions;
 
-using SafeIR;
-using SafeIR.Plugins;
-
 /// <summary>
 /// Published when a monster detects a player within sensing range. Plugins subscribe to decide
-/// whether to calm the monster so weak players are not bullied.
+/// whether to calm the monster so weak players are not bullied. No hand-written event adapter is
+/// needed — the framework infers the sandbox shape from the record's properties (parameter names
+/// <c>e_&lt;PropertyName&gt;</c>, CLR types mapped to sandbox types).
 /// </summary>
 public sealed record MonsterAggroEvent(
     string MonsterId,
@@ -13,27 +12,3 @@ public sealed record MonsterAggroEvent(
     int Distance,
     int MonsterLevel,
     int PlayerLevel);
-
-public sealed class MonsterAggroEventAdapter : IPluginEventAdapter<MonsterAggroEvent>
-{
-    public static MonsterAggroEventAdapter Instance { get; } = new();
-
-    public string EventName => "MonsterAggroEvent";
-
-    public IReadOnlyList<Parameter> Parameters { get; } = [
-        new("e_MonsterId", SandboxType.String),
-        new("e_PlayerId", SandboxType.String),
-        new("e_Distance", SandboxType.I32),
-        new("e_MonsterLevel", SandboxType.I32),
-        new("e_PlayerLevel", SandboxType.I32)
-    ];
-
-    public IReadOnlyList<SandboxValue> ToSandboxValues(MonsterAggroEvent e)
-        => [
-            SandboxValue.FromString(e.MonsterId),
-            SandboxValue.FromString(e.PlayerId),
-            SandboxValue.FromInt32(e.Distance),
-            SandboxValue.FromInt32(e.MonsterLevel),
-            SandboxValue.FromInt32(e.PlayerLevel)
-        ];
-}

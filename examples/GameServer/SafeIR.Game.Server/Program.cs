@@ -20,8 +20,12 @@ internal static class Program
         // that turns plugin messages into game-state changes; it is bound to the world once it exists.
         var sink = new GameCommandSink();
         using var server = PluginServer.Create(sink, defaultPolicy: ServerPolicy.Create());
-        server.RegisterEventAdapter(MonsterAggroEventAdapter.Instance);
-        server.RegisterEventAdapter(AttackEventAdapter.Instance);
+
+        // Register convention adapters for the events plugins may subscribe to. No hand-written
+        // adapter is needed — the sandbox shape is inferred from each record's properties. Resolving
+        // them up front lets prepared-package validation check kernel parameter shapes at install.
+        _ = server.Events.Resolve<MonsterAggroEvent>();
+        _ = server.Events.Resolve<AttackEvent>();
 
         var world = GameWorld.CreateDefault(server.Hooks);
         sink.Bind(world);
