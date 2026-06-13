@@ -124,17 +124,17 @@ function Assert-CompletedItemEvidence {
         },
         @{
             Text = "At least one safe file binding implemented and tested."
-            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("Granted_file_read", "file.readText")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
             Text = "Binding security checklist passes."
-            Path = "tests/SafeIR.Tests/Misc01/BindingRegistryHardeningTests.cs"
+            Path = "tests/SafeIR.Tests/Bindings/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING-AUDIT", "E-BINDING-GRANT", "E-BINDING-TYPE")
         },
         @{
@@ -159,12 +159,12 @@ function Assert-CompletedItemEvidence {
         },
         @{
             Text = "Compiled/interpreted differential tests pass."
-            Path = "tests/SafeIR.Tests/Misc02/DifferentialFuzzTests.cs"
+            Path = "tests/SafeIR.Tests/Fuzz/DifferentialFuzzTests.cs"
             Patterns = @("ExecutionMode\.Interpreted", "ExecutionMode\.Compiled")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/SafeIR.Tests/Misc07/SafeFileSystemTests.cs"
+            Path = "tests/SafeIR.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
@@ -224,11 +224,11 @@ function Assert-CompletedItemEvidence {
 
     $securitySectionEvidence = @{
         "User input" = @{
-            Path = "tests/SafeIR.Tests/Misc04/JsonImporterTests.cs"
+            Path = "tests/SafeIR.Tests/Serialization/JsonImporterTests.cs"
             Patterns = @("unsupported_properties", "assemblyName")
         }
         "IR" = @{
-            Path = "tests/SafeIR.Tests/Misc04/JsonImporterTests.cs"
+            Path = "tests/SafeIR.Tests/Serialization/JsonImporterTests.cs"
             Patterns = @("targetSandboxVersion", "reject")
         }
         "Type system" = @{
@@ -236,15 +236,15 @@ function Assert-CompletedItemEvidence {
             Patterns = @("SandboxType", "OpaqueId")
         }
         "Bindings" = @{
-            Path = "tests/SafeIR.Tests/Misc01/BindingRegistryHardeningTests.cs"
+            Path = "tests/SafeIR.Tests/Bindings/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING", "AuditLevel.PerCall")
         }
         "Capabilities/policy" = @{
-            Path = "tests/SafeIR.Tests/Misc01/CapabilityRevocationTests.cs"
+            Path = "tests/SafeIR.Tests/Policy/CapabilityRevocationTests.cs"
             Patterns = @("RevokeCapability", "CapabilityRevoked")
         }
         "Interpreter" = @{
-            Path = "src/SafeIR.Interpreter/InterpreterEvaluator.cs"
+            Path = "src/SafeIR.Interpreter/Internal/StatementExecutor.cs"
             Patterns = @("ChargeFuel", "ChargeLoopIteration")
         }
         "Compiler" = @{
@@ -264,7 +264,7 @@ function Assert-CompletedItemEvidence {
             Patterns = @("QuotaExceeded", "Fuel")
         }
         "Audit" = @{
-            Path = "tests/SafeIR.Tests/Misc07/SafeLoggingTests.cs"
+            Path = "tests/SafeIR.Tests/Audit/SafeLoggingTests.cs"
             Patterns = @("RunSummary", "redacted")
         }
     }
