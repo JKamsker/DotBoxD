@@ -232,6 +232,33 @@ public sealed class PluginAnalyzerHookChainTests
             tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Does_not_lower_an_element_only_InvokeKernel_terminal()
+    {
+        // An element-only terminal has no context, so it cannot ctx.Messages.Send — the only lowerable
+        // terminal effect. It must fail safe: no HookChain_ package, leaving the runtime terminal to throw.
+        var result = RunGenerator("""
+            using SafeIR.Plugins;
+            using SafeIR.Server.Abstractions;
+
+            namespace Sample;
+
+            public sealed record MonsterAggroEvent(string MonsterId, int Distance);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<MonsterAggroEvent>()
+                        .Where((e, ctx) => e.Distance <= 5)
+                        .InvokeKernel(e => default);
+            }
+            """);
+
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
     private static GeneratorDriverRunResult RunGenerator(string source)
     {
         var compilation = CSharpCompilation.Create(

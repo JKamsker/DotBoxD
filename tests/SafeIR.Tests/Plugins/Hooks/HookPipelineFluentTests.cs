@@ -64,4 +64,41 @@ public sealed class HookPipelineFluentTests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "SGP062");
     }
+
+    [Fact]
+    public void Element_only_InvokeKernel_func_throws_until_lowered()
+    {
+        using var server = PluginServer.Create();
+
+        // The element-only Func<TEvent, ValueTask> terminal must throw just like the (e, ctx) form: it
+        // can never run as host code (a verified terminal is reached only through the lowered IR).
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => server.Hooks.On<Ping>().InvokeKernel(p => ValueTask.CompletedTask));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP062");
+    }
+
+    [Fact]
+    public void Element_only_InvokeKernel_action_throws_until_lowered()
+    {
+        using var server = PluginServer.Create();
+
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => server.Hooks.On<Ping>().InvokeKernel(p => { }));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP062");
+    }
+
+    [Fact]
+    public void Staged_element_only_InvokeKernel_throws_until_lowered()
+    {
+        using var server = PluginServer.Create();
+
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => server.Hooks.On<Ping>()
+                .Select(p => p.Value)
+                .InvokeKernel(value => ValueTask.CompletedTask));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP062");
+    }
 }

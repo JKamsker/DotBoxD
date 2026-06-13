@@ -71,6 +71,44 @@ public sealed class HookChainRuntimeTests
         Assert.Equal("calm", message.Message);
     }
 
+    // A one-parameter Select projects the element; the projection must flow into the lowered terminal.
+    private const string OneParamSelectChainSource = """
+        using SafeIR.Plugins;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::SafeIR.Tests.ChainAggroEvent>()
+                    .Select(e => e.MonsterId)
+                    .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
+        }
+        """;
+
+    [Fact]
+    public async Task A_lowered_one_parameter_Select_projects_into_the_terminal_send_target()
+    {
+        var assembly = Compile(OneParamSelectChainSource, enableInterceptors: true);
+        var packageType = assembly.GetTypes().Single(type =>
+            type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
+            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+        var package = (PluginPackage)packageType
+            .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, null)!;
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-7", 3));
+
+        var message = Assert.Single(messages.Messages);
+        // The element-only Select(e => e.MonsterId) projection reached the lowered terminal's Send target.
+        Assert.Equal("monster-7", message.TargetId);
+        Assert.Equal("calm", message.Message);
+    }
+
     [Fact]
     public async Task Element_only_runtime_overloads_filter_and_run_without_a_context_parameter()
     {
