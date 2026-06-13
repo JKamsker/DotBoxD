@@ -1,6 +1,7 @@
 namespace SafeIR.Game.Server;
 
 using System.Globalization;
+using ShaRPC.Core;
 using SafeIR.Transport.Ipc;
 
 /// <summary>
@@ -45,30 +46,50 @@ internal static class Program
         Console.WriteLine($"Baseline: low-level players took {baselineDamage} total damage in {BaselineTicks} ticks.");
         Console.WriteLine();
 
-        // (c) Start the IPC control plane on a high-entropy pipe name.
+        // (c) Start the IPC control plane on a high-entropy pipe name. Each peer gets its own ownership
+        // session; when the connection drops, the session is disposed and the kernels it owned unload.
         var pipeName = "safe-ir-game-" + Guid.NewGuid().ToString("N");
-        var service = new GamePluginControlService(server, sink, world);
+        var connected = new TaskCompletionSource<GamePluginControlService>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var host = SafeIrShaRpcMessagePackIpc.ListenNamedPipe(
             pipeName,
-            peer => peer.ProvideGamePluginControlService(service));
+            peer =>
+            {
+                var session = server.CreateSession();
+                var service = new GamePluginControlService(server, session, sink, world);
+                peer.Disconnected += (_, _) =>
+                {
+                    session.Dispose();           // revoke + unregister the kernels this connection owned
+                    disconnected.TrySetResult();
+                };
+                peer.ProvideGamePluginControlService(service);
+                connected.TrySetResult(service);
+            });
         await host.StartAsync().ConfigureAwait(false);
         Console.WriteLine($"[server] listening for plugin on pipe '{pipeName}'.");
 
-        // (d) Launch the plugin child process; (e) wait for it to ship plugins and exit.
+        // (d) Launch the plugin child process.
         Console.WriteLine("[server] launching plugin child process...");
         var pluginProcess = PluginLauncher.Launch(pipeName);
-        await pluginProcess.WaitForExitAsync().ConfigureAwait(false);
-        if (pluginProcess.ExitCode != 0)
+        var pluginExit = pluginProcess.WaitForExitAsync();
+
+        // (e) Wait until the plugin has connected and installed its kernels (it then holds the
+        // connection). Fail fast if it exits early.
+        if (await Task.WhenAny(connected.Task, pluginExit).ConfigureAwait(false) == pluginExit && !connected.Task.IsCompleted)
         {
-            await Console.Error.WriteLineAsync($"[server] plugin exited with code {pluginProcess.ExitCode}.").ConfigureAwait(false);
-            await host.StopAsync().ConfigureAwait(false);
-            return 1;
+            return await FailAsync(host, $"plugin exited before connecting (code {pluginProcess.ExitCode}).").ConfigureAwait(false);
         }
 
-        Console.WriteLine("[server] plugin finished shipping kernels. Running with-plugin phase.");
+        var control = await connected.Task.ConfigureAwait(false);
+        if (await Task.WhenAny(control.Ready, pluginExit).ConfigureAwait(false) == pluginExit && !control.Ready.IsCompleted)
+        {
+            return await FailAsync(host, $"plugin exited before installing kernels (code {pluginProcess.ExitCode}).").ConfigureAwait(false);
+        }
+
+        Console.WriteLine("[server] plugin connected; kernels installed and live. Running with-plugin phase.");
         Console.WriteLine();
 
-        // (f) With-plugin phase: the untrusted kernels now run sandboxed and change behavior.
+        // (f) With-plugin phase: the untrusted kernels run sandboxed WHILE the plugin is connected.
         Console.WriteLine("--- WITH PLUGINS (guardian calms, retaliation taunts) ---");
         var pluginPhaseStart = PlayerHpById(world);
         for (var i = 0; i < PluginTicks; i++)
@@ -83,7 +104,16 @@ internal static class Program
         var perTickBaseline = (double)baselineDamage / BaselineTicks;
         var perTickPlugin = (double)pluginDamage / PluginTicks;
 
-        // (g) Summary.
+        // (g) Release the plugin; it disconnects, and ownership unloads its kernels.
+        control.SignalShutdown();
+        await pluginExit.ConfigureAwait(false);
+        await disconnected.Task.ConfigureAwait(false);
+        if (pluginProcess.ExitCode != 0)
+        {
+            return await FailAsync(host, $"plugin exited with code {pluginProcess.ExitCode}.").ConfigureAwait(false);
+        }
+
+        // (h) Summary, plus proof that disconnect unloaded the plugin's kernels.
         Console.WriteLine();
         Console.WriteLine("=== SUMMARY ===");
         Console.WriteLine(Format("Baseline damage/tick (no plugin)", perTickBaseline));
@@ -91,10 +121,18 @@ internal static class Program
         Console.WriteLine(perTickPlugin < perTickBaseline
             ? "Plugins reduced bullying: low-level players survive longer than baseline."
             : "Plugins applied (see per-tick effects above).");
+        Console.WriteLine($"On disconnect the plugin's kernels were unloaded (installed kernels now: {server.Kernels.Snapshot().Count}).");
         PrintSurvivors(world);
 
         await host.StopAsync().ConfigureAwait(false);
         return 0;
+    }
+
+    private static async Task<int> FailAsync(RpcHost host, string message)
+    {
+        await Console.Error.WriteLineAsync($"[server] {message}").ConfigureAwait(false);
+        await host.StopAsync().ConfigureAwait(false);
+        return 1;
     }
 
     private static Dictionary<string, int> PlayerHpById(GameWorld world)

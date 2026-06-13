@@ -46,7 +46,13 @@ internal static class Program
             .ConfigureAwait(false);
         Console.WriteLine("[plugin] tuned guardian live settings (CalmStrength=35, AggroRange=6).");
 
-        Console.WriteLine("[plugin] done: 2 kernels shipped, settings updated. Exiting.");
+        // Hold the connection open so the kernels stay owned and live while the server runs its
+        // with-plugin phase. When the server signals shutdown this returns and we disconnect, at which
+        // point the server unloads our kernels (ownership = connection lifetime).
+        Console.WriteLine("[plugin] kernels live; holding connection until server completes...");
+        await service.HoldUntilShutdownAsync().ConfigureAwait(false);
+
+        Console.WriteLine("[plugin] released by server. Disconnecting (kernels will be unloaded). Exiting.");
         return 0;
     }
 }

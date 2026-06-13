@@ -18,6 +18,13 @@ public interface IGamePluginControlService
         bool atomic = false,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Called by the plugin after it has installed its kernels. It holds the connection open — keeping
+    /// the kernels owned and live — until the server finishes its with-plugin phase. When it returns,
+    /// the plugin disconnects, and ownership unloads its kernels.
+    /// </summary>
+    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+
     ValueTask<WorldSnapshot> GetWorldAsync(CancellationToken ct = default);
 
     ValueTask<string[]> DrainEffectsAsync(CancellationToken ct = default);

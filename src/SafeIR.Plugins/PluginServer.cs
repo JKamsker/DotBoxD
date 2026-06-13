@@ -71,25 +71,62 @@ public sealed class PluginServer : IDisposable
         return this;
     }
 
-    public async ValueTask<InstalledKernel> InstallAsync(
+    public ValueTask<InstalledKernel> InstallAsync(
         PluginPackage package,
         SandboxPolicy? policy = null,
         CancellationToken cancellationToken = default)
+        => InstallCoreAsync(package, policy, owner: null, cancellationToken);
+
+    /// <summary>
+    /// Creates a new ownership session. Every kernel installed through the session is tagged with it
+    /// as the owner, so no other session can replace or mutate it; disposing the session revokes and
+    /// unregisters the kernels it owns. Use one session per untrusted connection.
+    /// </summary>
+    public PluginSession CreateSession()
     {
         ThrowIfDisposed();
-        PluginPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
-            .ConfigureAwait(false);
-        PluginPackageValidator.ValidatePrepared(package, plan, Events);
-        var kernel = new InstalledKernel(_host, plan, package, _executionMode);
-        Kernels.Add(kernel);
-        return kernel;
+        return new PluginSession(this);
     }
 
     public bool Uninstall(string pluginId)
     {
         ThrowIfDisposed();
         return Kernels.Remove(pluginId);
+    }
+
+    internal ValueTask<InstalledKernel> InstallOwnedAsync(
+        PluginSession owner,
+        PluginPackage package,
+        SandboxPolicy? policy,
+        CancellationToken cancellationToken)
+        => InstallCoreAsync(package, policy, owner, cancellationToken);
+
+    internal void UninstallOwned(PluginSession owner, string pluginId)
+    {
+        // The owning server may have been disposed first (it revokes all kernels in Dispose); a
+        // session disposing afterward is a no-op rather than an ObjectDisposedException.
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        Kernels.RemoveOwned(owner, pluginId);
+    }
+
+    private async ValueTask<InstalledKernel> InstallCoreAsync(
+        PluginPackage package,
+        SandboxPolicy? policy,
+        object? owner,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        PluginPackageValidator.Validate(package);
+        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
+            .ConfigureAwait(false);
+        PluginPackageValidator.ValidatePrepared(package, plan, Events);
+        var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
+        Kernels.Add(kernel);
+        return kernel;
     }
 
     /// <summary>
@@ -104,6 +141,13 @@ public sealed class PluginServer : IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
+            // Revoke running kernels before tearing down the host so an in-flight publish cannot call
+            // into a disposed SandboxHost; revocation cancels each kernel's execution token first.
+            foreach (var kernel in Kernels.Snapshot())
+            {
+                kernel.Revoke();
+            }
+
             _host.Dispose();
         }
     }
@@ -179,6 +223,20 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
             if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
                 !ReferenceEquals(existing, kernel))
             {
+                // Fail closed if a different session already owns this id: one plugin must not be able
+                // to hijack/replace another plugin's kernel by reusing its id. A same-owner reinstall
+                // (hot reload) replaces and revokes the prior incumbent; a null owner is the legacy
+                // in-process path and keeps replace semantics.
+                if (existing.OwnerId is not null && kernel.OwnerId is not null &&
+                    !ReferenceEquals(existing.OwnerId, kernel.OwnerId))
+                {
+                    throw new SandboxValidationException([
+                        new SandboxDiagnostic(
+                            "SGP050",
+                            $"plugin id '{kernel.Manifest.PluginId}' is owned by another session and cannot be replaced.")
+                    ]);
+                }
+
                 revoke = existing;
             }
 
@@ -186,6 +244,32 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         }
 
         revoke?.Revoke();
+    }
+
+    /// <summary>
+    /// Removes and revokes a kernel only if it is owned by <paramref name="owner"/> (or has no owner),
+    /// so a session disposal never tears down another session's kernel that may have replaced this id.
+    /// </summary>
+    internal bool RemoveOwned(PluginSession owner, string pluginId)
+    {
+        InstalledKernel? kernel;
+        lock (_gate)
+        {
+            if (!_kernels.TryGetValue(pluginId, out kernel))
+            {
+                return false;
+            }
+
+            if (kernel.OwnerId is not null && !ReferenceEquals(kernel.OwnerId, owner))
+            {
+                return false;
+            }
+
+            _kernels.Remove(pluginId);
+        }
+
+        kernel.Revoke();
+        return true;
     }
 
     internal bool Remove(string pluginId)

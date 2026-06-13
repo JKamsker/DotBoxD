@@ -3,7 +3,7 @@ namespace SafeIR.Plugins;
 using SafeIR;
 using SafeIR.Hosting;
 
-public sealed class InstalledKernel
+public sealed partial class InstalledKernel
 {
     private readonly object _typedValueGate = new();
     private readonly object _updateModeGate = new();
@@ -19,17 +19,20 @@ public sealed class InstalledKernel
     private readonly Dictionary<Type, LiveUpdateMode> _updateModes = [];
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
     private readonly CancellationTokenSource _revocation = new();
+    private readonly object? _ownerId;
     private int _revoked;
 
     internal InstalledKernel(
         SandboxHost host,
         ExecutionPlan plan,
         PluginPackage package,
-        ExecutionMode executionMode)
+        ExecutionMode executionMode,
+        object? ownerId = null)
     {
         _host = host;
         _plan = plan;
         _executionMode = executionMode;
+        _ownerId = ownerId;
         Package = package;
         Manifest = package.Manifest;
         Value = LiveSettingStore.FromDefinitions(Manifest.LiveSettings);
@@ -44,6 +47,13 @@ public sealed class InstalledKernel
     public PluginExecutionObservation? LastExecution => _executionObserver.Last;
     public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot();
     public bool IsRevoked => Volatile.Read(ref _revoked) != 0;
+
+    /// <summary>
+    /// Opaque owner token of the session that installed this kernel, or <c>null</c> for kernels
+    /// installed directly on the server (no session). Used by <see cref="KernelRegistry"/> to reject
+    /// cross-owner id reuse so one plugin cannot replace another plugin's kernel.
+    /// </summary>
+    public object? OwnerId => _ownerId;
 
     public void Revoke()
     {
@@ -109,7 +119,7 @@ public sealed class InstalledKernel
         TEvent e,
         CancellationToken cancellationToken = default)
     {
-        await _executionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await AcquireExecutionGateAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
@@ -130,7 +140,7 @@ public sealed class InstalledKernel
         TEvent e,
         CancellationToken cancellationToken = default)
     {
-        await _executionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await AcquireExecutionGateAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
@@ -150,7 +160,16 @@ public sealed class InstalledKernel
         TEvent e,
         CancellationToken cancellationToken = default)
     {
-        await _executionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await AcquireExecutionGateAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SandboxRuntimeException) when (IsRevoked)
+        {
+            // Revoked while queued on the execution gate: skip silently rather than fault the publish.
+            return;
+        }
+
         try
         {
             if (IsRevoked)
@@ -177,69 +196,32 @@ public sealed class InstalledKernel
         }
     }
 
-    public async ValueTask ModifySettingsAsync(
-        IReadOnlyDictionary<string, object?> values,
-        bool atomic = false,
-        CancellationToken cancellationToken = default)
+    // Acquires the per-kernel execution gate so that Revoke() unblocks any queued waiter. The
+    // uncontended path takes the semaphore synchronously (no allocation, preserving the hot path);
+    // only when it must actually wait does it link the caller's token with the revocation token so a
+    // concurrent Revoke() cancels the wait. A wait cancelled by revocation surfaces as the standard
+    // "capability was revoked" SandboxRuntimeException; a wait cancelled by the caller surfaces as
+    // OperationCanceledException.
+    private async ValueTask AcquireExecutionGateAsync(CancellationToken cancellationToken)
     {
-        if (atomic)
+        PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
+        if (_executionGate.Wait(0, CancellationToken.None))
         {
-            await _executionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
         }
 
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _revocation.Token);
         try
         {
-            PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
-            Value.SetMany(values);
-            RefreshTypedValuesFromStore();
+            await _executionGate.WaitAsync(linked.Token).ConfigureAwait(false);
         }
-        finally
+        catch (OperationCanceledException) when (IsRevoked && !cancellationToken.IsCancellationRequested)
         {
-            if (atomic)
-            {
-                _executionGate.Release();
-            }
-        }
-    }
-
-    internal async ValueTask ModifyAsync<TState>(
-        TState current,
-        Action<TState> modify,
-        bool atomic,
-        CancellationToken cancellationToken) where TState : class
-    {
-        ArgumentNullException.ThrowIfNull(modify);
-        if (atomic)
-        {
-            await _executionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            PluginKernelRevocation.ThrowIfRevoked(true);
+            throw;
         }
 
-        try
-        {
-            PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
-            if (typeof(TState).IsInterface)
-            {
-                var draftStore = Value.Copy(Manifest.LiveSettings);
-                var draft = draftStore.As<TState>();
-                modify(draft);
-                Value.SetMany(draftStore.ToObjectValues(Manifest.LiveSettings));
-                RefreshTypedValuesFromStore();
-                return;
-            }
-
-            var classDraft = LiveKernelValueFactory.CreateDraft(current);
-            modify(classDraft);
-            Value.SetMany(LiveKernelValueFactory.ExtractSettings(classDraft, Manifest.LiveSettings));
-            LiveKernelValueFactory.CopyLiveProperties(classDraft, current);
-            RefreshTypedValuesFromStore();
-        }
-        finally
-        {
-            if (atomic)
-            {
-                _executionGate.Release();
-            }
-        }
+        PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
     }
 
     private static bool AsShouldHandleResult(SandboxValue result)

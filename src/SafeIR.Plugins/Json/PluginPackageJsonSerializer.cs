@@ -328,4 +328,15 @@ public static class PluginServerJsonExtensions
         cancellationToken.ThrowIfCancellationRequested();
         return server.InstallAsync(PluginPackageJsonSerializer.Import(json), policy, cancellationToken);
     }
+
+    public static ValueTask<InstalledKernel> InstallJsonAsync(
+        this PluginSession session,
+        string json,
+        SandboxPolicy? policy = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        cancellationToken.ThrowIfCancellationRequested();
+        return session.InstallAsync(PluginPackageJsonSerializer.Import(json), policy, cancellationToken);
+    }
 }
