@@ -34,7 +34,7 @@ internal sealed class CompiledExecutableCache : IDisposable
         CompiledArtifactGuard.ValidateExecutableEnvelope(artifact, plan, entrypoint);
         var key = Key(artifact);
         var candidate = new Lazy<Task<MaterializedCompiledArtifact>>(
-            () => _materialize(artifact, plan, entrypoint, cancellationToken).AsTask(),
+            () => _materialize(artifact, plan, entrypoint, CancellationToken.None).AsTask(),
             LazyThreadSafetyMode.ExecutionAndPublication);
         Lazy<Task<MaterializedCompiledArtifact>> lazy;
         lock (_gate)
@@ -58,7 +58,6 @@ internal sealed class CompiledExecutableCache : IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            RemoveIfCurrent(key, lazy);
             throw;
         }
         catch

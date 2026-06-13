@@ -1,20 +1,20 @@
 ---
 id: COR-0010
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Compiled executable cache lets first caller cancellation poison shared materialization
 dedup_key: correctness/compiled-cache/shared-materialization/first-caller-cancellation-poisons-waiters
 created_at: 2026-06-12T22:02:31.7262205+00:00
 created_by: correctness-producer
 created_commit: 
-updated_at: 2026-06-12T22:02:31.7262205+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T00:15:01.6346277+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T00:13:47.2112159+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T00:15:01.6346277+00:00
+fixed_commit: pending
 verified_by: 
 verified_at: 
 verified_commit: 
