@@ -8,7 +8,7 @@ using System.ComponentModel.DataAnnotations;
 /// server as opaque IR — the server never compiles this source.
 /// </summary>
 [Plugin("guardian")]
-public sealed partial class GuardianKernel : IEventKernel<MonsterAggroEvent>
+public sealed partial class GuardianKernel : IMonsterAggroService
 {
     [LiveSetting]
     [Range(0, 100)]

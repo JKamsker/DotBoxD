@@ -7,7 +7,7 @@ using System.ComponentModel.DataAnnotations;
 /// hitting. Lowered to verified SafeIR and shipped as opaque IR over IPC.
 /// </summary>
 [Plugin("retaliation")]
-public sealed partial class RetaliationKernel : IEventKernel<AttackEvent>
+public sealed partial class RetaliationKernel : IAttackService
 {
     [LiveSetting]
     [Range(0, 10_000)]
