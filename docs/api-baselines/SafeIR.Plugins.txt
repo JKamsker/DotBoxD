@@ -9,6 +9,7 @@ public async ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancella
 public async ValueTask<bool> ShouldHandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask<InstalledKernel> InstallAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public bool IsRevoked => Volatile.Read(ref _revoked) != 0
+public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool Uninstall(string pluginId)
 public CancellationToken CancellationToken { get; }
 public const string CapabilityId = "game.message.write"
@@ -38,6 +39,7 @@ public HookPipeline<TEvent> UseKernel<TKernel>() where TKernel : class
 public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
 public HookPipeline<TEvent> Where(Func<TEvent, HookContext, ValueTask<bool>> filter)
 public HookRegistry Hooks { get; }
+public IEnumerator<InstalledKernel> GetEnumerator() => Snapshot().GetEnumerator()
 public InstalledKernel Get(string pluginId)
 public InstalledKernel Kernel { get; }
 public interface IEventKernel<TEvent>
@@ -47,6 +49,7 @@ public interface IPluginMessageSink
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()
 public IPluginMessageSink Messages { get; }
 public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value); }
+public IReadOnlyList<InstalledKernel> Snapshot()
 public IReadOnlyList<LiveSettingDefinition> Definitions
 public IReadOnlyList<LiveSettingDefinition> LiveSettings { get => _liveSettings; init => _liveSettings = PluginModelCopy.List(value); }
 public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot()
@@ -75,7 +78,7 @@ public sealed class HookPipeline<TEvent>
 public sealed class HookRegistry
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class InstalledKernel
-public sealed class KernelRegistry
+public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 public sealed class LiveContext<T> where T : class
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LiveSettingStore

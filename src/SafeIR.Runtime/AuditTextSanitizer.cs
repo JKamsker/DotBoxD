@@ -8,6 +8,11 @@ public static partial class AuditTextSanitizer
 
     public static string SanitizeAndRedact(string message)
     {
+        if (!RequiresSanitization(message))
+        {
+            return message;
+        }
+
         var chars = message.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
@@ -28,6 +33,28 @@ public static partial class AuditTextSanitizer
         return AuthSchemePattern().Replace(
             sanitized,
             match => match.Groups["scheme"].Value + " " + Redacted);
+    }
+
+    /// <summary>
+    /// Cheap, allocation-free prefilter that returns <c>true</c> only when
+    /// <see cref="SanitizeAndRedact"/> could observably change <paramref name="message"/>.
+    /// It is intentionally conservative: it never returns <c>false</c> for text that any
+    /// redaction pass would rewrite. Control characters are sanitized; every redaction
+    /// regex requires a credential separator ('@', ':', or '=') or an auth scheme keyword
+    /// ("bearer"/"basic"), so the absence of all of these guarantees the message is clean.
+    /// </summary>
+    private static bool RequiresSanitization(string message)
+    {
+        foreach (var c in message)
+        {
+            if (char.IsControl(c) || c is '@' or ':' or '=')
+            {
+                return true;
+            }
+        }
+
+        return message.Contains("bearer", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("basic", StringComparison.OrdinalIgnoreCase);
     }
 
     public static string RedactPathSegments(string path)

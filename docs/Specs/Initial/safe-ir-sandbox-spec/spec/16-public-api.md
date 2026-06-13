@@ -182,7 +182,13 @@ public sealed class SandboxPolicyBuilder
         SandboxEffect allowedEffects,
         Func<ResourceLimits, ResourceLimits>? configureLimits = null);
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun);
-    public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun);
+    public SandboxPolicyBuilder GrantFileWrite(
+        string root,
+        long maxBytesPerRun,
+        bool allowCreate = false,
+        bool allowOverwrite = false);
+    public SandboxPolicyBuilder GrantTimeNow();
+    public SandboxPolicyBuilder GrantRandom();
     public SandboxPolicyBuilder GrantLogging();
     public SandboxPolicyBuilder WithFuel(long maxFuel);
     public SandboxPolicyBuilder WithMaxLoopIterations(long iterations);
@@ -205,6 +211,74 @@ public sealed class SandboxPolicyBuilder
 
 `SandboxResourceUsage` reports fuel, loop iterations, allocation bytes, host calls, file/network bytes,
 log events, cumulative collection elements, and string bytes charged during the run.
+
+### `GrantFileWrite` create and overwrite policy
+
+`GrantFileWrite` exposes two policy-shaping flags beyond `root` and `maxBytesPerRun`, and both
+default to safe-by-default deny:
+
+- `allowCreate` (default `false`): when `false`, a granted write that targets a missing file (or that
+  would have to create a missing parent directory) is denied. Set it to `true` to permit creating new
+  targets under `root`.
+- `allowOverwrite` (default `false`): when `false`, a granted write that targets an existing file is
+  denied. Set it to `true` to permit replacing existing files under `root`.
+
+These are explicit policy decisions, not implementation details: the two-argument call
+`GrantFileWrite(root, maxBytesPerRun)` grants `file.write` but leaves `allowCreate = false` and
+`allowOverwrite = false`, so a host that does not opt in will see writes denied at runtime even though
+the capability is granted. The builder serializes both flags into the `file.write` grant, and the
+runtime fails closed when either flag is absent or `false`.
+
+```csharp
+// Create-only grant: new files may be created under the root, but existing files are protected.
+var createOnly = SandboxPolicyBuilder.Create()
+    .GrantFileWrite(root: outputRoot, maxBytesPerRun: 256_000, allowCreate: true, allowOverwrite: false)
+    .Build();
+
+// Overwrite-enabled grant: existing files may be replaced (typically alongside allowCreate).
+var overwrite = SandboxPolicyBuilder.Create()
+    .GrantFileWrite(root: outputRoot, maxBytesPerRun: 256_000, allowCreate: true, allowOverwrite: true)
+    .Build();
+```
+
+### `GrantTimeNow` and `GrantRandom` capability grants
+
+Time and random are capability-gated runtime features served by the `SafeIR.Runtime` host bindings
+(`SandboxHostBuilder.AddTimeBindings()` and `AddRandomBindings()`). The matching policy-builder
+helpers are the intended safe way to authorize a module that declares those capability requests:
+
+- `GrantTimeNow()` grants the `time.now` capability and enables the `Time` effect. Modules that call
+  `time.nowUnixMillis` require this grant; without it preparation fails closed with an `E-POLICY-CAP`
+  diagnostic.
+- `GrantRandom()` grants the `random` capability and enables the `Random` effect. Modules that call
+  `random.nextI32` require this grant.
+
+Both helpers are first-class alternatives to the generic `Grant(...)` escape hatch, so deterministic
+host setup stays copyable without source or test spelunking.
+
+`Deterministic(logicalNow, randomSeed)` pairs with these grants to make time and random replayable:
+
+- For `time.now`, `LogicalNow` becomes the logical clock. A deterministic run reads `time.now` from
+  `LogicalNow` instead of the wall clock, and time binding audit events are stamped with `LogicalNow`.
+- For `random`, `RandomSeed` seeds the deterministic generator so the same seed replays the same
+  sequence across runs. A deterministic random policy must supply a seed; omitting it fails closed
+  with an `E-POLICY-DETERMINISM` diagnostic. Random audit timestamps fall back to `UnixEpoch` when no
+  `LogicalNow` is set.
+
+```csharp
+using var host = SandboxHost.Create(builder =>
+{
+    builder.AddDefaultPureBindings();
+    builder.AddTimeBindings();
+    builder.AddRandomBindings();
+});
+
+var policy = SandboxPolicyBuilder.Create()
+    .GrantTimeNow()
+    .GrantRandom()
+    .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 123)
+    .Build();
+```
 
 ## Binding registration
 

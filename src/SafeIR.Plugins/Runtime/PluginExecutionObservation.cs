@@ -17,8 +17,17 @@ public sealed record PluginExecutionObservation(
 
 internal sealed class PluginExecutionObserver
 {
+    // Bounded retention window. Long-running hosts can drive millions of executions
+    // through a single installed kernel, so full history is kept in a fixed-size ring
+    // buffer instead of an unbounded list: memory tracks active diagnostics rather than
+    // lifetime event volume, and Snapshot copies only this window. LastExecution stays
+    // the always-on hot-path diagnostic for the most recent run.
+    private const int HistoryCapacity = 128;
+
     private readonly object _gate = new();
-    private readonly List<PluginExecutionObservation> _observations = [];
+    private readonly PluginExecutionObservation?[] _observations = new PluginExecutionObservation?[HistoryCapacity];
+    private int _start;
+    private int _count;
     private PluginExecutionObservation? _last;
 
     public PluginExecutionObservation? Last
@@ -36,7 +45,13 @@ internal sealed class PluginExecutionObserver
     {
         lock (_gate)
         {
-            return _observations.ToArray();
+            var snapshot = new PluginExecutionObservation[_count];
+            for (var i = 0; i < _count; i++)
+            {
+                snapshot[i] = _observations[(_start + i) % HistoryCapacity]!;
+            }
+
+            return snapshot;
         }
     }
 
@@ -58,7 +73,17 @@ internal sealed class PluginExecutionObserver
 
         lock (_gate)
         {
-            _observations.Add(observation);
+            var slot = (_start + _count) % HistoryCapacity;
+            _observations[slot] = observation;
+            if (_count < HistoryCapacity)
+            {
+                _count++;
+            }
+            else
+            {
+                _start = (_start + 1) % HistoryCapacity;
+            }
+
             _last = observation;
         }
     }

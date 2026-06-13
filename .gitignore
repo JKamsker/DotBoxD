@@ -11,3 +11,5 @@ artifacts/
 BenchmarkDotNet.Artifacts/
 docs/agent-loop/.agentq.lock
 docs/agent-loop/tmp/
+
+error.log
