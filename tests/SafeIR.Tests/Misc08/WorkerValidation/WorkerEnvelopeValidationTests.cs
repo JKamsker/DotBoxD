@@ -4,6 +4,8 @@ namespace SafeIR.Tests;
 
 public sealed class WorkerEnvelopeValidationTests
 {
+    private static readonly string ValidCacheKey = new('f', 64);
+
     [Theory]
     [InlineData("unsafe\rmessage", null)]
     [InlineData("password token leaked", null)]
@@ -34,6 +36,32 @@ public sealed class WorkerEnvelopeValidationTests
         {
             ForgedSummaryField = fieldName,
             ForgedSummaryValue = fieldValue
+        };
+        var host = Host(worker);
+        var plan = await PrepareAsync(host);
+
+        var result = await ExecuteAsync(host, plan);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
+    }
+
+    [Theory]
+    [InlineData("not-an-artifact-hash", null, null)]
+    [InlineData(null, "artifactHash", "not-an-artifact-hash")]
+    public async Task Failed_compiled_worker_result_rejects_malformed_artifact_hash(
+        string? artifactHash,
+        string? forgedField,
+        string? forgedValue)
+    {
+        var worker = new EnvelopeWorker
+        {
+            Error = new SandboxError(SandboxErrorCode.InvalidInput, "defined worker error"),
+            ResultMode = ExecutionMode.Compiled,
+            ArtifactHash = artifactHash,
+            ForgedSummaryField = forgedField,
+            ForgedSummaryValue = forgedValue
         };
         var host = Host(worker);
         var plan = await PrepareAsync(host);
@@ -76,6 +104,8 @@ public sealed class WorkerEnvelopeValidationTests
         public SandboxError? Error { get; init; }
         public string? ForgedSummaryField { get; init; }
         public string? ForgedSummaryValue { get; init; }
+        public ExecutionMode ResultMode { get; init; } = ExecutionMode.Interpreted;
+        public string? ArtifactHash { get; init; }
 
         public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
@@ -88,7 +118,14 @@ public sealed class WorkerEnvelopeValidationTests
             var runId = options.RunId ?? SandboxRunId.New();
             var budget = new ResourceMeter(plan.Budget);
             var fields = new Dictionary<string, string>(
-                RunSummaryAuditFields.Create(plan, budget, ExecutionMode.Interpreted, "None"),
+                RunSummaryAuditFields.Create(
+                    plan,
+                    budget,
+                    ResultMode,
+                    "None",
+                    ResultMode == ExecutionMode.Compiled && ArtifactHash is not null ? "LoadedAssembly" : null,
+                    ResultMode == ExecutionMode.Compiled && ArtifactHash is not null ? ValidCacheKey : null,
+                    ResultMode == ExecutionMode.Compiled ? ArtifactHash : null),
                 StringComparer.Ordinal);
 
             if (ForgedSummaryField is not null && ForgedSummaryValue is not null)
@@ -113,10 +150,11 @@ public sealed class WorkerEnvelopeValidationTests
                 Error = Error,
                 ResourceUsage = budget.Snapshot(),
                 AuditEvents = audit.Events,
-                ActualMode = ExecutionMode.Interpreted,
+                ActualMode = ResultMode,
                 ModuleHash = plan.ModuleHash,
                 PlanHash = plan.PlanHash,
-                PolicyHash = plan.PolicyHash
+                PolicyHash = plan.PolicyHash,
+                ArtifactHash = ArtifactHash
             });
         }
     }

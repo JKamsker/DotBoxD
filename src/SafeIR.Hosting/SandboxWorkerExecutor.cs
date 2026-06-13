@@ -123,7 +123,9 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             return string.IsNullOrWhiteSpace(result.ArtifactHash);
         }
 
-        return !result.Succeeded || IsHexSha256(result.ArtifactHash);
+        return result.Succeeded
+            ? IsHexSha256(result.ArtifactHash)
+            : string.IsNullOrWhiteSpace(result.ArtifactHash) || IsHexSha256(result.ArtifactHash);
     }
 
     private static bool WorkerPayloadMatches(ExecutionPlan plan, string entrypoint, SandboxExecutionResult result)
@@ -272,7 +274,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
 
         if (!result.Succeeded)
         {
-            return true;
+            return FailedCompiledEnvelopeMatches(result, summary);
         }
 
         if (!IsHexSha256(result.ArtifactHash))
@@ -284,6 +286,20 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         return FieldEquals(summary, "artifactHash", artifactHash) &&
                FieldEquals(summary, "runtimeForm", "LoadedAssembly") &&
                HasHexSha256Field(summary, "cacheKey");
+    }
+
+    private static bool FailedCompiledEnvelopeMatches(SandboxExecutionResult result, SandboxAuditEvent summary)
+    {
+        var hasResultArtifact = !string.IsNullOrWhiteSpace(result.ArtifactHash);
+        if (!hasResultArtifact)
+        {
+            return !summary.Fields!.ContainsKey("artifactHash") &&
+                   !summary.Fields.ContainsKey("runtimeForm") &&
+                   !summary.Fields.ContainsKey("cacheKey");
+        }
+
+        return IsHexSha256(result.ArtifactHash) &&
+               FieldEquals(summary, "artifactHash", result.ArtifactHash!);
     }
 
     private static bool FieldEquals(SandboxAuditEvent summary, string key, string value)

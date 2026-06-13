@@ -1,20 +1,20 @@
 ---
 id: COR-0031
 area: correctness
-status: open
+status: fixed_pending_verification
 priority: medium
 title: Failed compiled worker results can carry malformed artifact hashes
 dedup_key: correctness/worker-result/failed-compiled-artifact-hash-unvalidated
 created_at: 2026-06-12T22:33:57.4637511+00:00
 created_by: codex-correctness-producer
 created_commit: 
-updated_at: 2026-06-12T22:33:57.4637511+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
-fixed_by: 
-fixed_at: 
-fixed_commit: 
+updated_at: 2026-06-13T00:38:12.3393463+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T00:36:40.3351307+00:00
+claim_branch: workflow-work
+fixed_by: worker
+fixed_at: 2026-06-13T00:38:12.3393463+00:00
+fixed_commit: pending
 verified_by: 
 verified_at: 
 verified_commit: 
