@@ -1,17 +1,17 @@
 ---
 id: CMP-0011
 area: completeness
-status: open
+status: claimed
 priority: medium
 title: README lacks a safe-default host baseline before IO examples
 dedup_key: cmp/samples/safe-default-host-baseline-missing
 created_at: 2026-06-12T22:08:16.1396303+00:00
 created_by: continuous-completeness-producer
 created_commit: 
-updated_at: 2026-06-12T22:08:16.1396303+00:00
-claimed_by: 
-claimed_at: 
-claim_branch: 
+updated_at: 2026-06-13T06:16:31.5203443+00:00
+claimed_by: worker
+claimed_at: 2026-06-13T06:16:31.5203443+00:00
+claim_branch: workflow-work
 fixed_by: 
 fixed_at: 
 fixed_commit: 

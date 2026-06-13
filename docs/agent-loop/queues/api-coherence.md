@@ -4,39 +4,15 @@
 
 ## Open
 
-- [ ] `API-0003` medium - Plugin JSON upload helpers are omitted from package surface guidance
-  - File: `docs/agent-loop/findings/API-0003-plugin-json-upload-helpers-are-omitted-from-package-surface-guidance.md`
-  - Dedup: `api-plugin-json-upload-package-guidance`
-- [ ] `API-0004` medium - Public packages do not generate XML documentation files
-  - File: `docs/agent-loop/findings/API-0004-public-packages-do-not-generate-xml-documentation-files.md`
-  - Dedup: `api/package-xml-docs/not-generated-for-public-packages`
-- [ ] `API-0005` medium - Package metadata uses one generic description and tag set for all packages
-  - File: `docs/agent-loop/findings/API-0005-package-metadata-uses-one-generic-description-and-tag-set-for-all-packages.md`
-  - Dedup: `api/package-metadata/generic-description-tags-for-all-packages`
-- [ ] `API-0006` medium - Package release gates lack a clean NuGet consumer smoke test
-  - File: `docs/agent-loop/findings/API-0006-package-release-gates-lack-a-clean-nuget-consumer-smoke-test.md`
-  - Dedup: `api/package-consumer-smoke/missing-clean-nuget-consumer`
-- [ ] `API-0007` medium - NuGet package readme lacks install and package-composition guidance
-  - File: `docs/agent-loop/findings/API-0007-nuget-package-readme-lacks-install-and-package-composition-guidance.md`
-  - Dedup: `api/nuget-readme/missing-install-package-composition-guidance`
 - [ ] `API-0008` medium - Plugin analyzer package lacks public diagnostic reference
   - File: `docs/agent-loop/findings/API-0008-plugin-analyzer-package-lacks-public-diagnostic-reference.md`
   - Dedup: `api/plugin-analyzer/diagnostic-reference/missing-public-docs`
-- [ ] `API-0010` medium - Public packages do not ship symbol/source-link artifacts
-  - File: `docs/agent-loop/findings/API-0010-public-packages-do-not-ship-symbol-source-link-artifacts.md`
-  - Dedup: `api-package-symbol-source-link-artifacts`
-- [ ] `API-0011` medium - Stable release gate allows a prerelease IPC transport package
-  - File: `docs/agent-loop/findings/API-0011-stable-release-gate-allows-a-prerelease-ipc-transport-package.md`
-  - Dedup: `api-stable-release-allows-prerelease-ipc-package`
 - [ ] `API-0012` medium - Worker-process isolation has no shippable worker host surface
   - File: `docs/agent-loop/findings/API-0012-worker-process-isolation-has-no-shippable-worker-host-surface.md`
   - Dedup: `api/worker-process/missing-shipped-worker-host-sample`
 - [ ] `API-0013` medium - Time and random policy grant helpers are missing from public API docs
   - File: `docs/agent-loop/findings/API-0013-time-and-random-policy-grant-helpers-are-missing-from-public-api-docs.md`
   - Dedup: `api/policy-builder/time-random-grant-helpers-missing-from-public-docs`
-- [ ] `API-0014` medium - Release pipeline uploads OS-specific package sets without a canonical artifact check
-  - File: `docs/agent-loop/findings/API-0014-release-pipeline-uploads-os-specific-package-sets-without-a-canonical-artifact-c.md`
-  - Dedup: `api/package-release/os-matrix-package-artifact-identity`
 - [ ] `API-0015` medium - Generated runtime facade ships without a public support boundary
   - File: `docs/agent-loop/findings/API-0015-generated-runtime-facade-ships-without-a-public-support-boundary.md`
   - Dedup: `api/public-surface/generated-runtime-facade/support-boundary`
@@ -55,10 +31,6 @@
 
 ## Claimed
 
-- [>] `API-0016` medium - Validation result type leaks from an Internal namespace
-  - File: `docs/agent-loop/findings/API-0016-validation-result-type-leaks-from-an-internal-namespace.md`
-  - Owner: `worker`
-  - Branch: `workflow-work`
 
 ## Fixed pending verification
 
@@ -74,6 +46,42 @@
   - File: `docs/agent-loop/findings/API-0002-http-transport-setup-helpers-are-only-exposed-from-an-internal-namespace.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
+- [~] `API-0003` medium - Plugin JSON upload helpers are omitted from package surface guidance
+  - File: `docs/agent-loop/findings/API-0003-plugin-json-upload-helpers-are-omitted-from-package-surface-guidance.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0004` medium - Public packages do not generate XML documentation files
+  - File: `docs/agent-loop/findings/API-0004-public-packages-do-not-generate-xml-documentation-files.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0005` medium - Package metadata uses one generic description and tag set for all packages
+  - File: `docs/agent-loop/findings/API-0005-package-metadata-uses-one-generic-description-and-tag-set-for-all-packages.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0006` medium - Package release gates lack a clean NuGet consumer smoke test
+  - File: `docs/agent-loop/findings/API-0006-package-release-gates-lack-a-clean-nuget-consumer-smoke-test.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0007` medium - NuGet package readme lacks install and package-composition guidance
+  - File: `docs/agent-loop/findings/API-0007-nuget-package-readme-lacks-install-and-package-composition-guidance.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0010` medium - Public packages do not ship symbol/source-link artifacts
+  - File: `docs/agent-loop/findings/API-0010-public-packages-do-not-ship-symbol-source-link-artifacts.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0011` medium - Stable release gate allows a prerelease IPC transport package
+  - File: `docs/agent-loop/findings/API-0011-stable-release-gate-allows-a-prerelease-ipc-transport-package.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0016` medium - Validation result type leaks from an Internal namespace
+  - File: `docs/agent-loop/findings/API-0016-validation-result-type-leaks-from-an-internal-namespace.md`
+  - Fixed by: `worker`
+  - Commit: ``
+- [~] `API-0014` medium - Release pipeline uploads OS-specific package sets without a canonical artifact check
+  - File: `docs/agent-loop/findings/API-0014-release-pipeline-uploads-os-specific-package-sets-without-a-canonical-artifact-c.md`
+  - Fixed by: `worker`
+  - Commit: ``
 
 ## Verified
 

@@ -4,9 +4,6 @@
 
 ## Open
 
-- [ ] `CMP-0007` medium - Runnable addendum examples do not exercise production JSON package upload
-  - File: `docs/agent-loop/findings/CMP-0007-runnable-addendum-examples-do-not-exercise-production-json-package-upload.md`
-  - Dedup: `cmp-runnable-addendum-json-upload-example-coverage`
 - [ ] `CMP-0008` medium - Release readiness does not verify evidence for completed documentation inventory items
   - File: `docs/agent-loop/findings/CMP-0008-release-readiness-does-not-verify-evidence-for-completed-documentation-inventory.md`
   - Dedup: `cmp-release-readiness-documentation-inventory-evidence-coverage`
@@ -16,9 +13,6 @@
 - [ ] `CMP-0010` medium - Manifest inspection example omits capability requests and setting ranges
   - File: `docs/agent-loop/findings/CMP-0010-manifest-inspection-example-omits-capability-requests-and-setting-ranges.md`
   - Dedup: `cmp/plugin-admin-review/manifest-inspection-omits-capabilities-and-ranges`
-- [ ] `CMP-0011` medium - README lacks a safe-default host baseline before IO examples
-  - File: `docs/agent-loop/findings/CMP-0011-readme-lacks-a-safe-default-host-baseline-before-io-examples.md`
-  - Dedup: `cmp/samples/safe-default-host-baseline-missing`
 - [ ] `CMP-0012` medium - Public JSON ingestion lacks a versioned schema artifact
   - File: `docs/agent-loop/findings/CMP-0012-public-json-ingestion-lacks-a-versioned-schema-artifact.md`
   - Dedup: `completeness/json-ingestion/versioned-schema-artifact-missing`
@@ -49,6 +43,10 @@
 
 ## Claimed
 
+- [>] `CMP-0011` medium - README lacks a safe-default host baseline before IO examples
+  - File: `docs/agent-loop/findings/CMP-0011-readme-lacks-a-safe-default-host-baseline-before-io-examples.md`
+  - Owner: `worker`
+  - Branch: `workflow-work`
 
 ## Fixed pending verification
 
@@ -64,6 +62,10 @@
   - File: `docs/agent-loop/findings/CMP-0003-runtime-configuration-example-applies-undeclared-enabled-live-setting.md`
   - Fixed by: `implementer`
   - Commit: `working-tree`
+- [~] `CMP-0007` medium - Runnable addendum examples do not exercise production JSON package upload
+  - File: `docs/agent-loop/findings/CMP-0007-runnable-addendum-examples-do-not-exercise-production-json-package-upload.md`
+  - Fixed by: `worker`
+  - Commit: ``
 
 ## Verified
 
