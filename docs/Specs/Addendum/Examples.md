@@ -369,6 +369,42 @@ Safe defaults a binding author should follow:
 - **Compiled runtime stub**: custom bindings dispatch through
   `CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))`.
 
+## Audit Observer Example
+
+`SandboxHostBuilder.ForwardAuditEventsTo(...)` is the public host integration point for operational
+audit streaming (telemetry, billing, incident review, compliance export). The runnable example lives
+in `examples\Addendum\SafeIR.AddendumExamples\Examples\AuditObserverExample.cs` and is exercised by
+the addendum example run and the docs smoke script.
+
+The example registers two observers and runs a minimal module:
+
+```csharp
+var observed = new List<SandboxAuditEvent>();
+
+using var host = SandboxHost.Create(builder =>
+{
+    builder.AddDefaultPureBindings();
+    builder.UseInterpreter();
+    // A failing telemetry sink must not change sandbox results or starve later observers.
+    builder.ForwardAuditEventsTo(_ => throw new InvalidOperationException("telemetry sink offline"));
+    builder.ForwardAuditEventsTo(observed.Add);
+});
+
+var plan = await host.PrepareAsync(module, policy);
+var result = await host.ExecuteAsync(plan, "main", input,
+    new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+// Observed events equal the returned result's audit events, in sequence order, even though the
+// first observer threw on every event.
+var matchesResult = observed.SequenceEqual(result.AuditEvents);
+```
+
+The example prints that the throwing observer did not change `result.Succeeded`, that the surviving
+observer received exactly `result.AuditEvents`, and that the events arrive in `SequenceNumber` order.
+This is the contract documented in `docs/Specs/Initial/safe-ir-sandbox-spec/spec/16-public-api.md`:
+observer failures are isolated and do not change the returned `SandboxExecutionResult` or prevent
+later observers from receiving the same sequenced audit events.
+
 ## Flagship Fire Damage Example
 
 The flagship example is implemented in:

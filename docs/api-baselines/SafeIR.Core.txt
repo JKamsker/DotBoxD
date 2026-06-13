@@ -14,14 +14,16 @@ public BindingRegistryBuilder Add(BindingDescriptor descriptor)
 public BindingRegistryBuilder AddRange(IEnumerable<BindingDescriptor> descriptors)
 public BindingSignature Signature => new(
 public bool AllowFallbackToInterpreter { get; init; } = true
+public bool Contains(string id) => _bindings.ContainsKey(id)
+public bool Deterministic { get => _deterministic; init { _deterministic = value; ResetHash(); } }
 public bool EnableDebugTrace { get; init; }
 public bool Equals(ExecutionPlanSeal? other)
 public bool Equals(ListValue? other)
 public bool Equals(MapValue? other)
 public bool Equals(SandboxType? other)
 public bool ExecutionDispatched { get; init; }
-public bool GrantsCapability(string capabilityId)
 public bool GrantsCapability(string capabilityId, DateTimeOffset now)
+public bool GrantsCapability(string capabilityId)
 public bool HasBindingAuditSince( BindingDescriptor descriptor, long checkpoint, bool success, SandboxErrorCode? expectedErrorCode, SandboxRunId runId, string moduleHash, string policyHash)
 public bool IsForbidden() => IsForbidden(this)
 public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth)
@@ -41,6 +43,7 @@ public const string CanonicalizerVersion = "safe-ir-canonicalizer-1"
 public DateTimeOffset AuditTimestamp()
 public DateTimeOffset GrantClock
 public DateTimeOffset UtcNow()
+public DateTimeOffset? LogicalNow { get => _logicalNow; init { _logicalNow = value; ResetHash(); } }
 public delegate ValueTask<SandboxValue> BindingInvoker( SandboxContext context, IReadOnlyList<SandboxValue> args, CancellationToken cancellationToken)
 public delegate void CapabilityGrantValidator( CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
 public enum AuditLevel
@@ -113,12 +116,13 @@ public interface IBindingCatalog
 public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = ModelCopy.ValueDictionary(value); }
 public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
 public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
+public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
 public IReadOnlyDictionary<string, string> BindingAuditFields( string resourceKind, DateTimeOffset startedAt, long? bytesRead = null, long? bytesWritten = null)
 public IReadOnlyDictionary<string, string> Metadata { get => _metadata; init => _metadata = ModelCopy.StringDictionary(value); }
 public IReadOnlyDictionary<string, string> Parameters { get; init; } =
 public IReadOnlyDictionary<string, string>? Fields { get => _fields; init => _fields = CopyFields(value); }
 public IReadOnlyList<BindingSignature> Signatures
-public IReadOnlyList<CapabilityGrant> Grants { get => _grants; init => _grants = ModelCopy.List(value); }
+public IReadOnlyList<CapabilityGrant> Grants
 public IReadOnlyList<CapabilityRequest> CapabilityRequests { get => _capabilityRequests; init => _capabilityRequests = ModelCopy.List(value); }
 public IReadOnlyList<Expression> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<Parameter> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
@@ -127,7 +131,7 @@ public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(di
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
-public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = ModelCopy.List(value); }
+public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Then { get => _then; init => _then = ModelCopy.List(value); }
@@ -170,9 +174,11 @@ public required string PlanHash { get; init; }
 public required string PolicyHash { get; init; }
 public ResourceLimits Budget { get; }
 public ResourceLimits Limits { get; }
+public ResourceLimits ResourceLimits { get => _resourceLimits; init { _resourceLimits = value; ResetHash(); } }
 public ResourceMeter Budget { get; }
 public ResourceMeter(ResourceLimits limits)
 public SandboxContext( SandboxRunId runId, SandboxPolicy policy, ResourceMeter budget, BindingRegistry bindings, IAuditSink audit, CancellationToken cancellationToken, IReadOnlySet<string>? allowedBindingIds = null, string? moduleHash = null, string? policyHash = null)
+public SandboxEffect AllowedEffects { get => _allowedEffects; init { _allowedEffects = value; ResetHash(); } }
 public SandboxError Error { get; }
 public SandboxError? Error { get; init; }
 public SandboxIsolation Isolation { get; init; } = SandboxIsolation.InProcess
@@ -217,10 +223,10 @@ public sealed class ExecutionPlan
 public sealed class ExecutionPlanSeal : IEquatable<ExecutionPlanSeal>
 public sealed class InMemoryAuditSink : IAuditSink
 public sealed class ResourceMeter
-public sealed class SandboxContext
 public sealed class SandboxPolicyBuilder
 public sealed class SandboxRuntimeException : Exception
 public sealed class SandboxValidationException( IReadOnlyList<SandboxDiagnostic> diagnostics)
+public sealed partial class SandboxContext
 public sealed record AssignmentStatement(string Name, Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record BinaryExpression(Expression Left, string Operator, Expression Right, SourceSpan Span) : Expression(Span)
 public sealed record BindingCostModel( long BaseFuel, long PerByteFuel = 0, bool AllocationFromReturnBytes = false, int? MaxCallsPerRun = null)
@@ -386,14 +392,16 @@ public static void ValidateInputShape(SandboxValue input, int parameterCount)
 public string BindingManifestHash { get; }
 public string CreateChargedStringConcat(string left, string right)
 public string CreateChargedSubstring(string value, int startIndex, int length)
-public string Hash => StableHash()
+public string Hash => (_hash ??= CreateHashCache()).Value
 public string ManifestHash { get; }
 public string ModuleHash { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
+public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()
+public ulong? RandomSeed { get => _randomSeed; init { _randomSeed = value; ResetHash(); } }
 public void ChargeAllocation(long bytes)
 public void ChargeBindingCall(BindingDescriptor descriptor)
 public void ChargeCollection(SandboxValue value, CancellationToken cancellationToken)

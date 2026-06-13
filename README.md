@@ -129,6 +129,23 @@ var roundTripped = SafeIrJsonImporter.Import(json);
 var plan = await host.PrepareAsync(roundTripped, policy);
 ```
 
+## JSON Ingestion Schemas
+
+The public JSON ingestion envelopes ship with versioned, machine-readable JSON Schema artifacts so
+plugin authors, admin UIs, and upload validators can validate JSON before sending it to a server
+instead of inferring the contract from importer source:
+
+- [`schemas/v1/safe-ir-module.schema.json`](schemas/v1/safe-ir-module.schema.json) describes the
+  module envelope accepted by `SafeIrJsonImporter.Import(string)`.
+- [`schemas/v1/safe-ir-plugin-package.schema.json`](schemas/v1/safe-ir-plugin-package.schema.json)
+  describes the plugin package envelope accepted by `PluginPackageJsonSerializer.Import(string)`.
+
+The same artifacts are embedded in the `SafeIR.Serialization.Json` package and exposed through
+`SafeIrJsonSchemas.ModuleEnvelope`, `SafeIrJsonSchemas.PluginPackageEnvelope`, and
+`SafeIrJsonSchemas.SchemaVersion`. The schemas are kept in sync with the importer's strict shape by
+a regression test; the `v1` directory segment and `SchemaVersion` are bumped together whenever the
+JSON contract changes.
+
 ## Local Verification
 
 ```powershell

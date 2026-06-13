@@ -58,6 +58,7 @@ For hard isolation against runtime bugs, memory exhaustion, process termination,
 | `examples/example-ir.md` | Example IR snippets |
 | `examples/example-binding-manifest.md` | Example binding manifest |
 | `operations/runbook.md` | Operational runbook and incident response |
+| `operations/error-codes.md` | Per-code `SandboxErrorCode` reference and operator guidance |
 | `checklists/security-review.md` | Security checklist |
 | `checklists/release-readiness.md` | Release checklist |
 | `references.md` | External references used |

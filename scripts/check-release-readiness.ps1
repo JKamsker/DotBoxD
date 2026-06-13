@@ -284,6 +284,38 @@ function Assert-CompletedItemEvidence {
             ForEach-Object { "$([System.IO.Path]::GetFileName($_.File)):$($_.Line) [$($_.Section)] $($_.Text)" }
         throw "Completed security review items are missing section evidence checks: $($sample -join '; ')"
     }
+
+    # Completed "Documentation" inventory items are release evidence: verify each checked entry
+    # still points at an existing doc with expected patterns (non-blocking for -RequireComplete).
+    $docSpec = "docs/Specs/Initial/safe-ir-sandbox-spec"
+    $documentationEvidence = @{
+        "User-facing language docs." = @{ Path = "$docSpec/spec/04-ir-language.md"; Patterns = @("JSON IR", "IR design goals") }
+        "Host binding author guide." = @{ Path = "$docSpec/spec/07-bindings.md"; Patterns = @("# 07 — Bindings", "host-provided") }
+        "Security model docs." = @{ Path = "$docSpec/spec/02-threat-model.md"; Patterns = @("Threat Model", "Assets to protect") }
+        "Capability catalog." = @{ Path = "$docSpec/spec/08-runtime-safe-apis.md"; Patterns = @("Safe file API", "Safe network API") }
+        "Error code reference." = @{ Path = "$docSpec/spec/09-interpreted-mode.md"; Patterns = @("E-POLICY-001", "E-RUNTIME-004") }
+        "Debugging guide." = @{ Path = "$docSpec/spec/09-interpreted-mode.md"; Patterns = @("Debugging support") }
+        "Operational runbook." = @{ Path = "$docSpec/operations/runbook.md"; Patterns = @("Operational Runbook") }
+    }
+
+    $completedDocumentation = @($items | Where-Object {
+        -not $_.Required -and $_.Complete -and $_.File -eq $releaseReadiness -and $_.Section -eq "Documentation"
+    })
+
+    foreach ($item in $completedDocumentation) {
+        if ($documentationEvidence.ContainsKey($item.Text)) {
+            $entry = $documentationEvidence[$item.Text]
+            Assert-Evidence "Documentation item '$($item.Text)'" $entry.Path $entry.Patterns
+        }
+    }
+
+    $missingDocumentationEvidence = @($completedDocumentation | Where-Object { -not $documentationEvidence.ContainsKey($_.Text) })
+    if ($missingDocumentationEvidence.Count -gt 0) {
+        $sample = $missingDocumentationEvidence |
+            Select-Object -First 10 |
+            ForEach-Object { "$([System.IO.Path]::GetFileName($_.File)):$($_.Line) $($_.Text)" }
+        throw "Completed documentation inventory items are missing evidence checks: $($sample -join '; ')"
+    }
 }
 
 Assert-CompletedItemEvidence

@@ -1,5 +1,7 @@
 namespace SafeIR.Plugins;
 
+using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using SafeIR;
 using SafeIR.Hosting;
 
@@ -86,7 +88,7 @@ public sealed class PluginServer
         => Kernels.Remove(pluginId);
 }
 
-public sealed class KernelRegistry
+public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, InstalledKernel> _kernels = new(StringComparer.Ordinal);
@@ -101,6 +103,43 @@ public sealed class KernelRegistry
 
     public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
         => new(Get(pluginId));
+
+    /// <summary>
+    /// Probes installation state without throwing, letting an admin/host UI discover whether a
+    /// plugin id is currently installed and read its live kernel without catching
+    /// <see cref="KeyNotFoundException"/>.
+    /// </summary>
+    public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
+    {
+        ArgumentNullException.ThrowIfNull(pluginId);
+        lock (_gate)
+        {
+            return _kernels.TryGetValue(pluginId, out kernel);
+        }
+    }
+
+    /// <summary>
+    /// Returns a stable snapshot of the currently installed kernels for inventory rendering. The
+    /// returned list is detached from registry internals, so it is safe to enumerate while installs
+    /// and uninstalls continue concurrently.
+    /// </summary>
+    public IReadOnlyList<InstalledKernel> Snapshot()
+    {
+        lock (_gate)
+        {
+            return _kernels.Values.ToArray();
+        }
+    }
+
+    /// <summary>
+    /// Enumerates the currently installed kernels over a stable snapshot, so an admin/host UI can
+    /// iterate the inventory directly (for example with <c>foreach</c> or LINQ) without taking a
+    /// dependency on <see cref="Snapshot"/>. Enumeration is detached from registry internals and is
+    /// therefore unaffected by concurrent installs and uninstalls.
+    /// </summary>
+    public IEnumerator<InstalledKernel> GetEnumerator() => Snapshot().GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     internal InstalledKernel GetByKernelType<TKernel>() where TKernel : class
     {

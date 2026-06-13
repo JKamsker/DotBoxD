@@ -8,7 +8,15 @@ internal static class ManifestInspectionExample
 
         Console.WriteLine($"manifest: plugin={package.Manifest.PluginId}");
         foreach (var setting in package.Manifest.LiveSettings) {
-            Console.WriteLine($"  setting {setting.Name}: {setting.Type} = {setting.DefaultValue}");
+            var range = setting.Min is null && setting.Max is null
+                ? string.Empty
+                : $" range=[{setting.Min}..{setting.Max}]";
+            Console.WriteLine($"  setting {setting.Name}: {setting.Type} = {setting.DefaultValue}{range}");
+        }
+
+        foreach (var capability in package.Module.CapabilityRequests) {
+            var reason = capability.Reason is null ? string.Empty : $" ({capability.Reason})";
+            Console.WriteLine($"  capability {capability.Id}{reason}");
         }
 
         foreach (var effect in package.Manifest.Effects) {
