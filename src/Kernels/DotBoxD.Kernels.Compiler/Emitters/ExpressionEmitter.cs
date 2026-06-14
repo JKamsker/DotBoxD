@@ -228,6 +228,26 @@ internal sealed class ExpressionEmitter
             return StackKind.Bool;
         }
 
+        if (binary.Operator is "==" or "!=" or "<" or "<=" or ">" or ">=" &&
+            _stackPlan.Infer(binary.Left) is { Name: "F64" } &&
+            _stackPlan.Infer(binary.Right) is { Name: "F64" })
+        {
+            EmitAs(binary.Left, StackKind.F64);
+            EmitAs(binary.Right, StackKind.F64);
+            var raw = binary.Operator switch
+            {
+                "<" => nameof(CompiledRuntime.LtF64Raw),
+                "<=" => nameof(CompiledRuntime.LteF64Raw),
+                ">" => nameof(CompiledRuntime.GtF64Raw),
+                ">=" => nameof(CompiledRuntime.GteF64Raw),
+                "==" => nameof(CompiledRuntime.EqF64Raw),
+                "!=" => nameof(CompiledRuntime.NeF64Raw),
+                _ => throw Unsupported("operator not supported by compiler")
+            };
+            _il.Emit(OpCodes.Call, Runtime(raw));
+            return StackKind.Bool;
+        }
+
         EmitAs(binary.Left, StackKind.Boxed);
         EmitAs(binary.Right, StackKind.Boxed);
         var method = binary.Operator switch

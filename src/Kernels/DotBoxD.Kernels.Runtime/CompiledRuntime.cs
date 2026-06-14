@@ -147,39 +147,6 @@ public static partial class CompiledRuntime
     [MethodImpl(AggressiveInlining)] public static bool AsBool(SandboxValue value) => ((BoolValue)value).Value;
     public static double AsF64(SandboxValue value) => ((F64Value)value).Value;
 
-    [MethodImpl(AggressiveInlining)] public static int AddI32Raw(int left, int right) => SandboxInt32Math.Add(left, right);
-    [MethodImpl(AggressiveInlining)] public static int SubI32Raw(int left, int right) => SandboxInt32Math.Subtract(left, right);
-    [MethodImpl(AggressiveInlining)] public static int MulI32Raw(int left, int right) => SandboxInt32Math.Multiply(left, right);
-    [MethodImpl(AggressiveInlining)] public static int DivI32Raw(int left, int right) => SandboxInt32Math.Divide(left, right);
-    [MethodImpl(AggressiveInlining)] public static int RemI32Raw(int left, int right) => SandboxInt32Math.Remainder(left, right);
-    [MethodImpl(AggressiveInlining)] public static int AddRemI32Raw(int left, int right, int divisor) => SandboxInt32Math.Remainder(SandboxInt32Math.Add(left, right), divisor);
-    [MethodImpl(AggressiveInlining)] public static int NegI32Raw(int value) => SandboxInt32Math.Negate(value);
-
-    // Unboxed f64 arithmetic: identical semantics to the boxed Add/Sub/Mul/Div (SandboxFloat64Math enforces the
-    // same finiteness check), but keeps the operand and result as `double` on the stack instead of allocating an
-    // F64Value per operation. Lets f64 arithmetic loops/expressions run without per-op boxing.
-    [MethodImpl(AggressiveInlining)] public static double AddF64Raw(double left, double right) => SandboxFloat64Math.Add(left, right);
-    [MethodImpl(AggressiveInlining)] public static double SubF64Raw(double left, double right) => SandboxFloat64Math.Subtract(left, right);
-    [MethodImpl(AggressiveInlining)] public static double MulF64Raw(double left, double right) => SandboxFloat64Math.Multiply(left, right);
-    [MethodImpl(AggressiveInlining)] public static double DivF64Raw(double left, double right) => SandboxFloat64Math.Divide(left, right);
-
-    // Unboxed i32 comparisons (result kept as a bool on the stack instead of an allocated BoolValue). Pure, no
-    // overflow, identical to the boxed LtI32/etc. Lets branch conditions like `i % 2 < 1` avoid per-iteration boxing.
-    [MethodImpl(AggressiveInlining)] public static bool LtI32Raw(int left, int right) => left < right;
-    [MethodImpl(AggressiveInlining)] public static bool LteI32Raw(int left, int right) => left <= right;
-    [MethodImpl(AggressiveInlining)] public static bool GtI32Raw(int left, int right) => left > right;
-    [MethodImpl(AggressiveInlining)] public static bool GteI32Raw(int left, int right) => left >= right;
-    [MethodImpl(AggressiveInlining)] public static bool EqI32Raw(int left, int right) => left == right;
-    [MethodImpl(AggressiveInlining)] public static bool NeI32Raw(int left, int right) => left != right;
-
-    // Unboxed i64 arithmetic (checked overflow, identical to the boxed Add/Sub/Mul/Div/Rem for I64 operands).
-    [MethodImpl(AggressiveInlining)] public static long AddI64Raw(long left, long right) => SandboxInt64Math.Add(left, right);
-    [MethodImpl(AggressiveInlining)] public static long SubI64Raw(long left, long right) => SandboxInt64Math.Subtract(left, right);
-    [MethodImpl(AggressiveInlining)] public static long MulI64Raw(long left, long right) => SandboxInt64Math.Multiply(left, right);
-    [MethodImpl(AggressiveInlining)] public static long DivI64Raw(long left, long right) => SandboxInt64Math.Divide(left, right);
-    [MethodImpl(AggressiveInlining)] public static long RemI64Raw(long left, long right) => SandboxInt64Math.Remainder(left, right);
-    [MethodImpl(AggressiveInlining)] public static long NegI64Raw(long value) => SandboxInt64Math.Negate(value);
-
     public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
     public static SandboxValue SubI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
     public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
