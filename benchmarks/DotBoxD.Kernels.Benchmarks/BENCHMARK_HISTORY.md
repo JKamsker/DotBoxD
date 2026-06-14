@@ -302,33 +302,39 @@ Two follow-ups closed the compiled gaps, then a baseline-fairness correction exp
    un-foldable per-iteration work. Replaced the body with `(value + 3) % 1000003` (same body on both sides,
    mirroring the i32 baseline's `% 1000003`). The ratio was a denominator artifact, now confirmed.
 
-Final `--probe-matrix` (after fairness, full suite green):
+A follow-up added the substitution-aware fused opcode `(raw + const) % const`
+(`RemainderAddRawConstConst`), collapsing the inline-call body's 4-node plan tree to one fused dispatch +
+one idiv (byte-identical fuel, identical checked-overflow semantics). Interpreted `local-call` 10.4x -> 7.2x.
+
+Final `--probe-matrix` (after fairness + fused opcode, full suite green; ratios on a lightly-loaded run):
 
 ```
 case                         handwritten   compiled      x   interpreted      x
-i32 add/rem loop                 25.4 ms     23.9 ms   0.9       89.2 ms    3.5
-math.sqrt binding                 7.8 ms      8.4 ms   1.1       18.9 ms    2.4
-math.sqrt x3 binding             11.8 ms     12.3 ms   1.0       20.6 ms    1.8
-string.length binding             0.2 ms      0.4 ms   1.9        1.0 ms    4.7
-list.count intrinsic              0.2 ms      0.2 ms   1.1        1.0 ms    4.5
-list.get intrinsic                0.5 ms      0.2 ms   0.5        1.6 ms    3.0
-map.get intrinsic                 5.2 ms      0.8 ms   0.1        0.5 ms    0.1
-local function call               2.3 ms      2.6 ms   1.1       24.4 ms   10.4
-trivial no-loop (diagnostic)      0.0 ms      0.5 ms  12.2        0.1 ms    1.5
+i32 add/rem loop                 24.3 ms     25.1 ms   1.0      118.9 ms    4.9
+math.sqrt binding                 8.0 ms      8.2 ms   1.0       19.5 ms    2.4
+math.sqrt x3 binding             11.8 ms     12.1 ms   1.0       21.0 ms    1.8
+string.length binding             0.2 ms      0.2 ms   1.2        1.0 ms    4.6
+list.count intrinsic              0.3 ms      0.3 ms   0.8        1.1 ms    3.7
+list.get intrinsic                0.6 ms      0.3 ms   0.5        1.9 ms    3.3
+map.get intrinsic                 5.4 ms      0.8 ms   0.1        0.6 ms    0.1
+local function call               2.4 ms      2.7 ms   1.1       17.6 ms    7.2
+trivial no-loop (diagnostic)      0.0 ms      0.6 ms  13.0        0.1 ms    1.9
 ```
 
 **Compiled meets <=2x across every loop benchmark.** Interpreted meets <=5x on all but `local function call`.
 
 ## Current Gaps
 
-- `local function call` interpreted 10.4x: now a *fair* number, not an artifact. The `% 1000003` is a
-  **constant** modulo, which the JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten
-  baseline and the compiled IL (hence compiled is 1.1x). The interpreter holds the divisor as runtime data
-  and executes a real `idiv` (~10 ns) per call, so most of the 10.4x is the constant-division strength-reduction
-  gap (a general interpreter trait affecting any constant `/` or `%`), with the remainder being call dispatch.
-  Reaching <=5x would require constant-divisor strength reduction in the interpreter (signed magic-number
-  multiply) — a real, broadly beneficial optimization, but correctness-sensitive for the sandbox; deferred
-  pending explicit sign-off. Absolute cost is ~24 ms / 1M calls.
+- `local function call` interpreted 7.2x: a *fair* number, not an artifact. The `% 1000003` is a **constant**
+  modulo, which the JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten baseline and the
+  compiled IL (hence compiled is 1.1x). The interpreter holds the divisor as runtime data and executes a real
+  `idiv` (~10 ns), so the body alone is ~5x; the unavoidable depth-metering call node (required by
+  `Fix_CMP_0023`) adds the rest. Confirmed by the i32 case: the *same* fused modulo with no call is only
+  ~3.7-4.9x. Attempts to trim call overhead (inlining `EvaluateInlineCall`, caching `MaxCallDepth`) had no
+  measurable effect — the JIT already handles them. The only remaining lever is constant-divisor strength
+  reduction in the interpreter (signed magic-number multiply) — broadly beneficial (helps i32 and the list
+  cases too) but correctness-sensitive for the sandbox; deferred pending explicit sign-off. Absolute cost is
+  ~18 ms / 1M calls.
 - `trivial no-loop` (compiled 12.2x): a single no-op invocation isolating fixed host-pipeline overhead
   (~0.5 ms, down from the ~16 ms per-call re-emit floor we fixed). Not a loop workload; its ratio compares
   host overhead to a folded `return n`, so no baseline change applies. Kept as a diagnostic row.
