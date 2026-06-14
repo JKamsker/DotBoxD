@@ -61,6 +61,10 @@ public abstract record SandboxValue
         SandboxType keyType,
         SandboxType valueType)
         => new MapValue(values, keyType, valueType);
+
+    public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields);
+
+    internal static SandboxValue FromOwnedRecord(SandboxValue[] fields) => RecordValue.FromOwnedFields(fields);
 }
 
 public sealed record UnitValue : SandboxValue
@@ -177,6 +181,84 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
         foreach (var value in Values)
         {
             hash.Add(value);
+        }
+
+        return hash.ToHashCode();
+    }
+}
+
+public sealed record RecordValue : SandboxValue
+{
+    private IReadOnlyList<SandboxValue> _fields;
+
+    public RecordValue(IReadOnlyList<SandboxValue> Fields)
+        => _fields = Snapshot(Fields);
+
+    public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
+
+    /// <summary>
+    /// Constructs a record value over an array the caller has just allocated, fully populated, and will
+    /// not retain or mutate, avoiding the defensive copy <see cref="SandboxValue.FromRecord"/> performs.
+    /// Internal because the owned-array contract cannot be enforced for external callers.
+    /// </summary>
+    internal static RecordValue FromOwnedFields(SandboxValue[] fields)
+        => new(new OwnedSnapshot(ModelCopy.WrapOwned(fields)));
+
+    private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> fields)
+        => fields is OwnedSnapshot owned ? owned.Fields : ModelCopy.List(fields);
+
+    private sealed class OwnedSnapshot(IReadOnlyList<SandboxValue> fields) : IReadOnlyList<SandboxValue>
+    {
+        public IReadOnlyList<SandboxValue> Fields { get; } = fields;
+
+        public SandboxValue this[int index] => Fields[index];
+
+        public int Count => Fields.Count;
+
+        public IEnumerator<SandboxValue> GetEnumerator() => Fields.GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    public override SandboxType Type
+    {
+        get
+        {
+            var fieldTypes = new SandboxType[_fields.Count];
+            for (var i = 0; i < _fields.Count; i++)
+            {
+                fieldTypes[i] = _fields[i].Type;
+            }
+
+            return SandboxType.Record(fieldTypes);
+        }
+    }
+
+    public bool Equals(RecordValue? other)
+    {
+        if (other is null || Fields.Count != other.Fields.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Fields.Count; i++)
+        {
+            if (!Fields[i].Equals(other.Fields[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(SandboxType.RecordName, StringComparer.Ordinal);
+        foreach (var field in Fields)
+        {
+            hash.Add(field);
         }
 
         return hash.ToHashCode();

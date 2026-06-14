@@ -385,7 +385,7 @@ internal sealed class FunctionAnalyzer
             _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{call.GenericType}'", Span: call.Span));
         }
 
-        if (call.Name is not ("list.empty" or "map.empty"))
+        if (call.Name is not ("list.empty" or "map.empty" or "record.new"))
         {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", $"call '{call.Name}' does not accept genericType", Span: call.Span));
         }

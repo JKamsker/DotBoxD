@@ -15,7 +15,7 @@ public static class SandboxValueValidator
         // no traversal bookkeeping. Validate them inline to avoid allocating the
         // HashSet/Stack the recursive collection walk requires; this is the hot path
         // for every function return and binding argument check.
-        if (value is not ListValue and not MapValue)
+        if (value is not ListValue and not MapValue and not RecordValue)
         {
             RequireScalarType(value, expectedType, errorCode, message);
             return;
@@ -52,6 +52,9 @@ public static class SandboxValueValidator
                     break;
                 case MapValue map:
                     PushMap(map, frame.ExpectedType, active, stack, errorCode, message);
+                    break;
+                case RecordValue record:
+                    PushRecord(record, frame.ExpectedType, active, stack, errorCode, message);
                     break;
             }
         }
@@ -124,6 +127,28 @@ public static class SandboxValueValidator
         }
     }
 
+    private static void PushRecord(
+        RecordValue record,
+        SandboxType expectedType,
+        HashSet<object> active,
+        Stack<Frame> stack,
+        SandboxErrorCode errorCode,
+        string message)
+    {
+        if (!expectedType.IsRecord ||
+            expectedType.Arguments.Count != record.Fields.Count)
+        {
+            throw Error(errorCode, message);
+        }
+
+        Enter(record, active, errorCode, message);
+        stack.Push(new Frame(record, expectedType, Exit: true));
+        for (var i = record.Fields.Count - 1; i >= 0; i--)
+        {
+            stack.Push(new Frame(record.Fields[i], expectedType.Arguments[i], Exit: false));
+        }
+    }
+
     private static void Enter(
         object value,
         HashSet<object> active,
@@ -141,7 +166,7 @@ public static class SandboxValueValidator
 
     private static bool IsKnownValueKind(SandboxValue value)
         => value is UnitValue or BoolValue or I32Value or I64Value or F64Value or StringValue or OpaqueIdValue
-            or SandboxPathValue or SandboxUriValue or ListValue or MapValue;
+            or SandboxPathValue or SandboxUriValue or ListValue or MapValue or RecordValue;
 
     internal static void RequireScalarInvariants(
         SandboxValue value,

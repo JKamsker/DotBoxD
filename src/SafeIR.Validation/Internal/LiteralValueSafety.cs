@@ -73,7 +73,7 @@ internal static class LiteralValueSafety
                 }
 
                 return true;
-            case ListValue or MapValue:
+            case ListValue or MapValue or RecordValue:
                 return true;
             default:
                 return false;
@@ -103,6 +103,13 @@ internal static class LiteralValueSafety
                     {
                         stack.Push(pair.Value);
                         stack.Push(pair.Key);
+                    }
+
+                    break;
+                case RecordValue record:
+                    for (var i = record.Fields.Count - 1; i >= 0; i--)
+                    {
+                        stack.Push(record.Fields[i]);
                     }
 
                     break;

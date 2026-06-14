@@ -52,6 +52,26 @@ internal static class CollectionOperations
         return Charge(context, SandboxValue.FromList(values, source.ItemType));
     }
 
+    public static SandboxValue BuildRecord(IReadOnlyList<SandboxValue> fields, SandboxContext context)
+    {
+        context.ChargeFuel(SandboxCollectionFuel.Copy(fields.Count));
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(fields.Count, 16));
+        return Charge(context, SandboxValue.FromRecord(fields));
+    }
+
+    public static SandboxValue GetRecordField(SandboxValue index, SandboxValue record, SandboxContext context)
+    {
+        var fields = AsRecordReadOnly(record).Fields;
+        context.ChargeFuel(SandboxCollectionFuel.Read(fields.Count));
+        var i = AsI32(index).Value;
+        if (i < 0 || i >= fields.Count)
+        {
+            throw Error(SandboxErrorCode.InvalidInput, "record field index is out of range");
+        }
+
+        return fields[i];
+    }
+
     public static SandboxValue CreateMap(SandboxType mapType, SandboxContext context)
     {
         if (mapType.Name != "Map" || mapType.Arguments.Count != 2)
@@ -142,6 +162,9 @@ internal static class CollectionOperations
 
     private static MapValue AsMapReadOnly(SandboxValue value)
         => value as MapValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected map value");
+
+    private static RecordValue AsRecordReadOnly(SandboxValue value)
+        => value as RecordValue ?? throw Error(SandboxErrorCode.InvalidInput, "expected record value");
 
     private static I32Value AsI32(SandboxValue value)
         => value as I32Value ?? throw Error(SandboxErrorCode.InvalidInput, "expected I32 value");

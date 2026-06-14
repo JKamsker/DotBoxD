@@ -49,6 +49,9 @@ internal static class SandboxValueShapeMeter
                 case MapValue map:
                     shape = AddMap(shape, map, frame.Depth, active, stack, limits);
                     break;
+                case RecordValue record:
+                    shape = AddRecord(shape, record, frame.Depth, active, stack, limits);
+                    break;
                 case UnitValue or BoolValue or I32Value or I64Value or F64Value:
                     break;
                 default:
@@ -100,6 +103,28 @@ internal static class SandboxValueShapeMeter
         }
 
         return AddCollection(shape, map.Values.Count, 0, map.Values.Count, depth, limits);
+    }
+
+    private static ValueShape AddRecord(
+        ValueShape shape,
+        RecordValue record,
+        int parentDepth,
+        HashSet<object> active,
+        Stack<Frame> stack,
+        ResourceLimits? limits)
+    {
+        Enter(record, active);
+        var depth = parentDepth + 1;
+        // A record's fields are counted as collection elements and its nesting as one depth level, so a
+        // record is budgeted exactly like a fixed-size list under the same element/depth limits.
+        EnsureCollectionLimits(record.Fields.Count, 0, depth, limits);
+        stack.Push(new Frame(record, depth, Exit: true));
+        for (var i = record.Fields.Count - 1; i >= 0; i--)
+        {
+            stack.Push(new Frame(record.Fields[i], depth, Exit: false));
+        }
+
+        return AddCollection(shape, record.Fields.Count, record.Fields.Count, 0, depth, limits);
     }
 
     private static ValueShape AddCollection(

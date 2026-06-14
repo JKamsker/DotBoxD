@@ -298,10 +298,13 @@ internal sealed class ExpressionEvaluator
             "map.get" => CollectionOperations.GetMapValue(Arg(args, 1), Arg(args, 0), _context),
             "map.set" => CollectionOperations.SetMapValue(Arg(args, 2), Arg(args, 1), Arg(args, 0), _context),
             "map.remove" => CollectionOperations.RemoveMapValue(Arg(args, 1), Arg(args, 0), _context),
+            "record.new" => CollectionOperations.BuildRecord(args, _context),
+            "record.get" => CollectionOperations.GetRecordField(Arg(args, 1), Arg(args, 0), _context),
             _ => SandboxValue.Unit
         };
         return call.Name is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
+            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove"
+            or "record.new" or "record.get";
     }
 
     public ValueTask<SandboxValue> InvokeFunctionAsync(SandboxFunction function, IReadOnlyList<SandboxValue> args)

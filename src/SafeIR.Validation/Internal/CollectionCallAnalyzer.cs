@@ -9,7 +9,7 @@ internal delegate SandboxType ExpressionAnalyzer(
     ref bool canReorder,
     bool recordCapabilities);
 
-internal sealed class CollectionCallAnalyzer
+internal sealed partial class CollectionCallAnalyzer
 {
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly ExpressionAnalyzer _analyzeExpression;
@@ -48,6 +48,8 @@ internal sealed class CollectionCallAnalyzer
             "map.get" => AnalyzeMapGet(call, scope, ref effects, ref canReorder, recordCapabilities),
             "map.set" => AnalyzeMapSet(call, scope, ref effects, ref canReorder, recordCapabilities),
             "map.remove" => AnalyzeMapRemove(call, scope, ref effects, ref canReorder, recordCapabilities),
+            "record.new" => AnalyzeRecordNew(call, scope, ref effects, ref canReorder, recordCapabilities),
+            "record.get" => AnalyzeRecordGet(call, scope, ref effects, ref canReorder, recordCapabilities),
             _ => SandboxType.Unit
         };
         return true;
@@ -335,16 +337,4 @@ internal sealed class CollectionCallAnalyzer
             "E-CALL-ARITY",
             $"{call.Name} expects {expected} argument{(expected == 1 ? "" : "s")}",
             Span: call.Span));
-
-    private void CheckKnownType(SandboxType type, SourceSpan span)
-    {
-        if (!type.IsKnown(_declaredOpaqueIdTypes) || type.IsForbidden())
-        {
-            _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{type}'", Span: span));
-        }
-    }
-
-    private static bool IsCollectionCall(string name)
-        => name is "list.empty" or "list.of" or "list.count" or "list.get" or "list.add"
-            or "map.empty" or "map.containsKey" or "map.get" or "map.set" or "map.remove";
 }

@@ -30,6 +30,7 @@ internal static class CollectionIntrinsicDispatcher
             "list.count" => 1,
             "list.get" => 2,
             "list.add" => 2,
+            "record.get" => 2,
             "map.containsKey" => 2,
             "map.get" => 2,
             "map.set" => 3,
@@ -54,6 +55,7 @@ internal static class CollectionIntrinsicDispatcher
             "list.count" => CollectionOperations.CountList(arg0, context),
             "list.get" => CollectionOperations.GetListItem(arg1, arg0, context),
             "list.add" => CollectionOperations.AddListItem(arg1, arg0, context),
+            "record.get" => CollectionOperations.GetRecordField(arg1, arg0, context),
             "map.empty" => CollectionOperations.CreateMap(
                 call.GenericType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit),
                 context),

@@ -20,6 +20,7 @@ public bool EnableDebugTrace { get; init; }
 public bool Equals(ExecutionPlanSeal? other)
 public bool Equals(ListValue? other)
 public bool Equals(MapValue? other)
+public bool Equals(RecordValue? other)
 public bool Equals(SandboxType? other)
 public bool ExecutionDispatched { get; init; }
 public bool GrantsCapability(string capabilityId, DateTimeOffset now)
@@ -29,6 +30,7 @@ public bool IsForbidden() => IsForbidden(this)
 public bool IsKnown(int maxDepth = 8) => IsKnown(this, 0, maxDepth, declaredOpaqueIdTypes: null)
 public bool IsKnown(IReadOnlySet<string> declaredOpaqueIdTypes, int maxDepth = 8)
 public bool IsKnownBuiltIn(int maxDepth = 8) => IsKnown(this, 0, maxDepth, EmptyOpaqueIdTypes)
+public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName)
 public bool IsValidMapKey() => IsValidMapKey(declaredOpaqueIdTypes: null)
 public bool IsValidMapKey(IReadOnlySet<string>? declaredOpaqueIdTypes)
 public bool RequireDeterministic { get; init; }
@@ -43,6 +45,7 @@ public CapabilityGrant GetGrant(string capabilityId)
 public const int MaxTextLiteralLength = 65_536
 public const SandboxEffect Pure = SandboxEffect.Cpu | SandboxEffect.Alloc
 public const string CanonicalizerVersion = "safe-ir-canonicalizer-1"
+public const string RecordName = "Record"
 public DateTimeOffset AuditTimestamp()
 public DateTimeOffset GrantClock
 public DateTimeOffset UtcNow()
@@ -132,6 +135,7 @@ public IReadOnlyList<SandboxDiagnostic> Diagnostics { get; } = ModelCopy.List(di
 public IReadOnlyList<SandboxFunction> Functions { get => _functions; init => _functions = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Arguments { get => _arguments; init => _arguments = ModelCopy.List(value); }
 public IReadOnlyList<SandboxType> Parameters { get => _parameters; init => _parameters = ModelCopy.List(value); }
+public IReadOnlyList<SandboxValue> Fields { get => _fields; init => _fields = Snapshot(value); }
 public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
 public IReadOnlyList<Statement> Body { get => _body; init => _body = ModelCopy.List(value); }
 public IReadOnlyList<Statement> Else { get => _else; init => _else = ModelCopy.List(value); }
@@ -151,6 +155,7 @@ public long StringBytes { get; private set; }
 public override bool Equals(object? obj) => Equals(obj as ExecutionPlanSeal)
 public override int GetHashCode()
 public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(_value)
+public override SandboxType Type
 public override SandboxType Type => SandboxType.Bool
 public override SandboxType Type => SandboxType.F64
 public override SandboxType Type => SandboxType.I32
@@ -169,6 +174,7 @@ public override string ToString() => RelativePath
 public override string ToString() => Value
 public override string ToString() => Value.ToString("N")
 public readonly record struct ShortCircuitOperands(Expression First, Expression Second, bool Reordered)
+public RecordValue(IReadOnlyList<SandboxValue> Fields)
 public required IReadOnlyList<SandboxAuditEvent> AuditEvents
 public required SandboxResourceUsage ResourceUsage { get; init; }
 public required string ModuleHash { get; init; }
@@ -251,6 +257,7 @@ public sealed record LiteralExpression(SandboxValue Value, SourceSpan Span) : Ex
 public sealed record MapValue( IReadOnlyDictionary<SandboxValue, SandboxValue> Values, SandboxType KeyType, SandboxType ValueType) : SandboxValue
 public sealed record OpaqueIdValue(string TypeName, string Value) : SandboxValue
 public sealed record Parameter(string Name, SandboxType Type)
+public sealed record RecordValue : SandboxValue
 public sealed record ResourceLimits( long MaxFuel = 100_000, long MaxLoopIterations = 100_000, TimeSpan? MaxWallTime = null, long MaxAllocatedBytes = 1_048_576, int MaxCallDepth = 64, int MaxHostCalls = 100, int MaxListLength = 10_000, int MaxMapEntries = 10_000, int MaxCollectionDepth = 32, long MaxTotalCollectionElements = 100_000, long MaxFileBytesRead = 1_048_576, long MaxFileBytesWritten = 0, long MaxNetworkBytesRead = 1_048_576, long MaxNetworkBytesWritten = 1_048_576, int MaxLogEvents = 100, int MaxLogMessageLength = 4_096, int MaxStringLength = 65_536, long MaxTotalStringBytes = 1_048_576)
 public sealed record ReturnStatement(Expression Value, SourceSpan Span) : Statement(Span)
 public sealed record SandboxAuditEvent( SandboxRunId RunId, string Kind, DateTimeOffset Timestamp, bool Success, string? BindingId = null, string? CapabilityId = null, SandboxEffect Effect = SandboxEffect.None, string? ResourceId = null, SandboxErrorCode? ErrorCode = null, string? Message = null, long? Bytes = null, IReadOnlyDictionary<string, string>? Fields = null, long SequenceNumber = 0)
@@ -348,6 +355,7 @@ public static SandboxType I32 { get; } = Scalar("I32")
 public static SandboxType I64 { get; } = Scalar("I64")
 public static SandboxType List(SandboxType item) => new("List", [item])
 public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value])
+public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields)
 public static SandboxType SandboxPath { get; } = Scalar("SandboxPath")
 public static SandboxType SandboxUri { get; } = Scalar("SandboxUri")
 public static SandboxType Scalar(string name) => new(name, [])
@@ -364,6 +372,7 @@ public static SandboxValue FromList(IReadOnlyList<SandboxValue> values)
 public static SandboxValue FromMap( IReadOnlyDictionary<SandboxValue, SandboxValue> values, SandboxType keyType, SandboxType valueType)
 public static SandboxValue FromOpaqueId(string typeName, string value)
 public static SandboxValue FromPath(string value)
+public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields)
 public static SandboxValue FromString(string value) => new StringValue(value)
 public static SandboxValue FromUri(string value)
 public static SandboxValue GetArgument( SandboxValue input, int index, int parameterCount, SandboxType expectedType)

@@ -38,11 +38,22 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
     public static SandboxType SandboxPath { get; } = Scalar("SandboxPath");
     public static SandboxType SandboxUri { get; } = Scalar("SandboxUri");
 
+    public const string RecordName = "Record";
+
     public static SandboxType Scalar(string name) => new(name, []);
 
     public static SandboxType List(SandboxType item) => new("List", [item]);
 
     public static SandboxType Map(SandboxType key, SandboxType value) => new("Map", [key, value]);
+
+    /// <summary>
+    /// A composite record/object type: an ordered, positional list of field types (≥ 1). Field names are
+    /// not part of the structural type — the analyzer and the host marshaling layer map fields to a C#
+    /// DTO's declared member order. Records can nest (a field may itself be a record, list, or map).
+    /// </summary>
+    public static SandboxType Record(IReadOnlyList<SandboxType> fields) => new(RecordName, fields);
+
+    public bool IsRecord => Arguments.Count > 0 && StringComparer.Ordinal.Equals(Name, RecordName);
 
     public static bool IsForbiddenName(string name)
         => ForbiddenNames.Contains(name) ||
@@ -64,7 +75,7 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         if (string.IsNullOrEmpty(name) ||
             name.Length > MaxOpaqueIdNameLength ||
             AllowedScalars.Contains(name) ||
-            name is "List" or "Map" ||
+            name is "List" or "Map" or RecordName ||
             IsForbiddenName(name) ||
             !char.IsAsciiLetterUpper(name[0]))
         {
@@ -183,6 +194,21 @@ public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Argumen
         {
             return type.Arguments.Count == 1 &&
                    IsKnown(type.Arguments[0], depth + 1, maxDepth, declaredOpaqueIdTypes);
+        }
+
+        if (type.Name == RecordName)
+        {
+            // A record is a positional tuple of known field types (≥ 1). Field types may nest, so each
+            // recurses with an incremented depth against the same bound.
+            for (var i = 0; i < type.Arguments.Count; i++)
+            {
+                if (!IsKnown(type.Arguments[i], depth + 1, maxDepth, declaredOpaqueIdTypes))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         return type.Name == "Map" &&

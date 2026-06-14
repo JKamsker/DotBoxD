@@ -174,6 +174,7 @@ public static class CanonicalModuleHasher
             SandboxUriValue uri => Node("uri", uri.Value.Value),
             ListValue list => ListLiteral(list),
             MapValue map => MapLiteral(map),
+            RecordValue record => RecordLiteral(record),
             _ => throw new NotSupportedException(value.GetType().Name)
         };
 
@@ -212,6 +213,18 @@ public static class CanonicalModuleHasher
         for (var i = 0; i < list.Values.Count; i++)
         {
             fields[2 + i] = Value(list.Values[i]);
+        }
+
+        return Node(fields);
+    }
+
+    private static string RecordLiteral(RecordValue record)
+    {
+        var fields = new string?[1 + record.Fields.Count];
+        fields[0] = "record";
+        for (var i = 0; i < record.Fields.Count; i++)
+        {
+            fields[1 + i] = Value(record.Fields[i]);
         }
 
         return Node(fields);

@@ -55,6 +55,9 @@ internal static class SandboxValidatedValueShapeMeter
                 case MapValue map:
                     shape = AddMap(shape, map, frame.ExpectedType, frame.Depth, active, stack, limits, errorCode, message);
                     break;
+                case RecordValue record:
+                    shape = AddRecord(shape, record, frame.ExpectedType, frame.Depth, active, stack, limits, errorCode, message);
+                    break;
                 case UnitValue or BoolValue or I32Value or I64Value or F64Value:
                     break;
             }
@@ -121,6 +124,34 @@ internal static class SandboxValidatedValueShapeMeter
         }
 
         return AddCollection(shape, map.Values.Count, 0, map.Values.Count, depth, limits);
+    }
+
+    private static ValueShape AddRecord(
+        ValueShape shape,
+        RecordValue record,
+        SandboxType expectedType,
+        int parentDepth,
+        HashSet<object> active,
+        Stack<Frame> stack,
+        ResourceLimits? limits,
+        SandboxErrorCode errorCode,
+        string message)
+    {
+        if (!expectedType.IsRecord || expectedType.Arguments.Count != record.Fields.Count)
+        {
+            throw Error(errorCode, message);
+        }
+
+        Enter(record, active, errorCode, message);
+        var depth = parentDepth + 1;
+        EnsureCollectionLimits(record.Fields.Count, 0, depth, limits);
+        stack.Push(new Frame(record, expectedType, depth, Exit: true));
+        for (var i = record.Fields.Count - 1; i >= 0; i--)
+        {
+            stack.Push(new Frame(record.Fields[i], expectedType.Arguments[i], depth, Exit: false));
+        }
+
+        return AddCollection(shape, record.Fields.Count, record.Fields.Count, 0, depth, limits);
     }
 
     private static ValueShape AddCollection(
@@ -218,7 +249,7 @@ internal static class SandboxValidatedValueShapeMeter
 
     private static bool IsKnownValueKind(SandboxValue value)
         => value is UnitValue or BoolValue or I32Value or I64Value or F64Value or StringValue or OpaqueIdValue
-            or SandboxPathValue or SandboxUriValue or ListValue or MapValue;
+            or SandboxPathValue or SandboxUriValue or ListValue or MapValue or RecordValue;
 
     private static void RequireOpaqueId(
         OpaqueIdValue id,
