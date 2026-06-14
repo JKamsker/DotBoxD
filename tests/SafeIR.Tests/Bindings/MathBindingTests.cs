@@ -109,6 +109,68 @@ public sealed class MathBindingTests
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.Equal(expected, ((F64Value)result.Value!).Value, precision: 10);
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        Assert.Equal(1, result.ResourceUsage.HostCalls);
+    }
+
+    [Fact]
+    public async Task Compiled_direct_math_binding_enforces_host_call_limit()
+    {
+        var result = await ExecuteReturnAsync(
+            """{ "call": "math.sqrt", "args": [{ "f64": 9.0 }] }""",
+            "F64",
+            SandboxPolicyBuilder.Create().WithMaxHostCalls(0).Build(),
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false },
+            compiler: true);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.Equal(1, result.ResourceUsage.HostCalls);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+    }
+
+    [Fact]
+    public async Task Compiled_f64_math_loop_charges_each_direct_intrinsic_call()
+    {
+        var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "compiled-f64-math-loop",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "F64",
+              "body": [
+                { "op": "set", "name": "total", "value": { "f64": 81.0 } },
+                {
+                  "op": "forRange",
+                  "local": "i",
+                  "start": { "i32": 0 },
+                  "end": { "i32": 3 },
+                  "body": [
+                    { "op": "set", "name": "total", "value": { "call": "math.sqrt", "args": [{ "var": "total" }] } }
+                  ]
+                },
+                { "op": "return", "value": { "var": "total" } }
+              ]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(Math.Sqrt(Math.Sqrt(Math.Sqrt(81.0))), ((F64Value)result.Value!).Value, precision: 10);
+        Assert.Equal(3, result.ResourceUsage.HostCalls);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
     }
 
     [Theory]

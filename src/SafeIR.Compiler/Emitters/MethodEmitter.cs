@@ -174,11 +174,18 @@ internal sealed class MethodEmitter
         }
 
         var kind = _stackPlan.LocalKind(name);
-        var local = _il.DeclareLocal(kind == StackKind.I32 ? typeof(int) : typeof(SandboxValue));
+        var local = _il.DeclareLocal(LocalType(kind));
         var entry = (local, kind);
         _locals[name] = entry;
         return entry;
     }
+
+    private static Type LocalType(StackKind kind)
+        => kind switch {
+            StackKind.I32 => typeof(int),
+            StackKind.F64 => typeof(double),
+            _ => typeof(SandboxValue)
+        };
 
     private void EmitReturnValue()
     {

@@ -120,6 +120,29 @@ public sealed class BindingRegistryValidationTests
     }
 
     [Fact]
+    public void Binding_registry_rejects_audited_direct_runtime_method()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                BindingSafety.PureIntrinsic,
+                auditLevel: AuditLevel.PerCall)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
+    }
+
+    [Fact]
+    public void Binding_registry_rejects_direct_runtime_method_with_wrong_signature()
+    {
+        var ex = Assert.Throws<SandboxValidationException>(() => Build(
+            TestBinding(
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                BindingSafety.PureIntrinsic)));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
+    }
+
+    [Fact]
     public void Binding_registry_rejects_side_effecting_binding_without_capability()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
@@ -195,7 +218,8 @@ public sealed class BindingRegistryValidationTests
         BindingCostModel? costModel = null,
         SandboxEffect effects = SandboxEffect.Cpu,
         string id = "test.binding",
-        string? requiredCapability = null)
+        string? requiredCapability = null,
+        AuditLevel auditLevel = AuditLevel.None)
         => new(
             id,
             SemVersion.One,
@@ -204,7 +228,7 @@ public sealed class BindingRegistryValidationTests
             effects,
             requiredCapability,
             costModel ?? BindingCostModel.Fixed(1),
-            AuditLevel.None,
+            auditLevel,
             safety,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
             compiled);

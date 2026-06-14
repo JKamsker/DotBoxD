@@ -32,7 +32,14 @@ internal sealed class ExpressionEmitter
     }
 
     public void EmitAs(Expression expression, StackKind want)
-        => Coerce(EmitValue(expression), want);
+    {
+        if (want == StackKind.F64 && F64MathIntrinsicEmitter.TryEmit(expression, _bindings, _il, EmitAs))
+        {
+            return;
+        }
+
+        Coerce(EmitValue(expression), want);
+    }
 
     public void Coerce(StackKind have, StackKind want)
     {
@@ -46,8 +53,14 @@ internal sealed class ExpressionEmitter
             case (StackKind.I32, StackKind.Boxed):
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
                 break;
+            case (StackKind.F64, StackKind.Boxed):
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
+                break;
             case (StackKind.Boxed, StackKind.I32):
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsI32)));
+                break;
+            case (StackKind.Boxed, StackKind.F64):
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsF64)));
                 break;
             case (StackKind.Boxed, StackKind.Bool):
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsBool)));
@@ -86,6 +99,12 @@ internal sealed class ExpressionEmitter
         {
             EmitInt32(_il, i32.Value);
             return StackKind.I32;
+        }
+
+        if (value is F64Value f64)
+        {
+            _il.Emit(OpCodes.Ldc_R8, f64.Value);
+            return StackKind.F64;
         }
 
         CompiledLiteralEmitter.Emit(_il, value);

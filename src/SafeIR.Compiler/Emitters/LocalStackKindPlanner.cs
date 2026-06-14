@@ -25,8 +25,8 @@ internal sealed class LocalStackKindPlanner
         => expression switch
         {
             LiteralExpression literal => literal.Value.Type,
-            VariableExpression variable => localKinds.TryGetValue(variable.Name, out var kind) && kind == StackKind.I32
-                ? SandboxType.I32
+            VariableExpression variable => localKinds.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
+                ? type
                 : LocalSeedType(variable.Name),
             UnaryExpression { Operator: "!" } => SandboxType.Bool,
             UnaryExpression unary => Infer(unary.Operand, localKinds),
@@ -48,7 +48,7 @@ internal sealed class LocalStackKindPlanner
         ScanLocalKinds(_function.Body, candidates);
         foreach (var pair in candidates)
         {
-            if (pair.Value == StackKind.I32)
+            if (pair.Value != StackKind.Boxed)
             {
                 _localKinds[pair.Key] = pair.Value;
             }
@@ -91,7 +91,18 @@ internal sealed class LocalStackKindPlanner
     }
 
     private static StackKind KindOf(SandboxType? type)
-        => type is { Name: "I32" } ? StackKind.I32 : StackKind.Boxed;
+        => type switch {
+            { Name: "I32" } => StackKind.I32,
+            { Name: "F64" } => StackKind.F64,
+            _ => StackKind.Boxed
+        };
+
+    private static SandboxType? TypeOf(StackKind kind)
+        => kind switch {
+            StackKind.I32 => SandboxType.I32,
+            StackKind.F64 => SandboxType.F64,
+            _ => null
+        };
 
     private SandboxType? LocalSeedType(string name)
     {

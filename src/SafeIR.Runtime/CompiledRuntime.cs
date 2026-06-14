@@ -27,6 +27,7 @@ public static class CompiledRuntime
 {
     [MethodImpl(AggressiveInlining)] public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount);
     [MethodImpl(AggressiveInlining)] public static void ChargeLoopIteration(SandboxContext context, int fuelAmount) => context.ChargeLoopIteration(fuelAmount);
+    [MethodImpl(AggressiveInlining)] public static void ChargeBindingCall(SandboxContext context, string id) => context.ChargeBindingCall(context.Bindings.GetDescriptor(id));
     public static void EnterCall(SandboxContext context) => context.EnterCall();
     public static void ExitCall(SandboxContext context) => context.ExitCall();
 
@@ -171,6 +172,7 @@ public static class CompiledRuntime
     }
 
     public static SandboxValue SqrtF64(SandboxValue value) => F64(Math.Sqrt(AsF64(value)));
+    [MethodImpl(AggressiveInlining)] public static double SqrtF64Raw(double value) { var result = Math.Sqrt(value); return double.IsFinite(result) ? result : throw InvalidInput("f64 value must be finite"); }
 
     public static SandboxValue FloorF64(SandboxValue value) => F64(Math.Floor(AsF64(value)));
 

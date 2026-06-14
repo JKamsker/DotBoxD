@@ -160,6 +160,13 @@ internal sealed class ExpressionEvaluator
 
     private ValueTask<SandboxValue> EvaluateCall(CallExpression call, InterpreterFrame frame)
     {
+        if (UnaryMathIntrinsicDispatcher.IsCandidate(call.Name) &&
+            UnaryMathIntrinsicDispatcher.TryEvaluate(
+                call, this, frame, _context, _options, _moduleHash, frame.FunctionId, out var mathValue))
+        {
+            return mathValue;
+        }
+
         // Fixed-arity collection intrinsics complete synchronously and never let an
         // argument escape, so they can be dispatched straight from locals without
         // allocating a per-call argument array. Operands are evaluated in source order;

@@ -302,5 +302,47 @@ internal static class BindingRegistryValidator
         {
             diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' uses a direct compiled runtime method but is not a pure intrinsic"));
         }
+
+        if (binding.Compiled.Method != GenericBindingStub && binding.AuditLevel != AuditLevel.None)
+        {
+            diagnostics.Add(new SandboxDiagnostic("E-BINDING-COMPILED", $"binding '{binding.Id}' uses a direct compiled runtime method but requires binding audit"));
+        }
+
+        ValidateDirectCompiledSignature(binding, diagnostics);
     }
+
+    private static void ValidateDirectCompiledSignature(BindingDescriptor binding, List<SandboxDiagnostic> diagnostics)
+    {
+        if (binding.Compiled.Method == GenericBindingStub) { return; }
+
+        var expected = DirectCompiledSignature(binding.Compiled.Method);
+        if (!binding.ReturnType.Equals(expected.Return) ||
+            binding.Parameters.Count != expected.Parameters.Length)
+        {
+            diagnostics.Add(DirectSignatureDiagnostic(binding));
+            return;
+        }
+
+        for (var i = 0; i < expected.Parameters.Length; i++)
+        {
+            if (!binding.Parameters[i].Equals(expected.Parameters[i]))
+            {
+                diagnostics.Add(DirectSignatureDiagnostic(binding));
+                return;
+            }
+        }
+    }
+
+    private static (SandboxType Return, SandboxType[] Parameters) DirectCompiledSignature(string method)
+        => method switch {
+            "StringLength" => (SandboxType.I32, [SandboxType.String]),
+            "ConcatString" => (SandboxType.String, [SandboxType.String, SandboxType.String]),
+            "AbsI32" => (SandboxType.I32, [SandboxType.I32]),
+            "MinI32" or "MaxI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32]),
+            "ClampI32" => (SandboxType.I32, [SandboxType.I32, SandboxType.I32, SandboxType.I32]),
+            "SqrtF64" or "FloorF64" or "CeilF64" or "RoundF64" => (SandboxType.F64, [SandboxType.F64]),
+            _ => (SandboxType.Unit, [])
+        };
+
+    private static SandboxDiagnostic DirectSignatureDiagnostic(BindingDescriptor binding) => new("E-BINDING-COMPILED", $"binding '{binding.Id}' direct compiled runtime signature does not match the binding shape");
 }

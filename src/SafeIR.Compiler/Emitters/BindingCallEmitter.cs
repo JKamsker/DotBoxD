@@ -18,6 +18,28 @@ internal static class BindingCallEmitter
             return false;
         }
 
+        if (CanEmitDirectIntrinsic(binding))
+        {
+            var locals = new LocalBuilder[call.Arguments.Count];
+            for (var i = 0; i < call.Arguments.Count; i++)
+            {
+                emitExpression(call.Arguments[i]);
+                locals[i] = il.DeclareLocal(typeof(SandboxValue));
+                il.Emit(OpCodes.Stloc, locals[i]);
+            }
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldstr, call.Name);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCall)));
+            foreach (var local in locals)
+            {
+                il.Emit(OpCodes.Ldloc, local);
+            }
+
+            il.Emit(OpCodes.Call, Runtime(binding.Compiled.Method));
+            return true;
+        }
+
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldstr, call.Name);
         ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
@@ -28,8 +50,12 @@ internal static class BindingCallEmitter
     private static bool IsCompiledPureBinding(BindingSignature binding)
         => binding.Compiled.Kind == "RuntimeStub" &&
            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == nameof(CompiledRuntime.CallBinding) &&
            binding.RequiredCapability is null &&
            binding.Safety is BindingSafety.PureHostFacade or BindingSafety.PureIntrinsic &&
            (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+
+    private static bool CanEmitDirectIntrinsic(BindingSignature binding)
+        => binding.Compiled.Method != nameof(CompiledRuntime.CallBinding) &&
+           binding.Safety == BindingSafety.PureIntrinsic &&
+           binding.AuditLevel == AuditLevel.None;
 }

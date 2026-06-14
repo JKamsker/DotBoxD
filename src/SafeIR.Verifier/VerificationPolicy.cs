@@ -49,6 +49,7 @@ public sealed record VerificationPolicy(
             new HashSet<string>(StringComparer.Ordinal) {
                 RuntimeMember("ChargeFuel", $"{SandboxContextName},{Int32Name}", VoidName),
                 RuntimeMember("ChargeLoopIteration", $"{SandboxContextName},{Int32Name}", VoidName),
+                RuntimeMember("ChargeBindingCall", $"{SandboxContextName},{StringName}", VoidName),
                 RuntimeMember("EnterCall", SandboxContextName, VoidName),
                 RuntimeMember("ExitCall", SandboxContextName, VoidName),
                 RuntimeMember("ValidateEntrypointInput", $"{SandboxValueName},{Int32Name}", VoidName),
@@ -115,6 +116,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("MaxI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("ClampI32", $"{SandboxValueName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("SqrtF64", SandboxValueName, SandboxValueName),
+                RuntimeMember("SqrtF64Raw", DoubleName, DoubleName),
                 RuntimeMember("FloorF64", SandboxValueName, SandboxValueName),
                 RuntimeMember("CeilF64", SandboxValueName, SandboxValueName),
                 RuntimeMember("RoundF64", SandboxValueName, SandboxValueName),
