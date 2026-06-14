@@ -13,8 +13,8 @@ all driven by Roslyn source generators (no runtime reflection on the hot path):
 
 - **Services** — the host implements a contract; clients call it remotely over RPC.
 - **Kernels** — a client supplies validated logic the host runs safely inside a metered sandbox.
-- **Pushdown** — a kernel composes the host's own services *server-side*, so many small remote
-  calls collapse into one validated round-trip.
+- **Pushdown** — a plugin ships its *own* sandboxed batch operation that runs *server-side*, looping
+  over the host's existing fine-grained bindings so many small remote calls collapse into one round-trip.
 
 The Services and channel libraries target `netstandard2.1`, so they run on **Unity / IL2CPP**.
 The Kernels and Pushdown stack targets `net10.0`.
@@ -23,9 +23,10 @@ The Kernels and Pushdown stack targets `net10.0`.
 
 ## The 3 ways to use one contract
 
-All three snippets below are distilled from the runnable acceptance sample at
-[`samples/Pushdown/DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd) — they use the real,
-compiling API.
+The snippets below use the real, compiling API. The Services and Kernels examples are distilled from the
+runnable acceptance sample at [`samples/Pushdown/DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd);
+the Pushdown example uses the kernel-RPC-service surface
+(see [`samples/Pushdown/PluginIpc`](samples/Pushdown/PluginIpc) and the proxy tests).
 
 ### 1. Services — define a contract, host it, call it remotely
 
@@ -102,38 +103,54 @@ if (result.Succeeded && result.Value is I32Value total)
 }
 ```
 
-### 3. Pushdown — compose host services next to the data
+### 3. Pushdown — plugins ship server-side batch operations
 
-A naive client makes one remote call per cart line, then sums the results. With pushdown, the host
-exposes a **service method** — `ComputeCartTotalAsync`, part of the same `[DotBoxDService]` contract —
-that composes its **own** catalog data and runs a validated **kernel** server-side, so the client
-submits the whole cart in **one** round-trip.
-
-> The method is *not itself* a kernel — it's an ordinary service method that **runs** one. The kernel is
-> `CartTotalKernel` from step 2 (sandboxed JSON IR, validated + fuel-metered by `SandboxHost`); here it
-> is invoked as `_kernel`.
+This is the payoff. The host is typically **frozen at release** and exposes only **fine-grained**
+bindings (e.g. "kill *one* monster"); it ships **no batch operations**. A client that needs to act on
+many entities would otherwise make **one remote call per entity**. With pushdown, a **plugin supplies its
+own server-side aggregate** as a sandboxed **kernel RPC service**: the analyzer lowers its C# batch method
+to verified IR that runs server-side, looping over the host's *existing* bindings. The server is never
+recompiled — only the plugin changes — and N round-trips collapse into **one**.
 
 ```csharp
-// Host side: a normal [DotBoxDService] method that runs the validated CartTotalKernel server-side.
-public async ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken ct = default)
+// The host (frozen at release) exposes only a fine-grained binding — there is NO batch method here.
+public interface IGameWorld
 {
-    // Host-side composition: turn each cart line into a subtotal using the host's own catalog.
-    var subtotals = new int[cart.Lines.Length];
-    for (var i = 0; i < cart.Lines.Length; i++)
-        subtotals[i] = PriceOf(cart.Lines[i].ItemId) * cart.Lines[i].Quantity;
-
-    // _kernel is the CartTotalKernel: the summation runs inside the metered sandbox, next to the service.
-    var (total, fuelUsed) = await _kernel.RunAsync(subtotals, ct);
-    return new CartTotal(total, fuelUsed);
+    [HostBinding("host.world.kill", "game.world.monster.write.kill",
+                 SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
+    bool Kill(int id);
 }
 
-// Client side: one submission instead of N price lookups.
-var pushdown = await catalog.ComputeCartTotalAsync(cart);
-// Round-trip win: 4 remote calls -> 1 (pushdown).
+// A PLUGIN adds its own batch aggregate. `KillMonsters` does not exist on the host — the plugin ships it.
+// The analyzer lowers this method to verified, capability-gated, fuel-metered IR (a sandboxed kernel).
+public interface IMonsterKillerService { List<KillResult> KillMonsters(List<int> monsterIds); }
+public readonly record struct KillResult(int MonsterId, bool Success);
+
+[KernelRpcService("monster-killer")]
+public sealed partial class MonsterKillerKernel
+{
+    public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
+    {
+        var results = new List<KillResult>();
+        foreach (var id in monsterIds)
+            results.Add(new KillResult(id, ctx.Host<IGameWorld>().Kill(id))); // calls the host's existing binding
+        return results;
+    }
+}
+
+// Server installs the plugin's kernel; the caller invokes it in ONE round-trip:
+await server.RegisterRpcServiceAsync<IMonsterKillerService, MonsterKillerKernel>();
+List<KillResult> killed = server.RpcService<IMonsterKillerService>().KillMonsters(ids); // 1 round-trip, not N
 ```
 
-In the end-to-end sample, a 4-line cart that takes **4 remote calls** the naive way collapses into
-**1 round-trip** with pushdown, and both paths produce the identical total (575).
+The batch logic is **author-supplied**, so it runs as a validated sandboxed kernel under the same trust
+model as event kernels: it can reach only the host bindings the server already exposes, gated by
+capabilities and fuel/quota limits, and it can take and return complex objects and lists of objects
+(via the IR `Record` type). See [`samples/Pushdown/PluginIpc`](samples/Pushdown/PluginIpc) for the
+kernel-RPC-service-over-IPC sample and
+[`docs/design/plugin-fluent-hooks-api/followups.md`](docs/design/plugin-fluent-hooks-api/followups.md)
+for the full design. (The simpler [`DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd) sample shows a
+host-owned aggregate calling a kernel — a variant of the same server-side-execution idea.)
 
 ---
 

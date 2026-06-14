@@ -1,32 +1,40 @@
 # Pushdown
 
-**Pushdown** turns many small remote service calls into **one** validated server-side execution. A
-kernel composes the host's own service surface *next to the data*, so the client submits the work once
-instead of making N round-trips.
+**Pushdown** turns many small remote calls into **one** validated server-side execution. The host is
+typically **frozen at release** and exposes only **fine-grained** bindings — it ships no batch
+operations. Instead of the client looping (one round-trip per entity), a **plugin ships its own
+server-side batch aggregate** as a sandboxed **kernel RPC service**: the analyzer lowers a C# batch
+method to verified IR that runs server-side, looping over the host's *existing* bindings. Only the
+plugin changes; the server is never recompiled.
 
-Without pushdown:
+Without pushdown (host has only `Kill(id)`):
 
 ```text
-client -> GetUnitPrice(item1)
-client -> GetUnitPrice(item2)
+client -> Kill(1)
+client -> Kill(2)
 ...           (N round-trips)
 ```
 
-With pushdown:
+With pushdown (plugin ships a `[KernelRpcService]` batch aggregate):
 
 ```text
-client -> submit validated kernel once
-host   -> runs the kernel locally against the service + its data
-host   -> returns one compact result
+client -> KillMonsters([1..N])         (1 round-trip)
+host   -> runs the plugin's verified kernel, looping ctx.Host<IGameWorld>().Kill(id) server-side
+host   -> returns List<KillResult>     (one compact result)
 ```
 
-The bridge lives in `DotBoxD.Pushdown.Services` (a MessagePack IPC addon that composes kernels with
-services). It is the direct realization of the merge: the **Services** (RPC) and **Kernels** (sandbox)
-stacks compiling and running together.
+The mechanism: mark a `partial class` `[KernelRpcService("id")]` with one public batch method whose
+trailing `HookContext` parameter exposes host bindings (`ctx.Host<T>()`); the
+[`DotBoxD.Plugins.Analyzer`](../../src/CodeGeneration/DotBoxD.Plugins.Analyzer) lowers it to verified IR
+(supporting `foreach`, `if`/`else`, locals, host binding calls, DTO construction, and `List<T>`
+accumulation — complex objects ride the IR `Record` type). The host installs it with
+`server.RegisterRpcServiceAsync<TService, TKernel>()` and the caller invokes
+`server.RpcService<TService>().Method(args)`. Over a process boundary, the
+`DotBoxD.Pushdown.Services` MessagePack IPC addon forwards install + invoke.
 
-Pushdown executes kernels under the same validation + metering as any other kernel, and should run under
-its own capability policy — a method reachable via normal RPC is not automatically reachable from a
-kernel.
+Because the batch logic is author-supplied, it runs as a validated sandboxed kernel: it reaches only the
+host bindings the server already exposes, under the same capability + fuel/quota limits as event kernels.
+A method reachable via normal RPC is **not** automatically reachable from a kernel.
 
 **See also:** the runnable [`samples/Pushdown/DotBoxD.EndToEnd`](../../samples/Pushdown/DotBoxD.EndToEnd)
 (prints the round-trip win) and [`samples/Pushdown/PluginIpc`](../../samples/Pushdown/PluginIpc).
