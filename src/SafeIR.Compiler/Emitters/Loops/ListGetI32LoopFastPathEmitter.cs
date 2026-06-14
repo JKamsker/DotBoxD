@@ -67,6 +67,7 @@ internal static class ListGetI32LoopFastPathEmitter
         var iterations = il.DeclareLocal(typeof(int));
         var count = il.DeclareLocal(typeof(int));
         var readFuel = il.DeclareLocal(typeof(long));
+        var reader = il.DeclareLocal(typeof(object));
         EmitBound(range.Start, il, declare);
         il.Emit(OpCodes.Stloc, index);
         EmitBound(range.End, il, declare);
@@ -80,6 +81,10 @@ internal static class ListGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Ldloc, end);
         il.Emit(OpCodes.Bge, finish);
 
+        CompiledMeterEmitter.Fuel(il, 1);
+        il.Emit(OpCodes.Ldloc, declare(plan.Source).Local);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderRaw)));
+        il.Emit(OpCodes.Stloc, reader);
         il.Emit(OpCodes.Ldloc, declare(plan.Source).Local);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListCountRaw)));
         il.Emit(OpCodes.Stloc, count);
@@ -101,10 +106,10 @@ internal static class ListGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Ldloc, readFuel);
         il.Emit(OpCodes.Ldloc, iterations);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBulkFuel)));
-        EmitLoopBody(fastLoop, finish, index, end, readFuel, range.LocalName, plan, il, declare, chargeReadFuel: false);
+        EmitLoopBody(fastLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: false);
 
         il.MarkLabel(fallback);
-        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, range.LocalName, plan, il, declare, chargeReadFuel: true);
+        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: true);
         il.MarkLabel(finish);
     }
 
@@ -114,6 +119,7 @@ internal static class ListGetI32LoopFastPathEmitter
         LocalBuilder index,
         LocalBuilder end,
         LocalBuilder readFuel,
+        LocalBuilder reader,
         string loopLocal,
         LoopPlan plan,
         ILGenerator il,
@@ -137,12 +143,12 @@ internal static class ListGetI32LoopFastPathEmitter
         if (plan.AddToTarget)
         {
             il.Emit(OpCodes.Ldloc, declare(plan.Target).Local);
-            EmitListGet(plan, il, declare);
+            EmitListGet(plan, reader, il, declare);
             il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AddI32Raw)));
         }
         else
         {
-            EmitListGet(plan, il, declare);
+            EmitListGet(plan, reader, il, declare);
         }
 
         il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
@@ -155,12 +161,13 @@ internal static class ListGetI32LoopFastPathEmitter
 
     private static void EmitListGet(
         LoopPlan plan,
+        LocalBuilder reader,
         ILGenerator il,
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
-        il.Emit(OpCodes.Ldloc, declare(plan.Source).Local);
+        il.Emit(OpCodes.Ldloc, reader);
         plan.Index.Emit(il, declare);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListGetI32Raw)));
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderGetRaw)));
     }
 
     private static bool TryGetAccumulatingGet(

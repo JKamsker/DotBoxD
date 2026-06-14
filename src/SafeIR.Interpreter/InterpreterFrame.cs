@@ -145,6 +145,30 @@ internal sealed class InterpreterFrame
                 "expected I32 value"));
     }
 
+    public bool TryReadListInt32ItemsSlot(int slot, out int[] items)
+    {
+        if (_slots[slot] is not ListValue list)
+        {
+            items = [];
+            return false;
+        }
+
+        var values = list.Values;
+        items = new int[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is not I32Value item)
+            {
+                items = [];
+                return false;
+            }
+
+            items[i] = item.Value;
+        }
+
+        return true;
+    }
+
     public bool TryGetMapSlot(string name, out int slot)
     {
         slot = _layout.GetSlot(name);

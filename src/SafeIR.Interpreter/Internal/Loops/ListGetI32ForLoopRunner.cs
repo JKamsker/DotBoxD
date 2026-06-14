@@ -24,7 +24,8 @@ internal static class ListGetI32ForLoopRunner
         var iterations = (long)end - start;
         var count = frame.ReadListCountSlot(plan.SourceSlot);
         var readFuel = SandboxCollectionFuel.Read(count);
-        if (!context.CanBulkChargeLoopIterations(iterations, plan.LoopFuelPerIteration) ||
+        if (!frame.TryReadListInt32ItemsSlot(plan.SourceSlot, out var items) ||
+            !context.CanBulkChargeLoopIterations(iterations, plan.LoopFuelPerIteration) ||
             !context.CanBulkChargeFuel(readFuel, iterations))
         {
             return false;
@@ -38,7 +39,7 @@ internal static class ListGetI32ForLoopRunner
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
-            var item = frame.ReadListInt32ItemSlot(plan.SourceSlot, plan.Index.Evaluate(frame, context));
+            var item = ReadItem(items, plan.Index.Evaluate(frame, context));
             var value = plan.AddToTarget
                 ? SandboxInt32Math.Add(frame.ReadRawInt32Slot(plan.TargetSlot), item)
                 : item;
@@ -52,6 +53,18 @@ internal static class ListGetI32ForLoopRunner
         }
 
         return true;
+    }
+
+    private static int ReadItem(int[] items, int index)
+    {
+        if ((uint)index >= (uint)items.Length)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "list index is out of range"));
+        }
+
+        return items[index];
     }
 
     private static bool TryCreatePlan(

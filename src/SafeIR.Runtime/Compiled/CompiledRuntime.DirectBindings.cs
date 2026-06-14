@@ -58,6 +58,36 @@ public static partial class CompiledRuntime
         return values[index] is I32Value item ? item.Value : throw InvalidInput("expected I32 value");
     }
 
+    public static object ListI32ReaderRaw(SandboxValue value)
+    {
+        var list = value as ListValue ?? throw InvalidInput("expected list value");
+        var values = list.Values;
+        var items = new int[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (values[i] is not I32Value item)
+            {
+                throw InvalidInput("expected I32 value");
+            }
+
+            items[i] = item.Value;
+        }
+
+        return items;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ListI32ReaderGetRaw(object reader, int index)
+    {
+        var items = (int[])reader;
+        if ((uint)index >= (uint)items.Length)
+        {
+            throw InvalidInput("list index is out of range");
+        }
+
+        return items[index];
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int MapCountRaw(SandboxValue value)
         => value is MapValue map ? map.Values.Count : throw InvalidInput("expected map value");

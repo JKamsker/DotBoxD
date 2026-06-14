@@ -31,7 +31,8 @@ dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompila
 | Direct `list.get` I32 loop adapter | `904087c` | `--probe-matrix` | `list.get` improved from compiled 74.7 ms / 137.6x and interpreted 270.1 ms / 497.7x to compiled 24.0 ms / 45.9x and interpreted 18.2 ms / 34.7x by bulk-charging collection read fuel and emitting raw I32 index/value operations. |
 | Direct `map.get` I32 loop adapter | `fe6cb0c` | `--probe-matrix` | `map.get` improved from compiled 220.4 ms / 44.4x and interpreted 170.0 ms / 34.2x to compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x by bulk-charging map read fuel while preserving per-iteration key literal charging. |
 | Hoisted `map.get` literal-key lookup | `99db2cb` | `--probe-matrix` | `map.get` improved from compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x to compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x by resolving the immutable literal-key lookup once and still charging the key literal in the loop. |
-| Bulk `map.get` key literal charging | this commit | `--probe-matrix` | `map.get` improved from compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x to compiled 19.7 ms / 4.1x and interpreted 0.5 ms / 0.1x by bulk-charging the literal key value and reusing the hoisted key/result in the loop. |
+| Bulk `map.get` key literal charging | `87765f0` | `--probe-matrix` | `map.get` improved from compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x to compiled 19.7 ms / 4.1x and interpreted 0.5 ms / 0.1x by bulk-charging the literal key value and reusing the hoisted key/result in the loop. |
+| Direct `list.get` I32 reader | this commit | `--probe-matrix` | `list.get` improved from compiled 25.0 ms / 47.7x and interpreted 18.2 ms / 34.8x to compiled 19.3 ms / 36.6x and interpreted 11.0 ms / 20.9x by building an I32 reader once and reusing raw items in the loop. |
 
 ## Matrix After `31fa6fe`
 
@@ -135,6 +136,19 @@ list.count intrinsic              0.2 ms     16.5 ms  77.9        0.9 ms    4.4
 list.get intrinsic                0.5 ms     25.0 ms  47.7       18.2 ms   34.8
 map.get intrinsic                 4.8 ms     19.7 ms   4.1        0.5 ms    0.1
 local function call               0.2 ms     22.0 ms 109.2       23.0 ms  113.8
+```
+
+## Matrix After Direct List Get I32 Reader
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.4 ms     38.0 ms   1.6      106.4 ms    4.6
+math.sqrt binding                 7.6 ms     23.2 ms   3.0       18.9 ms    2.5
+string.length binding             0.2 ms     15.8 ms  79.1        0.9 ms    4.8
+list.count intrinsic              0.2 ms     18.4 ms  87.1        1.0 ms    4.7
+list.get intrinsic                0.5 ms     19.3 ms  36.6       11.0 ms   20.9
+map.get intrinsic                 4.8 ms     18.3 ms   3.8        0.5 ms    0.1
+local function call               0.2 ms     21.2 ms 104.9       23.1 ms  114.6
 ```
 
 ## Current Gaps
