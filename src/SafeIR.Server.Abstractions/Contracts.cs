@@ -48,6 +48,32 @@ public sealed class CapabilityAttribute(string id) : Attribute
     public string Id { get; } = id;
 }
 
+/// <summary>
+/// Marks a reusable helper method whose body the SafeIR generator <b>inlines</b> into the kernel/hook IR
+/// at every call site, so plugin authors can factor shared gate/handler logic out of a
+/// <c>Where</c>/<c>Select</c>/<c>InvokeKernel</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
+/// without leaving the sandbox. For example:
+/// <code>
+/// server.Hooks.On&lt;MonsterAggroEvent&gt;()
+///     .Where((e, ctx) => IsBullying(e.MonsterLevel, e.PlayerLevel))
+///     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+///
+/// [KernelMethod]
+/// public static bool IsBullying(int monsterLevel, int playerLevel) =&gt; monsterLevel - playerLevel &gt;= 3;
+/// </code>
+/// The call lowers exactly as if the body were written inline: each parameter is replaced by its
+/// already-lowered argument IR, and any <c>[HostBinding]</c> calls or <c>[Capability]</c>-gated reads
+/// inside the body contribute their capabilities to the calling kernel's manifest.
+/// <para>
+/// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than
+/// miscompiling): the method must be <c>static</c>, have an expression body or a single
+/// <c>return</c> statement, and use only the supported scalar types (<c>bool</c>, <c>int</c>,
+/// <c>long</c>, <c>double</c>, <c>string</c>) for its parameters and return. Recursion is not allowed.
+/// </para>
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class KernelMethodAttribute : Attribute;
+
 public interface IEventKernel<TEvent>
 {
     bool ShouldHandle(TEvent e, HookContext context);

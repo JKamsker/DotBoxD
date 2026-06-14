@@ -31,6 +31,11 @@ internal static class SafeIrInvocationExpressionLowerer
             return hostCall;
         }
 
+        if (SafeIrKernelMethodInliner.TryInline(invocation, context, lowerExpression) is { } inlined)
+        {
+            return inlined;
+        }
+
         if (invocation.Expression is MemberAccessExpressionSyntax member &&
             string.Equals(member.Name.Identifier.ValueText, EqualsMethodName, StringComparison.Ordinal))
         {

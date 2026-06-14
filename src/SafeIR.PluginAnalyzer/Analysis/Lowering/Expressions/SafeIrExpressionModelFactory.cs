@@ -228,6 +228,15 @@ internal static class SafeIrExpressionModelFactory
         string name,
         SafeIrExpressionLoweringContext context)
     {
+        // Inside an inlined [KernelMethod] body: a reference to one of the method's parameters resolves to
+        // the already-lowered IR of the call-site argument. Checked first so a parameter shadows any
+        // same-named live setting (correct C# scoping).
+        if (context.InlinedBindings is { } bindings &&
+            bindings.TryGetValue(name, out var bound))
+        {
+            return bound;
+        }
+
         // A Select-projected element: inline its already-lowered IR wherever the downstream lambda
         // names it (compile-time substitution; the projection's event-property refs ride along).
         if (context.ProjectedElementName is { } projectedName &&

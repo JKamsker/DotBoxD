@@ -23,6 +23,7 @@ internal static class SafeIrGenerationNames
         public const string RangeAttribute = "System.ComponentModel.DataAnnotations.RangeAttribute";
         public const string HostBindingAttribute = "SafeIR.Server.Abstractions.HostBindingAttribute";
         public const string CapabilityAttribute = "SafeIR.Server.Abstractions.CapabilityAttribute";
+        public const string KernelMethodAttribute = "SafeIR.Server.Abstractions.KernelMethodAttribute";
     }
 
     public static class Contracts

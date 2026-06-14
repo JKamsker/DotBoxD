@@ -4,6 +4,8 @@ using Microsoft.CodeAnalysis;
 
 internal sealed class SafeIrExpressionLoweringContext
 {
+    private readonly IReadOnlyCollection<string>? _inlineStack;
+
     public SafeIrExpressionLoweringContext(
         string eventParameterName,
         EquatableArray<EventPropertyModel> eventProperties,
@@ -13,7 +15,9 @@ internal sealed class SafeIrExpressionLoweringContext
         string? projectedElementName = null,
         SafeIrExpressionModel? projectedElement = null,
         ICollection<string>? capabilities = null,
-        ICollection<string>? effects = null)
+        ICollection<string>? effects = null,
+        IReadOnlyDictionary<string, SafeIrExpressionModel>? inlinedBindings = null,
+        IReadOnlyCollection<string>? inlineStack = null)
     {
         EventParameterName = eventParameterName;
         EventProperties = eventProperties;
@@ -24,6 +28,8 @@ internal sealed class SafeIrExpressionLoweringContext
         ProjectedElement = projectedElement;
         Capabilities = capabilities;
         Effects = effects;
+        InlinedBindings = inlinedBindings;
+        _inlineStack = inlineStack;
     }
 
     public string EventParameterName { get; }
@@ -59,4 +65,53 @@ internal sealed class SafeIrExpressionLoweringContext
     /// throwaway sub-expression contexts.
     /// </summary>
     public ICollection<string>? Effects { get; }
+
+    /// <summary>
+    /// When lowering an inlined <c>[KernelMethod]</c> body: each of the method's parameter names bound to
+    /// the already-lowered IR of the corresponding call-site argument. An identifier matching one of these
+    /// substitutes the bound IR directly (compile-time inlining, the same mechanism as
+    /// <see cref="ProjectedElement"/> generalized to N parameters). Null outside an inlined body.
+    /// </summary>
+    public IReadOnlyDictionary<string, SafeIrExpressionModel>? InlinedBindings { get; }
+
+    /// <summary>True while <paramref name="methodKey"/> is already being inlined further up the stack
+    /// (used to reject recursive <c>[KernelMethod]</c> chains rather than inlining forever).</summary>
+    public bool IsInlining(string methodKey)
+        => _inlineStack is { } stack && stack.Contains(methodKey);
+
+    /// <summary>
+    /// Builds the sub-context used to lower an inlined <c>[KernelMethod]</c> body: switches to the body's
+    /// own semantic model, exposes the parameter <paramref name="bindings"/>, and pushes
+    /// <paramref name="methodKey"/> onto the inline stack. The event/live-setting scopes are dropped (a
+    /// static method sees only its parameters) while the capability/effect sinks are kept so any
+    /// <c>[HostBinding]</c> calls inside the body still contribute to the calling kernel's manifest.
+    /// </summary>
+    public SafeIrExpressionLoweringContext ForInlinedMethod(
+        SemanticModel bodySemanticModel,
+        IReadOnlyDictionary<string, SafeIrExpressionModel> bindings,
+        string methodKey)
+    {
+        var stack = new HashSet<string>(StringComparer.Ordinal);
+        if (_inlineStack is not null)
+        {
+            foreach (var entry in _inlineStack)
+            {
+                stack.Add(entry);
+            }
+        }
+
+        stack.Add(methodKey);
+        return new SafeIrExpressionLoweringContext(
+            eventParameterName: string.Empty,
+            eventProperties: default,
+            liveSettings: default,
+            bodySemanticModel,
+            CancellationToken,
+            projectedElementName: null,
+            projectedElement: null,
+            capabilities: Capabilities,
+            effects: Effects,
+            inlinedBindings: bindings,
+            inlineStack: stack);
+    }
 }
