@@ -529,3 +529,21 @@ fused body amortizes dispatch; structured loops with a condition + multiple node
 i64 arithmetic still boxes in both modes — no `I64` `StackKind` (compiler) or raw i64 frame slots (interpreter).
 Closing it needs that infrastructure across both tiers (larger than the entire f64 effort) for an uncommon type.
 This is the sole remaining *fixable* (not floor) corpus gap; deferred on cost/benefit, not on possibility.
+
+## i64 round (lambda-allocation bug + compiled unboxing)
+
+Added an `i64 arithmetic loop` probe (`(total*5+7) % 1000003`) and found a real bug: `SandboxInt64Math`'s
+Add/Sub/Mul/Negate used `Checked(() => checked(...))`, allocating a capturing closure **per op**. Inlined the
+try/catch (identical overflow semantics) — broad win for all i64 work in both tiers. Then added compiled i64
+unboxing: `StackKind.I64`, `*I64Raw` helpers (checked), i64 raw arithmetic in `EmitBinary`, I64<->Boxed
+coercions, `Ldc_I8` literals, verifier allowlist.
+
+- i64 arithmetic compiled: 43.7ms/16.8x -> **15.6ms/5.6x** (lambda fix + unboxing).
+- i64 interpreted still boxes (~280x, GC-noisy) — needs unboxed interpreter frame slots.
+
+### Remaining i64 parity (mirroring + frame work; the open continuation)
+
+- **Compiled i64 5.6x -> ~2x:** needs an i64 loop fast-path with bulk metering (mirror I32LoopFastPathEmitter +
+  a RawI64ExpressionPlan). Currently i64 loops use the general per-node-metered path. Medium (mostly mirroring).
+- **Interpreted i64:** needs unboxed i64 in the interpreter — raw i64 frame slots in InterpreterFrame (the
+  delicate part), an I64ExpressionPlan, and an I64ForLoopRunner (mirror the f64 trio). Larger.
