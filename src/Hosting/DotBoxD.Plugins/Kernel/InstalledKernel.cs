@@ -20,6 +20,7 @@ public sealed partial class InstalledKernel
     private readonly PendingLiveUpdateQueue _pendingLiveUpdates = new();
     private readonly CancellationTokenSource _revocation = new();
     private readonly object? _ownerId;
+    private readonly SandboxExecutionOptions _executionOptions;
     private int _revoked;
 
     internal InstalledKernel(
@@ -38,6 +39,7 @@ public sealed partial class InstalledKernel
         Value = LiveSettingStore.FromDefinitions(Manifest.LiveSettings);
         _entrypoints = package.Entrypoints;
         _liveStateSync = new LiveStateSyncRegistry(GetUpdateMode);
+        _executionOptions = new SandboxExecutionOptions { Mode = executionMode, SuppressSuccessfulRunSummaryAudit = true };
     }
 
     public PluginPackage Package { get; }
@@ -249,7 +251,7 @@ public sealed partial class InstalledKernel
                 _plan,
                 entrypoint,
                 input,
-                new SandboxExecutionOptions { Mode = _executionMode },
+                _executionOptions,
                 executionCancellation.Token)
             .ConfigureAwait(false);
         _executionObserver.Record(entrypoint, _executionMode, result);

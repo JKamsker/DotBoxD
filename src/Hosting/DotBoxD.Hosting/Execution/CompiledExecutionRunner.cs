@@ -37,7 +37,11 @@ internal static class CompiledExecutionRunner
             WriteCacheInvalidated(audit, runId, startedAt, plan, artifact);
             var value = artifact.Entrypoint(context, input);
             EnsureReturnType(plan, entrypoint, value);
-            WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
+            if (!options.SuppressSuccessfulRunSummaryAudit)
+            {
+                WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
+            }
+
             return ValueTask.FromResult(Result(plan, artifact, budget, audit, true, value, null));
         }
         catch (OperationCanceledException)

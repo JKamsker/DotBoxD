@@ -15,6 +15,7 @@ they are not BenchmarkDotNet statistical reports.
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-examples
 ```
 
 ## History
@@ -36,6 +37,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Direct `list.get` modulo index shortcut | `a514d91` | `--probe-matrix` | `list.get` interpreted improved from 11.0 ms / 20.9x to 1.7 ms / 3.3x by recognizing raw variable remainder indexes such as `i % 3`; compiled stayed about flat at 19.7 ms / 37.4x. |
 | Compiled `list.get` cyclic accumulator | `d134853` | `--probe-matrix` | Same-machine baseline from `a514d91` measured compiled `list.get` at 19.4 ms / 36.5x. This step measured 18.2 ms / 34.0x by replacing the zero-based `total += items[i % constant]` emitted loop with a verifier-allowlisted bulk helper. |
 | Nested F64 binding crossings | this commit | `--probe-matrix` | Added `math.sqrt x3 binding`, which calls `math.sqrt` three times per loop iteration. Same-machine baseline from `d134853` measured interpreted at 472.1 ms / 40.5x and compiled at 28.8 ms / 2.5x. This step measured interpreted at 20.3 ms / 1.8x and compiled at 27.5 ms / 2.4x while charging all 3 binding calls per iteration. |
+| Example workflow dispatch probe and plugin hot-path trims | this commit | `--probe-examples` | Added steady-state example coverage for a native hook chain versus a sandboxed JSON plugin. The original setup-inclusive probe exposed a large gap (`mixed fire/ice` compiled 3896.1 ms / 4954.3x, interpreted 255.2 ms / 324.5x). After separating setup from dispatch and trimming successful run summaries, empty audit snapshots, revocation checks, and default reflection compiled-cache hits, the dispatch-only probe measured `mixed fire/ice` native hook 9.6 ms, compiled 637.0 ms, interpreted 507.7 ms; `predicate miss` native hook 4.3 ms, compiled 129.3 ms, interpreted 170.8 ms; `predicate hit` native hook 3.2 ms, compiled 281.4 ms, interpreted 261.0 ms. This step improves diagnosability and removes avoidable overhead, but leaves plugin workflow dispatch far above near-native speed. |
 
 ## Matrix After `31fa6fe`
 
@@ -352,7 +354,6 @@ Decision (user-confirmed): accept 7.2x as the documented interpreter floor for c
 - `trivial no-loop` (compiled 12.2x): a single no-op invocation isolating fixed host-pipeline overhead
   (~0.5 ms, down from the ~16 ms per-call re-emit floor we fixed). Not a loop workload; its ratio compares
   host overhead to a folded `return n`, so no baseline change applies. Kept as a diagnostic row.
-
 ## Expanded coverage round (f64 arithmetic, nested loop, branch-in-loop)
 
 Probing patterns *outside* the original eight cases surfaced two compiled rogues that the original matrix

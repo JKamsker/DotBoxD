@@ -57,7 +57,7 @@ internal sealed class PluginExecutionObserver
 
     public void Record(string entrypoint, ExecutionMode requestedMode, SandboxExecutionResult result)
     {
-        ExtractMarkers(result.AuditEvents, out var summary, out var fallbackReason);
+        ExtractMarkers(requestedMode, result, out var summary, out var fallbackReason);
         var observation = new PluginExecutionObservation(
             entrypoint,
             requestedMode,
@@ -93,12 +93,19 @@ internal sealed class PluginExecutionObserver
     // error code. This replaces two independent full-list LINQ scans, so extraction stays
     // a single pass over the events even as audit volume grows.
     private static void ExtractMarkers(
-        IReadOnlyList<SandboxAuditEvent> auditEvents,
+        ExecutionMode requestedMode,
+        SandboxExecutionResult result,
         out IReadOnlyDictionary<string, string>? summary,
         out SandboxErrorCode? fallbackReason)
     {
         summary = null;
         fallbackReason = null;
+        if (requestedMode == ExecutionMode.Interpreted && result.ActualMode == ExecutionMode.Interpreted)
+        {
+            return;
+        }
+
+        var auditEvents = result.AuditEvents;
         var fallbackFound = false;
 
         for (var i = 0; i < auditEvents.Count; i++)

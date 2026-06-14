@@ -15,13 +15,15 @@ internal sealed class PluginEventAdapterValidationCache
     {
         ArgumentNullException.ThrowIfNull(adapter);
 
-        var shape = PluginEventShape.From(adapter);
+        var eventName = adapter.EventName;
+        var parameters = adapter.Parameters;
         if (_validatedAdapters.TryGetValue(adapter, out var cached) &&
-            cached.Value.Matches(shape))
+            cached.Value.Matches(eventName, parameters))
         {
             return;
         }
 
+        var shape = new PluginEventShape(eventName, parameters);
         KernelEntrypointValidator.Validate(manifest, plan, entrypoints, shape);
         _validatedAdapters.AddOrUpdate(adapter, new StrongBox<PluginEventShape>(shape));
     }
@@ -40,6 +42,25 @@ internal readonly struct PluginEventShape
 
     public static PluginEventShape From<TEvent>(IPluginEventAdapter<TEvent> adapter)
         => new(adapter.EventName, adapter.Parameters);
+
+    public bool Matches(string eventName, IReadOnlyList<Parameter> parameters)
+    {
+        if (!string.Equals(EventName, eventName, StringComparison.Ordinal) ||
+            Parameters.Count != parameters.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Parameters.Count; i++)
+        {
+            if (Parameters[i] != parameters[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     public bool Matches(PluginEventShape other)
     {

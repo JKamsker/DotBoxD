@@ -8,7 +8,7 @@ public sealed partial class ResourceMeter
     private const int FuelDeadlineCheckInterval = 64;
     private const int LoopDeadlineCheckInterval = 4096;
 
-    private readonly Dictionary<string, int> _callsByBinding = new(StringComparer.Ordinal);
+    private Dictionary<string, int>? _callsByBinding;
     private readonly long _deadline;
     private int _chargesSinceDeadlineCheck;
 
@@ -138,10 +138,11 @@ public sealed partial class ResourceMeter
             throw Quota($"host call budget exhausted at {bindingId}");
         }
 
-        var bindingCalls = _callsByBinding.TryGetValue(bindingId, out var existing)
+        var callsByBinding = CallsByBinding;
+        var bindingCalls = callsByBinding.TryGetValue(bindingId, out var existing)
             ? AddChecked(existing, 1, $"binding call budget exhausted at {bindingId}")
             : 1;
-        _callsByBinding[bindingId] = bindingCalls;
+        callsByBinding[bindingId] = bindingCalls;
         if (maxCallsPerRun is not null && bindingCalls > maxCallsPerRun.Value)
         {
             throw Quota($"binding call budget exhausted at {bindingId}");
@@ -229,6 +230,9 @@ public sealed partial class ResourceMeter
 
     private static SandboxRuntimeException Quota(string message)
         => new(new SandboxError(SandboxErrorCode.QuotaExceeded, message));
+
+    private Dictionary<string, int> CallsByBinding
+        => _callsByBinding ??= new Dictionary<string, int>(StringComparer.Ordinal);
 
     private static void ThrowIfNegative(long amount, string paramName)
     {

@@ -110,6 +110,7 @@ public sealed record SandboxExecutionOptions
     public bool RequireDeterministic { get; init; }
     public SandboxRunId? RunId { get; init; }
     public int AutoCompileThreshold { get; init; } = 20;
+    internal bool SuppressSuccessfulRunSummaryAudit { get; init; }
 }
 
 public enum ExecutionMode
