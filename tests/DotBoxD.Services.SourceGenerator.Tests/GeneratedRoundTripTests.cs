@@ -201,7 +201,7 @@ public class GeneratedRoundTripTests
     }
 
     [Fact]
-    public async Task DispatchAsync_WithUnknownMethod_ThrowsDotBoxDRpcNotFoundException()
+    public async Task DispatchAsync_WithUnknownMethod_ThrowsServiceNotFoundException()
     {
         const string source = """
             using DotBoxD.Services.Attributes;

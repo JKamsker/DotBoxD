@@ -108,7 +108,7 @@ public sealed class RaceConditionDeterministicTests
     {
         // A unique throwaway assembly so this never collides with any real assembly's catalog entry.
         Assembly asm = AssemblyBuilder.DefineDynamicAssembly(
-            new AssemblyName("DotBoxDRpcCatalogTest_" + Guid.NewGuid().ToString("N")),
+            new AssemblyName("RpcCatalogTest_" + Guid.NewGuid().ToString("N")),
             AssemblyBuilderAccess.Run);
 
         var faulted = new Lazy<bool>(() => false);   // thread A's attempt that faulted

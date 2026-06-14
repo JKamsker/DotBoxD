@@ -220,7 +220,7 @@ public sealed class PeerOutboundCoverageTests
     }
 
     [Fact]
-    public async Task InvokeAsync_ErrorResponse_ThrowsDotBoxDRpcRemoteException()
+    public async Task InvokeAsync_ErrorResponse_ThrowsRemoteServiceException()
     {
         var serializer = NewSerializer();
         await using var channel = new ScriptedConnection();
@@ -516,7 +516,7 @@ public sealed class PeerOutboundCoverageTests
     }
 
     [Fact]
-    public async Task InvokeAsync_ExceedingMaxPendingRequests_ThrowsDotBoxDRpcException()
+    public async Task InvokeAsync_ExceedingMaxPendingRequests_ThrowsServiceException()
     {
         var serializer = NewSerializer();
         await using var channel = new ScriptedConnection();

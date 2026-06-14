@@ -107,9 +107,9 @@ Opening raw networking or arbitrary transport objects to sandboxed code would we
 
 ## Verification
 
-- `DotBoxDRpcIpcAddonTests.Generic_transport_api_connects_over_non_named_pipe_transport`
+- `RpcIpcAddonTests.Generic_transport_api_connects_over_non_named_pipe_transport`
   demonstrates the generic API over an in-memory test transport.
-- `DotBoxDRpcIpcAddonTests.Configured_generic_client_can_provide_callback_services`
+- `RpcIpcAddonTests.Configured_generic_client_can_provide_callback_services`
   covers bidirectional client peer configuration.
 - `AddonBoundaryTests` keeps DotBoxD, MessagePack, and transport addon references out
   of Safe-IR core/runtime/hosting projects.

@@ -327,7 +327,7 @@ public sealed class RpcErrorTypesCoverageTests
 
         Assert.All(names, n => Assert.False(string.IsNullOrEmpty(n)));
         Assert.Equal(names.Length, names.Distinct().Count());
-        Assert.Equal("DotBoxDRpcInternalError", RpcErrorTypes.InternalError);
+        Assert.Equal("RpcInternalError", RpcErrorTypes.InternalError);
         Assert.Equal("DotBoxDServiceNotFound", RpcErrorTypes.ServiceNotFound);
     }
 }

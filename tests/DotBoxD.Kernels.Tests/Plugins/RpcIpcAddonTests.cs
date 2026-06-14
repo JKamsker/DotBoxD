@@ -6,7 +6,7 @@ using System.Threading.Channels;
 
 namespace DotBoxD.Kernels.Tests;
 
-public sealed class DotBoxDRpcIpcAddonTests
+public sealed class RpcIpcAddonTests
 {
     [Fact]
     public void Named_pipe_helpers_reject_predictable_pipe_names_by_default()
