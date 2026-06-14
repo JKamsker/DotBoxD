@@ -19,7 +19,10 @@ internal static class PerformanceMatrixCases
             new("list.count intrinsic", 1_000_000, 50_000, HandwrittenListCount, ListCountJson()),
             new("list.get intrinsic", 1_000_000, 50_000, HandwrittenListGet, ListGetJson()),
             new("map.get intrinsic", 500_000, 25_000, HandwrittenMapGet, MapGetJson()),
-            new("local function call", 1_000_000, 50_000, HandwrittenLocalCall, LocalCallJson())
+            new("local function call", 1_000_000, 50_000, HandwrittenLocalCall, LocalCallJson()),
+            new("f64 arithmetic loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenF64Arithmetic, PerformanceMatrixControlFlowCases.F64ArithmeticJson()),
+            new("nested loop", 1_000, 50, PerformanceMatrixControlFlowCases.HandwrittenNestedLoop, PerformanceMatrixControlFlowCases.NestedLoopJson()),
+            new("branch in loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchLoop, PerformanceMatrixControlFlowCases.BranchLoopJson())
         ];
 
     private static string TrivialJson()
