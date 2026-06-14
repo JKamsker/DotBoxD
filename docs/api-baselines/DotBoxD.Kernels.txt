@@ -117,7 +117,7 @@ public int NextRandomInt32(int minInclusive, int maxExclusive)
 public int Patch { get => _patch; init => _patch = RequireNonNegative(value, nameof(Patch)); }
 public interface IAuditSink
 public interface IBindingCatalog
-public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = ModelCopy.ValueDictionary(value); }
+public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
 public IReadOnlyDictionary<string, FunctionAnalysis> FunctionAnalysis { get; }
 public IReadOnlyDictionary<string, IReadOnlySet<string>> BindingReferences { get; }
 public IReadOnlyDictionary<string, SandboxFunction> FunctionLookup
@@ -337,16 +337,16 @@ public static IReadOnlyDictionary<string, string> Create( string resourceKind, D
 public static IReadOnlyList<SandboxValue> BindArguments(SandboxFunction function, SandboxValue input)
 public static IReadOnlySet<string> Collect(SandboxModule module, IBindingCatalog bindings, string? entrypoint)
 public static IReadOnlySet<string> Collect(SandboxModule module, IBindingCatalog bindings)
-public static long Add(long left, long right) => Checked(() => checked(left + right))
+public static long Add(long left, long right)
 public static long Copy(int sourceCount, int addedCount = 0)
 public static long Divide(long left, long right)
 public static long Empty() => BaseCost
 public static long EstimateCall(string callName, int argumentCount)
-public static long Multiply(long left, long right) => Checked(() => checked(left * right))
-public static long Negate(long value) => Checked(() => checked(-value))
+public static long Multiply(long left, long right)
+public static long Negate(long value)
 public static long Read(int count = 0) => BaseCost + Math.Max(0, count)
 public static long Remainder(long left, long right)
-public static long Subtract(long left, long right) => Checked(() => checked(left - right))
+public static long Subtract(long left, long right)
 public static SandboxPolicyBuilder Create() => new()
 public static SandboxRunId New() => new(Guid.NewGuid())
 public static SandboxType Bool { get; } = Scalar("Bool")
