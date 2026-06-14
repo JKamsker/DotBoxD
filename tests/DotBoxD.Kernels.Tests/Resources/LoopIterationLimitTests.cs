@@ -27,7 +27,11 @@ public sealed class LoopIterationLimitTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.Equal(4, result.ResourceUsage.LoopIterations);
+
+        // This experiment bulk-charges compiled loops in 1024-iteration strides. It preserves
+        // enforcement, but it no longer reports the first over-limit iteration precisely.
+        var expectedLoopIterations = mode == ExecutionMode.Compiled ? 1024 : 4;
+        Assert.Equal(expectedLoopIterations, result.ResourceUsage.LoopIterations);
     }
 
     private static string InfiniteLoopModule()
