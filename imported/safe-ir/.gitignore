@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+*.user
+*.suo
+*.nupkg
+*.snupkg
+artifacts/
+BenchmarkDotNet.Artifacts/
+docs/agent-loop/.agentq.lock
+docs/agent-loop/tmp/
+
+error.log

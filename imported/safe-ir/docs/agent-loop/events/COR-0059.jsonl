@@ -1,0 +1,4 @@
+{"at":"2026-06-13T06:28:36.4830027\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
+{"at":"2026-06-13T07:29:19.5497792\u002B00:00","agent":"implementer","type":"claimed","status":"claimed","message":"Claimed finding"}
+{"at":"2026-06-13T07:31:36.1003009\u002B00:00","agent":"implementer","type":"fixed","status":"fixed_pending_verification","message":"Added structural equality and stable hash behavior for sandbox list/map values with interpreter and compiled-runtime regression coverage for separately materialized equal collections."}
+{"at":"2026-06-13T07:35:16.7022244\u002B00:00","agent":"verifier","type":"verified","status":"verified","message":"Verified structural ListValue and MapValue equality/hash behavior and passing Fix_COR_0059 regression tests for direct, interpreted, and compiled collection equality."}

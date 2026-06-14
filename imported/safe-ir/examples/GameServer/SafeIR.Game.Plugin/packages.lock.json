@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "MessagePack": {
+        "type": "Transitive",
+        "resolved": "3.1.7",
+        "contentHash": "gXpifaxbhfBqh8bVToQn9j+OgCnhXWMbRCV7RQIbCVa9CNJG1fY6oHAYYl+ER3Tb9uUIHiQ5QbGiGwwFhoagbA==",
+        "dependencies": {
+          "MessagePack.Annotations": "3.1.7",
+          "MessagePackAnalyzer": "3.1.7",
+          "Microsoft.NET.StringTools": "17.11.4"
+        }
+      },
+      "MessagePack.Annotations": {
+        "type": "Transitive",
+        "resolved": "3.1.7",
+        "contentHash": "IW1yX9viarFl/Dsio5G+pM90JkOSW4xhAiJcKxPPF5rzyp2/yCpieWju8G99QLEmaQeze2uQMEskUBA59YZmkw=="
+      },
+      "MessagePackAnalyzer": {
+        "type": "Transitive",
+        "resolved": "3.1.7",
+        "contentHash": "ZF+OOJTRS7Ogzb4gG36hPKVQk3kEbp6kkUcdRjhddDq/uSGcV4BKIdYiyJipExXyE/zsqYb0ic215O9kI+fjPA=="
+      },
+      "Microsoft.NET.StringTools": {
+        "type": "Transitive",
+        "resolved": "17.11.4",
+        "contentHash": "mudqUHhNpeqIdJoUx2YDWZO/I9uEDYVowan89R6wsomfnUJQk6HteoQTlNjZDixhT2B4IXMkMtgZtoceIjLRmA=="
+      },
+      "ShaRPC": {
+        "type": "Transitive",
+        "resolved": "1.0.0-ci.30",
+        "contentHash": "Q3e/tSXJ4jJ+h63mjDqSTqiePKc8uw2XJYtyIueEOxIwNEr7fiI6QTX+1kHWQ9TohooWwnXK7b3miPMjsPbpeQ=="
+      },
+      "ShaRPC.Serializers.MessagePack": {
+        "type": "Transitive",
+        "resolved": "1.0.0-ci.30",
+        "contentHash": "lCrHVITMOt9KZmW33zBeeDmH4i1K3+5Ixc5Ihu1jq/ujjltRkLpNjSD6dwIgUuYv/B3jtnu4ODljxIHvDb+C8A==",
+        "dependencies": {
+          "MessagePack": "3.1.7",
+          "ShaRPC": "1.0.0-ci.30"
+        }
+      },
+      "ShaRPC.Transports.NamedPipes": {
+        "type": "Transitive",
+        "resolved": "1.0.0-ci.30",
+        "contentHash": "tbHpzuBs1H2cyawUxVlgr1GN3IHwE7q3hIoulNsriAOQ62AYKN/a1os139uW5PHqJkTO7YSvrHTn6H35NjQXyg==",
+        "dependencies": {
+          "ShaRPC": "1.0.0-ci.30"
+        }
+      },
+      "safeir.compiler": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )",
+          "SafeIR.Verifier": "[0.1.0, )"
+        }
+      },
+      "safeir.core": {
+        "type": "Project"
+      },
+      "safeir.game.server.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "MessagePack": "[3.1.7, )",
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Plugins": "[0.1.0, )",
+          "ShaRPC": "[1.0.0-ci.30, )"
+        }
+      },
+      "safeir.hosting": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Compiler": "[0.1.0, )",
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Interpreter": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )",
+          "SafeIR.Verifier": "[0.1.0, )"
+        }
+      },
+      "safeir.interpreter": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )"
+        }
+      },
+      "safeir.plugins": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Hosting": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )",
+          "SafeIR.Serialization.Json": "[0.1.0, )",
+          "SafeIR.Server.Abstractions": "[0.1.0, )"
+        }
+      },
+      "safeir.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Validation": "[0.1.0, )"
+        }
+      },
+      "safeir.serialization.json": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Hosting": "[0.1.0, )"
+        }
+      },
+      "safeir.server.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )"
+        }
+      },
+      "safeir.transport.ipc.sharpc": {
+        "type": "Project",
+        "dependencies": {
+          "MessagePack": "[3.1.7, )",
+          "ShaRPC": "[1.0.0-ci.30, )",
+          "ShaRPC.Serializers.MessagePack": "[1.0.0-ci.30, )",
+          "ShaRPC.Transports.NamedPipes": "[1.0.0-ci.30, )"
+        }
+      },
+      "safeir.validation": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )"
+        }
+      },
+      "safeir.verifier": {
+        "type": "Project",
+        "dependencies": {
+          "SafeIR.Core": "[0.1.0, )",
+          "SafeIR.Runtime": "[0.1.0, )"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{"at":"2026-06-12T22:02:31.7303024\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
+{"at":"2026-06-13T00:13:47.2149243\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
+{"at":"2026-06-13T00:15:01.6378079\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","commit":"pending","message":"Isolated shared compiled executable materialization from caller wait cancellation and added concurrent waiter regression coverage."}
+{"at":"2026-06-13T00:19:52.5094735\u002B00:00","agent":"verifier","type":"verified","status":"verified","message":"Verified shared materialization now uses CancellationToken.None while caller cancellation only applies to WaitAsync; targeted CompiledMaterialization tests and C# line guard passed."}

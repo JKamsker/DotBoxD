@@ -1,0 +1,4 @@
+{"at":"2026-06-12T21:03:12.9712086\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
+{"at":"2026-06-12T21:10:55.8773241\u002B00:00","agent":"fixer","type":"claimed","status":"claimed","message":"Claimed finding"}
+{"at":"2026-06-12T21:12:07.0842576\u002B00:00","agent":"fixer","type":"fixed","status":"fixed_pending_verification","message":"Stored typed event adapter shapes at registration time and added explicit-interface adapter install regression coverage."}
+{"at":"2026-06-12T21:16:44.9852772\u002B00:00","agent":"verifier","type":"verified","status":"verified","message":"Inspected PluginEventAdapterRegistry registration-time shape capture and PluginHookSignatureTests explicit-interface adapter install regression. Ran dotnet test tests\\SafeIR.Tests\\SafeIR.Tests.csproj --filter FullyQualifiedName~PluginHookSignatureTests: 7 passed, 0 failed. Ran .\\scripts\\agentq.ps1 doctor: doctor ok."}
