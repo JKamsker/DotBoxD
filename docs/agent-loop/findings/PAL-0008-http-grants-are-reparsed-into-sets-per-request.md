@@ -29,11 +29,11 @@ HTTP capability grant parameters are reparsed into new collections on every `net
 
 ## Evidence
 
-- `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:91` resolves the request for every HTTP binding call and then checks scheme, host, byte limits, and timeout from the grant.
-- `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:180` calls `SafeHttpGrantReader.ReadSet(grant, "allowedSchemes", ["https"])` for each request.
-- `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:189` calls `SafeHttpGrantReader.ReadSet(grant, "allowedHosts", [])` for each request.
-- `src/DotBoxd.Hosting.Http/Internal/SafeHttpGrantReader.cs:9` builds fallback text with `string.Join` when needed, then `src/DotBoxd.Hosting.Http/Internal/SafeHttpGrantReader.cs:10` splits the CSV string and `src/DotBoxd.Hosting.Http/Internal/SafeHttpGrantReader.cs:11` materializes a new `HashSet<string>`.
-- `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:214`, `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:224`, and `src/DotBoxd.Kernels.Runtime/Bindings/SafeHttpClient.cs:229` also reparse boolean grant parameters for DNS/IP checks during each request.
+- `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:91` resolves the request for every HTTP binding call and then checks scheme, host, byte limits, and timeout from the grant.
+- `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:180` calls `SafeHttpGrantReader.ReadSet(grant, "allowedSchemes", ["https"])` for each request.
+- `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:189` calls `SafeHttpGrantReader.ReadSet(grant, "allowedHosts", [])` for each request.
+- `src/DotBoxD.Hosting.Http/Internal/SafeHttpGrantReader.cs:9` builds fallback text with `string.Join` when needed, then `src/DotBoxD.Hosting.Http/Internal/SafeHttpGrantReader.cs:10` splits the CSV string and `src/DotBoxD.Hosting.Http/Internal/SafeHttpGrantReader.cs:11` materializes a new `HashSet<string>`.
+- `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:214`, `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:224`, and `src/DotBoxD.Kernels.Runtime/Bindings/SafeHttpClient.cs:229` also reparse boolean grant parameters for DNS/IP checks during each request.
 - Existing network tests cover policy behavior, but there is no allocation benchmark for repeated HTTP binding calls under the same grant.
 
 ## Impact

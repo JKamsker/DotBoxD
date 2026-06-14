@@ -25,24 +25,24 @@ duplicate_of:
 
 ## Claim
 
-The DotBoxd.Kernels DotBoxd MessagePack IPC convenience defaults leave the low-allocation unary invocation path disabled, so callers using the named-pipe helpers get the higher-allocation transport profile unless they manually know which DotBoxd options to override.
+The DotBoxD.Kernels DotBoxD MessagePack IPC convenience defaults leave the low-allocation unary invocation path disabled, so callers using the named-pipe helpers get the higher-allocation transport profile unless they manually know which DotBoxD options to override.
 
 ## Evidence
 
-- `src/DotBoxd.Pushdown.Services/DotBoxdDotBoxdRpcMessagePackIpc.cs:10` defines `DefaultClientOptions` with `RequestTimeout` and `RejectInboundCalls`, but it does not set `EnableLowAllocationValueTaskInvocations`.
-- `src/DotBoxd.Pushdown.Services/DotBoxdDotBoxdRpcMessagePackIpc.cs:14` defines bidirectional client defaults with only `RequestTimeout`.
-- `src/DotBoxd.Pushdown.Services/DotBoxdDotBoxdRpcMessagePackIpc.cs:23` passes server options through as provided, so default `ListenNamedPipe` callers also do not get the low-allocation server-side options used by the benchmarks.
-- `benchmarks/DotBoxd.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:76` enables `EnableLowAllocationValueTaskInvocations` only when the explicit `--low-alloc` profile is selected, and `benchmarks/DotBoxd.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:89` separately opts the server into low-allocation settings.
-- `benchmarks/DotBoxd.Kernels.Benchmarks/Program.cs:8` exposes this only as a manual profile mode; there is no allocation regression gate for the public DotBoxd.Kernels IPC defaults.
+- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:10` defines `DefaultClientOptions` with `RequestTimeout` and `RejectInboundCalls`, but it does not set `EnableLowAllocationValueTaskInvocations`.
+- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:14` defines bidirectional client defaults with only `RequestTimeout`.
+- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:23` passes server options through as provided, so default `ListenNamedPipe` callers also do not get the low-allocation server-side options used by the benchmarks.
+- `benchmarks/DotBoxD.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:76` enables `EnableLowAllocationValueTaskInvocations` only when the explicit `--low-alloc` profile is selected, and `benchmarks/DotBoxD.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:89` separately opts the server into low-allocation settings.
+- `benchmarks/DotBoxD.Kernels.Benchmarks/Program.cs:8` exposes this only as a manual profile mode; there is no allocation regression gate for the public DotBoxD.Kernels IPC defaults.
 
 ## Impact
 
-DotBoxd.Kernels exposes IPC as a preview addon with named-pipe convenience helpers, but the easy path is not the low-allocation path already identified by the benchmark harness. Plugin IPC users can pay avoidable per-call allocation on request/response dispatch while believing they are using the recommended DotBoxd.Kernels transport defaults.
+DotBoxD.Kernels exposes IPC as a preview addon with named-pipe convenience helpers, but the easy path is not the low-allocation path already identified by the benchmark harness. Plugin IPC users can pay avoidable per-call allocation on request/response dispatch while believing they are using the recommended DotBoxD.Kernels transport defaults.
 
 ## Better target
 
-Either make the DotBoxd.Kernels IPC defaults use the low-allocation DotBoxd options when the safety tradeoffs are acceptable, or expose an explicit `LowAllocation` DotBoxd.Kernels options factory and document/gate it. The target should make the public convenience path allocation behavior intentional and measured.
+Either make the DotBoxD.Kernels IPC defaults use the low-allocation DotBoxD options when the safety tradeoffs are acceptable, or expose an explicit `LowAllocation` DotBoxD.Kernels options factory and document/gate it. The target should make the public convenience path allocation behavior intentional and measured.
 
 ## Benchmark/allocation test idea
 
-Add an allocation test or BenchmarkDotNet comparison for `DotBoxdDotBoxdRpcMessagePackIpc.ListenNamedPipe`/`ConnectNamedPipeAsync` with default options versus a low-allocation options factory. Measure `AddAsync` and struct echo bytes/call, and fail if the documented default/profile regresses beyond an explicit allocation budget.
+Add an allocation test or BenchmarkDotNet comparison for `DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe`/`ConnectNamedPipeAsync` with default options versus a low-allocation options factory. Measure `AddAsync` and struct echo bytes/call, and fail if the documented default/profile regresses beyond an explicit allocation budget.

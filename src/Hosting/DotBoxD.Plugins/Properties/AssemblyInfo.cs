@@ -1,0 +1,4 @@
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("DotBoxD.Kernels.Serialization.Json")]
+[assembly: InternalsVisibleTo("DotBoxD.Kernels.Tests")]

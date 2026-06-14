@@ -53,14 +53,14 @@ function ReadPackageVersions {
 
 $versions = ReadPackageVersions
 $requiredIds = @(
-    "DotBoxd.Hosting",
-    "DotBoxd.Kernels.Runtime",
-    "DotBoxd.Kernels.Serialization.Json",
-    "DotBoxd.Hosting.Http",
-    "DotBoxd.Plugins",
-    "DotBoxd.Abstractions",
-    "DotBoxd.Plugins.Analyzer",
-    "DotBoxd.Pushdown.Services"
+    "DotBoxD.Hosting",
+    "DotBoxD.Kernels.Runtime",
+    "DotBoxD.Kernels.Serialization.Json",
+    "DotBoxD.Hosting.Http",
+    "DotBoxD.Plugins",
+    "DotBoxD.Abstractions",
+    "DotBoxD.Plugins.Analyzer",
+    "DotBoxD.Pushdown.Services"
 )
 foreach ($id in $requiredIds) {
     if (-not $versions.Contains($id)) {
@@ -105,14 +105,14 @@ $nugetConfig = @"
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
   <!--
-    Resolve every DotBoxd.* package from the freshly-built local feed only. Pinning version 0.1.0
+    Resolve every DotBoxD.* package from the freshly-built local feed only. Pinning version 0.1.0
     can otherwise collide with a previously published 0.1.0 on nuget.org, so the smoke would test
-    stale package contents instead of the local build. The pattern is DotBoxd.* (not just
-    DotBoxd.Kernels.*) so the Hosting/Plugins/Abstractions/Pushdown packages also map locally.
+    stale package contents instead of the local build. The pattern is DotBoxD.* (not just
+    DotBoxD.Kernels.*) so the Hosting/Plugins/Abstractions/Pushdown packages also map locally.
   -->
   <packageSourceMapping>
     <packageSource key="local">
-      <package pattern="DotBoxd.*" />
+      <package pattern="DotBoxD.*" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
@@ -137,27 +137,27 @@ $project = @"
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="DotBoxd.Hosting" Version="$($versions["DotBoxd.Hosting"])" />
-    <PackageReference Include="DotBoxd.Kernels.Runtime" Version="$($versions["DotBoxd.Kernels.Runtime"])" />
-    <PackageReference Include="DotBoxd.Kernels.Serialization.Json" Version="$($versions["DotBoxd.Kernels.Serialization.Json"])" />
-    <PackageReference Include="DotBoxd.Hosting.Http" Version="$($versions["DotBoxd.Hosting.Http"])" />
-    <PackageReference Include="DotBoxd.Plugins" Version="$($versions["DotBoxd.Plugins"])" />
-    <PackageReference Include="DotBoxd.Abstractions" Version="$($versions["DotBoxd.Abstractions"])" />
-    <PackageReference Include="DotBoxd.Pushdown.Services" Version="$($versions["DotBoxd.Pushdown.Services"])" />
-    <PackageReference Include="DotBoxd.Plugins.Analyzer" Version="$($versions["DotBoxd.Plugins.Analyzer"])" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <PackageReference Include="DotBoxD.Hosting" Version="$($versions["DotBoxD.Hosting"])" />
+    <PackageReference Include="DotBoxD.Kernels.Runtime" Version="$($versions["DotBoxD.Kernels.Runtime"])" />
+    <PackageReference Include="DotBoxD.Kernels.Serialization.Json" Version="$($versions["DotBoxD.Kernels.Serialization.Json"])" />
+    <PackageReference Include="DotBoxD.Hosting.Http" Version="$($versions["DotBoxD.Hosting.Http"])" />
+    <PackageReference Include="DotBoxD.Plugins" Version="$($versions["DotBoxD.Plugins"])" />
+    <PackageReference Include="DotBoxD.Abstractions" Version="$($versions["DotBoxD.Abstractions"])" />
+    <PackageReference Include="DotBoxD.Pushdown.Services" Version="$($versions["DotBoxD.Pushdown.Services"])" />
+    <PackageReference Include="DotBoxD.Plugins.Analyzer" Version="$($versions["DotBoxD.Plugins.Analyzer"])" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
 "@
-Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "DotBoxd.Kernels.PackageConsumerSmoke.csproj") -Value $project
+Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "DotBoxD.Kernels.PackageConsumerSmoke.csproj") -Value $project
 
 $program = @"
-using DotBoxd.Kernels;
-using DotBoxd.Hosting;
-using DotBoxd.Plugins;
-using DotBoxd.Kernels.Serialization.Json;
-using DotBoxd.Hosting.Http;
-using DotBoxd.Kernels.Transport.Ipc;
-using DotBoxd.Kernels.PackageConsumerSmoke;
+using DotBoxD.Kernels;
+using DotBoxD.Hosting;
+using DotBoxD.Plugins;
+using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Hosting.Http;
+using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Kernels.PackageConsumerSmoke;
 using System.IO;
 
 var host = SandboxHost.Create(builder =>
@@ -175,11 +175,11 @@ var policy = SandboxPolicyBuilder.Create()
     .GrantHttpGet(new[] { "example.com" }, 4096)
     .Build();
 
-var moduleImporter = typeof(DotBoxdJsonImporter);
+var moduleImporter = typeof(DotBoxDJsonImporter);
 var pluginUpload = typeof(PluginPackageJsonSerializer);
-var ipc = typeof(DotBoxdDotBoxdRpcMessagePackIpc);
+var ipc = typeof(DotBoxDDotBoxDRpcMessagePackIpc);
 
-// Prove the packaged DotBoxdJsonExporter module-export surface is reachable and that the
+// Prove the packaged DotBoxDJsonExporter module-export surface is reachable and that the
 // documented JSON IR round trip (export -> import -> prepare) works through the public
 // package references and namespaces. If the exporter is dropped from the package, lands in
 // the wrong namespace, or loses a transitive dependency, this consumer fails to compile or
@@ -205,8 +205,8 @@ var roundTripModule = new SandboxModule(
     },
     new Dictionary<string, string>());
 
-var exportedJson = DotBoxdJsonExporter.Export(roundTripModule, indented: true);
-var reimported = DotBoxdJsonImporter.Import(exportedJson);
+var exportedJson = DotBoxDJsonExporter.Export(roundTripModule, indented: true);
+var reimported = DotBoxDJsonImporter.Import(exportedJson);
 if (reimported.Id != "package-consumer-roundtrip")
 {
     throw new InvalidOperationException(`$"Unexpected round-tripped module id: {reimported.Id}");
@@ -218,7 +218,7 @@ if (!roundTripPlan.Module.Functions.Any(f => f.Id == "main"))
     throw new InvalidOperationException("Round-tripped module is missing its entrypoint after prepare.");
 }
 
-// Prove the packaged DotBoxd.Plugins.Analyzer source generator produced a callable
+// Prove the packaged DotBoxD.Plugins.Analyzer source generator produced a callable
 // *PluginPackage.Create() factory for the [Plugin] kernel defined below. If the
 // analyzer asset is missing from the package, the generator fails to initialize, or the
 // generated factory cannot build a valid PluginPackage, this consumer will not compile or
@@ -247,9 +247,9 @@ Console.WriteLine($"{host.GetType().Name}:{policy.Hash}:{moduleImporter.Name}:{p
 Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "Program.cs") -Value $program
 
 $kernel = @"
-namespace DotBoxd.Kernels.PackageConsumerSmoke;
+namespace DotBoxD.Kernels.PackageConsumerSmoke;
 
-using DotBoxd.Abstractions;
+using DotBoxD.Abstractions;
 
 public sealed record SmokeEvent(string TargetId, string Message, int Amount);
 

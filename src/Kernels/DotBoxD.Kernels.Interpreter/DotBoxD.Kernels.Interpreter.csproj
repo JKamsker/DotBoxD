@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  
+  <PropertyGroup>
+    <Description>DotBoxD.Kernels interpreted execution backend for validated IR modules.</Description>
+    <PackageTags>dotboxd;sandbox;interpreter;execution</PackageTags>
+  </PropertyGroup>
+<ItemGroup>
+    <ProjectReference Include="..\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
+    <ProjectReference Include="..\DotBoxD.Kernels.Validation\DotBoxD.Kernels.Validation.csproj" />
+    <ProjectReference Include="..\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

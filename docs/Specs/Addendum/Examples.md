@@ -2,9 +2,9 @@
 
 This branch implements the addendum as a hosting-layer plugin model:
 
-- `DotBoxd.Plugins` exposes live values, typed live contexts, kernel state, hook pipelines, plugin manifests, and safe message bindings.
-- `DotBoxd.Plugins.Analyzer` provides local SDK diagnostics for forbidden File IO in kernels and unsupported live setting types.
-- `DotBoxd.Kernels.PluginIpc.Server.Abstractions` owns the server-side event contracts that plugin clients implement against.
+- `DotBoxD.Plugins` exposes live values, typed live contexts, kernel state, hook pipelines, plugin manifests, and safe message bindings.
+- `DotBoxD.Plugins.Analyzer` provides local SDK diagnostics for forbidden File IO in kernels and unsupported live setting types.
+- `DotBoxD.Kernels.PluginIpc.Server.Abstractions` owns the server-side event contracts that plugin clients implement against.
 - Plugin packages carry JSON Safe IR plus manifest metadata. The server validates manifest identity, declared effects, and the Safe IR module with the existing Safe IR validator before installation.
 - Hook handlers run through `SandboxHost.ExecuteAsync`. The local examples reference a generated package factory for trusted development-time convenience; production upload accepts serialized JSON package data and does not load arbitrary plugin DLLs.
 
@@ -44,19 +44,19 @@ public sealed partial class EpicItemsOnly : IItemFilter
 ```
 
 Simple filters request CPU-only execution. They do not mutate server state and do not receive raw host services.
-This simple contract is host-side C# guidance today; the current DotBoxd.Kernels source generator only
+This simple contract is host-side C# guidance today; the current DotBoxD.Kernels source generator only
 lowers `IEventKernel<TEvent>` kernels into plugin packages.
 
 ### 2. Implement A Kernel
 
-Use kernels when the plugin needs both a server-side filter and an approved action path. The current sample kernel lives at `samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\FireDamageKernel.cs`.
+Use kernels when the plugin needs both a server-side filter and an approved action path. The current sample kernel lives at `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\FireDamageKernel.cs`.
 
 The authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`, `HookContext`, `IPluginMessageSink`,
 `IPluginEventAdapter<TEvent>`, `LiveSettingAttribute`) live in the purpose-agnostic
-`DotBoxd.Abstractions` package; add `using DotBoxd.Abstractions;` to kernel sources.
+`DotBoxD.Abstractions` package; add `using DotBoxD.Abstractions;` to kernel sources.
 
 ```csharp
-using DotBoxd.Abstractions;
+using DotBoxD.Abstractions;
 
 [Plugin("fire-damage")]
 public sealed partial class FireDamageKernel : IEventKernel<DamageEvent>
@@ -251,13 +251,13 @@ This is the data a server owner needs to show settings, defaults, ranges, reques
 
 The production server installs a plugin package from serialized JSON package data. The JSON envelope contains a manifest, entrypoint names if needed, and the Safe IR module. It does not contain an assembly path or plugin DLL reference.
 
-Reference the `DotBoxd.Plugins` package for `PluginPackageJsonSerializer` and the
+Reference the `DotBoxD.Plugins` package for `PluginPackageJsonSerializer` and the
 `InstallJsonAsync` extension. The helper types are plugin-facing APIs used from the
-`DotBoxd.Plugins` namespace (the package references `DotBoxd.Kernels.Serialization.Json` for the module-IR
+`DotBoxD.Plugins` namespace (the package references `DotBoxD.Kernels.Serialization.Json` for the module-IR
 round trip):
 
 ```csharp
-using DotBoxd.Plugins;
+using DotBoxD.Plugins;
 ```
 
 ```csharp
@@ -311,7 +311,7 @@ Each observation includes the entrypoint name, requested mode, actual mode, succ
 
 Host-owned bindings are the main extensibility point for exposing product-specific data and
 services to verified Safe IR. The runnable example lives in
-`samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\Examples\CustomBindingExample.cs` and is exercised by
+`samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\CustomBindingExample.cs` and is exercised by
 the capabilities example run and the docs smoke script.
 
 The example authors a `tenant.lookup` binding and shows every field a binding author must decide:
@@ -380,7 +380,7 @@ Safe defaults a binding author should follow:
 
 `SandboxHostBuilder.ForwardAuditEventsTo(...)` is the public host integration point for operational
 audit streaming (telemetry, billing, incident review, compliance export). The runnable example lives
-in `samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\Examples\AuditObserverExample.cs` and is exercised by
+in `samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\AuditObserverExample.cs` and is exercised by
 the capabilities example run and the docs smoke script.
 
 The example registers two observers and runs a minimal module:
@@ -419,7 +419,7 @@ later observers from receiving the same sequenced audit events.
 the collection-shape limits (`WithMaxListLength`, `WithMaxMapEntries`, `WithMaxCollectionDepth`,
 `WithMaxTotalCollectionElements`), the log limits (`WithMaxLogEvents`, `WithMaxLogMessageLength`), and the
 string limits (`WithMaxStringLength`, `WithMaxTotalStringBytes`). The runnable proof lives in
-`samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\Examples\ResourceLimitsExample.cs` and is
+`samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\ResourceLimitsExample.cs` and is
 exercised by the capabilities example run and the docs smoke script.
 
 The example runs small JSON IR modules under intentionally tight non-fuel limits and prints the public
@@ -448,10 +448,10 @@ contract in `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md`.
 
 The flagship example is implemented in:
 
-- `samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\FireDamageKernel.cs`
-- `samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Server.Abstractions\DamageEvent.cs`
-- `DotBoxd.Plugins.Analyzer` generated `FireDamagePluginPackage.g.cs`
-- `samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\Program.cs`
+- `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\FireDamageKernel.cs`
+- `samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server.Abstractions\DamageEvent.cs`
+- `DotBoxD.Plugins.Analyzer` generated `FireDamagePluginPackage.g.cs`
+- `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\Program.cs`
 
 Mental model:
 
@@ -467,15 +467,15 @@ The server executes verified Safe IR, not arbitrary plugin DLLs.
 Run the complete addendum example set, split across three topic projects:
 
 ```powershell
-dotnet run --project samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
-dotnet run --project samples\Kernels\Hosting\DotBoxd.Kernels.Example.Hosting\DotBoxd.Kernels.Example.Hosting.csproj
-dotnet run --project samples\Kernels\PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring.csproj
+dotnet run --project samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\DotBoxD.Kernels.Example.Capabilities.csproj
+dotnet run --project samples\Kernels\Hosting\DotBoxD.Kernels.Example.Hosting\DotBoxD.Kernels.Example.Hosting.csproj
+dotnet run --project samples\Kernels\PluginAuthoring\DotBoxD.Kernels.Example.PluginAuthoring\DotBoxD.Kernels.Example.PluginAuthoring.csproj
 ```
 
 Run:
 
 ```powershell
-dotnet run --project samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\DotBoxd.Kernels.PluginLocal.csproj
+dotnet run --project samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\DotBoxD.Kernels.PluginLocal.csproj
 ```
 
 The example installs the `fire-damage` kernel, publishes events, updates `MinDamage` and `DamageType` at runtime, and shows that future hook executions observe the latest live settings.
@@ -488,18 +488,18 @@ It also demonstrates:
 
 ## Named-Pipe IPC Example
 
-The IPC sample uses `DotBoxd.Pushdown.Services`, which wraps DotBoxd named pipes with MessagePack serialization. The pipe name is a trusted local control-plane endpoint: pass an explicit high-entropy or otherwise deployment-scoped name, and do not expose it across tenant boundaries. The shared contract project still references `DotBoxd` and `MessagePack` because service attributes and payload attributes live with the contract types.
+The IPC sample uses `DotBoxD.Pushdown.Services`, which wraps DotBoxD named pipes with MessagePack serialization. The pipe name is a trusted local control-plane endpoint: pass an explicit high-entropy or otherwise deployment-scoped name, and do not expose it across tenant boundaries. The shared contract project still references `DotBoxD` and `MessagePack` because service attributes and payload attributes live with the contract types.
 
 Run the server in one terminal:
 
 ```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Server\DotBoxd.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
+dotnet run --project samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server\DotBoxD.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
 ```
 
 Run the client in another:
 
 ```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Client\DotBoxd.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
+dotnet run --project samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Client\DotBoxD.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
 ```
 
 The client reads settings, publishes a matching event, changes live settings over IPC, and publishes again to prove the server-side hook pipeline uses the updated state.
@@ -508,13 +508,13 @@ The client reads settings, publishes a matching event, changes live settings ove
 
 The golden example combines every layer of the plugin model into one runnable scenario. It lives in:
 
-- `samples\Kernels\GameServer\DotBoxd.Kernels.Game.Server.Abstractions` — the shared contract: the
+- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server.Abstractions` — the shared contract: the
   `MonsterAggroEvent` and `AttackEvent` records with their `IPluginEventAdapter<T>` adapters, the
-  `[DotBoxdService] IGamePluginControlService` IPC contract with MessagePack DTOs, and the
+  `[DotBoxDService] IGamePluginControlService` IPC contract with MessagePack DTOs, and the
   plugin -> server command DSL helpers in `GameCommands`.
-- `samples\Kernels\GameServer\DotBoxd.Kernels.Game.Plugin` — the child process that authors two kernels
+- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Plugin` — the child process that authors two kernels
   (`GuardianKernel`, `RetaliationKernel`) and ships them over IPC.
-- `samples\Kernels\GameServer\DotBoxd.Kernels.Game.Server` — the parent process: a deterministic 1D simulation, the
+- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server` — the parent process: a deterministic 1D simulation, the
   example-defined command sink, the IPC service, and the orchestration entrypoint.
 
 ### Filter + projection + invoke
@@ -550,12 +550,12 @@ The host ships each kernel as opaque verified IR with `PluginPackageJsonSerializ
 subscription declares.
 
 The plugin's only sandbox capability is `host.message.write`. The *meaning* of those messages is
-defined by the example, not by DotBoxd.Kernels core: `Simulation\GameCommandSink.cs` implements
+defined by the example, not by DotBoxD.Kernels core: `Simulation\GameCommandSink.cs` implements
 `IPluginMessageSink`, parses the `calm:`/`taunt:` DSL, validates it (known verb, known/opaque entity
 ids, clamped strength), and applies it to the world. Invalid or unknown commands are ignored safely
 and never throw back into the sandbox. The server contrasts a baseline phase (no plugins) with a
 with-plugin phase to show the untrusted kernels measurably changing game behavior.
 
 ```powershell
-dotnet run --project samples\Kernels\GameServer\DotBoxd.Kernels.Game.Server\DotBoxd.Kernels.Game.Server.csproj
+dotnet run --project samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server\DotBoxD.Kernels.Game.Server.csproj
 ```

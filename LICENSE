@@ -1,9 +1,9 @@
 MIT License
 
 Copyright (c) 2026 Danial Jumagaliyev (ShaRPC)
-Copyright (c) 2026 Jonas Kamsker (Safe-IR / DotBoxd)
+Copyright (c) 2026 Jonas Kamsker (Safe-IR / DotBoxD)
 
-DotBoxd merges two formerly standalone MIT-licensed projects into a single
+DotBoxD merges two formerly standalone MIT-licensed projects into a single
 repository: ShaRPC (the Services / channels stack, originally by Danial
 Jumagaliyev) and Safe-IR (the Kernels / Pushdown stack, originally by Jonas
 Kamsker). Both copyright notices above are preserved as required by the MIT

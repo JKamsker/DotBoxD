@@ -29,10 +29,10 @@ duplicate_of:
 
 ## Evidence
 
-- `src/DotBoxd.Kernels/Model/RunSummaryAuditFields.cs:5` exposes `Create(...)` as a public helper returning `IReadOnlyDictionary<string, string>`.
-- `src/DotBoxd.Kernels/Model/RunSummaryAuditFields.cs:16` builds a mutable `Dictionary<string, string>`.
-- `src/DotBoxd.Kernels/Model/RunSummaryAuditFields.cs:56` returns that dictionary directly instead of wrapping it with `ModelCopy.StringDictionary(...)` or another read-only collection.
-- `tests/DotBoxd.Kernels.Tests/Misc06/PublicModelImmutabilityTests.cs` covers several public model collection copy paths, but the grep/read pass did not find coverage that casts the result of `RunSummaryAuditFields.Create(...)` back to `IDictionary<string, string>` and mutates it.
+- `src/DotBoxD.Kernels/Model/RunSummaryAuditFields.cs:5` exposes `Create(...)` as a public helper returning `IReadOnlyDictionary<string, string>`.
+- `src/DotBoxD.Kernels/Model/RunSummaryAuditFields.cs:16` builds a mutable `Dictionary<string, string>`.
+- `src/DotBoxD.Kernels/Model/RunSummaryAuditFields.cs:56` returns that dictionary directly instead of wrapping it with `ModelCopy.StringDictionary(...)` or another read-only collection.
+- `tests/DotBoxD.Kernels.Tests/Misc06/PublicModelImmutabilityTests.cs` covers several public model collection copy paths, but the grep/read pass did not find coverage that casts the result of `RunSummaryAuditFields.Create(...)` back to `IDictionary<string, string>` and mutates it.
 
 ## Impact
 

@@ -42,89 +42,89 @@ foreach ($allowedId in $AllowedPrereleasePackageIds) {
 }
 
 $expectedLicenseExpression = "MIT"
-$expectedRepositoryUrl = "https://github.com/JKamsker/DotBoxd"
+$expectedRepositoryUrl = "https://github.com/JKamsker/DotBoxD"
 $expectedRepositoryType = "git"
 $expectedPackageMetadata = @{
-    "DotBoxd.Kernels" = @{
-        Description = "Core DotBoxd.Kernels model, policy, resource metering, diagnostics, and canonical hashing primitives."
+    "DotBoxD.Kernels" = @{
+        Description = "Core DotBoxD.Kernels model, policy, resource metering, diagnostics, and canonical hashing primitives."
         Tags = @("dotboxd", "core", "policy", "resources", "hashing")
     }
-    "DotBoxd.Kernels.Validation" = @{
-        Description = "DotBoxd.Kernels structural, type, effect, policy, and binding validation APIs."
+    "DotBoxD.Kernels.Validation" = @{
+        Description = "DotBoxD.Kernels structural, type, effect, policy, and binding validation APIs."
         Tags = @("dotboxd", "validation", "type-checking", "policy")
     }
-    "DotBoxd.Kernels.Runtime" = @{
-        Description = "DotBoxd.Kernels safe host runtime bindings for files, time, random, logging, strings, and math."
+    "DotBoxD.Kernels.Runtime" = @{
+        Description = "DotBoxD.Kernels safe host runtime bindings for files, time, random, logging, strings, and math."
         Tags = @("dotboxd", "runtime", "bindings", "files", "logging")
     }
-    "DotBoxd.Kernels.Serialization.Json" = @{
-        Description = "DotBoxd.Kernels JSON IR import and export helpers for the module envelope."
+    "DotBoxD.Kernels.Serialization.Json" = @{
+        Description = "DotBoxD.Kernels JSON IR import and export helpers for the module envelope."
         Tags = @("dotboxd", "json", "serialization")
     }
-    "DotBoxd.Abstractions" = @{
-        Description = "DotBoxd.Kernels plugin-to-host contracts: plugin marker attribute, event kernel, hook context, message sink, and event adapter abstractions."
+    "DotBoxD.Abstractions" = @{
+        Description = "DotBoxD.Kernels plugin-to-host contracts: plugin marker attribute, event kernel, hook context, message sink, and event adapter abstractions."
         Tags = @("dotboxd", "plugins", "contracts", "abstractions")
     }
-    "DotBoxd.Hosting.Http" = @{
-        Description = "DotBoxd.Kernels HTTP GET transport bindings, grant helpers, and pinned HTTP policy validation."
+    "DotBoxD.Hosting.Http" = @{
+        Description = "DotBoxD.Kernels HTTP GET transport bindings, grant helpers, and pinned HTTP policy validation."
         Tags = @("dotboxd", "http", "transport", "network", "policy")
     }
-    "DotBoxd.Pushdown.Services" = @{
-        Description = "Preview DotBoxd.Kernels DotBoxd MessagePack IPC transport addon with named-pipe helpers."
+    "DotBoxD.Pushdown.Services" = @{
+        Description = "Preview DotBoxD.Kernels DotBoxD MessagePack IPC transport addon with named-pipe helpers."
         Tags = @("dotboxd", "ipc", "transport", "dotboxd", "preview")
     }
-    "DotBoxd.Kernels.Interpreter" = @{
-        Description = "DotBoxd.Kernels interpreted execution backend for validated IR modules."
+    "DotBoxD.Kernels.Interpreter" = @{
+        Description = "DotBoxD.Kernels interpreted execution backend for validated IR modules."
         Tags = @("dotboxd", "interpreter", "execution")
     }
-    "DotBoxd.Kernels.Compiler" = @{
-        Description = "DotBoxd.Kernels generated-runtime compiler backend and persistent compiled artifact cache."
+    "DotBoxD.Kernels.Compiler" = @{
+        Description = "DotBoxD.Kernels generated-runtime compiler backend and persistent compiled artifact cache."
         Tags = @("dotboxd", "compiler", "cache", "generated-runtime")
     }
-    "DotBoxd.Kernels.Verifier" = @{
-        Description = "DotBoxd.Kernels generated assembly verifier and artifact manifest models."
+    "DotBoxD.Kernels.Verifier" = @{
+        Description = "DotBoxD.Kernels generated assembly verifier and artifact manifest models."
         Tags = @("dotboxd", "verifier", "assemblies", "manifests")
     }
-    "DotBoxd.Hosting" = @{
-        Description = "DotBoxd.Kernels host orchestration APIs for import, preparation, execution, isolation, and runtime selection."
+    "DotBoxD.Hosting" = @{
+        Description = "DotBoxD.Kernels host orchestration APIs for import, preparation, execution, isolation, and runtime selection."
         Tags = @("dotboxd", "hosting", "orchestration", "isolation")
     }
-    "DotBoxd.Plugins.Analyzer" = @{
-        Description = "DotBoxd.Kernels plugin source analyzer and generator package for package-backed plugins."
+    "DotBoxD.Plugins.Analyzer" = @{
+        Description = "DotBoxD.Kernels plugin source analyzer and generator package for package-backed plugins."
         Tags = @("dotboxd", "plugins", "analyzer", "source-generator")
     }
-    "DotBoxd.Plugins" = @{
-        Description = "DotBoxd.Kernels plugin manifest, installed kernel, hook, and message-binding APIs."
+    "DotBoxD.Plugins" = @{
+        Description = "DotBoxD.Kernels plugin manifest, installed kernel, hook, and message-binding APIs."
         Tags = @("dotboxd", "plugins", "hooks", "kernels")
     }
-    "DotBoxd" = @{
-        Description = "DotBoxd meta-package: pulls in the full stack across all three usage modes — Services (source-generated RPC), Kernels (validated sandboxed logic hosted via DotBoxd.Hosting), and Pushdown (running kernels next to host services). Reference this single package to get the complete DotBoxd surface for a net10.0 host."
+    "DotBoxD" = @{
+        Description = "DotBoxD meta-package: pulls in the full stack across all three usage modes — Services (source-generated RPC), Kernels (validated sandboxed logic hosted via DotBoxD.Hosting), and Pushdown (running kernels next to host services). Reference this single package to get the complete DotBoxD surface for a net10.0 host."
         Tags = @("dotboxd", "rpc", "sandbox", "kernels", "pushdown", "meta")
         Tfm = "net10.0"
     }
-    "DotBoxd.Services.All" = @{
-        Description = "DotBoxd service/channels bundle: the source-generated RPC core (DotBoxd.Services) together with the MessagePack codec and the TCP and named-pipe transports. Targets netstandard2.1 and is Unity/IL2CPP compatible for service-only consumers that do not need the Kernels or Pushdown stack."
+    "DotBoxD.Services.All" = @{
+        Description = "DotBoxD service/channels bundle: the source-generated RPC core (DotBoxD.Services) together with the MessagePack codec and the TCP and named-pipe transports. Targets netstandard2.1 and is Unity/IL2CPP compatible for service-only consumers that do not need the Kernels or Pushdown stack."
         Tags = @("dotboxd", "rpc", "services", "channels", "transport", "messagepack", "unity", "il2cpp", "meta")
         Tfm = "netstandard2.1"
     }
-    "DotBoxd.Services" = @{
+    "DotBoxD.Services" = @{
         Description = "High-performance, transport-agnostic RPC framework for C#. Bundles the runtime core and the source generator (compile-time client proxies and server dispatchers)."
         Tags = @("dotboxd", "sandbox", "ir", "interpreter", "compiler", "serialization", "transport")
         Tfm = "netstandard2.1"
-        ExtraEntries = @("analyzers/dotnet/cs/DotBoxd.Services.SourceGenerator.dll")
+        ExtraEntries = @("analyzers/dotnet/cs/DotBoxD.Services.SourceGenerator.dll")
     }
-    "DotBoxd.Transports.Tcp" = @{
-        Description = "TCP transport implementation for DotBoxd"
+    "DotBoxD.Transports.Tcp" = @{
+        Description = "TCP transport implementation for DotBoxD"
         Tags = @("dotboxd", "transport")
         Tfm = "netstandard2.1"
     }
-    "DotBoxd.Codecs.MessagePack" = @{
-        Description = "MessagePack serializer implementation for DotBoxd"
+    "DotBoxD.Codecs.MessagePack" = @{
+        Description = "MessagePack serializer implementation for DotBoxD"
         Tags = @("dotboxd", "serialization")
         Tfm = "netstandard2.1"
     }
-    "DotBoxd.Transports.NamedPipes" = @{
-        Description = "Named pipe transport implementation for DotBoxd process-boundary IPC."
+    "DotBoxD.Transports.NamedPipes" = @{
+        Description = "Named pipe transport implementation for DotBoxD process-boundary IPC."
         Tags = @("dotboxd", "transport")
         Tfm = "netstandard2.1"
         Readme = "named-pipe-transport.md"
@@ -225,9 +225,9 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
         }
     }
 
-    if ($id -eq "DotBoxd.Plugins.Analyzer") {
-        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.dll")
-        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.xml")
+    if ($id -eq "DotBoxD.Plugins.Analyzer") {
+        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll")
+        [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml")
     } else {
         [void] $allowedExact.Add("lib/$tfm/$id.dll")
         [void] $allowedExact.Add("lib/$tfm/$id.xml")
@@ -236,11 +236,11 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
     # Embedded, machine-readable JSON ingestion schemas (CMP-0012) are also packed so consumers can
     # load the contract from the package. The module envelope ships with the purpose-agnostic
     # serialization package; the plugin-package envelope ships with the plugin package.
-    if ($id -eq "DotBoxd.Kernels.Serialization.Json") {
+    if ($id -eq "DotBoxD.Kernels.Serialization.Json") {
         [void] $allowedExact.Add("schemas/v1/dotboxd-kernel-module.schema.json")
     }
 
-    if ($id -eq "DotBoxd.Plugins") {
+    if ($id -eq "DotBoxD.Plugins") {
         [void] $allowedExact.Add("schemas/v1/dotboxd-plugin-package.schema.json")
     }
 
@@ -312,11 +312,11 @@ function AssertReadmeGuidance($zip, [string] $readme, [string] $packageName) {
 
     $requiredReadmePatterns = @(
         "## Installing from NuGet",
-        "dotnet add package DotBoxd.Hosting",
-        "dotnet add package DotBoxd.Kernels.Serialization.Json",
-        "dotnet add package DotBoxd.Hosting.Http",
-        "dotnet add package DotBoxd.Plugins.Analyzer",
-        "dotnet add package DotBoxd.Pushdown.Services",
+        "dotnet add package DotBoxD.Hosting",
+        "dotnet add package DotBoxD.Kernels.Serialization.Json",
+        "dotnet add package DotBoxD.Hosting.Http",
+        "dotnet add package DotBoxD.Plugins.Analyzer",
+        "dotnet add package DotBoxD.Pushdown.Services",
         "PluginPackageJsonSerializer"
     )
     foreach ($pattern in $requiredReadmePatterns) {
@@ -332,7 +332,7 @@ function AssertSymbolPackage(
     [string] $version,
     [string] $tfm,
     [System.Collections.IDictionary] $symbolPackages) {
-    if ($id -eq "DotBoxd.Plugins.Analyzer") {
+    if ($id -eq "DotBoxD.Plugins.Analyzer") {
         return
     }
 
@@ -352,25 +352,25 @@ function AssertSymbolPackage(
 }
 
 $expectedIds = [string[]] @(
-    "DotBoxd.Kernels",
-    "DotBoxd.Kernels.Validation",
-    "DotBoxd.Kernels.Runtime",
-    "DotBoxd.Kernels.Serialization.Json",
-    "DotBoxd.Hosting.Http",
-    "DotBoxd.Pushdown.Services",
-    "DotBoxd.Kernels.Interpreter",
-    "DotBoxd.Kernels.Compiler",
-    "DotBoxd.Kernels.Verifier",
-    "DotBoxd.Hosting",
-    "DotBoxd.Plugins.Analyzer",
-    "DotBoxd.Plugins",
-    "DotBoxd.Abstractions",
-    "DotBoxd",
-    "DotBoxd.Services.All",
-    "DotBoxd.Services",
-    "DotBoxd.Transports.Tcp",
-    "DotBoxd.Codecs.MessagePack",
-    "DotBoxd.Transports.NamedPipes"
+    "DotBoxD.Kernels",
+    "DotBoxD.Kernels.Validation",
+    "DotBoxD.Kernels.Runtime",
+    "DotBoxD.Kernels.Serialization.Json",
+    "DotBoxD.Hosting.Http",
+    "DotBoxD.Pushdown.Services",
+    "DotBoxD.Kernels.Interpreter",
+    "DotBoxD.Kernels.Compiler",
+    "DotBoxD.Kernels.Verifier",
+    "DotBoxD.Hosting",
+    "DotBoxD.Plugins.Analyzer",
+    "DotBoxD.Plugins",
+    "DotBoxD.Abstractions",
+    "DotBoxD",
+    "DotBoxD.Services.All",
+    "DotBoxD.Services",
+    "DotBoxD.Transports.Tcp",
+    "DotBoxD.Codecs.MessagePack",
+    "DotBoxD.Transports.NamedPipes"
 )
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -474,9 +474,9 @@ foreach ($package in $packages) {
             throw "Package $($package.Name) repository commit '$([string] $repository.commit)' does not match current commit '$normalizedExpectedRepositoryCommit'."
         }
 
-        if ($id -eq "DotBoxd.Plugins.Analyzer") {
-            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.dll" $package.Name
-            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.xml" $package.Name
+        if ($id -eq "DotBoxD.Plugins.Analyzer") {
+            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.dll" $package.Name
+            AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxD.Plugins.Analyzer.xml" $package.Name
             AssertNoZipEntryPrefix $zip "lib/" $package.Name
         } else {
             AssertZipEntry $zip "lib/$packageTfm/$id.dll" $package.Name

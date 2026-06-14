@@ -29,11 +29,11 @@ Generated assembly verification decodes member signatures multiple times across 
 
 ## Evidence
 
-- `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:66` runs `VerifyMemberReferences` over the assembly metadata before method-body verification.
-- `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:121` iterates every `MemberReference`, and `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:128` decodes each via `MetadataName.MemberSignature`.
-- During method body reading, `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.Methods.cs:88` calls `GeneratedIlReader.ReadInstructions`, and `src/DotBoxd.Kernels.Verifier/Generated/GeneratedIlReader.cs:75` decodes the call operand with `MetadataName.MemberSignature` again.
-- The same instruction list then goes through `OpCodeVerifier.VerifyBody` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.Methods.cs:89`; `src/DotBoxd.Kernels.Verifier/OpCodeVerifier.cs:92` decodes `MetadataName.MemberSignature` a third time from the saved operand handle.
-- `src/DotBoxd.Kernels.Verifier/Generated/MetadataName.cs:65` uses `DecodeMethodSignature(...)`, and `src/DotBoxd.Kernels.Verifier/Generated/MetadataName.cs:88` formats a new signature string with `string.Join` for each decode.
+- `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:66` runs `VerifyMemberReferences` over the assembly metadata before method-body verification.
+- `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:121` iterates every `MemberReference`, and `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:128` decodes each via `MetadataName.MemberSignature`.
+- During method body reading, `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.Methods.cs:88` calls `GeneratedIlReader.ReadInstructions`, and `src/DotBoxD.Kernels.Verifier/Generated/GeneratedIlReader.cs:75` decodes the call operand with `MetadataName.MemberSignature` again.
+- The same instruction list then goes through `OpCodeVerifier.VerifyBody` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.Methods.cs:89`; `src/DotBoxD.Kernels.Verifier/OpCodeVerifier.cs:92` decodes `MetadataName.MemberSignature` a third time from the saved operand handle.
+- `src/DotBoxD.Kernels.Verifier/Generated/MetadataName.cs:65` uses `DecodeMethodSignature(...)`, and `src/DotBoxD.Kernels.Verifier/Generated/MetadataName.cs:88` formats a new signature string with `string.Join` for each decode.
 - Existing verifier call benchmarks exercise runtime calls, but they do not isolate or assert metadata signature decode reuse across verifier passes.
 
 ## Impact

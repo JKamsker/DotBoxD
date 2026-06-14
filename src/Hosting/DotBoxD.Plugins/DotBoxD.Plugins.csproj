@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  
+  <PropertyGroup>
+    <Description>DotBoxD.Kernels plugin manifest, installed kernel, hook, and message-binding APIs.</Description>
+    <PackageTags>dotboxd;sandbox;plugins;hooks;kernels</PackageTags>
+  </PropertyGroup>
+<ItemGroup>
+    <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
+    <ProjectReference Include="..\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
+    <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
+    <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
+    <ProjectReference Include="..\DotBoxD.Abstractions\DotBoxD.Abstractions.csproj" />
+  </ItemGroup>
+
+  <!--
+    Versioned plugin-package JSON ingestion schema artifact (CMP-0012). Embedded here (rather than
+    in the purpose-agnostic DotBoxD.Kernels.Serialization.Json package) and loaded via PluginPackageJsonSchemas.
+    LogicalName pins the resource name regardless of build host or link path.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\schemas\v1\dotboxd-plugin-package.schema.json"
+                      LogicalName="DotBoxD.Plugins.schemas.v1.dotboxd-plugin-package.schema.json"
+                      Pack="true"
+                      PackagePath="schemas\v1\dotboxd-plugin-package.schema.json" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

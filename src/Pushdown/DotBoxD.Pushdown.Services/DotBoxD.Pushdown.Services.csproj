@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  
+  <PropertyGroup>
+    <Description>Preview DotBoxD.Kernels DotBoxD MessagePack IPC transport addon with named-pipe helpers.</Description>
+    <PackageTags>dotboxd;sandbox;ipc;transport;dotboxd;preview</PackageTags>
+  </PropertyGroup>
+<ItemGroup>
+    <PackageReference Include="MessagePack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\Channels\DotBoxD.Codecs.MessagePack\DotBoxD.Codecs.MessagePack.csproj" />
+    <ProjectReference Include="..\..\Channels\DotBoxD.Transports.NamedPipes\DotBoxD.Transports.NamedPipes.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

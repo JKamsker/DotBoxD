@@ -29,11 +29,11 @@ Plugin package validation checks that live-setting range definitions are well fo
 
 ## Evidence
 
-`src/DotBoxd.Plugins/Runtime/PluginPackageValidator.cs` validates each live setting in `ValidateSetting(...)` by converting the type, converting the default with `LiveSettingTypeConverter.ToSandboxValue(...)`, and then calling `ValidateRange(setting, diagnostics)`.
+`src/DotBoxD.Plugins/Runtime/PluginPackageValidator.cs` validates each live setting in `ValidateSetting(...)` by converting the type, converting the default with `LiveSettingTypeConverter.ToSandboxValue(...)`, and then calling `ValidateRange(setting, diagnostics)`.
 
 `ValidateRange(...)` only calls `LiveSettingTypeConverter.ValidateRangeDefinition(setting)`, which verifies that ranges are numeric and that `Min <= Max`. It does not call `ValidateRangeValue(...)` for `setting.DefaultValue`.
 
-`src/DotBoxd.Plugins/Runtime/LiveSettings.cs` does call `LiveSettingTypeConverter.ValidateRangeValue(...)` later from `LiveSettingStore.FromDefinitions(...)`, but that happens during `InstalledKernel` construction after `PluginServer.InstallAsync(...)` has already run package validation and prepared the module. `src/DotBoxd.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs` also returns an imported package after `PluginPackageValidator.Validate(package)`, so a JSON package whose default is outside `min`/`max` can be returned as semantically valid by the public import path.
+`src/DotBoxD.Plugins/Runtime/LiveSettings.cs` does call `LiveSettingTypeConverter.ValidateRangeValue(...)` later from `LiveSettingStore.FromDefinitions(...)`, but that happens during `InstalledKernel` construction after `PluginServer.InstallAsync(...)` has already run package validation and prepared the module. `src/DotBoxD.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs` also returns an imported package after `PluginPackageValidator.Validate(package)`, so a JSON package whose default is outside `min`/`max` can be returned as semantically valid by the public import path.
 
 For example, a setting like `new LiveSettingDefinition("Limit", "int", 100, 0, 10)` has a supported type and a valid range definition, so package validation accepts it even though the initial value cannot satisfy the manifest contract.
 

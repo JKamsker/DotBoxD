@@ -29,15 +29,15 @@ Public direct plugin kernel invocation bypasses the server-side event adapter wh
 
 ## Evidence
 
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:107` calls `kernel.ValidateFor(_adapter)` before adding a kernel to a hook pipeline.
-- `src/DotBoxd.Plugins/Runtime/KernelEntrypointValidator.cs:13` rejects adapters whose `EventName` is not present in `manifest.Subscriptions`, and it also validates the entrypoint parameter shape against the adapter and live settings.
-- `src/DotBoxd.Plugins/InstalledKernel.cs:99` (`ShouldHandleAsync`) and `src/DotBoxd.Plugins/InstalledKernel.cs:118` (`HandleAsync`) accept an arbitrary `IPluginEventAdapter<TEvent>`, build input, and execute the prepared entrypoint without calling `ValidateFor(adapter)`.
-- `src/DotBoxd.Plugins/InstalledKernel.cs:242` exposes the validation helper, but only the hook pipeline path uses it.
-- `src/DotBoxd.Plugins/Runtime/PluginPreparedPackageValidator.cs:124` through `src/DotBoxd.Plugins/Runtime/PluginPreparedPackageValidator.cs:132` skips exact adapter parameter validation when the server has not registered an adapter shape for the manifest event. In that case, the direct public methods become the first runtime boundary that sees the caller-supplied adapter, but they do not enforce the manifest subscription or expected shape.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:107` calls `kernel.ValidateFor(_adapter)` before adding a kernel to a hook pipeline.
+- `src/DotBoxD.Plugins/Runtime/KernelEntrypointValidator.cs:13` rejects adapters whose `EventName` is not present in `manifest.Subscriptions`, and it also validates the entrypoint parameter shape against the adapter and live settings.
+- `src/DotBoxD.Plugins/InstalledKernel.cs:99` (`ShouldHandleAsync`) and `src/DotBoxD.Plugins/InstalledKernel.cs:118` (`HandleAsync`) accept an arbitrary `IPluginEventAdapter<TEvent>`, build input, and execute the prepared entrypoint without calling `ValidateFor(adapter)`.
+- `src/DotBoxD.Plugins/InstalledKernel.cs:242` exposes the validation helper, but only the hook pipeline path uses it.
+- `src/DotBoxD.Plugins/Runtime/PluginPreparedPackageValidator.cs:124` through `src/DotBoxD.Plugins/Runtime/PluginPreparedPackageValidator.cs:132` skips exact adapter parameter validation when the server has not registered an adapter shape for the manifest event. In that case, the direct public methods become the first runtime boundary that sees the caller-supplied adapter, but they do not enforce the manifest subscription or expected shape.
 
 ## Risk
 
-DotBoxd.Kernels's plugin model treats hook subscriptions and server event adapters as the whitelist for which server events a plugin may observe. A host or integration that uses the public direct `InstalledKernel.ShouldHandleAsync` / `HandleAsync` helpers can execute a plugin for an event adapter that is not in the plugin manifest, as long as the adapter produces values compatible with the IR entrypoint. That bypasses the same verifier boundary enforced by `HookPipeline.UseKernel` and weakens explicit server whitelisting for direct invocation callers.
+DotBoxD.Kernels's plugin model treats hook subscriptions and server event adapters as the whitelist for which server events a plugin may observe. A host or integration that uses the public direct `InstalledKernel.ShouldHandleAsync` / `HandleAsync` helpers can execute a plugin for an event adapter that is not in the plugin manifest, as long as the adapter produces values compatible with the IR entrypoint. That bypasses the same verifier boundary enforced by `HookPipeline.UseKernel` and weakens explicit server whitelisting for direct invocation callers.
 
 ## Suggested acceptance tests
 

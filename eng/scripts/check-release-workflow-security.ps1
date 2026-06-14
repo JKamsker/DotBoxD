@@ -107,8 +107,8 @@ if ($attestJob -notmatch "artifacts/packages/\*\.snupkg") {
 }
 
 # 4. Publishing must be gated to the canonical repo on a real tag.
-if ($publishJob -notmatch "github\.repository\s*==\s*'JKamsker/DotBoxd'") {
-    throw "Publish job must be gated to the canonical repository (github.repository == 'JKamsker/DotBoxd')."
+if ($publishJob -notmatch "github\.repository\s*==\s*'JKamsker/DotBoxD'") {
+    throw "Publish job must be gated to the canonical repository (github.repository == 'JKamsker/DotBoxD')."
 }
 
 if ($publishJob -notmatch "startsWith\(github\.ref,\s*'refs/tags/'\)") {

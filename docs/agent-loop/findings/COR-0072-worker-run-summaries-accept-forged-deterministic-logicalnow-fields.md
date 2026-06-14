@@ -29,10 +29,10 @@ Worker run-summary validation allows deterministic workers to add a `logicalNow`
 
 ## Evidence
 
-- `src/DotBoxd.Hosting/WorkerAuditValidator.cs:113` to `src/DotBoxd.Hosting/WorkerAuditValidator.cs:116` whitelists `logicalNow` whenever `plan.Policy.Deterministic` is true.
-- `src/DotBoxd.Hosting/SandboxWorkerExecutor.cs:238` to `src/DotBoxd.Hosting/SandboxWorkerExecutor.cs:258` compares required identity and resource fields, but not `logicalNow`.
-- `src/DotBoxd.Hosting/SandboxWorkerExecutor.cs:263` checks budget ceiling fields, and `src/DotBoxd.Hosting/SandboxWorkerExecutor.cs:268` to `src/DotBoxd.Hosting/SandboxWorkerExecutor.cs:288` checks compiled envelope fields, but still never validates `logicalNow`.
-- `src/DotBoxd.Kernels/Model/RunSummaryAuditFields.cs:16` to `src/DotBoxd.Kernels/Model/RunSummaryAuditFields.cs:56` does not emit a trusted `logicalNow` field for host-created summaries, so the worker boundary is accepting a worker-supplied field that is not regenerated from host state.
+- `src/DotBoxD.Hosting/WorkerAuditValidator.cs:113` to `src/DotBoxD.Hosting/WorkerAuditValidator.cs:116` whitelists `logicalNow` whenever `plan.Policy.Deterministic` is true.
+- `src/DotBoxD.Hosting/SandboxWorkerExecutor.cs:238` to `src/DotBoxD.Hosting/SandboxWorkerExecutor.cs:258` compares required identity and resource fields, but not `logicalNow`.
+- `src/DotBoxD.Hosting/SandboxWorkerExecutor.cs:263` checks budget ceiling fields, and `src/DotBoxD.Hosting/SandboxWorkerExecutor.cs:268` to `src/DotBoxD.Hosting/SandboxWorkerExecutor.cs:288` checks compiled envelope fields, but still never validates `logicalNow`.
+- `src/DotBoxD.Kernels/Model/RunSummaryAuditFields.cs:16` to `src/DotBoxD.Kernels/Model/RunSummaryAuditFields.cs:56` does not emit a trusted `logicalNow` field for host-created summaries, so the worker boundary is accepting a worker-supplied field that is not regenerated from host state.
 
 ## Impact
 

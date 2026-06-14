@@ -29,12 +29,12 @@ duplicate_of:
 
 ## Evidence
 
-- `src/DotBoxd.Kernels/Policy.cs:28` exposes `public string Hash => StableHash();`, so the value is not cached on the immutable policy record.
-- `src/DotBoxd.Kernels/Policy.cs:43` routes every access to `PolicyHash.Compute(this)`.
-- `PolicyHash.Compute` allocates canonical records with `new List<string>` at `src/DotBoxd.Kernels/Model/PolicyHash.cs:7`, and grant hashing allocates `string[]` / `List<string?>` records at `src/DotBoxd.Kernels/Model/PolicyHash.cs:27` and `src/DotBoxd.Kernels/Model/PolicyHash.cs:66`.
-- `CanonicalEncoding.HashRecords` joins all policy records into one string at `src/DotBoxd.Kernels/CanonicalEncoding.cs:23`, and `HashText` encodes that string into a UTF-8 byte array at `src/DotBoxd.Kernels/CanonicalEncoding.cs:31`.
-- `ExecutionPlanBuilder.Build` reads `policy.Hash` at `src/DotBoxd.Hosting/Execution/ExecutionPlanBuilder.cs:18`, `src/DotBoxd.Hosting/Execution/ExecutionPlanBuilder.cs:24`, and `src/DotBoxd.Hosting/Execution/ExecutionPlanBuilder.cs:50` for a single plan build.
-- `SandboxHost.PrepareAsync` calls `ExecutionPlanBuilder.Build` at `src/DotBoxd.Hosting/Execution/SandboxHost.cs:59`, and `ExecutionPlanGuard.EnsurePrepared` rebuilds an expected plan at `src/DotBoxd.Hosting/Execution/ExecutionPlanGuard.cs:39` before every execution.
+- `src/DotBoxD.Kernels/Policy.cs:28` exposes `public string Hash => StableHash();`, so the value is not cached on the immutable policy record.
+- `src/DotBoxD.Kernels/Policy.cs:43` routes every access to `PolicyHash.Compute(this)`.
+- `PolicyHash.Compute` allocates canonical records with `new List<string>` at `src/DotBoxD.Kernels/Model/PolicyHash.cs:7`, and grant hashing allocates `string[]` / `List<string?>` records at `src/DotBoxD.Kernels/Model/PolicyHash.cs:27` and `src/DotBoxD.Kernels/Model/PolicyHash.cs:66`.
+- `CanonicalEncoding.HashRecords` joins all policy records into one string at `src/DotBoxD.Kernels/CanonicalEncoding.cs:23`, and `HashText` encodes that string into a UTF-8 byte array at `src/DotBoxD.Kernels/CanonicalEncoding.cs:31`.
+- `ExecutionPlanBuilder.Build` reads `policy.Hash` at `src/DotBoxD.Hosting/Execution/ExecutionPlanBuilder.cs:18`, `src/DotBoxD.Hosting/Execution/ExecutionPlanBuilder.cs:24`, and `src/DotBoxD.Hosting/Execution/ExecutionPlanBuilder.cs:50` for a single plan build.
+- `SandboxHost.PrepareAsync` calls `ExecutionPlanBuilder.Build` at `src/DotBoxD.Hosting/Execution/SandboxHost.cs:59`, and `ExecutionPlanGuard.EnsurePrepared` rebuilds an expected plan at `src/DotBoxD.Hosting/Execution/ExecutionPlanGuard.cs:39` before every execution.
 
 ## Impact
 

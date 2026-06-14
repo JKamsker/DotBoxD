@@ -1,0 +1,29 @@
+using DotBoxD.Kernels.PluginIpc.Server;
+using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Services.Generated;
+
+if (args.Length != 1)
+{
+    Console.Error.WriteLine("Usage: DotBoxD.Kernels.PluginIpc.Server <named-pipe-name>");
+    return;
+}
+
+var pipeName = args[0];
+var service = await PluginControlService.CreateAsync();
+
+await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+    pipeName,
+    peer => peer.ProvidePluginControlService(service));
+
+await host.StartAsync();
+Console.WriteLine($"DotBoxD.Kernels plugin IPC server listening on pipe '{pipeName}'.");
+Console.WriteLine("Press Ctrl+C to stop.");
+
+var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+Console.CancelKeyPress += (_, e) => {
+    e.Cancel = true;
+    stopped.TrySetResult();
+};
+
+await stopped.Task;
+await host.StopAsync();

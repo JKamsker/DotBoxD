@@ -74,117 +74,117 @@ function Assert-CompletedItemEvidence {
     $releaseEvidence = @(
         @{
             Text = "Restricted IR implemented."
-            Path = "src/DotBoxd.Kernels/ModuleModel.cs"
+            Path = "src/DotBoxD.Kernels/ModuleModel.cs"
             Patterns = @("SandboxModule", "Expression")
         },
         @{
             Text = "Canonical hashing implemented."
-            Path = "src/DotBoxd.Kernels/Model/CanonicalModuleHasher.cs"
+            Path = "src/DotBoxD.Kernels/Model/CanonicalModuleHasher.cs"
             Patterns = @("Hash", "Serialize")
         },
         @{
             Text = "Type checker implemented."
-            Path = "src/DotBoxd.Kernels.Validation/FunctionAnalyzer.cs"
+            Path = "src/DotBoxD.Kernels.Validation/FunctionAnalyzer.cs"
             Patterns = @("Analyze", "SandboxType")
         },
         @{
             Text = "Effect analyzer implemented."
-            Path = "src/DotBoxd.Kernels.Validation/FunctionAnalyzer.cs"
+            Path = "src/DotBoxD.Kernels.Validation/FunctionAnalyzer.cs"
             Patterns = @("Effects", "Binding")
         },
         @{
             Text = "Capability policy implemented."
-            Path = "src/DotBoxd.Kernels/Policy.cs"
+            Path = "src/DotBoxD.Kernels/Policy.cs"
             Patterns = @("CapabilityGrant", "SandboxPolicy")
         },
         @{
             Text = "Binding registry validation implemented."
-            Path = "src/DotBoxd.Kernels/Bindings/BindingRegistryValidator.cs"
+            Path = "src/DotBoxD.Kernels/Bindings/BindingRegistryValidator.cs"
             Patterns = @("Validate", "BindingDescriptor")
         },
         @{
             Text = "Interpreted mode implemented."
-            Path = "src/DotBoxd.Kernels.Interpreter/SandboxInterpreter.cs"
+            Path = "src/DotBoxD.Kernels.Interpreter/SandboxInterpreter.cs"
             Patterns = @("ExecuteAsync", "ExecuteEntrypointAsync")
         },
         @{
             Text = "Fuel limits implemented."
-            Path = "src/DotBoxd.Kernels/Model/Resources.cs"
+            Path = "src/DotBoxD.Kernels/Model/Resources.cs"
             Patterns = @("ChargeFuel", "MaxFuel")
         },
         @{
             Text = "Safe error model implemented."
-            Path = "src/DotBoxd.Kernels/Model/Diagnostics.cs"
+            Path = "src/DotBoxD.Kernels/Model/Diagnostics.cs"
             Patterns = @("SandboxError", "SafeMessage")
         },
         @{
             Text = "Basic audit implemented."
-            Path = "src/DotBoxd.Kernels/Bindings/Audit.cs"
+            Path = "src/DotBoxD.Kernels/Bindings/Audit.cs"
             Patterns = @("SandboxAuditEvent", "IAuditSink")
         },
         @{
             Text = "At least one safe file binding implemented and tested."
-            Path = "tests/DotBoxd.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("Granted_file_read", "file.readText")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
             Text = "Binding security checklist passes."
-            Path = "tests/DotBoxd.Kernels.Tests/Bindings/BindingRegistryHardeningTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Bindings/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING-AUDIT", "E-BINDING-GRANT", "E-BINDING-TYPE")
         },
         @{
             Text = "Compiler emits valid managed assemblies."
-            Path = "src/DotBoxd.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
+            Path = "src/DotBoxD.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
             Patterns = @("AssemblyBuilder", "CompileAsync")
         },
         @{
             Text = "Generated assemblies use runtime stubs only."
-            Path = "src/DotBoxd.Kernels.Compiler/Emitters/MethodEmitter.cs"
+            Path = "src/DotBoxD.Kernels.Compiler/Emitters/MethodEmitter.cs"
             Patterns = @("CompiledRuntime", "EmitCall")
         },
         @{
             Text = "Verifier implemented."
-            Path = "src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs"
+            Path = "src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs"
             Patterns = @("VerifyAsync", "VerificationResult")
         },
         @{
             Text = "Verifier malicious fixtures pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Verifier/Core/VerifierAttackMatrixTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Verifier/Core/VerifierAttackMatrixTests.cs"
             Patterns = @("HttpClient", "ProcessStart", "Calli")
         },
         @{
             Text = "Compiled/interpreted differential tests pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Fuzz/DifferentialFuzzTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Fuzz/DifferentialFuzzTests.cs"
             Patterns = @("ExecutionMode\.Interpreted", "ExecutionMode\.Compiled")
         },
         @{
             Text = "Path traversal tests pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs"
             Patterns = @("\.\./secret\.txt", "config/\.\./\.\./secret\.txt")
         },
         @{
             Text = "DLL cache manifest implemented."
-            Path = "src/DotBoxd.Kernels.Verifier/Generated/VerificationModels.cs"
+            Path = "src/DotBoxD.Kernels.Verifier/Generated/VerificationModels.cs"
             Patterns = @("ArtifactManifest", "CacheKey")
         },
         @{
             Text = "Cache invalidation tests pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Compiled/Core/CompiledCacheMetadataTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Compiled/Core/CompiledCacheMetadataTests.cs"
             Patterns = @("CacheKey", "quarantined_and_recompiled")
         },
         @{
             Text = "Cache corruption tests pass."
-            Path = "tests/DotBoxd.Kernels.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
             Patterns = @("MutatesSecondArtifactCompiler", "AssemblyBytes")
         },
         @{
             Text = '`AssemblyLoadContext` lifecycle tested.'
-            Path = "tests/DotBoxd.Kernels.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Compiled/Core/CompiledMaterializationCacheTests.cs"
             Patterns = @("WeakReference", "AssemblyLoadContext")
         },
         @{
@@ -224,47 +224,47 @@ function Assert-CompletedItemEvidence {
 
     $securitySectionEvidence = @{
         "User input" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Serialization/JsonImporterTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Serialization/JsonImporterTests.cs"
             Patterns = @("unsupported_properties", "assemblyName")
         }
         "IR" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Serialization/JsonImporterTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Serialization/JsonImporterTests.cs"
             Patterns = @("targetSandboxVersion", "reject")
         }
         "Type system" = @{
-            Path = "src/DotBoxd.Kernels/Sandbox/SandboxType.cs"
+            Path = "src/DotBoxD.Kernels/Sandbox/SandboxType.cs"
             Patterns = @("SandboxType", "OpaqueId")
         }
         "Bindings" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Bindings/BindingRegistryHardeningTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Bindings/BindingRegistryHardeningTests.cs"
             Patterns = @("E-BINDING", "AuditLevel.PerCall")
         }
         "Capabilities/policy" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Policy/CapabilityRevocationTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Policy/CapabilityRevocationTests.cs"
             Patterns = @("RevokeCapability", "CapabilityRevoked")
         }
         "Interpreter" = @{
-            Path = "src/DotBoxd.Kernels.Interpreter/Internal/StatementExecutor.cs"
+            Path = "src/DotBoxD.Kernels.Interpreter/Internal/StatementExecutor.cs"
             Patterns = @("ChargeFuel", "ChargeLoopIteration")
         }
         "Compiler" = @{
-            Path = "src/DotBoxd.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
+            Path = "src/DotBoxD.Kernels.Compiler/Emitters/ReflectionEmitSandboxCompiler.cs"
             Patterns = @("CompileAsync", "Verification")
         }
         "Verifier" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Verifier/Generated/VerifierTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Verifier/Generated/VerifierTests.cs"
             Patterns = @("PInvoke", "MutableStatic")
         }
         "Cache" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Compiled/Core/CompiledCacheTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Compiled/Core/CompiledCacheTests.cs"
             Patterns = @("Policy_hash_change", "Binding_manifest_change")
         }
         "Resource limits" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Compiled/Generated/CompiledRuntimeQuotaTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Compiled/Generated/CompiledRuntimeQuotaTests.cs"
             Patterns = @("QuotaExceeded", "Fuel")
         }
         "Audit" = @{
-            Path = "tests/DotBoxd.Kernels.Tests/Audit/SafeLoggingTests.cs"
+            Path = "tests/DotBoxD.Kernels.Tests/Audit/SafeLoggingTests.cs"
             Patterns = @("RunSummary", "redacted")
         }
     }

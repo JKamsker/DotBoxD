@@ -63,7 +63,7 @@ The in-process security boundary is semantic:
 ```text
 User can only express allowed IR operations.
 Compiler/interpreter only implement those operations.
-Generated IL exists only in compiled mode. DotBoxd.Kernels never interprets IL; the current trusted
+Generated IL exists only in compiled mode. DotBoxD.Kernels never interprets IL; the current trusted
 compiler emits a verified generated assembly/DLL, and the CLR executes that loaded runtime form.
 `DynamicMethod` is a future backend only after an equivalent gate exists.
 Host APIs are narrow capability facades.

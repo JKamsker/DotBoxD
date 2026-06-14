@@ -1,6 +1,6 @@
-# DotBoxd documentation
+# DotBoxD documentation
 
-DotBoxd is a source-generated, contract-first .NET extension runtime. One C# contract can be used in
+DotBoxD is a source-generated, contract-first .NET extension runtime. One C# contract can be used in
 three ways:
 
 - **[Services](concepts/services.md)** — the host implements a contract; clients call it remotely (RPC).
@@ -40,9 +40,9 @@ flowchart LR
 
 ## Runnable example
 
-The acceptance sample [`samples/Pushdown/DotBoxd.EndToEnd`](../samples/Pushdown/DotBoxd.EndToEnd)
+The acceptance sample [`samples/Pushdown/DotBoxD.EndToEnd`](../samples/Pushdown/DotBoxD.EndToEnd)
 demonstrates all three modes end to end:
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxd.EndToEnd
+dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 ```

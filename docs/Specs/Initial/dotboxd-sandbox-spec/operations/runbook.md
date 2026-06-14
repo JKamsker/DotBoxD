@@ -1,14 +1,14 @@
-# DotBoxd.Kernels Operational Runbook
+# DotBoxD.Kernels Operational Runbook
 
-This runbook covers operating the DotBoxd.Kernels packages in a host application. It does not claim that a
+This runbook covers operating the DotBoxD.Kernels packages in a host application. It does not claim that a
 host has deployed worker processes, dashboards, retention, or alerting; those are environment-owned
 inventory items that must be configured by the product operator.
 
 ## Release Preflight
 
-Before publishing or enabling DotBoxd.Kernels for a tenant:
+Before publishing or enabling DotBoxD.Kernels for a tenant:
 
-- Run `dotnet test DotBoxd.Kernels.slnx --configuration Release`.
+- Run `dotnet test DotBoxD.Kernels.slnx --configuration Release`.
 - Run `scripts/check-release-readiness.ps1 -RequireComplete`.
 - Run `scripts/check-spec-manifest.ps1`.
 - Run `scripts/check-docs-smoke.ps1`.
@@ -27,7 +27,7 @@ Worker-process execution is required for high-risk tenants or when the host need
 boundary. `SandboxIsolation.WorkerProcess` must fail closed unless the host configures a worker
 client with a hardened profile. A production worker should run as a separate OS identity or
 container, inherit no secrets, have restricted filesystem permissions, and have memory, process,
-wall-time, and network limits applied outside the DotBoxd.Kernels process.
+wall-time, and network limits applied outside the DotBoxD.Kernels process.
 
 ## Normal Operations
 
@@ -74,7 +74,7 @@ identity:
 1. Keep the host-side fail-closed result.
 2. Stop reusing the worker instance.
 3. Preserve worker stdout/stderr, host audit events, and process/container exit metadata.
-4. Recycle the worker pool only after confirming the worker image and DotBoxd.Kernels package set match the
+4. Recycle the worker pool only after confirming the worker image and DotBoxD.Kernels package set match the
    host deployment.
 5. Escalate repeated malformed worker results as host-infrastructure failures.
 

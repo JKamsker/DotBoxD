@@ -4,12 +4,12 @@
   "files": [
     {
       "path": "../Addendum/Addendum.md",
-      "sha256": "2dbad4b26bb9a28edb4b586fa2d1bf92075d018c6d2dbd9025a1d2d69fd772fb",
+      "sha256": "3582532f56cf0d8ad45a105add049f108701ab9f0a4618c3aa6e268420141955",
       "bytes": 27776
     },
     {
       "path": "../Addendum/Examples.md",
-      "sha256": "e7d9a91e370da94ea7247cda885e95cef4263ca7934600e3ede4198eba612e24",
+      "sha256": "06ce1222956d04285d26ffb397c1b05d3bcb1b2bf26e8f794e66c2e4f176227c",
       "bytes": 23191
     },
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "checklists/release-readiness.md",
-      "sha256": "d653b706d658e57763a8d2ae05230bdc033550c42b49403a32e7954b8a62fe72",
+      "sha256": "cdfa0b5aac79e69c61221406b6ab903be32fc0ea8f17bdf6c6e264b9955d6f80",
       "bytes": 2169
     },
     {
@@ -39,7 +39,7 @@
     },
     {
       "path": "examples/example-binding-manifest.md",
-      "sha256": "1a59b6efb6c6be3e310f37e01f68cc0dbf86737a1f37f7bd092620d869ebf218",
+      "sha256": "b7eff0e8c1ed24951e3c533b5a493c3ec320749205581b727dee9ef4cfd9786d",
       "bytes": 1955
     },
     {
@@ -49,12 +49,12 @@
     },
     {
       "path": "operations/error-codes.md",
-      "sha256": "7c16614fa71ab9339ed53b60df975f19c5a21b70eed0fc11f3864d32b596cb1e",
+      "sha256": "9648a857edca889e0d564553d809b5b6c24d3cc262595d3d8d4121f60e65e166",
       "bytes": 11179
     },
     {
       "path": "operations/runbook.md",
-      "sha256": "4c9ef22ec1ceb3036dc12c1e11747d05bbe115ad58ac66396906acd800d69d68",
+      "sha256": "ac6dc8a442fdb6a5695989ebddc1b68d156c8e8d918599eda33a8b5798ccdb9c",
       "bytes": 4523
     },
     {
@@ -69,7 +69,7 @@
     },
     {
       "path": "spec/00-overview.md",
-      "sha256": "0398fb34c33f09aade8d8c229a702dfcc70b03ab35a94270e3939b3e087d183a",
+      "sha256": "8ce13f10fef22f8f7b82f5721d01c7fdc0fead82c548a6388281d68b4246e746",
       "bytes": 5182
     },
     {
@@ -84,7 +84,7 @@
     },
     {
       "path": "spec/03-architecture.md",
-      "sha256": "ee8a76d13942ddd0e4598c38a751058fbbcc91a00143b4ee6203f4d9c6537a74",
+      "sha256": "20e4f6f02a5eb850e0eb79dc26471fb685637e468cceb20510611c99a6ee7a69",
       "bytes": 9631
     },
     {
@@ -104,7 +104,7 @@
     },
     {
       "path": "spec/07-bindings.md",
-      "sha256": "c48cbd3d0d480982f3a10a49b4552a600361d8f2af7aa66d6b05e48bf9e50b4b",
+      "sha256": "436775980ab52005c2b95d31363768d4420c00e1dd1e13d7a384c6db6453df94",
       "bytes": 8430
     },
     {
@@ -119,12 +119,12 @@
     },
     {
       "path": "spec/10-compiled-mode.md",
-      "sha256": "f57d0ccf21b507d7f21b9998a9f0f46cff061e88079d0b53d12f6022ba587d5a",
+      "sha256": "2808acead3006adc2f46f84cc5d4f8bfc6c85ed3ed8abb3af10af9d3898c3a37",
       "bytes": 9441
     },
     {
       "path": "spec/11-generated-code-verifier.md",
-      "sha256": "0db5f4ab17273d7382ab24d04252accdc56e759ca6a82708e424a721ec6ad680",
+      "sha256": "4ace080d625b98404690ca695cb0220ff8cf38fd817c133bb8a1ec198aad65cf",
       "bytes": 8206
     },
     {
@@ -134,7 +134,7 @@
     },
     {
       "path": "spec/13-cache-versioning.md",
-      "sha256": "158184b9f82e6ed9746e650c1de894d746cf99f54895e0901515ae7cfe3e6bee",
+      "sha256": "466da9825948a71afe07c2a987b1e86dda320c1b4cf0f5779787691dde9765a7",
       "bytes": 5705
     },
     {
@@ -149,7 +149,7 @@
     },
     {
       "path": "spec/16-public-api.md",
-      "sha256": "49f9dd7c8585b5b9d107a460f251eb7d78a6f892ed7f0aee1be429809ba102b0",
+      "sha256": "b5de1178415f9b8b1a9cb0ead5cdb1a85c5dd5103315784de677bd61a27d54b2",
       "bytes": 24440
     },
     {

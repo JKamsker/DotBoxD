@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  
+  <PropertyGroup>
+    <Description>DotBoxD.Kernels JSON IR import and export helpers for the module envelope.</Description>
+    <PackageTags>dotboxd;sandbox;json;serialization</PackageTags>
+  </PropertyGroup>
+<ItemGroup>
+    <ProjectReference Include="..\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
+    <ProjectReference Include="..\..\Hosting\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotBoxD.Plugins" />
+  </ItemGroup>
+
+  <!--
+    Versioned JSON ingestion schema artifact (CMP-0012). The checked-in module schema under
+    schemas/v1 is embedded so consumers can load the contract via DotBoxDJsonSchemas, and
+    packed so it ships with the NuGet package. LogicalName pins the resource name used by
+    DotBoxDJsonSchemas regardless of build host or link path. The plugin-package schema is
+    embedded by DotBoxD.Plugins (see PluginPackageJsonSchemas).
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\schemas\v1\dotboxd-kernel-module.schema.json"
+                      LogicalName="DotBoxD.Kernels.Serialization.Json.schemas.v1.dotboxd-kernel-module.schema.json"
+                      Pack="true"
+                      PackagePath="schemas\v1\dotboxd-kernel-module.schema.json" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

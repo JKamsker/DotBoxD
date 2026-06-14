@@ -34,9 +34,9 @@ A host following the package-facing API page can grant `file.write` and still ge
 ## Evidence
 
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md` documents only `public SandboxPolicyBuilder GrantFileWrite(string root, long maxBytesPerRun);`.
-- `src/DotBoxd.Kernels/Policy.cs` implements `GrantFileWrite(string root, long maxBytesPerRun, bool allowCreate = false, bool allowOverwrite = false)` and serializes both flags into the `file.write` grant.
-- `src/DotBoxd.Kernels.Runtime/Bindings/SafeFileWritePublisher.cs` reads `allowCreate` and `allowOverwrite` with `false` fallbacks and denies missing-target creation or existing-target overwrite unless the matching flag is enabled.
-- `tests/DotBoxd.Kernels.Tests/Misc07/SafeFileSystemTests.cs` has coverage for successful create with `allowCreate: true`, overwrite denial, and the default builder grant denying both create and overwrite.
+- `src/DotBoxD.Kernels/Policy.cs` implements `GrantFileWrite(string root, long maxBytesPerRun, bool allowCreate = false, bool allowOverwrite = false)` and serializes both flags into the `file.write` grant.
+- `src/DotBoxD.Kernels.Runtime/Bindings/SafeFileWritePublisher.cs` reads `allowCreate` and `allowOverwrite` with `false` fallbacks and denies missing-target creation or existing-target overwrite unless the matching flag is enabled.
+- `tests/DotBoxD.Kernels.Tests/Misc07/SafeFileSystemTests.cs` has coverage for successful create with `allowCreate: true`, overwrite denial, and the default builder grant denying both create and overwrite.
 
 ## Suggested test or benchmark
 

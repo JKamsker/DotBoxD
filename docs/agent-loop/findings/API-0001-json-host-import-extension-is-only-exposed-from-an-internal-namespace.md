@@ -25,14 +25,14 @@ duplicate_of:
 
 ## Claim
 
-The JSON serialization addon documents `SandboxHost.ImportJsonAsync(...)` as a normal public host API, but the extension method is declared under `DotBoxd.Kernels.Serialization.Json.Internal`. A consumer following the README/public API sample imports `DotBoxd.Kernels`, `DotBoxd.Hosting`, and `DotBoxd.Kernels.Runtime`, so the extension method is not discoverable or callable unless they also reference an `Internal` namespace.
+The JSON serialization addon documents `SandboxHost.ImportJsonAsync(...)` as a normal public host API, but the extension method is declared under `DotBoxD.Kernels.Serialization.Json.Internal`. A consumer following the README/public API sample imports `DotBoxD.Kernels`, `DotBoxD.Hosting`, and `DotBoxD.Kernels.Runtime`, so the extension method is not discoverable or callable unless they also reference an `Internal` namespace.
 
 ## Evidence
 
-- `README.md` Minimal Host Usage calls `await host.ImportJsonAsync(jsonIr)` with `using DotBoxd.Kernels;`, `using DotBoxd.Hosting;`, and `using DotBoxd.Kernels.Runtime;` only.
+- `README.md` Minimal Host Usage calls `await host.ImportJsonAsync(jsonIr)` with `using DotBoxD.Kernels;`, `using DotBoxD.Hosting;`, and `using DotBoxD.Kernels.Runtime;` only.
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md` says `ImportJsonAsync` is the extension method provided by the JSON serialization addon.
-- `src/DotBoxd.Kernels.Serialization.Json/Internal/SandboxHostJsonExtensions.cs` declares `namespace DotBoxd.Kernels.Serialization.Json.Internal;` for the public `SandboxHostJsonExtensions` type.
-- `tests/DotBoxd.Kernels.Tests/GlobalUsings.cs` imports `DotBoxd.Kernels.Serialization.Json.Internal`, so the current API surface test does not catch whether a normal consumer can use the documented namespace/import pattern.
+- `src/DotBoxD.Kernels.Serialization.Json/Internal/SandboxHostJsonExtensions.cs` declares `namespace DotBoxD.Kernels.Serialization.Json.Internal;` for the public `SandboxHostJsonExtensions` type.
+- `tests/DotBoxD.Kernels.Tests/GlobalUsings.cs` imports `DotBoxD.Kernels.Serialization.Json.Internal`, so the current API surface test does not catch whether a normal consumer can use the documented namespace/import pattern.
 
 ## User impact
 
@@ -44,20 +44,20 @@ Moving or forwarding the extension into a public namespace is additive if the ex
 
 ## Suggested acceptance test
 
-Add a consumer-facing compile/API test that references `DotBoxd.Kernels.Serialization.Json` and verifies this snippet compiles without importing `.Internal`:
+Add a consumer-facing compile/API test that references `DotBoxD.Kernels.Serialization.Json` and verifies this snippet compiles without importing `.Internal`:
 
 ```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Hosting;
-using DotBoxd.Kernels.Runtime;
-using DotBoxd.Kernels.Serialization.Json;
+using DotBoxD.Kernels;
+using DotBoxD.Hosting;
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Serialization.Json;
 
 using var host = SandboxHost.Create(builder => builder.UseInterpreter());
 _ = await host.ImportJsonAsync(jsonIr);
 ```
 
-Also include a README-style variant if the intended public namespace is `DotBoxd.Kernels` rather than `DotBoxd.Kernels.Serialization.Json`.
+Also include a README-style variant if the intended public namespace is `DotBoxD.Kernels` rather than `DotBoxD.Kernels.Serialization.Json`.
 
 ## Smallest fixable slice
 
-Expose `SandboxHostJsonExtensions` from the intended public namespace, such as `DotBoxd.Kernels.Serialization.Json`, and update tests/examples to avoid `DotBoxd.Kernels.Serialization.Json.Internal` for public addon APIs. Keep a forwarding compatibility shim only if source compatibility is desired.
+Expose `SandboxHostJsonExtensions` from the intended public namespace, such as `DotBoxD.Kernels.Serialization.Json`, and update tests/examples to avoid `DotBoxD.Kernels.Serialization.Json.Internal` for public addon APIs. Keep a forwarding compatibility shim only if source compatibility is desired.

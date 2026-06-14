@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to DotBoxd! -->
+<!-- Thanks for contributing to DotBoxD! -->
 
 ## Summary
 
@@ -15,8 +15,8 @@
 
 ## Checklist
 
-- [ ] `dotnet build DotBoxd.slnx -c Release` is clean
-- [ ] `dotnet test DotBoxd.slnx -c Release` passes
+- [ ] `dotnet build DotBoxD.slnx -c Release` is clean
+- [ ] `dotnet test DotBoxD.slnx -c Release` passes
 - [ ] New/changed behavior is covered by tests
 - [ ] Security-sensitive changes (validation, verifier, bindings, capabilities) keep the
       security-boundary suite green

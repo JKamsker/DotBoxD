@@ -1,11 +1,11 @@
 # Sandbox caveats — what is and isn't a boundary
 
-> **The single most important security fact about DotBoxd:**
+> **The single most important security fact about DotBoxD:**
 > **`AssemblyLoadContext` is not a sandbox.** Loading a .NET assembly — even into a separate
 > `AssemblyLoadContext` — gives that code the full permissions of the process. It is an *isolation*
 > mechanism for assembly versioning, **not** a security boundary.
 
-DotBoxd has three execution modes. They look superficially similar ("run some logic the caller
+DotBoxD has three execution modes. They look superficially similar ("run some logic the caller
 supplied") but have completely different security guarantees. Choose the mode that matches how much you
 trust the code.
 
@@ -21,7 +21,7 @@ A **kernel** is restricted **IR** (intermediate representation), authored as JSO
 4. For **compiled** mode, **verifies** the generated assembly before it runs (the verifier enforces the
    same restrictions the interpreter does).
 
-This is the boundary DotBoxd is built to defend, and it is exercised by a required security-boundary
+This is the boundary DotBoxD is built to defend, and it is exercised by a required security-boundary
 test suite on every CI run. It defends against author-supplied *logic expressed as IR* — both buggy and
 many malicious authors.
 

@@ -58,13 +58,13 @@ jobs:
 
       - name: Run Services benchmarks
         run: >-
-          dotnet run -c Release --project benchmarks/DotBoxd.Services.Benchmarks --
+          dotnet run -c Release --project benchmarks/DotBoxD.Services.Benchmarks --
           --filter '*' --job short --exporters json
           --artifacts artifacts/benchmarks/services
 
       - name: Run Kernels benchmarks
         run: >-
-          dotnet run -c Release --project benchmarks/DotBoxd.Kernels.Benchmarks --
+          dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks --
           --filter '*' --job short --exporters json
           --artifacts artifacts/benchmarks/kernels
 
@@ -102,7 +102,7 @@ jobs:
       - name: Track / alert on Services benchmarks
         uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
         with:
-          name: DotBoxd.Services Benchmarks
+          name: DotBoxD.Services Benchmarks
           tool: 'benchmarkdotnet'
           output-file-path: artifacts/benchmarks/merged/services.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +116,7 @@ jobs:
       - name: Track / alert on Kernels benchmarks
         uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
         with:
-          name: DotBoxd.Kernels Benchmarks
+          name: DotBoxD.Kernels Benchmarks
           tool: 'benchmarkdotnet'
           output-file-path: artifacts/benchmarks/merged/kernels.json
           github-token: ${{ secrets.GITHUB_TOKEN }}

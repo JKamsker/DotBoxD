@@ -1,7 +1,7 @@
-# DotBoxd.Kernels Error Code Reference
+# DotBoxD.Kernels Error Code Reference
 
-This is the maintained per-code reference for `DotBoxd.Kernels.SandboxErrorCode`. Every public code has
-exactly one entry below. The order matches the enum in `src/DotBoxd.Kernels/Sandbox/SandboxError.cs`.
+This is the maintained per-code reference for `DotBoxD.Kernels.SandboxErrorCode`. Every public code has
+exactly one entry below. The order matches the enum in `src/DotBoxD.Kernels/Sandbox/SandboxError.cs`.
 
 A `SandboxError` carries the `Code`, a tenant-safe `SafeMessage`, and an optional `DiagnosticId`
 that correlates to host-side audit events. Hosts must surface only the safe message to untrusted
@@ -200,5 +200,5 @@ succeed only once the input, policy, capability grant, or environment changes.
 
 This reference is gated by a regression test that parses `SandboxErrorCode` and verifies that every
 enum value has an entry here with retry, audit/event, escalation, and safe-message guidance. When a
-new error code is added to `src/DotBoxd.Kernels/Sandbox/SandboxError.cs`, add its entry here in the same
+new error code is added to `src/DotBoxD.Kernels/Sandbox/SandboxError.cs`, add its entry here in the same
 order so new codes cannot ship undocumented.

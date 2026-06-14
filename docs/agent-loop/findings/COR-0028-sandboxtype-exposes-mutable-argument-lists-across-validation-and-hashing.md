@@ -29,13 +29,13 @@ duplicate_of:
 
 ## Evidence
 
-- `src/DotBoxd.Kernels/Sandbox/SandboxType.cs:5` declares `public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)` with no constructor body or init accessor that snapshots `Arguments`.
-- `src/DotBoxd.Kernels/Sandbox/SandboxType.cs:65` through `src/DotBoxd.Kernels/Sandbox/SandboxType.cs:85` implement equality and hashing by iterating the live `Arguments` collection.
-- `src/DotBoxd.Kernels/Sandbox/SandboxType.cs:116` through `src/DotBoxd.Kernels/Sandbox/SandboxType.cs:137` uses the live collection to decide whether a type is known and whether map keys are valid.
-- `src/DotBoxd.Kernels.Validation/StructuralValidator.cs:47` validates function return/parameter types, and `src/DotBoxd.Kernels.Validation/StructuralValidator.cs:198` through `src/DotBoxd.Kernels.Validation/StructuralValidator.cs:203` checks map key/type validity from the same mutable `Arguments` data.
-- `src/DotBoxd.Kernels/Model/CanonicalModuleHasher.cs:182` through `src/DotBoxd.Kernels/Model/CanonicalModuleHasher.cs:185` hashes module types by walking `type.Arguments`, while `src/DotBoxd.Kernels.Compiler/IlEmitterPrimitives.cs:55` through `src/DotBoxd.Kernels.Compiler/IlEmitterPrimitives.cs:71` emits compiled type constants from the same mutable shape.
-- `src/DotBoxd.Kernels/Sandbox/SandboxValueValidator.cs:57` through `src/DotBoxd.Kernels/Sandbox/SandboxValueValidator.cs:81` validates runtime list/map values against `expectedType.Arguments`.
-- `tests/DotBoxd.Kernels.Tests/Misc06/PublicModelImmutabilityTests.cs` covers modules, plugin manifests, values, audit payloads, and validation exceptions, but it has no `SandboxType` argument-aliasing test.
+- `src/DotBoxD.Kernels/Sandbox/SandboxType.cs:5` declares `public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)` with no constructor body or init accessor that snapshots `Arguments`.
+- `src/DotBoxD.Kernels/Sandbox/SandboxType.cs:65` through `src/DotBoxD.Kernels/Sandbox/SandboxType.cs:85` implement equality and hashing by iterating the live `Arguments` collection.
+- `src/DotBoxD.Kernels/Sandbox/SandboxType.cs:116` through `src/DotBoxD.Kernels/Sandbox/SandboxType.cs:137` uses the live collection to decide whether a type is known and whether map keys are valid.
+- `src/DotBoxD.Kernels.Validation/StructuralValidator.cs:47` validates function return/parameter types, and `src/DotBoxD.Kernels.Validation/StructuralValidator.cs:198` through `src/DotBoxD.Kernels.Validation/StructuralValidator.cs:203` checks map key/type validity from the same mutable `Arguments` data.
+- `src/DotBoxD.Kernels/Model/CanonicalModuleHasher.cs:182` through `src/DotBoxD.Kernels/Model/CanonicalModuleHasher.cs:185` hashes module types by walking `type.Arguments`, while `src/DotBoxD.Kernels.Compiler/IlEmitterPrimitives.cs:55` through `src/DotBoxD.Kernels.Compiler/IlEmitterPrimitives.cs:71` emits compiled type constants from the same mutable shape.
+- `src/DotBoxD.Kernels/Sandbox/SandboxValueValidator.cs:57` through `src/DotBoxD.Kernels/Sandbox/SandboxValueValidator.cs:81` validates runtime list/map values against `expectedType.Arguments`.
+- `tests/DotBoxD.Kernels.Tests/Misc06/PublicModelImmutabilityTests.cs` covers modules, plugin manifests, values, audit payloads, and validation exceptions, but it has no `SandboxType` argument-aliasing test.
 
 A minimal repro shape is:
 

@@ -29,10 +29,10 @@ The untyped `SandboxValue.FromList(IReadOnlyList<SandboxValue>)` factory snapsho
 
 ## Evidence
 
-- `src/DotBoxd.Kernels/Sandbox/SandboxValue.cs` implements the untyped `FromList` overload by calling `ModelCopy.List(values)` before constructing `new ListValue(...)`.
+- `src/DotBoxD.Kernels/Sandbox/SandboxValue.cs` implements the untyped `FromList` overload by calling `ModelCopy.List(values)` before constructing `new ListValue(...)`.
 - `ListValue` stores its `Values` through `ModelCopy.List(Values)`, so the constructor defensively copies the already-copied snapshot.
-- `src/DotBoxd.Kernels/Model/ModelCopy.cs` implements `List<T>` as `values.ToArray()` plus `ReadOnlyCollection<T>`.
-- Hot call sites include `src/DotBoxd.Kernels.Runtime/CompiledRuntime.cs` `ListOf`, `src/DotBoxd.Kernels.Interpreter/Internal/CollectionOperations.cs` `BuildList`, and public host/test input construction through `SandboxValue.FromList(...)`.
+- `src/DotBoxD.Kernels/Model/ModelCopy.cs` implements `List<T>` as `values.ToArray()` plus `ReadOnlyCollection<T>`.
+- Hot call sites include `src/DotBoxD.Kernels.Runtime/CompiledRuntime.cs` `ListOf`, `src/DotBoxD.Kernels.Interpreter/Internal/CollectionOperations.cs` `BuildList`, and public host/test input construction through `SandboxValue.FromList(...)`.
 - Existing `PAL-0040` covers plugin kernel input using the typed `FromList(values, itemType)` overload after building a working array. This finding is the broader untyped factory double-snapshot that remains outside plugin input construction.
 
 ## Impact

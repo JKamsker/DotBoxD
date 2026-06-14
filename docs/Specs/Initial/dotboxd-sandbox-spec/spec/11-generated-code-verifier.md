@@ -67,7 +67,7 @@ Example allowlist:
 
 ```text
 System.Private.CoreLib
-DotBoxd.Kernels.Runtime
+DotBoxD.Kernels.Runtime
 ```
 
 Depending on backend, other framework assemblies may be required. Keep the list minimal.
@@ -81,9 +81,9 @@ Allow only exact approved runtime types.
 Allowed example:
 
 ```text
-DotBoxd.Kernels.SandboxContext
-DotBoxd.Kernels.SandboxValue
-DotBoxd.Kernels.Runtime.CompiledRuntime
+DotBoxD.Kernels.SandboxContext
+DotBoxD.Kernels.SandboxValue
+DotBoxD.Kernels.Runtime.CompiledRuntime
 System.Int32
 System.Boolean
 System.String
@@ -117,10 +117,10 @@ Allow exact approved members only.
 Prefer exact method signatures:
 
 ```text
-DotBoxd.Kernels.Runtime.CompiledRuntime.ChargeFuel(SandboxContext, Int32)
-DotBoxd.Kernels.Runtime.CompiledRuntime.CallBinding(SandboxContext, String, SandboxValue[])
-DotBoxd.Kernels.SandboxValue.FromInt32(Int32)
-DotBoxd.Kernels.Runtime.CompiledRuntime.AsI32(SandboxValue)
+DotBoxD.Kernels.Runtime.CompiledRuntime.ChargeFuel(SandboxContext, Int32)
+DotBoxD.Kernels.Runtime.CompiledRuntime.CallBinding(SandboxContext, String, SandboxValue[])
+DotBoxD.Kernels.SandboxValue.FromInt32(Int32)
+DotBoxD.Kernels.Runtime.CompiledRuntime.AsI32(SandboxValue)
 ```
 
 Reject all other method/field references.

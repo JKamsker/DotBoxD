@@ -25,7 +25,7 @@ duplicate_of:
 
 ## Claim
 
-The `DotBoxd.Kernels.Validation` package exposes `ModuleValidator` as a public validator, but its public `Validate(...)` method returns `ModuleValidationResult` from `DotBoxd.Kernels.Validation.Internal`. A consumer using the validation package has to depend on an `Internal` namespace for the result type of a documented package-level feature.
+The `DotBoxD.Kernels.Validation` package exposes `ModuleValidator` as a public validator, but its public `Validate(...)` method returns `ModuleValidationResult` from `DotBoxD.Kernels.Validation.Internal`. A consumer using the validation package has to depend on an `Internal` namespace for the result type of a documented package-level feature.
 
 ## Why this matters
 
@@ -33,21 +33,21 @@ Validation is listed as a current package surface for structural, type, effect, 
 
 ## Evidence
 
-- `README.md:10` lists `DotBoxd.Kernels.Validation` as the package for structural, type, effect, policy, and binding validation.
-- `src/DotBoxd.Kernels.Validation/ModuleValidator.cs:5` declares public `ModuleValidator` in namespace `DotBoxd.Kernels.Validation`.
-- `src/DotBoxd.Kernels.Validation/ModuleValidator.cs:7` exposes `public ModuleValidationResult Validate(SandboxModule module, IBindingCatalog bindings, SandboxPolicy? policy = null)`.
-- `src/DotBoxd.Kernels.Validation/Internal/ModuleValidationResult.cs:1` declares the result namespace as `DotBoxd.Kernels.Validation.Internal`.
-- `src/DotBoxd.Kernels.Validation/Internal/ModuleValidationResult.cs:5` declares `public sealed record ModuleValidationResult(...)`, so the type is externally visible even though the namespace signals implementation detail.
-- `src/DotBoxd.Kernels.Validation/Internal/GlobalUsings.cs:1` adds `global using DotBoxd.Kernels.Validation.Internal` inside the project, hiding the namespace mismatch from in-assembly code but not from normal consumers.
+- `README.md:10` lists `DotBoxD.Kernels.Validation` as the package for structural, type, effect, policy, and binding validation.
+- `src/DotBoxD.Kernels.Validation/ModuleValidator.cs:5` declares public `ModuleValidator` in namespace `DotBoxD.Kernels.Validation`.
+- `src/DotBoxD.Kernels.Validation/ModuleValidator.cs:7` exposes `public ModuleValidationResult Validate(SandboxModule module, IBindingCatalog bindings, SandboxPolicy? policy = null)`.
+- `src/DotBoxD.Kernels.Validation/Internal/ModuleValidationResult.cs:1` declares the result namespace as `DotBoxD.Kernels.Validation.Internal`.
+- `src/DotBoxD.Kernels.Validation/Internal/ModuleValidationResult.cs:5` declares `public sealed record ModuleValidationResult(...)`, so the type is externally visible even though the namespace signals implementation detail.
+- `src/DotBoxD.Kernels.Validation/Internal/GlobalUsings.cs:1` adds `global using DotBoxD.Kernels.Validation.Internal` inside the project, hiding the namespace mismatch from in-assembly code but not from normal consumers.
 - Existing API-0001 and API-0002 cover JSON and HTTP extension methods exposed only from internal namespaces. This finding is distinct: the validation package's public method signature leaks an internal result type.
 
 ## Suggested acceptance test
 
-Add a consumer-facing compile/API test that references `DotBoxd.Kernels.Validation` and verifies this snippet compiles without importing `DotBoxd.Kernels.Validation.Internal`:
+Add a consumer-facing compile/API test that references `DotBoxD.Kernels.Validation` and verifies this snippet compiles without importing `DotBoxD.Kernels.Validation.Internal`:
 
 ```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Kernels.Validation;
+using DotBoxD.Kernels;
+using DotBoxD.Kernels.Validation;
 
 var validator = new ModuleValidator();
 ModuleValidationResult result = validator.Validate(module, bindings, policy);
@@ -57,7 +57,7 @@ If the intended API avoids naming the concrete result type, add an alternate tes
 
 ## Suggested fix direction
 
-Move or forward `ModuleValidationResult` into the public `DotBoxd.Kernels.Validation` namespace, and keep a compatibility shim only if source compatibility with current internal-namespace consumers is required. Update public API docs to describe the result fields, especially `Functions`, `ModuleEffects`, `RequiredCapabilities`, and `BindingReferences`.
+Move or forward `ModuleValidationResult` into the public `DotBoxD.Kernels.Validation` namespace, and keep a compatibility shim only if source compatibility with current internal-namespace consumers is required. Update public API docs to describe the result fields, especially `Functions`, `ModuleEffects`, `RequiredCapabilities`, and `BindingReferences`.
 
 ## Scope boundaries
 
@@ -70,6 +70,6 @@ Do not change validation behavior or diagnostics in this finding. The fix should
 ## Verification checklist
 
 - [ ] Consumers can use `ModuleValidator.Validate(...)` and name the result type from a public namespace.
-- [ ] No consumer-facing sample requires `DotBoxd.Kernels.Validation.Internal`.
+- [ ] No consumer-facing sample requires `DotBoxD.Kernels.Validation.Internal`.
 - [ ] Public API docs describe the validation result shape.
 - [ ] Existing validation behavior and diagnostics remain unchanged.

@@ -69,7 +69,7 @@
 
 ## Main packages
 
-### `DotBoxd.Kernels`
+### `DotBoxD.Kernels`
 
 Contains:
 
@@ -82,7 +82,7 @@ Contains:
 
 Must not depend on Reflection.Emit or host app infrastructure.
 
-### `DotBoxd.Kernels.Validation`
+### `DotBoxD.Kernels.Validation`
 
 Contains:
 
@@ -93,7 +93,7 @@ Contains:
 - binding signature validation
 - resource-cost analysis
 
-### `DotBoxd.Kernels.Runtime`
+### `DotBoxD.Kernels.Runtime`
 
 Contains:
 
@@ -105,7 +105,7 @@ Contains:
 - audit sink abstractions
 - binding invocation abstractions
 
-### `DotBoxd.Kernels.Serialization.Json`
+### `DotBoxD.Kernels.Serialization.Json`
 
 Contains:
 
@@ -114,7 +114,7 @@ Contains:
 - import-budget enforcement
 - host JSON import extension methods
 
-### `DotBoxd.Hosting.Http`
+### `DotBoxD.Hosting.Http`
 
 Contains:
 
@@ -123,17 +123,17 @@ Contains:
 - pinned HTTP transport
 - HTTP grant validation
 
-### `DotBoxd.Pushdown.Services`
+### `DotBoxD.Pushdown.Services`
 
 Contains:
 
-- DotBoxd MessagePack transport-agnostic helpers
+- DotBoxD MessagePack transport-agnostic helpers
 - named-pipe convenience wrappers
 - plugin-control IPC transport primitives
 
-Packaging note: this addon remains prerelease while the upstream DotBoxd packages it depends on are prerelease-only. Stable DotBoxd.Kernels release gates permit prerelease metadata and dependencies only for this explicitly documented preview addon.
+Packaging note: this addon remains prerelease while the upstream DotBoxD packages it depends on are prerelease-only. Stable DotBoxD.Kernels release gates permit prerelease metadata and dependencies only for this explicitly documented preview addon.
 
-### `DotBoxd.Kernels.Interpreter`
+### `DotBoxD.Kernels.Interpreter`
 
 Contains:
 
@@ -142,7 +142,7 @@ Contains:
 - trace events
 - interpreter-specific optimizations
 
-### `DotBoxd.Kernels.Compiler`
+### `DotBoxD.Kernels.Compiler`
 
 Contains:
 
@@ -152,7 +152,7 @@ Contains:
 - cache artifact writer
 - generated symbol/debug info where needed
 
-### `DotBoxd.Kernels.Verifier`
+### `DotBoxD.Kernels.Verifier`
 
 Contains:
 
@@ -162,7 +162,7 @@ Contains:
 - manifest verifier
 - cache artifact verifier
 
-### `DotBoxd.Hosting`
+### `DotBoxD.Hosting`
 
 Contains:
 
@@ -172,7 +172,7 @@ Contains:
 - execution-mode selector
 - worker-process client if used
 
-### `DotBoxd.Plugins.Analyzer`
+### `DotBoxD.Plugins.Analyzer`
 
 Contains:
 
@@ -180,7 +180,7 @@ Contains:
 - local SDK diagnostics for unsupported kernel shapes
 - live-setting and forbidden host API analyzer rules
 
-### `DotBoxd.Plugins`
+### `DotBoxD.Plugins`
 
 Contains:
 

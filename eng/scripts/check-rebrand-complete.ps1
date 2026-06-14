@@ -5,7 +5,7 @@
     legacy SGP#### diagnostic id) survives in the active source tree.
 
 .DESCRIPTION
-    The repository was rebranded from ShaRPC / SafeIR to DotBoxd. This gate keeps the
+    The repository was rebranded from ShaRPC / SafeIR to DotBoxD. This gate keeps the
     rebrand from silently regressing. It scans the active project surface
     (src tests benchmarks samples eng schemas) for a case-SENSITIVE set of legacy
     brand spellings and prints the offending file:line so the leak is easy to find.

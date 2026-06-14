@@ -1,6 +1,6 @@
 # Followups: `[KernelMethod]` inlining and kernel RPC services
 
-Two follow-on features layered on the lowering pipeline and the kernel runtime. Both keep the DotBoxd.Kernels
+Two follow-on features layered on the lowering pipeline and the kernel runtime. Both keep the DotBoxD.Kernels
 invariant: plugin authors write plain C#, the generator lowers it to **verified, sandboxed IR**, and the
 server never compiles plugin source.
 
@@ -29,7 +29,7 @@ public static bool IsBullyingLowLevelPlayer(
 There is **no call** in the lowered IR — the method body is **inlined** at each call site. The generator:
 
 1. Resolves the invoked symbol and checks for `[KernelMethod]`
-   ([DotBoxdKernelMethodInliner](../../../src/DotBoxd.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxdKernelMethodInliner.cs)).
+   ([DotBoxDKernelMethodInliner](../../../src/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)).
    A method without the attribute returns `null` so the normal dispatch continues; once the attribute is
    seen the inliner *owns* the call and any unsupported shape throws `NotSupportedException` (fail-safe).
 2. Lowers each call-site argument in the **calling** context (so a `[HostBinding]` call or
@@ -37,7 +37,7 @@ There is **no call** in the lowered IR — the method body is **inlined** at eac
    manifest).
 3. Lowers the method's body with each parameter name bound to its already-lowered argument IR — the same
    compile-time substitution the `Select` projection uses (`ProjectedElement`), generalized to N
-   parameters via `DotBoxdExpressionLoweringContext.InlinedBindings` and resolved first in
+   parameters via `DotBoxDExpressionLoweringContext.InlinedBindings` and resolved first in
    `LowerIdentifier` (so a parameter correctly shadows a same-named live setting).
 4. Switches to the method body's own semantic model (the body may live in another file/tree).
 
@@ -46,7 +46,7 @@ already supports (AND-composed `Where`s, `Select` projection, the terminal `Send
 
 ### Where it plugs in
 
-`DotBoxdInvocationExpressionLowerer.Lower` tries, in order: `[HostBinding]` → `[KernelMethod]` →
+`DotBoxDInvocationExpressionLowerer.Lower` tries, in order: `[HostBinding]` → `[KernelMethod]` →
 `string.Equals`/`Substring` → throw. So the inliner sits next to the existing host-binding lowerer and
 benefits from the same `catch (NotSupportedException)` fail-safe in `HookChainModelFactory` /
 `PluginKernelModelFactory` (no package emitted; the runtime terminal throws `DBXK062`).
@@ -71,14 +71,14 @@ build. This matches the host-binding precedent.
 
 ### Example
 
-`GuardianKernel.ShouldHandle` ([example](../../../examples/GameServer/DotBoxd.Kernels.Game.Plugin/Kernels/GuardianKernel.cs))
+`GuardianKernel.ShouldHandle` ([example](../../../examples/GameServer/DotBoxD.Kernels.Game.Plugin/Kernels/GuardianKernel.cs))
 factors its "is this monster bullying a weaker player in range?" rule into
 `IsBullyingLowLevelPlayer([KernelMethod])`, passing the live settings as arguments. The example runs
 end-to-end unchanged (exit 0; damage/tick drops from baseline exactly as before).
 
 ### Tests
 
-[`PluginAnalyzerKernelMethodTests`](../../../tests/DotBoxd.Kernels.Tests/PluginAnalyzer/Generated/PluginAnalyzerKernelMethodTests.cs):
+[`PluginAnalyzerKernelMethodTests`](../../../tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/PluginAnalyzerKernelMethodTests.cs):
 inlining into a kernel-class `ShouldHandle` (runtime gate equivalence), into an inline `Where` chain,
 multi-argument helpers, capability collection through a `[HostBinding]` argument (manifest + install
 under a wildcard grant), and the multi-statement-body fail-safe (no chain package generated).
@@ -140,11 +140,11 @@ compile to IL like event kernels.
 
 | Layer | What it does |
 |---|---|
-| **Authoring** ([`[KernelRpcService]`](../../../src/DotBoxd.Abstractions/Contracts.cs)) | Marks the class; its one public batch method (trailing `HookContext` = host-binding marker) is the entrypoint. |
-| **Lowering** ([`RpcKernelModelFactory`](../../../src/DotBoxd.Plugins.Analyzer/Analysis/Rpc/RpcKernelModelFactory.cs), [`DotBoxdRpcJsonLowerer`](../../../src/DotBoxd.Plugins.Analyzer/Analysis/Rpc/DotBoxdRpcJsonLowerer.cs)) | Lowers the method body to verified IR **JSON** and emits a `<Name>PluginPackage` whose `Create()` imports it — so it ships exactly like an event kernel. Supports locals, a `foreach` over a list, `if`/`else`, host bindings, DTO construction (`new T(...)`/`new T{...}` → `record.new`), list accumulation (`list.Add` → `list.add`), indexing/`.Count`, and `return`. |
-| **Package + install** ([`PluginManifest.RpcEntrypoint`](../../../src/DotBoxd.Plugins/PluginManifest.cs), [`RpcKernelPackageValidator`](../../../src/DotBoxd.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)) | A distinct package shape (no event subscription/contract) validated and installed via `InstallRpcAsync` / `PluginSession.InstallRpcAsync` (owned + revoked on disconnect, like event kernels). |
-| **Invoke** ([`InstalledKernel.InvokeRpcAsync`](../../../src/DotBoxd.Plugins/Kernel/InstalledKernel.Rpc.cs)) | Binds caller args to the entrypoint's leading parameters (live settings fill the trailing ones), runs the IR once under the execution gate, and **returns** the result value (not discarded). |
-| **Typed surface** ([`KernelRpcMarshaller`](../../../src/DotBoxd.Plugins/Runtime/Rpc/KernelRpcMarshaller.cs), [`KernelRpcServiceProxy`](../../../src/DotBoxd.Plugins/Runtime/Rpc/KernelRpcServiceProxy.cs), [`PluginServer.RpcService`](../../../src/DotBoxd.Plugins/Runtime/Rpc/PluginServer.Rpc.cs)) | `RegisterRpcServiceAsync<TService, TKernel>()` installs the kernel and binds the contract; `RpcService<TService>()` returns a runtime proxy that marshals C# args ↔ sandbox values (scalars, lists, DTOs, lists of DTOs) so `service.KillMonsters(ids)` returns real `List<KillResult>`. |
+| **Authoring** ([`[KernelRpcService]`](../../../src/DotBoxD.Abstractions/Contracts.cs)) | Marks the class; its one public batch method (trailing `HookContext` = host-binding marker) is the entrypoint. |
+| **Lowering** ([`RpcKernelModelFactory`](../../../src/DotBoxD.Plugins.Analyzer/Analysis/Rpc/RpcKernelModelFactory.cs), [`DotBoxDRpcJsonLowerer`](../../../src/DotBoxD.Plugins.Analyzer/Analysis/Rpc/DotBoxDRpcJsonLowerer.cs)) | Lowers the method body to verified IR **JSON** and emits a `<Name>PluginPackage` whose `Create()` imports it — so it ships exactly like an event kernel. Supports locals, a `foreach` over a list, `if`/`else`, host bindings, DTO construction (`new T(...)`/`new T{...}` → `record.new`), list accumulation (`list.Add` → `list.add`), indexing/`.Count`, and `return`. |
+| **Package + install** ([`PluginManifest.RpcEntrypoint`](../../../src/DotBoxD.Plugins/PluginManifest.cs), [`RpcKernelPackageValidator`](../../../src/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)) | A distinct package shape (no event subscription/contract) validated and installed via `InstallRpcAsync` / `PluginSession.InstallRpcAsync` (owned + revoked on disconnect, like event kernels). |
+| **Invoke** ([`InstalledKernel.InvokeRpcAsync`](../../../src/DotBoxD.Plugins/Kernel/InstalledKernel.Rpc.cs)) | Binds caller args to the entrypoint's leading parameters (live settings fill the trailing ones), runs the IR once under the execution gate, and **returns** the result value (not discarded). |
+| **Typed surface** ([`KernelRpcMarshaller`](../../../src/DotBoxD.Plugins/Runtime/Rpc/KernelRpcMarshaller.cs), [`KernelRpcServiceProxy`](../../../src/DotBoxD.Plugins/Runtime/Rpc/KernelRpcServiceProxy.cs), [`PluginServer.RpcService`](../../../src/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs)) | `RegisterRpcServiceAsync<TService, TKernel>()` installs the kernel and binds the contract; `RpcService<TService>()` returns a runtime proxy that marshals C# args ↔ sandbox values (scalars, lists, DTOs, lists of DTOs) so `service.KillMonsters(ids)` returns real `List<KillResult>`. |
 
 ### Capabilities and effects
 
@@ -165,17 +165,17 @@ builds lists/records) + the binding effects, matched against the verified entryp
 
 ### Tests
 
-[`RpcKernelRuntimeTests`](../../../tests/DotBoxd.Kernels.Tests/Plugins/Rpc/RpcKernelRuntimeTests.cs) (loop →
+[`RpcKernelRuntimeTests`](../../../tests/DotBoxD.Kernels.Tests/Plugins/Rpc/RpcKernelRuntimeTests.cs) (loop →
 host binding per element → `List<Record>` in one roundtrip; JSON round-trip; capability deny;
-arg-count guard), [`RpcKernelGenerationTests`](../../../tests/DotBoxd.Kernels.Tests/Plugins/Rpc/RpcKernelGenerationTests.cs)
+arg-count guard), [`RpcKernelGenerationTests`](../../../tests/DotBoxD.Kernels.Tests/Plugins/Rpc/RpcKernelGenerationTests.cs)
 (plain-C# `[KernelRpcService]` → generated IR → install → invoke), and
-[`KernelRpcServiceProxyTests`](../../../tests/DotBoxd.Kernels.Tests/Plugins/Rpc/KernelRpcServiceProxyTests.cs)
+[`KernelRpcServiceProxyTests`](../../../tests/DotBoxD.Kernels.Tests/Plugins/Rpc/KernelRpcServiceProxyTests.cs)
 (the typed proxy + `RegisterRpcServiceAsync`/`RpcService` + DTO/list marshaller round-trips), plus the
-record-type foundation in [`SafeRecordCollectionTests`](../../../tests/DotBoxd.Kernels.Tests/Collections/SafeRecordCollectionTests.cs).
+record-type foundation in [`SafeRecordCollectionTests`](../../../tests/DotBoxD.Kernels.Tests/Collections/SafeRecordCollectionTests.cs).
 
 ---
 
-## 3. Compiling DotBoxd.Kernels to fast, verified IL
+## 3. Compiling DotBoxD.Kernels to fast, verified IL
 
 The record/RPC work above made every IR shape (records included) compile to verified IL. A follow-up pass
 made that compiled IL **fast** without weakening any safety invariant.

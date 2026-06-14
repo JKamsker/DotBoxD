@@ -98,7 +98,7 @@ Example:
   "safety": "ReadOnlyExternal",
   "compiledTarget": {
     "kind": "RuntimeStub",
-    "type": "DotBoxd.Kernels.Runtime.CompiledRuntime",
+    "type": "DotBoxD.Kernels.Runtime.CompiledRuntime",
     "method": "CallBinding"
   }
 }
@@ -143,7 +143,7 @@ public static class CompiledRuntime
 For performance, pure sandbox intrinsics may point at exact reviewed `CompiledRuntime` methods
 such as `AbsI32` or `StringLength`. External host facades must route through the generic
 binding-call stub. The registry must validate the exact compiled target type and method; a
-namespace prefix such as `DotBoxd.Kernels.Runtime.*` is not enough.
+namespace prefix such as `DotBoxD.Kernels.Runtime.*` is not enough.
 
 Avoid generating code that directly calls arbitrary app methods.
 
@@ -155,7 +155,7 @@ A smaller surface is better:
 
 ```text
 Generated code may call:
-  DotBoxd.Kernels.Runtime.CompiledRuntime.CallBinding(ctx, bindingId, args)
+  DotBoxD.Kernels.Runtime.CompiledRuntime.CallBinding(ctx, bindingId, args)
 
 Generated code may not call:
   MyGameServer.PlayerService.Whatever(...)

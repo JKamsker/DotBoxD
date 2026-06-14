@@ -2,14 +2,14 @@
 
 Companion to [plan.md](plan.md). Plugin side: [plugin-walkthrough.md](plugin-walkthrough.md).
 
-This shows the **end-state code** for the trusted host process (`DotBoxd.Kernels.Game.Server`) once
+This shows the **end-state code** for the trusted host process (`DotBoxD.Kernels.Game.Server`) once
 Phases A–C land. It is illustrative, not a diff — focus on *how the project reads*, not exact lines.
 
 ## The mental model in one picture
 
 ```
 ┌─────────────────────────────┐         IPC (named pipe)        ┌──────────────────────────────┐
-│  DotBoxd.Kernels.Game.Plugin          │  ─────────────────────────────▶ │  DotBoxd.Kernels.Game.Server          │
+│  DotBoxD.Kernels.Game.Plugin          │  ─────────────────────────────▶ │  DotBoxD.Kernels.Game.Server          │
 │  (untrusted author code)     │   ships verified IR + settings  │  (trusted host)              │
 │                              │                                  │                              │
 │  • Kernels (plain C#)        │                                  │  • Owns the SandboxPolicy    │
@@ -17,7 +17,7 @@ Phases A–C land. It is illustrative, not a diff — focus on *how the project 
 │  • server.Events.On<>()...   │                                  │  • Drives the simulation     │
 └─────────────────────────────┘                                  └──────────────────────────────┘
         │                                                                    ▲
-        │ source generator (DotBoxd.Plugins.Analyzer)                          │
+        │ source generator (DotBoxD.Plugins.Analyzer)                          │
         ▼                                                                    │
    lowers kernels + Where/Select/InvokeKernel lambdas  ────────────────────▶ opaque verified IR
 ```
@@ -29,7 +29,7 @@ IR in a sandbox, drives the simulation, and exposes the control plane the plugin
 
 ## The contract it exposes (shared)
 
-These live in `DotBoxd.Kernels.Game.Server.Abstractions`, referenced by both processes.
+These live in `DotBoxD.Kernels.Game.Server.Abstractions`, referenced by both processes.
 
 ### Service contracts — what the server lets plugins implement
 
@@ -49,7 +49,7 @@ The plugin ships IR and tunes settings over this; the plugin's shim wraps it, so
 never calls it directly.
 
 ```csharp
-[DotBoxdService]
+[DotBoxDService]
 public interface IGamePluginControlService
 {
     ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
@@ -89,7 +89,7 @@ signed grant, and manifest request. See [ownership-auth-and-policy.md](ownership
 §4 for the full auth + per-plugin-limit model.
 
 ```csharp
-namespace DotBoxd.Kernels.Game.Server;
+namespace DotBoxD.Kernels.Game.Server;
 
 internal static class ServerPolicy
 {
@@ -111,9 +111,9 @@ into `Main`; the `0`/`1` exit-code contract is preserved; the local helpers beco
 methods on `Program`.
 
 ```csharp
-namespace DotBoxd.Kernels.Game.Server;
+namespace DotBoxD.Kernels.Game.Server;
 
-using DotBoxd.Kernels.Transport.Ipc;
+using DotBoxD.Kernels.Transport.Ipc;
 
 internal static class Program
 {
@@ -136,7 +136,7 @@ internal static class Program
         //     (see ownership-auth-and-policy.md §2 + §4).
         var pipeName = "dotboxd-game-" + Guid.NewGuid().ToString("N");
         var authenticator = new LocalProcessAuthenticator();   // server spawned the child → trusted
-        await using var host = DotBoxdDotBoxdRpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
+        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
         {
             var session = server.CreateSession(authenticator.Authenticate(peer));
             peer.ProvideGamePluginControlService(new GamePluginControlService(session, sink, world));
@@ -200,7 +200,7 @@ Binding a kernel **class** is no longer a hook-chain terminal — it moved to
 `server.Kernels.Register<TService, TKernel>()`. That call resolves the kernel package, installs it
 through the owning session under the resolved per-plugin policy, and wires it **generically** —
 resolving the adapter by the manifest's event name instead of the old hardcoded `WireHook` switch
-([GamePluginControlService.cs:59-77](../../../examples/GameServer/DotBoxd.Kernels.Game.Server/Ipc/GamePluginControlService.cs)
+([GamePluginControlService.cs:59-77](../../../examples/GameServer/DotBoxD.Kernels.Game.Server/Ipc/GamePluginControlService.cs)
 is deleted). See [kernel-binding-model.md](kernel-binding-model.md) §4.
 
 `server.Events` is the fire-and-forget mirror of `server.Hooks` (same chain surface; isolates handler

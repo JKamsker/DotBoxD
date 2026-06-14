@@ -1,0 +1,100 @@
+<Solution>
+
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+
+  <Folder Name="/src/Services/">
+    <Project Path="src/Services/DotBoxD.Services/DotBoxD.Services.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Meta/">
+    <Project Path="src/Meta/DotBoxD/DotBoxD.csproj" />
+    <Project Path="src/Meta/DotBoxD.Services.All/DotBoxD.Services.All.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Channels/">
+    <Project Path="src/Channels/DotBoxD.Transports.Tcp/DotBoxD.Transports.Tcp.csproj" />
+    <Project Path="src/Channels/DotBoxD.Transports.NamedPipes/DotBoxD.Transports.NamedPipes.csproj" />
+    <Project Path="src/Channels/DotBoxD.Codecs.MessagePack/DotBoxD.Codecs.MessagePack.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Kernels/">
+    <Project Path="src/Kernels/DotBoxD.Kernels/DotBoxD.Kernels.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Validation/DotBoxD.Kernels.Validation.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Runtime/DotBoxD.Kernels.Runtime.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Interpreter/DotBoxD.Kernels.Interpreter.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Compiler/DotBoxD.Kernels.Compiler.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Verifier/DotBoxD.Kernels.Verifier.csproj" />
+    <Project Path="src/Kernels/DotBoxD.Kernels.Serialization.Json/DotBoxD.Kernels.Serialization.Json.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/">
+    <Project Path="src/Hosting/DotBoxD.Hosting/DotBoxD.Hosting.csproj" />
+    <Project Path="src/Hosting/DotBoxD.Abstractions/DotBoxD.Abstractions.csproj" />
+    <Project Path="src/Hosting/DotBoxD.Plugins/DotBoxD.Plugins.csproj" />
+    <Project Path="src/Hosting/DotBoxD.Hosting.Http/DotBoxD.Hosting.Http.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Pushdown/">
+    <Project Path="src/Pushdown/DotBoxD.Pushdown.Services/DotBoxD.Pushdown.Services.csproj" />
+  </Folder>
+
+  <Folder Name="/src/CodeGeneration/">
+    <Project Path="src/CodeGeneration/DotBoxD.Services.SourceGenerator/DotBoxD.Services.SourceGenerator.csproj" />
+    <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Services.Tests.GeneratedFixtures/DotBoxD.Services.Tests.GeneratedFixtures.csproj" />
+  </Folder>
+
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/DotBoxD.Kernels.Benchmarks/DotBoxD.Kernels.Benchmarks.csproj" />
+    <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Services/">
+    <Project Path="samples/Services/GameService/Shared/Shared.csproj" />
+    <Project Path="samples/Services/GameService/Server/Server.csproj" />
+    <Project Path="samples/Services/GameService/Client/Client.csproj" />
+    <Project Path="samples/Services/Inventory/Shared/Inventory.Shared.csproj" />
+    <Project Path="samples/Services/Inventory/Server/Inventory.Server.csproj" />
+    <Project Path="samples/Services/Inventory/Client/Inventory.Client.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Kernels/">
+    <Project Path="samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/DotBoxD.Kernels.Example.Capabilities.csproj" />
+    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Plugin/DotBoxD.Kernels.Game.Plugin.csproj" />
+    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Server/DotBoxD.Kernels.Game.Server.csproj" />
+    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Server.Abstractions/DotBoxD.Kernels.Game.Server.Abstractions.csproj" />
+    <Project Path="samples/Kernels/Hosting/DotBoxD.Kernels.Example.Hosting/DotBoxD.Kernels.Example.Hosting.csproj" />
+    <Project Path="samples/Kernels/HttpTransport/DotBoxD.Kernels.HttpTransportExample/DotBoxD.Kernels.HttpTransportExample.csproj" />
+    <Project Path="samples/Kernels/LocalPlugin/DotBoxD.Kernels.PluginLocal/DotBoxD.Kernels.PluginLocal.csproj" />
+    <Project Path="samples/Kernels/PluginAuthoring/DotBoxD.Kernels.Example.PluginAuthoring/DotBoxD.Kernels.Example.PluginAuthoring.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Pushdown/">
+    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Shared/DotBoxD.Kernels.PluginIpc.Shared.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Server.Abstractions/DotBoxD.Kernels.PluginIpc.Server.Abstractions.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Server/DotBoxD.Kernels.PluginIpc.Server.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Client/DotBoxD.Kernels.PluginIpc.Client.csproj" />
+    <Project Path="samples/Pushdown/DotBoxD.EndToEnd/DotBoxD.EndToEnd.csproj" />
+  </Folder>
+
+  <Folder Name="/tools/">
+    <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
+    <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
+  </Folder>
+
+  <Properties Name="Visual Studio">
+    <Property Name="OpenWith" Value="17" />
+  </Properties>
+
+</Solution>

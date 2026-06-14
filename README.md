@@ -1,14 +1,14 @@
-# DotBoxd
+# DotBoxD
 
 > Source-generated, contract-first .NET extension runtime: **Services**, **Kernels**, **Pushdown**.
 
-[![CI](https://github.com/JKamsker/DotBoxd/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxd/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/JKamsker/DotBoxd/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxd/actions/workflows/codeql.yml)
-[![NuGet](https://img.shields.io/nuget/v/DotBoxd.svg)](https://www.nuget.org/packages/DotBoxd)
+[![CI](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml)
+[![NuGet](https://img.shields.io/nuget/v/DotBoxD.svg)](https://www.nuget.org/packages/DotBoxD)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 
-DotBoxd lets a host and its clients share **one C# contract** and use it in three different ways,
+DotBoxD lets a host and its clients share **one C# contract** and use it in three different ways,
 all driven by Roslyn source generators (no runtime reflection on the hot path):
 
 - **Services** — the host implements a contract; clients call it remotely over RPC.
@@ -24,16 +24,16 @@ The Kernels and Pushdown stack targets `net10.0`.
 ## The 3 ways to use one contract
 
 All three snippets below are distilled from the runnable acceptance sample at
-[`samples/Pushdown/DotBoxd.EndToEnd`](samples/Pushdown/DotBoxd.EndToEnd) — they use the real,
+[`samples/Pushdown/DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd) — they use the real,
 compiling API.
 
 ### 1. Services — define a contract, host it, call it remotely
 
 ```csharp
-using DotBoxd.Services.Attributes;
+using DotBoxD.Services.Attributes;
 
 // One contract, shared by host and client.
-[DotBoxdService]
+[DotBoxDService]
 public interface ICatalogService
 {
     ValueTask<int> GetUnitPriceAsync(string itemId, CancellationToken cancellationToken = default);
@@ -42,23 +42,23 @@ public interface ICatalogService
 ```
 
 ```csharp
-using DotBoxd.Kernels.Transport.Ipc;   // IPC helper (ships in DotBoxd.Pushdown.Services)
-using DotBoxd.Services.Generated;       // generated ProvideCatalogService / Get<T>
+using DotBoxD.Kernels.Transport.Ipc;   // IPC helper (ships in DotBoxD.Pushdown.Services)
+using DotBoxD.Services.Generated;       // generated ProvideCatalogService / Get<T>
 
 // Host: turn every accepted connection into a peer that serves the contract.
-await using var host = DotBoxdDotBoxdRpcMessagePackIpc.ListenNamedPipe(
+await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
     pipeName,
     peer => peer.ProvideCatalogService(new CatalogService(prices)));
 await host.StartAsync();
 
 // Client: connect and get a strongly typed proxy — calls go over the wire.
-await using var connection = await DotBoxdDotBoxdRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
+await using var connection = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var catalog = connection.Get<ICatalogService>();
 
 var unitPrice = await catalog.GetUnitPriceAsync("sword"); // one remote round-trip
 ```
 
-The `[DotBoxdService]` attribute drives the `DotBoxd.Services.SourceGenerator`, which emits a typed
+The `[DotBoxDService]` attribute drives the `DotBoxD.Services.SourceGenerator`, which emits a typed
 proxy, a dispatcher, and the `ProvideCatalogService(...)` / `Get<ICatalogService>()` extensions at
 compile time. The GameService sample shows the same model over **TCP** with bidirectional callbacks
 (see [`samples/Services/GameService`](samples/Services/GameService)).
@@ -69,8 +69,8 @@ A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host
 validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
 
 ```csharp
-using DotBoxd.Hosting;
-using DotBoxd.Kernels;
+using DotBoxD.Hosting;
+using DotBoxD.Kernels;
 
 // A sandbox host with only the safe, pure bindings enabled.
 var host = SandboxHost.Create(builder =>
@@ -105,7 +105,7 @@ if (result.Succeeded && result.Value is I32Value total)
 ### 3. Pushdown — compose host services next to the data
 
 A naive client makes one remote call per cart line, then sums the results. With pushdown, the host
-exposes a **service method** — `ComputeCartTotalAsync`, part of the same `[DotBoxdService]` contract —
+exposes a **service method** — `ComputeCartTotalAsync`, part of the same `[DotBoxDService]` contract —
 that composes its **own** catalog data and runs a validated **kernel** server-side, so the client
 submits the whole cart in **one** round-trip.
 
@@ -114,7 +114,7 @@ submits the whole cart in **one** round-trip.
 > is invoked as `_kernel`.
 
 ```csharp
-// Host side: a normal [DotBoxdService] method that runs the validated CartTotalKernel server-side.
+// Host side: a normal [DotBoxDService] method that runs the validated CartTotalKernel server-side.
 public async ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken ct = default)
 {
     // Host-side composition: turn each cart line into a subtotal using the host's own catalog.
@@ -141,20 +141,20 @@ In the end-to-end sample, a 4-line cart that takes **4 remote calls** the naive 
 
 ```bash
 # Full net10.0 stack (Services + Kernels + Pushdown):
-dotnet add package DotBoxd
+dotnet add package DotBoxD
 
 # Unity / netstandard2.1 service bundle:
-dotnet add package DotBoxd.Services.All
+dotnet add package DotBoxD.Services.All
 
 # Preview pushdown IPC addon (prerelease while upstream deps are prerelease):
-dotnet add package DotBoxd.Pushdown.Services --prerelease
+dotnet add package DotBoxD.Pushdown.Services --prerelease
 ```
 
 Then read [`docs/getting-started`](docs/getting-started/) for first-service, first-kernel, and
 pushdown walkthroughs, or run the acceptance sample:
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxd.EndToEnd
+dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 ```
 
 ---
@@ -182,9 +182,9 @@ flowchart LR
     Pushdown --> Services
 
     subgraph Channels["Transports + Codecs"]
-        Tcp["DotBoxd.Transports.Tcp"]
-        Pipes["DotBoxd.Transports.NamedPipes"]
-        MsgPack["DotBoxd.Codecs.MessagePack"]
+        Tcp["DotBoxD.Transports.Tcp"]
+        Pipes["DotBoxD.Transports.NamedPipes"]
+        MsgPack["DotBoxD.Codecs.MessagePack"]
     end
 
     Services --- Channels
@@ -199,7 +199,7 @@ flowchart LR
     Kernels --> Runtime
 ```
 
-The generators (`DotBoxd.Services.SourceGenerator`, `DotBoxd.Plugins.Analyzer`) emit proxies,
+The generators (`DotBoxD.Services.SourceGenerator`, `DotBoxD.Plugins.Analyzer`) emit proxies,
 dispatchers, and plugin factories at compile time. Diagnostics are namespaced `DBXS###` (services)
 and `DBXK###` (kernels/plugins). See [`docs/index.md`](docs/index.md) for the full picture.
 
@@ -209,46 +209,46 @@ and `DBXK###` (kernels/plugins). See [`docs/index.md`](docs/index.md) for the fu
 
 | Package | Purpose | TFM | Stability |
 |---------|---------|-----|-----------|
-| `DotBoxd` | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
-| `DotBoxd.Services.All` | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxd.Services` | Contract attributes, `RpcPeer`/`RpcHost`, dispatch | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxd.Codecs.MessagePack` | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxd.Transports.Tcp` | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxd.Transports.NamedPipes` | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxd.Services.SourceGenerator` | Roslyn generator for `[DotBoxdService]` proxies/dispatchers | netstandard2.0 | Stable |
-| `DotBoxd.Abstractions` | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
-| `DotBoxd.Kernels` | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
-| `DotBoxd.Kernels.Validation` | Structural, type, effect, policy, binding validation | net10.0 | Preview |
-| `DotBoxd.Kernels.Runtime` | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
-| `DotBoxd.Kernels.Interpreter` | Direct IR execution backend | net10.0 | Preview |
-| `DotBoxd.Kernels.Compiler` | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
-| `DotBoxd.Kernels.Verifier` | Generated-assembly verifier | net10.0 | Preview |
-| `DotBoxd.Kernels.Serialization.Json` | JSON IR importer/exporter + schema | net10.0 | Preview |
-| `DotBoxd.Hosting` | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
-| `DotBoxd.Hosting.Http` | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
-| `DotBoxd.Plugins` | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
-| `DotBoxd.Plugins.Analyzer` | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
-| `DotBoxd.Pushdown.Services` | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
+| `DotBoxD` | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
+| `DotBoxD.Services.All` | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxD.Services` | Contract attributes, `RpcPeer`/`RpcHost`, dispatch | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxD.Codecs.MessagePack` | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxD.Transports.Tcp` | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxD.Transports.NamedPipes` | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxD.Services.SourceGenerator` | Roslyn generator for `[DotBoxDService]` proxies/dispatchers | netstandard2.0 | Stable |
+| `DotBoxD.Abstractions` | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
+| `DotBoxD.Kernels` | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
+| `DotBoxD.Kernels.Validation` | Structural, type, effect, policy, binding validation | net10.0 | Preview |
+| `DotBoxD.Kernels.Runtime` | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
+| `DotBoxD.Kernels.Interpreter` | Direct IR execution backend | net10.0 | Preview |
+| `DotBoxD.Kernels.Compiler` | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
+| `DotBoxD.Kernels.Verifier` | Generated-assembly verifier | net10.0 | Preview |
+| `DotBoxD.Kernels.Serialization.Json` | JSON IR importer/exporter + schema | net10.0 | Preview |
+| `DotBoxD.Hosting` | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
+| `DotBoxD.Hosting.Http` | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
+| `DotBoxD.Plugins` | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
+| `DotBoxD.Plugins.Analyzer` | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
+| `DotBoxD.Pushdown.Services` | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
 
-`DotBoxd.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
+`DotBoxD.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
 dependencies are prerelease; stable release gates fail if it is included in a stable package set.
 
 ### Common namespaces & key types
 
 After installing, these are the entry points you'll reach for:
 
-- `DotBoxd.Services`: `[DotBoxdService]` contracts, `RpcPeer` / `RpcHost`, and the generated
+- `DotBoxD.Services`: `[DotBoxDService]` contracts, `RpcPeer` / `RpcHost`, and the generated
   `Provide{Service}` / `Get<TService>()` wiring.
-- `DotBoxd.Hosting`: `SandboxHost` — import, validate, prepare, and execute kernels under policy.
-- `DotBoxd.Kernels.Serialization.Json`: JSON IR import **and export** round-trip via
-  `DotBoxdJsonImporter` and `DotBoxdJsonExporter`.
-- `DotBoxd.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
+- `DotBoxD.Hosting`: `SandboxHost` — import, validate, prepare, and execute kernels under policy.
+- `DotBoxD.Kernels.Serialization.Json`: JSON IR import **and export** round-trip via
+  `DotBoxDJsonImporter` and `DotBoxDJsonExporter`.
+- `DotBoxD.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
 
 ---
 
 ## Security: what is and isn't a boundary
 
-DotBoxd is precise about its trust boundary — read this before deploying:
+DotBoxD is precise about its trust boundary — read this before deploying:
 
 - **Safe mode is the real boundary.** A kernel is restricted IR that is validated, capability-gated,
   fuel/quota-metered, and (for compiled mode) verified before it runs. Users never supply C#, raw IL,
@@ -267,7 +267,7 @@ three execution modes, and the capabilities/bindings model.
 
 ## Status & roadmap
 
-DotBoxd merges the former standalone ShaRPC (RPC) and Safe-IR (kernel sandbox) repositories into one
+DotBoxD merges the former standalone ShaRPC (RPC) and Safe-IR (kernel sandbox) repositories into one
 contract-first runtime. The net10.0 Kernels/Pushdown stack is **preview**; the netstandard2.1
 Services/channel stack is the more mature surface. Deferred work and known gaps are tracked in
 [`docs/architecture/follow-up-issues.md`](docs/architecture/follow-up-issues.md).
@@ -277,8 +277,8 @@ Services/channel stack is the more mature surface. Deferred work and known gaps 
 Build, test, and the CI gate list live in [`CONTRIBUTING.md`](CONTRIBUTING.md). In short:
 
 ```bash
-dotnet build DotBoxd.slnx -c Release
-dotnet test  DotBoxd.slnx -c Release
+dotnet build DotBoxD.slnx -c Release
+dotnet test  DotBoxD.slnx -c Release
 ```
 
 Please read the [Code of Conduct](CODE_OF_CONDUCT.md). For how to view pre-merge history of the two
@@ -287,6 +287,6 @@ original repos, see
 
 ## License
 
-DotBoxd is [MIT licensed](LICENSE). It preserves the attribution of both original projects:
+DotBoxD is [MIT licensed](LICENSE). It preserves the attribution of both original projects:
 **Copyright (c) 2026 Danial Jumagaliyev** (ShaRPC, the Services/channels stack) and
-**Copyright (c) 2026 Jonas Kamsker** (Safe-IR / DotBoxd, the Kernels/Pushdown stack).
+**Copyright (c) 2026 Jonas Kamsker** (Safe-IR / DotBoxD, the Kernels/Pushdown stack).

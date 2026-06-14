@@ -63,21 +63,21 @@ jobs:
           cache-dependency-path: '**/*.csproj'
 
       - name: Restore
-        run: dotnet restore DotBoxd.slnx
+        run: dotnet restore DotBoxD.slnx
 
       - name: Build
-        run: dotnet build DotBoxd.slnx -c Release --no-restore
+        run: dotnet build DotBoxD.slnx -c Release --no-restore
 
       - name: Test
         shell: pwsh
-        # Run test projects sequentially rather than `dotnet test DotBoxd.slnx` (all assemblies at
+        # Run test projects sequentially rather than `dotnet test DotBoxD.slnx` (all assemblies at
         # once): the sandbox's wall-clock deadline/quota tests can flip to Timeout under concurrent
         # multi-assembly load on shared CI runners. Each project passes reliably on its own.
         run: |
           $projects = @(
-            'tests/DotBoxd.Services.SourceGenerator.Tests/DotBoxd.Services.SourceGenerator.Tests.csproj',
-            'tests/DotBoxd.Services.Tests/DotBoxd.Services.Tests.csproj',
-            'tests/DotBoxd.Kernels.Tests/DotBoxd.Kernels.Tests.csproj',
+            'tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj',
+            'tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj',
+            'tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj',
             'tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj'
           )
           $failed = $false
@@ -124,10 +124,10 @@ jobs:
           cache-dependency-path: '**/*.csproj'
 
       - name: Restore
-        run: dotnet restore DotBoxd.slnx
+        run: dotnet restore DotBoxD.slnx
 
       - name: Build
-        run: dotnet build DotBoxd.slnx -c Release --no-restore
+        run: dotnet build DotBoxD.slnx -c Release --no-restore
 
       - name: Rebrand completeness
         shell: pwsh
@@ -149,7 +149,7 @@ jobs:
         shell: pwsh
         run: |
           ./eng/scripts/run-required-tests.ps1 `
-            -Project tests/DotBoxd.Kernels.Tests/DotBoxd.Kernels.Tests.csproj `
+            -Project tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj `
             -Configuration Release `
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
@@ -187,4 +187,4 @@ jobs:
         run: ./eng/scripts/check-docs-smoke.ps1 -Configuration Release
 
       - name: End-to-end acceptance sample
-        run: dotnet run -c Release --no-build --project samples/Pushdown/DotBoxd.EndToEnd
+        run: dotnet run -c Release --no-build --project samples/Pushdown/DotBoxD.EndToEnd

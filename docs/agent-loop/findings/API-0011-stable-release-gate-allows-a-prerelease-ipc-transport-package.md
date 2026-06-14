@@ -24,19 +24,19 @@ duplicate_of:
 # API-0011: Stable release gate allows a prerelease IPC transport package
 
 ## Claim
-Stable release validation explicitly allows `DotBoxd.Pushdown.Services` to remain prerelease and to ship prerelease `DotBoxd` dependencies, so a stable DotBoxd.Kernels tag can publish an incomplete public package surface without a separate release-channel boundary.
+Stable release validation explicitly allows `DotBoxD.Pushdown.Services` to remain prerelease and to ship prerelease `DotBoxD` dependencies, so a stable DotBoxD.Kernels tag can publish an incomplete public package surface without a separate release-channel boundary.
 
 ## Evidence
-- `src/DotBoxd.Pushdown.Services/DotBoxd.Pushdown.Services.csproj` references `DotBoxd`, `DotBoxd.Codecs.MessagePack`, and `DotBoxd.Transports.NamedPipes` at `1.0.0-ci.30`, and sets `<VersionSuffix>dotboxd-ci.30</VersionSuffix>`.
-- `.github/workflows/ci.yml` passes `AllowedPrereleasePackageIds = @("DotBoxd.Pushdown.Services")` in the stable release metadata gate.
-- `scripts/check-package-metadata.ps1` has an `allowedPrereleaseDependenciesByPackage` entry for `DotBoxd.Pushdown.Services`, and `IsAllowedPrereleaseDependency` accepts dependency versions that start with `1.0.0-ci.`.
+- `src/DotBoxD.Pushdown.Services/DotBoxD.Pushdown.Services.csproj` references `DotBoxD`, `DotBoxD.Codecs.MessagePack`, and `DotBoxD.Transports.NamedPipes` at `1.0.0-ci.30`, and sets `<VersionSuffix>dotboxd-ci.30</VersionSuffix>`.
+- `.github/workflows/ci.yml` passes `AllowedPrereleasePackageIds = @("DotBoxD.Pushdown.Services")` in the stable release metadata gate.
+- `scripts/check-package-metadata.ps1` has an `allowedPrereleaseDependenciesByPackage` entry for `DotBoxD.Pushdown.Services`, and `IsAllowedPrereleaseDependency` accepts dependency versions that start with `1.0.0-ci.`.
 - Existing package metadata findings cover generic metadata text and consumer smoke coverage, but they do not require the IPC transport to be excluded from stable releases or promoted only after its dependencies are stable.
 
 ## Impact
-The stable package set can look release-ready while one public transport package remains tied to CI builds of an external dependency stack. Consumers installing the DotBoxd.Kernels package family from a stable release may unknowingly depend on a preview IPC transport whose compatibility and support level differ from the rest of the release.
+The stable package set can look release-ready while one public transport package remains tied to CI builds of an external dependency stack. Consumers installing the DotBoxD.Kernels package family from a stable release may unknowingly depend on a preview IPC transport whose compatibility and support level differ from the rest of the release.
 
 ## Better target
-Make the release channel explicit: either mark `DotBoxd.Pushdown.Services` non-packable until DotBoxd dependencies are stable, publish it only from a preview channel with clear versioning, or require stable DotBoxd dependency versions before stable DotBoxd.Kernels tags can include this package.
+Make the release channel explicit: either mark `DotBoxD.Pushdown.Services` non-packable until DotBoxD dependencies are stable, publish it only from a preview channel with clear versioning, or require stable DotBoxD dependency versions before stable DotBoxD.Kernels tags can include this package.
 
 ## Acceptance test idea
 For release branches and tags, `check-package-metadata.ps1` should fail if any public package version or dependency version is prerelease unless the release is explicitly a prerelease channel and the package is documented as excluded from stable support.

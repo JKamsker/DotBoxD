@@ -18,12 +18,12 @@ claims the reviews corrected (noted inline there).
 | **B3 (core)** — hierarchical/wildcard capability matching (`game.world.monster.*`) | ✅ done, tested |
 | **C-0** — analyzer detection of un-lowered `InvokeKernel(lambda)` chains (DBXK110) | ✅ done, tested |
 | **C-1** — kernel-type → package resolution | ✅ done via reflection-based `KernelPackageRegistry` (the `[ModuleInitializer]` emit is the optional AOT path, deferred to avoid generator/golden-snapshot churn) |
-| **C-2 / C-3** — **lower** `Where`/`Select`/`InvokeKernel` lambda bodies to verified DotBoxd.Kernels | ✅ **done, tested** — `HookChainModelFactory` lowers `On<TEvent>().Where*(lambda).Select*(lambda).InvokeKernel((e,ctx)=>ctx.Messages.Send(...))` into a `HookChain_<id>PluginPackage` through the existing emitter/verifier. All `Where`s AND-compose into `ShouldHandle`; a `Select` projection substitutes into downstream `Where`/`Send` at compile time (lowering-context projected-element binding); the terminal `Send` becomes `Handle`. Subset: expression-body lambdas, single `Send`; other shapes fail safe. The runtime hook-up is complete too — `DotBoxdHookChainInterceptorEmitter` emits a C# *interceptor* (preview) so the `InvokeKernel` call site installs+wires its generated chain package (`UseGeneratedChain`) instead of throwing `DBXK062`. |
-| **B3 (capability gating)** — wildcard-gated install enforcement | ✅ **done, tested** — `CapabilityPattern` + `PolicyResolver`/`PolicyGrantValidator` authorize a concrete required capability under a wildcard grant and fail closed otherwise. **Example demo done, e2e:** `[HostBinding(id, capability, effects)]` host-service methods (`DotBoxdHostBindingExpressionLowerer`) lower a `ctx.Host<T>().M(args)` call to a `CallExpression(id, args)`; the analyzer derives `RequiredCapabilities` (host-binding caps, `[Capability]`-gated event-property reads, the message-write Send cap) and the host-binding effects into the manifest. `IGameWorldAccess.GetHealth` lowers to `host.world.getHealth`; the server builds a per-kernel least-privilege policy from each manifest's `RequiredCapabilities`, so the guardian gets `game.world.monster.read.*` (matching `…read.health`) and a write/threat kernel is denied at install. Verified by `PluginAnalyzerHostBindingTests` (7) and the GameServer example (exit 0). |
+| **C-2 / C-3** — **lower** `Where`/`Select`/`InvokeKernel` lambda bodies to verified DotBoxD.Kernels | ✅ **done, tested** — `HookChainModelFactory` lowers `On<TEvent>().Where*(lambda).Select*(lambda).InvokeKernel((e,ctx)=>ctx.Messages.Send(...))` into a `HookChain_<id>PluginPackage` through the existing emitter/verifier. All `Where`s AND-compose into `ShouldHandle`; a `Select` projection substitutes into downstream `Where`/`Send` at compile time (lowering-context projected-element binding); the terminal `Send` becomes `Handle`. Subset: expression-body lambdas, single `Send`; other shapes fail safe. The runtime hook-up is complete too — `DotBoxDHookChainInterceptorEmitter` emits a C# *interceptor* (preview) so the `InvokeKernel` call site installs+wires its generated chain package (`UseGeneratedChain`) instead of throwing `DBXK062`. |
+| **B3 (capability gating)** — wildcard-gated install enforcement | ✅ **done, tested** — `CapabilityPattern` + `PolicyResolver`/`PolicyGrantValidator` authorize a concrete required capability under a wildcard grant and fail closed otherwise. **Example demo done, e2e:** `[HostBinding(id, capability, effects)]` host-service methods (`DotBoxDHostBindingExpressionLowerer`) lower a `ctx.Host<T>().M(args)` call to a `CallExpression(id, args)`; the analyzer derives `RequiredCapabilities` (host-binding caps, `[Capability]`-gated event-property reads, the message-write Send cap) and the host-binding effects into the manifest. `IGameWorldAccess.GetHealth` lowers to `host.world.getHealth`; the server builds a per-kernel least-privilege policy from each manifest's `RequiredCapabilities`, so the guardian gets `game.world.monster.read.*` (matching `…read.health`) and a write/threat kernel is denied at install. Verified by `PluginAnalyzerHostBindingTests` (7) and the GameServer example (exit 0). |
 | **Auth/signing/policy-resolver** | deferred appendix (no consumer; see §below) |
 
-Every shipped item above is committed with a green `dotnet build DotBoxd.Kernels.slnx -c Release` and a green
-`tests/DotBoxd.Kernels.Tests` run.
+Every shipped item above is committed with a green `dotnet build DotBoxD.Kernels.slnx -c Release` and a green
+`tests/DotBoxD.Kernels.Tests` run.
 
 ## What the reviews changed (the short version)
 
@@ -32,7 +32,7 @@ Every shipped item above is committed with a green `dotnet build DotBoxd.Kernels
   connection, and the server *builds the only package it installs*. The manifest cannot widen anything
   today (it has no limits field). → **Deferred to an appendix** behind a real trust-boundary story.
   Ownership uses **the session object itself as identity** — no `PluginIdentity`/authenticator needed.
-- **`peer.OnDisconnected` is fictional.** DotBoxd exposes no such hook in our transport. Revoke-on-disconnect
+- **`peer.OnDisconnected` is fictional.** DotBoxD exposes no such hook in our transport. Revoke-on-disconnect
   must bind to the **real** `RpcPeerSession`/host lifecycle (verify at implementation) or a
   **session-owned heartbeat + absolute TTL** fallback — specified, not deferred.
 - **Generic wiring "by event-name string" cannot compile.** `HookRegistry.On` is generic-only and
@@ -69,22 +69,22 @@ Every shipped item above is committed with a green `dotnet build DotBoxd.Kernels
 
 ### Phase A — example cleanup, renames, Program classes, slnx  *(low risk; this session)*
 No framework/API changes; keeps the current functional install path working.
-- Rename `examples/GameServer/DotBoxd.Kernels.Game.PluginHost` → `DotBoxd.Kernels.Game.Plugin` (folder, csproj, namespaces,
+- Rename `examples/GameServer/DotBoxD.Kernels.Game.PluginHost` → `DotBoxD.Kernels.Game.Plugin` (folder, csproj, namespaces,
   generated package namespaces).
 - Server: `PluginHostLauncher` → `PluginLauncher`; constants/env var (`SAFEIR_GAME_PLUGINHOST_DLL` →
   `SAFEIR_GAME_PLUGIN_DLL`); update call site.
 - Delete `Local/LocalPreview.cs`, `Local/PluginHostPolicy.cs`, `Local/RecordingMessageSink.cs`.
 - Both `Program` → full `internal static class Program` with `Main`; preserve exit-code contract.
-- `DotBoxd.Kernels.slnx` nested solution folders mirroring disk.
+- `DotBoxD.Kernels.slnx` nested solution folders mirroring disk.
 - Update `scripts/check-docs-smoke.ps1`, `docs/Specs/Addendum/Examples.md`, `README.md`.
-- **Verify:** `dotnet build DotBoxd.Kernels.slnx -c Release`; run the server example end-to-end (baseline +
+- **Verify:** `dotnet build DotBoxD.Kernels.slnx -c Release`; run the server example end-to-end (baseline +
   with-plugin phases, exit 0); `./scripts/check-docs-smoke.ps1 -Configuration Release`.
 
 ### Phase B — fluent surface, ownership, convention wiring, capability gating  *(framework work in `src/`)*
 1. **Convention wiring** — delete the example adapters; rewrite `WireHook` to the internal shape-based
    path (`PluginEventAdapterRegistry.TryResolveShape` + a new `UseKernelByShape(InstalledKernel, shape)`
    on `HookRegistry`). Keep `On<TEvent>()` for the chain.
-2. **Ownership** (`src/DotBoxd.Plugins`):
+2. **Ownership** (`src/DotBoxD.Plugins`):
    - `OwnerId` on `InstalledKernel` (ctor); `KernelRegistry.Add` fail-closed on cross-owner id (`DBXK060`),
      same-owner reinstall revokes the prior incumbent (capture in-lock, revoke out-of-lock).
    - `PluginSession : IDisposable` (+ `IAsyncDisposable`), the object is the `OwnerId`; `CreateSession`,
@@ -103,8 +103,8 @@ No framework/API changes; keeps the current functional install path working.
    (wildcard bucket); example game-world ctx bindings (`IGameWorldAccess` → `game.world.*` bindings with
    `RequiredCapability`); `ServerPolicy` grants `game.world.monster.*` (read) to guardian; install-time
    capability check (deny) + runtime backstop → `CapabilityViolationResponse`.
-- **Verify:** `tests/DotBoxd.Kernels.Tests` green + new unit tests (owner fail-closed, revoke-unblocks-waiter,
-  wildcard match, deny-on-missing-capability, settings owner-check); update `DotBoxd.Plugins` API baseline.
+- **Verify:** `tests/DotBoxD.Kernels.Tests` green + new unit tests (owner fail-closed, revoke-unblocks-waiter,
+  wildcard match, deny-on-missing-capability, settings owner-check); update `DotBoxD.Plugins` API baseline.
 
 ### Phase C — analyzer lowering  *(large, highest risk; sub-phased C-0…C-3 per [plan.md](plan.md))*
 - Lower `Where`/`Select`/`InvokeKernel` chain lambdas to verified IR (un-obsolete a **lowered**

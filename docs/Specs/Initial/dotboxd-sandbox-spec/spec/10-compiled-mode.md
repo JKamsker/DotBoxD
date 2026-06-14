@@ -187,9 +187,9 @@ public static class CompiledRuntime
 Verifier allowlist can then be small:
 
 ```text
-DotBoxd.Kernels.Runtime.CompiledRuntime.* exact allowed methods
-DotBoxd.Kernels.SandboxContext exact allowed methods
-DotBoxd.Kernels.SandboxValue exact allowed constructors/accessors
+DotBoxD.Kernels.Runtime.CompiledRuntime.* exact allowed methods
+DotBoxD.Kernels.SandboxContext exact allowed methods
+DotBoxD.Kernels.SandboxValue exact allowed constructors/accessors
 ```
 
 ## Typed fast path

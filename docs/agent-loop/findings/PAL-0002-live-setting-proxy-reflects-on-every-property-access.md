@@ -29,12 +29,12 @@ Interface-shaped live settings use reflection and allocate argument arrays on ev
 
 ## Evidence
 
-- `LiveSettingStore.As<T>()` returns a `LiveContextProxy<T>` at `src/DotBoxd.Plugins/Runtime/LiveSettings.cs:130`.
-- `LiveKernelValueFactory.Create<T>` also returns `kernel.Value.As<T>()` for interface-shaped settings at `src/DotBoxd.Plugins/Runtime/LiveKernelValueFactory.cs:9` and `src/DotBoxd.Plugins/Runtime/LiveKernelValueFactory.cs:10`.
-- Every proxy invocation computes the property name at `src/DotBoxd.Plugins/Runtime/LiveContext.cs:33`, checks method-name strings at `src/DotBoxd.Plugins/Runtime/LiveContext.cs:34` and `src/DotBoxd.Plugins/Runtime/LiveContext.cs:38`, then routes to `Read`/`Write`.
-- `Read` performs `typeof(LiveSettingStore).GetMethod(...).MakeGenericMethod(...).Invoke(...)` and allocates an object-array argument with `[propertyName]` at `src/DotBoxd.Plugins/Runtime/LiveContext.cs:49` through `src/DotBoxd.Plugins/Runtime/LiveContext.cs:52`.
-- `Write` repeats the method lookup/generic construction/reflection invoke and allocates `[propertyName, value]` at `src/DotBoxd.Plugins/Runtime/LiveContext.cs:59` through `src/DotBoxd.Plugins/Runtime/LiveContext.cs:62`.
-- Tests exercise interface-shaped kernel settings in `tests/DotBoxd.Kernels.Tests/Misc05/PluginAddendumTests.cs:157`, but there is no allocation benchmark for repeated live-setting property access.
+- `LiveSettingStore.As<T>()` returns a `LiveContextProxy<T>` at `src/DotBoxD.Plugins/Runtime/LiveSettings.cs:130`.
+- `LiveKernelValueFactory.Create<T>` also returns `kernel.Value.As<T>()` for interface-shaped settings at `src/DotBoxD.Plugins/Runtime/LiveKernelValueFactory.cs:9` and `src/DotBoxD.Plugins/Runtime/LiveKernelValueFactory.cs:10`.
+- Every proxy invocation computes the property name at `src/DotBoxD.Plugins/Runtime/LiveContext.cs:33`, checks method-name strings at `src/DotBoxD.Plugins/Runtime/LiveContext.cs:34` and `src/DotBoxD.Plugins/Runtime/LiveContext.cs:38`, then routes to `Read`/`Write`.
+- `Read` performs `typeof(LiveSettingStore).GetMethod(...).MakeGenericMethod(...).Invoke(...)` and allocates an object-array argument with `[propertyName]` at `src/DotBoxD.Plugins/Runtime/LiveContext.cs:49` through `src/DotBoxD.Plugins/Runtime/LiveContext.cs:52`.
+- `Write` repeats the method lookup/generic construction/reflection invoke and allocates `[propertyName, value]` at `src/DotBoxD.Plugins/Runtime/LiveContext.cs:59` through `src/DotBoxD.Plugins/Runtime/LiveContext.cs:62`.
+- Tests exercise interface-shaped kernel settings in `tests/DotBoxD.Kernels.Tests/Misc05/PluginAddendumTests.cs:157`, but there is no allocation benchmark for repeated live-setting property access.
 
 ## Impact
 

@@ -1,13 +1,13 @@
 using Inventory.Shared;
-using DotBoxd.Services;
-using DotBoxd.Services.Generated;
-using DotBoxd.Codecs.MessagePack;
-using DotBoxd.Transports.Tcp;
+using DotBoxD.Services;
+using DotBoxD.Services.Generated;
+using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Transports.Tcp;
 
 const string Host = "localhost";
 const int Port = 5051;
 
-Console.WriteLine("DotBoxd Inventory Client");
+Console.WriteLine("DotBoxD Inventory Client");
 Console.WriteLine("=======================");
 Console.WriteLine();
 
@@ -58,7 +58,7 @@ try
     // -------------- 3. Nested service — sub-proxy returned by the root --------------
     //
     // OpenInventoryAsync returns Task<IPlayerInventory>, but IPlayerInventory is itself
-    // a [DotBoxdService]. The generator wires this so the wire response is an opaque
+    // a [DotBoxDService]. The generator wires this so the wire response is an opaque
     // ServiceHandle, and the value handed back to us is a working sub-proxy bound to
     // the exact server-side PlayerInventory instance the root created. Every call on
     // `cleoInventory` below routes to that same object.

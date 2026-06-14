@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea or enhancement for DotBoxd
+description: Suggest an idea or enhancement for DotBoxD
 labels: ["enhancement"]
 body:
   - type: dropdown

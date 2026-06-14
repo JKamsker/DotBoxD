@@ -25,16 +25,16 @@ duplicate_of:
 
 ## Claim
 
-`DotBoxd.Kernels.Verifier` exposes verifier diagnostics as stable-looking `V-*` codes through its public result model, but the public docs do not provide a diagnostic reference that maps those codes to meaning, likely causes, severity, and remediation.
+`DotBoxD.Kernels.Verifier` exposes verifier diagnostics as stable-looking `V-*` codes through its public result model, but the public docs do not provide a diagnostic reference that maps those codes to meaning, likely causes, severity, and remediation.
 
 ## Evidence
 
-- `README.md:17` lists `DotBoxd.Kernels.Verifier` as a current package, but the README does not link to a verifier diagnostic reference or describe any `V-*` code families.
-- `src/DotBoxd.Kernels.Verifier/Generated/VerificationModels.cs:55` defines the public `VerificationDiagnostic(string Code, string Message)` model, and `src/DotBoxd.Kernels.Verifier/Generated/VerificationModels.cs:59` exposes those diagnostics on `VerificationResult` returned by the public verifier interface at `src/DotBoxd.Kernels.Verifier/Generated/VerificationModels.cs:64`.
-- The verifier emits many user-visible codes, for example `V-MANIFEST-HASH` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:21`, `V-PE-FORMAT` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:45`, `V-ASM-REF` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:93`, `V-TYPE-FORBIDDEN` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:112`, `V-OPCODE` at `src/DotBoxd.Kernels.Verifier/OpCodeVerifier.cs:54`, `V-MEMBER` at `src/DotBoxd.Kernels.Verifier/OpCodeVerifier.cs:95`, and `V-COMPILED-SHAPE` at `src/DotBoxd.Kernels.Verifier/Generated/GeneratedExecuteShapeVerifier.cs:19`.
-- Test coverage asserts these codes as contract-like outputs, including `tests/DotBoxd.Kernels.Tests/Verifier/Generated/VerifierTests.cs:13` through `:32`, `tests/DotBoxd.Kernels.Tests/Verifier/Core/VerifierAttackMatrixTests.cs:14` through `:20`, `tests/DotBoxd.Kernels.Tests/Verifier/Core/VerifierManifestIdentityTests.cs:70`, and `tests/DotBoxd.Kernels.Tests/Verifier/Generated/VerifierStackTypeTests.cs:29`.
+- `README.md:17` lists `DotBoxD.Kernels.Verifier` as a current package, but the README does not link to a verifier diagnostic reference or describe any `V-*` code families.
+- `src/DotBoxD.Kernels.Verifier/Generated/VerificationModels.cs:55` defines the public `VerificationDiagnostic(string Code, string Message)` model, and `src/DotBoxD.Kernels.Verifier/Generated/VerificationModels.cs:59` exposes those diagnostics on `VerificationResult` returned by the public verifier interface at `src/DotBoxD.Kernels.Verifier/Generated/VerificationModels.cs:64`.
+- The verifier emits many user-visible codes, for example `V-MANIFEST-HASH` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:21`, `V-PE-FORMAT` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:45`, `V-ASM-REF` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:93`, `V-TYPE-FORBIDDEN` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedAssemblyVerifier.cs:112`, `V-OPCODE` at `src/DotBoxD.Kernels.Verifier/OpCodeVerifier.cs:54`, `V-MEMBER` at `src/DotBoxD.Kernels.Verifier/OpCodeVerifier.cs:95`, and `V-COMPILED-SHAPE` at `src/DotBoxD.Kernels.Verifier/Generated/GeneratedExecuteShapeVerifier.cs:19`.
+- Test coverage asserts these codes as contract-like outputs, including `tests/DotBoxD.Kernels.Tests/Verifier/Generated/VerifierTests.cs:13` through `:32`, `tests/DotBoxD.Kernels.Tests/Verifier/Core/VerifierAttackMatrixTests.cs:14` through `:20`, `tests/DotBoxD.Kernels.Tests/Verifier/Core/VerifierManifestIdentityTests.cs:70`, and `tests/DotBoxD.Kernels.Tests/Verifier/Generated/VerifierStackTypeTests.cs:29`.
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:463` documents the verifier API shape, and `docs/Specs/Initial/dotboxd-sandbox-spec/spec/11-generated-code-verifier.md:27` mentions diagnostics in the result model, but neither file catalogs the emitted `V-*` codes or gives remediation guidance.
-- A refreshed queue search found existing coverage for plugin analyzer diagnostic documentation (`API-0008`), sandbox error-code guidance (`CMP-0009`), verifier correctness findings such as `COR-0032`, verifier model mutability (`COR-0025`), and verifier performance findings, but no completeness/API finding for the public `DotBoxd.Kernels.Verifier` diagnostic-code reference.
+- A refreshed queue search found existing coverage for plugin analyzer diagnostic documentation (`API-0008`), sandbox error-code guidance (`CMP-0009`), verifier correctness findings such as `COR-0032`, verifier model mutability (`COR-0025`), and verifier performance findings, but no completeness/API finding for the public `DotBoxD.Kernels.Verifier` diagnostic-code reference.
 
 ## Impact
 
@@ -46,11 +46,11 @@ Add a public verifier diagnostics reference linked from `README.md`, `docs/Specs
 
 ## Release gate idea
 
-Add a docs readiness check that extracts `VerificationDiagnostic("V-...")` codes from `src/DotBoxd.Kernels.Verifier` and fails when the public reference lacks an entry for a new code or code family.
+Add a docs readiness check that extracts `VerificationDiagnostic("V-...")` codes from `src/DotBoxD.Kernels.Verifier` and fails when the public reference lacks an entry for a new code or code family.
 
 ## Scope boundaries
 
-This does not change verifier behavior, manifest identity validation, compiled-cache validation, error-code guidance, or plugin analyzer diagnostics. It is only about the missing public diagnostic reference for the `DotBoxd.Kernels.Verifier` package surface.
+This does not change verifier behavior, manifest identity validation, compiled-cache validation, error-code guidance, or plugin analyzer diagnostics. It is only about the missing public diagnostic reference for the `DotBoxD.Kernels.Verifier` package surface.
 
 ## Deduplication key
 

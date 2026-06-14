@@ -29,11 +29,11 @@ Plugin hook dispatch snapshots filter and handler lists into new arrays on every
 
 ## Evidence
 
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:54` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:65` is the public event dispatch path for `PluginServer.Hooks.PublishAsync`.
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:71` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:73` stores filters and handlers in mutable `List<...>` fields.
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:91` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:106` mutates those lists under the pipeline lock during setup, and `UseKernel` adds plugin handlers through the same path at `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:126` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:129`.
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:138` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:146` locks on every publish and calls `_filters.ToArray()` plus `_handlers.ToArray()`, allocating snapshots proportional to pipeline size even when no lifecycle mutation is happening.
-- `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:149` through `src/DotBoxd.Plugins/Runtime/HookRegistry.cs:159` then iterates those snapshots for every event.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:54` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:65` is the public event dispatch path for `PluginServer.Hooks.PublishAsync`.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:71` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:73` stores filters and handlers in mutable `List<...>` fields.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:91` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:106` mutates those lists under the pipeline lock during setup, and `UseKernel` adds plugin handlers through the same path at `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:126` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:129`.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:138` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:146` locks on every publish and calls `_filters.ToArray()` plus `_handlers.ToArray()`, allocating snapshots proportional to pipeline size even when no lifecycle mutation is happening.
+- `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:149` through `src/DotBoxD.Plugins/Runtime/HookRegistry.cs:159` then iterates those snapshots for every event.
 - Existing `COR-0012` was a correctness finding about concurrent mutation and stable publish snapshots; it is now verified. This finding is separate: the current stable-snapshot implementation pays per-publish allocation on the hot event path. Existing `PAL-0004` covers convention event adapter reflection/arrays and `PAL-0033` covers plugin execution observation retention, not hook handler-list snapshots.
 
 ## Impact

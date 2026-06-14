@@ -29,11 +29,11 @@ Plugin package validation repeatedly searches the module function list for the s
 
 ## Evidence
 
-- `src/DotBoxd.Plugins/Runtime/PluginPackageValidator.cs:27` calls `ValidateEntrypoints`, which validates both configured kernel entrypoints.
-- `src/DotBoxd.Plugins/Runtime/PluginPackageValidator.cs:100` checks each entrypoint with `package.Module.Functions.Any(...)`, scanning the function list once for `ShouldHandle` and once for `Handle`.
-- `src/DotBoxd.Plugins/Runtime/PluginPreparedPackageValidator.cs:75` later validates prepared entrypoints, and `src/DotBoxd.Plugins/Runtime/PluginPreparedPackageValidator.cs:135` uses `FirstOrDefault(...)` over `package.Module.Functions` for each of those same entrypoint IDs.
-- `src/DotBoxd.Plugins/Runtime/PluginPreparedPackageValidator.cs:102` then builds expected parameter shape after the function rescans, so the package path has no shared indexed entrypoint lookup.
-- Existing tests cover validation behavior (`tests/DotBoxd.Kernels.Tests/Misc06/PluginPackageValidationTests.cs`) and analyzer package generation, but the benchmark project has no plugin package validation/preparation benchmark that scales module function count.
+- `src/DotBoxD.Plugins/Runtime/PluginPackageValidator.cs:27` calls `ValidateEntrypoints`, which validates both configured kernel entrypoints.
+- `src/DotBoxD.Plugins/Runtime/PluginPackageValidator.cs:100` checks each entrypoint with `package.Module.Functions.Any(...)`, scanning the function list once for `ShouldHandle` and once for `Handle`.
+- `src/DotBoxD.Plugins/Runtime/PluginPreparedPackageValidator.cs:75` later validates prepared entrypoints, and `src/DotBoxD.Plugins/Runtime/PluginPreparedPackageValidator.cs:135` uses `FirstOrDefault(...)` over `package.Module.Functions` for each of those same entrypoint IDs.
+- `src/DotBoxD.Plugins/Runtime/PluginPreparedPackageValidator.cs:102` then builds expected parameter shape after the function rescans, so the package path has no shared indexed entrypoint lookup.
+- Existing tests cover validation behavior (`tests/DotBoxD.Kernels.Tests/Misc06/PluginPackageValidationTests.cs`) and analyzer package generation, but the benchmark project has no plugin package validation/preparation benchmark that scales module function count.
 
 ## Impact
 

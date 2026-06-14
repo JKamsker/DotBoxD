@@ -29,7 +29,7 @@ The README and public API docs lead with host samples that immediately register 
 
 ## Why this matters
 
-DotBoxd.Kernels's security model is capability-based. New hosts need an obvious minimal configuration that has no file/network/time/random bindings, explicit resource limits, and no optional compiled/runtime cache setup until they intentionally opt in. Without that sample, onboarding starts from a broader host surface than necessary.
+DotBoxD.Kernels's security model is capability-based. New hosts need an obvious minimal configuration that has no file/network/time/random bindings, explicit resource limits, and no optional compiled/runtime cache setup until they intentionally opt in. Without that sample, onboarding starts from a broader host surface than necessary.
 
 ## Evidence
 

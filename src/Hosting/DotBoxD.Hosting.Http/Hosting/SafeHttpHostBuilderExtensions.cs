@@ -1,0 +1,17 @@
+namespace DotBoxD.Hosting.Http;
+
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Hosting.Http.Internal;
+
+public static class SafeHttpHostBuilderExtensions
+{
+    public static SandboxHostBuilder AddNetworkBindings(
+        this SandboxHostBuilder builder,
+        SafeInMemoryHttpMessageInvoker? invoker = null,
+        SafeDnsResolver? dnsResolver = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.AddBinding(SafeHttpBindings.GetText(invoker, dnsResolver));
+        return builder;
+    }
+}

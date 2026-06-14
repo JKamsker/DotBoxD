@@ -1,7 +1,7 @@
 # Services (RPC)
 
 A **Service** is a handwritten host capability behind a shared C# contract. Annotate an interface with
-`[DotBoxdService]` and the `DotBoxd.Services.SourceGenerator` emits, at compile time:
+`[DotBoxDService]` and the `DotBoxD.Services.SourceGenerator` emits, at compile time:
 
 - a typed **client proxy** (calls marshal over the wire, no runtime reflection),
 - a server **dispatcher**, and
@@ -10,9 +10,9 @@ A **Service** is a handwritten host capability behind a shared C# contract. Anno
 The runtime is **peer-based and bidirectional** (`RpcPeer` / `RpcHost`): one connection can both serve
 and call services. It is transport- and codec-neutral:
 
-- **Transports**: `DotBoxd.Transports.Tcp`, `DotBoxd.Transports.NamedPipes` (and an in-process channel
+- **Transports**: `DotBoxD.Transports.Tcp`, `DotBoxD.Transports.NamedPipes` (and an in-process channel
   for tests). Channels carry framed messages and know nothing about services.
-- **Codecs**: `DotBoxd.Codecs.MessagePack`.
+- **Codecs**: `DotBoxD.Codecs.MessagePack`.
 
 The Services + channel + codec libraries target **netstandard2.1**, so they run on **Unity / IL2CPP**.
 

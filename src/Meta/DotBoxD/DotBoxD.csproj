@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>DotBoxD</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>DotBoxD meta-package: pulls in the full stack across all three usage modes — Services (source-generated RPC), Kernels (validated sandboxed logic hosted via DotBoxD.Hosting), and Pushdown (running kernels next to host services). Reference this single package to get the complete DotBoxD surface for a net10.0 host.</Description>
+    <PackageTags>dotboxd;rpc;sandbox;kernels;pushdown;meta</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
+    <ProjectReference Include="..\..\Hosting\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
+    <ProjectReference Include="..\..\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
+  </ItemGroup>
+
+</Project>

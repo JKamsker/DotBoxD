@@ -25,14 +25,14 @@ duplicate_of:
 
 ## Claim
 
-The HTTP transport addon is described as providing public HTTP GET binding and grant helpers, but the host/policy extension methods are declared under `DotBoxd.Hosting.Http.Internal`. A normal consumer cannot discover `builder.AddNetworkBindings(...)` or `SandboxPolicyBuilder.Create().GrantHttpGet(...)` through a public addon namespace.
+The HTTP transport addon is described as providing public HTTP GET binding and grant helpers, but the host/policy extension methods are declared under `DotBoxD.Hosting.Http.Internal`. A normal consumer cannot discover `builder.AddNetworkBindings(...)` or `SandboxPolicyBuilder.Create().GrantHttpGet(...)` through a public addon namespace.
 
 ## Evidence
 
-- `README.md` lists `DotBoxd.Hosting.Http` as the package for HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
-- `src/DotBoxd.Hosting.Http/Internal/SafeHttpHostBuilderExtensions.cs` declares `namespace DotBoxd.Hosting.Http.Internal;` for public `AddNetworkBindings` on `SandboxHostBuilder`.
-- `src/DotBoxd.Hosting.Http/Internal/SafeHttpPolicyBuilderExtensions.cs` declares `namespace DotBoxd.Hosting.Http.Internal;` for public `GrantHttpGet` on `SandboxPolicyBuilder`.
-- `tests/DotBoxd.Kernels.Tests/GlobalUsings.cs` imports `DotBoxd.Hosting.Http.Internal`, and network tests call `GrantHttpGet(...)`, so the tests exercise behavior only after opting into the internal namespace.
+- `README.md` lists `DotBoxD.Hosting.Http` as the package for HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
+- `src/DotBoxD.Hosting.Http/Internal/SafeHttpHostBuilderExtensions.cs` declares `namespace DotBoxD.Hosting.Http.Internal;` for public `AddNetworkBindings` on `SandboxHostBuilder`.
+- `src/DotBoxD.Hosting.Http/Internal/SafeHttpPolicyBuilderExtensions.cs` declares `namespace DotBoxD.Hosting.Http.Internal;` for public `GrantHttpGet` on `SandboxPolicyBuilder`.
+- `tests/DotBoxD.Kernels.Tests/GlobalUsings.cs` imports `DotBoxD.Hosting.Http.Internal`, and network tests call `GrantHttpGet(...)`, so the tests exercise behavior only after opting into the internal namespace.
 
 ## User impact
 
@@ -47,9 +47,9 @@ Adding public namespace extension wrappers is additive. Moving the existing type
 Add a consumer-facing compile/API test that references the HTTP addon and verifies this setup compiles without importing `.Internal`:
 
 ```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Hosting;
-using DotBoxd.Hosting.Http;
+using DotBoxD.Kernels;
+using DotBoxD.Hosting;
+using DotBoxD.Hosting.Http;
 
 using var host = SandboxHost.Create(builder => builder.AddNetworkBindings());
 var policy = SandboxPolicyBuilder.Create()
@@ -57,8 +57,8 @@ var policy = SandboxPolicyBuilder.Create()
     .Build();
 ```
 
-The test should fail if `DotBoxd.Hosting.Http.Internal` is required for host or policy extension methods.
+The test should fail if `DotBoxD.Hosting.Http.Internal` is required for host or policy extension methods.
 
 ## Smallest fixable slice
 
-Expose the HTTP host and policy extension methods from `DotBoxd.Hosting.Http`, then update tests/examples to import that namespace instead of `DotBoxd.Hosting.Http.Internal`. Keep internal implementation types internal or hidden behind forwarding extension wrappers.
+Expose the HTTP host and policy extension methods from `DotBoxD.Hosting.Http`, then update tests/examples to import that namespace instead of `DotBoxD.Hosting.Http.Internal`. Keep internal implementation types internal or hidden behind forwarding extension wrappers.

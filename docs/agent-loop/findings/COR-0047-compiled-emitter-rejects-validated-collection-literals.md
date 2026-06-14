@@ -35,11 +35,11 @@ A host or generator using the public object model can prepare a valid pure modul
 
 ## Evidence
 
-- `src/DotBoxd.Kernels.Validation/Internal/LiteralExpressionAnalyzer.cs` validates `LiteralExpression.Value` generically and returns `literal.Value.Type`, so `ListValue` and `MapValue` literals are accepted when their contents match their declared shape.
-- `src/DotBoxd.Kernels/Model/CanonicalModuleHasher.cs` includes `ListValue` and `MapValue` in canonical module serialization, confirming these literals are part of prepared module identity.
-- `src/DotBoxd.Kernels.Interpreter/ExpressionEvaluator.cs` evaluates all literals through `ChargeLiteral(...)`, so interpreted execution supports and charges collection literals.
-- `src/DotBoxd.Kernels.Compiler/Emitters/CompiledLiteralEmitter.cs` omits `ListValue` and `MapValue` cases and throws `ValidationError` via `Unsupported("literal not supported by compiler")`.
-- `tests/DotBoxd.Kernels.Tests/Misc06/ProgrammaticIrValidationTests.cs` already treats programmatic collection literals as supported validation/runtime inputs, but only exercises interpreted execution.
+- `src/DotBoxD.Kernels.Validation/Internal/LiteralExpressionAnalyzer.cs` validates `LiteralExpression.Value` generically and returns `literal.Value.Type`, so `ListValue` and `MapValue` literals are accepted when their contents match their declared shape.
+- `src/DotBoxD.Kernels/Model/CanonicalModuleHasher.cs` includes `ListValue` and `MapValue` in canonical module serialization, confirming these literals are part of prepared module identity.
+- `src/DotBoxD.Kernels.Interpreter/ExpressionEvaluator.cs` evaluates all literals through `ChargeLiteral(...)`, so interpreted execution supports and charges collection literals.
+- `src/DotBoxD.Kernels.Compiler/Emitters/CompiledLiteralEmitter.cs` omits `ListValue` and `MapValue` cases and throws `ValidationError` via `Unsupported("literal not supported by compiler")`.
+- `tests/DotBoxD.Kernels.Tests/Misc06/ProgrammaticIrValidationTests.cs` already treats programmatic collection literals as supported validation/runtime inputs, but only exercises interpreted execution.
 
 ## Suggested fix
 

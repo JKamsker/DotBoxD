@@ -19,7 +19,7 @@
       "safety": "PureIntrinsic",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "DotBoxd.Kernels.Runtime.CompiledRuntime",
+        "type": "DotBoxD.Kernels.Runtime.CompiledRuntime",
         "method": "SqrtF64"
       }
     },
@@ -39,7 +39,7 @@
       "safety": "ReadOnlyExternal",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "DotBoxd.Kernels.Runtime.CompiledRuntime",
+        "type": "DotBoxD.Kernels.Runtime.CompiledRuntime",
         "method": "CallBinding"
       }
     },
@@ -58,7 +58,7 @@
       "safety": "SideEffectingExternal",
       "compiledTarget": {
         "kind": "RuntimeStub",
-        "type": "DotBoxd.Kernels.Runtime.CompiledRuntime",
+        "type": "DotBoxD.Kernels.Runtime.CompiledRuntime",
         "method": "CallBinding"
       }
     }

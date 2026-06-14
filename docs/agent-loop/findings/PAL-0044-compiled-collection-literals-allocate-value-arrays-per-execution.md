@@ -29,15 +29,15 @@ Compiled collection literals allocate fresh `SandboxValue[]` buffers every time 
 
 ## Evidence
 
-- `src/DotBoxd.Kernels.Compiler/Emitters/CompiledLiteralEmitter.cs` emits collection literals through `EmitListLiteral` and `EmitMapLiteral`, both of which call `EmitValueArray` for literal elements.
+- `src/DotBoxD.Kernels.Compiler/Emitters/CompiledLiteralEmitter.cs` emits collection literals through `EmitListLiteral` and `EmitMapLiteral`, both of which call `EmitValueArray` for literal elements.
 - `EmitValueArray` emits a runtime call to `CompiledRuntime.CreateLiteralValueArray` and fills the returned array element by element in the generated method body.
-- `src/DotBoxd.Kernels.Runtime/CompiledRuntime.cs` forwards `CreateLiteralValueArray` to `CompiledLiteralRuntime.CreateValueArray`.
-- `src/DotBoxd.Kernels.Runtime/Compiled/CompiledLiteralRuntime.cs` implements `CreateValueArray` as `new SandboxValue[count]`, and `MapLiteralValue` then builds a `Dictionary<SandboxValue, SandboxValue>` from the key/value arrays.
+- `src/DotBoxD.Kernels.Runtime/CompiledRuntime.cs` forwards `CreateLiteralValueArray` to `CompiledLiteralRuntime.CreateValueArray`.
+- `src/DotBoxD.Kernels.Runtime/Compiled/CompiledLiteralRuntime.cs` implements `CreateValueArray` as `new SandboxValue[count]`, and `MapLiteralValue` then builds a `Dictionary<SandboxValue, SandboxValue>` from the key/value arrays.
 - Existing `PAL-0013` covers compiled binding argument arrays per binding dispatch. This finding is about compiled literal constants allocating value buffers per literal evaluation.
 
 ## Impact
 
-Programmatic DotBoxd.Kernels and generated modules can contain list/map literals that are evaluated inside loops or frequently executed entrypoints. Compiled mode currently rebuilds the same literal arrays and map dictionaries per execution instead of reusing artifact-level immutable literal data, so allocation scales with literal size times execution count even when the literal contents never change.
+Programmatic DotBoxD.Kernels and generated modules can contain list/map literals that are evaluated inside loops or frequently executed entrypoints. Compiled mode currently rebuilds the same literal arrays and map dictionaries per execution instead of reusing artifact-level immutable literal data, so allocation scales with literal size times execution count even when the literal contents never change.
 
 ## Suggested fix direction
 

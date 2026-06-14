@@ -1,11 +1,11 @@
-using DotBoxd.Services.Attributes;
+using DotBoxD.Services.Attributes;
 
 namespace Shared;
 
 /// <summary>
 /// Game service interface defining the RPC contract.
 /// </summary>
-[DotBoxdService]
+[DotBoxDService]
 public interface IGameService
 {
     Task<PlayerState> GetPlayerStateAsync(PlayerId playerId, CancellationToken ct = default);

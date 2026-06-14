@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Services\DotBoxd.Services\DotBoxd.Services.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Channels\DotBoxd.Transports.Tcp\DotBoxd.Transports.Tcp.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Channels\DotBoxd.Codecs.MessagePack\DotBoxd.Codecs.MessagePack.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Channels\DotBoxD.Transports.Tcp\DotBoxD.Transports.Tcp.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Channels\DotBoxD.Codecs.MessagePack\DotBoxD.Codecs.MessagePack.csproj" />
     <ProjectReference Include="..\Shared\Inventory.Shared.csproj" />
   </ItemGroup>
 

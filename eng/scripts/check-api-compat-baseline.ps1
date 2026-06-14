@@ -14,19 +14,19 @@ $baselineRoot = if ([System.IO.Path]::IsPathRooted($BaselineDirectory)) {
 }
 
 $packages = @(
-    @{ Id = "DotBoxd.Kernels"; Path = "src/Kernels/DotBoxd.Kernels" },
-    @{ Id = "DotBoxd.Kernels.Validation"; Path = "src/Kernels/DotBoxd.Kernels.Validation" },
-    @{ Id = "DotBoxd.Kernels.Runtime"; Path = "src/Kernels/DotBoxd.Kernels.Runtime" },
-    @{ Id = "DotBoxd.Kernels.Serialization.Json"; Path = "src/Kernels/DotBoxd.Kernels.Serialization.Json" },
-    @{ Id = "DotBoxd.Hosting.Http"; Path = "src/Hosting/DotBoxd.Hosting.Http" },
-    @{ Id = "DotBoxd.Pushdown.Services"; Path = "src/Pushdown/DotBoxd.Pushdown.Services" },
-    @{ Id = "DotBoxd.Kernels.Interpreter"; Path = "src/Kernels/DotBoxd.Kernels.Interpreter" },
-    @{ Id = "DotBoxd.Kernels.Compiler"; Path = "src/Kernels/DotBoxd.Kernels.Compiler" },
-    @{ Id = "DotBoxd.Kernels.Verifier"; Path = "src/Kernels/DotBoxd.Kernels.Verifier" },
-    @{ Id = "DotBoxd.Hosting"; Path = "src/Hosting/DotBoxd.Hosting" },
-    @{ Id = "DotBoxd.Plugins.Analyzer"; Path = "src/CodeGeneration/DotBoxd.Plugins.Analyzer" },
-    @{ Id = "DotBoxd.Plugins"; Path = "src/Hosting/DotBoxd.Plugins" },
-    @{ Id = "DotBoxd.Abstractions"; Path = "src/Hosting/DotBoxd.Abstractions" }
+    @{ Id = "DotBoxD.Kernels"; Path = "src/Kernels/DotBoxD.Kernels" },
+    @{ Id = "DotBoxD.Kernels.Validation"; Path = "src/Kernels/DotBoxD.Kernels.Validation" },
+    @{ Id = "DotBoxD.Kernels.Runtime"; Path = "src/Kernels/DotBoxD.Kernels.Runtime" },
+    @{ Id = "DotBoxD.Kernels.Serialization.Json"; Path = "src/Kernels/DotBoxD.Kernels.Serialization.Json" },
+    @{ Id = "DotBoxD.Hosting.Http"; Path = "src/Hosting/DotBoxD.Hosting.Http" },
+    @{ Id = "DotBoxD.Pushdown.Services"; Path = "src/Pushdown/DotBoxD.Pushdown.Services" },
+    @{ Id = "DotBoxD.Kernels.Interpreter"; Path = "src/Kernels/DotBoxD.Kernels.Interpreter" },
+    @{ Id = "DotBoxD.Kernels.Compiler"; Path = "src/Kernels/DotBoxD.Kernels.Compiler" },
+    @{ Id = "DotBoxD.Kernels.Verifier"; Path = "src/Kernels/DotBoxD.Kernels.Verifier" },
+    @{ Id = "DotBoxD.Hosting"; Path = "src/Hosting/DotBoxD.Hosting" },
+    @{ Id = "DotBoxD.Plugins.Analyzer"; Path = "src/CodeGeneration/DotBoxD.Plugins.Analyzer" },
+    @{ Id = "DotBoxD.Plugins"; Path = "src/Hosting/DotBoxD.Plugins" },
+    @{ Id = "DotBoxD.Abstractions"; Path = "src/Hosting/DotBoxD.Abstractions" }
 )
 
 function Normalize-ApiLine([string] $Line) {
@@ -362,7 +362,7 @@ function Write-Baseline([string] $Path, [string] $PackageId, [string[]] $Api) {
     $directory = Split-Path -Parent $Path
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
     $content = @(
-        "# DotBoxd.Kernels public API baseline",
+        "# DotBoxD.Kernels public API baseline",
         "# Package: $PackageId",
         "# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.",
         ""

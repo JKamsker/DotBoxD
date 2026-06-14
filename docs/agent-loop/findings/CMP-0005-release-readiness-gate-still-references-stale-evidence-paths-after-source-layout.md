@@ -25,7 +25,7 @@ duplicate_of:
 
 ## Claim
 
-`check-release-readiness.ps1` still maps many completed release-readiness and security-review checklist items to stale source/test paths after the source and test layout changed. CMP-0001 fixed the `CanonicalModuleHasher` entry, but the next completed item already fails on `src/DotBoxd.Kernels/BindingRegistryValidator.cs`, and a mechanical path check shows many other completed evidence entries also point at files that no longer exist.
+`check-release-readiness.ps1` still maps many completed release-readiness and security-review checklist items to stale source/test paths after the source and test layout changed. CMP-0001 fixed the `CanonicalModuleHasher` entry, but the next completed item already fails on `src/DotBoxD.Kernels/BindingRegistryValidator.cs`, and a mechanical path check shows many other completed evidence entries also point at files that no longer exist.
 
 ## Why this matters
 
@@ -38,39 +38,39 @@ The README local verification flow and the release/tag gate both run `scripts/ch
 `scripts/check-release-readiness.ps1` maps those completed items to paths that do not exist in this worktree, for example:
 
 ```text
-src/DotBoxd.Kernels/BindingRegistryValidator.cs
-src/DotBoxd.Kernels/Resources.cs
-src/DotBoxd.Kernels/Audit.cs
-src/DotBoxd.Kernels/SandboxError.cs
-src/DotBoxd.Kernels.Compiler/ReflectionEmitSandboxCompiler.cs
-src/DotBoxd.Kernels.Compiler/MethodEmitter.cs
-src/DotBoxd.Kernels.Verifier/GeneratedAssemblyVerifier.cs
-src/DotBoxd.Kernels.Verifier/VerificationModels.cs
-tests/DotBoxd.Kernels.Tests/SafeFileSystemTests.cs
-tests/DotBoxd.Kernels.Tests/BindingRegistryHardeningTests.cs
-tests/DotBoxd.Kernels.Tests/VerifierAttackMatrixTests.cs
-tests/DotBoxd.Kernels.Tests/DifferentialFuzzTests.cs
-tests/DotBoxd.Kernels.Tests/CompiledCacheMetadataTests.cs
-tests/DotBoxd.Kernels.Tests/CompiledMaterializationCacheTests.cs
+src/DotBoxD.Kernels/BindingRegistryValidator.cs
+src/DotBoxD.Kernels/Resources.cs
+src/DotBoxD.Kernels/Audit.cs
+src/DotBoxD.Kernels/SandboxError.cs
+src/DotBoxD.Kernels.Compiler/ReflectionEmitSandboxCompiler.cs
+src/DotBoxD.Kernels.Compiler/MethodEmitter.cs
+src/DotBoxD.Kernels.Verifier/GeneratedAssemblyVerifier.cs
+src/DotBoxD.Kernels.Verifier/VerificationModels.cs
+tests/DotBoxD.Kernels.Tests/SafeFileSystemTests.cs
+tests/DotBoxD.Kernels.Tests/BindingRegistryHardeningTests.cs
+tests/DotBoxD.Kernels.Tests/VerifierAttackMatrixTests.cs
+tests/DotBoxD.Kernels.Tests/DifferentialFuzzTests.cs
+tests/DotBoxD.Kernels.Tests/CompiledCacheMetadataTests.cs
+tests/DotBoxD.Kernels.Tests/CompiledMaterializationCacheTests.cs
 ```
 
 A focused search shows the evidence was mostly moved rather than removed, for example:
 
 ```text
-src/DotBoxd.Kernels/Bindings/BindingRegistryValidator.cs
-src/DotBoxd.Kernels/Model/Resources.cs
-src/DotBoxd.Kernels/Bindings/Audit.cs
-src/DotBoxd.Kernels/Model/Diagnostics.cs
-tests/DotBoxd.Kernels.Tests/Misc01/BindingRegistryHardeningTests.cs
-tests/DotBoxd.Kernels.Tests/Misc02/DifferentialFuzzTests.cs
-tests/DotBoxd.Kernels.Tests/Compiled/Core/CompiledCacheMetadataTests.cs
-tests/DotBoxd.Kernels.Tests/Compiled/Generated/CompiledRuntimeQuotaTests.cs
+src/DotBoxD.Kernels/Bindings/BindingRegistryValidator.cs
+src/DotBoxD.Kernels/Model/Resources.cs
+src/DotBoxD.Kernels/Bindings/Audit.cs
+src/DotBoxD.Kernels/Model/Diagnostics.cs
+tests/DotBoxD.Kernels.Tests/Misc01/BindingRegistryHardeningTests.cs
+tests/DotBoxD.Kernels.Tests/Misc02/DifferentialFuzzTests.cs
+tests/DotBoxD.Kernels.Tests/Compiled/Core/CompiledCacheMetadataTests.cs
+tests/DotBoxD.Kernels.Tests/Compiled/Generated/CompiledRuntimeQuotaTests.cs
 ```
 
 CMP-0001 verification also recorded the first remaining failure after the canonical-hasher fix:
 
 ```text
-Release checklist item 'Binding registry validation implemented.' is marked complete but evidence is missing: src/DotBoxd.Kernels/BindingRegistryValidator.cs
+Release checklist item 'Binding registry validation implemented.' is marked complete but evidence is missing: src/DotBoxD.Kernels/BindingRegistryValidator.cs
 ```
 
 ## Suggested test or benchmark

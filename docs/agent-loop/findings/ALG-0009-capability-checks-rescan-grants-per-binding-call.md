@@ -29,14 +29,14 @@ Capability checks rescan the policy grant list multiple times for a single bindi
 
 ## Evidence
 
-- `src/DotBoxd.Kernels/Policy.cs:26` stores policy grants as an array-backed `IReadOnlyList<CapabilityGrant>`.
-- `src/DotBoxd.Kernels/Policy.cs:33` through `src/DotBoxd.Kernels/Policy.cs:36` implements `GrantsCapability` with `Grants.Any(...)`, scanning the grant list until it finds an active matching capability.
-- `src/DotBoxd.Kernels/Policy.cs:38` through `src/DotBoxd.Kernels/Policy.cs:44` implements `GetGrant` with `Grants.FirstOrDefault(...)`, scanning the same list again to return the matching grant.
-- `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:41` through `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:57` routes `RequireCapability` through `Policy.GrantsCapability`.
-- `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:59` through `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:63` makes `GetCapability` call `RequireCapability` first, then `Policy.GetGrant`, which means `GetCapability` performs two list scans on success.
-- `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:202` through `src/DotBoxd.Kernels/Sandbox/SandboxContext.cs:213` charges a binding call and invokes `RequireCapability` for descriptors with a required capability.
-- Both interpreted and compiled binding dispatch go through `ChargeBindingCall`: `src/DotBoxd.Kernels.Interpreter/ExpressionEvaluator.cs:173` and `src/DotBoxd.Kernels.Runtime/CompiledBindingDispatcher.cs:14`.
-- File and HTTP bindings then repeat capability resolution inside the binding implementation: `src/DotBoxd.Kernels.Runtime/Bindings/SafeFileSystem.cs:138` and `src/DotBoxd.Kernels.Runtime/Bindings/SafeFileSystem.cs:139` call `RequireCapability` and `GetCapability`, while `src/DotBoxd.Hosting.Http/SafeHttpClient.cs:93` and `src/DotBoxd.Hosting.Http/SafeHttpClient.cs:94` do the same for `net.http.get`.
+- `src/DotBoxD.Kernels/Policy.cs:26` stores policy grants as an array-backed `IReadOnlyList<CapabilityGrant>`.
+- `src/DotBoxD.Kernels/Policy.cs:33` through `src/DotBoxD.Kernels/Policy.cs:36` implements `GrantsCapability` with `Grants.Any(...)`, scanning the grant list until it finds an active matching capability.
+- `src/DotBoxD.Kernels/Policy.cs:38` through `src/DotBoxD.Kernels/Policy.cs:44` implements `GetGrant` with `Grants.FirstOrDefault(...)`, scanning the same list again to return the matching grant.
+- `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:41` through `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:57` routes `RequireCapability` through `Policy.GrantsCapability`.
+- `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:59` through `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:63` makes `GetCapability` call `RequireCapability` first, then `Policy.GetGrant`, which means `GetCapability` performs two list scans on success.
+- `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:202` through `src/DotBoxD.Kernels/Sandbox/SandboxContext.cs:213` charges a binding call and invokes `RequireCapability` for descriptors with a required capability.
+- Both interpreted and compiled binding dispatch go through `ChargeBindingCall`: `src/DotBoxD.Kernels.Interpreter/ExpressionEvaluator.cs:173` and `src/DotBoxD.Kernels.Runtime/CompiledBindingDispatcher.cs:14`.
+- File and HTTP bindings then repeat capability resolution inside the binding implementation: `src/DotBoxD.Kernels.Runtime/Bindings/SafeFileSystem.cs:138` and `src/DotBoxD.Kernels.Runtime/Bindings/SafeFileSystem.cs:139` call `RequireCapability` and `GetCapability`, while `src/DotBoxD.Hosting.Http/SafeHttpClient.cs:93` and `src/DotBoxD.Hosting.Http/SafeHttpClient.cs:94` do the same for `net.http.get`.
 - This is distinct from `PAL-0020`, which covers recomputing policy hash records, and from `PAL-0022`, which covers parsing file grant parameters after a grant has been found. The issue here is repeated linear lookup of stable grants.
 
 ## Impact

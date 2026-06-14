@@ -1,6 +1,6 @@
-# Contributing to DotBoxd
+# Contributing to DotBoxD
 
-Thanks for your interest in DotBoxd. This guide covers building, testing, the CI gates your change
+Thanks for your interest in DotBoxD. This guide covers building, testing, the CI gates your change
 must pass, and commit conventions.
 
 ## Prerequisites
@@ -12,23 +12,23 @@ must pass, and commit conventions.
 
 ## Build & test
 
-The solution file is `DotBoxd.slnx`.
+The solution file is `DotBoxD.slnx`.
 
 ```bash
-dotnet restore DotBoxd.slnx
-dotnet build   DotBoxd.slnx -c Release --no-restore
-dotnet test    DotBoxd.slnx -c Release --no-build
+dotnet restore DotBoxD.slnx
+dotnet build   DotBoxD.slnx -c Release --no-restore
+dotnet test    DotBoxD.slnx -c Release --no-build
 ```
 
 Run the end-to-end acceptance sample (it exercises all three modes and must print `RESULT: PASS`):
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxd.EndToEnd
+dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 ```
 
 > Warnings are treated as errors in CI (`TreatWarningsAsErrors` is on when `GITHUB_ACTIONS=true`).
 > To reproduce CI strictness locally, set the environment variable before building:
-> `GITHUB_ACTIONS=true dotnet build DotBoxd.slnx -c Release`.
+> `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release`.
 
 ## CI gates
 
@@ -47,7 +47,7 @@ Every pull request runs the `ci` workflow (`.github/workflows/ci.yml`):
 | Public API baseline | `check-api-compat-baseline.ps1` | Public package API matches `docs/api-baselines/*.txt` |
 | Security-boundary tests | `run-required-tests.ps1` | A required allowlist of sandbox/security tests passes |
 | Docs & examples smoke | `check-docs-smoke.ps1` | Doc commands point at real paths; kernel samples run |
-| End-to-end acceptance | `dotnet run … DotBoxd.EndToEnd` | All three modes produce the expected result |
+| End-to-end acceptance | `dotnet run … DotBoxD.EndToEnd` | All three modes produce the expected result |
 
 Additional workflows: **CodeQL** (`codeql.yml`, C# static analysis on push/PR + weekly) and
 **benchmarks** (`benchmarks.yml`, scheduled and on PRs labeled `benchmark`). The **release**

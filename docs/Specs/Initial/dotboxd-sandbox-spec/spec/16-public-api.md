@@ -65,7 +65,7 @@ public sealed class SandboxHost : IDisposable
 ```
 
 `ImportJsonAsync` is the extension method provided by the JSON serialization addon.
-DotBoxd.Kernels does not expose a custom language parser; hosts import JSON IR into the safe model.
+DotBoxD.Kernels does not expose a custom language parser; hosts import JSON IR into the safe model.
 `SandboxHost` owns materialized compiled delegates and should be disposed by long-lived hosts when
 the host instance is retired.
 `RevokeCapability` is host-local and applies to already-prepared plans. A plan whose module
@@ -243,7 +243,7 @@ var overwrite = SandboxPolicyBuilder.Create()
 
 ### `GrantTimeNow` and `GrantRandom` capability grants
 
-Time and random are capability-gated runtime features served by the `DotBoxd.Kernels.Runtime` host bindings
+Time and random are capability-gated runtime features served by the `DotBoxD.Kernels.Runtime` host bindings
 (`SandboxHostBuilder.AddTimeBindings()` and `AddRandomBindings()`). The matching policy-builder
 helpers are the intended safe way to authorize a module that declares those capability requests:
 
@@ -305,7 +305,7 @@ builder.Add(new BindingDescriptor(
     AuditLevel: AuditLevel.PerResource,
     Safety: BindingSafety.ReadOnlyExternal,
     Invoke: SafeFileBindings.ReadText.Invoke,
-    Compiled: CompiledBinding.RuntimeStub("DotBoxd.Kernels.Runtime.CompiledRuntime", "CallBinding")));
+    Compiled: CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding")));
 ```
 
 ## Execution plan
@@ -498,12 +498,12 @@ public static class SandboxHostJsonExtensions
         CancellationToken cancellationToken = default);
 }
 
-public static class DotBoxdJsonImporter
+public static class DotBoxDJsonImporter
 {
     public static SandboxModule Import(string json);
 }
 
-public static class DotBoxdJsonExporter
+public static class DotBoxDJsonExporter
 {
     public static string Export(SandboxModule module, bool indented = false);
 }

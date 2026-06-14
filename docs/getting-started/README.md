@@ -10,22 +10,22 @@
 
 ```bash
 # Full net10.0 stack (Services + Kernels + Pushdown):
-dotnet add package DotBoxd
+dotnet add package DotBoxD
 
 # Service / Unity (netstandard2.1) bundle only:
-dotnet add package DotBoxd.Services.All
+dotnet add package DotBoxD.Services.All
 ```
 
 Or reference individual packages — see the table in the root [README](../../README.md).
 
 ## First Service (RPC)
 
-1. Define a contract and annotate it with `[DotBoxdService]`.
+1. Define a contract and annotate it with `[DotBoxDService]`.
 2. Implement it on the host and `Provide…` it on each accepted peer.
 3. Connect from the client and call the generated typed proxy.
 
 The complete, compiling pattern is in [`samples/Services/GameService`](../../samples/Services/GameService)
-(TCP) and in the [end-to-end sample](../../samples/Pushdown/DotBoxd.EndToEnd) (named pipes). See
+(TCP) and in the [end-to-end sample](../../samples/Pushdown/DotBoxD.EndToEnd) (named pipes). See
 [concepts/services.md](../concepts/services.md).
 
 ## First Kernel (sandbox)
@@ -45,7 +45,7 @@ submits work in one round-trip instead of N. See [`samples/Pushdown`](../../samp
 ## Run the acceptance sample
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxd.EndToEnd
+dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 ```
 
 It demonstrates all three modes and prints the round-trip win.

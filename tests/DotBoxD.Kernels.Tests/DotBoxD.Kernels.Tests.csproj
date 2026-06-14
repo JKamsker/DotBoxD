@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Serialize test collections: the sandbox deadline/quota/network tests are wall-clock-sensitive
+         and flip to Timeout under thread-pool contention on CPU-limited CI runners. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
+    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server.Abstractions\DotBoxD.Kernels.PluginIpc.Server.Abstractions.csproj" />
+    <ProjectReference Include="..\..\samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\DotBoxD.Kernels.PluginLocal.csproj" />
+    <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Plugins.Analyzer\DotBoxD.Plugins.Analyzer.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Validation\DotBoxD.Kernels.Validation.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting.Http\DotBoxD.Hosting.Http.csproj" />
+    <ProjectReference Include="..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Interpreter\DotBoxD.Kernels.Interpreter.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Compiler\DotBoxD.Kernels.Compiler.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Verifier\DotBoxD.Kernels.Verifier.csproj" />
+  </ItemGroup>
+
+</Project>

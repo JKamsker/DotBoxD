@@ -1,4 +1,4 @@
-using DotBoxd.Services.Attributes;
+using DotBoxD.Services.Attributes;
 
 namespace Shared;
 
@@ -7,7 +7,7 @@ namespace Shared;
 /// back to it. Demonstrates the bidirectional peer model: the same connection carries
 /// <see cref="IGameService"/> calls one way and <see cref="IPlayerNotifications"/> calls the other.
 /// </summary>
-[DotBoxdService]
+[DotBoxDService]
 public interface IPlayerNotifications
 {
     Task NotifyAsync(string message, CancellationToken ct = default);

@@ -1,13 +1,13 @@
 using Server;
 using Shared;
-using DotBoxd.Services;
-using DotBoxd.Services.Generated;
-using DotBoxd.Codecs.MessagePack;
-using DotBoxd.Transports.Tcp;
+using DotBoxD.Services;
+using DotBoxD.Services.Generated;
+using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Transports.Tcp;
 
 const int Port = 5050;
 
-Console.WriteLine("DotBoxd Peer (provider side) Example");
+Console.WriteLine("DotBoxD Peer (provider side) Example");
 Console.WriteLine("===================================");
 Console.WriteLine();
 

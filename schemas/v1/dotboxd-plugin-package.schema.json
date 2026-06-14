@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/JKamsker/Safe-IR/schemas/v1/dotboxd-plugin-package.schema.json",
-  "title": "DotBoxd Plugin Package Envelope",
+  "title": "DotBoxD Plugin Package Envelope",
   "description": "Versioned JSON Schema for the plugin package envelope accepted by PluginPackageJsonSerializer.Import(string json). Mirrors the importer's strict shape for the manifest, embedded module, live settings, hook subscriptions, and kernel entrypoints. The 'module' property follows the Safe IR module envelope schema (dotboxd-kernel-module.schema.json). Schema version is tracked by the directory segment (v1) and the schemaVersion constant; bump both when the JSON contract changes.",
   "x-dotboxd-schema-version": "1.0.0",
   "type": "object",

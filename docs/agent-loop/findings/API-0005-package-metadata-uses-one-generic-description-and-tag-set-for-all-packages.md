@@ -29,19 +29,19 @@ All product packages inherit the same generic NuGet description and tags from `D
 
 ## Why this matters
 
-Package consumers see metadata before opening the repository README. A generic description/tag set makes `DotBoxd.Kernels`, `DotBoxd.Hosting`, `DotBoxd.Plugins.Analyzer`, `DotBoxd.Hosting.Http`, and the preview DotBoxd addon look interchangeable in package feeds, which weakens discoverability and makes safe package selection harder.
+Package consumers see metadata before opening the repository README. A generic description/tag set makes `DotBoxD.Kernels`, `DotBoxD.Hosting`, `DotBoxD.Plugins.Analyzer`, `DotBoxD.Hosting.Http`, and the preview DotBoxD addon look interchangeable in package feeds, which weakens discoverability and makes safe package selection harder.
 
 ## Evidence
 
-- `Directory.Build.props:15` sets one repository-wide `<Description>`: `DotBoxd.Kernels sandbox components for validating, interpreting, compiling, hosting, serializing, and transporting restricted .NET workloads.`
+- `Directory.Build.props:15` sets one repository-wide `<Description>`: `DotBoxD.Kernels sandbox components for validating, interpreting, compiling, hosting, serializing, and transporting restricted .NET workloads.`
 - `Directory.Build.props:16` sets one repository-wide `<PackageTags>` list for every package.
-- `README.md:5` through `README.md:19` gives package-specific roles for `DotBoxd.Kernels`, `DotBoxd.Kernels.Validation`, `DotBoxd.Kernels.Runtime`, `DotBoxd.Kernels.Serialization.Json`, `DotBoxd.Hosting.Http`, `DotBoxd.Pushdown.Services`, `DotBoxd.Kernels.Interpreter`, `DotBoxd.Kernels.Compiler`, `DotBoxd.Kernels.Verifier`, `DotBoxd.Hosting`, `DotBoxd.Plugins.Analyzer`, and `DotBoxd.Plugins`.
-- A targeted metadata scan over `src -g "*.csproj"` found only target-framework/build settings such as `src/DotBoxd.Plugins.Analyzer/DotBoxd.Plugins.Analyzer.csproj:15` and `src/DotBoxd.Pushdown.Services/DotBoxd.Pushdown.Services.csproj:14`; it found no project-specific `<Description>` or `<PackageTags>` overrides.
+- `README.md:5` through `README.md:19` gives package-specific roles for `DotBoxD.Kernels`, `DotBoxD.Kernels.Validation`, `DotBoxD.Kernels.Runtime`, `DotBoxD.Kernels.Serialization.Json`, `DotBoxD.Hosting.Http`, `DotBoxD.Pushdown.Services`, `DotBoxD.Kernels.Interpreter`, `DotBoxD.Kernels.Compiler`, `DotBoxD.Kernels.Verifier`, `DotBoxD.Hosting`, `DotBoxD.Plugins.Analyzer`, and `DotBoxD.Plugins`.
+- A targeted metadata scan over `src -g "*.csproj"` found only target-framework/build settings such as `src/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj:15` and `src/DotBoxD.Pushdown.Services/DotBoxD.Pushdown.Services.csproj:14`; it found no project-specific `<Description>` or `<PackageTags>` overrides.
 - `scripts/check-package-metadata.ps1` requires a non-empty `description`, but it does not require package-specific descriptions or tags, so the current generic metadata shape is accepted.
 
 ## Suggested acceptance test
 
-Extend `check-package-metadata.ps1` or add a package metadata test with an expected metadata inventory. It should fail if every package has the same description/tags and should assert that each package's description identifies its package-specific role, with explicit preview wording for `DotBoxd.Pushdown.Services`.
+Extend `check-package-metadata.ps1` or add a package metadata test with an expected metadata inventory. It should fail if every package has the same description/tags and should assert that each package's description identifies its package-specific role, with explicit preview wording for `DotBoxD.Pushdown.Services`.
 
 ## Suggested fix direction
 
