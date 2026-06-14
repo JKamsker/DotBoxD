@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxD/actions/workflows/codeql.yml)
-[![NuGet](https://img.shields.io/nuget/v/DotBoxD.svg)](https://www.nuget.org/packages/DotBoxD)
+[![NuGet packages](https://img.shields.io/badge/NuGet-packages-004880.svg?logo=nuget)](https://www.nuget.org/packages?q=DotBoxD)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 
@@ -158,10 +158,10 @@ host-owned aggregate calling a kernel — a variant of the same server-side-exec
 
 ```bash
 # Full net10.0 stack (Services + Kernels + Pushdown):
-dotnet add package DotBoxD
+dotnet add package DotBoxD --prerelease
 
 # Unity / netstandard2.1 service bundle:
-dotnet add package DotBoxD.Services.All
+dotnet add package DotBoxD.Services.All --prerelease
 
 # Preview pushdown IPC addon (prerelease while upstream deps are prerelease):
 dotnet add package DotBoxD.Pushdown.Services --prerelease
@@ -180,29 +180,30 @@ dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 
 Most consumers start with a meta-package (`DotBoxD` for the full net10.0 stack, `DotBoxD.Services.All`
 for the Unity/netstandard2.1 service bundle). To pull individual packages instead, add only the pieces
-you need:
+you need. Main-branch CI packages are published as `0.1.0-ci.*` prereleases; omit `--prerelease` once
+you target a stable tag release.
 
 ```bash
 # Host orchestration (SandboxHost: import, prepare, execute kernels under policy):
-dotnet add package DotBoxD.Hosting
+dotnet add package DotBoxD.Hosting --prerelease
 
 # Safe host runtime bindings (files, time, random, logging, strings, math):
-dotnet add package DotBoxD.Kernels.Runtime
+dotnet add package DotBoxD.Kernels.Runtime --prerelease
 
 # JSON IR import/export round trip (JsonImporter / JsonExporter):
-dotnet add package DotBoxD.Kernels.Serialization.Json
+dotnet add package DotBoxD.Kernels.Serialization.Json --prerelease
 
 # HTTP GET binding, grant helpers, and pinned-transport policy validation:
-dotnet add package DotBoxD.Hosting.Http
+dotnet add package DotBoxD.Hosting.Http --prerelease
 
 # Plugin authoring contracts ([Plugin], IEventKernel<TEvent>, HookContext):
-dotnet add package DotBoxD.Abstractions
+dotnet add package DotBoxD.Abstractions --prerelease
 
 # Host runtime that loads, validates, and dispatches plugins:
-dotnet add package DotBoxD.Plugins
+dotnet add package DotBoxD.Plugins --prerelease
 
 # Source generator + analyzer that turns [Plugin] kernels into package-backed plugins:
-dotnet add package DotBoxD.Plugins.Analyzer
+dotnet add package DotBoxD.Plugins.Analyzer --prerelease
 
 # Preview MessagePack IPC addon that runs kernels next to host services (prerelease):
 dotnet add package DotBoxD.Pushdown.Services --prerelease
@@ -263,29 +264,30 @@ and `DBXK###` (kernels/plugins). See [`docs/index.md`](docs/index.md) for the fu
 
 | Package | Purpose | TFM | Stability |
 |---------|---------|-----|-----------|
-| `DotBoxD` | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
-| `DotBoxD.Services.All` | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxD.Services` | Contract attributes, `RpcPeer`/`RpcHost`, dispatch | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxD.Codecs.MessagePack` | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxD.Transports.Tcp` | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxD.Transports.NamedPipes` | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
-| `DotBoxD.Services.SourceGenerator` | Roslyn generator for `[DotBoxDService]` proxies/dispatchers | netstandard2.0 | Stable |
-| `DotBoxD.Abstractions` | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
-| `DotBoxD.Kernels` | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
-| `DotBoxD.Kernels.Validation` | Structural, type, effect, policy, binding validation | net10.0 | Preview |
-| `DotBoxD.Kernels.Runtime` | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
-| `DotBoxD.Kernels.Interpreter` | Direct IR execution backend | net10.0 | Preview |
-| `DotBoxD.Kernels.Compiler` | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
-| `DotBoxD.Kernels.Verifier` | Generated-assembly verifier | net10.0 | Preview |
-| `DotBoxD.Kernels.Serialization.Json` | JSON IR importer/exporter + schema | net10.0 | Preview |
-| `DotBoxD.Hosting` | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
-| `DotBoxD.Hosting.Http` | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
-| `DotBoxD.Plugins` | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
-| `DotBoxD.Plugins.Analyzer` | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
-| `DotBoxD.Pushdown.Services` | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
+| [`DotBoxD`](https://www.nuget.org/packages/DotBoxD) | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
+| [`DotBoxD.Services.All`](https://www.nuget.org/packages/DotBoxD.Services.All) | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Services`](https://www.nuget.org/packages/DotBoxD.Services) | Contract attributes, `RpcPeer`/`RpcHost`, dispatch, and bundled source generator | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Codecs.MessagePack`](https://www.nuget.org/packages/DotBoxD.Codecs.MessagePack) | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Transports.Tcp`](https://www.nuget.org/packages/DotBoxD.Transports.Tcp) | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Transports.NamedPipes`](https://www.nuget.org/packages/DotBoxD.Transports.NamedPipes) | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| [`DotBoxD.Abstractions`](https://www.nuget.org/packages/DotBoxD.Abstractions) | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
+| [`DotBoxD.Kernels`](https://www.nuget.org/packages/DotBoxD.Kernels) | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
+| [`DotBoxD.Kernels.Validation`](https://www.nuget.org/packages/DotBoxD.Kernels.Validation) | Structural, type, effect, policy, binding validation | net10.0 | Preview |
+| [`DotBoxD.Kernels.Runtime`](https://www.nuget.org/packages/DotBoxD.Kernels.Runtime) | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
+| [`DotBoxD.Kernels.Interpreter`](https://www.nuget.org/packages/DotBoxD.Kernels.Interpreter) | Direct IR execution backend | net10.0 | Preview |
+| [`DotBoxD.Kernels.Compiler`](https://www.nuget.org/packages/DotBoxD.Kernels.Compiler) | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
+| [`DotBoxD.Kernels.Verifier`](https://www.nuget.org/packages/DotBoxD.Kernels.Verifier) | Generated-assembly verifier | net10.0 | Preview |
+| [`DotBoxD.Kernels.Serialization.Json`](https://www.nuget.org/packages/DotBoxD.Kernels.Serialization.Json) | JSON IR importer/exporter + schema | net10.0 | Preview |
+| [`DotBoxD.Hosting`](https://www.nuget.org/packages/DotBoxD.Hosting) | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
+| [`DotBoxD.Hosting.Http`](https://www.nuget.org/packages/DotBoxD.Hosting.Http) | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
+| [`DotBoxD.Plugins`](https://www.nuget.org/packages/DotBoxD.Plugins) | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
+| [`DotBoxD.Plugins.Analyzer`](https://www.nuget.org/packages/DotBoxD.Plugins.Analyzer) | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
+| [`DotBoxD.Pushdown.Services`](https://www.nuget.org/packages/DotBoxD.Pushdown.Services) | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
 
 `DotBoxD.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
 dependencies are prerelease; stable release gates fail if it is included in a stable package set.
+`DotBoxD.Services.SourceGenerator` is bundled inside `DotBoxD.Services` as an analyzer asset, not
+published as a standalone package.
 
 ### Common namespaces & key types
 

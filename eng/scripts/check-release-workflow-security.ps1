@@ -4,12 +4,14 @@
     Security gate for the tag-driven release workflow (.github/workflows/release.yml).
 
 .DESCRIPTION
-    Asserts that the package-producing / publishing pipeline keeps its security posture:
+    Asserts that the package-producing / publishing pipelines keep their security posture:
       - every action is pinned to a full 40-char commit SHA (no floating tags);
       - the privileged attestation job (OIDC + attestation write) is isolated, depends on
         pack, and only downloads + attests artifacts (no source checkout / build / test);
       - the pack job does NOT carry OIDC/attestation write permissions;
       - publishing to NuGet.org is gated to the canonical repo on a real tag;
+      - main-branch CI prerelease publishing is gated to the canonical repo and only
+        publishes packages produced by its pack job;
       - provenance attestation covers both .nupkg and .snupkg with a pinned action;
       - the line-length guard is not abused to run local dotnet tools.
 
@@ -20,10 +22,15 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $workflowPath = Join-Path $root ".github/workflows/release.yml"
+$ciWorkflowPath = Join-Path $root ".github/workflows/ci.yml"
 $lineGuardPath = Join-Path $root "eng/scripts/check-csharp-file-lines.ps1"
 
 if (-not (Test-Path -LiteralPath $workflowPath)) {
     throw "Release workflow file does not exist: $workflowPath"
+}
+
+if (-not (Test-Path -LiteralPath $ciWorkflowPath)) {
+    throw "CI workflow file does not exist: $ciWorkflowPath"
 }
 
 if (-not (Test-Path -LiteralPath $lineGuardPath)) {
@@ -31,6 +38,7 @@ if (-not (Test-Path -LiteralPath $lineGuardPath)) {
 }
 
 $workflow = Get-Content -Raw -LiteralPath $workflowPath
+$ciWorkflow = Get-Content -Raw -LiteralPath $ciWorkflowPath
 $lineGuard = Get-Content -Raw -LiteralPath $lineGuardPath
 
 function Get-WorkflowJobBlock([string] $jobId) {
@@ -46,6 +54,19 @@ function Get-WorkflowJobBlock([string] $jobId) {
 $packJob = Get-WorkflowJobBlock "pack"
 $attestJob = Get-WorkflowJobBlock "attest"
 $publishJob = Get-WorkflowJobBlock "publish"
+
+function Get-CiWorkflowJobBlock([string] $jobId) {
+    $escaped = [regex]::Escape($jobId)
+    $match = [regex]::Match($ciWorkflow, "(?ms)^  ${escaped}:\s*\r?\n.*?(?=^  [A-Za-z0-9_-]+:\s*\r?\n|\z)")
+    if (-not $match.Success) {
+        throw "CI workflow job '$jobId' does not exist."
+    }
+
+    return $match.Value
+}
+
+$ciPackJob = Get-CiWorkflowJobBlock "pack-packages"
+$ciPublishJob = Get-CiWorkflowJobBlock "publish-nuget"
 
 # 1. Every action reference must be pinned to a full commit SHA.
 $usesMatches = [regex]::Matches($workflow, "(?m)^\s*uses:\s*(?<action>[^@\s]+)@(?<ref>[^\s#]+)")
@@ -120,7 +141,48 @@ if ($workflow -notmatch "(?m)^\s+uses:\s+\./\.github/workflows/ci\.yml\s*$") {
     throw "Release workflow must reuse ci.yml as a verification gate (uses: ./.github/workflows/ci.yml)."
 }
 
-# 6. The line guard must not install, restore, or execute dotnet local tools.
+# 6. Main-branch CI publishing must consume pack artifacts and stay tightly gated.
+if ($ciPackJob -notmatch "(?m)^\s{4}needs:\s+\[build-test,\s*gates\]\s*$") {
+    throw "CI pack job must depend on build-test and gates before producing publishable packages."
+}
+
+if ($ciPackJob -match "bitwarden/sm-action@" -or $ciPackJob -match "dotnet\s+nuget\s+push") {
+    throw "CI pack job must not fetch publish credentials or push packages."
+}
+
+if ($ciPublishJob -notmatch "(?m)^\s{4}needs:\s+pack-packages\s*$") {
+    throw "CI publish job must depend on the pack-packages artifact job."
+}
+
+if ($ciPublishJob -notmatch "github\.event_name\s*==\s*'push'") {
+    throw "CI publish job must be gated to push events."
+}
+
+if ($ciPublishJob -notmatch "github\.repository\s*==\s*'JKamsker/DotBoxD'") {
+    throw "CI publish job must be gated to the canonical repository (github.repository == 'JKamsker/DotBoxD')."
+}
+
+if ($ciPublishJob -notmatch "github\.ref\s*==\s*'refs/heads/main'") {
+    throw "CI publish job must be gated to the main branch."
+}
+
+if ($ciPublishJob -match "(?im)^\s+uses:\s+actions/checkout@") {
+    throw "CI publish job must not check out source; it may only download package artifacts and publish them."
+}
+
+if ($ciPublishJob -notmatch "actions/download-artifact@[0-9a-fA-F]{40}") {
+    throw "CI publish job must download packaged artifacts with a SHA-pinned action."
+}
+
+if ($ciPublishJob -notmatch "name:\s+nuget-packages") {
+    throw "CI publish job must download the nuget-packages artifact produced by pack-packages."
+}
+
+if ($ciPublishJob -notmatch "dotnet\s+nuget\s+push\s+`"artifacts/packages/\*\.nupkg`"") {
+    throw "CI publish job must push the downloaded .nupkg files from artifacts/packages."
+}
+
+# 7. The line guard must not install, restore, or execute dotnet local tools.
 if ($lineGuard -match "(?im)^\s*&?\s*dotnet\s+(tool\s+(install|restore|run)|new\s+tool-manifest)\b") {
     throw "Release line guard must not install, restore, or execute dotnet local tools."
 }

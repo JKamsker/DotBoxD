@@ -34,8 +34,8 @@ dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 
 Every pull request runs the `ci` workflow (`.github/workflows/ci.yml`):
 
-**Build & test** — restore, build, and `dotnet test` on `ubuntu-latest`, `windows-latest`, and
-`macos-latest` with the .NET 8/9/10 SDKs.
+**Build & test** — restore, build, and `dotnet test` on `ubuntu-latest` and `windows-latest` with
+the .NET 8/9/10 SDKs.
 
 **Security & quality gates** (`eng/scripts/`):
 
@@ -48,6 +48,10 @@ Every pull request runs the `ci` workflow (`.github/workflows/ci.yml`):
 | Security-boundary tests | `run-required-tests.ps1` | A required allowlist of sandbox/security tests passes |
 | Docs & examples smoke | `check-docs-smoke.ps1` | Doc commands point at real paths; kernel samples run |
 | End-to-end acceptance | `dotnet run … DotBoxD.EndToEnd` | All three modes produce the expected result |
+
+**Package validation** — after build/test and gates pass, CI packs every product package, runs
+`check-package-metadata.ps1`, runs the package consumer smoke test, and uploads the package artifact.
+Pushes to `main` in `JKamsker/DotBoxD` then publish `0.1.0-ci.<run>` prerelease packages to NuGet.org.
 
 Additional workflows: **CodeQL** (`codeql.yml`, C# static analysis on push/PR + weekly) and
 **benchmarks** (`benchmarks.yml`, scheduled and on PRs labeled `benchmark`). The **release**
