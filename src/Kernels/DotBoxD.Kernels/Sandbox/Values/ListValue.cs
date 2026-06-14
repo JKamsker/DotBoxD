@@ -16,6 +16,12 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
     internal static ListValue FromOwnedValues(SandboxValue[] values, SandboxType itemType)
         => new(values, itemType, ownsValues: true);
 
+    internal void ResetOwnedValues(SandboxValue[] values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        _values = values;
+    }
+
     private ListValue(SandboxValue[] values, SandboxType itemType, bool ownsValues)
         : this(Array.Empty<SandboxValue>(), itemType)
     {

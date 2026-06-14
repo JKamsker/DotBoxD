@@ -5,6 +5,7 @@ using DotBoxD.Kernels;
 public sealed partial class InstalledKernel
 {
     private SandboxValue[]? _preparedInputValues;
+    private ListValue? _preparedInputList;
 
     private SandboxValue BuildInput<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
@@ -20,7 +21,8 @@ public sealed partial class InstalledKernel
                 Manifest.LiveSettings,
                 Value,
                 _pendingLiveUpdates.Enqueue,
-                ref _preparedInputValues)
+                ref _preparedInputValues,
+                ref _preparedInputList)
             : PluginKernelInputBuilder.Build(
                 adapter,
                 e,
