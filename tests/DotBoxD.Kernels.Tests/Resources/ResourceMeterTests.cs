@@ -128,4 +128,20 @@ public sealed class ResourceMeterTests
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
     }
+
+    [Fact]
+    public void ResetForReuse_clears_usage_and_per_binding_counts()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxHostCalls: 2));
+        meter.ChargeValue(SandboxValue.FromString("fire"));
+        meter.ChargeHostCall("test.binding", maxCallsPerRun: 1);
+
+        meter.ResetForReuse();
+
+        var usage = meter.Snapshot();
+        Assert.Equal(0, usage.HostCalls);
+        Assert.Equal(0, usage.StringBytes);
+        Assert.Equal(0, usage.AllocatedBytes);
+        meter.ChargeHostCall("test.binding", maxCallsPerRun: 1);
+    }
 }

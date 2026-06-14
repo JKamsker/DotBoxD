@@ -10,7 +10,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ResourceMeter? reusableNoAuditBudget = null)
     {
         Debug.Assert(options.Isolation == SandboxIsolation.InProcess);
         Debug.Assert(Enum.IsDefined(options.Mode));
@@ -27,7 +28,13 @@ public sealed partial class SandboxHost
         }
 
         return CanTryCompiledNoAuditValue(plan, entrypoint, options)
-            ? ExecuteCompiledPreparedValueAsync(plan, entrypoint, input, options, cancellationToken)
+            ? ExecuteCompiledPreparedValueAsync(
+                plan,
+                entrypoint,
+                input,
+                options,
+                cancellationToken,
+                reusableNoAuditBudget)
             : ExecutePreparedResultAsValueAsync(plan, entrypoint, input, options, cancellationToken);
     }
 
@@ -36,7 +43,8 @@ public sealed partial class SandboxHost
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ResourceMeter? reusableNoAuditBudget)
     {
         try
         {
@@ -66,7 +74,8 @@ public sealed partial class SandboxHost
                 input,
                 options,
                 allowedBindings,
-                cancellationToken);
+                cancellationToken,
+                reusableNoAuditBudget);
             return result.FullResult is null
                 ? result
                 : PreparedExecutionResult.FromResult(Publish(result.FullResult));

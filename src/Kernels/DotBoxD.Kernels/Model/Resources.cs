@@ -9,19 +9,14 @@ public sealed partial class ResourceMeter
     private const int LoopDeadlineCheckInterval = 4096;
 
     private Dictionary<string, int>? _callsByBinding;
-    private readonly long _deadline;
+    private long _deadline;
     private int _chargesSinceDeadlineCheck;
 
     public ResourceMeter(ResourceLimits limits)
     {
         ResourceLimitValidation.Validate(limits);
         Limits = limits;
-        var now = Stopwatch.GetTimestamp();
-        var timeoutTicks = Math.Ceiling(limits.EffectiveWallTime.TotalSeconds * Stopwatch.Frequency);
-        var cappedTicks = timeoutTicks >= long.MaxValue - now
-            ? long.MaxValue - now
-            : (long)timeoutTicks;
-        _deadline = now + Math.Max(1, cappedTicks);
+        _deadline = CreateDeadline(limits);
     }
 
     public ResourceLimits Limits { get; }

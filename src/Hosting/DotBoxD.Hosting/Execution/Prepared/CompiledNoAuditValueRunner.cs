@@ -11,10 +11,12 @@ internal static class CompiledNoAuditValueRunner
         SandboxValue input,
         SandboxExecutionOptions options,
         IReadOnlySet<string> allowedBindings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ResourceMeter? reusableBudget)
     {
         var artifact = executable.Artifact;
-        var budget = new ResourceMeter(plan.Budget);
+        var budget = reusableBudget ?? new ResourceMeter(plan.Budget);
+        reusableBudget?.ResetForReuse();
         var context = new SandboxContext(
             SandboxRunId.Suppressed,
             plan.Policy,
