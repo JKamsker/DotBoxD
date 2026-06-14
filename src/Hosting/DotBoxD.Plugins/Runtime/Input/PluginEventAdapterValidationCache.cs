@@ -17,6 +17,7 @@ internal sealed class PluginEventAdapterValidationCache
 
         var eventName = adapter.EventName;
         var parameters = adapter.Parameters;
+        PluginEventValueWriterShapeValidator.Validate(adapter, parameters);
         if (_validatedAdapters.TryGetValue(adapter, out var cached) &&
             cached.Value.Matches(eventName, parameters))
         {
@@ -26,6 +27,22 @@ internal sealed class PluginEventAdapterValidationCache
         var shape = new PluginEventShape(eventName, parameters);
         KernelEntrypointValidator.Validate(manifest, plan, entrypoints, shape);
         _validatedAdapters.AddOrUpdate(adapter, new StrongBox<PluginEventShape>(shape));
+    }
+}
+
+internal static class PluginEventValueWriterShapeValidator
+{
+    public static void Validate<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        IReadOnlyList<Parameter> parameters)
+    {
+        if (adapter is IPluginEventValueWriter<TEvent> writer &&
+            writer.EventValueCount != parameters.Count)
+        {
+            throw new SandboxValidationException([
+                new SandboxDiagnostic("SGP033", "Plugin event value writer count does not match adapter parameters.")
+            ]);
+        }
     }
 }
 

@@ -25,10 +25,11 @@ internal sealed class PluginExecutionObserver
     private const int HistoryCapacity = 128;
 
     private readonly object _gate = new();
-    private readonly PluginExecutionObservation?[] _observations = new PluginExecutionObservation?[HistoryCapacity];
+    private readonly ObservationEntry[] _observations = new ObservationEntry[HistoryCapacity];
     private int _start;
     private int _count;
-    private PluginExecutionObservation? _last;
+    private ObservationEntry _last;
+    private bool _hasLast;
 
     public PluginExecutionObservation? Last
     {
@@ -36,7 +37,7 @@ internal sealed class PluginExecutionObserver
         {
             lock (_gate)
             {
-                return _last;
+                return _hasLast ? _last.ToObservation() : null;
             }
         }
     }
@@ -48,7 +49,7 @@ internal sealed class PluginExecutionObserver
             var snapshot = new PluginExecutionObservation[_count];
             for (var i = 0; i < _count; i++)
             {
-                snapshot[i] = _observations[(_start + i) % HistoryCapacity]!;
+                snapshot[i] = _observations[(_start + i) % HistoryCapacity].ToObservation();
             }
 
             return snapshot;
@@ -58,7 +59,7 @@ internal sealed class PluginExecutionObserver
     public void Record(string entrypoint, ExecutionMode requestedMode, SandboxExecutionResult result)
     {
         ExtractMarkers(requestedMode, result, out var summary, out var fallbackReason);
-        var observation = new PluginExecutionObservation(
+        var observation = new ObservationEntry(
             entrypoint,
             requestedMode,
             result.ActualMode,
@@ -85,6 +86,7 @@ internal sealed class PluginExecutionObserver
             }
 
             _last = observation;
+            _hasLast = true;
         }
     }
 
@@ -126,4 +128,32 @@ internal sealed class PluginExecutionObserver
 
     private static string? Field(IReadOnlyDictionary<string, string>? fields, string key)
         => fields is not null && fields.TryGetValue(key, out var value) ? value : null;
+
+    private readonly record struct ObservationEntry(
+        string Entrypoint,
+        ExecutionMode RequestedMode,
+        ExecutionMode ActualMode,
+        bool Succeeded,
+        SandboxErrorCode? ErrorCode,
+        SandboxErrorCode? FallbackReason,
+        string CacheStatus,
+        string? RuntimeForm,
+        string? CacheKey,
+        string? ArtifactHash,
+        string? MaterializationStatus)
+    {
+        public PluginExecutionObservation ToObservation()
+            => new(
+                Entrypoint,
+                RequestedMode,
+                ActualMode,
+                Succeeded,
+                ErrorCode,
+                FallbackReason,
+                CacheStatus,
+                RuntimeForm,
+                CacheKey,
+                ArtifactHash,
+                MaterializationStatus);
+    }
 }
