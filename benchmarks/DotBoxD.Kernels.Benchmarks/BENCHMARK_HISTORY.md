@@ -439,7 +439,13 @@ documented, non-trivial-to-remove cause:
 
 Absolute times are all small (<= ~38 ms per 1M ops), far under the wall-time guardrail.
 
-### Not yet probed (possible future gaps)
+### Known remaining gaps (large or niche; not pursued)
 
-i64 arithmetic, string building (concat/substring) loops, and record field access loops have not been probed.
-String building is inherently allocation-bound; i64 likely boxes (no `I64ExpressionPlan`) but is uncommon.
+- **i64 arithmetic boxes in both modes.** Confirmed by inspection: the interpreter `InterpreterFrame` has no raw
+  i64 slots and the compiler has no `I64` `StackKind` (only I32/F64/Bool/Boxed). Unboxing i64 therefore needs a
+  new stack kind + raw frame slots across both modes — substantially larger than the f64 work (f64 already had
+  both) — for an uncommon type. Deferred as large + low-frequency.
+- **String building (concat/substring) loops.** Inherently allocation-bound (immutable strings allocate on both
+  the handwritten and sandbox sides); also hard to benchmark fairly since constant-operand concats fold. Not a
+  boxing/fast-path gap.
+- **Record field access loops.** Not probed.
