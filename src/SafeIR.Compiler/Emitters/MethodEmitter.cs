@@ -10,6 +10,7 @@ internal sealed class MethodEmitter
 {
     private readonly ILGenerator _il;
     private readonly SandboxFunction _function;
+    private readonly IReadOnlyDictionary<string, SandboxFunction> _functionModels;
     private readonly Dictionary<string, (LocalBuilder Local, StackKind Kind)> _locals = new(StringComparer.Ordinal);
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
@@ -18,12 +19,14 @@ internal sealed class MethodEmitter
         ILGenerator il,
         SandboxFunction function,
         IReadOnlyDictionary<string, MethodInfo> functions,
+        IReadOnlyDictionary<string, SandboxFunction> functionModels,
         IBindingCatalog bindings,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
     {
         _il = il;
         _function = function;
-        _stackPlan = new LocalStackKindPlanner(function, bindings);
+        _functionModels = functionModels;
+        _stackPlan = new LocalStackKindPlanner(function, bindings, functionAnalysis);
         _expressions = new ExpressionEmitter(il, functions, bindings, functionAnalysis, _locals, _stackPlan);
     }
 
@@ -121,7 +124,7 @@ internal sealed class MethodEmitter
 
     private void EmitForRange(ForRangeStatement range)
     {
-        if (I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, Declare))
+        if (I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, Declare))
         {
             return;
         }

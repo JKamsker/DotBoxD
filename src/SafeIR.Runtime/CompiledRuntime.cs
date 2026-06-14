@@ -30,6 +30,8 @@ public static class CompiledRuntime
     [MethodImpl(AggressiveInlining)] public static void ChargeBindingCall(SandboxContext context, string id) => context.ChargeBindingCall(context.Bindings.GetDescriptor(id));
     public static void EnterCall(SandboxContext context) => context.EnterCall();
     public static void ExitCall(SandboxContext context) => context.ExitCall();
+    [MethodImpl(AggressiveInlining)] public static void EnterInlineCall(SandboxContext context) => context.EnterCall();
+    [MethodImpl(AggressiveInlining)] public static void ExitInlineCall(SandboxContext context) => context.ExitCall();
 
     public static void ValidateEntrypointInput(SandboxValue input, int parameterCount)
         => EntrypointBinder.ValidateInputShape(input, parameterCount);

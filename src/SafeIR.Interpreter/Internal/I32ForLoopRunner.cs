@@ -10,11 +10,12 @@ internal static class I32ForLoopRunner
         int end,
         InterpreterFrame frame,
         SandboxContext context,
-        SandboxExecutionOptions options)
+        SandboxExecutionOptions options,
+        I32CallEvaluator calls)
     {
         if (options.EnableDebugTrace ||
             start >= end ||
-            !TryCreateBodyPlan(statement, frame, out var body, out var fuelPerIteration))
+            !TryCreateBodyPlan(statement, frame, calls, out var body, out var fuelPerIteration))
         {
             return false;
         }
@@ -28,7 +29,7 @@ internal static class I32ForLoopRunner
             for (var statementIndex = 0; statementIndex < body.Length; statementIndex++)
             {
                 var assignment = body[statementIndex];
-                frame.WriteRawInt32Slot(assignment.TargetSlot, assignment.Expression.Evaluate(frame));
+                frame.WriteRawInt32Slot(assignment.TargetSlot, assignment.Expression.Evaluate(frame, context));
             }
 
             if (--checkpoint == 0)
@@ -44,6 +45,7 @@ internal static class I32ForLoopRunner
     private static bool TryCreateBodyPlan(
         ForRangeStatement statement,
         InterpreterFrame frame,
+        I32CallEvaluator calls,
         out AssignmentPlan[] body,
         out long fuelPerIteration)
     {
@@ -52,7 +54,7 @@ internal static class I32ForLoopRunner
         for (var i = 0; i < statement.Body.Count; i++)
         {
             if (statement.Body[i] is not AssignmentStatement assignment ||
-                !I32ExpressionPlan.TryCreate(assignment.Value, frame, statement.LocalName, out var expression))
+                !I32ExpressionPlan.TryCreate(assignment.Value, frame, statement.LocalName, calls, out var expression))
             {
                 body = [];
                 return false;

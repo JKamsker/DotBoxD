@@ -6,12 +6,17 @@ internal sealed class LocalStackKindPlanner
 {
     private readonly SandboxFunction _function;
     private readonly IBindingCatalog _bindings;
+    private readonly IReadOnlyDictionary<string, FunctionAnalysis> _functionAnalysis;
     private readonly Dictionary<string, StackKind> _localKinds = new(StringComparer.Ordinal);
 
-    public LocalStackKindPlanner(SandboxFunction function, IBindingCatalog bindings)
+    public LocalStackKindPlanner(
+        SandboxFunction function,
+        IBindingCatalog bindings,
+        IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis)
     {
         _function = function;
         _bindings = bindings;
+        _functionAnalysis = functionAnalysis;
         InferLocalKinds();
     }
 
@@ -120,5 +125,7 @@ internal sealed class LocalStackKindPlanner
     private SandboxType? InferCallType(CallExpression call)
         => call.Name == "list.count"
             ? SandboxType.I32
-            : _bindings.TryGet(call.Name, out var binding) ? binding.ReturnType : null;
+            : _functionAnalysis.TryGetValue(call.Name, out var analysis)
+                ? analysis.ReturnType
+                : _bindings.TryGet(call.Name, out var binding) ? binding.ReturnType : null;
 }

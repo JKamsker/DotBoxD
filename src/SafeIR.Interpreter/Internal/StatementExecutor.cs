@@ -12,17 +12,20 @@ internal sealed class StatementExecutor
 {
     private readonly SandboxContext _context;
     private readonly ExpressionEvaluator _expressions;
+    private readonly I32CallEvaluator _calls;
     private readonly SandboxExecutionOptions _options;
     private readonly string _moduleHash;
 
     public StatementExecutor(
         SandboxContext context,
         ExpressionEvaluator expressions,
+        I32CallEvaluator calls,
         SandboxExecutionOptions options,
         string moduleHash)
     {
         _context = context;
         _expressions = expressions;
+        _calls = calls;
         _options = options;
         _moduleHash = moduleHash;
     }
@@ -220,7 +223,7 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
-        if (I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        if (I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
         {
             return default;
         }

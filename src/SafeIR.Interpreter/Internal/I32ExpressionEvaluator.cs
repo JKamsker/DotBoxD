@@ -7,6 +7,12 @@ internal interface I32CallEvaluator
     bool CanEvaluateInt32Call(CallExpression call);
 
     int EvaluateInt32Call(CallExpression call);
+
+    bool TryCreateInt32CallPlan(
+        CallExpression call,
+        InterpreterFrame frame,
+        string assumedInt32Local,
+        out I32ExpressionPlan plan);
 }
 
 internal static class I32ExpressionEvaluator

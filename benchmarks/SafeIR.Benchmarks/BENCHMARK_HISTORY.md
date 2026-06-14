@@ -1,0 +1,61 @@
+# SafeIR Benchmark History
+
+This file is the performance ledger for SafeIR interpreter/compiler optimization work.
+Each optimization commit should append the benchmark command and the before/after
+numbers it used.
+
+All results below are local stopwatch probes on this machine, run in Release mode.
+Ratios are relative to handwritten C# measured in the same run. These probes are
+intended for regression hunting and directionally comparing implementation steps;
+they are not BenchmarkDotNet statistical reports.
+
+## Commands
+
+```powershell
+dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled
+dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompilation=false -- --probe-bindings
+dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompilation=false -- --probe-matrix
+```
+
+## History
+
+| Step | Commit | Probe | Key result |
+| --- | --- | --- | --- |
+| I32 interpreted loop fast path | `44bc06f` | `--probe-compiled` | Interpreted scalar loop dropped to about 3.3x to 3.5x handwritten in subsequent scalar probes. |
+| I32 compiled raw loop path | `024f1ca` | `--probe-compiled` | Scalar compiled loop reached 62.2 ms vs 47.9 ms handwritten, or 1.3x. |
+| Binding crossing optimization | `216eec6` | `--probe-bindings` | `math.sqrt` crossing improved from compiled 542.1 ms / 68.8x to 196.7 ms / 25.1x; interpreted improved from 677.7 ms / 86.0x to 514.7 ms / 65.6x. |
+| Performance matrix and string length direct path | `31fa6fe` | `--probe-matrix` | Added a matrix for worse cases. `string.length` compiled improved from about 426 ms to 59-62 ms for 1M calls; interpreted improved from about 411 ms to 299-305 ms. |
+| Local function call in I32 loop fast path | this commit | `--probe-matrix` | `local function call` improved from compiled 73.1 ms / 352.2x and interpreted 266.6 ms / 1284.3x to compiled 20.6 ms / 97.7x and interpreted 23.2 ms / 109.8x. |
+
+## Matrix After `31fa6fe`
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.7 ms     39.1 ms   1.7      102.7 ms    4.3
+math.sqrt binding                 7.8 ms    194.8 ms  25.0      365.0 ms   46.9
+string.length binding             0.2 ms     62.4 ms 288.8      305.3 ms 1413.2
+list.count intrinsic              0.2 ms     47.8 ms 205.9      244.9 ms 1055.0
+list.get intrinsic                0.5 ms     49.7 ms  93.5      310.8 ms  584.8
+map.get intrinsic                 2.3 ms    145.2 ms  62.0      195.5 ms   83.4
+local function call               0.2 ms     73.1 ms 352.2      266.6 ms 1284.3
+```
+
+## Matrix After Local Function Call Fast Path
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.4 ms     39.5 ms   1.7      104.9 ms    4.5
+math.sqrt binding                 7.9 ms    209.5 ms  26.6      362.1 ms   45.9
+string.length binding             0.2 ms     63.7 ms 293.5      299.6 ms 1380.5
+list.count intrinsic              0.2 ms     47.4 ms 213.9      240.8 ms 1086.0
+list.get intrinsic                0.5 ms     51.1 ms  95.6      308.0 ms  576.3
+map.get intrinsic                 2.4 ms    134.5 ms  57.0      221.7 ms   94.0
+local function call               0.2 ms     20.6 ms  97.7       23.2 ms  109.8
+```
+
+## Current Gaps
+
+The broad performance target is not met yet. The matrix still exposes several
+bad cases, especially collection intrinsics, map access, `math.sqrt` binding
+crossing, and the absolute handwritten baseline for tiny operations where the
+handwritten timing is sub-millisecond.

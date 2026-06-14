@@ -116,6 +116,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
         var reachableFunctions = ReachableFunctionCollector.Collect(plan, function);
         var functions = DefineFunctionMethods(type, reachableFunctions);
         var methodReferences = functions.ToDictionary(p => p.Key, p => (MethodInfo)p.Value, StringComparer.Ordinal);
+        var functionModels = reachableFunctions.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var execute = type.DefineMethod(
             "Execute",
             MethodAttributes.Public | MethodAttributes.Static,
@@ -129,6 +130,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
                 functions[item.Id].GetILGenerator(),
                 item,
                 methodReferences,
+                functionModels,
                 plan.Bindings,
                 plan.FunctionAnalysis).Emit();
         }

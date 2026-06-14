@@ -52,6 +52,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ChargeBindingCall", $"{SandboxContextName},{StringName}", VoidName),
                 RuntimeMember("EnterCall", SandboxContextName, VoidName),
                 RuntimeMember("ExitCall", SandboxContextName, VoidName),
+                RuntimeMember("EnterInlineCall", SandboxContextName, VoidName),
+                RuntimeMember("ExitInlineCall", SandboxContextName, VoidName),
                 RuntimeMember("ValidateEntrypointInput", $"{SandboxValueName},{Int32Name}", VoidName),
                 RuntimeMember("GetInputArgument", $"{SandboxValueName},{Int32Name},{Int32Name},{SandboxTypeName}", SandboxValueName),
                 RuntimeMember("RequireValueType", $"{SandboxValueName},{SandboxTypeName}", SandboxValueName),

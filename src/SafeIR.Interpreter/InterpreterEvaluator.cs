@@ -21,7 +21,7 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         _functions = plan.FunctionLookup;
         _functionAnalysis = plan.FunctionAnalysis;
         _expressions = new ExpressionEvaluator(_context, this, _functionAnalysis, _options, _moduleHash);
-        _statements = new StatementExecutor(_context, _expressions, _options, _moduleHash);
+        _statements = new StatementExecutor(_context, _expressions, this, _options, _moduleHash);
     }
 
     public ValueTask<SandboxValue> ExecuteEntrypointAsync(string entrypoint, SandboxValue input)
@@ -63,6 +63,43 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         {
             _context.ExitCall();
         }
+    }
+
+    public bool TryCreateInt32CallPlan(
+        CallExpression call,
+        InterpreterFrame frame,
+        string assumedInt32Local,
+        out I32ExpressionPlan plan)
+    {
+        plan = null!;
+        if (!_functions.TryGetValue(call.Name, out var function) ||
+            !TryGetInlineableInt32Return(function, call, out var expression))
+        {
+            return false;
+        }
+
+        var parameter = function.Parameters[0];
+        if (!I32ExpressionPlan.TryCreate(call.Arguments[0], frame, assumedInt32Local, this, out var argument))
+        {
+            return false;
+        }
+
+        var substitutions = new Dictionary<string, I32ExpressionPlan>(StringComparer.Ordinal) {
+            [parameter.Name] = argument
+        };
+        if (!I32ExpressionPlan.TryCreate(
+            expression,
+            frame,
+            assumedInt32Local,
+            calls: null,
+            substitutions,
+            out var body))
+        {
+            return false;
+        }
+
+        plan = I32ExpressionPlan.InlineCall(body);
+        return true;
     }
 
     // Non-async invocation: a function whose body is fully synchronous (no pending
@@ -166,4 +203,47 @@ internal sealed class InterpreterEvaluator : I32CallEvaluator
         expression = null!;
         return false;
     }
+
+    private static bool TryGetInlineableInt32Return(
+        SandboxFunction function,
+        CallExpression call,
+        out Expression expression)
+    {
+        if (call.Arguments.Count == 1 &&
+            IsSimpleInlineArgument(call.Arguments[0]) &&
+            function.Parameters.Count == 1 &&
+            function.Parameters[0].Type == SandboxType.I32 &&
+            function.ReturnType == SandboxType.I32 &&
+            function.Body.Count == 1 &&
+            function.Body[0] is ReturnStatement ret &&
+            !ContainsCall(ret.Value) &&
+            CountVariableUses(ret.Value, function.Parameters[0].Name) == 1)
+        {
+            expression = ret.Value;
+            return true;
+        }
+
+        expression = null!;
+        return false;
+    }
+
+    private static int CountVariableUses(Expression expression, string name)
+        => expression switch {
+            VariableExpression variable => string.Equals(variable.Name, name, StringComparison.Ordinal) ? 1 : 0,
+            UnaryExpression unary => CountVariableUses(unary.Operand, name),
+            BinaryExpression binary => CountVariableUses(binary.Left, name) + CountVariableUses(binary.Right, name),
+            CallExpression call => call.Arguments.Sum(argument => CountVariableUses(argument, name)),
+            _ => 0
+        };
+
+    private static bool IsSimpleInlineArgument(Expression expression)
+        => expression is LiteralExpression { Value: I32Value } or VariableExpression;
+
+    private static bool ContainsCall(Expression expression)
+        => expression switch {
+            CallExpression => true,
+            UnaryExpression unary => ContainsCall(unary.Operand),
+            BinaryExpression binary => ContainsCall(binary.Left) || ContainsCall(binary.Right),
+            _ => false
+        };
 }
