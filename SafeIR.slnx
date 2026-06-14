@@ -14,33 +14,32 @@
         <Project Path="src/SafeIR.Validation/SafeIR.Validation.csproj" />
         <Project Path="src/SafeIR.Verifier/SafeIR.Verifier.csproj" />
     </Folder>
-    <Folder Name="/examples/">
-        <Folder Name="/examples/Capabilities/">
-            <Project Path="examples/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj" />
-        </Folder>
-        <Folder Name="/examples/GameServer/">
-            <Project Path="examples/GameServer/SafeIR.Game.Plugin/SafeIR.Game.Plugin.csproj" />
-            <Project Path="examples/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj" />
-            <Project Path="examples/GameServer/SafeIR.Game.Server.Abstractions/SafeIR.Game.Server.Abstractions.csproj" />
-        </Folder>
-        <Folder Name="/examples/Hosting/">
-            <Project Path="examples/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj" />
-        </Folder>
-        <Folder Name="/examples/HttpTransport/">
-            <Project Path="examples/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj" />
-        </Folder>
-        <Folder Name="/examples/LocalPlugin/">
-            <Project Path="examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
-        </Folder>
-        <Folder Name="/examples/PluginAuthoring/">
-            <Project Path="examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj" />
-        </Folder>
-        <Folder Name="/examples/PluginIpc/">
-            <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
-            <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
-            <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
-            <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
-        </Folder>
+    <Folder Name="/examples/" />
+    <Folder Name="/examples/Capabilities/">
+        <Project Path="examples/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj" />
+    </Folder>
+    <Folder Name="/examples/GameServer/">
+        <Project Path="examples/GameServer/SafeIR.Game.Plugin/SafeIR.Game.Plugin.csproj" />
+        <Project Path="examples/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj" />
+        <Project Path="examples/GameServer/SafeIR.Game.Server.Abstractions/SafeIR.Game.Server.Abstractions.csproj" />
+    </Folder>
+    <Folder Name="/examples/Hosting/">
+        <Project Path="examples/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj" />
+    </Folder>
+    <Folder Name="/examples/HttpTransport/">
+        <Project Path="examples/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj" />
+    </Folder>
+    <Folder Name="/examples/LocalPlugin/">
+        <Project Path="examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
+    </Folder>
+    <Folder Name="/examples/PluginAuthoring/">
+        <Project Path="examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj" />
+    </Folder>
+    <Folder Name="/examples/PluginIpc/">
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
+        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
     </Folder>
     <Folder Name="/benchmarks/">
         <Project Path="benchmarks/SafeIR.Benchmarks/SafeIR.Benchmarks.csproj" />
