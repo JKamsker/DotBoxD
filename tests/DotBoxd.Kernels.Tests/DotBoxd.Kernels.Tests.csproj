@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Serialize test collections: the sandbox deadline/quota/network tests are wall-clock-sensitive
+         and flip to Timeout under thread-pool contention on CPU-limited CI runners. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
