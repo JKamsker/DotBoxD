@@ -48,7 +48,18 @@ public sealed partial class SandboxHost
     {
         try
         {
-            var executable = await _compiled.GetAsync(plan, entrypoint, cancellationToken).ConfigureAwait(false);
+            var executableCached = false;
+            CompiledExecutable executable = default;
+            if (reusableNoAuditState is not null)
+            {
+                executableCached = reusableNoAuditState.TryGetExecutable(entrypoint, out executable);
+            }
+
+            if (!executableCached)
+            {
+                executable = await _compiled.GetAsync(plan, entrypoint, cancellationToken).ConfigureAwait(false);
+            }
+
             if (!CompiledExecutionRunner.CanUseNoAuditSuccessPath(
                     plan,
                     entrypoint,
@@ -65,6 +76,11 @@ public sealed partial class SandboxHost
                         cancellationToken)
                     .ConfigureAwait(false);
                 return PreparedExecutionResult.FromResult(Publish(fullResult));
+            }
+
+            if (!executableCached)
+            {
+                reusableNoAuditState?.StoreExecutable(entrypoint, executable);
             }
 
             var result = CompiledNoAuditValueRunner.Execute(
