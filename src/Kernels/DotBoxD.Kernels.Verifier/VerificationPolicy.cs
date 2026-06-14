@@ -49,6 +49,7 @@ public sealed record VerificationPolicy(
             new HashSet<string>(StringComparer.Ordinal) {
                 RuntimeMember("ChargeFuel", $"{SandboxContextName},{Int32Name}", VoidName),
                 RuntimeMember("ChargeLoopIteration", $"{SandboxContextName},{Int32Name}", VoidName),
+                RuntimeMember("AccumulateLinearI32", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("CanBulkChargeLoopIterations", $"{SandboxContextName},{Int32Name},{Int32Name}", BooleanName),
                 RuntimeMember("CanBulkChargeFuel", $"{SandboxContextName},{Int64Name},{Int32Name}", BooleanName),
                 RuntimeMember("ChargeBulkFuel", $"{SandboxContextName},{Int64Name},{Int32Name}", VoidName),

@@ -27,6 +27,54 @@ public static partial class CompiledRuntime
 {
     [MethodImpl(AggressiveInlining)] public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount);
     [MethodImpl(AggressiveInlining)] public static void ChargeLoopIteration(SandboxContext context, int fuelAmount) => context.ChargeLoopIteration(fuelAmount);
+
+    /// <summary>
+    /// Closed-form replacement for a loop of the form <c>for i in [0,iterations): total = total + inv</c>.
+    /// Reproduces the equivalent checked-arithmetic loop EXACTLY: it charges <paramref name="iterations"/>
+    /// loop iterations at <paramref name="fuelPerIteration"/> each (or fewer, up to and including the
+    /// iteration that would overflow), and throws the same integer-overflow error at the same iteration the
+    /// loop would. Because the result is computed in O(1) instead of O(n) and there is no loop back-edge, the
+    /// per-iteration metering call is eliminated.
+    ///
+    /// EXPERIMENT TRADEOFF (exp/closed-form-accumulation): adds one trusted runtime primitive to the verifier
+    /// allowlist. No safety guarantee is weakened — charged loop-iterations/fuel and the overflow-throw point
+    /// are identical to the loop, the bound checks still fire, and the verifier still requires per-iteration
+    /// metering on every *actual* loop (this just isn't one). The cost is a small increase in trusted-runtime
+    /// surface that must stay in lockstep with the verifier.
+    /// </summary>
+    public static int AccumulateLinearI32(SandboxContext context, int total, int inv, int iterations, int fuelPerIteration)
+    {
+        if (iterations <= 0)
+        {
+            return total;
+        }
+
+        if (inv == 0)
+        {
+            context.ChargeLoopIterations(iterations, fuelPerIteration);
+            return total;
+        }
+
+        long start = total;
+        long step = inv;
+        // First 1-based iteration k at which (total + inv*k) leaves the Int32 range. The running sum is
+        // monotonic in k (increasing for inv>0, decreasing for inv<0), so this is the exact iteration the
+        // checked add in the loop body would throw on.
+        long firstOverflow = inv > 0
+            ? (int.MaxValue - start) / step + 1
+            : (start - int.MinValue) / -step + 1;
+
+        if (firstOverflow <= iterations)
+        {
+            // The overflowing iteration charges its loop meter before the add throws, so charge exactly that
+            // many iterations, then raise the same overflow error the loop would.
+            context.ChargeLoopIterations((int)firstOverflow, fuelPerIteration);
+            throw InvalidInput("integer overflow");
+        }
+
+        context.ChargeLoopIterations(iterations, fuelPerIteration);
+        return (int)(start + step * iterations);
+    }
     [MethodImpl(AggressiveInlining)] public static void ChargeBindingCall(SandboxContext context, string id) => context.ChargeBindingCall(context.Bindings.GetDescriptor(id));
     public static void EnterCall(SandboxContext context) => context.EnterCall();
     public static void ExitCall(SandboxContext context) => context.ExitCall();
