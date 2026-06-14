@@ -63,12 +63,14 @@ public static class PluginMessageBindings
 
                 await sink.SendAsync(targetId, message, cancellationToken).ConfigureAwait(false);
                 var timestamp = DateTimeOffset.UtcNow;
-                var fields = new Dictionary<string, string>(
-                    context.BindingAuditFields("plugin-message", timestamp),
-                    StringComparer.Ordinal)
-                {
-                    ["messageLength"] = message.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                };
+                var fields = BindingAuditFields.CreateMutable(
+                    "plugin-message",
+                    timestamp,
+                    context.ModuleHash,
+                    context.PolicyHash,
+                    context.Policy.Deterministic,
+                    extraCapacity: 1);
+                fields["messageLength"] = message.Length.ToString(CultureInfo.InvariantCulture);
                 context.Audit.Write(new SandboxAuditEvent(
                     context.RunId,
                     "PluginMessage",
@@ -177,6 +179,19 @@ public static class PluginMessageBindings
     }
 
     private static string Sanitize(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (char.IsControl(value[i]))
+            {
+                return SanitizeWithControlCharacters(value);
+            }
+        }
+
+        return value;
+    }
+
+    private static string SanitizeWithControlCharacters(string value)
     {
         var chars = value.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
