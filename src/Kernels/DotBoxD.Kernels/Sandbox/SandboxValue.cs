@@ -4,8 +4,12 @@ using System.Collections.Immutable;
 
 public abstract record SandboxValue
 {
+    private const int CachedI32Min = -1;
+    private const int CachedI32Max = 256;
+
     private static readonly SandboxValue True = new BoolValue(true);
     private static readonly SandboxValue False = new BoolValue(false);
+    private static readonly SandboxValue[] CachedI32Values = CreateCachedI32Values();
 
     public static SandboxValue Unit { get; } = new UnitValue();
 
@@ -13,7 +17,10 @@ public abstract record SandboxValue
 
     public static SandboxValue FromBool(bool value) => value ? True : False;
 
-    public static SandboxValue FromInt32(int value) => new I32Value(value);
+    public static SandboxValue FromInt32(int value)
+        => value >= CachedI32Min && value <= CachedI32Max
+            ? CachedI32Values[value - CachedI32Min]
+            : new I32Value(value);
 
     public static SandboxValue FromInt64(long value) => new I64Value(value);
 
@@ -70,6 +77,17 @@ public abstract record SandboxValue
     public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields);
 
     internal static SandboxValue FromOwnedRecord(SandboxValue[] fields) => RecordValue.FromOwnedFields(fields);
+
+    private static SandboxValue[] CreateCachedI32Values()
+    {
+        var values = new SandboxValue[CachedI32Max - CachedI32Min + 1];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = new I32Value(CachedI32Min + i);
+        }
+
+        return values;
+    }
 }
 
 public sealed record UnitValue : SandboxValue

@@ -16,4 +16,18 @@ public sealed class SandboxValueFactoryTests
         Assert.Equal(new BoolValue(true), firstTrue);
         Assert.Equal(new BoolValue(false), firstFalse);
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(120)]
+    [InlineData(256)]
+    public void FromInt32_reuses_common_immutable_i32_values(int value)
+    {
+        var first = SandboxValue.FromInt32(value);
+        var second = SandboxValue.FromInt32(value);
+
+        Assert.Same(first, second);
+        Assert.Equal(new I32Value(value), first);
+    }
 }
