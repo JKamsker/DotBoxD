@@ -216,6 +216,12 @@ internal sealed class MethodEmitter
     private void EmitWhile(WhileStatement loop)
     {
         _nonNegativeF64Locals.Clear();
+        if (WhileI32LoopFastPathEmitter.TryEmit(loop, _il, _stackPlan, _expressions, _functionModels, Declare))
+        {
+            _nonNegativeF64Locals.Clear();
+            return;
+        }
+
         var startLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
