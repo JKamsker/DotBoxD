@@ -248,6 +248,11 @@ internal sealed class StatementExecutor
             return default;
         }
 
+        if (BranchedI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
+        {
+            return default;
+        }
+
         if (F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
         {
             return default;
