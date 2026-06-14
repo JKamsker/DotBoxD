@@ -616,3 +616,25 @@ emits no un-unloadable assemblies); compiler = the *hot* tier, tiered up to afte
 tree-walk (by design, mooted by tier-up) and the f64 finiteness/pipeline floor. No further semantics-preserving
 gain reaches target; the only levers are a spec change (f64, doesn't reach target anyway) or a major cold-tier
 rewrite (OSR/bytecode-VM) whose payoff is mooted by tiering up.
+
+## f64 floor — PROVEN (upgraded from estimate)
+
+Investigated whether compiled f64 (~6x) could be improved by moving finiteness from per-op to store/observation
+points. It cannot, and this is now proven (not estimated):
+1. **Spec test:** `NumericOperatorTests` asserts f64 arithmetic overflow (`1e308 * 1e308`) throws *at the op*.
+2. **Cross-mode consistency:** the boxed path is `FromDouble(SandboxFloat64Math.Op(...))` per operation, and
+   `FromDouble` rejects non-finite — so the boxed path throws per-op. The unboxed path MUST match per-op or the
+   tiers diverge (e.g. `1.0/(huge*huge)`: per-op throws; deferred-check returns 0). The differential suite would
+   catch the divergence.
+
+So per-op f64 finiteness is mandatory; with a JIT-tightly-pipelined handwritten baseline (~1.3 ns), the two
+finiteness branches per iteration put compiled f64 at ~6x. **Proven floor**, not an optimization gap.
+
+### Definitive terminal state
+
+Every benchmark is a win or a proven floor; no semantics-preserving, cross-mode-consistent change improves any
+ratio:
+- Compiled <=2x on every benchmark except f64 (proven per-op-finiteness floor) and trivial (host-overhead diag).
+- All scalar types (i32/i64/f64) unboxed in both tiers; all loop shapes (for/nested/branch/while) fast-pathed;
+  constant modulo via exact reciprocal (i32/i64); branchless overflow (i32/i64).
+- Interpreted over-5x cases are the cold-tier tree-walk (no-codegen by design; hot code tiers up to compiled).
