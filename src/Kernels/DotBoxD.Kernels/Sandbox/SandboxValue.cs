@@ -4,11 +4,14 @@ using System.Collections.Immutable;
 
 public abstract record SandboxValue
 {
+    private static readonly SandboxValue True = new BoolValue(true);
+    private static readonly SandboxValue False = new BoolValue(false);
+
     public static SandboxValue Unit { get; } = new UnitValue();
 
     public abstract SandboxType Type { get; }
 
-    public static SandboxValue FromBool(bool value) => new BoolValue(value);
+    public static SandboxValue FromBool(bool value) => value ? True : False;
 
     public static SandboxValue FromInt32(int value) => new I32Value(value);
 
