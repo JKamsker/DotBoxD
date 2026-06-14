@@ -233,42 +233,16 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
-        if (MapGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
-        {
-            return default;
-        }
-
-        if (ListGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
-        {
-            return default;
-        }
-
-        if (ListCountForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
-        {
-            return default;
-        }
-
-        if (StringLengthForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
-        {
-            return default;
-        }
-
-        if (I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
-        {
-            return default;
-        }
-
-        if (BranchedI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
-        {
-            return default;
-        }
-
-        if (F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
-        {
-            return default;
-        }
-
-        if (I64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        // Try each unboxed loop fast-path in order; `||` short-circuits so the first match runs and wins.
+        if (MapGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
+            ListGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
+            ListCountForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
+            StringLengthForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
+            I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
+            BranchedI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
+            BranchedF64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
+            F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
+            I64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
         {
             return default;
         }

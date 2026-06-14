@@ -84,6 +84,51 @@ internal static class PerformanceMatrixControlFlowCases
         }
         """;
 
+    public static object HandwrittenBranchedF64Loop(int iterations)
+    {
+        var total = 1.0;
+        for (var i = 0; i < iterations; i++)
+        {
+            if (i % 2 < 1)
+            {
+                total = (total * 0.9) + 0.1;
+            }
+            else
+            {
+                total = (total * 0.8) + 0.2;
+            }
+        }
+
+        return total;
+    }
+
+    public static string BranchedF64LoopJson()
+        => """
+        {
+          "id": "matrix-branched-f64",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "F64",
+              "body": [
+                { "op": "set", "name": "total", "value": { "f64": 1.0 } },
+                { "op": "forRange", "local": "i", "start": { "i32": 0 }, "end": { "var": "iterations" },
+                  "body": [
+                    { "op": "if",
+                      "condition": { "op": "lt", "left": { "op": "rem", "left": { "var": "i" }, "right": { "i32": 2 } }, "right": { "i32": 1 } },
+                      "then": [{ "op": "set", "name": "total", "value": { "op": "add", "left": { "op": "mul", "left": { "var": "total" }, "right": { "f64": 0.9 } }, "right": { "f64": 0.1 } } }],
+                      "else": [{ "op": "set", "name": "total", "value": { "op": "add", "left": { "op": "mul", "left": { "var": "total" }, "right": { "f64": 0.8 } }, "right": { "f64": 0.2 } } }] }
+                  ] },
+                { "op": "return", "value": { "var": "total" } }
+              ]
+            }
+          ]
+        }
+        """;
+
     public static object HandwrittenWhileLoop(int iterations)
     {
         var acc = 0;
