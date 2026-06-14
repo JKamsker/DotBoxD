@@ -6,6 +6,7 @@
          as a single "DotBoxD" package, so consumers install one thing. -->
     <PackageId>DotBoxD.Services</PackageId>
     <Description>High-performance, transport-agnostic RPC framework for C#. Bundles the runtime core and the source generator (compile-time client proxies and server dispatchers).</Description>
+    <PackageTags>dotboxd;rpc;services;source-generator;transport</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -176,6 +176,43 @@ dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
 
 ---
 
+## Installing from NuGet
+
+Most consumers start with a meta-package (`DotBoxD` for the full net10.0 stack, `DotBoxD.Services.All`
+for the Unity/netstandard2.1 service bundle). To pull individual packages instead, add only the pieces
+you need:
+
+```bash
+# Host orchestration (SandboxHost: import, prepare, execute kernels under policy):
+dotnet add package DotBoxD.Hosting
+
+# Safe host runtime bindings (files, time, random, logging, strings, math):
+dotnet add package DotBoxD.Kernels.Runtime
+
+# JSON IR import/export round trip (JsonImporter / JsonExporter):
+dotnet add package DotBoxD.Kernels.Serialization.Json
+
+# HTTP GET binding, grant helpers, and pinned-transport policy validation:
+dotnet add package DotBoxD.Hosting.Http
+
+# Plugin authoring contracts ([Plugin], IEventKernel<TEvent>, HookContext):
+dotnet add package DotBoxD.Abstractions
+
+# Host runtime that loads, validates, and dispatches plugins:
+dotnet add package DotBoxD.Plugins
+
+# Source generator + analyzer that turns [Plugin] kernels into package-backed plugins:
+dotnet add package DotBoxD.Plugins.Analyzer
+
+# Preview MessagePack IPC addon that runs kernels next to host services (prerelease):
+dotnet add package DotBoxD.Pushdown.Services --prerelease
+```
+
+After installing `DotBoxD.Plugins`, load a built plugin package with `PluginPackageJsonSerializer`,
+which deserializes the plugin-package JSON envelope (manifest + module) so the host can install it.
+
+---
+
 ## Architecture
 
 ```mermaid

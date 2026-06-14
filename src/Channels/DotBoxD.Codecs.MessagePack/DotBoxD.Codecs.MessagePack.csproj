@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <Description>MessagePack serializer implementation for DotBoxD</Description>
+    <PackageTags>dotboxd;serialization;messagepack;codec;rpc</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,6 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <PackageId>DotBoxD.Transports.NamedPipes</PackageId>
     <Description>Named pipe transport implementation for DotBoxD process-boundary IPC.</Description>
+    <PackageTags>dotboxd;transport;named-pipes;ipc;rpc</PackageTags>
     <PackageReadmeFile>named-pipe-transport.md</PackageReadmeFile>
   </PropertyGroup>
 

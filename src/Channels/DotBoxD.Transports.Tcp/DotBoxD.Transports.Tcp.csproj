@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <Description>TCP transport implementation for DotBoxD</Description>
+    <PackageTags>dotboxd;transport;tcp;rpc;services</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

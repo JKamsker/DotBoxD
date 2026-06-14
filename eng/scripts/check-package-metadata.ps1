@@ -70,8 +70,8 @@ $expectedPackageMetadata = @{
         Tags = @("dotboxd", "http", "transport", "network", "policy")
     }
     "DotBoxD.Pushdown.Services" = @{
-        Description = "Preview DotBoxD.Kernels DotBoxD MessagePack IPC transport addon with named-pipe helpers."
-        Tags = @("dotboxd", "ipc", "transport", "dotboxd", "preview")
+        Description = "Preview DotBoxD MessagePack IPC addon that runs sandboxed kernels next to host RPC services, with named-pipe helpers."
+        Tags = @("dotboxd", "ipc", "transport", "pushdown", "preview")
     }
     "DotBoxD.Kernels.Interpreter" = @{
         Description = "DotBoxD.Kernels interpreted execution backend for validated IR modules."
@@ -109,7 +109,7 @@ $expectedPackageMetadata = @{
     }
     "DotBoxD.Services" = @{
         Description = "High-performance, transport-agnostic RPC framework for C#. Bundles the runtime core and the source generator (compile-time client proxies and server dispatchers)."
-        Tags = @("dotboxd", "sandbox", "ir", "interpreter", "compiler", "serialization", "transport")
+        Tags = @("dotboxd", "rpc", "services", "source-generator", "transport")
         Tfm = "netstandard2.1"
         ExtraEntries = @("analyzers/dotnet/cs/DotBoxD.Services.SourceGenerator.dll")
     }
