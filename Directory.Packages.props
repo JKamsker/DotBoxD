@@ -9,7 +9,7 @@
   <ItemGroup>
     <!-- Channels / Services runtime deps (netstandard2.1, kept at 8.0 for Unity/IL2CPP) -->
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
-    <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
+    <PackageVersion Include="System.Collections.Immutable" Version="10.0.9" />
     <PackageVersion Include="System.Threading.Channels" Version="8.0.0" />
 
     <!-- Serialization (aligned across both families) -->
