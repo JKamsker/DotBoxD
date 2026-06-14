@@ -33,7 +33,8 @@ dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompila
 | Hoisted `map.get` literal-key lookup | `99db2cb` | `--probe-matrix` | `map.get` improved from compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x to compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x by resolving the immutable literal-key lookup once and still charging the key literal in the loop. |
 | Bulk `map.get` key literal charging | `87765f0` | `--probe-matrix` | `map.get` improved from compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x to compiled 19.7 ms / 4.1x and interpreted 0.5 ms / 0.1x by bulk-charging the literal key value and reusing the hoisted key/result in the loop. |
 | Direct `list.get` I32 reader | `aa15dd2` | `--probe-matrix` | `list.get` improved from compiled 25.0 ms / 47.7x and interpreted 18.2 ms / 34.8x to compiled 19.3 ms / 36.6x and interpreted 11.0 ms / 20.9x by building an I32 reader once and reusing raw items in the loop. |
-| Direct `list.get` modulo index shortcut | this commit | `--probe-matrix` | `list.get` interpreted improved from 11.0 ms / 20.9x to 1.7 ms / 3.3x by recognizing raw variable remainder indexes such as `i % 3`; compiled stayed about flat at 19.7 ms / 37.4x. |
+| Direct `list.get` modulo index shortcut | `a514d91` | `--probe-matrix` | `list.get` interpreted improved from 11.0 ms / 20.9x to 1.7 ms / 3.3x by recognizing raw variable remainder indexes such as `i % 3`; compiled stayed about flat at 19.7 ms / 37.4x. |
+| Compiled `list.get` cyclic accumulator | this commit | `--probe-matrix` | Same-machine baseline from `a514d91` measured compiled `list.get` at 19.4 ms / 36.5x. This step measured 18.2 ms / 34.0x by replacing the zero-based `total += items[i % constant]` emitted loop with a verifier-allowlisted bulk helper. |
 
 ## Matrix After `31fa6fe`
 
@@ -163,6 +164,34 @@ list.count intrinsic              0.2 ms     17.5 ms  80.9        1.0 ms    4.5
 list.get intrinsic                0.5 ms     19.7 ms  37.4        1.7 ms    3.3
 map.get intrinsic                 4.9 ms     20.3 ms   4.2        0.6 ms    0.1
 local function call               0.2 ms     22.3 ms 109.9       23.0 ms  113.4
+```
+
+## Matrix After Compiled List Get Cyclic Accumulator
+
+Baseline from a temporary worktree at `a514d91`:
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 24.0 ms     41.3 ms   1.7      112.0 ms    4.7
+math.sqrt binding                 7.8 ms     25.3 ms   3.2       18.8 ms    2.4
+string.length binding             0.2 ms     17.3 ms  84.9        1.0 ms    4.8
+list.count intrinsic              0.2 ms     22.1 ms  99.3        1.0 ms    4.4
+list.get intrinsic                0.5 ms     19.4 ms  36.5        1.8 ms    3.4
+map.get intrinsic                 5.1 ms     21.1 ms   4.1        0.6 ms    0.1
+local function call               0.2 ms     22.6 ms 108.0       24.6 ms  117.6
+```
+
+After this change:
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.5 ms     39.6 ms   1.7      122.6 ms    5.2
+math.sqrt binding                 7.8 ms     23.9 ms   3.1       18.5 ms    2.4
+string.length binding             0.2 ms     17.5 ms  83.7        1.0 ms    4.8
+list.count intrinsic              0.2 ms     17.5 ms  82.0        1.0 ms    4.5
+list.get intrinsic                0.5 ms     18.2 ms  34.0        1.7 ms    3.2
+map.get intrinsic                 5.0 ms     19.2 ms   3.9        0.5 ms    0.1
+local function call               0.2 ms     20.8 ms 101.3       24.3 ms  118.5
 ```
 
 ## Current Gaps

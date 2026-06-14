@@ -96,6 +96,53 @@ internal static class ListGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Sub);
         il.Emit(OpCodes.Stloc, iterations);
 
+        CompiledMeterEmitter.Fuel(il, 1);
+        if (!TryEmitRemainderCycle(range, plan, iterations, readFuel, reader, fallback, finish, il, declare))
+        {
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, readFuel);
+            il.Emit(OpCodes.Ldloc, iterations);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CanBulkChargeFuel)));
+            il.Emit(OpCodes.Brfalse, fallback);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, readFuel);
+            il.Emit(OpCodes.Ldloc, iterations);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBulkFuel)));
+            EmitLoopBody(fastLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: false);
+        }
+
+        il.MarkLabel(fallback);
+        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: true);
+        il.MarkLabel(finish);
+    }
+
+    private static bool TryEmitRemainderCycle(
+        ForRangeStatement range,
+        LoopPlan plan,
+        LocalBuilder iterations,
+        LocalBuilder readFuel,
+        LocalBuilder reader,
+        Label fallback,
+        Label finish,
+        ILGenerator il,
+        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+    {
+        if (!plan.AddToTarget ||
+            range.Start is not LiteralExpression { Value: I32Value { Value: 0 } } ||
+            !plan.Index.TryGetVariableRemainderConstant(out var name, out var divisor) ||
+            !string.Equals(name, range.LocalName, StringComparison.Ordinal) ||
+            divisor <= 0)
+        {
+            return false;
+        }
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldloc, iterations);
+        EmitInt32(il, plan.LoopFuelPerIteration);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CanBulkChargeLoopIterations)));
+        il.Emit(OpCodes.Brfalse, fallback);
+
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldloc, readFuel);
         il.Emit(OpCodes.Ldloc, iterations);
@@ -103,14 +150,21 @@ internal static class ListGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Brfalse, fallback);
 
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldloc, readFuel);
+        il.Emit(OpCodes.Ldloc, reader);
+        il.Emit(OpCodes.Ldloc, declare(plan.Target).Local);
         il.Emit(OpCodes.Ldloc, iterations);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBulkFuel)));
-        EmitLoopBody(fastLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: false);
+        EmitInt32(il, divisor);
+        EmitInt32(il, plan.LoopFuelPerIteration);
+        il.Emit(OpCodes.Ldloc, readFuel);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderAddRemainderCycleFromZeroRaw)));
+        il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
 
-        il.MarkLabel(fallback);
-        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, reader, range.LocalName, plan, il, declare, chargeReadFuel: true);
-        il.MarkLabel(finish);
+        il.Emit(OpCodes.Ldloc, iterations);
+        EmitInt32(il, 1);
+        il.Emit(OpCodes.Sub);
+        il.Emit(OpCodes.Stloc, declare(range.LocalName).Local);
+        il.Emit(OpCodes.Br, finish);
+        return true;
     }
 
     private static void EmitLoopBody(
@@ -241,10 +295,5 @@ internal static class ListGetI32LoopFastPathEmitter
         => expression is LiteralExpression { Value: I32Value } ||
            expression is VariableExpression variable && stackPlan.LocalKind(variable.Name) == StackKind.I32;
 
-    private readonly record struct LoopPlan(
-        string Target,
-        string Source,
-        I32IndexExpressionPlan Index,
-        bool AddToTarget,
-        int LoopFuelPerIteration);
+    private readonly record struct LoopPlan(string Target, string Source, I32IndexExpressionPlan Index, bool AddToTarget, int LoopFuelPerIteration);
 }
