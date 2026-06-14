@@ -100,13 +100,6 @@ public static partial class CompiledRuntime
         => double.IsFinite(value) ? SandboxValue.FromDouble(value) : throw InvalidInput("f64 value must be finite");
     [MethodImpl(AggressiveInlining)] public static SandboxValue Bool(bool value) => SandboxValue.FromBool(value);
 
-    public static SandboxType TypeScalar(string name) => SandboxType.Scalar(name);
-    public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType);
-    public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType);
-    public static SandboxType TypeRecord(SandboxType[] fieldTypes) => SandboxType.Record(fieldTypes);
-
-    public static SandboxType[] CreateTypeArray(int count)
-        => count >= 0 ? new SandboxType[count] : throw InvalidInput("type array length must be non-negative");
     private static SandboxValue String(string value) => SandboxValue.FromString(value);
 
     public static SandboxValue StringConst(SandboxContext context, string value)
