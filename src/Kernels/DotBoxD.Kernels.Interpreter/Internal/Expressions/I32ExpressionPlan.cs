@@ -2,7 +2,7 @@ namespace DotBoxD.Kernels.Interpreter.Internal;
 
 using DotBoxD.Kernels;
 
-internal sealed class I32ExpressionPlan
+internal sealed partial class I32ExpressionPlan
 {
     private readonly ExpressionKind _kind;
     private readonly int _value;
@@ -114,6 +114,9 @@ internal sealed class I32ExpressionPlan
             ExpressionKind.RemainderAddRawRawConst => SandboxInt32Math.Remainder(
                 SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), frame.ReadRawInt32Slot(_value2)),
                 _value3),
+            ExpressionKind.RemainderAddRawConstConst => SandboxInt32Math.Remainder(
+                SandboxInt32Math.Add(frame.ReadRawInt32Slot(_value), _value2),
+                _value3),
             ExpressionKind.AddRawMultiplyRawConst => SandboxInt32Math.Add(
                 frame.ReadRawInt32Slot(_value),
                 SandboxInt32Math.Multiply(frame.ReadRawInt32Slot(_value2), _value3)),
@@ -145,6 +148,15 @@ internal sealed class I32ExpressionPlan
         IReadOnlyDictionary<string, I32ExpressionPlan>? substitutions,
         out I32ExpressionPlan plan)
     {
+        // (raw + const) % const — resolves the slot through inline-call substitutions, so inline bodies of this
+        // common modular-accumulator shape collapse to a single fused dispatch + one idiv instead of a 4-node
+        // tree. Fuel is identical to the generic Remainder(Add(Raw, Lit), Lit) plan (5), so metering is unchanged.
+        if (TryCreateRemainderAddRawConstConst(binary, frame, assumedInt32Local, substitutions, out plan))
+        {
+            return true;
+        }
+
+        // The remaining fused shapes read two frame slots directly and are not substitution-aware.
         if (substitutions is not null)
         {
             plan = null!;
@@ -255,6 +267,7 @@ internal sealed class I32ExpressionPlan
         Negate,
         InlineCall,
         RemainderAddRawRawConst,
+        RemainderAddRawConstConst,
         AddRawMultiplyRawConst,
         Add,
         Subtract,
