@@ -15,6 +15,22 @@ public interface IGameWorldAccess
     [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
     int GetHealth(string entityId);
 
+    /// <summary>Whether the id currently belongs to a monster. Monster-read capability.</summary>
+    [HostBinding("host.world.isMonster", "game.world.monster.read.kind", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    bool IsMonster(string entityId);
+
+    /// <summary>The entity's level (0 if unknown). Monster-read capability.</summary>
+    [HostBinding("host.world.getLevel", "game.world.monster.read.level", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    int GetLevel(string entityId);
+
+    /// <summary>The entity's 1D world position (0 if unknown). Monster-read capability.</summary>
+    [HostBinding("host.world.getPosition", "game.world.monster.read.position", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    int GetPosition(string entityId);
+
+    /// <summary>Kills a live monster by id and returns whether the world changed. Monster-write capability.</summary>
+    [HostBinding("host.world.killMonster", "game.world.monster.write.kill", SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
+    bool KillMonster(string entityId);
+
     /// <summary>
     /// The entity's combat threat rating. Also a read, but gated under a different capability subtree
     /// (<c>game.world.combat.*</c>) than the monster-read grant: a kernel that reads it is denied at

@@ -4,13 +4,21 @@ using DotBoxD.Services.Attributes;
 
 /// <summary>
 /// Control plane the plugin host calls over IPC. The host ships opaque verified IR
-/// (<see cref="InstallPluginAsync"/>), tunes live settings (<see cref="UpdateSettingsAsync"/>), and
-/// can observe the running simulation (<see cref="GetWorldAsync"/>, <see cref="DrainEffectsAsync"/>).
+/// (<see cref="InstallPluginAsync"/> and <see cref="InstallKernelRpcAsync"/>), tunes live settings,
+/// invokes plugin-owned kernel RPC services, and can call ordinary server APIs such as
+/// <see cref="KillMonsterAsync"/>.
 /// </summary>
 [DotBoxDService]
 public interface IGamePluginControlService
 {
     ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+
+    ValueTask<string> InstallKernelRpcAsync(string packageJson, CancellationToken ct = default);
+
+    ValueTask<KernelRpcWireValue> InvokeKernelRpcAsync(
+        string pluginId,
+        KernelRpcWireValue[] arguments,
+        CancellationToken ct = default);
 
     ValueTask UpdateSettingsAsync(
         string pluginId,
@@ -28,4 +36,14 @@ public interface IGamePluginControlService
     ValueTask<WorldSnapshot> GetWorldAsync(CancellationToken ct = default);
 
     ValueTask<string[]> DrainEffectsAsync(CancellationToken ct = default);
+
+    ValueTask<bool> KillMonsterAsync(string monsterId, CancellationToken ct = default);
+
+    ValueTask<bool> IsMonsterAsync(string entityId, CancellationToken ct = default);
+
+    ValueTask<int> GetEntityHealthAsync(string entityId, CancellationToken ct = default);
+
+    ValueTask<int> GetEntityLevelAsync(string entityId, CancellationToken ct = default);
+
+    ValueTask<int> GetEntityPositionAsync(string entityId, CancellationToken ct = default);
 }

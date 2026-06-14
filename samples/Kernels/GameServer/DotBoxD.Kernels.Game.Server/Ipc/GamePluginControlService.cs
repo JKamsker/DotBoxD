@@ -44,6 +44,48 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         return kernel.Manifest.PluginId;
     }
 
+    public async ValueTask<string> InstallKernelRpcAsync(string packageJson, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(packageJson);
+
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        var policy = ServerPolicy.ForKernel(package.Manifest.RequiredCapabilities);
+        var kernel = await _session.InstallRpcAsync(package, policy, ct).ConfigureAwait(false);
+        return kernel.Manifest.PluginId;
+    }
+
+    public async ValueTask<KernelRpcWireValue> InvokeKernelRpcAsync(
+        string pluginId,
+        KernelRpcWireValue[] arguments,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pluginId);
+        ArgumentNullException.ThrowIfNull(arguments);
+        if (!_session.Owns(pluginId))
+        {
+            throw new InvalidOperationException($"Kernel RPC service '{pluginId}' is not owned by this plugin session.");
+        }
+
+        var kernel = _server.Kernels.Get(pluginId);
+        var function = RpcEntrypoint(kernel);
+        var liveSettings = kernel.Manifest.LiveSettings.Count;
+        var callerCount = function.Parameters.Count - liveSettings;
+        if (callerCount < 0 || arguments.Length != callerCount)
+        {
+            throw new InvalidOperationException(
+                $"Kernel RPC service '{pluginId}' expects {callerCount} argument(s) but received {arguments.Length}.");
+        }
+
+        var sandboxArguments = new SandboxValue[arguments.Length];
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            sandboxArguments[i] = KernelRpcWireValueConverter.ToSandboxValue(arguments[i], function.Parameters[i].Type);
+        }
+
+        var result = await kernel.InvokeRpcAsync(sandboxArguments, ct).ConfigureAwait(false);
+        return KernelRpcWireValueConverter.FromSandboxValue(result);
+    }
+
     public ValueTask UpdateSettingsAsync(
         string pluginId,
         LiveSettingUpdate[] updates,
@@ -80,6 +122,41 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         return ValueTask.FromResult(_sink.DrainEffects());
     }
 
+    public ValueTask<bool> KillMonsterAsync(string monsterId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(monsterId);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_world.KillMonster(monsterId));
+    }
+
+    public ValueTask<bool> IsMonsterAsync(string entityId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entityId);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_world.IsMonster(entityId));
+    }
+
+    public ValueTask<int> GetEntityHealthAsync(string entityId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entityId);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_world.GetHealth(entityId));
+    }
+
+    public ValueTask<int> GetEntityLevelAsync(string entityId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entityId);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_world.GetLevel(entityId));
+    }
+
+    public ValueTask<int> GetEntityPositionAsync(string entityId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entityId);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(_world.GetPosition(entityId));
+    }
+
     private void WireHook(InstalledKernel kernel)
     {
         // Map by the kernel's declared subscription event so the server stays agnostic of plugin ids.
@@ -98,5 +175,24 @@ internal sealed class GamePluginControlService : IGamePluginControlService
                 throw new InvalidOperationException(
                     $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
         }
+    }
+
+    private static SandboxFunction RpcEntrypoint(InstalledKernel kernel)
+    {
+        if (kernel.Manifest.RpcEntrypoint is not { } entrypoint)
+        {
+            throw new InvalidOperationException($"Kernel '{kernel.Manifest.PluginId}' is not a kernel RPC service.");
+        }
+
+        foreach (var function in kernel.Package.Module.Functions)
+        {
+            if (function.IsEntrypoint && string.Equals(function.Id, entrypoint, StringComparison.Ordinal))
+            {
+                return function;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Kernel RPC service '{kernel.Manifest.PluginId}' is missing entrypoint '{entrypoint}'.");
     }
 }

@@ -31,7 +31,9 @@ internal sealed class GameWorld
                 new GameEntity("player-1", EntityKind.Player, level: 1, hp: 30, position: 0),
                 new GameEntity("player-2", EntityKind.Player, level: 3, hp: 30, position: 4),
                 new GameEntity("monster-1", EntityKind.Monster, level: 8, hp: 80, position: 7),
-                new GameEntity("monster-2", EntityKind.Monster, level: 8, hp: 80, position: 12)
+                new GameEntity("monster-2", EntityKind.Monster, level: 8, hp: 80, position: 12),
+                new GameEntity("monster-3", EntityKind.Monster, level: 6, hp: 55, position: 80),
+                new GameEntity("monster-4", EntityKind.Monster, level: 6, hp: 45, position: 90)
             ],
             hooks);
 
@@ -77,6 +79,28 @@ internal sealed class GameWorld
 
     internal GameEntity? FindEntity(string id)
         => _entities.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.Ordinal));
+
+    internal int GetHealth(string entityId)
+        => FindEntity(entityId)?.Hp ?? 0;
+
+    internal bool IsMonster(string entityId)
+        => FindEntity(entityId)?.Kind == EntityKind.Monster;
+
+    internal int GetLevel(string entityId)
+        => FindEntity(entityId)?.Level ?? 0;
+
+    internal int GetPosition(string entityId)
+        => FindEntity(entityId)?.Position ?? 0;
+
+    internal bool KillMonster(string monsterId)
+    {
+        if (FindEntity(monsterId) is not { Kind: EntityKind.Monster } monster)
+        {
+            return false;
+        }
+
+        return monster.Kill();
+    }
 
     private async ValueTask RunMonsterAsync(GameEntity monster, CancellationToken cancellationToken)
     {

@@ -42,7 +42,7 @@ internal static class Program
         var playerHpBaseline = PlayerHpById(world);
 
         Console.WriteLine("=== DotBoxD.Kernels Game Server (golden example) ===");
-        Console.WriteLine("Low-level players (player-1 lvl1, player-2 lvl3) vs high-level monsters (lvl8).");
+        Console.WriteLine("Low-level players face nearby lvl8 monsters; two remote monsters are used by the RPC demo.");
         Console.WriteLine();
 
         // (b) Baseline phase: no plugins. Monsters bully the low-level players.
@@ -99,7 +99,8 @@ internal static class Program
             return await FailAsync(host, $"plugin exited before installing kernels (code {pluginProcess.ExitCode}).").ConfigureAwait(false);
         }
 
-        Console.WriteLine("[server] plugin connected; kernels installed and live. Running with-plugin phase.");
+        Console.WriteLine("[server] plugin connected; event kernels and kernel RPC service are installed and live.");
+        Console.WriteLine("[server] Running with-plugin phase after the plugin's direct IPC/RPC setup calls.");
         Console.WriteLine();
 
         // (f) With-plugin phase: the untrusted kernels run sandboxed WHILE the plugin is connected.

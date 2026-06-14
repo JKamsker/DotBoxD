@@ -42,6 +42,17 @@ internal sealed class GameEntity
 
     public void TakeDamage(int amount) => Hp = Math.Max(0, Hp - amount);
 
+    public bool Kill()
+    {
+        if (!IsAlive)
+        {
+            return false;
+        }
+
+        Hp = 0;
+        return true;
+    }
+
     public void AddCalm(string playerId, int strength)
     {
         var current = _calmByPlayer.GetValueOrDefault(playerId);

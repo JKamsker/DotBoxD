@@ -9,10 +9,13 @@ namespace DotBoxD.Kernels.Game.Server;
 /// <c>game.world.monster.read.health</c> but not <c>game.world.combat.threat</c> (<c>GetThreat</c>), so
 /// a kernel that reads threat is denied at install. Without the message-write grant, package
 /// preparation fails closed too.
+/// Kernel RPC services get the same least-privilege treatment; the monster-killer batch kernel receives
+/// <c>game.world.monster.write.*</c> only because its verified IR declares the kill binding.
 /// </summary>
 internal static class ServerPolicy
 {
     private const string MonsterReadPrefix = "game.world.monster.read.";
+    private const string MonsterWritePrefix = "game.world.monster.write.";
 
     /// <summary>The base ceiling applied to a kernel with no extra capability needs.</summary>
     public static SandboxPolicy Create() => ForKernel([]);
@@ -34,6 +37,12 @@ internal static class ServerPolicy
                 capability.StartsWith(MonsterReadPrefix, StringComparison.Ordinal)))
         {
             builder.Grant("game.world.monster.read.*", new { }, SandboxEffect.HostStateRead);
+        }
+
+        if (requiredCapabilities.Any(capability =>
+                capability.StartsWith(MonsterWritePrefix, StringComparison.Ordinal)))
+        {
+            builder.Grant("game.world.monster.write.*", new { }, SandboxEffect.HostStateWrite);
         }
 
         return builder.Build();
