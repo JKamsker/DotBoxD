@@ -148,6 +148,12 @@ internal sealed class MethodEmitter
             return;
         }
 
+        if (ListGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare))
+        {
+            _nonNegativeF64Locals.Clear();
+            return;
+        }
+
         if (ListCountLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare))
         {
             _nonNegativeF64Locals.Clear();

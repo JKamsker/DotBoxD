@@ -120,6 +120,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("StringLengthRaw", SandboxValueName, Int32Name),
                 RuntimeMember("ListCountRaw", SandboxValueName, Int32Name),
                 RuntimeMember("ListReadFuelRaw", Int32Name, Int64Name),
+                RuntimeMember("ListGetI32Raw", $"{SandboxValueName},{Int32Name}", Int32Name),
                 RuntimeMember("ConcatString", $"{SandboxContextName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("AbsI32", SandboxValueName, SandboxValueName),
                 RuntimeMember("MinI32", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),

@@ -35,6 +35,19 @@ public static partial class CompiledRuntime
     public static long ListReadFuelRaw(int count) => SandboxCollectionFuel.Read(count);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ListGetI32Raw(SandboxValue value, int index)
+    {
+        var list = value as ListValue ?? throw InvalidInput("expected list value");
+        var values = list.Values;
+        if (index < 0 || index >= values.Count)
+        {
+            throw InvalidInput("list index is out of range");
+        }
+
+        return values[index] is I32Value item ? item.Value : throw InvalidInput("expected I32 value");
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double SqrtF64Raw(double value)
     {
         var result = Math.Sqrt(value);

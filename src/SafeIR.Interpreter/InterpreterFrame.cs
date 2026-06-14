@@ -123,6 +123,28 @@ internal sealed class InterpreterFrame
     public int ReadListCountSlot(int slot)
         => _slots[slot] is ListValue value ? value.Values.Count : throw UnassignedSlot();
 
+    public int ReadListInt32ItemSlot(int slot, int index)
+    {
+        if (_slots[slot] is not ListValue list)
+        {
+            throw UnassignedSlot();
+        }
+
+        var values = list.Values;
+        if (index < 0 || index >= values.Count)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "list index is out of range"));
+        }
+
+        return values[index] is I32Value item
+            ? item.Value
+            : throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "expected I32 value"));
+    }
+
     public bool TryReadDouble(string name, out double value)
     {
         var slot = _layout.GetSlot(name);
