@@ -62,6 +62,9 @@ public interface IAuditSink
 
 public sealed class InMemoryAuditSink : IAuditSink
 {
+    private static readonly IReadOnlyList<SandboxAuditEvent> EmptySnapshot =
+        new OwnedAuditEventSnapshot(Array.Empty<SandboxAuditEvent>());
+
     private readonly List<SandboxAuditEvent> _events = [];
     private long _sequence;
 
@@ -75,7 +78,7 @@ public sealed class InMemoryAuditSink : IAuditSink
     /// retained by the sink, so result construction can adopt it without copying again.
     /// </summary>
     internal IReadOnlyList<SandboxAuditEvent> SnapshotEvents()
-        => new OwnedAuditEventSnapshot(_events.ToArray());
+        => _events.Count == 0 ? EmptySnapshot : new OwnedAuditEventSnapshot(_events.ToArray());
 
     public void Write(SandboxAuditEvent auditEvent)
     {

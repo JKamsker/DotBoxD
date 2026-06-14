@@ -84,6 +84,12 @@ internal sealed class MethodEmitter
                 UpdateF64Facts(assignment.Name, assignment.Value);
                 return false;
             case ReturnStatement ret:
+                if (BoolReturnFastPathEmitter.TryEmit(ret.Value, _il, _stackPlan, Declare))
+                {
+                    EmitReturnValue();
+                    return true;
+                }
+
                 _expressions.EmitAs(ret.Value, StackKind.Boxed);
                 EmitReturnValue();
                 return true;
