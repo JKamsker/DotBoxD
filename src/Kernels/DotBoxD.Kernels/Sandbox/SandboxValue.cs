@@ -1,7 +1,5 @@
 namespace DotBoxD.Kernels;
 
-using System.Collections.Immutable;
-
 public abstract record SandboxValue
 {
     private const int CachedI32Min = -1;
@@ -143,88 +141,6 @@ public sealed record SandboxUri(string Value)
 public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
 {
     public override SandboxType Type => SandboxType.Scalar("SandboxUri");
-}
-
-public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue
-{
-    private IReadOnlyList<SandboxValue> _values = Snapshot(Values);
-
-    public IReadOnlyList<SandboxValue> Values { get => _values; init => _values = Snapshot(value); }
-
-    /// <summary>
-    /// Constructs a list value over an array the caller has just allocated, fully
-    /// populated, and will not expose for mutation, avoiding a second defensive copy.
-    /// Internal because the owned-array contract cannot be enforced for external callers.
-    /// </summary>
-    internal static ListValue FromOwnedValues(SandboxValue[] values, SandboxType itemType)
-        => new(new OwnedSnapshot(values), itemType);
-
-    private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> values)
-        => values switch
-        {
-            OwnedSnapshot owned => owned,
-            // An ImmutableList is already an immutable, structurally-shared snapshot; storing it directly
-            // (no defensive copy) is what lets list.add share structure and run in O(log n) instead of O(n).
-            ImmutableList<SandboxValue> immutable => immutable,
-            _ => ModelCopy.List(values)
-        };
-
-    /// <summary>
-    /// Returns a new list with <paramref name="item"/> appended, sharing structure with this list via an
-    /// immutable backing so the append is O(log n) rather than an O(n) copy. Charged fuel/allocation are
-    /// unchanged by the caller; only the runtime data structure and wall-time differ.
-    /// </summary>
-    internal ListValue Append(SandboxValue item)
-    {
-        var immutable = _values as ImmutableList<SandboxValue> ?? ImmutableList.CreateRange(_values);
-        return new ListValue(immutable.Add(item), ItemType);
-    }
-
-    private sealed class OwnedSnapshot(SandboxValue[] values) : IReadOnlyList<SandboxValue>
-    {
-        public SandboxValue this[int index] => values[index];
-
-        public int Count => values.Length;
-
-        public IEnumerator<SandboxValue> GetEnumerator()
-            => ((IEnumerable<SandboxValue>)values).GetEnumerator();
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
-    }
-
-    public override SandboxType Type => SandboxType.List(ItemType);
-
-    public bool Equals(ListValue? other)
-    {
-        if (other is null ||
-            !ItemType.Equals(other.ItemType) ||
-            Values.Count != other.Values.Count)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < Values.Count; i++)
-        {
-            if (!Values[i].Equals(other.Values[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        hash.Add(ItemType);
-        foreach (var value in Values)
-        {
-            hash.Add(value);
-        }
-
-        return hash.ToHashCode();
-    }
 }
 
 public sealed record RecordValue : SandboxValue
