@@ -4,7 +4,7 @@ internal sealed class CompiledExecutableExecutionCache
 {
     private const int Capacity = 64;
 
-    private readonly Dictionary<string, LinkedListNode<Entry>> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<CacheKey, LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recency = new();
     private readonly object _gate = new();
 
@@ -14,7 +14,7 @@ internal sealed class CompiledExecutableExecutionCache
         Func<CancellationToken, ValueTask<CompiledExecutable>> materialize,
         CancellationToken cancellationToken)
     {
-        var key = Key(plan, entrypoint);
+        var key = new CacheKey(plan.PlanHash, entrypoint);
         CacheLookup lookup;
         lock (_gate)
         {
@@ -45,7 +45,7 @@ internal sealed class CompiledExecutableExecutionCache
     }
 
     private CacheLookup TouchOrAdd(
-        string key,
+        CacheKey key,
         Func<CancellationToken, ValueTask<CompiledExecutable>> materialize)
     {
         if (_entries.TryGetValue(key, out var existing))
@@ -72,7 +72,7 @@ internal sealed class CompiledExecutableExecutionCache
         return new CacheLookup(null, candidate, true);
     }
 
-    private void MarkCompleted(string key, Lazy<Task<CompiledExecutable>> lazy, CompiledExecutable executable)
+    private void MarkCompleted(CacheKey key, Lazy<Task<CompiledExecutable>> lazy, CompiledExecutable executable)
     {
         lock (_gate)
         {
@@ -83,7 +83,7 @@ internal sealed class CompiledExecutableExecutionCache
         }
     }
 
-    private void RemoveIfCurrent(string key, Lazy<Task<CompiledExecutable>> lazy)
+    private void RemoveIfCurrent(CacheKey key, Lazy<Task<CompiledExecutable>> lazy)
     {
         lock (_gate)
         {
@@ -95,17 +95,16 @@ internal sealed class CompiledExecutableExecutionCache
         }
     }
 
-    private static string Key(ExecutionPlan plan, string entrypoint)
-        => plan.PlanHash + "|" + entrypoint;
-
     private readonly record struct CacheLookup(
         CompiledExecutable? Completed,
         Lazy<Task<CompiledExecutable>>? Lazy,
         bool IsMiss);
 
-    private sealed class Entry(string key, Lazy<Task<CompiledExecutable>> executable)
+    private readonly record struct CacheKey(string PlanHash, string Entrypoint);
+
+    private sealed class Entry(CacheKey key, Lazy<Task<CompiledExecutable>> executable)
     {
-        public string Key { get; } = key;
+        public CacheKey Key { get; } = key;
         public Lazy<Task<CompiledExecutable>> Executable { get; } = executable;
         public CompiledExecutable? Completed { get; set; }
     }

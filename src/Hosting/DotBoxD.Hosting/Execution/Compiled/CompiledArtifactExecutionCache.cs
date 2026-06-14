@@ -7,7 +7,7 @@ internal sealed class CompiledArtifactExecutionCache
 {
     private const int Capacity = 64;
 
-    private readonly Dictionary<string, LinkedListNode<Entry>> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<CacheKey, LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recency = new();
     private readonly object _gate = new();
 
@@ -17,7 +17,7 @@ internal sealed class CompiledArtifactExecutionCache
         Func<CancellationToken, ValueTask<CompiledArtifact>> compile,
         CancellationToken cancellationToken)
     {
-        var key = Key(plan, entrypoint);
+        var key = new CacheKey(plan.PlanHash, entrypoint);
         CacheLookup lookup;
         lock (_gate)
         {
@@ -48,7 +48,7 @@ internal sealed class CompiledArtifactExecutionCache
     }
 
     private CacheLookup TouchOrAdd(
-        string key,
+        CacheKey key,
         Func<CancellationToken, ValueTask<CompiledArtifact>> compile)
     {
         if (_entries.TryGetValue(key, out var existing))
@@ -75,7 +75,7 @@ internal sealed class CompiledArtifactExecutionCache
         return new CacheLookup(null, candidate);
     }
 
-    private void MarkCompleted(string key, Lazy<Task<CompiledArtifact>> lazy, CompiledArtifact artifact)
+    private void MarkCompleted(CacheKey key, Lazy<Task<CompiledArtifact>> lazy, CompiledArtifact artifact)
     {
         lock (_gate)
         {
@@ -86,7 +86,7 @@ internal sealed class CompiledArtifactExecutionCache
         }
     }
 
-    private void RemoveIfCurrent(string key, Lazy<Task<CompiledArtifact>> lazy)
+    private void RemoveIfCurrent(CacheKey key, Lazy<Task<CompiledArtifact>> lazy)
     {
         lock (_gate)
         {
@@ -98,14 +98,13 @@ internal sealed class CompiledArtifactExecutionCache
         }
     }
 
-    private static string Key(ExecutionPlan plan, string entrypoint)
-        => plan.PlanHash + "|" + entrypoint;
-
     private readonly record struct CacheLookup(CompiledArtifact? Completed, Lazy<Task<CompiledArtifact>>? Lazy);
 
-    private sealed class Entry(string key, Lazy<Task<CompiledArtifact>> artifact)
+    private readonly record struct CacheKey(string PlanHash, string Entrypoint);
+
+    private sealed class Entry(CacheKey key, Lazy<Task<CompiledArtifact>> artifact)
     {
-        public string Key { get; } = key;
+        public CacheKey Key { get; } = key;
         public Lazy<Task<CompiledArtifact>> Artifact { get; } = artifact;
         public CompiledArtifact? Completed { get; set; }
     }
