@@ -60,8 +60,11 @@ public sealed class PeerInboundCoverageTests
         BinaryPrimitives.WriteInt32LittleEndian(bogus.AsSpan(0, 4), 999); // length lies about the buffer
         connection.Enqueue(RentFrame(bogus));
 
-        await using var peer = RpcPeer.Over(connection, serializer).Start();
+        // Subscribe BEFORE Start(): the frame is already enqueued, so the read loop can process it and
+        // raise ProtocolError before the handler is attached if we start first (a race that flakes on CI).
+        await using var peer = RpcPeer.Over(connection, serializer);
         peer.ProtocolError += (_, args) => protocolError.TrySetResult(args);
+        peer.Start();
 
         var args = await protocolError.Task.WaitAsync(ShortTimeout);
 
@@ -85,8 +88,11 @@ public sealed class PeerInboundCoverageTests
         using var frame = MessageFramer.FrameToPayload(77, (MessageType)unknownType, ReadOnlySpan<byte>.Empty);
         connection.Enqueue(CopyFrame(frame));
 
-        await using var peer = RpcPeer.Over(connection, serializer).Start();
+        // Subscribe BEFORE Start(): the frame is already enqueued, so the read loop can process it and
+        // raise ProtocolError before the handler is attached if we start first (a race that flakes on CI).
+        await using var peer = RpcPeer.Over(connection, serializer);
         peer.ProtocolError += (_, args) => protocolError.TrySetResult(args);
+        peer.Start();
 
         var args = await protocolError.Task.WaitAsync(ShortTimeout);
 

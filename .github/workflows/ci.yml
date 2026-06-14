@@ -37,7 +37,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # ubuntu + windows are the validated CI targets. macOS is intentionally excluded for now:
+        # several transport tests use .NET named pipes, which are emulated over Unix domain sockets on
+        # macOS with different exception/timing semantics, so they are not yet reliable there. Tracked
+        # in docs/architecture/follow-up-issues.md.
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout

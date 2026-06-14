@@ -32,6 +32,13 @@ none of them block the current green build.
   legacy terms (ShaRPC, Safe-IR, plugin) with the new three-pillar vocabulary (Services / Kernels /
   Pushdown). Do a deliberate terminology sweep across public docs.
 
+- [ ] **macOS named-pipe test compatibility (re-add macOS to CI).** The CI build-test matrix is
+  ubuntu + windows. macOS is excluded because several transport tests use .NET named pipes, which are
+  emulated over Unix domain sockets on macOS with different exception types (e.g.
+  `ArgumentOutOfRangeException` vs `ObjectDisposedException` on dispose-during-connect) and timing.
+  Make those tests macOS-robust (or gate them by platform), then add `macos-latest` back to the matrix.
+  The netstandard2.1 Services/Channels libraries themselves are cross-platform; this is a test-harness gap.
+
 - [ ] **Re-enable lock files + regenerate.** `RestorePackagesWithLockFile` is currently `false` and
   `CentralPackageTransitivePinningEnabled` is off (disabled during the merge + rebrand churn — see
   `Directory.Build.props` / `Directory.Packages.props`). Re-enable both and regenerate the lock files in
