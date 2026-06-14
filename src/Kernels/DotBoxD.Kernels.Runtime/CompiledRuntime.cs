@@ -75,6 +75,23 @@ public static partial class CompiledRuntime
         context.ChargeLoopIterations(iterations, fuelPerIteration);
         return (int)(start + step * iterations);
     }
+
+    /// <summary>
+    /// Strided loop metering (exp/strided-metering): charges a batch of <paramref name="iterations"/> loop
+    /// iterations (and iterations*<paramref name="fuelPerIteration"/> fuel) in one call. Generated loops count
+    /// iterations in a local and flush here every STRIDE iterations plus once at exit. Charged loop-iterations
+    /// and fuel are identical to charging each iteration; only the number of cross-assembly metering calls
+    /// drops from once-per-iteration to once-per-stride (the per-iteration call is the dominant compiled-loop
+    /// cost because it cannot be JIT-inlined across the dynamic-assembly boundary).
+    ///
+    /// TRADEOFF: quota enforcement becomes strided — a loop may run up to one STRIDE of iterations past a
+    /// budget before the next flush throws. CPU and wall-time stay bounded (by STRIDE x per-iteration cost),
+    /// but the verifier's strict per-iteration CPU-bound proof is relaxed to a per-STRIDE proof.
+    /// </summary>
+    [MethodImpl(AggressiveInlining)]
+    public static void ChargeLoopBatch(SandboxContext context, int iterations, int fuelPerIteration)
+        => context.ChargeLoopIterations(iterations, fuelPerIteration);
+
     [MethodImpl(AggressiveInlining)] public static void ChargeBindingCall(SandboxContext context, string id) => context.ChargeBindingCall(context.Bindings.GetDescriptor(id));
     public static void EnterCall(SandboxContext context) => context.EnterCall();
     public static void ExitCall(SandboxContext context) => context.ExitCall();

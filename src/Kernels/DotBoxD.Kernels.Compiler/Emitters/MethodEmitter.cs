@@ -198,13 +198,14 @@ internal sealed class MethodEmitter
         _expressions.EmitAs(range.End, StackKind.I32);
         _il.Emit(OpCodes.Stloc, end);
 
+        var counter = CompiledLoopMeter.Begin(_il);
         var startLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
         _il.Emit(OpCodes.Ldloc, index);
         _il.Emit(OpCodes.Ldloc, end);
         _il.Emit(OpCodes.Bge, finishLabel);
-        CompiledMeterEmitter.LoopIteration(_il, 5);
+        CompiledLoopMeter.Tick(_il, counter, 5);
         var (loopVar, loopKind) = Declare(range.LocalName);
         _il.Emit(OpCodes.Ldloc, index);
         _expressions.Coerce(StackKind.I32, loopKind);
@@ -216,6 +217,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, index);
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);
+        CompiledLoopMeter.Flush(_il, counter, 5);
         _nonNegativeF64Locals.Clear();
     }
 
@@ -228,16 +230,18 @@ internal sealed class MethodEmitter
             return;
         }
 
+        var counter = CompiledLoopMeter.Begin(_il);
         var startLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
         _expressions.EmitAs(loop.Condition, StackKind.Bool);
         _il.Emit(OpCodes.Brfalse, finishLabel);
-        CompiledMeterEmitter.LoopIteration(_il, 5);
+        CompiledLoopMeter.Tick(_il, counter, 5);
         EmitBlock(loop.Body);
         _nonNegativeF64Locals.Clear();
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);
+        CompiledLoopMeter.Flush(_il, counter, 5);
     }
 
     private (LocalBuilder Local, StackKind Kind) Declare(string name)

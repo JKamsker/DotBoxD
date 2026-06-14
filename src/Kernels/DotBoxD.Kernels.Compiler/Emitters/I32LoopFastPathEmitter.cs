@@ -44,13 +44,14 @@ internal sealed class I32LoopFastPathEmitter
         _expressions.EmitAs(range.End, StackKind.I32);
         _il.Emit(OpCodes.Stloc, end);
 
+        var counter = CompiledLoopMeter.Begin(_il);
         var startLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
         _il.Emit(OpCodes.Ldloc, index);
         _il.Emit(OpCodes.Ldloc, end);
         _il.Emit(OpCodes.Bge, finishLabel);
-        CompiledMeterEmitter.LoopIteration(_il, fuelPerIteration);
+        CompiledLoopMeter.Tick(_il, counter, fuelPerIteration);
 
         var (loopVar, _) = _declare(range.LocalName);
         _il.Emit(OpCodes.Ldloc, index);
@@ -69,6 +70,7 @@ internal sealed class I32LoopFastPathEmitter
         _il.Emit(OpCodes.Stloc, index);
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);
+        CompiledLoopMeter.Flush(_il, counter, fuelPerIteration);
         return true;
     }
 

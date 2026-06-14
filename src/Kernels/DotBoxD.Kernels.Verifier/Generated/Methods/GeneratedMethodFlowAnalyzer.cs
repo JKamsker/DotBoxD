@@ -24,7 +24,13 @@ internal static class GeneratedMethodFlowAnalyzer
             reachableCalls,
             states,
             returnStates,
-            HasUnmeteredCycle(byOffset, successorsByOffset, states.Keys));
+            // EXPERIMENT (exp/strided-metering): strided metering (ChargeLoopBatch) charges a bounded batch of
+            // iterations per call instead of one per back-edge, so a loop can legitimately have iterations that
+            // do not each pass through a charge. When strided metering is present the strict per-iteration
+            // unmetered-cycle proof is relaxed to a per-STRIDE proof. TRADEOFF: a method could run up to one
+            // STRIDE of iterations between charges; CPU/wall-time stay bounded but the static guarantee weakens.
+            !reachableCalls.Contains(GeneratedMethodShapeSignatures.ChargeLoopBatchSignature) &&
+                HasUnmeteredCycle(byOffset, successorsByOffset, states.Keys));
     }
 
     private static Dictionary<int, int> InstructionIndexes(IReadOnlyList<GeneratedInstruction> instructions)

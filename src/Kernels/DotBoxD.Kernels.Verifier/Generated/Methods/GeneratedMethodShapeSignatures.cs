@@ -16,6 +16,10 @@ internal static class GeneratedMethodShapeSignatures
     // internally, so it counts as a fuel meter for the instruction-density / sparsity rule.
     internal static readonly string AccumulateLinearI32Signature =
         $"{CompiledRuntimeName}.AccumulateLinearI32({SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name}):{Int32Name}";
+    // Strided loop metering (exp/strided-metering): charges a batch of loop iterations, so it counts as a
+    // fuel meter and as a loop-iteration charge for the cycle/density rules.
+    internal static readonly string ChargeLoopBatchSignature =
+        $"{CompiledRuntimeName}.ChargeLoopBatch({SandboxContextName},{Int32Name},{Int32Name}):{VoidName}";
     internal static readonly IReadOnlySet<string> ExecuteAllowedCalls = new HashSet<string>(StringComparer.Ordinal) {
         ValidateInput,
         $"{CompiledRuntimeName}.GetInputArgument({SandboxValueName},{Int32Name},{Int32Name},{SandboxTypeName}):{SandboxValueName}",
@@ -37,6 +41,7 @@ internal static class GeneratedMethodShapeSignatures
             var member when member == ChargeFuelSignature => GeneratedMeterState.ChargeFuel,
             var member when member == ChargeLoopIterationSignature => GeneratedMeterState.ChargeFuel,
             var member when member == AccumulateLinearI32Signature => GeneratedMeterState.ChargeFuel,
+            var member when member == ChargeLoopBatchSignature => GeneratedMeterState.ChargeFuel,
             _ => GeneratedMeterState.None
         };
         return instruction.IsLocalCall && IsGeneratedFunctionCall(instruction.CalledMember)
@@ -50,7 +55,8 @@ internal static class GeneratedMethodShapeSignatures
     internal static bool IsFuelMeter(string? calledMember)
         => calledMember == ChargeFuelSignature
            || calledMember == ChargeLoopIterationSignature
-           || calledMember == AccumulateLinearI32Signature;
+           || calledMember == AccumulateLinearI32Signature
+           || calledMember == ChargeLoopBatchSignature;
 
     internal static bool IsRuntimeWorkCall(string? calledMember)
         => calledMember is not null &&

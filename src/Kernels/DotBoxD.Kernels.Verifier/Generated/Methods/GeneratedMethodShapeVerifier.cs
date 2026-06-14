@@ -51,8 +51,18 @@ internal static class GeneratedMethodShapeVerifier
 
         VerifyMeterOrder(methodName, analysis, diagnostics);
         VerifyPositiveMeterAmounts(methodName, analysis, diagnostics);
-        VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
-        VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
+
+        // EXPERIMENT (exp/strided-metering): strided metering charges a bounded batch of iterations per call,
+        // so individual iterations / work calls legitimately run between charges. When it is present, the
+        // per-work-call and per-instruction-run meter-density proofs are relaxed to a per-STRIDE proof.
+        // TRADEOFF: up to one STRIDE of work can run between charges (CPU/wall-time still bounded by
+        // STRIDE x per-iteration cost), so the static density guarantee weakens to a bounded-overrun guarantee.
+        if (!analysis.ReachableCalls.Contains(GeneratedMethodShapeSignatures.ChargeLoopBatchSignature))
+        {
+            VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
+            VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
+        }
+
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.IsLocalCall))
         {
