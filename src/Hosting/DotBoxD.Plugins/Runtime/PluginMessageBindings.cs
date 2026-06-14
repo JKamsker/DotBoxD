@@ -25,7 +25,9 @@ public static class PluginMessageBindings
     }
 
     public static BindingDescriptor CreateSend(IPluginMessageSink sink)
-        => new(
+    {
+        var invoker = new PluginMessageSendInvoker(sink);
+        return new BindingDescriptor(
             SendBindingId,
             SemVersion.One,
             [SandboxType.String, SandboxType.String],
@@ -35,57 +37,10 @@ public static class PluginMessageBindings
             new BindingCostModel(5, MaxCallsPerRun: 100),
             AuditLevel.PerResource,
             BindingSafety.SideEffectingExternal,
-            async (context, args, cancellationToken) =>
-            {
-                var targetId = ((StringValue)args[0]).Value;
-                if (!SandboxLiteralConstraints.IsOpaqueId(targetId))
-                {
-                    throw new SandboxRuntimeException(new SandboxError(
-                        SandboxErrorCode.InvalidInput,
-                        "host.message.send denied: target ID is invalid"));
-                }
-
-                var options = ReadGrantOptions(context.GetCapability(CapabilityId));
-                if (!options.AllowsTarget(targetId))
-                {
-                    throw new SandboxRuntimeException(new SandboxError(
-                        SandboxErrorCode.PermissionDenied,
-                        "host.message.send denied: target is not in the granted recipient set"));
-                }
-
-                var message = Sanitize(((StringValue)args[1]).Value);
-                if (options.MaxMessageLength is { } maxMessageLength && message.Length > maxMessageLength)
-                {
-                    throw new SandboxRuntimeException(new SandboxError(
-                        SandboxErrorCode.QuotaExceeded,
-                        "host.message.send denied: message exceeds the granted length limit"));
-                }
-
-                await sink.SendAsync(targetId, message, cancellationToken).ConfigureAwait(false);
-                var timestamp = DateTimeOffset.UtcNow;
-                var fields = BindingAuditFields.CreateMutable(
-                    "plugin-message",
-                    timestamp,
-                    context.ModuleHash,
-                    context.PolicyHash,
-                    context.Policy.Deterministic,
-                    extraCapacity: 1);
-                fields["messageLength"] = message.Length.ToString(CultureInfo.InvariantCulture);
-                context.Audit.Write(new SandboxAuditEvent(
-                    context.RunId,
-                    "PluginMessage",
-                    timestamp,
-                    true,
-                    BindingId: SendBindingId,
-                    CapabilityId: CapabilityId,
-                    Effect: SandboxEffect.HostStateWrite,
-                    ResourceId: $"target:{SanitizeResourceTargetId(targetId)}",
-                    Message: AuditTextSanitizer.SanitizeAndRedact(message),
-                    Fields: fields));
-                return SandboxValue.Unit;
-            },
+            invoker.Invoke,
             CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
             ValidateGrant);
+    }
 
     private static void ValidateGrant(CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)
     {
@@ -213,6 +168,30 @@ public static class PluginMessageBindings
             : "[redacted]";
     }
 
+    private static void WriteAudit(SandboxContext context, string targetId, string message)
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var fields = BindingAuditFields.CreateMutable(
+            "plugin-message",
+            timestamp,
+            context.ModuleHash,
+            context.PolicyHash,
+            context.Policy.Deterministic,
+            extraCapacity: 1);
+        fields["messageLength"] = message.Length.ToString(CultureInfo.InvariantCulture);
+        context.Audit.Write(new SandboxAuditEvent(
+            context.RunId,
+            "PluginMessage",
+            timestamp,
+            true,
+            BindingId: SendBindingId,
+            CapabilityId: CapabilityId,
+            Effect: SandboxEffect.HostStateWrite,
+            ResourceId: $"target:{SanitizeResourceTargetId(targetId)}",
+            Message: AuditTextSanitizer.SanitizeAndRedact(message),
+            Fields: fields));
+    }
+
     private sealed record MessageGrantOptions(
         IReadOnlySet<string>? AllowedTargets,
         IReadOnlyList<string>? TargetPrefixes,
@@ -243,6 +222,60 @@ public static class PluginMessageBindings
             }
 
             return false;
+        }
+    }
+
+    private sealed class PluginMessageSendInvoker(IPluginMessageSink sink)
+    {
+        public ValueTask<SandboxValue> Invoke(
+            SandboxContext context,
+            IReadOnlyList<SandboxValue> args,
+            CancellationToken cancellationToken)
+        {
+            var targetId = ((StringValue)args[0]).Value;
+            if (!SandboxLiteralConstraints.IsOpaqueId(targetId))
+            {
+                throw new SandboxRuntimeException(new SandboxError(
+                    SandboxErrorCode.InvalidInput,
+                    "host.message.send denied: target ID is invalid"));
+            }
+
+            var options = ReadGrantOptions(context.GetCapability(CapabilityId));
+            if (!options.AllowsTarget(targetId))
+            {
+                throw new SandboxRuntimeException(new SandboxError(
+                    SandboxErrorCode.PermissionDenied,
+                    "host.message.send denied: target is not in the granted recipient set"));
+            }
+
+            var message = Sanitize(((StringValue)args[1]).Value);
+            if (options.MaxMessageLength is { } maxMessageLength && message.Length > maxMessageLength)
+            {
+                throw new SandboxRuntimeException(new SandboxError(
+                    SandboxErrorCode.QuotaExceeded,
+                    "host.message.send denied: message exceeds the granted length limit"));
+            }
+
+            var send = sink.SendAsync(targetId, message, cancellationToken);
+            if (!send.IsCompletedSuccessfully)
+            {
+                return AwaitSendAsync(send, context, targetId, message);
+            }
+
+            send.GetAwaiter().GetResult();
+            WriteAudit(context, targetId, message);
+            return ValueTask.FromResult(SandboxValue.Unit);
+        }
+
+        private static async ValueTask<SandboxValue> AwaitSendAsync(
+            ValueTask send,
+            SandboxContext context,
+            string targetId,
+            string message)
+        {
+            await send.ConfigureAwait(false);
+            WriteAudit(context, targetId, message);
+            return SandboxValue.Unit;
         }
     }
 }
