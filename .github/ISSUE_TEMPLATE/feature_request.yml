@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an idea or enhancement for DotBoxd
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Services (RPC)
+        - Kernels (sandbox runtime)
+        - Pushdown
+        - Channels / Transports / Codecs
+        - Source generators / analyzers
+        - Docs / tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem would this solve? What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the API or behavior you'd like. Sketch code if helpful.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

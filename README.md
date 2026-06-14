@@ -1,356 +1,275 @@
-# Safe-IR
+# DotBoxd
 
-Safe-IR is a restricted IR sandbox for .NET. User-authored work is represented as JSON IR, imported into a safe IR model, validated against a capability policy, and then executed either by the IR interpreter or by compiler-owned runtime forms.
+> Source-generated, contract-first .NET extension runtime: **Services**, **Kernels**, **Pushdown**.
 
-Interpreted mode executes verified IR directly. Compiled mode is only a runtime optimization: the current compiler emits a verified generated assembly and the CLR executes that loaded form. `DynamicMethod` is reserved for a future backend after an equivalent gate exists. User input never supplies C#, raw IL, CLR member names, assemblies, or arbitrary host calls.
+[![CI](https://github.com/JKamsker/DotBoxd/actions/workflows/ci.yml/badge.svg)](https://github.com/JKamsker/DotBoxd/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/JKamsker/DotBoxd/actions/workflows/codeql.yml/badge.svg)](https://github.com/JKamsker/DotBoxd/actions/workflows/codeql.yml)
+[![NuGet](https://img.shields.io/nuget/v/DotBoxd.svg)](https://www.nuget.org/packages/DotBoxd)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
 
-## Current Packages
+DotBoxd lets a host and its clients share **one C# contract** and use it in three different ways,
+all driven by Roslyn source generators (no runtime reflection on the hot path):
 
-- `DotBoxd.Kernels`: IR model, policy model, resource metering, canonical hashing.
-- `DotBoxd.Kernels.Validation`: structural, type, effect, policy, and binding validation. `ModuleValidator`
-  returns the public `ModuleValidationResult` evidence shape with diagnostics, function analysis,
-  module effects, required capabilities, and binding references.
-- `DotBoxd.Kernels.Runtime`: safe host bindings for files, time, random, logging, strings, and math.
-- `DotBoxd.Kernels.Serialization.Json`: JSON IR importer and exporter, host import extensions, and plugin package JSON upload helpers.
-- `DotBoxd.Hosting.Http`: HTTP GET binding, grant helpers, pinned transport, and HTTP grant validation.
-- `DotBoxd.Pushdown.Services`: preview MessagePack IPC addon built on DotBoxd generic transports, with named-pipe convenience helpers.
-- `DotBoxd.Kernels.Interpreter`: direct IR execution backend.
-- `DotBoxd.Kernels.Compiler`: generated-runtime backend and persistent artifact cache.
-- `DotBoxd.Kernels.Verifier`: generated assembly verifier.
-- `DotBoxd.Hosting`: host-facing orchestration API.
-- `DotBoxd.Plugins.Analyzer`: source generator and analyzer for local plugin packages.
-- `DotBoxd.Abstractions`: purpose-agnostic plugin-to-host contracts a plugin author compiles
-  against — `[Plugin]`, `IEventKernel<TEvent>`, `HookContext`, `IPluginMessageSink`,
-  `IPluginEventAdapter<TEvent>`, and `LiveSettingAttribute`. Depends only on `DotBoxd.Kernels`.
-- `DotBoxd.Plugins`: the host/server runtime that loads, validates, and dispatches plugins — plugin
-  manifest, installed kernel, hook, message-binding, and plugin-package JSON APIs. Runtime
-  package-install, prepared-package, kernel-entrypoint, and live-setting rejections surface stable
-  `SGP*` diagnostics catalogued by the public `PluginDiagnosticCodes` reference (see
-  [Plugin Runtime Diagnostics](#plugin-runtime-diagnostics)).
+- **Services** — the host implements a contract; clients call it remotely over RPC.
+- **Kernels** — a client supplies validated logic the host runs safely inside a metered sandbox.
+- **Pushdown** — a kernel composes the host's own services *server-side*, so many small remote
+  calls collapse into one validated round-trip.
 
-## Installing from NuGet
+The Services and channel libraries target `netstandard2.1`, so they run on **Unity / IL2CPP**.
+The Kernels and Pushdown stack targets `net10.0`.
 
-Use the package set that matches the host surface you are compiling against:
+---
 
-```powershell
-# Minimal host execution with JSON import and safe runtime bindings.
-dotnet add package DotBoxd.Hosting
-dotnet add package DotBoxd.Kernels.Runtime
-dotnet add package DotBoxd.Kernels.Serialization.Json
+## The 3 ways to use one contract
 
-# HTTP GET transport and policy helpers.
-dotnet add package DotBoxd.Hosting.Http
+All three snippets below are distilled from the runnable acceptance sample at
+[`samples/Pushdown/DotBoxd.EndToEnd`](samples/Pushdown/DotBoxd.EndToEnd) — they use the real,
+compiling API.
 
-# Plugin manifests/kernels plus production JSON upload helpers.
-dotnet add package DotBoxd.Plugins
-dotnet add package DotBoxd.Kernels.Serialization.Json
+### 1. Services — define a contract, host it, call it remotely
 
-# Source-generated plugin package factories.
-dotnet add package DotBoxd.Plugins.Analyzer
+```csharp
+using DotBoxd.Services.Attributes;
 
-# Preview IPC addon. This package currently follows a prerelease channel while DotBoxd dependencies are prerelease.
+// One contract, shared by host and client.
+[DotBoxdService]
+public interface ICatalogService
+{
+    ValueTask<int> GetUnitPriceAsync(string itemId, CancellationToken cancellationToken = default);
+    ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken cancellationToken = default);
+}
+```
+
+```csharp
+using DotBoxd.Kernels.Transport.Ipc;   // IPC helper (ships in DotBoxd.Pushdown.Services)
+using DotBoxd.Services.Generated;       // generated ProvideCatalogService / Get<T>
+
+// Host: turn every accepted connection into a peer that serves the contract.
+await using var host = DotBoxdDotBoxdRpcMessagePackIpc.ListenNamedPipe(
+    pipeName,
+    peer => peer.ProvideCatalogService(new CatalogService(prices)));
+await host.StartAsync();
+
+// Client: connect and get a strongly typed proxy — calls go over the wire.
+await using var connection = await DotBoxdDotBoxdRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
+var catalog = connection.Get<ICatalogService>();
+
+var unitPrice = await catalog.GetUnitPriceAsync("sword"); // one remote round-trip
+```
+
+The `[DotBoxdService]` attribute drives the `DotBoxd.Services.SourceGenerator`, which emits a typed
+proxy, a dispatcher, and the `ProvideCatalogService(...)` / `Get<ICatalogService>()` extensions at
+compile time. The GameService sample shows the same model over **TCP** with bidirectional callbacks
+(see [`samples/Services/GameService`](samples/Services/GameService)).
+
+### 2. Kernels — run validated logic under a policy
+
+A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host imports it,
+validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
+
+```csharp
+using DotBoxd.Hosting;
+using DotBoxd.Kernels;
+
+// A sandbox host with only the safe, pure bindings enabled.
+var host = SandboxHost.Create(builder =>
+{
+    builder.AddDefaultPureBindings();
+    builder.UseInterpreter();
+});
+
+// A policy is a hard budget: fuel, loop iterations, list length, capability grants.
+var policy = SandboxPolicyBuilder.Create()
+    .WithFuel(1_000_000)
+    .WithMaxLoopIterations(10_000)
+    .WithMaxListLength(10_000)
+    .Build();
+
+var module = await host.ImportJsonAsync(kernelJson);
+var plan = await host.PrepareAsync(module, policy);
+
+var input = SandboxValue.FromList(
+    [.. subtotals.Select(SandboxValue.FromInt32)],
+    SandboxType.I32);
+
+var result = await host.ExecuteAsync(plan, "main", input);
+
+if (result.Succeeded && result.Value is I32Value total)
+{
+    // A buggy or hostile kernel cannot run away with host resources:
+    Console.WriteLine($"total={total.Value}, fuel burned={result.ResourceUsage.FuelUsed}");
+}
+```
+
+### 3. Pushdown — compose host services next to the data
+
+A naive client makes one remote call per cart line, then sums the results. With pushdown, the host
+exposes a contract method that composes its **own** catalog data into the kernel's inputs and runs
+the validated kernel server-side — so the client submits the whole cart in **one** round-trip.
+
+```csharp
+// Host side: ComputeCartTotalAsync composes catalog data, then runs the sandboxed kernel.
+public async ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken ct = default)
+{
+    var subtotals = new int[cart.Lines.Length];
+    for (var i = 0; i < cart.Lines.Length; i++)
+        subtotals[i] = PriceOf(cart.Lines[i].ItemId) * cart.Lines[i].Quantity;
+
+    // The summation runs inside the metered kernel, right next to the service.
+    var (total, fuelUsed) = await _kernel.RunAsync(subtotals, ct);
+    return new CartTotal(total, fuelUsed);
+}
+
+// Client side: one submission instead of N price lookups.
+var pushdown = await catalog.ComputeCartTotalAsync(cart);
+// Round-trip win: 4 remote calls -> 1 (pushdown).
+```
+
+In the end-to-end sample, a 4-line cart that takes **4 remote calls** the naive way collapses into
+**1 round-trip** with pushdown, and both paths produce the identical total (575).
+
+---
+
+## Quick start
+
+```bash
+# Full net10.0 stack (Services + Kernels + Pushdown):
+dotnet add package DotBoxd
+
+# Unity / netstandard2.1 service bundle:
+dotnet add package DotBoxd.Services.All
+
+# Preview pushdown IPC addon (prerelease while upstream deps are prerelease):
 dotnet add package DotBoxd.Pushdown.Services --prerelease
 ```
 
-Common namespaces:
+Then read [`docs/getting-started`](docs/getting-started/) for first-service, first-kernel, and
+pushdown walkthroughs, or run the acceptance sample:
 
-- `DotBoxd.Kernels`, `DotBoxd.Hosting`, and `DotBoxd.Kernels.Runtime` for host setup and execution.
-- `DotBoxd.Kernels.Serialization.Json` for `ImportJsonAsync`, `DotBoxdJsonImporter`, and `DotBoxdJsonExporter` (the module export side of the JSON IR round trip).
-- `DotBoxd.Hosting.Http` for HTTP binding registration and `GrantHttpGet`.
-- `DotBoxd.Abstractions` for the plugin authoring contracts (`[Plugin]`,
-  `IEventKernel<TEvent>`, `HookContext`).
-- `DotBoxd.Plugins` for plugin manifests, `PluginPackage`, and `PluginPackageJsonSerializer` (the
-  production JSON plugin upload/import and export helper now lives in this package, which references
-  `DotBoxd.Kernels.Serialization.Json` for the module-IR round trip).
-- `DotBoxd.Kernels.Transport.Ipc` for the preview DotBoxd MessagePack IPC addon.
-
-## Minimal Host Usage
-
-```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Hosting;
-using DotBoxd.Kernels.Runtime;
-
-var host = SandboxHost.Create(builder => {
-    builder.AddDefaultPureBindings();
-    builder.AddFileBindings();
-    builder.UseInterpreter();
-    builder.UseCompilerIfAvailable();
-});
-
-var module = await host.ImportJsonAsync(jsonIr);
-var policy = SandboxPolicyBuilder.Create()
-    .GrantFileRead(root: @"C:\tenant\123\config", maxBytesPerRun: 256_000)
-    .WithFuel(10_000)
-    .Build();
-
-var plan = await host.PrepareAsync(module, policy);
-var result = await host.ExecuteAsync(
-    plan,
-    entrypoint: "main",
-    input: SandboxValue.Unit,
-    options: new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+```bash
+dotnet run -c Release --project samples/Pushdown/DotBoxd.EndToEnd
 ```
 
-## JSON IR Example
+---
 
-```json
-{
-  "id": "config-reader",
-  "version": "1.0.0",
-  "capabilityRequests": [
-    { "id": "file.read", "reason": "Read tenant-local config" }
-  ],
-  "functions": [
-    {
-      "id": "main",
-      "visibility": "entrypoint",
-      "parameters": [],
-      "returnType": "String",
-      "body": [
-        {
-          "op": "return",
-          "value": {
-            "call": "file.readText",
-            "args": [{ "path": "settings.json" }]
-          }
-        }
-      ]
-    }
-  ]
-}
+## Architecture
+
+```mermaid
+flowchart LR
+    Client["Client / Plugin"]
+    Host["Host process"]
+
+    subgraph Modes["One contract, three modes"]
+        Services["Services<br/>RPC dispatch"]
+        Kernels["Kernels<br/>metered IR sandbox"]
+        Pushdown["Pushdown<br/>server-side composition"]
+    end
+
+    Client -->|"remote call"| Services
+    Client -->|"submit validated IR"| Kernels
+    Client -->|"one submission"| Pushdown
+
+    Services --> Host
+    Kernels --> Host
+    Pushdown --> Kernels
+    Pushdown --> Services
+
+    subgraph Channels["Transports + Codecs"]
+        Tcp["DotBoxd.Transports.Tcp"]
+        Pipes["DotBoxd.Transports.NamedPipes"]
+        MsgPack["DotBoxd.Codecs.MessagePack"]
+    end
+
+    Services --- Channels
+    Pushdown --- Channels
+
+    subgraph Runtime["Kernel runtime"]
+        Validation["Validation"]
+        Interp["Interpreter"]
+        Compiler["Compiler + Verifier"]
+    end
+
+    Kernels --> Runtime
 ```
 
-## JSON IR Round Trip
+The generators (`DotBoxd.Services.SourceGenerator`, `DotBoxd.Plugins.Analyzer`) emit proxies,
+dispatchers, and plugin factories at compile time. Diagnostics are namespaced `DBXS###` (services)
+and `DBXK###` (kernels/plugins). See [`docs/index.md`](docs/index.md) for the full picture.
 
-Tooling that builds or transforms `SandboxModule` instances can serialize them back to JSON IR
-with `DotBoxdJsonExporter` and re-import the result with `DotBoxdJsonImporter`, both from the
-`DotBoxd.Kernels.Serialization.Json` package:
+---
 
-```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Kernels.Serialization.Json;
+## Packages
 
-var json = DotBoxdJsonExporter.Export(module, indented: true);
-var roundTripped = DotBoxdJsonImporter.Import(json);
-var plan = await host.PrepareAsync(roundTripped, policy);
+| Package | Purpose | TFM | Stability |
+|---------|---------|-----|-----------|
+| `DotBoxd` | Meta-package: the full net10.0 stack (Services + Kernels + Pushdown) | net10.0 | Preview |
+| `DotBoxd.Services.All` | Meta-package: service + Unity bundle | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxd.Services` | Contract attributes, `RpcPeer`/`RpcHost`, dispatch | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxd.Codecs.MessagePack` | MessagePack serializer for the wire format | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxd.Transports.Tcp` | TCP transport | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxd.Transports.NamedPipes` | Named-pipe transport (local IPC) | netstandard2.1 | Stable · **Unity/IL2CPP** |
+| `DotBoxd.Services.SourceGenerator` | Roslyn generator for `[DotBoxdService]` proxies/dispatchers | netstandard2.0 | Stable |
+| `DotBoxd.Abstractions` | Plugin-to-host authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`) | net10.0 | Preview |
+| `DotBoxd.Kernels` | IR model, policy model, resource metering, canonical hashing | net10.0 | Preview |
+| `DotBoxd.Kernels.Validation` | Structural, type, effect, policy, binding validation | net10.0 | Preview |
+| `DotBoxd.Kernels.Runtime` | Safe host bindings (files, time, random, logging, strings, math) | net10.0 | Preview |
+| `DotBoxd.Kernels.Interpreter` | Direct IR execution backend | net10.0 | Preview |
+| `DotBoxd.Kernels.Compiler` | Generated-runtime backend + persistent artifact cache | net10.0 | Preview |
+| `DotBoxd.Kernels.Verifier` | Generated-assembly verifier | net10.0 | Preview |
+| `DotBoxd.Kernels.Serialization.Json` | JSON IR importer/exporter + schema | net10.0 | Preview |
+| `DotBoxd.Hosting` | Host-facing orchestration API (`SandboxHost`) | net10.0 | Preview |
+| `DotBoxd.Hosting.Http` | HTTP GET binding, grant helpers, pinned transport | net10.0 | Preview |
+| `DotBoxd.Plugins` | Host runtime that loads/validates/dispatches plugins | net10.0 | Preview |
+| `DotBoxd.Plugins.Analyzer` | Generator + analyzer for local plugin packages | netstandard2.0 | Preview |
+| `DotBoxd.Pushdown.Services` | MessagePack IPC addon that composes kernels with services | net10.0 | **Preview / prerelease** |
+
+`DotBoxd.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
+dependencies are prerelease; stable release gates fail if it is included in a stable package set.
+
+---
+
+## Security: what is and isn't a boundary
+
+DotBoxd is precise about its trust boundary — read this before deploying:
+
+- **Safe mode is the real boundary.** A kernel is restricted IR that is validated, capability-gated,
+  fuel/quota-metered, and (for compiled mode) verified before it runs. Users never supply C#, raw IL,
+  CLR member names, assemblies, or arbitrary host calls.
+- **Trusted-plugin mode is NOT a security boundary.** It loads normal .NET assemblies via
+  `AssemblyLoadContext`, and **`AssemblyLoadContext` is not a sandbox** — loaded code has full CLR
+  capabilities. Only use it for code you already trust.
+- **Untrusted arbitrary .NET code must be out-of-process / OS-isolated.** In-process restrictions
+  defend against accidental and many malicious-author attacks, but hard multi-tenant isolation
+  requires a worker process, container, or OS-level boundary.
+
+See [`SECURITY.md`](SECURITY.md) and [`docs/security`](docs/security/) for the threat model, the
+three execution modes, and the capabilities/bindings model.
+
+---
+
+## Status & roadmap
+
+DotBoxd merges the former standalone ShaRPC (RPC) and Safe-IR (kernel sandbox) repositories into one
+contract-first runtime. The net10.0 Kernels/Pushdown stack is **preview**; the netstandard2.1
+Services/channel stack is the more mature surface. Deferred work and known gaps are tracked in
+[`docs/architecture/follow-up-issues.md`](docs/architecture/follow-up-issues.md).
+
+## Contributing
+
+Build, test, and the CI gate list live in [`CONTRIBUTING.md`](CONTRIBUTING.md). In short:
+
+```bash
+dotnet build DotBoxd.slnx -c Release
+dotnet test  DotBoxd.slnx -c Release
 ```
 
-## JSON Ingestion Schemas
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md). For how to view pre-merge history of the two
+original repos, see
+[`docs/contributing/migration-from-standalone-repos.md`](docs/contributing/migration-from-standalone-repos.md).
 
-The public JSON ingestion envelopes ship with versioned, machine-readable JSON Schema artifacts so
-plugin authors, admin UIs, and upload validators can validate JSON before sending it to a server
-instead of inferring the contract from importer source:
+## License
 
-- [`schemas/v1/dotboxd-kernel-module.schema.json`](schemas/v1/dotboxd-kernel-module.schema.json) describes the
-  module envelope accepted by `DotBoxdJsonImporter.Import(string)`.
-- [`schemas/v1/dotboxd-plugin-package.schema.json`](schemas/v1/dotboxd-plugin-package.schema.json)
-  describes the plugin package envelope accepted by `PluginPackageJsonSerializer.Import(string)`.
-
-The module schema is embedded in the `DotBoxd.Kernels.Serialization.Json` package and exposed through
-`DotBoxdJsonSchemas.ModuleEnvelope` and `DotBoxdJsonSchemas.SchemaVersion`; the plugin-package schema
-is embedded in the `DotBoxd.Plugins` package and exposed through
-`PluginPackageJsonSchemas.PackageEnvelope`. The schemas are kept in sync with the importer's strict
-shape by a regression test; the `v1` directory segment and `SchemaVersion` are bumped together
-whenever the JSON contract changes.
-
-## Local Verification
-
-```powershell
-dotnet restore DotBoxd.slnx --locked-mode
-dotnet build DotBoxd.slnx --configuration Release --no-restore
-dotnet test DotBoxd.slnx --configuration Release --no-build
-.\eng\scripts\run-required-tests.ps1 `
-  -Project tests\DotBoxd.Kernels.Tests\DotBoxd.Kernels.Tests.csproj `
-  -Configuration Release `
-  -NoBuild `
-  -RequiredFullyQualifiedNameContains @(
-    "SafeFileSystemTests",
-    "SafeFileSystemReparsePointTests",
-    "FileExtensionPolicyTests",
-    "PathUriLiteralValidationTests",
-    "CompiledArtifactGuardTests",
-    "CompiledRuntimeQuotaTests",
-    "VerifierAttackMatrixTests",
-    "VerifierLoopMeteringTests",
-    "BindingRegistryHardeningTests",
-    "PluginPackageValidationTests",
-    "PluginRevocationTests",
-    "PinnedHttpTransportTests",
-    "DifferentialFuzzTests"
-  )
-.\eng\scripts\check-docs-smoke.ps1 -Configuration Release
-.\eng\scripts\check-csharp-file-lines.ps1
-.\eng\scripts\check-spec-manifest.ps1
-.\eng\scripts\check-release-readiness.ps1
-Remove-Item artifacts\packages\*.nupkg -Force -ErrorAction SilentlyContinue
-dotnet pack DotBoxd.slnx --configuration Release --no-build --output artifacts/packages
-.\eng\scripts\check-package-metadata.ps1 -PackageDirectory artifacts\packages -AllowPrereleaseVersions
-.\eng\scripts\check-package-consumer-smoke.ps1 -PackageDirectory artifacts\packages -Configuration Release
-```
-
-`DotBoxd.Pushdown.Services` is intentionally packed as a prerelease package while its upstream DotBoxd dependencies are prerelease-only. Stable release gates fail if this preview addon is included in a stable package set before its package version and dependencies are stable.
-
-CI builds and tests on Windows, Ubuntu, and macOS, but NuGet packages are produced only by the
-canonical `ubuntu-latest` matrix leg and uploaded as `packages-canonical`. Treat that canonical
-artifact set as the only publishable package output for a release.
-
-## HTTP Transport Example
-
-`samples/Kernels/HttpTransport` is the maintained safe-setup path for the `DotBoxd.Hosting.Http`
-package. It registers `AddNetworkBindings(...)` with a deterministic in-memory invoker, grants a
-single host through `GrantHttpGet(...)` with explicit response-byte and timeout limits, runs a
-module that calls `net.http.get`, and proves both an allowed request and a denied out-of-allowlist
-request. Allowlist semantics, byte limits, timeout capping, and private-network defaults match the
-production pinned transport; only the invoker is swapped for determinism.
-
-```powershell
-dotnet run --project samples\Kernels\HttpTransport\DotBoxd.Kernels.HttpTransportExample\DotBoxd.Kernels.HttpTransportExample.csproj
-```
-
-## Logging Example
-
-Logging is a user-facing safe API with an explicit capability boundary: a host must both register
-the bindings at setup with `AddLogBindings()` and grant `log.write` in the policy with
-`GrantLogging()`. Without both, a module that calls `log.info`/`log.warn` is denied with the
-`E-POLICY-CAP` diagnostic. Granted log messages are audited as sanitized `SandboxLog` events
-(secret-shaped tokens are redacted before they reach the sink), and `ResourceUsage.LogEvents`
-reports how many log calls ran. `WithMaxLogEvents` and `WithMaxLogMessageLength` are the quota
-controls; exceeding either returns a `QuotaExceeded` failure.
-
-```csharp
-using DotBoxd.Kernels;
-using DotBoxd.Hosting;
-using DotBoxd.Kernels.Runtime;
-using DotBoxd.Kernels.Serialization.Json;
-
-using var host = SandboxHost.Create(builder => {
-    builder.AddDefaultPureBindings();
-    builder.AddLogBindings();
-    builder.UseInterpreter();
-});
-
-var module = await host.ImportJsonAsync(loggingJsonIr);
-var policy = SandboxPolicyBuilder.Create()
-    .GrantLogging()
-    .WithMaxLogEvents(8)
-    .WithMaxLogMessageLength(256)
-    .Build();
-
-var plan = await host.PrepareAsync(module, policy);
-var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
-// result.ResourceUsage.LogEvents and the sanitized "SandboxLog" audit events expose the output.
-```
-
-The runnable standalone walkthrough lives in
-`samples/Kernels/Capabilities/DotBoxd.Kernels.Example.Capabilities/Examples/SafeLoggingExample.cs` and is exercised by the
-docs smoke. It runs the granted path and a tight `WithMaxLogEvents` quota denial:
-
-```powershell
-dotnet run --project samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
-```
-
-## Plugin Addendum Examples
-
-The addendum implementation lives in `src/DotBoxd.Plugins`.
-
-The addendum examples are split into three topic projects:
-
-```powershell
-dotnet run --project samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
-dotnet run --project samples\Kernels\Hosting\DotBoxd.Kernels.Example.Hosting\DotBoxd.Kernels.Example.Hosting.csproj
-dotnet run --project samples\Kernels\PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring.csproj
-```
-
-Run the local live-kernel example:
-
-```powershell
-dotnet run --project samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\DotBoxd.Kernels.PluginLocal.csproj
-```
-
-Run the real named-pipe IPC sample with the DotBoxd MessagePack addon:
-
-Terminal 1:
-
-```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Server\DotBoxd.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
-```
-
-Terminal 2:
-
-```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Client\DotBoxd.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
-```
-
-See `docs\Specs\Addendum\Examples.md` for details.
-
-## Game Server Plugin Example (golden)
-
-The golden example runs an aggro/combat simulation server that exposes hooks and events, and a
-separate plugin host that authors kernels, previews them locally, ships them as opaque verified IR
-over IPC, and tunes live settings. The server runs the untrusted kernels sandboxed; they change game
-behavior only through an example-defined command sink (the plugin's sole sandbox capability stays
-`host.message.write`, while the game semantics live in the example, not in core). The server
-self-launches the plugin host child process, so a single command drives the whole demo: it prints a
-baseline phase where monsters bully low-level players, the host's local preview and ship/settings
-logs, and a with-plugin phase where guardian/retaliation kernels keep the weak players alive.
-
-```powershell
-dotnet run --project samples\Kernels\GameServer\DotBoxd.Kernels.Game.Server\DotBoxd.Kernels.Game.Server.csproj
-```
-
-## Plugin Runtime Diagnostics
-
-The `DotBoxd.Plugins` package emits stable `SGP*` `SandboxDiagnostic` codes when an uploaded or
-generated plugin package is rejected. These runtime diagnostics are distinct from the compile-time
-`DotBoxd.Plugins.Analyzer` SDK diagnostics (which share the `SGP` namespace) and from verifier `V-*`
-diagnostics. The public `PluginDiagnosticCodes` reference in the `DotBoxd.Plugins` namespace
-catalogues every runtime `SGP*` code with its emitting phase, the audience that must fix it
-(plugin author vs. host operator), the likely cause, and a remediation note:
-
-```csharp
-using DotBoxd.Plugins;
-
-try
-{
-    pluginServer.Install(package);
-}
-catch (SandboxValidationException ex)
-{
-    foreach (var diagnostic in ex.Diagnostics)
-    {
-        if (PluginDiagnosticCodes.TryGetReference(diagnostic.Code, out var reference))
-        {
-            // reference.Phase, reference.Audience, reference.Meaning, reference.Remediation
-            // give upload UIs and hosts triage guidance instead of an opaque code.
-        }
-    }
-}
-```
-
-| Code | Phase | Audience | Meaning |
-|------|-------|----------|---------|
-| DBXK010 | Package validation | Plugin author | Manifest does not declare a plugin id. |
-| DBXK011 | Package validation | Plugin author | Manifest plugin id does not match the module id. |
-| DBXK012 | Package validation | Plugin author | Module metadata does not bind to the manifest plugin id. |
-| DBXK013 | Package validation | Plugin author | Module kernel metadata is missing or a subscription targets a different kernel. |
-| DBXK014 | Prepared-package validation | Plugin author | Contract is not a valid `IEventKernel<TEvent>` or its event does not match a subscription. |
-| DBXK020 | Live setting | Plugin author | Live setting type is unsupported or its default value is invalid. |
-| DBXK021 | Package validation | Plugin author | A live setting name is declared more than once. |
-| DBXK022 | Live setting | Plugin author | A range is declared on a non-numeric live setting type. |
-| DBXK023 | Live setting | Host operator | A live setting value is outside its allowed range. |
-| DBXK024 | Live setting | Plugin author | A live setting minimum is greater than its maximum. |
-| DBXK030 | Package validation | Plugin author | The manifest declares no hook subscriptions. |
-| DBXK031 | Package validation | Plugin author | A subscription is missing event/kernel, or a kernel is wired to an unsubscribed event. |
-| DBXK032 | Package validation | Plugin author | A required kernel entrypoint is missing or not public. |
-| DBXK033 | Prepared-package validation | Plugin author | An entrypoint signature does not match the hook event and live settings. |
-| DBXK034 | Prepared-package validation | Plugin author | Entrypoints disagree on parameter shape, or a pipeline uses a conflicting adapter. |
-| DBXK035 | Prepared-package validation | Plugin author | Live settings are not declared as trailing entrypoint parameters. |
-| DBXK040 | Package validation | Plugin author | An effect is unsupported or no verified effects are declared. |
-| DBXK041 | Prepared-package validation | Plugin author | Manifest effects do not match the verified entrypoint effects. |
-| DBXK042 | Package validation | Plugin author | The manifest execution mode is unsupported. |
-| DBXK050 | Package validation | Plugin author | Manifest text is empty, has control characters, or looks like a forbidden CLR/IL descriptor. |
-
-`PluginDiagnosticCodes.All` is the maintained source of truth; a regression test fails if the
-runtime emits an `SGP*` code that the reference does not document, so new runtime plugin
-diagnostics cannot ship without user-facing guidance.
+DotBoxd is [MIT licensed](LICENSE). It preserves the attribution of both original projects:
+**Copyright (c) 2026 Danial Jumagaliyev** (ShaRPC, the Services/channels stack) and
+**Copyright (c) 2026 Jonas Kamsker** (Safe-IR / DotBoxd, the Kernels/Pushdown stack).

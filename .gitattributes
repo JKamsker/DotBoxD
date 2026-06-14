@@ -1,0 +1,28 @@
+# Normalize line endings: store as LF, check out native by default.
+* text=auto eol=lf
+
+# Files that must keep CRLF / are tooling-specific
+*.sln       text eol=crlf
+*.slnx      text eol=lf
+*.cs        text eol=lf
+*.csproj    text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.ps1       text eol=lf
+*.sh        text eol=lf
+
+# Binary assets — never normalize/diff
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.ico       binary
+*.snk       binary
+*.nupkg     binary
+
+# Treat snapshot baselines as text but don't let them churn on EOL
+*.verified.txt text eol=lf
+*.received.txt text eol=lf

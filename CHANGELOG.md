@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased
+## [Unreleased] — DotBoxd
+
+This release establishes **DotBoxd**, a single contract-first .NET extension runtime spanning
+Services, Kernels, and Pushdown.
+
+- **Merged repositories:** the formerly standalone ShaRPC (RPC framework) and Safe-IR (kernel
+  sandbox) projects were combined into one monorepo via history-preserving subtree merges. See
+  `docs/contributing/migration-from-standalone-repos.md` for how to view pre-merge history.
+- **Full rebrand:** all assemblies, namespaces, attributes, and diagnostics renamed to the
+  `DotBoxd.*` family (`[DotBoxdService]`, `DBXS###` services diagnostics, `DBXK###` kernel/plugin
+  diagnostics). The wire format is unchanged.
+- **Central Package Management (CPM):** versions are managed centrally via
+  `Directory.Packages.props`; the solution uses the `DotBoxd.slnx` format.
+- **New CI / release pipelines:** cross-platform build/test (net8/9/10 on Windows, Ubuntu, macOS),
+  security & quality gates (rebrand completeness, file-length, spec manifest, API baseline,
+  security-boundary tests, docs smoke, end-to-end acceptance), CodeQL, benchmarks, and a tag-driven
+  release pipeline with provenance attestation.
+- **Meta-packages:** `DotBoxd` (net10.0, full stack) and `DotBoxd.Services.All` (netstandard2.1,
+  Unity/IL2CPP service bundle).
+- **End-to-end acceptance sample:** `samples/Pushdown/DotBoxd.EndToEnd` demonstrates all three modes
+  (Services, Kernels, Pushdown) in one runnable program and is enforced as a CI gate.
+- **Documentation & repo polish:** new top-level README, `docs/` information architecture
+  (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
+  `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
+
+---
+
+The entries below predate the DotBoxd rebrand and refer to the former ShaRPC API names. They are
+retained verbatim as historical record (CHANGELOG is excluded from the rebrand-completeness gate).
+
+## Unreleased (pre-rebrand, ShaRPC history)
 
 - **BREAKING:** Removed the legacy `ShaRpcClient`, `ShaRpcServer` (and their builders /
   `IShaRpcClient` / `IShaRpcServer`), `ShaRpcPeer`, and `DuplexConnectionSplitter`. `RpcPeer`

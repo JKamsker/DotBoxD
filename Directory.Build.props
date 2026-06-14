@@ -15,10 +15,12 @@
          (no locked-mode flag). Revisit once the package graph stabilizes. -->
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <VersionPrefix>0.1.0</VersionPrefix>
-    <Authors>JKamsker</Authors>
-    <Company>JKamsker</Company>
-    <Description>DotBoxd.Kernels sandbox components for validating, interpreting, compiling, hosting, serializing, and transporting restricted .NET workloads.</Description>
-    <PackageTags>dotboxd;sandbox;ir;interpreter;compiler;serialization;transport</PackageTags>
+    <Authors>Jonas Kamsker</Authors>
+    <Company>DotBoxd</Company>
+    <Product>DotBoxd</Product>
+    <Description>DotBoxd is a source-generated, contract-first .NET extension runtime: typed RPC Services, validated sandboxed Kernels, and server-side Pushdown of kernels next to host services.</Description>
+    <Copyright>Copyright (c) 2026 Danial Jumagaliyev (ShaRPC) and Jonas Kamsker (Safe-IR / DotBoxd)</Copyright>
+    <PackageTags>dotboxd;rpc;source-generator;sandbox;ir;kernels;pushdown;messagepack</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>

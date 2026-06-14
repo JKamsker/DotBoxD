@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a defect in DotBoxd
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. For **security** issues, use private reporting (see SECURITY.md) instead.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Services (RPC)
+        - Kernels (sandbox runtime)
+        - Pushdown
+        - Channels / Transports / Codecs
+        - Source generators / analyzers
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package / commit version
+      placeholder: "e.g. DotBoxd 0.1.0-ci.123 or commit sha"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what actually happened? Include any DBXS####/DBXK#### diagnostic codes.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Steps or a minimal code snippet that reproduces the issue.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS, .NET SDK version, target framework"
