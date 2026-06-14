@@ -10,6 +10,25 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Runtime libs are intentionally pinned to 8.0.x so the Services/Channels stack stays
+      # netstandard2.1 / Unity-IL2CPP friendly. Do not bump them to 9/10.
+      - dependency-name: "System.IO.Pipelines"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Collections.Immutable"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Threading.Channels"
+        update-types: ["version-update:semver-major"]
+      # FluentAssertions 8+ ships under a commercial (paid) license; stay on the free 6.x line.
+      - dependency-name: "FluentAssertions"
+        update-types: ["version-update:semver-major"]
+      # Roslyn versions are hand-managed (generators pin 4.8 shipped / 4.14 host) — see
+      # Directory.Packages.props. Bumps must be deliberate, not automated.
+      - dependency-name: "Microsoft.CodeAnalysis.*"
+      # Verify snapshot tooling: a major can change snapshot format/behaviour and churn every
+      # generator baseline. Bump deliberately.
+      - dependency-name: "Verify.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
