@@ -37,6 +37,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Compiled `list.get` cyclic accumulator | `d134853` | `--probe-matrix` | Same-machine baseline from `a514d91` measured compiled `list.get` at 19.4 ms / 36.5x. This step measured 18.2 ms / 34.0x by replacing the zero-based `total += items[i % constant]` emitted loop with a verifier-allowlisted bulk helper. |
 | Nested F64 binding crossings | this commit | `--probe-matrix` | Added `math.sqrt x3 binding`, which calls `math.sqrt` three times per loop iteration. Same-machine baseline from `d134853` measured interpreted at 472.1 ms / 40.5x and compiled at 28.8 ms / 2.5x. This step measured interpreted at 20.3 ms / 1.8x and compiled at 27.5 ms / 2.4x while charging all 3 binding calls per iteration. |
 | Closed-form local helper accumulator | this commit | `--probe-matrix` | Same-machine baseline before this step measured `local function call` at compiled 24.1 ms / 115.2x and interpreted 25.3 ms / 121.0x. After bulk call-depth precheck and closed-form I32 helper accumulation, interpreted measured 0.1 ms / 0.3x; compiled still measured 16.0 ms / 71.6x because repeated compiled runs were still paying compile/verify overhead. |
+| Expanded control-flow matrix baseline | this commit | `--probe-matrix` | Added non-hand-picked coverage for `while`, `if`, and two-argument local helper loops. Same-machine results exposed new gaps: `while i32 add/rem loop` compiled 95.4 ms / 19.7x and interpreted 434.9 ms / 89.7x; `if branch i32 loop` compiled 40.8 ms / 97.4x and interpreted 398.7 ms / 950.9x; `two-arg local function` compiled 150.1 ms / 376.0x and interpreted 398.9 ms / 999.1x. |
 
 ## Matrix After `31fa6fe`
 
@@ -353,7 +354,6 @@ Decision (user-confirmed): accept 7.2x as the documented interpreter floor for c
 - `trivial no-loop` (compiled 12.2x): a single no-op invocation isolating fixed host-pipeline overhead
   (~0.5 ms, down from the ~16 ms per-call re-emit floor we fixed). Not a loop workload; its ratio compares
   host overhead to a folded `return n`, so no baseline change applies. Kept as a diagnostic row.
-
 ## Expanded coverage round (f64 arithmetic, nested loop, branch-in-loop)
 
 Probing patterns *outside* the original eight cases surfaced two compiled rogues that the original matrix

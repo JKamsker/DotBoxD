@@ -1,10 +1,16 @@
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
-// Extra coverage beyond the core intrinsic/binding matrix: pure f64 arithmetic, nested loops, and a
-// branch-in-loop. All baselines do real, un-foldable per-iteration work (f64 recurrence / modular accumulation)
-// so the ratios are fair (no JIT-folded denominator).
+// Extra coverage beyond the core intrinsic/binding matrix. Integration owns the f64/nested/branch/while/i64 cases;
+// topic branches can append additional unapproved control-flow probes via All().
 internal static class PerformanceMatrixControlFlowCases
 {
+    public static IReadOnlyList<PerformanceMatrixCase> All()
+        => [
+            new("while i32 add/rem loop", 2_000_000, 50_000, HandwrittenWhileI32Modulo, WhileI32ModuloJson()),
+            new("if branch i32 loop", 2_000_000, 50_000, HandwrittenIfBranch, IfBranchJson()),
+            new("two-arg local function", 750_000, 25_000, HandwrittenTwoArgLocalCall, TwoArgLocalCallJson())
+        ];
+
     public static object HandwrittenF64Arithmetic(int iterations)
     {
         var total = 1.0;
@@ -54,6 +60,19 @@ internal static class PerformanceMatrixControlFlowCases
         for (var i = 0; i < iterations; i++)
         {
             total = ((total * 5) + 7) % 1_000_003;
+        }
+
+        return total;
+    }
+
+    private static object HandwrittenWhileI32Modulo(int iterations)
+    {
+        var i = 0;
+        var total = 0;
+        while (i < iterations)
+        {
+            total = (total + i) % 1_000_003;
+            i++;
         }
 
         return total;
@@ -168,6 +187,30 @@ internal static class PerformanceMatrixControlFlowCases
         }
         """;
 
+    private static object HandwrittenIfBranch(int iterations)
+    {
+        var total = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            total += i % 2 == 0 ? 1 : 2;
+        }
+
+        return total;
+    }
+
+    private static object HandwrittenTwoArgLocalCall(int iterations)
+    {
+        var total = 0;
+        for (var i = 0; i < iterations; i++)
+        {
+            total = Add(total, i % 3);
+        }
+
+        return total;
+    }
+
+    private static int Add(int left, int right) => left + right;
+
     public static string F64ArithmeticJson()
         => """
         {
@@ -248,6 +291,102 @@ internal static class PerformanceMatrixControlFlowCases
                         "right": { "i32": 1000003 } } }] }
                   ] },
                 { "op": "return", "value": { "var": "acc" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string WhileI32ModuloJson()
+        => """
+        {
+          "id": "matrix-while-i32-modulo",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "I32",
+              "body": [
+                { "op": "set", "name": "i", "value": { "i32": 0 } },
+                { "op": "set", "name": "total", "value": { "i32": 0 } },
+                {
+                  "op": "while",
+                  "condition": { "op": "lt", "left": { "var": "i" }, "right": { "var": "iterations" } },
+                  "body": [
+                    { "op": "set", "name": "total", "value": {
+                      "op": "rem",
+                      "left": { "op": "add", "left": { "var": "total" }, "right": { "var": "i" } },
+                      "right": { "i32": 1000003 } } },
+                    { "op": "set", "name": "i", "value": {
+                      "op": "add",
+                      "left": { "var": "i" },
+                      "right": { "i32": 1 } } }
+                  ]
+                },
+                { "op": "return", "value": { "var": "total" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string IfBranchJson()
+        => """
+        {
+          "id": "matrix-if-branch",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "I32",
+              "body": [
+                { "op": "set", "name": "total", "value": { "i32": 0 } },
+                { "op": "forRange", "local": "i", "start": { "i32": 0 }, "end": { "var": "iterations" },
+                  "body": [
+                    { "op": "if",
+                      "condition": { "op": "eq", "left": { "op": "rem", "left": { "var": "i" }, "right": { "i32": 2 } }, "right": { "i32": 0 } },
+                      "then": [{ "op": "set", "name": "total", "value": { "op": "add", "left": { "var": "total" }, "right": { "i32": 1 } } }],
+                      "else": [{ "op": "set", "name": "total", "value": { "op": "add", "left": { "var": "total" }, "right": { "i32": 2 } } }] }
+                  ] },
+                { "op": "return", "value": { "var": "total" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string TwoArgLocalCallJson()
+        => """
+        {
+          "id": "matrix-two-arg-local-call",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "add",
+              "visibility": "private",
+              "parameters": [
+                { "name": "left", "type": "I32" },
+                { "name": "right", "type": "I32" }
+              ],
+              "returnType": "I32",
+              "body": [{ "op": "return", "value": { "op": "add", "left": { "var": "left" }, "right": { "var": "right" } } }]
+            },
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "I32",
+              "body": [
+                { "op": "set", "name": "total", "value": { "i32": 0 } },
+                { "op": "forRange", "local": "i", "start": { "i32": 0 }, "end": { "var": "iterations" },
+                  "body": [{ "op": "set", "name": "total", "value": {
+                    "call": "add",
+                    "args": [{ "var": "total" }, { "op": "rem", "left": { "var": "i" }, "right": { "i32": 3 } }] } }] },
+                { "op": "return", "value": { "var": "total" } }
               ]
             }
           ]
