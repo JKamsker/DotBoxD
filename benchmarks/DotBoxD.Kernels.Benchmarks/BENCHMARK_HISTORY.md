@@ -638,3 +638,20 @@ ratio:
 - All scalar types (i32/i64/f64) unboxed in both tiers; all loop shapes (for/nested/branch/while) fast-pathed;
   constant modulo via exact reciprocal (i32/i64); branchless overflow (i32/i64).
 - Interpreted over-5x cases are the cold-tier tree-walk (no-codegen by design; hot code tiers up to compiled).
+
+## Edge-case round: f64 comparisons closed; short-circuit is a verifier floor
+
+- **f64 comparisons unboxed** (LtF64Raw/.../NeF64Raw): closed the last scalar-comparison boxing gap (analog of
+  the i32 comparisons). Raw-scalar ABI extracted to CompiledRuntime.RawScalar.cs.
+- **`&&` / `||` short-circuit unboxing — attempted and reverted (proven floor).** Emitting compound boolean
+  conditions as unboxed bool (raw 0/1, no AsBool/Bool boxing) broke 13 verifier tests: the verifier *mandates*
+  the boxed boolean short-circuit shape (AsBool + Bool) as a safety invariant. So unboxing `&&`/`||` is blocked
+  the same way f64 finiteness is — a verifier/security requirement, not an optimization gap. Reverted; 1591 green.
+
+### Remaining edge cases (unbenchmarked + substantial; not pursued)
+
+`f64`/`i64`-bodied branched and while loops use the general per-node-metered path (the branched/while fast-paths
+are i32-only). A fast-path for them would mirror the i32 machinery for f64/i64 — substantial, with no benchmark
+showing the pattern is a real bottleneck, and (as the short-circuit attempt showed) edge-case codegen changes
+risk hidden verifier-invariant breakage. Mixed i32/i64 operands in one expression similarly fall back. These are
+speculative; left documented rather than implemented.
