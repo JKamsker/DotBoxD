@@ -42,6 +42,32 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
+    /// Installs a <b>kernel RPC service</b> package owned by this session (see
+    /// <see cref="PluginServer.InstallRpcAsync"/>). Same ownership/atomicity guarantees as
+    /// <see cref="InstallAsync"/>; the kernel is invoked request/response via
+    /// <see cref="InstalledKernel.InvokeRpcAsync"/> and revoked when the session is disposed.
+    /// </summary>
+    public async ValueTask<InstalledKernel> InstallRpcAsync(
+        PluginPackage package,
+        SandboxPolicy? policy = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            var kernel = await _server.InstallOwnedRpcAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
+            _owned.Add(package.Manifest.PluginId);
+            return kernel;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
     /// Updates live settings for a kernel this session owns. Rejects ids the session does not own so
     /// one plugin cannot tune another plugin's kernel.
     /// </summary>

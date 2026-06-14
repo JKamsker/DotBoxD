@@ -6,7 +6,7 @@ using System.Text.Json;
 using SafeIR.Serialization.Json.Internal;
 using static SafeIR.JsonImport;
 
-public static class PluginPackageJsonSerializer
+public static partial class PluginPackageJsonSerializer
 {
     public static string Export(PluginPackage package, bool indented = false)
     {
@@ -33,7 +33,17 @@ public static class PluginPackageJsonSerializer
             });
 
             var package = ReadPackage(document.RootElement);
-            PluginPackageValidator.Validate(package);
+            // A kernel RPC service package has its own shape (no event subscription/contract), so it is
+            // validated by RpcKernelPackageValidator instead of the event-kernel validator.
+            if (package.Manifest.RpcEntrypoint is not null)
+            {
+                RpcKernelPackageValidator.Validate(package);
+            }
+            else
+            {
+                PluginPackageValidator.Validate(package);
+            }
+
             return package;
         }
         catch (JsonException ex)
@@ -54,20 +64,6 @@ public static class PluginPackageJsonSerializer
         WriteEntrypoints(writer, package.Entrypoints);
         writer.WritePropertyName("module");
         SafeIrJsonExporter.Write(writer, package.Module);
-        writer.WriteEndObject();
-    }
-
-    private static void WriteManifest(Utf8JsonWriter writer, PluginManifest manifest)
-    {
-        writer.WritePropertyName("manifest");
-        writer.WriteStartObject();
-        writer.WriteString("pluginId", manifest.PluginId);
-        writer.WriteString("contract", manifest.Contract);
-        writer.WriteString("mode", manifest.Mode.ToString());
-        WriteStringArray(writer, "effects", manifest.Effects);
-        WriteLiveSettings(writer, manifest.LiveSettings);
-        WriteSubscriptions(writer, manifest.Subscriptions);
-        WriteStringArray(writer, "requiredCapabilities", manifest.RequiredCapabilities);
         writer.WriteEndObject();
     }
 
@@ -177,28 +173,6 @@ public static class PluginPackageJsonSerializer
             : null;
 
         return PluginPackage.Create(manifest, module, entrypoints);
-    }
-
-    private static PluginManifest ReadManifest(JsonElement element)
-    {
-        RequireAllowedProperties(
-            element,
-            "plugin manifest",
-            ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions", "requiredCapabilities"]);
-
-        return new PluginManifest(
-            RequiredString(element, "pluginId"),
-            RequiredString(element, "contract"),
-            ReadExecutionMode(RequiredString(element, "mode")),
-            ReadStringArray(RequiredArray(element, "effects"), "effects"),
-            ReadLiveSettings(RequiredArray(element, "liveSettings")),
-            ReadSubscriptions(RequiredArray(element, "subscriptions")))
-        {
-            // Optional for back-compat: manifests exported before required-capability derivation omit it.
-            RequiredCapabilities = element.TryGetProperty("requiredCapabilities", out var requiredCapabilities)
-                ? ReadStringArray(requiredCapabilities, "requiredCapabilities")
-                : []
-        };
     }
 
     private static ExecutionMode ReadExecutionMode(string value)

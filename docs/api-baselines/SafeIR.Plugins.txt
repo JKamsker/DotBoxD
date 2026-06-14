@@ -9,6 +9,8 @@ public async ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancella
 public async ValueTask UpdateSettingsAsync( string pluginId, IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
 public async ValueTask<bool> ShouldHandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask<InstalledKernel> InstallAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public async ValueTask<InstalledKernel> InstallRpcAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public async ValueTask<SandboxValue> InvokeRpcAsync( IReadOnlyList<SandboxValue> arguments, CancellationToken cancellationToken = default)
 public bool IsRevoked => Volatile.Read(ref _revoked) != 0
 public bool Owns(string pluginId)
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
@@ -121,9 +123,9 @@ public static class KernelPackageRegistry
 public static class PluginDiagnosticCodes
 public static class PluginMessageBindings
 public static class PluginPackageJsonSchemas
-public static class PluginPackageJsonSerializer
 public static class PluginServerJsonExtensions
 public static IReadOnlyList<PluginDiagnosticReference> All => References
+public static partial class PluginPackageJsonSerializer
 public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
 public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
@@ -140,6 +142,7 @@ public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginSession se
 public static void Register(Type kernelType, Func<PluginPackage> factory)
 public string Name { get; }
 public string Name => Definition.Name
+public string? RpcEntrypoint { get; init; }
 public T As<T>() where T : class => LiveContextProxy<T>.Create(this)
 public T Get<T>(string name)
 public T Value
@@ -150,6 +153,7 @@ public ValueTask DisposeAsync()
 public ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public ValueTask ModifyAsync( Action<TSettings> modify, bool atomic = false, CancellationToken cancellationToken = default)
 public ValueTask<InstalledKernel> InstallAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public ValueTask<InstalledKernel> InstallRpcAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public void Dispose()
 public void Register<TEvent>(IPluginEventAdapter<TEvent> adapter)
 public void Revoke()

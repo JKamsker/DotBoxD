@@ -30,6 +30,14 @@ public sealed record PluginManifest(
         get => _requiredCapabilities;
         init => _requiredCapabilities = PluginModelCopy.List(value ?? []);
     }
+
+    /// <summary>
+    /// For a <b>kernel RPC service</b> kernel: the id of the single request/response entrypoint function
+    /// the host invokes with caller arguments and whose result it returns (see
+    /// <c>InstalledKernel.InvokeRpcAsync</c>). <c>null</c> for ordinary event kernels, which dispatch
+    /// through <c>ShouldHandle</c>/<c>Handle</c> instead. Additive; defaults to <c>null</c>.
+    /// </summary>
+    public string? RpcEntrypoint { get; init; }
 }
 
 public sealed record LiveSettingDefinition(

@@ -86,6 +86,18 @@ public sealed class PluginServer : IDisposable
         => InstallCoreAsync(package, policy, owner: null, cancellationToken);
 
     /// <summary>
+    /// Installs a <b>kernel RPC service</b> package — a kernel invoked request/response (via
+    /// <see cref="InstalledKernel.InvokeRpcAsync"/>) rather than wired to an event. It is validated by
+    /// <see cref="RpcKernelPackageValidator"/> (no event subscription/contract) and always runs
+    /// interpreted, since record/object I/O is interpreter-only.
+    /// </summary>
+    public ValueTask<InstalledKernel> InstallRpcAsync(
+        PluginPackage package,
+        SandboxPolicy? policy = null,
+        CancellationToken cancellationToken = default)
+        => InstallRpcCoreAsync(package, policy, owner: null, cancellationToken);
+
+    /// <summary>
     /// Creates a new ownership session. Every kernel installed through the session is tagged with it
     /// as the owner, so no other session can replace or mutate it; disposing the session revokes and
     /// unregisters the kernels it owns. Use one session per untrusted connection.
@@ -108,6 +120,13 @@ public sealed class PluginServer : IDisposable
         SandboxPolicy? policy,
         CancellationToken cancellationToken)
         => InstallCoreAsync(package, policy, owner, cancellationToken);
+
+    internal ValueTask<InstalledKernel> InstallOwnedRpcAsync(
+        PluginSession owner,
+        PluginPackage package,
+        SandboxPolicy? policy,
+        CancellationToken cancellationToken)
+        => InstallRpcCoreAsync(package, policy, owner, cancellationToken);
 
     internal void UninstallOwned(PluginSession owner, string pluginId)
     {
@@ -133,6 +152,24 @@ public sealed class PluginServer : IDisposable
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
+        Kernels.Add(kernel);
+        return kernel;
+    }
+
+    private async ValueTask<InstalledKernel> InstallRpcCoreAsync(
+        PluginPackage package,
+        SandboxPolicy? policy,
+        object? owner,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        RpcKernelPackageValidator.Validate(package);
+        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
+            .ConfigureAwait(false);
+        RpcKernelPackageValidator.ValidatePrepared(package, plan);
+        // Record/object I/O is interpreter-only (the verifier permits newarr only for SandboxValue), so
+        // RPC kernels always run interpreted regardless of the server's default execution mode.
+        var kernel = new InstalledKernel(_host, plan, package, ExecutionMode.Interpreted, owner);
         Kernels.Add(kernel);
         return kernel;
     }
