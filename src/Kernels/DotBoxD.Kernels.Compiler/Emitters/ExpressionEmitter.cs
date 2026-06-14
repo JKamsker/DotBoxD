@@ -56,6 +56,9 @@ internal sealed class ExpressionEmitter
             case (StackKind.F64, StackKind.Boxed):
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
                 break;
+            case (StackKind.Bool, StackKind.Boxed):
+                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+                break;
             case (StackKind.Boxed, StackKind.I32):
                 _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsI32)));
                 break;
@@ -172,6 +175,26 @@ internal sealed class ExpressionEmitter
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
             return StackKind.F64;
+        }
+
+        if (binary.Operator is "==" or "!=" or "<" or "<=" or ">" or ">=" &&
+            _stackPlan.Infer(binary.Left) is { Name: "I32" } &&
+            _stackPlan.Infer(binary.Right) is { Name: "I32" })
+        {
+            EmitAs(binary.Left, StackKind.I32);
+            EmitAs(binary.Right, StackKind.I32);
+            var raw = binary.Operator switch
+            {
+                "<" => nameof(CompiledRuntime.LtI32Raw),
+                "<=" => nameof(CompiledRuntime.LteI32Raw),
+                ">" => nameof(CompiledRuntime.GtI32Raw),
+                ">=" => nameof(CompiledRuntime.GteI32Raw),
+                "==" => nameof(CompiledRuntime.EqI32Raw),
+                "!=" => nameof(CompiledRuntime.NeI32Raw),
+                _ => throw Unsupported("operator not supported by compiler")
+            };
+            _il.Emit(OpCodes.Call, Runtime(raw));
+            return StackKind.Bool;
         }
 
         EmitAs(binary.Left, StackKind.Boxed);

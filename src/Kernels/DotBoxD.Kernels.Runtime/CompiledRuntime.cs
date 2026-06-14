@@ -163,6 +163,15 @@ public static partial class CompiledRuntime
     [MethodImpl(AggressiveInlining)] public static double MulF64Raw(double left, double right) => SandboxFloat64Math.Multiply(left, right);
     [MethodImpl(AggressiveInlining)] public static double DivF64Raw(double left, double right) => SandboxFloat64Math.Divide(left, right);
 
+    // Unboxed i32 comparisons (result kept as a bool on the stack instead of an allocated BoolValue). Pure, no
+    // overflow, identical to the boxed LtI32/etc. Lets branch conditions like `i % 2 < 1` avoid per-iteration boxing.
+    [MethodImpl(AggressiveInlining)] public static bool LtI32Raw(int left, int right) => left < right;
+    [MethodImpl(AggressiveInlining)] public static bool LteI32Raw(int left, int right) => left <= right;
+    [MethodImpl(AggressiveInlining)] public static bool GtI32Raw(int left, int right) => left > right;
+    [MethodImpl(AggressiveInlining)] public static bool GteI32Raw(int left, int right) => left >= right;
+    [MethodImpl(AggressiveInlining)] public static bool EqI32Raw(int left, int right) => left == right;
+    [MethodImpl(AggressiveInlining)] public static bool NeI32Raw(int left, int right) => left != right;
+
     public static SandboxValue AddI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Add(AsI32(left), AsI32(right)));
     public static SandboxValue SubI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Subtract(AsI32(left), AsI32(right)));
     public static SandboxValue MulI32(SandboxValue left, SandboxValue right) => I32(SandboxInt32Math.Multiply(AsI32(left), AsI32(right)));
