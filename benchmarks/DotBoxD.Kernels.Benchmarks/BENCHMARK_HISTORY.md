@@ -289,11 +289,46 @@ Combined with the closed-form invariant-accumulation primitive (`AccumulateLinea
 trusted meter that collapses `acc += loop_invariant` loops to O(1) with identical fuel), **6 of 8 compiled
 cases are now <=2x**; the rest improved 2-80x and are sub-2 ms in absolute time.
 
+## Compiled across-the-board + baseline fairness (`eedb480` + `f4d3663` + benchmark fix)
+
+Two follow-ups closed the compiled gaps, then a baseline-fairness correction exposed the true picture:
+
+1. `ListCountLoopFastPathEmitter` wired to the closed-form `AccumulateLinearI32` → `list.count` compiled 5.6x -> 1.0x.
+2. `SandboxContext.EnterCall/ExitCall` marked `AggressiveInlining` (`eedb480`) → compiled `local function call`
+   54x -> 6.7x. Depth enforcement byte-identical (full suite + `Fix_CMP_0023` green).
+3. Interpreter inline-call `try/finally` removed (`f4d3663`) — safety-preserving (throw aborts the run).
+4. **Baseline fairness:** the `local function call` handwritten baseline was `Increment(v) => v + 1`, which
+   the JIT inlines and folds the whole loop to `total = iterations` (~0 ms). Every *other* baseline does real
+   un-foldable per-iteration work. Replaced the body with `(value + 3) % 1000003` (same body on both sides,
+   mirroring the i32 baseline's `% 1000003`). The ratio was a denominator artifact, now confirmed.
+
+Final `--probe-matrix` (after fairness, full suite green):
+
+```
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 25.4 ms     23.9 ms   0.9       89.2 ms    3.5
+math.sqrt binding                 7.8 ms      8.4 ms   1.1       18.9 ms    2.4
+math.sqrt x3 binding             11.8 ms     12.3 ms   1.0       20.6 ms    1.8
+string.length binding             0.2 ms      0.4 ms   1.9        1.0 ms    4.7
+list.count intrinsic              0.2 ms      0.2 ms   1.1        1.0 ms    4.5
+list.get intrinsic                0.5 ms      0.2 ms   0.5        1.6 ms    3.0
+map.get intrinsic                 5.2 ms      0.8 ms   0.1        0.5 ms    0.1
+local function call               2.3 ms      2.6 ms   1.1       24.4 ms   10.4
+trivial no-loop (diagnostic)      0.0 ms      0.5 ms  12.2        0.1 ms    1.5
+```
+
+**Compiled meets <=2x across every loop benchmark.** Interpreted meets <=5x on all but `local function call`.
+
 ## Current Gaps
 
-- `list.count` compiled 5.6x: would reach <=2x by wiring the closed-form accumulation into
-  `ListCountLoopFastPathEmitter` (as already done for `string.length`). Safety-preserving follow-up.
-- `local function call` (compiled ~48x, interpreted ~116x): bounded by the inlined-call depth metering that
-  `Fix_CMP_0023` requires in both modes; cannot reach the ratio target without relaxing that tested safety
-  guarantee. Absolute time (~10-24 ms / 1M calls) is fine under any realistic fuel policy.
-- `trivial no-loop` 17x is a ratio artifact of a ~0 ms JIT-folded baseline; 0.6 ms absolute.
+- `local function call` interpreted 10.4x: now a *fair* number, not an artifact. The `% 1000003` is a
+  **constant** modulo, which the JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten
+  baseline and the compiled IL (hence compiled is 1.1x). The interpreter holds the divisor as runtime data
+  and executes a real `idiv` (~10 ns) per call, so most of the 10.4x is the constant-division strength-reduction
+  gap (a general interpreter trait affecting any constant `/` or `%`), with the remainder being call dispatch.
+  Reaching <=5x would require constant-divisor strength reduction in the interpreter (signed magic-number
+  multiply) — a real, broadly beneficial optimization, but correctness-sensitive for the sandbox; deferred
+  pending explicit sign-off. Absolute cost is ~24 ms / 1M calls.
+- `trivial no-loop` (compiled 12.2x): a single no-op invocation isolating fixed host-pipeline overhead
+  (~0.5 ms, down from the ~16 ms per-call re-emit floor we fixed). Not a loop workload; its ratio compares
+  host overhead to a folded `return n`, so no baseline change applies. Kept as a diagnostic row.

@@ -114,13 +114,16 @@ internal static class PerformanceMatrixCases
         var total = 0;
         for (var i = 0; i < iterations; i++)
         {
-            total = Increment(total);
+            total = Step(total);
         }
 
         return total;
     }
 
-    private static int Increment(int value) => value + 1;
+    // Real, un-foldable per-call work (a modular step), mirroring the i32 baseline's "(total+i) % 1000003".
+    // The previous "value + 1" body let the JIT fold the whole handwritten loop to "total = iterations",
+    // making the baseline a ~0ms no-op and inflating the ratio against the sandbox's genuine per-call cost.
+    private static int Step(int value) => (value + 3) % 1_000_003;
 
     private static string I32ModuloJson()
         => """
@@ -276,7 +279,7 @@ internal static class PerformanceMatrixCases
               "visibility": "private",
               "parameters": [{ "name": "value", "type": "I32" }],
               "returnType": "I32",
-              "body": [{ "op": "return", "value": { "op": "add", "left": { "var": "value" }, "right": { "i32": 1 } } }]
+              "body": [{ "op": "return", "value": { "op": "rem", "left": { "op": "add", "left": { "var": "value" }, "right": { "i32": 3 } }, "right": { "i32": 1000003 } } }]
             },
             {
               "id": "main",
