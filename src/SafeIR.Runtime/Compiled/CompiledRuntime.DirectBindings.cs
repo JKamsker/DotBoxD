@@ -48,6 +48,25 @@ public static partial class CompiledRuntime
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int MapCountRaw(SandboxValue value)
+        => value is MapValue map ? map.Values.Count : throw InvalidInput("expected map value");
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int MapGetI32Raw(SandboxValue value, SandboxValue key)
+    {
+        var map = value as MapValue ?? throw InvalidInput("expected map value");
+        SandboxValueValidator.RequireType(key, map.KeyType, "map key type mismatch");
+        if (!map.Values.TryGetValue(key, out var item))
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.NotFound,
+                "map key was not found"));
+        }
+
+        return item is I32Value i32 ? i32.Value : throw InvalidInput("expected I32 value");
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double SqrtF64Raw(double value)
     {
         var result = Math.Sqrt(value);

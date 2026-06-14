@@ -28,7 +28,8 @@ dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompila
 | Local function call in I32 loop fast path | `fe7c6ef` | `--probe-matrix` | `local function call` improved from compiled 73.1 ms / 352.2x and interpreted 266.6 ms / 1284.3x to compiled 20.6 ms / 97.7x and interpreted 23.2 ms / 109.8x. |
 | Direct binding loop adapters | `9cece3c` | `--probe-matrix` | Added direct F64 math and `string.length` loop adapters with bulk binding charges. `math.sqrt` improved from compiled 177.2 ms / 22.9x and interpreted 374.8 ms / 48.4x to compiled 23.1 ms / 3.0x and interpreted 18.2 ms / 2.4x. `string.length` improved from compiled 64.7 ms / 303.4x and interpreted 311.0 ms / 1457.4x to compiled 17.5 ms / 87.6x and interpreted 1.0 ms / 4.9x; its ratio remains distorted by the sub-millisecond handwritten baseline. |
 | Direct `list.count` loop adapter | `23551ba` | `--probe-matrix` | `list.count` improved from compiled 72.9 ms / 314.8x and interpreted 196.6 ms / 848.5x to compiled 18.2 ms / 83.6x and interpreted 1.0 ms / 4.6x by bulk-charging collection read fuel and reusing the raw count in the loop. |
-| Direct `list.get` I32 loop adapter | this commit | `--probe-matrix` | `list.get` improved from compiled 74.7 ms / 137.6x and interpreted 270.1 ms / 497.7x to compiled 24.0 ms / 45.9x and interpreted 18.2 ms / 34.7x by bulk-charging collection read fuel and emitting raw I32 index/value operations. |
+| Direct `list.get` I32 loop adapter | `904087c` | `--probe-matrix` | `list.get` improved from compiled 74.7 ms / 137.6x and interpreted 270.1 ms / 497.7x to compiled 24.0 ms / 45.9x and interpreted 18.2 ms / 34.7x by bulk-charging collection read fuel and emitting raw I32 index/value operations. |
+| Direct `map.get` I32 loop adapter | this commit | `--probe-matrix` | `map.get` improved from compiled 220.4 ms / 44.4x and interpreted 170.0 ms / 34.2x to compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x by bulk-charging map read fuel while preserving per-iteration key literal charging. |
 
 ## Matrix After `31fa6fe`
 
@@ -95,10 +96,23 @@ map.get intrinsic                 5.0 ms    220.4 ms  44.4      170.0 ms   34.2
 local function call               0.2 ms     20.9 ms 103.6       23.2 ms  115.0
 ```
 
+## Matrix After Direct Map Get I32 Loop Adapter
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.8 ms     38.5 ms   1.6      101.4 ms    4.3
+math.sqrt binding                 7.8 ms     23.9 ms   3.1       18.3 ms    2.3
+string.length binding             0.2 ms     17.8 ms  86.0        1.0 ms    4.7
+list.count intrinsic              0.2 ms     17.7 ms  81.5        1.0 ms    4.8
+list.get intrinsic                0.5 ms     25.2 ms  46.6       18.3 ms   33.9
+map.get intrinsic                 4.8 ms    155.2 ms  32.1      149.5 ms   31.0
+local function call               0.2 ms     21.8 ms 107.7       24.0 ms  118.6
+```
+
 ## Current Gaps
 
 The broad performance target is not met yet. The matrix still exposes several
 bad cases, especially map access, local function calls, and tiny operations
-where the handwritten timing is sub-millisecond. `math.sqrt` now meets the
-interpreted target on this probe, but compiled is still about 3x handwritten and
-remains above the 2x target.
+where the handwritten timing is sub-millisecond. The current `map.get` adapter
+still leaves per-iteration key literal charging in place, so deeper map/key
+specialization remains necessary.

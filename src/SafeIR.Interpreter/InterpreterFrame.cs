@@ -145,6 +145,37 @@ internal sealed class InterpreterFrame
                 "expected I32 value"));
     }
 
+    public bool TryGetMapSlot(string name, out int slot)
+    {
+        slot = _layout.GetSlot(name);
+        return _slots[slot] is MapValue;
+    }
+
+    public int ReadMapCountSlot(int slot)
+        => _slots[slot] is MapValue value ? value.Values.Count : throw UnassignedSlot();
+
+    public int ReadMapInt32ValueSlot(int slot, SandboxValue key)
+    {
+        if (_slots[slot] is not MapValue map)
+        {
+            throw UnassignedSlot();
+        }
+
+        SandboxValueValidator.RequireType(key, map.KeyType, "map key type mismatch");
+        if (!map.Values.TryGetValue(key, out var value))
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.NotFound,
+                "map key was not found"));
+        }
+
+        return value is I32Value item
+            ? item.Value
+            : throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "expected I32 value"));
+    }
+
     public bool TryReadDouble(string name, out double value)
     {
         var slot = _layout.GetSlot(name);
