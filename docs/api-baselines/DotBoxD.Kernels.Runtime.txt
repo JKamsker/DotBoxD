@@ -20,6 +20,7 @@ public static bool CanBulkChargeBindingCallsScaled( SandboxContext context, stri
 public static bool CanBulkChargeFuel(SandboxContext context, long fuelPerUnit, int count)
 public static bool CanBulkChargeLoopIterations(SandboxContext context, int count, int fuelPerIteration)
 public static bool CanBulkChargeSandboxValue(SandboxContext context, SandboxValue value, int count)
+public static bool StringEqualsRaw(SandboxValue left, SandboxValue right)
 public static class DefaultSandboxBindings
 public static class MathBindings
 public static class SafeFileBindings
