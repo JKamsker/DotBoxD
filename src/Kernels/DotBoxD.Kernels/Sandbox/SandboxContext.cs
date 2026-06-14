@@ -129,6 +129,24 @@ public sealed partial class SandboxContext
 
     public void ChargeValue(SandboxValue value) => Budget.ChargeValue(value, CancellationToken);
 
+    /// <summary>
+    /// Charges a precomputed value shape and the scan-fuel its metering walk would have cost
+    /// (<c>nodes / 64</c>), instead of re-walking the value. The charged fuel and shape are identical to
+    /// <see cref="ChargeValue"/>; this is used by incremental collection operations (see
+    /// <see cref="ValueShapeCache"/>) to avoid an O(n) re-walk on every add/set.
+    /// </summary>
+    internal void ChargeComposedValue(in ShapeInfo info)
+    {
+        CancellationToken.ThrowIfCancellationRequested();
+        var scanFuel = info.Nodes / 64;
+        if (scanFuel > 0)
+        {
+            Budget.ChargeFuel(scanFuel);
+        }
+
+        Budget.ChargeValueShape(info.Shape);
+    }
+
     public void ChargeString(string value)
     {
         CancellationToken.ThrowIfCancellationRequested();

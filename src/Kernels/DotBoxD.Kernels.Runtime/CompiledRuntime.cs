@@ -181,63 +181,7 @@ public static partial class CompiledRuntime
 
     public static SandboxValue RoundF64(SandboxValue value) => F64(Math.Round(AsF64(value), MidpointRounding.ToEven));
 
-    public static SandboxValue ListOf(SandboxContext context, SandboxValue[] values)
-    {
-        context.ChargeFuel(SandboxCollectionFuel.Copy(values.Length));
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(values.Length, 16));
-        return ChargeValue(context, SandboxValue.FromList(values));
-    }
-
-    public static SandboxValue ListLiteral(SandboxContext context, SandboxType itemType, SandboxValue[] values)
-        => CompiledLiteralRuntime.ListLiteral(context, itemType, values);
-
-    public static SandboxValue ListLiteralValue(SandboxType itemType, SandboxValue[] values)
-        => CompiledLiteralRuntime.ListLiteralValue(itemType, values);
-
-    public static SandboxValue ListEmpty(SandboxContext context, SandboxType itemType)
-    {
-        context.ChargeFuel(SandboxCollectionFuel.Empty());
-        context.ChargeAllocation(8);
-        return ChargeValue(context, SandboxValue.FromList([], itemType));
-    }
-
-    public static SandboxValue ListCount(SandboxContext context, SandboxValue list)
-    {
-        var values = AsListReadOnly(list).Values;
-        context.ChargeFuel(SandboxCollectionFuel.Read(values.Count));
-        return I32(values.Count);
-    }
-
-    public static SandboxValue ListGet(SandboxContext context, SandboxValue list, SandboxValue index)
-    {
-        var values = AsListReadOnly(list).Values;
-        context.ChargeFuel(SandboxCollectionFuel.Read(values.Count));
-        var i = AsI32(index);
-        if (i < 0 || i >= values.Count)
-        {
-            throw InvalidInput("list index is out of range");
-        }
-
-        return values[i];
-    }
-
-    public static SandboxValue ListAdd(SandboxContext context, SandboxValue list, SandboxValue item)
-    {
-        var source = AsList(list);
-        if (item.Type != source.ItemType)
-        {
-            throw InvalidInput("list item type mismatch");
-        }
-
-        context.ChargeFuel(SandboxCollectionFuel.Copy(source.Values.Count, addedCount: 1));
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(
-            source.Values.Count,
-            addedCount: 1,
-            bytesPerElement: 16));
-        var values = source.Values.ToList();
-        values.Add(item);
-        return ChargeValue(context, SandboxValue.FromList(values, source.ItemType));
-    }
+    // List and record collection entry points live in CompiledRuntime.Collections.cs (same partial type).
 
     public static SandboxValue MapEmpty(SandboxContext context, SandboxType keyType, SandboxType valueType)
         => CompiledMapRuntime.Empty(context, keyType, valueType);
@@ -268,26 +212,6 @@ public static partial class CompiledRuntime
 
     public static SandboxValue MapRemove(SandboxContext context, SandboxValue map, SandboxValue key)
         => CompiledMapRuntime.Remove(context, map, key);
-
-    public static SandboxValue RecordNew(SandboxContext context, SandboxValue[] fields)
-    {
-        context.ChargeFuel(SandboxCollectionFuel.Copy(fields.Length));
-        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(fields.Length, 16));
-        return ChargeValue(context, SandboxValue.FromRecord(fields));
-    }
-
-    public static SandboxValue RecordGet(SandboxContext context, SandboxValue record, SandboxValue index)
-    {
-        var fields = AsRecordReadOnly(record).Fields;
-        context.ChargeFuel(SandboxCollectionFuel.Read(fields.Count));
-        var i = AsI32(index);
-        if (i < 0 || i >= fields.Count)
-        {
-            throw InvalidInput("record field index is out of range");
-        }
-
-        return fields[i];
-    }
 
     public static SandboxValue CallBinding(SandboxContext context, string id, SandboxValue[] args)
         => CompiledBindingDispatcher.CallBinding(context, id, args);

@@ -1,5 +1,7 @@
 namespace DotBoxD.Kernels;
 
+using System.Collections.Immutable;
+
 public abstract record SandboxValue
 {
     public static SandboxValue Unit { get; } = new UnitValue();
@@ -137,7 +139,25 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
         => new(new OwnedSnapshot(ModelCopy.WrapOwned(values)), itemType);
 
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> values)
-        => values is OwnedSnapshot owned ? owned.Values : ModelCopy.List(values);
+        => values switch
+        {
+            OwnedSnapshot owned => owned.Values,
+            // An ImmutableList is already an immutable, structurally-shared snapshot; storing it directly
+            // (no defensive copy) is what lets list.add share structure and run in O(log n) instead of O(n).
+            ImmutableList<SandboxValue> immutable => immutable,
+            _ => ModelCopy.List(values)
+        };
+
+    /// <summary>
+    /// Returns a new list with <paramref name="item"/> appended, sharing structure with this list via an
+    /// immutable backing so the append is O(log n) rather than an O(n) copy. Charged fuel/allocation are
+    /// unchanged by the caller; only the runtime data structure and wall-time differ.
+    /// </summary>
+    internal ListValue Append(SandboxValue item)
+    {
+        var immutable = _values as ImmutableList<SandboxValue> ?? ImmutableList.CreateRange(_values);
+        return new ListValue(immutable.Add(item), ItemType);
+    }
 
     private sealed class OwnedSnapshot(IReadOnlyList<SandboxValue> values) : IReadOnlyList<SandboxValue>
     {
@@ -265,51 +285,4 @@ public sealed record RecordValue : SandboxValue
     }
 }
 
-public sealed record MapValue(
-    IReadOnlyDictionary<SandboxValue, SandboxValue> Values,
-    SandboxType KeyType,
-    SandboxType ValueType) : SandboxValue
-{
-    private IReadOnlyDictionary<SandboxValue, SandboxValue> _values = ModelCopy.ValueDictionary(Values);
-
-    public IReadOnlyDictionary<SandboxValue, SandboxValue> Values { get => _values; init => _values = ModelCopy.ValueDictionary(value); }
-
-    public override SandboxType Type => SandboxType.Map(KeyType, ValueType);
-
-    public bool Equals(MapValue? other)
-    {
-        if (other is null ||
-            !KeyType.Equals(other.KeyType) ||
-            !ValueType.Equals(other.ValueType) ||
-            Values.Count != other.Values.Count)
-        {
-            return false;
-        }
-
-        foreach (var entry in Values)
-        {
-            if (!other.Values.TryGetValue(entry.Key, out var otherValue) ||
-                !entry.Value.Equals(otherValue))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public override int GetHashCode()
-    {
-        // Maps have no defined enumeration order, so combine entry hashes
-        // commutatively (XOR) to keep the hash order-independent.
-        var keyTypeHash = KeyType.GetHashCode();
-        var valueTypeHash = ValueType.GetHashCode();
-        var entriesHash = 0;
-        foreach (var entry in Values)
-        {
-            entriesHash ^= HashCode.Combine(entry.Key, entry.Value);
-        }
-
-        return HashCode.Combine(keyTypeHash, valueTypeHash, entriesHash);
-    }
-}
+// MapValue lives in MapValue.cs (kept out of this file to stay under the line cap).
