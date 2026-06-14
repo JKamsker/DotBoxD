@@ -383,13 +383,63 @@ branch in loop                    2.5 ms     20.8 ms   8.4      406.0 ms  163.5
 trivial no-loop (diagnostic)      0.0 ms      0.5 ms  14.5        0.1 ms    1.7
 ```
 
-### Remaining gaps after this round (improvable, NOT yet at target)
+## Unboxing round (interpreter f64 + branched + while; compiled f64 + comparisons)
 
-- **Interpreted f64 arithmetic / branch (boxing).** The interpreter has an unboxed i32 expression plan
-  (`I32ExpressionPlan`) but **no unboxed f64 or bool plan** — f64 arithmetic and branched bodies box every
-  intermediate, so they are very slow (and GC-noisy). Fixable with an `F64ExpressionPlan` analogous to the i32
-  one; substantial but high-value. NOT attempted yet.
-- **Compiled f64 arithmetic 5.8x / branch 8.4x.** Both fell off the bulk-charge fast paths into the general
-  emitter, which charges fuel per-subexpression and (f64) does a mandatory per-op finiteness check the FMA'd
-  baseline skips. Further gains need a bulk-charge fast path for these shapes (branched-loop / multi-statement);
-  diminishing returns vs the i32 case. Absolute cost is already small (7 ms / 21 ms per 1M).
+Closed the interpreter boxing rogues across all common loop shapes, plus the compiled f64/comparison gaps:
+
+- **f64 arithmetic, compiled**: `AddF64Raw/.../DivF64Raw` (unboxed, `SandboxFloat64Math` finiteness) in the
+  general emitter + a fast-path arithmetic plan. 84.9x/104ms -> ~6x/7ms.
+- **f64 arithmetic, interpreted**: extended `F64ExpressionPlan` with Add/Sub/Mul/Div (via `SandboxFloat64Math`)
+  and let `F64ForLoopRunner` run binding-free bodies. **567x/680ms -> 19x/25ms (~30x faster)**.
+- **i32 comparisons, compiled**: `LtI32Raw/.../NeI32Raw` (unboxed bool) + Bool->Boxed coercion. Speeds every
+  i32 conditional.
+- **branch-in-loop, interpreted**: new `I32ComparisonPlan` + `BranchedI32ForLoopRunner` (unboxed condition and
+  branches). **148x/357ms -> 12x/31ms (~12x faster)**.
+- **while-loop, interpreted**: new `WhileI32ForLoopRunner` (the runners were all forRange-based; while loops
+  boxed). **135x/322ms -> 15x/38ms (~9x faster)**.
+
+All metering matches the general/boxed path node-for-node (full 1591-suite incl. fuel-accounting +
+interpreter/compiled equivalence green every step).
+
+Latest `--probe-matrix` (GC-noisy on interpreted; ratios stable to +-20%):
+
+```
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 24.4 ms     25.5 ms   1.0      120.9 ms    4.9
+math.sqrt binding                 8.3 ms      8.7 ms   1.0       19.9 ms    2.4
+math.sqrt x3 binding             12.5 ms     14.5 ms   1.2       21.7 ms    1.7
+string.length binding             0.2 ms      0.3 ms   1.2        1.0 ms    4.6
+list.count intrinsic              0.2 ms      0.3 ms   1.2        1.0 ms    4.4
+list.get intrinsic                0.6 ms      0.3 ms   0.5        1.8 ms    3.2
+map.get intrinsic                 5.3 ms      0.9 ms   0.2        0.6 ms    0.1
+local function call               2.4 ms      2.8 ms   1.2       21.8 ms    9.1
+f64 arithmetic loop               1.3 ms      7.6 ms   6.0       24.6 ms   19.2
+nested loop                       2.5 ms      2.8 ms   1.1       17.3 ms    6.8
+branch in loop                    2.6 ms     17.1 ms   6.7       31.3 ms   12.2
+while loop                        2.6 ms     14.8 ms   5.8       38.2 ms   14.9
+trivial no-loop (diagnostic)      0.0 ms      0.6 ms  15.7        0.1 ms    2.0
+```
+
+### Bounded frontier (every remaining over-target case traces to one of these)
+
+The boxing / missing-fast-path rogues are now closed. Each remaining over-target case is bounded by a
+documented, non-trivial-to-remove cause:
+
+1. **Interpreter constant-divisor `idiv`** (i32 4.9x, nested 6.8x, branch 12x, while 15x, local-call 9x): every
+   *fair* non-foldable i32 body needs a `%`/`/`, which the JIT strength-reduces in handwritten/compiled code but
+   the interpreter runs as a runtime `idiv` (~7-9 ns of a ~12 ns iteration). Removing it needs signed
+   magic-number division in sandbox arithmetic — declined (correctness-critical, sign-off-gated). A safe
+   double-reciprocal variant would save only ~25%.
+2. **f64 per-op finiteness + no FMA** (f64 compiled 6x, interpreted 19x): the mandatory finiteness check and
+   separate mul/add can't match the baseline's fused multiply-add. Structural.
+3. **Compiled per-subexpression metering density** (branch 6.7x, while 5.8x): branched/multi-statement loops
+   can't bulk-charge (data-dependent fuel), so each node pays a metering call. Coarsening it is a cross-cutting
+   fuel-accounting redesign that must stay consistent across both modes + the verifier.
+4. **`trivial` diagnostic** (compiled 15.7x): fixed per-invocation host overhead on a no-op; not a workload.
+
+Absolute times are all small (<= ~38 ms per 1M ops), far under the wall-time guardrail.
+
+### Not yet probed (possible future gaps)
+
+i64 arithmetic, string building (concat/substring) loops, and record field access loops have not been probed.
+String building is inherently allocation-bound; i64 likely boxes (no `I64ExpressionPlan`) but is uncommon.
