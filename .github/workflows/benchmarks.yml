@@ -1,0 +1,127 @@
+name: benchmarks
+
+# BenchmarkDotNet suites. Runs weekly, on demand, and on a PR only when it carries the
+# 'benchmark' label. Results are tracked over time with github-action-benchmark; regression
+# gating + auto-push are restricted to the scheduled main-branch run so PR/manual runs only
+# measure and never fail or rewrite history.
+#
+# BenchmarkDotNet's JSON exporter writes one *-report-full-compressed.json per benchmark
+# class. github-action-benchmark consumes a single file, so each suite's per-class reports
+# are merged (their Benchmarks arrays concatenated) into one valid BDN JSON before tracking.
+
+on:
+  schedule:
+    # Mondays 04:17 UTC.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Run BenchmarkDotNet suites
+    # PR runs: only when the just-applied label is 'benchmark'. Schedule/dispatch: always.
+    if: github.event_name != 'pull_request' || github.event.label.name == 'benchmark'
+    runs-on: ubuntu-latest
+    permissions:
+      # Auto-push of results to gh-pages and PR alert comments need write; only exercised on
+      # the scheduled main run (see the action-step guards below).
+      contents: write
+      deployments: write
+      pull-requests: write
+    env:
+      # Only the scheduled run on main may gate on regressions and push history.
+      IS_TRACKING_RUN: ${{ github.event_name == 'schedule' && github.ref == 'refs/heads/main' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Run Services benchmarks
+        run: >-
+          dotnet run -c Release --project benchmarks/DotBoxd.Services.Benchmarks --
+          --filter '*' --job short --exporters json
+          --artifacts artifacts/benchmarks/services
+
+      - name: Run Kernels benchmarks
+        run: >-
+          dotnet run -c Release --project benchmarks/DotBoxd.Kernels.Benchmarks --
+          --filter '*' --job short --exporters json
+          --artifacts artifacts/benchmarks/kernels
+
+      - name: Merge BenchmarkDotNet reports per suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/benchmarks/merged
+          merge_suite() {
+            local suite="$1"
+            local outFile="artifacts/benchmarks/merged/${suite}.json"
+            mapfile -t reports < <(find "artifacts/benchmarks/${suite}/results" \
+              -name '*-report-full-compressed.json' 2>/dev/null | sort)
+            if [[ ${#reports[@]} -eq 0 ]]; then
+              echo "No BenchmarkDotNet reports found for suite '${suite}'." >&2
+              exit 1
+            fi
+            # Keep the first report's envelope (Title/HostEnvironmentInfo) and concatenate the
+            # Benchmarks arrays from every per-class report into it.
+            jq -s '.[0] * {Benchmarks: (map(.Benchmarks) | add)}' "${reports[@]}" > "${outFile}"
+            echo "Merged ${#reports[@]} report(s) into ${outFile}"
+          }
+          merge_suite services
+          merge_suite kernels
+
+      - name: Upload raw benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: benchmark-results
+          path: artifacts/benchmarks/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Track / alert on Services benchmarks
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        with:
+          name: DotBoxd.Services Benchmarks
+          tool: 'benchmarkdotnet'
+          output-file-path: artifacts/benchmarks/merged/services.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          benchmark-data-dir-path: dev/bench/services
+          alert-threshold: '150%'
+          comment-on-alert: true
+          # Only the scheduled main run gates and rewrites the gh-pages history.
+          fail-on-alert: ${{ env.IS_TRACKING_RUN == 'true' }}
+          auto-push: ${{ env.IS_TRACKING_RUN == 'true' }}
+
+      - name: Track / alert on Kernels benchmarks
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        with:
+          name: DotBoxd.Kernels Benchmarks
+          tool: 'benchmarkdotnet'
+          output-file-path: artifacts/benchmarks/merged/kernels.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          benchmark-data-dir-path: dev/bench/kernels
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: ${{ env.IS_TRACKING_RUN == 'true' }}
+          auto-push: ${{ env.IS_TRACKING_RUN == 'true' }}

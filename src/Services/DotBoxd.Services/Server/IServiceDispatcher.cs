@@ -7,8 +7,8 @@ namespace DotBoxd.Services.Server;
 
 /// <summary>
 /// Interface for generated service dispatchers that route incoming requests to the
-/// appropriate service method. Root-service dispatchers use <see cref="DispatchAsync"/>;
-/// sub-service dispatchers also implement <see cref="DispatchOnInstanceAsync"/> to route
+/// appropriate service method. Root-service dispatchers use <c>DispatchAsync</c>;
+/// sub-service dispatchers also implement <c>DispatchOnInstanceAsync</c> to route
 /// calls to a particular registered instance.
 /// </summary>
 public interface IServiceDispatcher

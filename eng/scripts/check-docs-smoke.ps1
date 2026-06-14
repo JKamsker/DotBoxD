@@ -5,15 +5,15 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$capabilitiesExample = Join-Path $root "examples/Capabilities/DotBoxd.Kernels.Example.Capabilities/DotBoxd.Kernels.Example.Capabilities.csproj"
-$hostingExample = Join-Path $root "examples/Hosting/DotBoxd.Kernels.Example.Hosting/DotBoxd.Kernels.Example.Hosting.csproj"
-$pluginAuthoringExample = Join-Path $root "examples/PluginAuthoring/DotBoxd.Kernels.Example.PluginAuthoring/DotBoxd.Kernels.Example.PluginAuthoring.csproj"
-$httpTransportExample = Join-Path $root "examples/HttpTransport/DotBoxd.Kernels.HttpTransportExample/DotBoxd.Kernels.HttpTransportExample.csproj"
-$localPluginExample = Join-Path $root "examples/LocalPlugin/DotBoxd.Kernels.PluginLocal/DotBoxd.Kernels.PluginLocal.csproj"
-$ipcServerExample = Join-Path $root "examples/PluginIpc/DotBoxd.Kernels.PluginIpc.Server/DotBoxd.Kernels.PluginIpc.Server.csproj"
-$ipcClientExample = Join-Path $root "examples/PluginIpc/DotBoxd.Kernels.PluginIpc.Client/DotBoxd.Kernels.PluginIpc.Client.csproj"
-$gameServerExample = Join-Path $root "examples/GameServer/DotBoxd.Kernels.Game.Server/DotBoxd.Kernels.Game.Server.csproj"
-$gamePluginExample = Join-Path $root "examples/GameServer/DotBoxd.Kernels.Game.Plugin/DotBoxd.Kernels.Game.Plugin.csproj"
+$capabilitiesExample = Join-Path $root "samples/Kernels/Capabilities/DotBoxd.Kernels.Example.Capabilities/DotBoxd.Kernels.Example.Capabilities.csproj"
+$hostingExample = Join-Path $root "samples/Kernels/Hosting/DotBoxd.Kernels.Example.Hosting/DotBoxd.Kernels.Example.Hosting.csproj"
+$pluginAuthoringExample = Join-Path $root "samples/Kernels/PluginAuthoring/DotBoxd.Kernels.Example.PluginAuthoring/DotBoxd.Kernels.Example.PluginAuthoring.csproj"
+$httpTransportExample = Join-Path $root "samples/Kernels/HttpTransport/DotBoxd.Kernels.HttpTransportExample/DotBoxd.Kernels.HttpTransportExample.csproj"
+$localPluginExample = Join-Path $root "samples/Kernels/LocalPlugin/DotBoxd.Kernels.PluginLocal/DotBoxd.Kernels.PluginLocal.csproj"
+$ipcServerExample = Join-Path $root "samples/Pushdown/PluginIpc/DotBoxd.Kernels.PluginIpc.Server/DotBoxd.Kernels.PluginIpc.Server.csproj"
+$ipcClientExample = Join-Path $root "samples/Pushdown/PluginIpc/DotBoxd.Kernels.PluginIpc.Client/DotBoxd.Kernels.PluginIpc.Client.csproj"
+$gameServerExample = Join-Path $root "samples/Kernels/GameServer/DotBoxd.Kernels.Game.Server/DotBoxd.Kernels.Game.Server.csproj"
+$gamePluginExample = Join-Path $root "samples/Kernels/GameServer/DotBoxd.Kernels.Game.Plugin/DotBoxd.Kernels.Game.Plugin.csproj"
 
 function Resolve-RepoPath([string] $Path) {
     $normalized = $Path.Trim().Trim('"').Replace('\', [System.IO.Path]::DirectorySeparatorChar)
@@ -290,7 +290,7 @@ function Invoke-GameServer([string] $ServerProject, [string] $HostDll) {
     }
 }
 
-$gamePluginDll = Join-Path $root "examples/GameServer/DotBoxd.Kernels.Game.Plugin/bin/$Configuration/net10.0/DotBoxd.Kernels.Game.Plugin.dll"
+$gamePluginDll = Join-Path $root "samples/Kernels/GameServer/DotBoxd.Kernels.Game.Plugin/bin/$Configuration/net10.0/DotBoxd.Kernels.Game.Plugin.dll"
 if (-not (Test-Path -LiteralPath $gamePluginDll)) {
     throw "Game server smoke prerequisite missing: $gamePluginDll (build the solution first)."
 }

@@ -3,7 +3,6 @@ using DotBoxd.Services;
 using DotBoxd.Services.Exceptions;
 using DotBoxd.Services.Generated;
 using DotBoxd.Services.Server;
-using DotBoxd.Services.Generated;
 using DotBoxd.Codecs.MessagePack;
 using DotBoxd.Services.Tests;
 using Shared;

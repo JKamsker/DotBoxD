@@ -24,7 +24,7 @@ namespace DotBoxd.Services.SourceGenerator.Tests.Cov;
 /// <para>
 /// Both methods live on one service interface and the cache is shared per-compilation
 /// (<c>SharedRpcTypeValidationCache</c>), so processing <c>UseAAsync(A)</c> first deterministically
-/// poisons the B entry before <c>UseBAsync(B)</c> is validated. <see cref="A"/> declares its
+/// poisons the B entry before <c>UseBAsync(B)</c> is validated. <c>A</c> declares its
 /// <c>Child</c> (type B) field BEFORE its <c>Svc</c> (the service interface) field, which is the
 /// member ordering that drives the cycle-break-then-find-service sequence.
 /// </para>

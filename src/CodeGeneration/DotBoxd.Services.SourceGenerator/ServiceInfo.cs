@@ -21,11 +21,11 @@ internal enum MethodReturnKind
     TaskOfSubService,
     /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> where <c>TResult</c> is itself a <c>[DotBoxdService]</c> interface — nested sub-service.</summary>
     ValueTaskOfSubService,
-    /// <summary><see cref="System.Collections.Generic.IAsyncEnumerable{T}"/> streamed item-by-item.</summary>
+    /// <summary><c>IAsyncEnumerable&lt;T&gt;</c> streamed item-by-item.</summary>
     AsyncEnumerable,
-    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <see cref="System.Collections.Generic.IAsyncEnumerable{T}"/>.</summary>
+    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <c>IAsyncEnumerable&lt;T&gt;</c>.</summary>
     TaskOfAsyncEnumerable,
-    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.Collections.Generic.IAsyncEnumerable{T}"/>.</summary>
+    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <c>IAsyncEnumerable&lt;T&gt;</c>.</summary>
     ValueTaskOfAsyncEnumerable,
     /// <summary><see cref="System.IO.Stream"/> streamed as bytes.</summary>
     Stream,
@@ -33,11 +33,11 @@ internal enum MethodReturnKind
     TaskOfStream,
     /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.IO.Stream"/>.</summary>
     ValueTaskOfStream,
-    /// <summary><see cref="System.IO.Pipelines.Pipe"/> streamed as bytes.</summary>
+    /// <summary><c>Pipe</c> streamed as bytes.</summary>
     Pipe,
-    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <see cref="System.IO.Pipelines.Pipe"/>.</summary>
+    /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> whose result is <c>Pipe</c>.</summary>
     TaskOfPipe,
-    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <see cref="System.IO.Pipelines.Pipe"/>.</summary>
+    /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> whose result is <c>Pipe</c>.</summary>
     ValueTaskOfPipe,
 }
 
@@ -141,22 +141,22 @@ internal sealed record ServiceProjection(
 /// </summary>
 internal sealed record AsyncSiblingMethod(
     int SourceIndex,
-    /// <summary>Method name on the sibling (e.g. <c>"Add"</c> → <c>"AddAsync"</c>).</summary>
+    // Method name on the sibling (e.g. "Add" -> "AddAsync").
     string Name,
-    /// <summary>Original method this row was derived from — used by the proxy emitter to
-    /// pick the wire call shape and to suppress duplicate emission when the sibling row
-    /// is identical to the original method.</summary>
+    // Original method this row was derived from — used by the proxy emitter to
+    // pick the wire call shape and to suppress duplicate emission when the sibling row
+    // is identical to the original method.
     MethodModel Source,
-    /// <summary>The return kind on the sibling — always Task / TaskOf / ValueTask / ValueTaskOf;
-    /// sync methods are projected onto <see cref="MethodReturnKind.Task"/> or
-    /// <see cref="MethodReturnKind.TaskOf"/> depending on whether they carry a payload.</summary>
+    // The return kind on the sibling — always Task / TaskOf / ValueTask / ValueTaskOf;
+    // sync methods are projected onto MethodReturnKind.Task or
+    // MethodReturnKind.TaskOf depending on whether they carry a payload.
     MethodReturnKind SiblingReturnKind,
-    /// <summary>Parameter list emitted on the sibling interface.</summary>
+    // Parameter list emitted on the sibling interface.
     EquatableArray<ParameterModel> Parameters,
-    /// <summary>True when this row materially differs from <see cref="Source"/> — i.e.
-    /// the proxy needs an extra method to satisfy the sibling interface. False when one
-    /// physical method on the proxy satisfies both interfaces (already-async methods
-    /// with the same name and signature).</summary>
+    // True when this row materially differs from Source — i.e.
+    // the proxy needs an extra method to satisfy the sibling interface. False when one
+    // physical method on the proxy satisfies both interfaces (already-async methods
+    // with the same name and signature).
     bool RequiresExtraProxyMethod);
 
 /// <summary>Shared helpers used by both the proxy and dispatcher emitters.</summary>

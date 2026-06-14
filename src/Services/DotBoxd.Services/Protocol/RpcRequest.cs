@@ -34,7 +34,7 @@ public struct RpcRequest
     /// Per-connection opaque identifier of the server-side instance this call targets.
     /// <c>null</c> for ordinary singleton-service calls (the legacy code path); non-null
     /// for nested-service calls dispatched via
-    /// <see cref="DotBoxd.Services.Server.IServiceDispatcher.DispatchOnInstanceAsync"/>.
+    /// <c>IServiceDispatcher.DispatchOnInstanceAsync</c>.
     /// Wire-compatible with older peers because absent properties deserialize to null.
     /// </summary>
     public string? InstanceId { get; set; }

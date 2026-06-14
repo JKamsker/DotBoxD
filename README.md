@@ -157,10 +157,10 @@ whenever the JSON contract changes.
 ## Local Verification
 
 ```powershell
-dotnet restore DotBoxd.Kernels.slnx --locked-mode
-dotnet build DotBoxd.Kernels.slnx --configuration Release --no-restore
-dotnet test DotBoxd.Kernels.slnx --configuration Release --no-build
-.\scripts\run-required-tests.ps1 `
+dotnet restore DotBoxd.slnx --locked-mode
+dotnet build DotBoxd.slnx --configuration Release --no-restore
+dotnet test DotBoxd.slnx --configuration Release --no-build
+.\eng\scripts\run-required-tests.ps1 `
   -Project tests\DotBoxd.Kernels.Tests\DotBoxd.Kernels.Tests.csproj `
   -Configuration Release `
   -NoBuild `
@@ -179,14 +179,14 @@ dotnet test DotBoxd.Kernels.slnx --configuration Release --no-build
     "PinnedHttpTransportTests",
     "DifferentialFuzzTests"
   )
-.\scripts\check-docs-smoke.ps1 -Configuration Release
-.\scripts\check-csharp-file-lines.ps1
-.\scripts\check-spec-manifest.ps1
-.\scripts\check-release-readiness.ps1
+.\eng\scripts\check-docs-smoke.ps1 -Configuration Release
+.\eng\scripts\check-csharp-file-lines.ps1
+.\eng\scripts\check-spec-manifest.ps1
+.\eng\scripts\check-release-readiness.ps1
 Remove-Item artifacts\packages\*.nupkg -Force -ErrorAction SilentlyContinue
-dotnet pack DotBoxd.Kernels.slnx --configuration Release --no-build --output artifacts/packages
-.\scripts\check-package-metadata.ps1 -PackageDirectory artifacts\packages -AllowPrereleaseVersions
-.\scripts\check-package-consumer-smoke.ps1 -PackageDirectory artifacts\packages -Configuration Release
+dotnet pack DotBoxd.slnx --configuration Release --no-build --output artifacts/packages
+.\eng\scripts\check-package-metadata.ps1 -PackageDirectory artifacts\packages -AllowPrereleaseVersions
+.\eng\scripts\check-package-consumer-smoke.ps1 -PackageDirectory artifacts\packages -Configuration Release
 ```
 
 `DotBoxd.Pushdown.Services` is intentionally packed as a prerelease package while its upstream DotBoxd dependencies are prerelease-only. Stable release gates fail if this preview addon is included in a stable package set before its package version and dependencies are stable.
@@ -197,7 +197,7 @@ artifact set as the only publishable package output for a release.
 
 ## HTTP Transport Example
 
-`examples/HttpTransport` is the maintained safe-setup path for the `DotBoxd.Hosting.Http`
+`samples/Kernels/HttpTransport` is the maintained safe-setup path for the `DotBoxd.Hosting.Http`
 package. It registers `AddNetworkBindings(...)` with a deterministic in-memory invoker, grants a
 single host through `GrantHttpGet(...)` with explicit response-byte and timeout limits, runs a
 module that calls `net.http.get`, and proves both an allowed request and a denied out-of-allowlist
@@ -205,7 +205,7 @@ request. Allowlist semantics, byte limits, timeout capping, and private-network 
 production pinned transport; only the invoker is swapped for determinism.
 
 ```powershell
-dotnet run --project examples\HttpTransport\DotBoxd.Kernels.HttpTransportExample\DotBoxd.Kernels.HttpTransportExample.csproj
+dotnet run --project samples\Kernels\HttpTransport\DotBoxd.Kernels.HttpTransportExample\DotBoxd.Kernels.HttpTransportExample.csproj
 ```
 
 ## Logging Example
@@ -243,11 +243,11 @@ var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 ```
 
 The runnable standalone walkthrough lives in
-`examples/Capabilities/DotBoxd.Kernels.Example.Capabilities/Examples/SafeLoggingExample.cs` and is exercised by the
+`samples/Kernels/Capabilities/DotBoxd.Kernels.Example.Capabilities/Examples/SafeLoggingExample.cs` and is exercised by the
 docs smoke. It runs the granted path and a tight `WithMaxLogEvents` quota denial:
 
 ```powershell
-dotnet run --project examples\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
+dotnet run --project samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
 ```
 
 ## Plugin Addendum Examples
@@ -257,15 +257,15 @@ The addendum implementation lives in `src/DotBoxd.Plugins`.
 The addendum examples are split into three topic projects:
 
 ```powershell
-dotnet run --project examples\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
-dotnet run --project examples\Hosting\DotBoxd.Kernels.Example.Hosting\DotBoxd.Kernels.Example.Hosting.csproj
-dotnet run --project examples\PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring.csproj
+dotnet run --project samples\Kernels\Capabilities\DotBoxd.Kernels.Example.Capabilities\DotBoxd.Kernels.Example.Capabilities.csproj
+dotnet run --project samples\Kernels\Hosting\DotBoxd.Kernels.Example.Hosting\DotBoxd.Kernels.Example.Hosting.csproj
+dotnet run --project samples\Kernels\PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring\DotBoxd.Kernels.Example.PluginAuthoring.csproj
 ```
 
 Run the local live-kernel example:
 
 ```powershell
-dotnet run --project examples\LocalPlugin\DotBoxd.Kernels.PluginLocal\DotBoxd.Kernels.PluginLocal.csproj
+dotnet run --project samples\Kernels\LocalPlugin\DotBoxd.Kernels.PluginLocal\DotBoxd.Kernels.PluginLocal.csproj
 ```
 
 Run the real named-pipe IPC sample with the DotBoxd MessagePack addon:
@@ -273,13 +273,13 @@ Run the real named-pipe IPC sample with the DotBoxd MessagePack addon:
 Terminal 1:
 
 ```powershell
-dotnet run --project examples\PluginIpc\DotBoxd.Kernels.PluginIpc.Server\DotBoxd.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
+dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Server\DotBoxd.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
 ```
 
 Terminal 2:
 
 ```powershell
-dotnet run --project examples\PluginIpc\DotBoxd.Kernels.PluginIpc.Client\DotBoxd.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
+dotnet run --project samples\Pushdown\PluginIpc\DotBoxd.Kernels.PluginIpc.Client\DotBoxd.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
 ```
 
 See `docs\Specs\Addendum\Examples.md` for details.
@@ -296,7 +296,7 @@ baseline phase where monsters bully low-level players, the host's local preview 
 logs, and a with-plugin phase where guardian/retaliation kernels keep the weak players alive.
 
 ```powershell
-dotnet run --project examples\GameServer\DotBoxd.Kernels.Game.Server\DotBoxd.Kernels.Game.Server.csproj
+dotnet run --project samples\Kernels\GameServer\DotBoxd.Kernels.Game.Server\DotBoxd.Kernels.Game.Server.csproj
 ```
 
 ## Plugin Runtime Diagnostics

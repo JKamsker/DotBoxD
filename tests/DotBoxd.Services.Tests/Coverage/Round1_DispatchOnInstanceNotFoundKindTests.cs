@@ -7,7 +7,7 @@ using Xunit;
 namespace DotBoxd.Services.Tests.Cov;
 
 /// <summary>
-/// Round 1 regression coverage for the <see cref="IServiceDispatcher.DispatchOnInstanceAsync"/>
+/// Round 1 regression coverage for the <c>DispatchOnInstanceAsync</c>
 /// default interface member. A hand-written dispatcher that does not override the instance-scoped
 /// entry point must signal a not-found result whose <see cref="DotBoxdRpcNotFoundException.Kind"/> is
 /// <see cref="DotBoxdRpcNotFoundException.NotFoundKind.Instance"/> — the service exists, but it does not

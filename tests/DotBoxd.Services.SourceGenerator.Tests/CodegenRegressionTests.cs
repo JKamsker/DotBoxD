@@ -14,8 +14,7 @@ namespace DotBoxd.Services.SourceGenerator.Tests;
 /// generic-interface rejection, nested-interface rejection, reserved-keyword
 /// escaping, string-literal escaping, and global:: qualification.
 /// Each test compiles the user source + generated source end-to-end via
-/// <see cref="CSharpCompilation.Emit(Stream, Stream, Stream, Stream,
-/// System.Collections.Generic.IEnumerable{ResourceDescription}, EmitOptions, CompilationOptions, CancellationToken)"/>
+/// <c>Emit</c>
 /// so a generated file that doesn't actually compile would fail the test.
 /// </summary>
 public class CodegenRegressionTests
@@ -799,7 +798,7 @@ public class CodegenRegressionTests
     /// <summary>
     /// Regression for the hint-name collision discovered in round 2 review:
     /// two services with the same simple interface name in different namespaces previously
-    /// collided on <see cref="SourceProductionContext.AddSource"/> and threw at runtime.
+    /// collided on <c>AddSource</c> and threw at runtime.
     /// </summary>
     [Fact]
     public void SameSimpleInterfaceNameAcrossNamespaces_DoesNotCollideOnHintName()

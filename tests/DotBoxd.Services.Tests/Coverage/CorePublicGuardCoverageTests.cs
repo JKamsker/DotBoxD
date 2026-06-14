@@ -5,7 +5,6 @@ using DotBoxd.Services.Generated;
 using DotBoxd.Services.Serialization;
 using DotBoxd.Services.Server;
 using DotBoxd.Services.Transport;
-using DotBoxd.Services.Generated;
 using DotBoxd.Codecs.MessagePack;
 using DotBoxd.Services.Tests;
 using Shared;

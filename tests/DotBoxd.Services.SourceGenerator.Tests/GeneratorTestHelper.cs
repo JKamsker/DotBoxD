@@ -101,9 +101,9 @@ internal static class GeneratorTestHelper
 
     /// <summary>
     /// Reconstructs the hint name the generator produces for a (namespace, interface, kind)
-    /// tuple. Mirrors <see cref="DotBoxd.Services.SourceGenerator.DotBoxdRpcGenerator.HintNamePrefix"/>:
+    /// tuple. Mirrors <c>HintNamePrefix</c>:
     /// the namespace (with dots replaced by underscores) is prepended to the interface
-    /// name so two services with the same simple name don't collide on <see cref="SourceProductionContext.AddSource"/>.
+    /// name so two services with the same simple name don't collide on <c>AddSource</c>.
     /// Use this in tests instead of hardcoded literals so a future naming-scheme change
     /// only requires one edit.
     /// </summary>

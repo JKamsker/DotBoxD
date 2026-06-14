@@ -11,8 +11,8 @@ namespace DotBoxd.Services.SourceGenerator;
 /// <see cref="System.Threading.CancellationToken"/>). All emitted type references are
 /// fully qualified. When a service method's return type is itself a
 /// <c>[DotBoxdService]</c> interface the dispatcher registers the returned instance with
-/// the per-connection <see cref="DotBoxd.Services.Server.IInstanceRegistry"/> and serializes a
-/// <see cref="DotBoxd.Services.Protocol.ServiceHandle"/> in its place. Every dispatcher also
+/// the per-connection <c>IInstanceRegistry</c> and serializes a
+/// <c>ServiceHandle</c> in its place. Every dispatcher also
 /// emits a <c>DispatchOnInstanceAsync</c> override that resolves a registered instance
 /// and runs the same switch against it — so any service may be reached as a sub-service.
 /// </summary>

@@ -42,7 +42,7 @@ foreach ($allowedId in $AllowedPrereleasePackageIds) {
 }
 
 $expectedLicenseExpression = "MIT"
-$expectedRepositoryUrl = "https://github.com/JKamsker/Safe-IR"
+$expectedRepositoryUrl = "https://github.com/JKamsker/DotBoxd"
 $expectedRepositoryType = "git"
 $expectedPackageMetadata = @{
     "DotBoxd.Kernels" = @{
@@ -97,6 +97,67 @@ $expectedPackageMetadata = @{
         Description = "DotBoxd.Kernels plugin manifest, installed kernel, hook, and message-binding APIs."
         Tags = @("dotboxd", "plugins", "hooks", "kernels")
     }
+    "DotBoxd" = @{
+        Description = "DotBoxd meta-package: pulls in the full stack across all three usage modes — Services (source-generated RPC), Kernels (validated sandboxed logic hosted via DotBoxd.Hosting), and Pushdown (running kernels next to host services). Reference this single package to get the complete DotBoxd surface for a net10.0 host."
+        Tags = @("dotboxd", "rpc", "sandbox", "kernels", "pushdown", "meta")
+        Tfm = "net10.0"
+    }
+    "DotBoxd.Services.All" = @{
+        Description = "DotBoxd service/channels bundle: the source-generated RPC core (DotBoxd.Services) together with the MessagePack codec and the TCP and named-pipe transports. Targets netstandard2.1 and is Unity/IL2CPP compatible for service-only consumers that do not need the Kernels or Pushdown stack."
+        Tags = @("dotboxd", "rpc", "services", "channels", "transport", "messagepack", "unity", "il2cpp", "meta")
+        Tfm = "netstandard2.1"
+    }
+    "DotBoxd.Services" = @{
+        Description = "High-performance, transport-agnostic RPC framework for C#. Bundles the runtime core and the source generator (compile-time client proxies and server dispatchers)."
+        Tags = @("dotboxd", "sandbox", "ir", "interpreter", "compiler", "serialization", "transport")
+        Tfm = "netstandard2.1"
+        ExtraEntries = @("analyzers/dotnet/cs/DotBoxd.Services.SourceGenerator.dll")
+    }
+    "DotBoxd.Transports.Tcp" = @{
+        Description = "TCP transport implementation for DotBoxd"
+        Tags = @("dotboxd", "transport")
+        Tfm = "netstandard2.1"
+    }
+    "DotBoxd.Codecs.MessagePack" = @{
+        Description = "MessagePack serializer implementation for DotBoxd"
+        Tags = @("dotboxd", "serialization")
+        Tfm = "netstandard2.1"
+    }
+    "DotBoxd.Transports.NamedPipes" = @{
+        Description = "Named pipe transport implementation for DotBoxd process-boundary IPC."
+        Tags = @("dotboxd", "transport")
+        Tfm = "netstandard2.1"
+        Readme = "named-pipe-transport.md"
+        ExtraEntries = @("README.md")
+        SkipReadmeGuidance = $true
+    }
+}
+
+function GetPackageStructuralFacts([string] $id) {
+    $facts = @{
+        Tfm = "net10.0"
+        Readme = "README.md"
+        ExtraEntries = @()
+        SkipReadmeGuidance = $false
+    }
+
+    if ($expectedPackageMetadata.ContainsKey($id)) {
+        $entry = $expectedPackageMetadata[$id]
+        if ($entry.ContainsKey("Tfm") -and -not [string]::IsNullOrWhiteSpace([string] $entry.Tfm)) {
+            $facts.Tfm = [string] $entry.Tfm
+        }
+        if ($entry.ContainsKey("Readme") -and -not [string]::IsNullOrWhiteSpace([string] $entry.Readme)) {
+            $facts.Readme = [string] $entry.Readme
+        }
+        if ($entry.ContainsKey("ExtraEntries") -and $null -ne $entry.ExtraEntries) {
+            $facts.ExtraEntries = [string[]] $entry.ExtraEntries
+        }
+        if ($entry.ContainsKey("SkipReadmeGuidance")) {
+            $facts.SkipReadmeGuidance = [bool] $entry.SkipReadmeGuidance
+        }
+    }
+
+    return $facts
 }
 
 function IsHexString([string] $value, [int] $length) {
@@ -150,7 +211,7 @@ function AssertNoZipEntryPrefix($zip, [string] $prefix, [string] $packageName) {
     }
 }
 
-function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [string] $packageName) {
+function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [string] $tfm, [string[]] $extraEntries, [string] $packageName) {
     $allowedExact = New-Object "System.Collections.Generic.HashSet[string]" ([StringComparer]::Ordinal)
     [void] $allowedExact.Add("[Content_Types].xml")
     [void] $allowedExact.Add("_rels/.rels")
@@ -158,19 +219,25 @@ function AssertPackageEntryAllowlist($zip, [string] $id, [string] $readme, [stri
     [void] $allowedExact.Add($readme)
     [void] $allowedExact.Add(".signature.p7s")
 
+    foreach ($extra in $extraEntries) {
+        if (-not [string]::IsNullOrWhiteSpace($extra)) {
+            [void] $allowedExact.Add($extra)
+        }
+    }
+
     if ($id -eq "DotBoxd.Plugins.Analyzer") {
         [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.dll")
         [void] $allowedExact.Add("analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.xml")
     } else {
-        [void] $allowedExact.Add("lib/net10.0/$id.dll")
-        [void] $allowedExact.Add("lib/net10.0/$id.xml")
+        [void] $allowedExact.Add("lib/$tfm/$id.dll")
+        [void] $allowedExact.Add("lib/$tfm/$id.xml")
     }
 
     # Embedded, machine-readable JSON ingestion schemas (CMP-0012) are also packed so consumers can
     # load the contract from the package. The module envelope ships with the purpose-agnostic
     # serialization package; the plugin-package envelope ships with the plugin package.
     if ($id -eq "DotBoxd.Kernels.Serialization.Json") {
-        [void] $allowedExact.Add("schemas/v1/dotboxd-module.schema.json")
+        [void] $allowedExact.Add("schemas/v1/dotboxd-kernel-module.schema.json")
     }
 
     if ($id -eq "DotBoxd.Plugins") {
@@ -263,6 +330,7 @@ function AssertSymbolPackage(
     [System.IO.FileInfo] $package,
     [string] $id,
     [string] $version,
+    [string] $tfm,
     [System.Collections.IDictionary] $symbolPackages) {
     if ($id -eq "DotBoxd.Plugins.Analyzer") {
         return
@@ -277,7 +345,7 @@ function AssertSymbolPackage(
     $zip = [System.IO.Compression.ZipFile]::OpenRead($symbolPackage.FullName)
     try {
         AssertZipEntry $zip "$id.nuspec" $symbolPackage.Name
-        AssertZipEntry $zip "lib/net10.0/$id.pdb" $symbolPackage.Name
+        AssertZipEntry $zip "lib/$tfm/$id.pdb" $symbolPackage.Name
     } finally {
         $zip.Dispose()
     }
@@ -296,7 +364,13 @@ $expectedIds = [string[]] @(
     "DotBoxd.Hosting",
     "DotBoxd.Plugins.Analyzer",
     "DotBoxd.Plugins",
-    "DotBoxd.Abstractions"
+    "DotBoxd.Abstractions",
+    "DotBoxd",
+    "DotBoxd.Services.All",
+    "DotBoxd.Services",
+    "DotBoxd.Transports.Tcp",
+    "DotBoxd.Codecs.MessagePack",
+    "DotBoxd.Transports.NamedPipes"
 )
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -361,13 +435,22 @@ foreach ($package in $packages) {
 
         [void] (RequiredText $metadata "authors" $package.Name)
         AssertPackageMetadata $metadata $id $package.Name
+
+        $structuralFacts = GetPackageStructuralFacts $id
+        $expectedReadme = [string] $structuralFacts.Readme
+        $packageTfm = [string] $structuralFacts.Tfm
+        $extraEntries = [string[]] $structuralFacts.ExtraEntries
+        $skipReadmeGuidance = [bool] $structuralFacts.SkipReadmeGuidance
+
         $readme = RequiredText $metadata "readme" $package.Name
-        if ($readme -ne "README.md") {
-            throw "Package $($package.Name) must use README.md as its package readme."
+        if ($readme -ne $expectedReadme) {
+            throw "Package $($package.Name) must use $expectedReadme as its package readme."
         }
 
         AssertZipEntry $zip $readme $package.Name
-        AssertReadmeGuidance $zip $readme $package.Name
+        if (-not $skipReadmeGuidance) {
+            AssertReadmeGuidance $zip $readme $package.Name
+        }
 
         $license = $metadata.SelectSingleNode("*[local-name()='license']")
         if ($null -eq $license -or
@@ -396,12 +479,12 @@ foreach ($package in $packages) {
             AssertZipEntry $zip "analyzers/dotnet/cs/DotBoxd.Plugins.Analyzer.xml" $package.Name
             AssertNoZipEntryPrefix $zip "lib/" $package.Name
         } else {
-            AssertZipEntry $zip "lib/net10.0/$id.dll" $package.Name
-            AssertZipEntry $zip "lib/net10.0/$id.xml" $package.Name
+            AssertZipEntry $zip "lib/$packageTfm/$id.dll" $package.Name
+            AssertZipEntry $zip "lib/$packageTfm/$id.xml" $package.Name
         }
 
-        AssertPackageEntryAllowlist $zip $id $readme $package.Name
-        AssertSymbolPackage $package $id $version $symbolPackages
+        AssertPackageEntryAllowlist $zip $id $readme $packageTfm $extraEntries $package.Name
+        AssertSymbolPackage $package $id $version $packageTfm $symbolPackages
 
         $dependencies = $metadata.SelectNodes(".//*[local-name()='dependency']")
         foreach ($dependency in $dependencies) {

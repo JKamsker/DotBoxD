@@ -10,8 +10,9 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <!-- Lock files temporarily disabled during the repo merge + rebrand churn; re-enabled and
-         regenerated in the CI/release phase once project names are final. -->
+    <!-- Lock files are intentionally OFF for now: with Central Package Management across many
+         multi-TFM projects they are fragile to regenerate, so CI uses plain `dotnet restore`
+         (no locked-mode flag). Revisit once the package graph stabilizes. -->
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>JKamsker</Authors>
@@ -21,7 +22,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/JKamsker/Safe-IR</RepositoryUrl>
+    <RepositoryUrl>https://github.com/JKamsker/DotBoxd</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <DebugType>portable</DebugType>

@@ -105,13 +105,14 @@ $nugetConfig = @"
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
   <!--
-    Resolve the DotBoxd.Kernels.* packages from the freshly-built local feed only. Pinning version 0.1.0
+    Resolve every DotBoxd.* package from the freshly-built local feed only. Pinning version 0.1.0
     can otherwise collide with a previously published 0.1.0 on nuget.org, so the smoke would test
-    stale package contents instead of the local build.
+    stale package contents instead of the local build. The pattern is DotBoxd.* (not just
+    DotBoxd.Kernels.*) so the Hosting/Plugins/Abstractions/Pushdown packages also map locally.
   -->
   <packageSourceMapping>
     <packageSource key="local">
-      <package pattern="DotBoxd.Kernels.*" />
+      <package pattern="DotBoxd.*" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
@@ -129,6 +130,11 @@ $project = @"
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- This temp project lives under artifacts/ inside the repo, so MSBuild would otherwise
+         inherit the repo's Directory.Packages.props (Central Package Management) and reject the
+         inline PackageReference versions with NU1008. A real external consumer is not under our
+         CPM, so opt out here to simulate that hermetic consumption. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="DotBoxd.Hosting" Version="$($versions["DotBoxd.Hosting"])" />

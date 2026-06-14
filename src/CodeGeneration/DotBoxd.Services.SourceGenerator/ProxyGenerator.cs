@@ -6,7 +6,7 @@ namespace DotBoxd.Services.SourceGenerator;
 /// <summary>
 /// Generates client proxy classes for DotBoxd services. The generated proxy implements
 /// the user's interface exactly — same return types, same parameter list, only adding
-/// a forwarding body to <see cref="DotBoxd.Services.IRpcInvoker"/>. All emitted
+/// a forwarding body to <c>IRpcInvoker</c>. All emitted
 /// type references are fully qualified with <c>global::</c> so the generated file
 /// never depends on the user's <c>using</c> set.
 /// </summary>
