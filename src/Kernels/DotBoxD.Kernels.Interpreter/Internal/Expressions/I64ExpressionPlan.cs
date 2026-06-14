@@ -10,14 +10,16 @@ internal sealed class I64ExpressionPlan
     private readonly ExpressionKind _kind;
     private readonly int _slot;
     private readonly long _literal;
+    private readonly ulong _magic;
     private readonly I64ExpressionPlan? _left;
     private readonly I64ExpressionPlan? _right;
 
-    private I64ExpressionPlan(ExpressionKind kind, int slot = 0, long literal = 0, I64ExpressionPlan? left = null, I64ExpressionPlan? right = null)
+    private I64ExpressionPlan(ExpressionKind kind, int slot = 0, long literal = 0, ulong magic = 0, I64ExpressionPlan? left = null, I64ExpressionPlan? right = null)
     {
         _kind = kind;
         _slot = slot;
         _literal = literal;
+        _magic = magic;
         _left = left;
         _right = right;
         FuelCost = 1 + (left?.FuelCost ?? 0) + (right?.FuelCost ?? 0);
@@ -36,8 +38,27 @@ internal sealed class I64ExpressionPlan
             ExpressionKind.Multiply => SandboxInt64Math.Multiply(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Divide => SandboxInt64Math.Divide(_left!.Evaluate(frame), _right!.Evaluate(frame)),
             ExpressionKind.Remainder => SandboxInt64Math.Remainder(_left!.Evaluate(frame), _right!.Evaluate(frame)),
+            ExpressionKind.RemainderByConst => FastRemainder(_left!.Evaluate(frame), _literal, _magic),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported i64 expression"))
         };
+
+    // Exact `a % d` for a positive constant divisor d via the 64-bit reciprocal m = floor(2^64/d): for a >= 0,
+    // the high 64 bits of a*m equal floor(a/d) or one less, so a single compare-subtract gives the exact
+    // remainder (no idiv). Negatives / non-positive divisors fall back to the checked modulo — byte-identical.
+    private static long FastRemainder(long a, long divisor, ulong magic)
+    {
+        if (magic == 0u || a < 0)
+        {
+            return SandboxInt64Math.Remainder(a, divisor);
+        }
+
+        var q = (long)System.Math.BigMul((ulong)a, magic, out _);
+        var r = a - (q * divisor);
+        return r >= divisor ? r - divisor : r;
+    }
+
+    private static ulong MagicFor(long divisor)
+        => divisor > 1 ? (ulong)((System.UInt128.One << 64) / (System.UInt128)(ulong)divisor) : 0u;
 
     public static bool TryCreate(Expression expression, InterpreterFrame frame, out I64ExpressionPlan plan)
     {
@@ -51,6 +72,10 @@ internal sealed class I64ExpressionPlan
                 return true;
             case UnaryExpression { Operator: "-" } unary when TryCreate(unary.Operand, frame, out var operand):
                 plan = new I64ExpressionPlan(ExpressionKind.Negate, left: operand);
+                return true;
+            case BinaryExpression { Operator: "%", Right: LiteralExpression { Value: I64Value divisor } } modByConst
+                when divisor.Value > 0 && TryCreate(modByConst.Left, frame, out var dividend):
+                plan = new I64ExpressionPlan(ExpressionKind.RemainderByConst, literal: divisor.Value, magic: MagicFor(divisor.Value), left: dividend);
                 return true;
             case BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" } binary
                 when TryCreate(binary.Left, frame, out var left) && TryCreate(binary.Right, frame, out var right):
@@ -82,6 +107,7 @@ internal sealed class I64ExpressionPlan
         Subtract,
         Multiply,
         Divide,
-        Remainder
+        Remainder,
+        RemainderByConst
     }
 }
