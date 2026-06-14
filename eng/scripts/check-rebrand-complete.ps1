@@ -45,7 +45,7 @@ $scanRoots = @("src", "tests", "benchmarks", "samples", "eng", "schemas")
 
 # File extensions that count as source/config we care about.
 $includeExtensions = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-foreach ($ext in @(".cs", ".csproj", ".props", ".targets", ".json", ".slnx", ".editorconfig", ".md")) {
+foreach ($ext in @(".cs", ".csproj", ".props", ".targets", ".json", ".slnx", ".editorconfig", ".md", ".ps1")) {
     [void] $includeExtensions.Add($ext)
 }
 
@@ -65,6 +65,12 @@ function Test-ExcludedPath([string] $relativePath) {
     # CHANGELOG records the rename; LICENSE is legal text.
     $fileName = [System.IO.Path]::GetFileName($normalized)
     if ($fileName -ieq "CHANGELOG.md" -or $fileName -ieq "LICENSE") {
+        return $true
+    }
+
+    # This gate's own source defines the legacy/double-brand detection patterns as string
+    # literals, so it would always match itself once .ps1 files are scanned. Exclude it.
+    if ($fileName -ieq "check-rebrand-complete.ps1") {
         return $true
     }
 

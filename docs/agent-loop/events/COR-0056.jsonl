@@ -1,3 +1,0 @@
-{"at":"2026-06-12T23:33:14.5900384\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-13T00:29:10.4414951\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-13T00:32:59.7310898\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","commit":"pending","message":"Required success audit checks now reject contradictory success events carrying error codes."}

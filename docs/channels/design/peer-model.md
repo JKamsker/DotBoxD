@@ -1,7 +1,7 @@
 # DotBoxD Peer Model
 
-Status: implemented on `feature/peer-model`. The legacy `DotBoxDRpcClient` / `DotBoxDRpcServer` /
-`DotBoxDRpcPeer` and the `DuplexConnectionSplitter` have since been **removed** — `RpcPeer` and
+Status: implemented on `feature/peer-model`. The legacy `RpcClient` / `RpcServer` /
+`RpcPeer` and the `DuplexConnectionSplitter` have since been **removed** — `RpcPeer` and
 `RpcHost` are the only surface. The wire format is unchanged, so the removal is API-only.
 
 This document describes the move from a `client` / `server` mental model to a single,
@@ -40,7 +40,7 @@ The four message types already encode *direction* independently of *who sent the
 So message-id spaces never collide across directions even when both peers number their
 outbound requests from the same counter: the *type* tells you which way a frame flows. The
 old `DuplexConnectionSplitter` was an elaborate way of exploiting that fact by physically
-separating the two streams so a stock `DotBoxDRpcServer` and stock `DotBoxDRpcClient` could each
+separating the two streams so a stock `RpcServer` and stock `RpcClient` could each
 pretend they owned the socket. `RpcPeer` exploits it directly with a single loop.
 
 ## Core abstractions
@@ -173,7 +173,7 @@ public sealed class RpcPeerOptions
 
 ### `RpcHost` — accepting many connections
 
-The accept loop that lived inside `DotBoxDRpcServer` moves into a host whose *output is peers*.
+The accept loop that lived inside `RpcServer` moves into a host whose *output is peers*.
 Because each accepted connection is a full peer, the host can also call back into
 connecting peers.
 
@@ -256,9 +256,9 @@ await notifier.MessageReceivedAsync("welcome");
 
 | Was | Now | Notes |
 |---|---|---|
-| `DotBoxDRpcClient` / `IDotBoxDRpcClient` | `RpcPeer` (get-only) / `IRpcInvoker` | legacy client **removed** |
-| `DotBoxDRpcServer` + accept loop | `RpcHost` + per-conn `RpcPeer` | legacy server **removed**; accept concern is `RpcHost` |
-| `DotBoxDRpcPeer` + `DuplexConnectionSplitter` | `RpcPeer` (one loop) | both **removed** |
+| `RpcClient` / `IRpcClient` | `RpcPeer` (get-only) / `IRpcInvoker` | legacy client **removed** |
+| `RpcServer` + accept loop | `RpcHost` + per-conn `RpcPeer` | legacy server **removed**; accept concern is `RpcHost` |
+| `RpcPeer` + `DuplexConnectionSplitter` | `RpcPeer` (one loop) | both **removed** |
 | `IConnection` | `IRpcChannel` | `IConnection` **removed**; transports return `IRpcChannel` directly (impls unchanged — `IConnection` added no members) |
 | `serverBuilder.AddGameService(impl)` | `peer.ProvideGameService(impl)` | generated `Add…` extension **removed** |
 | `client.CreateGameServiceProxy()` | `peer.GetGameService()` | generated `Create…Proxy` extension **removed** |

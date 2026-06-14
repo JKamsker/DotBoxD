@@ -1,3 +1,0 @@
-{"at":"2026-06-12T21:00:37.0291471\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-12T21:04:29.3076029\u002B00:00","agent":"implementer","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-12T21:06:20.3374542\u002B00:00","agent":"implementer","type":"fixed","status":"fixed_pending_verification","commit":"working-tree","message":"Worker result validation now rejects failed worker payloads and run summaries with undefined SandboxErrorCode values. Added worker hardening regression for an undefined failure error code echoed in the run summary. Validation: worker hardening/isolation filtered dotnet test passed; ./scripts/check-csharp-file-lines.ps1 passed."}

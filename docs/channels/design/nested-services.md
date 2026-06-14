@@ -1,7 +1,7 @@
 # Nested Services in DotBoxD — Design
 
 > **Historical design note.** This document predates the peer-model refactor. The
-> `IDotBoxDRpcClient` / `DotBoxDRpcServer` / `DotBoxDRpcClientBuilder` types named below were superseded by
+> `IRpcClient` / `RpcServer` / `RpcClientBuilder` types named below were superseded by
 > the symmetric `RpcPeer` / `RpcHost` surface: the invoke contract is now `IRpcInvoker`
 > (implemented by `RpcPeer`), inbound dispatch lives in `RpcPeerInboundDispatcher`, and generated
 > proxies take an `IRpcInvoker`. The reasoning here still holds; only the type names changed.
@@ -228,7 +228,7 @@ The one subtlety: detecting `[DotBoxDService]` on a return type symbol requires 
 7. Add `InvokeOnInstanceAsync` overloads to `IRpcInvoker` and implement in `RpcPeer` (forward to the outbound request path with `InstanceId` set).
 8. Add new `MethodReturnKind` variants `TaskOfSubService` / `ValueTaskOfSubService` and a `SubServiceInfo(string InterfaceQualifiedName, string ServiceName)` value-equatable record.
 9. Extend `MethodModel` with an optional `SubServiceInfo? SubService` field.
-10. Update `DotBoxDRpcGenerator.ClassifyReturnType` to detect `[DotBoxDService]` on the unwrapped return symbol and emit the new return kinds plus `SubServiceInfo`.
+10. Update `RpcGenerator.ClassifyReturnType` to detect `[DotBoxDService]` on the unwrapped return symbol and emit the new return kinds plus `SubServiceInfo`.
 11. Update `ProxyGenerator` to add the second constructor `(IRpcInvoker, string instanceId)`, `_instanceId` field, and per-call branching between `InvokeAsync` and `InvokeOnInstanceAsync`.
 12. Update `ProxyGenerator` to emit `ServiceHandle`-aware code for sub-service-returning methods (deserialize handle, construct sub-proxy).
 13. Update `DispatcherGenerator` to emit `registry.Register(...)` + `ServiceHandle` serialization for sub-service-returning method cases.

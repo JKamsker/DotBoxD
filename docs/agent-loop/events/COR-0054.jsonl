@@ -1,3 +1,0 @@
-{"at":"2026-06-12T23:30:30.8249068\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-13T00:33:32.5667175\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-13T00:36:01.2828811\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","commit":"pending","message":"Worker run-summary validation now compares all emitted budget ceiling fields against the requested plan budget."}

@@ -1,3 +1,0 @@
-{"at":"2026-06-12T23:30:29.5203354\u002B00:00","agent":"correctness-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-13T00:33:31.3684095\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-13T00:36:00.1126073\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","commit":"pending","message":"Worker failure results now reject unsafe SafeMessage and DiagnosticId payloads before host publication."}

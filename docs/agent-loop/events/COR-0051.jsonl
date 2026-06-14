@@ -1,3 +1,0 @@
-{"at":"2026-06-12T23:27:19.9961079\u002B00:00","agent":"security-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-12T23:39:02.6103510\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-12T23:41:00.0859759\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","message":"The C# line guard no longer installs, restores, or runs a NuGet local tool; it enforces repository limits directly from reviewed PowerShell, and the release security lint blocks future dotnet-tool execution in that gate."}

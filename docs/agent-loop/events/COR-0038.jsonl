@@ -1,3 +1,0 @@
-{"at":"2026-06-12T22:48:36.7883586\u002B00:00","agent":"security-producer","type":"created","status":"open","message":"Created finding"}
-{"at":"2026-06-12T23:51:47.1758826\u002B00:00","agent":"worker","type":"claimed","status":"claimed","message":"Claimed finding"}
-{"at":"2026-06-12T23:53:05.4097854\u002B00:00","agent":"worker","type":"fixed","status":"fixed_pending_verification","message":"PluginPackageJsonSerializer.Import now runs semantic plugin package validation before returning a PluginPackage, rejecting mismatched manifest/module packages at the JSON boundary."}
