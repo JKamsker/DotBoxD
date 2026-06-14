@@ -22,7 +22,8 @@ internal static class PerformanceMatrixCases
             new("local function call", 1_000_000, 50_000, HandwrittenLocalCall, LocalCallJson()),
             new("f64 arithmetic loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenF64Arithmetic, PerformanceMatrixControlFlowCases.F64ArithmeticJson()),
             new("nested loop", 1_000, 50, PerformanceMatrixControlFlowCases.HandwrittenNestedLoop, PerformanceMatrixControlFlowCases.NestedLoopJson()),
-            new("branch in loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchLoop, PerformanceMatrixControlFlowCases.BranchLoopJson())
+            new("branch in loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchLoop, PerformanceMatrixControlFlowCases.BranchLoopJson()),
+            new("while loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenWhileLoop, PerformanceMatrixControlFlowCases.WhileLoopJson())
         ];
 
     private static string TrivialJson()

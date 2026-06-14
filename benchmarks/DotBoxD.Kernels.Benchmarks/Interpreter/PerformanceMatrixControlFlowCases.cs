@@ -48,6 +48,45 @@ internal static class PerformanceMatrixControlFlowCases
         return acc;
     }
 
+    public static object HandwrittenWhileLoop(int iterations)
+    {
+        var acc = 0;
+        var i = 0;
+        while (i < iterations)
+        {
+            acc = (acc + i) % 1_000_003;
+            i = i + 1;
+        }
+
+        return acc;
+    }
+
+    public static string WhileLoopJson()
+        => """
+        {
+          "id": "matrix-while-loop",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "iterations", "type": "I32" }],
+              "returnType": "I32",
+              "body": [
+                { "op": "set", "name": "acc", "value": { "i32": 0 } },
+                { "op": "set", "name": "i", "value": { "i32": 0 } },
+                { "op": "while", "condition": { "op": "lt", "left": { "var": "i" }, "right": { "var": "iterations" } },
+                  "body": [
+                    { "op": "set", "name": "acc", "value": { "op": "rem", "left": { "op": "add", "left": { "var": "acc" }, "right": { "var": "i" } }, "right": { "i32": 1000003 } } },
+                    { "op": "set", "name": "i", "value": { "op": "add", "left": { "var": "i" }, "right": { "i32": 1 } } }
+                  ] },
+                { "op": "return", "value": { "var": "acc" } }
+              ]
+            }
+          ]
+        }
+        """;
+
     public static string F64ArithmeticJson()
         => """
         {

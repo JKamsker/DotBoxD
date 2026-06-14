@@ -153,7 +153,17 @@ internal sealed class StatementExecutor
         return await ExecuteBlockAsync(condition.Value ? statement.Then : statement.Else, frame).ConfigureAwait(false);
     }
 
-    private async ValueTask<SandboxValue?> ExecuteWhileAsync(WhileStatement statement, InterpreterFrame frame)
+    private ValueTask<SandboxValue?> ExecuteWhileAsync(WhileStatement statement, InterpreterFrame frame)
+    {
+        if (WhileI32ForLoopRunner.TryRun(statement, frame, _context, _options, _calls))
+        {
+            return default;
+        }
+
+        return ExecuteWhileBoxedAsync(statement, frame);
+    }
+
+    private async ValueTask<SandboxValue?> ExecuteWhileBoxedAsync(WhileStatement statement, InterpreterFrame frame)
     {
         while (((BoolValue)await EvaluateAsync(statement.Condition, frame).ConfigureAwait(false)).Value)
         {
