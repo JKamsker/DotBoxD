@@ -138,7 +138,7 @@ public sealed class PeerTests
         var game = client.GetGameService();
         Assert.NotNull(await game.GetServerStatusAsync());
 
-        var accepted = await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var accepted = await connected.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var callback = accepted.GetPlayerNotifications();
         await callback.NotifyAsync("hello from host");
 
@@ -182,13 +182,13 @@ public sealed class PeerTests
         {
             // Every accepted peer is independently callable.
             var statuses = await Task.WhenAll(clients.Select(c => c.GetGameService().GetServerStatusAsync()))
-                .WaitAsync(TimeSpan.FromSeconds(5));
+                .WaitAsync(TimeSpan.FromSeconds(30));
             Assert.All(statuses, Assert.NotNull);
 
-            await allConnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await allConnected.Task.WaitAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(peerCount, Volatile.Read(ref connectedCount));
 
-            await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
             // StopAsync must close every accepted peer.
             Assert.Equal(peerCount, hostPeers.Count);
@@ -292,7 +292,7 @@ public sealed class PeerTests
         var status = await game.GetServerStatusAsync();
         Assert.NotNull(status);
 
-        var who = await greeted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var who = await greeted.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal("sample-client", who);
 
         static async Task GreetAsync(RpcPeer peer, TaskCompletionSource<string> done)

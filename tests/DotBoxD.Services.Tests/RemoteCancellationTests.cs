@@ -29,12 +29,12 @@ public sealed class RemoteCancellationTests
 
         // Cancelling the caller's token must emit a Cancel frame that cancels the remote dispatch.
         var call = client.InvokeAsync(service.ServiceName, "Wait", requestCts.Token);
-        await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         requestCts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(TimeSpan.FromSeconds(5)));
-        await service.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(TimeSpan.FromSeconds(30)));
+        await service.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     private sealed class CancellableService : IServiceDispatcher

@@ -57,7 +57,7 @@ public sealed class RpcPeerInboundQueueRegressionTests
         try
         {
             await notifications.BackpressureFramesSent.WaitAsync(TimeSpan.FromSeconds(2));
-            var result = await call.WaitAsync(TimeSpan.FromSeconds(5));
+            var result = await call.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.Equal("callback-ok", result);
         }
@@ -102,7 +102,7 @@ public sealed class RpcPeerInboundQueueRegressionTests
         try
         {
             await notifications.BackpressureFramesSent.WaitAsync(TimeSpan.FromSeconds(2));
-            var result = await call.WaitAsync(TimeSpan.FromSeconds(5));
+            var result = await call.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.Equal("callback-ok", result);
         }

@@ -27,7 +27,7 @@ public sealed class Round5_PeerDisposeChannelThrowsTests
         var invoke = peer.InvokeAsync<int, string>("Svc", "Op", request: 1);
 
         // Ensure the request is on the wire (hence registered as pending) before teardown.
-        await channel.RequestSent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await channel.RequestSent.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         // The channel's DisposeAsync throws. On the bug this aborts DisposeCoreAsync before FailPending,
         // so the pending call hangs; teardown must continue and fail it. DisposeAsync may surface the

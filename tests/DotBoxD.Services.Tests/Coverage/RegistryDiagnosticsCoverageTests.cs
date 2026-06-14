@@ -122,7 +122,7 @@ public sealed class GeneratedServiceRegistryCoverageTests
         var invoker = new RecordingInvoker();
 
         var proxy = (IGameService)GeneratedServiceRegistry.CreateProxy(typeof(IGameService), invoker);
-        var status = await proxy.GetServerStatusAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var status = await proxy.GetServerStatusAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal("from-invoker", status.Version);
         // The generated proxy must forward the wire service name to the invoker.

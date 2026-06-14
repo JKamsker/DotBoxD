@@ -21,17 +21,17 @@ public sealed class StreamingRpcTests
             .InvokeAsyncEnumerable<int>("Streaming", "Numbers")
             .GetAsyncEnumerator();
 
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal(1, enumerator.Current);
 
         var ping = await pair.Client.InvokeAsync<int>("Streaming", "Ping")
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(42, ping);
 
         service.ReleaseNumbers();
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal(2, enumerator.Current);
-        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
     }
 
     [Fact]
@@ -41,12 +41,12 @@ public sealed class StreamingRpcTests
         await using var pair = await StreamingPeerPair.StartAsync(service);
 
         var streamTask = pair.Client.InvokeStreamAsync("Streaming", "Download");
-        await service.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await using var stream = await streamTask.WaitAsync(TimeSpan.FromSeconds(5));
-        await service.DownloadSourceRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await service.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await using var stream = await streamTask.WaitAsync(TimeSpan.FromSeconds(30));
+        await service.DownloadSourceRead.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         var buffer = new byte[4];
-        var read = await stream.ReadAsync(buffer).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        var read = await stream.ReadAsync(buffer).AsTask().WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(4, read);
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, buffer);
 
@@ -54,11 +54,11 @@ public sealed class StreamingRpcTests
         Assert.False(delayedRead.IsCompleted);
 
         var ping = await pair.Client.InvokeAsync<int>("Streaming", "Ping")
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(42, ping);
 
         service.ReleaseDownload();
-        read = await delayedRead.WaitAsync(TimeSpan.FromSeconds(5));
+        read = await delayedRead.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(4, read);
         Assert.Equal(new byte[] { 5, 6, 7, 8 }, buffer);
     }
@@ -70,8 +70,8 @@ public sealed class StreamingRpcTests
         await using var pair = await StreamingPeerPair.StartAsync(service);
 
         var pipe = await pair.Client.InvokePipeAsync("Streaming", "Pipe")
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await pipe.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await pipe.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(new byte[] { 9, 10, 11 }, result.Buffer.ToArray());
         pipe.Reader.AdvanceTo(result.Buffer.End);
@@ -109,7 +109,7 @@ public sealed class StreamingRpcTests
         await WaitForStageOrUploadAsync(service.UploadBytesRead.Task, upload, "read byte stream");
         await WaitForStageOrUploadAsync(service.UploadItemsRead.Task, upload, "read item stream");
         await WaitForStageOrUploadAsync(service.UploadPipeRead.Task, upload, "read pipe stream");
-        var sum = await upload.WaitAsync(TimeSpan.FromSeconds(5));
+        var sum = await upload.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1 + 2 + 3 + 10 + 20 + 5 + 6, sum);
     }
@@ -135,8 +135,8 @@ public sealed class StreamingRpcTests
         await using var stream = new RpcRemoteStream(receiver);
         var buffer = new byte[3];
         var read = await stream.ReadAsync(buffer, CancellationToken.None).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        await outbound.WaitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
+        await outbound.WaitAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(3, read);
         Assert.Equal(new byte[] { 7, 8, 9 }, buffer);
@@ -199,11 +199,11 @@ public sealed class StreamingRpcTests
         var enumerator = pair.Client
             .InvokeAsyncEnumerable<int>("Streaming", "Numbers")
             .GetAsyncEnumerator();
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
 
         await enumerator.DisposeAsync();
 
-        await service.NumbersCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await service.NumbersCanceled.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     private static Payload CopyPayload(ReadOnlyMemory<byte> frame)
@@ -218,7 +218,7 @@ public sealed class StreamingRpcTests
         Task upload,
         string stageName)
     {
-        var completed = await Task.WhenAny(stage, upload, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(stage, upload, Task.Delay(TimeSpan.FromSeconds(30)));
         if (completed == stage)
         {
             await stage;

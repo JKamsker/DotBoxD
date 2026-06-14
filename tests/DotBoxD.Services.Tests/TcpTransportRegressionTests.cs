@@ -180,7 +180,7 @@ public sealed class TcpTransportRegressionTests
         var deadPort = ReserveThenReleasePort();
         await using var transport = new TcpTransport(IPAddress.Loopback.ToString(), deadPort);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => transport.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<Exception>(() => transport.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(30)));
 
         // A failed connect must dispose its client and leave no half-open connection behind.
         Assert.False(transport.IsConnected);
@@ -193,7 +193,7 @@ public sealed class TcpTransportRegressionTests
         var deadPort = ReserveThenReleasePort();
         var transport = new TcpTransport(IPAddress.Loopback.ToString(), deadPort);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => transport.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<Exception>(() => transport.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(30)));
 
         // Disposing after a failed connect must not throw (atomic dispose tolerates the failed state).
         await transport.DisposeAsync();

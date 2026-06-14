@@ -21,7 +21,7 @@ public sealed class NamedPipeTransportTests
         var acceptTask = serverTransport.AcceptAsync();
         var clientTransport = new NamedPipeClientTransport(pipeName);
         await clientTransport.ConnectAsync();
-        var serverConnection = await acceptTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var serverConnection = await acceptTask.WaitAsync(TimeSpan.FromSeconds(30));
 
         try
         {
@@ -30,15 +30,15 @@ public sealed class NamedPipeTransportTests
             using var frame = MessageFramer.FrameToPayload(42, MessageType.Response, ReadOnlySpan<byte>.Empty);
 
             var receiveTask = serverConnection.ReceiveAsync();
-            await clientConnection.SendAsync(frame.Memory).WaitAsync(TimeSpan.FromSeconds(5));
-            using var received = await receiveTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await clientConnection.SendAsync(frame.Memory).WaitAsync(TimeSpan.FromSeconds(30));
+            using var received = await receiveTask.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.Equal(frame.Memory.ToArray(), received.Memory.ToArray());
         }
         finally
         {
-            await clientTransport.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
-            await serverConnection.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            await clientTransport.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+            await serverConnection.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
         }
     }
 

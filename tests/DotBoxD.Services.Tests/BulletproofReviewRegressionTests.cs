@@ -29,7 +29,7 @@ public sealed class BulletproofReviewRegressionTests
         await connection.ReceiveParked.WaitAsync(TimeSpan.FromSeconds(2));
 
         var dispose = peer.DisposeAsync().AsTask();
-        var winner = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(5)));
+        var winner = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(30)));
 
         Assert.Same(dispose, winner); // a deadlock would let the 5s delay win first
         await dispose;

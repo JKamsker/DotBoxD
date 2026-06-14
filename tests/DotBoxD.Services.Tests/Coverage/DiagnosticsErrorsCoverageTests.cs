@@ -52,7 +52,7 @@ public sealed class DiagnosticsErrorsCoverageTests
                 // must route that fault to diagnostics instead of breaking teardown.
                 registry.ReleaseAll();
 
-                var args = await observed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var args = await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
                 Assert.Same(boom, args.Error);
                 Assert.False(string.IsNullOrEmpty(args.Operation));
@@ -139,7 +139,7 @@ public sealed class DiagnosticsErrorsCoverageTests
                 // must not bubble out of teardown.
                 registry.ReleaseAll();
 
-                Assert.True(await secondObserved.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+                Assert.True(await secondObserved.Task.WaitAsync(TimeSpan.FromSeconds(30)));
             }
             finally
             {

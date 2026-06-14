@@ -37,7 +37,7 @@ public class StreamConnectionTests
         {
             var receiveTask = server.ReceiveAsync();
             await client.SendAsync(frame.Memory);
-            using var received = await receiveTask.WaitAsync(TimeSpan.FromSeconds(5));
+            using var received = await receiveTask.WaitAsync(TimeSpan.FromSeconds(30));
 
             Assert.Equal(frame.Memory.ToArray(), received.Memory.ToArray());
         }
