@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ShaRPC.Core\ShaRPC.Core.csproj" />
+    <ProjectReference Include="..\..\Services\ShaRPC.Core\ShaRPC.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\docs\named-pipe-transport.md"
+    <None Include="..\..\..\docs\channels\named-pipe-transport.md"
           Pack="true"
           PackagePath="\" />
   </ItemGroup>

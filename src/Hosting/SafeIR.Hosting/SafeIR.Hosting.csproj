@@ -6,12 +6,12 @@
     <PackageTags>safe-ir;sandbox;hosting;orchestration;isolation</PackageTags>
   </PropertyGroup>
 <ItemGroup>
-    <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
-    <ProjectReference Include="..\SafeIR.Validation\SafeIR.Validation.csproj" />
-    <ProjectReference Include="..\SafeIR.Runtime\SafeIR.Runtime.csproj" />
-    <ProjectReference Include="..\SafeIR.Interpreter\SafeIR.Interpreter.csproj" />
-    <ProjectReference Include="..\SafeIR.Compiler\SafeIR.Compiler.csproj" />
-    <ProjectReference Include="..\SafeIR.Verifier\SafeIR.Verifier.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Validation\SafeIR.Validation.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Runtime\SafeIR.Runtime.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Interpreter\SafeIR.Interpreter.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Compiler\SafeIR.Compiler.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Verifier\SafeIR.Verifier.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

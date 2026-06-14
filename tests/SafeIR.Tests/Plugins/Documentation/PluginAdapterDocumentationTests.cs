@@ -14,13 +14,12 @@ public sealed class PluginAdapterDocumentationTests
             File.ReadAllText(Path.Combine(root, "docs", "Specs", "Addendum", "Examples.md")));
         Assert.Contains(
             "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
-            File.ReadAllText(Path.Combine(root, "examples", "LocalPlugin", "SafeIR.PluginLocal", "Program.cs")));
+            File.ReadAllText(Path.Combine(root, "samples", "Kernels", "LocalPlugin", "SafeIR.PluginLocal", "Program.cs")));
         Assert.Contains(
             "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
             File.ReadAllText(Path.Combine(
                 root,
-                "examples",
-                "PluginIpc",
+                "samples", "Pushdown", "PluginIpc",
                 "SafeIR.PluginIpc.Server",
                 "PluginControlService.cs")));
     }
@@ -48,12 +47,12 @@ public sealed class PluginAdapterDocumentationTests
             File.ReadAllText(Path.Combine(root, "docs", "Specs", "Addendum", "Examples.md")));
         Assert.Contains(
             "defaultPolicy: PluginPolicy()",
-            File.ReadAllText(Path.Combine(root, "examples", "LocalPlugin", "SafeIR.PluginLocal", "Program.cs")));
+            File.ReadAllText(Path.Combine(root, "samples", "Kernels", "LocalPlugin", "SafeIR.PluginLocal", "Program.cs")));
         Assert.Contains(
             "defaultPolicy: PluginExamplePolicies.MessageWrite()",
             File.ReadAllText(Path.Combine(
                 root,
-                "examples",
+                "samples", "Kernels",
                 "PluginAuthoring",
                 "SafeIR.Example.PluginAuthoring",
                 "Examples",
@@ -65,7 +64,7 @@ public sealed class PluginAdapterDocumentationTests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

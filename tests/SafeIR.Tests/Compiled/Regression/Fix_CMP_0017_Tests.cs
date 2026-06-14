@@ -6,13 +6,13 @@ namespace SafeIR.Tests;
 /// <summary>
 /// Regression coverage for CMP-0017: the public <see cref="SandboxHostBuilder.ForwardAuditEventsTo"/>
 /// observer surface had no runnable, user-facing example. The implementation and unit tests existed
-/// (<c>tests/SafeIR.Tests/Audit/AuditObserverTests.cs</c>), but nothing under <c>examples/</c> showed
+/// (<c>tests/SafeIR.Tests/Audit/AuditObserverTests.cs</c>), but nothing under <c>samples/Kernels/</c> showed
 /// consumers how to wire an observer, prove observed events match
 /// <see cref="SandboxExecutionResult.AuditEvents"/>, or prove a throwing observer is isolated. Because
 /// none of the docs-smoke examples contained <c>ForwardAuditEventsTo</c>, a release could ship while the
 /// documented observer contract drifted from the package surface.
 ///
-/// The fix adds <c>examples/Capabilities/SafeIR.Example.Capabilities/Examples/AuditObserverExample.cs</c>, wires
+/// The fix adds <c>samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Examples/AuditObserverExample.cs</c>, wires
 /// it into the Capabilities example runner (which the docs-smoke script executes), and links it from the
 /// addendum examples doc. These tests pin both halves of the fix:
 /// (1) the runnable example exists, is wired into the smoke-executed runner, and is documented; and
@@ -21,10 +21,10 @@ namespace SafeIR.Tests;
 public sealed class Fix_CMP_0017_Tests
 {
     private const string ExampleRelative =
-        "examples/Capabilities/SafeIR.Example.Capabilities/Examples/AuditObserverExample.cs";
+        "samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Examples/AuditObserverExample.cs";
 
     private const string RunnerRelative =
-        "examples/Capabilities/SafeIR.Example.Capabilities/Program.cs";
+        "samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Program.cs";
 
     private const string DocsRelative = "docs/Specs/Addendum/Examples.md";
 
@@ -161,7 +161,7 @@ public sealed class Fix_CMP_0017_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

@@ -47,9 +47,9 @@ public sealed class Fix_API_0008_Tests
     {
         var root = RepositoryRoot();
         var shipped = File.ReadAllText(Path.Combine(
-            root, "src", "SafeIR.PluginAnalyzer", "AnalyzerReleases.Shipped.md"));
+            root, "src", "CodeGeneration", "SafeIR.PluginAnalyzer", "AnalyzerReleases.Shipped.md"));
         var unshipped = File.ReadAllText(Path.Combine(
-            root, "src", "SafeIR.PluginAnalyzer", "AnalyzerReleases.Unshipped.md"));
+            root, "src", "CodeGeneration", "SafeIR.PluginAnalyzer", "AnalyzerReleases.Unshipped.md"));
 
         // The help links published on the analyzer rules point consumers at these files,
         // so each tracked ID must actually appear in the reference it links to.
@@ -79,7 +79,7 @@ public sealed class Fix_API_0008_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

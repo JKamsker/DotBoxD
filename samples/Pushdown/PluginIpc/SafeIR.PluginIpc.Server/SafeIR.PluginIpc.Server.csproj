@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Hosting\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Pushdown\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
     <ProjectReference Include="..\SafeIR.PluginIpc.Shared\SafeIR.PluginIpc.Shared.csproj" />
     <ProjectReference Include="..\SafeIR.PluginIpc.Server.Abstractions\SafeIR.PluginIpc.Server.Abstractions.csproj" />
-    <ProjectReference Include="..\..\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj" />
+    <ProjectReference Include="..\..\..\Kernels\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

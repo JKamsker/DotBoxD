@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Pushdown\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
     <ProjectReference Include="..\SafeIR.PluginIpc.Shared\SafeIR.PluginIpc.Shared.csproj" />
   </ItemGroup>
 

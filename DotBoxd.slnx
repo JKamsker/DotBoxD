@@ -1,74 +1,94 @@
 <Solution>
-    <Folder Name="/src/">
-        <Project Path="src/SafeIR.PluginAnalyzer/SafeIR.PluginAnalyzer.csproj" />
-        <Project Path="src/SafeIR.Compiler/SafeIR.Compiler.csproj" />
-        <Project Path="src/SafeIR.Core/SafeIR.Core.csproj" />
-        <Project Path="src/SafeIR.Hosting/SafeIR.Hosting.csproj" />
-        <Project Path="src/SafeIR.Interpreter/SafeIR.Interpreter.csproj" />
-        <Project Path="src/SafeIR.Plugins/SafeIR.Plugins.csproj" />
-        <Project Path="src/SafeIR.Runtime/SafeIR.Runtime.csproj" />
-        <Project Path="src/SafeIR.Serialization.Json/SafeIR.Serialization.Json.csproj" />
-        <Project Path="src/SafeIR.Server.Abstractions/SafeIR.Server.Abstractions.csproj" />
-        <Project Path="src/SafeIR.Transport.Http/SafeIR.Transport.Http.csproj" />
-        <Project Path="src/SafeIR.Transport.Ipc.ShaRpc/SafeIR.Transport.Ipc.ShaRpc.csproj" />
-        <Project Path="src/SafeIR.Validation/SafeIR.Validation.csproj" />
-        <Project Path="src/SafeIR.Verifier/SafeIR.Verifier.csproj" />
-    </Folder>
-    <Folder Name="/examples/" />
-    <Folder Name="/examples/Capabilities/">
-        <Project Path="examples/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj" />
-    </Folder>
-    <Folder Name="/examples/GameServer/">
-        <Project Path="examples/GameServer/SafeIR.Game.Plugin/SafeIR.Game.Plugin.csproj" />
-        <Project Path="examples/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj" />
-        <Project Path="examples/GameServer/SafeIR.Game.Server.Abstractions/SafeIR.Game.Server.Abstractions.csproj" />
-    </Folder>
-    <Folder Name="/examples/Hosting/">
-        <Project Path="examples/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj" />
-    </Folder>
-    <Folder Name="/examples/HttpTransport/">
-        <Project Path="examples/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj" />
-    </Folder>
-    <Folder Name="/examples/LocalPlugin/">
-        <Project Path="examples/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
-    </Folder>
-    <Folder Name="/examples/PluginAuthoring/">
-        <Project Path="examples/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj" />
-    </Folder>
-    <Folder Name="/examples/PluginIpc/">
-        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
-        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
-        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
-        <Project Path="examples/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
-    </Folder>
-    <Folder Name="/benchmarks/">
-        <Project Path="benchmarks/SafeIR.Benchmarks/SafeIR.Benchmarks.csproj" />
-    </Folder>
-    <Folder Name="/tests/">
-        <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
-    </Folder>
-    <Folder Name="/tools/">
-        <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
-        <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
-    </Folder>
-    <!-- Solution Items -->
-<!--
-    <Folder Name="/Solution Items/">
-        <File Path="Directory.Packages.props" />
-    </Folder>
--->
 
-    <!-- List of Projects -->
-<!--
-    <Project Path="ADD_PROJECT_FILE_1_RELATIVE_PATH_HERE" />
-    <Project Path="ADD_PROJECT_FILE_2_RELATIVE_PATH_HERE">
-        <Configuration />
-        <Deploy />
-    </Project>
--->
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
 
-    <!-- Support is provisionally available on Visual Studio 17.10 and later versions. -->
-    <Properties Name="Visual Studio">
-        <Property Name="OpenWith" Value="17" />
-    </Properties>
+  <Folder Name="/src/Services/">
+    <Project Path="src/Services/ShaRPC.Core/ShaRPC.Core.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Channels/">
+    <Project Path="src/Channels/ShaRPC.Transports.Tcp/ShaRPC.Transports.Tcp.csproj" />
+    <Project Path="src/Channels/ShaRPC.Transports.NamedPipes/ShaRPC.Transports.NamedPipes.csproj" />
+    <Project Path="src/Channels/ShaRPC.Serializers.MessagePack/ShaRPC.Serializers.MessagePack.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Kernels/">
+    <Project Path="src/Kernels/SafeIR.Core/SafeIR.Core.csproj" />
+    <Project Path="src/Kernels/SafeIR.Validation/SafeIR.Validation.csproj" />
+    <Project Path="src/Kernels/SafeIR.Runtime/SafeIR.Runtime.csproj" />
+    <Project Path="src/Kernels/SafeIR.Interpreter/SafeIR.Interpreter.csproj" />
+    <Project Path="src/Kernels/SafeIR.Compiler/SafeIR.Compiler.csproj" />
+    <Project Path="src/Kernels/SafeIR.Verifier/SafeIR.Verifier.csproj" />
+    <Project Path="src/Kernels/SafeIR.Serialization.Json/SafeIR.Serialization.Json.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/">
+    <Project Path="src/Hosting/SafeIR.Hosting/SafeIR.Hosting.csproj" />
+    <Project Path="src/Hosting/SafeIR.Server.Abstractions/SafeIR.Server.Abstractions.csproj" />
+    <Project Path="src/Hosting/SafeIR.Plugins/SafeIR.Plugins.csproj" />
+    <Project Path="src/Hosting/SafeIR.Transport.Http/SafeIR.Transport.Http.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Pushdown/">
+    <Project Path="src/Pushdown/SafeIR.Transport.Ipc.ShaRpc/SafeIR.Transport.Ipc.ShaRpc.csproj" />
+  </Folder>
+
+  <Folder Name="/src/CodeGeneration/">
+    <Project Path="src/CodeGeneration/ShaRPC.SourceGenerator/ShaRPC.SourceGenerator.csproj" />
+    <Project Path="src/CodeGeneration/SafeIR.PluginAnalyzer/SafeIR.PluginAnalyzer.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/SafeIR.Tests/SafeIR.Tests.csproj" />
+    <Project Path="tests/ShaRPC.Tests/ShaRPC.Tests.csproj" />
+    <Project Path="tests/ShaRPC.SourceGenerator.Tests/ShaRPC.SourceGenerator.Tests.csproj" />
+    <Project Path="tests/ShaRPC.Tests.GeneratedFixtures/ShaRPC.Tests.GeneratedFixtures.csproj" />
+  </Folder>
+
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/SafeIR.Benchmarks/SafeIR.Benchmarks.csproj" />
+    <Project Path="benchmarks/ShaRPC.Benchmarks/ShaRPC.Benchmarks.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Services/">
+    <Project Path="samples/Services/GameService/Shared/Shared.csproj" />
+    <Project Path="samples/Services/GameService/Server/Server.csproj" />
+    <Project Path="samples/Services/GameService/Client/Client.csproj" />
+    <Project Path="samples/Services/Inventory/Shared/Inventory.Shared.csproj" />
+    <Project Path="samples/Services/Inventory/Server/Inventory.Server.csproj" />
+    <Project Path="samples/Services/Inventory/Client/Inventory.Client.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Kernels/">
+    <Project Path="samples/Kernels/Capabilities/SafeIR.Example.Capabilities/SafeIR.Example.Capabilities.csproj" />
+    <Project Path="samples/Kernels/GameServer/SafeIR.Game.Plugin/SafeIR.Game.Plugin.csproj" />
+    <Project Path="samples/Kernels/GameServer/SafeIR.Game.Server/SafeIR.Game.Server.csproj" />
+    <Project Path="samples/Kernels/GameServer/SafeIR.Game.Server.Abstractions/SafeIR.Game.Server.Abstractions.csproj" />
+    <Project Path="samples/Kernels/Hosting/SafeIR.Example.Hosting/SafeIR.Example.Hosting.csproj" />
+    <Project Path="samples/Kernels/HttpTransport/SafeIR.HttpTransportExample/SafeIR.HttpTransportExample.csproj" />
+    <Project Path="samples/Kernels/LocalPlugin/SafeIR.PluginLocal/SafeIR.PluginLocal.csproj" />
+    <Project Path="samples/Kernels/PluginAuthoring/SafeIR.Example.PluginAuthoring/SafeIR.Example.PluginAuthoring.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/Pushdown/">
+    <Project Path="samples/Pushdown/PluginIpc/SafeIR.PluginIpc.Shared/SafeIR.PluginIpc.Shared.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/SafeIR.PluginIpc.Server.Abstractions/SafeIR.PluginIpc.Server.Abstractions.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/SafeIR.PluginIpc.Server/SafeIR.PluginIpc.Server.csproj" />
+    <Project Path="samples/Pushdown/PluginIpc/SafeIR.PluginIpc.Client/SafeIR.PluginIpc.Client.csproj" />
+  </Folder>
+
+  <Folder Name="/tools/">
+    <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
+    <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
+  </Folder>
+
+  <Properties Name="Visual Studio">
+    <Property Name="OpenWith" Value="17" />
+  </Properties>
+
 </Solution>

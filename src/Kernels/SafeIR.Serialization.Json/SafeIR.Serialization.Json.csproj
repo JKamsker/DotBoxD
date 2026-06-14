@@ -7,7 +7,7 @@
   </PropertyGroup>
 <ItemGroup>
     <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
-    <ProjectReference Include="..\SafeIR.Hosting\SafeIR.Hosting.csproj" />
+    <ProjectReference Include="..\..\Hosting\SafeIR.Hosting\SafeIR.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +22,7 @@
     embedded by SafeIR.Plugins (see PluginPackageJsonSchemas).
   -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\schemas\v1\safe-ir-module.schema.json"
+    <EmbeddedResource Include="..\..\..\schemas\v1\safe-ir-module.schema.json"
                       LogicalName="SafeIR.Serialization.Json.schemas.v1.safe-ir-module.schema.json"
                       Pack="true"
                       PackagePath="schemas\v1\safe-ir-module.schema.json" />

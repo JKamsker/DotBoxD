@@ -10,7 +10,7 @@ namespace SafeIR.Tests;
 // Regression guard for CMP-0013: the maintained HTTP transport example must keep proving the
 // consumer-facing safe setup (AddNetworkBindings + GrantHttpGet) through the public package
 // surface, with one allowed request and one denied out-of-allowlist request. This mirrors what
-// examples/HttpTransport runs, so behavior drift in the documented setup is caught here too.
+// samples/Kernels/HttpTransport runs, so behavior drift in the documented setup is caught here too.
 public sealed class Fix_CMP_0013_Tests
 {
     private const string AllowedHost = "api.example.com";

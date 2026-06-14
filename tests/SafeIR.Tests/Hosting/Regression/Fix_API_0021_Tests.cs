@@ -72,7 +72,7 @@ public sealed class Fix_API_0021_Tests
     [Fact]
     public void Package_consumer_smoke_references_and_calls_the_exporter()
     {
-        var script = ReadRepositoryText(Path.Combine("scripts", "check-package-consumer-smoke.ps1"));
+        var script = ReadRepositoryText(Path.Combine("eng", "scripts", "check-package-consumer-smoke.ps1"));
 
         // The smoke must do more than reference the importer/upload types: it has to exercise the
         // packaged exporter so a dropped namespace, wrong package placement, or missing transitive
@@ -97,7 +97,7 @@ public sealed class Fix_API_0021_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

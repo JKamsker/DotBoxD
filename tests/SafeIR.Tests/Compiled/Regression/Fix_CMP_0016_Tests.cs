@@ -18,14 +18,12 @@ public sealed class Fix_CMP_0016_Tests
     {
         var itemContracts = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "examples",
-            "PluginIpc",
+            "samples", "Pushdown", "PluginIpc",
             "SafeIR.PluginIpc.Server.Abstractions",
             "ItemContracts.cs"));
         var formulaContracts = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "examples",
-            "PluginIpc",
+            "samples", "Pushdown", "PluginIpc",
             "SafeIR.PluginIpc.Server.Abstractions",
             "FormulaContracts.cs"));
 
@@ -42,7 +40,7 @@ public sealed class Fix_CMP_0016_Tests
     {
         var example = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "examples",
+            "samples", "Kernels",
             "PluginAuthoring",
             "SafeIR.Example.PluginAuthoring",
             "Examples",
@@ -80,7 +78,7 @@ public sealed class Fix_CMP_0016_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

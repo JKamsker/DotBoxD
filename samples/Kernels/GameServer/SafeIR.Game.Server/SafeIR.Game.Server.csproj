@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Hosting\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Kernels\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Pushdown\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
     <ProjectReference Include="..\SafeIR.Game.Server.Abstractions\SafeIR.Game.Server.Abstractions.csproj" />
   </ItemGroup>
 

@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Core\SafeIR.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

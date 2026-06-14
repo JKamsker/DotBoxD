@@ -95,7 +95,7 @@ public sealed class Fix_API_0019_Tests
 
     private static HashSet<string> EmittedRuntimePluginCodes()
     {
-        var pluginsRoot = Path.Combine(RepositoryRoot(), "src", "SafeIR.Plugins");
+        var pluginsRoot = Path.Combine(RepositoryRoot(), "src", "Hosting", "SafeIR.Plugins");
         var codes = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in Directory.EnumerateFiles(pluginsRoot, "*.cs", SearchOption.AllDirectories))
         {
@@ -120,7 +120,7 @@ public sealed class Fix_API_0019_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

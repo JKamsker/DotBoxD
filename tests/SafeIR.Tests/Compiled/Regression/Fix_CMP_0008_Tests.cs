@@ -24,7 +24,7 @@ public sealed class Fix_CMP_0008_Tests
     private const string ReleaseReadinessRelative =
         "docs/Specs/Initial/safe-ir-sandbox-spec/checklists/release-readiness.md";
 
-    private const string ScriptRelative = "scripts/check-release-readiness.ps1";
+    private const string ScriptRelative = "eng/scripts/check-release-readiness.ps1";
 
     [Fact]
     public void Documentation_section_is_inventory_and_fully_checked_complete()
@@ -143,7 +143,7 @@ public sealed class Fix_CMP_0008_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

@@ -7,13 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
+    <PackageReference Include="BenchmarkDotNet" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ShaRPC.Core\ShaRPC.Core.csproj" />
-    <ProjectReference Include="..\..\src\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj" />
-    <ProjectReference Include="..\..\samples\GameService\Shared\Shared.csproj" />
+    <ProjectReference Include="..\..\src\Services\ShaRPC.Core\ShaRPC.Core.csproj" />
+    <ProjectReference Include="..\..\src\Channels\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj" />
+    <ProjectReference Include="..\..\samples\Services\GameService\Shared\Shared.csproj" />
   </ItemGroup>
 
 </Project>

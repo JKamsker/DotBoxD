@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,12 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="ShaRPC" Version="1.0.0-ci.30" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.14.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ProjectReference Include="..\..\src\Services\ShaRPC.Core\ShaRPC.Core.csproj" />
+    <ProjectReference Include="..\..\src\CodeGeneration\ShaRPC.SourceGenerator\ShaRPC.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,20 +22,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\examples\PluginIpc\SafeIR.PluginIpc.Server.Abstractions\SafeIR.PluginIpc.Server.Abstractions.csproj" />
-    <ProjectReference Include="..\..\examples\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.PluginAnalyzer\SafeIR.PluginAnalyzer.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Core\SafeIR.Core.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Validation\SafeIR.Validation.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Runtime\SafeIR.Runtime.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Transport.Http\SafeIR.Transport.Http.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Interpreter\SafeIR.Interpreter.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Compiler\SafeIR.Compiler.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Hosting\SafeIR.Hosting.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
-    <ProjectReference Include="..\..\src\SafeIR.Verifier\SafeIR.Verifier.csproj" />
+    <ProjectReference Include="..\..\samples\Pushdown\PluginIpc\SafeIR.PluginIpc.Server.Abstractions\SafeIR.PluginIpc.Server.Abstractions.csproj" />
+    <ProjectReference Include="..\..\samples\Kernels\LocalPlugin\SafeIR.PluginLocal\SafeIR.PluginLocal.csproj" />
+    <ProjectReference Include="..\..\src\CodeGeneration\SafeIR.PluginAnalyzer\SafeIR.PluginAnalyzer.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Validation\SafeIR.Validation.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Runtime\SafeIR.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\SafeIR.Transport.Http\SafeIR.Transport.Http.csproj" />
+    <ProjectReference Include="..\..\src\Pushdown\SafeIR.Transport.Ipc.ShaRpc\SafeIR.Transport.Ipc.ShaRpc.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Interpreter\SafeIR.Interpreter.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Compiler\SafeIR.Compiler.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\SafeIR.Hosting\SafeIR.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\Hosting\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+    <ProjectReference Include="..\..\src\Kernels\SafeIR.Verifier\SafeIR.Verifier.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,12 +3,16 @@
     <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors Condition=" '$(GITHUB_ACTIONS)' == 'true' ">true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors Condition=" '$(GITHUB_ACTIONS)' != 'true' ">false</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>NU1900</WarningsNotAsErrors>
     <AnalysisLevel>10.0</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Lock files temporarily disabled during the repo merge + rebrand churn; re-enabled and
+         regenerated in the CI/release phase once project names are final. -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>JKamsker</Authors>
     <Company>JKamsker</Company>

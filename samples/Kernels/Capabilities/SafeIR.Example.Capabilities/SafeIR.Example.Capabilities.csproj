@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\SafeIR.Hosting\SafeIR.Hosting.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Runtime\SafeIR.Runtime.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Hosting\SafeIR.Hosting\SafeIR.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Kernels\SafeIR.Runtime\SafeIR.Runtime.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Kernels\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

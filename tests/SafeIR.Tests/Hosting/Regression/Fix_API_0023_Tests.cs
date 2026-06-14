@@ -18,7 +18,7 @@ public sealed class Fix_API_0023_Tests
     {
         var path = Path.Combine(
             RepositoryRoot(),
-            "scripts",
+            "eng", "scripts",
             "check-package-consumer-smoke.ps1");
         Assert.True(File.Exists(path), $"Missing package consumer smoke script: {path}");
         return File.ReadAllText(path);
@@ -107,7 +107,7 @@ public sealed class Fix_API_0023_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

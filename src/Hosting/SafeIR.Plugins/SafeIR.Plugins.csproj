@@ -6,10 +6,10 @@
     <PackageTags>safe-ir;sandbox;plugins;hooks;kernels</PackageTags>
   </PropertyGroup>
 <ItemGroup>
-    <ProjectReference Include="..\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Core\SafeIR.Core.csproj" />
     <ProjectReference Include="..\SafeIR.Hosting\SafeIR.Hosting.csproj" />
-    <ProjectReference Include="..\SafeIR.Runtime\SafeIR.Runtime.csproj" />
-    <ProjectReference Include="..\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Runtime\SafeIR.Runtime.csproj" />
+    <ProjectReference Include="..\..\Kernels\SafeIR.Serialization.Json\SafeIR.Serialization.Json.csproj" />
     <ProjectReference Include="..\SafeIR.Server.Abstractions\SafeIR.Server.Abstractions.csproj" />
   </ItemGroup>
 
@@ -19,7 +19,7 @@
     LogicalName pins the resource name regardless of build host or link path.
   -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\schemas\v1\safe-ir-plugin-package.schema.json"
+    <EmbeddedResource Include="..\..\..\schemas\v1\safe-ir-plugin-package.schema.json"
                       LogicalName="SafeIR.Plugins.schemas.v1.safe-ir-plugin-package.schema.json"
                       Pack="true"
                       PackagePath="schemas\v1\safe-ir-plugin-package.schema.json" />

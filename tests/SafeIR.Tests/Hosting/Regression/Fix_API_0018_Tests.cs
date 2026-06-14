@@ -74,7 +74,7 @@ public sealed class Fix_API_0018_Tests
 
     private static HashSet<string> EmittedVerifierCodes()
     {
-        var verifierRoot = Path.Combine(RepositoryRoot(), "src", "SafeIR.Verifier");
+        var verifierRoot = Path.Combine(RepositoryRoot(), "src", "Kernels", "SafeIR.Verifier");
         var codes = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in Directory.EnumerateFiles(verifierRoot, "*.cs", SearchOption.AllDirectories))
         {
@@ -99,7 +99,7 @@ public sealed class Fix_API_0018_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

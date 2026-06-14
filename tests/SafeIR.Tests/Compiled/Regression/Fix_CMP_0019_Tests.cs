@@ -13,7 +13,7 @@ namespace SafeIR.Tests;
 /// results and the matching <see cref="SandboxResourceUsage"/> counters. A release could regress non-fuel
 /// wiring while docs-smoke still passed because no user-facing sample exercised those knobs.
 ///
-/// The fix adds <c>examples/Capabilities/SafeIR.Example.Capabilities/Examples/ResourceLimitsExample.cs</c>, wires
+/// The fix adds <c>samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Examples/ResourceLimitsExample.cs</c>, wires
 /// it into the Capabilities example runner (which the docs-smoke script executes), and links it from the
 /// addendum examples doc. These tests pin both halves of the fix: (1) the runnable example exists, is
 /// wired into the smoke-executed runner, and is documented; and (2) the behavior the example demonstrates
@@ -22,10 +22,10 @@ namespace SafeIR.Tests;
 public sealed class Fix_CMP_0019_Tests
 {
     private const string ExampleRelative =
-        "examples/Capabilities/SafeIR.Example.Capabilities/Examples/ResourceLimitsExample.cs";
+        "samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Examples/ResourceLimitsExample.cs";
 
     private const string RunnerRelative =
-        "examples/Capabilities/SafeIR.Example.Capabilities/Program.cs";
+        "samples/Kernels/Capabilities/SafeIR.Example.Capabilities/Program.cs";
 
     private const string DocsRelative = "docs/Specs/Addendum/Examples.md";
 
@@ -279,7 +279,7 @@ public sealed class Fix_CMP_0019_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

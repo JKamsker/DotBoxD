@@ -6,17 +6,17 @@ namespace SafeIR.Tests;
 public sealed class AddonBoundaryTests
 {
     private static readonly string[] CoreLibraryDirectories = [
-        "src/SafeIR.Core",
-        "src/SafeIR.Validation",
-        "src/SafeIR.Hosting",
-        "src/SafeIR.Runtime"
+        "src/Kernels/SafeIR.Core",
+        "src/Kernels/SafeIR.Validation",
+        "src/Hosting/SafeIR.Hosting",
+        "src/Kernels/SafeIR.Runtime"
     ];
 
     private static readonly string[] CoreLibraryProjects = [
-        "src/SafeIR.Core/SafeIR.Core.csproj",
-        "src/SafeIR.Validation/SafeIR.Validation.csproj",
-        "src/SafeIR.Hosting/SafeIR.Hosting.csproj",
-        "src/SafeIR.Runtime/SafeIR.Runtime.csproj"
+        "src/Kernels/SafeIR.Core/SafeIR.Core.csproj",
+        "src/Kernels/SafeIR.Validation/SafeIR.Validation.csproj",
+        "src/Hosting/SafeIR.Hosting/SafeIR.Hosting.csproj",
+        "src/Kernels/SafeIR.Runtime/SafeIR.Runtime.csproj"
     ];
 
     private static readonly string[] ForbiddenCoreTokens = [
@@ -149,7 +149,7 @@ public sealed class AddonBoundaryTests
     private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SafeIR.slnx"))) {
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DotBoxd.slnx"))) {
             directory = directory.Parent;
         }
 

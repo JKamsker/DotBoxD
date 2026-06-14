@@ -29,13 +29,13 @@ public sealed class Fix_CMP_0012_Tests
     private const string PackageSchemaRelative = "schemas/v1/safe-ir-plugin-package.schema.json";
 
     private const string ImporterRelative =
-        "src/SafeIR.Serialization.Json/SafeIrJsonImporter.cs";
+        "src/Kernels/SafeIR.Serialization.Json/SafeIrJsonImporter.cs";
 
     private const string ExpressionReaderRelative =
-        "src/SafeIR.Serialization.Json/Internal/JsonExpressionReader.cs";
+        "src/Kernels/SafeIR.Serialization.Json/Internal/JsonExpressionReader.cs";
 
     private const string SerializerRelative =
-        "src/SafeIR.Plugins/Json/PluginPackageJsonSerializer.cs";
+        "src/Hosting/SafeIR.Plugins/Json/PluginPackageJsonSerializer.cs";
 
     [Fact]
     public void Versioned_schema_artifacts_are_checked_in_under_a_version_segment()
@@ -234,7 +234,7 @@ public sealed class Fix_CMP_0012_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

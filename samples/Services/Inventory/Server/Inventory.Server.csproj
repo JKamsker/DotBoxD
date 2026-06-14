@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\ShaRPC.Core\ShaRPC.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\ShaRPC.Transports.Tcp\ShaRPC.Transports.Tcp.csproj" />
-    <ProjectReference Include="..\..\..\src\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ShaRPC.Core\ShaRPC.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Channels\ShaRPC.Transports.Tcp\ShaRPC.Transports.Tcp.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Channels\ShaRPC.Serializers.MessagePack\ShaRPC.Serializers.MessagePack.csproj" />
     <ProjectReference Include="..\Shared\Inventory.Shared.csproj" />
   </ItemGroup>
 

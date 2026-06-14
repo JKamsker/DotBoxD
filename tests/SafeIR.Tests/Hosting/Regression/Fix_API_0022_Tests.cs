@@ -13,12 +13,12 @@ public sealed class Fix_API_0022_Tests
 {
     [Theory]
     // SafeIR.Compiler internal helpers cited in the finding.
-    [InlineData("SafeIR.Compiler", "src/SafeIR.Compiler/Emitters/MethodEmitter.cs")]
-    [InlineData("SafeIR.Compiler", "src/SafeIR.Compiler/IlEmitterPrimitives.cs")]
-    [InlineData("SafeIR.Compiler", "src/SafeIR.Compiler/Internal/PersistentCompiledArtifactCacheValidator.cs")]
+    [InlineData("SafeIR.Compiler", "src/Kernels/SafeIR.Compiler/Emitters/MethodEmitter.cs")]
+    [InlineData("SafeIR.Compiler", "src/Kernels/SafeIR.Compiler/IlEmitterPrimitives.cs")]
+    [InlineData("SafeIR.Compiler", "src/Kernels/SafeIR.Compiler/Internal/PersistentCompiledArtifactCacheValidator.cs")]
     // SafeIR.PluginAnalyzer internal helpers cited in the finding.
-    [InlineData("SafeIR.PluginAnalyzer", "src/SafeIR.PluginAnalyzer/Analysis/EquatableArray.cs")]
-    [InlineData("SafeIR.PluginAnalyzer", "src/SafeIR.PluginAnalyzer/Analysis/Lowering/Expressions/SafeIrExpressionLoweringContext.cs")]
+    [InlineData("SafeIR.PluginAnalyzer", "src/CodeGeneration/SafeIR.PluginAnalyzer/Analysis/EquatableArray.cs")]
+    [InlineData("SafeIR.PluginAnalyzer", "src/CodeGeneration/SafeIR.PluginAnalyzer/Analysis/Lowering/Expressions/SafeIrExpressionLoweringContext.cs")]
     public void Baseline_excludes_public_members_of_internal_types(string packageId, string sourceRelativePath)
     {
         var sourcePath = Path.Combine(RepositoryRoot(), sourceRelativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -214,7 +214,7 @@ public sealed class Fix_API_0022_Tests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "SafeIR.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "DotBoxd.slnx")))
             {
                 return current.FullName;
             }

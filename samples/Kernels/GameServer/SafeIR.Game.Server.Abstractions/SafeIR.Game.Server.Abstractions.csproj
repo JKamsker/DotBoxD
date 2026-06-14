@@ -1,13 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <PackageReference Include="MessagePack" Version="3.1.7" />
-    <PackageReference Include="ShaRPC" Version="1.0.0-ci.30" />
+    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\SafeIR.Core\SafeIR.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\SafeIR.Plugins\SafeIR.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ShaRPC.Core\ShaRPC.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\CodeGeneration\ShaRPC.SourceGenerator\ShaRPC.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Kernels\SafeIR.Core\SafeIR.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Hosting\SafeIR.Plugins\SafeIR.Plugins.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
