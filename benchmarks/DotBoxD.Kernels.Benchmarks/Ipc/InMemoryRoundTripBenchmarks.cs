@@ -20,13 +20,13 @@ public class InMemoryRoundTripBenchmarks
     public async Task SetupAsync()
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
-        _host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        _host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()),
             CreateServerOptions(LowAllocationProfile));
         await _host.StartAsync().ConfigureAwait(false);
 
-        _client = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        _client = await RpcMessagePackIpc.ConnectAsync(
                 new SingleConnectionTransport(clientChannel, ownsConnection: true),
                 CreateClientOptions(LowAllocationProfile))
             .ConfigureAwait(false);

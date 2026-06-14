@@ -27,7 +27,7 @@ public sealed class StreamingWave13RegressionTests
             new[] { handle });
 
         _ = context.GetAsyncEnumerable<int>(handle);
-        var error = Assert.Throws<DotBoxDRpcProtocolException>(
+        var error = Assert.Throws<ServiceProtocolException>(
             () => context.GetAsyncEnumerable<int>(handle));
 
         Assert.Contains("already claimed", error.Message);
@@ -48,7 +48,7 @@ public sealed class StreamingWave13RegressionTests
             SendAndCompleteAsync,
             streams);
 
-        var error = await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(
+        var error = await Assert.ThrowsAsync<ServiceProtocolException>(
             () => invoker.InvokeAsync<int>("Svc", "Streamed"));
 
         Assert.Contains("non-streaming invocation", error.Message);
@@ -95,7 +95,7 @@ public sealed class StreamingWave13RegressionTests
             SendAndCompleteAsync,
             streams);
 
-        var error = await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(
+        var error = await Assert.ThrowsAsync<ServiceProtocolException>(
             () => invoker.InvokeAsyncEnumerableAsync<int>("Svc", "Mixed"));
 
         Assert.Contains("payload must be empty", error.Message);
@@ -160,7 +160,7 @@ public sealed class StreamingWave13RegressionTests
             Assert.Equal(0, streams.InboundReceiverCount);
             Assert.Equal(RpcCanceledInboundStreams.Capacity, streams.CanceledInboundCount);
 
-            var error = Assert.Throws<DotBoxDRpcProtocolException>(() =>
+            var error = Assert.Throws<ServiceProtocolException>(() =>
                 streams.RegisterInboundResponse(
                     new RpcStreamHandle(19_500, RpcStreamKind.Binary),
                     CancellationToken.None));

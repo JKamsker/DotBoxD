@@ -2,7 +2,7 @@ namespace DotBoxD.Kernels.Serialization.Json;
 
 /// <summary>
 /// Exposes the versioned, machine-readable JSON Schema artifact that describes the public
-/// Safe IR module ingestion envelope accepted by <see cref="DotBoxDJsonImporter.Import(string)"/>.
+/// Safe IR module ingestion envelope accepted by <see cref="JsonImporter.Import(string)"/>.
 /// The plugin package envelope schema lives with the plugin layer in
 /// <c>DotBoxD.Plugins.PluginPackageJsonSchemas</c>.
 /// </summary>
@@ -14,7 +14,7 @@ namespace DotBoxD.Kernels.Serialization.Json;
 /// <see cref="SchemaVersion"/> and the <c>v{n}</c> directory segment, and update the schema files
 /// alongside the importer/exporter.
 /// </remarks>
-public static class DotBoxDJsonSchemas
+public static class JsonSchemas
 {
     private const string ResourcePrefix = "DotBoxD.Kernels.Serialization.Json.schemas.v1.";
 
@@ -28,13 +28,13 @@ public static class DotBoxDJsonSchemas
 
     /// <summary>
     /// JSON Schema document for the Safe IR module envelope
-    /// (<see cref="DotBoxDJsonImporter.Import(string)"/>).
+    /// (<see cref="JsonImporter.Import(string)"/>).
     /// </summary>
     public static string ModuleEnvelope => ReadResource(ModuleResourceName);
 
     private static string ReadResource(string resourceName)
     {
-        var assembly = typeof(DotBoxDJsonSchemas).Assembly;
+        var assembly = typeof(JsonSchemas).Assembly;
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
                 $"Embedded JSON schema resource '{resourceName}' was not found. " +

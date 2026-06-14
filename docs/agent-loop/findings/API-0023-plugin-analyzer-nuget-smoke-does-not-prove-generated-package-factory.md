@@ -39,7 +39,7 @@ A broken analyzer package layout, missing analyzer dependency, wrong `analyzers/
 - `docs/Specs/Addendum/Examples.md:48` states that the current source generator lowers `IEventKernel<TEvent>` kernels into plugin packages.
 - `docs/Specs/Addendum/Examples.md:55` through the surrounding sample use `[GamePlugin("fire-damage")]` on `FireDamageKernel`, and `docs/Specs/Addendum/Examples.md:117` installs the generated `FireDamagePluginPackage.Create()` factory.
 - The runnable examples that exercise generated factories wire the analyzer through source-tree project references, not the NuGet package: `examples/Addendum/DotBoxD.Kernels.AddendumExamples/DotBoxD.Kernels.AddendumExamples.csproj:4` and `examples/LocalPlugin/DotBoxD.Kernels.PluginLocal/DotBoxD.Kernels.PluginLocal.csproj:4` both reference `src/DotBoxD.Plugins.Analyzer` as an analyzer project reference.
-- `scripts/check-package-consumer-smoke.ps1:116` references the packaged `DotBoxD.Plugins.Analyzer`, but its generated `Program.cs` only compile-checks package types such as `DotBoxDJsonImporter`, `PluginPackageJsonSerializer`, and `DotBoxDDotBoxDRpcMessagePackIpc`; it does not define a `[GamePlugin]` kernel, implement `IEventKernel<TEvent>`, or call a generated `*PluginPackage.Create()` member.
+- `scripts/check-package-consumer-smoke.ps1:116` references the packaged `DotBoxD.Plugins.Analyzer`, but its generated `Program.cs` only compile-checks package types such as `JsonImporter`, `PluginPackageJsonSerializer`, and `RpcMessagePackIpc`; it does not define a `[GamePlugin]` kernel, implement `IEventKernel<TEvent>`, or call a generated `*PluginPackage.Create()` member.
 
 ## Suggested test or smoke
 

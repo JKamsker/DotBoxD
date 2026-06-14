@@ -61,7 +61,7 @@ public static partial class PluginPackageJsonSerializer
         RequireAllowedProperties(element, "plugin package", ["manifest", "module", "entrypoints"]);
         var manifest = ReadManifest(Required(element, "manifest"));
         var moduleElement = Required(element, "module");
-        var module = DotBoxDJsonImporter.Import(moduleElement, moduleElement.GetRawText());
+        var module = JsonImporter.Import(moduleElement, moduleElement.GetRawText());
         var entrypoints = element.TryGetProperty("entrypoints", out var entrypointElement)
             ? ReadEntrypoints(entrypointElement)
             : null;

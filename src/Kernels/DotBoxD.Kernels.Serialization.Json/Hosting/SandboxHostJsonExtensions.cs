@@ -11,6 +11,6 @@ public static class SandboxHostJsonExtensions
     {
         ArgumentNullException.ThrowIfNull(host);
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(DotBoxDJsonImporter.Import(jsonIr));
+        return ValueTask.FromResult(JsonImporter.Import(jsonIr));
     }
 }

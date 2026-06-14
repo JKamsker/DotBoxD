@@ -498,12 +498,12 @@ public static class SandboxHostJsonExtensions
         CancellationToken cancellationToken = default);
 }
 
-public static class DotBoxDJsonImporter
+public static class JsonImporter
 {
     public static SandboxModule Import(string json);
 }
 
-public static class DotBoxDJsonExporter
+public static class JsonExporter
 {
     public static string Export(SandboxModule module, bool indented = false);
 }

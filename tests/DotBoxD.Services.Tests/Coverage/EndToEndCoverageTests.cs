@@ -190,7 +190,7 @@ public sealed class EndToEndCoverageTests
             peer => peer.ProvideGameService(new TestGameService()));
         try
         {
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => game.GetPlayerStateAsync(new PlayerId { Id = "ghost" }).WaitAsync(Timeout));
 
             // Default: detail is hidden, opaque internal error type and message.
@@ -223,7 +223,7 @@ public sealed class EndToEndCoverageTests
         {
             var game = client.GetGameService();
 
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => game.GetPlayerStateAsync(new PlayerId { Id = "ghost" }).WaitAsync(Timeout));
 
             // Opt-in transformer exposes the real runtime type name and message.
@@ -257,7 +257,7 @@ public sealed class EndToEndCoverageTests
         {
             var game = client.GetGameService();
 
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => game.GetPlayerStateAsync(new PlayerId { Id = "ghost" }).WaitAsync(Timeout));
 
             Assert.Equal(RpcErrorTypes.InternalError, ex.RemoteExceptionType);
@@ -291,7 +291,7 @@ public sealed class EndToEndCoverageTests
         {
             var game = client.GetGameService();
 
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => game.GetPlayerStateAsync(new PlayerId { Id = "ghost" }).WaitAsync(Timeout));
 
             Assert.Equal("APP_PLAYER_MISSING", ex.RemoteExceptionType);
@@ -314,7 +314,7 @@ public sealed class EndToEndCoverageTests
         // Host provides nothing, so every service lookup misses.
         await using var h = await TransportHarness.StartTcpAsync(_ => { });
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => h.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
         Assert.Equal(RpcErrorTypes.ServiceNotFound, ex.RemoteExceptionType);
@@ -329,7 +329,7 @@ public sealed class EndToEndCoverageTests
             peer => peer.ProvideGameService(new TestGameService()));
         try
         {
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => client.InvokeAsync<ServerStatus>("IGameService", "NoSuchMethod").WaitAsync(Timeout));
 
             Assert.Equal(RpcErrorTypes.MethodNotFound, ex.RemoteExceptionType);
@@ -350,7 +350,7 @@ public sealed class EndToEndCoverageTests
             peer => peer.ProvideGameService(new TestGameService()));
         try
         {
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+            var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                 () => client.InvokeOnInstanceAsync<ServerStatus>(
                     "IGameService", "no-such-instance", "GetServerStatusAsync").WaitAsync(Timeout));
 
@@ -521,7 +521,7 @@ public sealed class EndToEndCoverageTests
             await host.DisposeAsync().AsTask().WaitAsync(Timeout);
 
             // Any subsequent call must fail with a DotBoxD exception rather than hang or return.
-            await Assert.ThrowsAnyAsync<DotBoxDRpcException>(
+            await Assert.ThrowsAnyAsync<ServiceException>(
                 () => InvokeUntilFailsAsync(game).WaitAsync(Timeout));
         }
         finally

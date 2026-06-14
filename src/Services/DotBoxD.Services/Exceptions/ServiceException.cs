@@ -3,17 +3,17 @@ namespace DotBoxD.Services.Exceptions;
 /// <summary>
 /// Base exception for DotBoxD errors.
 /// </summary>
-public class DotBoxDRpcException : Exception
+public class ServiceException : Exception
 {
-    public DotBoxDRpcException()
+    public ServiceException()
     {
     }
 
-    public DotBoxDRpcException(string message) : base(message)
+    public ServiceException(string message) : base(message)
     {
     }
 
-    public DotBoxDRpcException(string message, Exception innerException) : base(message, innerException)
+    public ServiceException(string message, Exception innerException) : base(message, innerException)
     {
     }
 }
@@ -21,14 +21,14 @@ public class DotBoxDRpcException : Exception
 /// <summary>
 /// Exception thrown when a remote RPC call fails.
 /// </summary>
-public class DotBoxDRpcRemoteException : DotBoxDRpcException
+public class RemoteServiceException : ServiceException
 {
     /// <summary>
     /// The type name of the remote exception.
     /// </summary>
     public string RemoteExceptionType { get; }
 
-    public DotBoxDRpcRemoteException(string message, string remoteExceptionType)
+    public RemoteServiceException(string message, string remoteExceptionType)
         : base(message)
     {
         RemoteExceptionType = remoteExceptionType;
@@ -38,13 +38,13 @@ public class DotBoxDRpcRemoteException : DotBoxDRpcException
 /// <summary>
 /// Exception thrown when a connection fails.
 /// </summary>
-public class DotBoxDRpcConnectionException : DotBoxDRpcException
+public class ServiceConnectionException : ServiceException
 {
-    public DotBoxDRpcConnectionException(string message) : base(message)
+    public ServiceConnectionException(string message) : base(message)
     {
     }
 
-    public DotBoxDRpcConnectionException(string message, Exception innerException) : base(message, innerException)
+    public ServiceConnectionException(string message, Exception innerException) : base(message, innerException)
     {
     }
 }
@@ -52,9 +52,9 @@ public class DotBoxDRpcConnectionException : DotBoxDRpcException
 /// <summary>
 /// Exception thrown when a request times out.
 /// </summary>
-public class DotBoxDRpcTimeoutException : DotBoxDRpcException
+public class ServiceTimeoutException : ServiceException
 {
-    public DotBoxDRpcTimeoutException(string message) : base(message)
+    public ServiceTimeoutException(string message) : base(message)
     {
     }
 }
@@ -62,7 +62,7 @@ public class DotBoxDRpcTimeoutException : DotBoxDRpcException
 /// <summary>
 /// Exception thrown when a service, method, or sub-service instance is not found.
 /// </summary>
-public class DotBoxDRpcNotFoundException : DotBoxDRpcException
+public class ServiceNotFoundException : ServiceException
 {
     /// <summary>Distinguishes which lookup produced the not-found result.</summary>
     public enum NotFoundKind
@@ -77,11 +77,11 @@ public class DotBoxDRpcNotFoundException : DotBoxDRpcException
         Instance,
     }
 
-    public DotBoxDRpcNotFoundException(string message) : this(message, NotFoundKind.Service)
+    public ServiceNotFoundException(string message) : this(message, NotFoundKind.Service)
     {
     }
 
-    public DotBoxDRpcNotFoundException(string message, NotFoundKind kind) : base(message)
+    public ServiceNotFoundException(string message, NotFoundKind kind) : base(message)
     {
         Kind = kind;
     }
@@ -93,9 +93,9 @@ public class DotBoxDRpcNotFoundException : DotBoxDRpcException
 /// <summary>
 /// Exception thrown when an inbound DotBoxD frame is malformed or cannot be decoded.
 /// </summary>
-public class DotBoxDRpcProtocolException : DotBoxDRpcException
+public class ServiceProtocolException : ServiceException
 {
-    public DotBoxDRpcProtocolException(string message) : base(message)
+    public ServiceProtocolException(string message) : base(message)
     {
     }
 }

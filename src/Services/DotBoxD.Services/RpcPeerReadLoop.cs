@@ -114,8 +114,8 @@ internal sealed class RpcPeerReadLoop
         _markClosed();
         _outbound.FailPending(
             readError is null
-                ? new DotBoxDRpcConnectionException("Connection closed.")
-                : new DotBoxDRpcConnectionException("Connection lost.", readError));
+                ? new ServiceConnectionException("Connection closed.")
+                : new ServiceConnectionException("Connection lost.", readError));
         _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 

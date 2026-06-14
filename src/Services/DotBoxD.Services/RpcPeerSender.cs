@@ -27,7 +27,7 @@ internal sealed class RpcPeerSender : IDisposable
         // park in WaitAsync (with a non-cancellable token) only to strand on a disposed send lock.
         if (_isClosed())
         {
-            throw new DotBoxDRpcConnectionException("Connection closed.");
+            throw new ServiceConnectionException("Connection closed.");
         }
 
         try
@@ -38,14 +38,14 @@ internal sealed class RpcPeerSender : IDisposable
         {
             // DisposeAsync disposed the send lock while this send raced teardown; surface the
             // connection contract rather than leaking ObjectDisposedException to the caller.
-            throw new DotBoxDRpcConnectionException("Connection closed.");
+            throw new ServiceConnectionException("Connection closed.");
         }
 
         try
         {
             if (_isClosed())
             {
-                throw new DotBoxDRpcConnectionException("Connection closed.");
+                throw new ServiceConnectionException("Connection closed.");
             }
 
             if (_valueTaskChannel is null)
@@ -88,7 +88,7 @@ internal sealed class RpcPeerSender : IDisposable
         if (_isClosed())
         {
             frame.Dispose();
-            throw new DotBoxDRpcConnectionException("Connection closed.");
+            throw new ServiceConnectionException("Connection closed.");
         }
 
         try
@@ -98,7 +98,7 @@ internal sealed class RpcPeerSender : IDisposable
         catch (ObjectDisposedException)
         {
             frame.Dispose();
-            throw new DotBoxDRpcConnectionException("Connection closed.");
+            throw new ServiceConnectionException("Connection closed.");
         }
         catch
         {
@@ -110,7 +110,7 @@ internal sealed class RpcPeerSender : IDisposable
         {
             if (_isClosed())
             {
-                throw new DotBoxDRpcConnectionException("Connection closed.");
+                throw new ServiceConnectionException("Connection closed.");
             }
 
             MessageFramer.ValidateOutgoingFrame(frame.WrittenSpan);

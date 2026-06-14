@@ -22,7 +22,7 @@ internal static class Program
 
         // Connect to the game server's control plane and wrap it in a server-shaped shim.
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
-        await using var connection = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName).ConfigureAwait(false);
+        await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName).ConfigureAwait(false);
         var server = new RemotePluginServer(connection.Get<IGamePluginControlService>());
 
         // Register each kernel as the implementation of a server service contract. Register resolves

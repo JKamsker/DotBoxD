@@ -29,10 +29,10 @@ DotBoxD.Kernels's public JSON module and plugin-package upload boundary does not
 
 ## Evidence
 
-- `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:427` exposes `DotBoxDJsonImporter.Import(string json)` and `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:440` exposes `PluginPackageJsonSerializer.Import(string json)` as public JSON ingestion APIs.
+- `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:427` exposes `JsonImporter.Import(string json)` and `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:440` exposes `PluginPackageJsonSerializer.Import(string json)` as public JSON ingestion APIs.
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md:452` says JSON import is the only built-in text ingestion path for Safe IR.
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/03-architecture.md:113` calls out JSON schema boundary checks as part of the JSON addon architecture.
-- `src/DotBoxD.Kernels.Serialization.Json/DotBoxDJsonImporter.cs:34` hard-codes the allowed top-level module fields, and the importer repeats strict `RequireAllowedProperties` checks for functions, statements, expressions, and types throughout that file.
+- `src/DotBoxD.Kernels.Serialization.Json/JsonImporter.cs:34` hard-codes the allowed top-level module fields, and the importer repeats strict `RequireAllowedProperties` checks for functions, statements, expressions, and types throughout that file.
 - `src/DotBoxD.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs:166` hard-codes plugin package fields, and `src/DotBoxD.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs:178`/`:238`/`:299`/`:307` enforce manifest, live-setting, subscription, and entrypoint shapes.
 - A repository search for `*.schema.json` and `*schema*.json` found no checked-in JSON Schema file outside build artifacts.
 - Existing tests exercise importer behavior, but they do not produce a consumable schema artifact for plugin authors, admin UIs, upload validators, or package tooling.

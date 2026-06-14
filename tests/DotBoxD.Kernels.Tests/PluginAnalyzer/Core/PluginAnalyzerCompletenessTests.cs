@@ -293,7 +293,7 @@ public sealed class PluginAnalyzerCompletenessTests
     {
         var compilation = CreateCompilation(source);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,

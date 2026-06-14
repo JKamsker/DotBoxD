@@ -109,8 +109,8 @@ public sealed class ValueTaskChannelCoverageTests
         ValueTask<T> call,
         ValueTaskInvokerHarness harness)
     {
-        harness.Invoker.FailPending(new DotBoxDRpcConnectionException("Connection closed."));
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        harness.Invoker.FailPending(new ServiceConnectionException("Connection closed."));
+        await Assert.ThrowsAsync<ServiceConnectionException>(
             () => call.AsTask().WaitAsync(Timeout));
     }
 
@@ -222,7 +222,7 @@ public sealed class ValueTaskChannelCoverageTests
                 return;
             }
 
-            Invoker.FailPending(new DotBoxDRpcConnectionException("Connection closed."));
+            Invoker.FailPending(new ServiceConnectionException("Connection closed."));
             await Invoker.StopCancelFramesAsync().ConfigureAwait(false);
             _streams.Stop();
         }

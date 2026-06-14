@@ -1,6 +1,6 @@
 namespace DotBoxD.Kernels.Tests;
 
-public sealed class DotBoxDJsonExporterTests
+public sealed class JsonExporterTests
 {
     private static readonly SourceSpan Span = new(1, 1);
 
@@ -31,8 +31,8 @@ public sealed class DotBoxDJsonExporterTests
                 ["kernel"] = "JsonExporterKernel"
             });
 
-        var json = DotBoxDJsonExporter.Export(module, indented: true);
-        var roundTrip = DotBoxDJsonImporter.Import(json);
+        var json = JsonExporter.Export(module, indented: true);
+        var roundTrip = JsonImporter.Import(json);
 
         Assert.Equal("json-exporter", roundTrip.Id);
         Assert.Equal(SemVersion.One, roundTrip.TargetSandboxVersion);
@@ -85,7 +85,7 @@ public sealed class DotBoxDJsonExporterTests
             ],
             new Dictionary<string, string>());
 
-        var roundTrip = DotBoxDJsonImporter.Import(DotBoxDJsonExporter.Export(module));
+        var roundTrip = JsonImporter.Import(JsonExporter.Export(module));
         var function = Assert.Single(roundTrip.Functions);
 
         Assert.Collection(
@@ -122,7 +122,7 @@ public sealed class DotBoxDJsonExporterTests
             [new SandboxFunction("Big", true, [], SandboxType.I32, statements)],
             new Dictionary<string, string> { ["pluginId"] = "large-export" });
 
-        var json = DotBoxDJsonExporter.Export(module);
+        var json = JsonExporter.Export(module);
 
         // Switching from MemoryStream.ToArray() to ArrayBufferWriter.WrittenSpan must
         // still decode the full payload: no truncation, and no trailing pooled-buffer
@@ -130,7 +130,7 @@ public sealed class DotBoxDJsonExporterTests
         Assert.EndsWith("}", json);
         Assert.Equal(json.Length, json.TrimEnd('\0').Length);
 
-        var roundTrip = DotBoxDJsonImporter.Import(json);
+        var roundTrip = JsonImporter.Import(json);
         var function = Assert.Single(roundTrip.Functions);
         Assert.Equal(statements.Count, function.Body.Count);
     }

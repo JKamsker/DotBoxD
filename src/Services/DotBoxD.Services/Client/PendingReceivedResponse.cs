@@ -10,11 +10,11 @@ internal sealed class PendingReceivedResponse :
     TaskCompletionSource<ReceivedResponse>,
     IPendingResponse
 {
-    private readonly DotBoxDRpcPendingRequests _owner;
+    private readonly PendingRequests _owner;
     private long _timeoutDeadline = long.MaxValue;
     private int _cancellationKind;
 
-    public PendingReceivedResponse(DotBoxDRpcPendingRequests owner, int messageId)
+    public PendingReceivedResponse(PendingRequests owner, int messageId)
         : base(TaskCreationOptions.RunContinuationsAsynchronously)
     {
         _owner = owner;

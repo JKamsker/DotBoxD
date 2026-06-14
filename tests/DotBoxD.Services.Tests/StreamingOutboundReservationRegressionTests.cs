@@ -66,7 +66,7 @@ public sealed class StreamingOutboundReservationRegressionTests
             RpcStreamAttachment.FromStream(handle, source, leaveOpen: false),
         };
 
-        await Assert.ThrowsAsync<DotBoxDRpcException>(() =>
+        await Assert.ThrowsAsync<ServiceException>(() =>
             invoker.InvokeAsync<RpcStreamHandle, int>(
                 "Svc",
                 "Upload",
@@ -196,7 +196,7 @@ public sealed class StreamingOutboundReservationRegressionTests
             RpcStreamAttachment.FromStream(handle, second, leaveOpen: false),
         };
 
-        await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(() =>
+        await Assert.ThrowsAsync<ServiceProtocolException>(() =>
             invoker.InvokeAsync<(RpcStreamHandle, RpcStreamHandle), int>(
                 "Svc",
                 "Upload",

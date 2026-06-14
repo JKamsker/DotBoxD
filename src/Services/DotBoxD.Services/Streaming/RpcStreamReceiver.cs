@@ -234,7 +234,7 @@ internal sealed class RpcStreamReceiver
         catch (Exception ex)
         {
             RpcDiagnostics.Report("Stream credit notification failed", ex);
-            Abort(new DotBoxDRpcConnectionException("Stream credit notification failed.", ex));
+            Abort(new ServiceConnectionException("Stream credit notification failed.", ex));
             _manager.RemoveCompletedInbound(this);
         }
     }

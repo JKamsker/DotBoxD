@@ -167,7 +167,7 @@ public sealed class RpcPeerOptions
     // under-sized Wait queue can stall a reentrant response until RequestTimeout.
     public int? InboundQueueCapacity { get; init; } = 1024;
     public int MaxPendingRequests { get; init; } = 4096;
-    public DotBoxDRpcQueueFullMode QueueFullMode { get; init; } = DotBoxDRpcQueueFullMode.Wait;
+    public QueueFullMode QueueFullMode { get; init; } = QueueFullMode.Wait;
 }
 ```
 

@@ -33,7 +33,7 @@ public sealed class RpcPeerInboundQueueBoundTests
                 new RpcPeerOptions
                 {
                     InboundQueueCapacity = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -73,7 +73,7 @@ public sealed class RpcPeerInboundQueueBoundTests
                 new RpcPeerOptions
                 {
                     InboundQueueCapacity = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.DropIncoming,
+                    QueueFullMode = QueueFullMode.DropIncoming,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -114,7 +114,7 @@ public sealed class RpcPeerInboundQueueBoundTests
                 {
                     InboundQueueCapacity = 5,
                     MaxConcurrentInboundDispatch = 3,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -152,7 +152,7 @@ public sealed class RpcPeerInboundQueueBoundTests
                 {
                     InboundQueueCapacity = 100,
                     MaxInboundBytes = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)

@@ -7,8 +7,8 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Identical_modules_share_canonical_hash()
     {
-        var first = DotBoxDJsonImporter.Import(SumModule());
-        var second = DotBoxDJsonImporter.Import(SumModule());
+        var first = JsonImporter.Import(SumModule());
+        var second = JsonImporter.Import(SumModule());
 
         Assert.Equal(CanonicalModuleHasher.Hash(first), CanonicalModuleHasher.Hash(second));
     }
@@ -16,7 +16,7 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Canonical_serialization_records_canonicalizer_version()
     {
-        var module = DotBoxDJsonImporter.Import(SumModule());
+        var module = JsonImporter.Import(SumModule());
         var serialized = CanonicalModuleHasher.Serialize(module);
 
         Assert.Contains(CanonicalModuleHasher.CanonicalizerVersion, serialized);
@@ -25,13 +25,13 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Statement_order_is_semantic()
     {
-        var declareThenOther = DotBoxDJsonImporter.Import(ModuleWithBody(
+        var declareThenOther = JsonImporter.Import(ModuleWithBody(
             """
             { "op": "set", "name": "first", "value": { "i32": 1 } },
             { "op": "set", "name": "second", "value": { "i32": 2 } },
             { "op": "return", "value": { "var": "first" } }
             """));
-        var swapped = DotBoxDJsonImporter.Import(ModuleWithBody(
+        var swapped = JsonImporter.Import(ModuleWithBody(
             """
             { "op": "set", "name": "second", "value": { "i32": 2 } },
             { "op": "set", "name": "first", "value": { "i32": 1 } },
@@ -44,10 +44,10 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Operand_order_is_semantic()
     {
-        var left = DotBoxDJsonImporter.Import(ModuleWithReturn(
+        var left = JsonImporter.Import(ModuleWithReturn(
             """{ "op": "sub", "left": { "i32": 1 }, "right": { "i32": 2 } }""",
             "I32"));
-        var right = DotBoxDJsonImporter.Import(ModuleWithReturn(
+        var right = JsonImporter.Import(ModuleWithReturn(
             """{ "op": "sub", "left": { "i32": 2 }, "right": { "i32": 1 } }""",
             "I32"));
 
@@ -57,8 +57,8 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Literal_authored_type_affects_hash()
     {
-        var asInt = DotBoxDJsonImporter.Import(ModuleWithReturn("""{ "i32": 1 }""", "I32"));
-        var asDouble = DotBoxDJsonImporter.Import(ModuleWithReturn("""{ "f64": 1.0 }""", "F64"));
+        var asInt = JsonImporter.Import(ModuleWithReturn("""{ "i32": 1 }""", "I32"));
+        var asDouble = JsonImporter.Import(ModuleWithReturn("""{ "f64": 1.0 }""", "F64"));
 
         Assert.NotEqual(CanonicalModuleHasher.Hash(asInt), CanonicalModuleHasher.Hash(asDouble));
     }
@@ -66,8 +66,8 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Parameter_name_is_part_of_hash()
     {
-        var first = DotBoxDJsonImporter.Import(ModuleWithParameter("p0"));
-        var second = DotBoxDJsonImporter.Import(ModuleWithParameter("p1"));
+        var first = JsonImporter.Import(ModuleWithParameter("p0"));
+        var second = JsonImporter.Import(ModuleWithParameter("p1"));
 
         Assert.NotEqual(CanonicalModuleHasher.Hash(first), CanonicalModuleHasher.Hash(second));
     }
@@ -91,7 +91,7 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Floating_point_literals_hash_independently_of_current_culture()
     {
-        var module = DotBoxDJsonImporter.Import(ModuleWithReturn("""{ "f64": 1.5 }""", "F64"));
+        var module = JsonImporter.Import(ModuleWithReturn("""{ "f64": 1.5 }""", "F64"));
         var originalCulture = CultureInfo.CurrentCulture;
         try {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
@@ -113,7 +113,7 @@ public sealed class CanonicalModuleHasherTests
     [Fact]
     public void Canonical_serialization_escapes_internal_control_separators()
     {
-        var module = DotBoxDJsonImporter.Import(ModuleWithReturn(
+        var module = JsonImporter.Import(ModuleWithReturn(
             """{ "string": "a\u0000b\u001fc\r\n\t\\d" }""",
             "String"));
 

@@ -2,13 +2,18 @@
 <#
 .SYNOPSIS
     Rebrand-completeness gate. Fails if any legacy ShaRPC/SafeIR brand token (or a
-    legacy SGP#### diagnostic id) survives in the active source tree.
+    legacy SGP#### diagnostic id) survives in the active source tree, or if the
+    DotBoxD brand is accidentally repeated back-to-back in an identifier.
 
 .DESCRIPTION
     The repository was rebranded from ShaRPC / SafeIR to DotBoxD. This gate keeps the
     rebrand from silently regressing. It scans the active project surface
     (src tests benchmarks samples eng schemas) for a case-SENSITIVE set of legacy
     brand spellings and prints the offending file:line so the leak is easy to find.
+
+    It also fails (case-insensitively) when the DotBoxD brand is repeated back-to-back
+    inside an identifier (e.g. "DotBoxD" written twice in a row, in either casing),
+    which is how the original double-branding bug slipped in.
 
     Intentionally excluded (these legitimately retain history / legal text):
       - docs/legacy/**   (archived legacy material)
@@ -28,6 +33,12 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 # Case-sensitive legacy-brand pattern. \bSGP[0-9] catches legacy diagnostic ids.
 $pattern = 'ShaRPC|ShaRpc|sharpc|SHARPC|SafeIR|SafeIr|safe-ir|safeir|\bSGP[0-9]'
 $regex = [regex]::new($pattern, [System.Text.RegularExpressions.RegexOptions]::None)
+
+# Case-INSENSITIVE double-brand pattern. Catches the DotBoxD brand written twice
+# back-to-back inside an identifier (in either casing of the trailing d/D). The
+# original double-branding bug looked like this; this guard keeps it from reappearing.
+$doubleBrandPattern = 'DotBox[dD]DotBox[dD]'
+$doubleBrandRegex = [regex]::new($doubleBrandPattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
 # Only these top-level areas make up the active project surface.
 $scanRoots = @("src", "tests", "benchmarks", "samples", "eng", "schemas")
@@ -85,6 +96,11 @@ foreach ($scanRoot in $scanRoots) {
             if ($match.Success) {
                 $violations.Add("$relative`:$lineNumber matched '$($match.Value)': $($line.Trim())")
             }
+
+            $doubleBrandMatch = $doubleBrandRegex.Match($line)
+            if ($doubleBrandMatch.Success) {
+                $violations.Add("$relative`:$lineNumber matched double-brand '$($doubleBrandMatch.Value)': $($line.Trim())")
+            }
         }
     }
 }
@@ -95,7 +111,7 @@ if ($violations.Count -gt 0) {
         Write-Error $violation -ErrorAction Continue
     }
 
-    throw "check-rebrand-complete found $($violations.Count) legacy brand token(s). The rebrand must stay complete."
+    throw "check-rebrand-complete found $($violations.Count) brand violation(s) (legacy and/or double-brand). The rebrand must stay complete."
 }
 
-Write-Host "Rebrand-completeness check passed. No legacy ShaRPC/SafeIR/SGP tokens in the active source tree."
+Write-Host "Rebrand-completeness check passed. No legacy ShaRPC/SafeIR/SGP tokens or double-brand identifiers in the active source tree."

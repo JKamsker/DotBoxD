@@ -108,7 +108,7 @@ public sealed class PeerTests
 
         // Inbound call from A is rejected by B.
         var callback = a.GetPlayerNotifications();
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(() => callback.WhoAmIAsync());
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(() => callback.WhoAmIAsync());
         Assert.Contains("does not accept inbound calls", ex.Message);
     }
 

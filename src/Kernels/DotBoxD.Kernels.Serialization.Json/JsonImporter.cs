@@ -3,7 +3,7 @@ using static DotBoxD.Kernels.JsonImport;
 
 namespace DotBoxD.Kernels;
 
-public static class DotBoxDJsonImporter
+public static class JsonImporter
 {
     public static SandboxModule Import(string json)
     {

@@ -12,7 +12,7 @@ public sealed class DotBoxDRpcIpcAddonTests
     public void Named_pipe_helpers_reject_predictable_pipe_names_by_default()
     {
         var ex = Assert.Throws<ArgumentException>(
-            () => DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe("dotboxd-dev", _ => { }));
+            () => RpcMessagePackIpc.ListenNamedPipe("dotboxd-dev", _ => { }));
 
         Assert.Equal("pipeName", ex.ParamName);
     }
@@ -20,10 +20,10 @@ public sealed class DotBoxDRpcIpcAddonTests
     [Fact]
     public async Task Named_pipe_helpers_allow_explicit_unsafe_development_pipe_names()
     {
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+        await using var host = RpcMessagePackIpc.ListenNamedPipe(
             "dotboxd-dev",
             _ => { },
-            DotBoxDNamedPipeOptions.UnsafeDevelopment);
+            NamedPipeTransportOptions.UnsafeDevelopment);
 
         Assert.NotNull(host);
     }
@@ -32,12 +32,12 @@ public sealed class DotBoxDRpcIpcAddonTests
     public async Task Generic_transport_api_connects_over_non_named_pipe_transport()
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        await using var host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<IProbeService>(new ProbeService()));
         await host.StartAsync();
 
-        await using var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
             new SingleConnectionTransport(clientChannel, ownsConnection: true));
         var service = session.Get<IProbeService>();
 
@@ -48,12 +48,12 @@ public sealed class DotBoxDRpcIpcAddonTests
     public async Task Configured_generic_client_can_provide_callback_services()
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        await using var host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<ICallbackCaller>(new CallbackCaller(peer.Get<IProbeCallback>())));
         await host.StartAsync();
 
-        await using var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
             new SingleConnectionTransport(clientChannel, ownsConnection: true),
             peer => peer.Provide<IProbeCallback>(new ProbeCallback()));
         var caller = session.Get<ICallbackCaller>();

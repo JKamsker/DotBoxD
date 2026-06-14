@@ -6,7 +6,7 @@ public sealed class F64FiniteValidationTests
     public void Json_f64_literal_rejects_non_finite_overflow()
     {
         var ex = Assert.Throws<SandboxValidationException>(() =>
-            DotBoxDJsonImporter.Import(MinimalModule("""{ "f64": 1e309 }""")));
+            JsonImporter.Import(MinimalModule("""{ "f64": 1e309 }""")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
     }

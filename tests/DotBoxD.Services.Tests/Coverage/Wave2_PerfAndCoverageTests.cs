@@ -229,7 +229,7 @@ public sealed class Wave2_PerfAndCoverageTests
             new RpcStreamHandle(1, RpcStreamKind.Binary),
         };
 
-        Assert.Throws<DotBoxD.Services.Exceptions.DotBoxDRpcProtocolException>(
+        Assert.Throws<DotBoxD.Services.Exceptions.ServiceProtocolException>(
             () => streams.RegisterInbound(handles, CancellationToken.None));
 
         Assert.Equal(0, streams.InboundReceiverCount);
@@ -269,7 +269,7 @@ public sealed class Wave2_PerfAndCoverageTests
             canceled.Add(i);
         }
 
-        Assert.Throws<DotBoxD.Services.Exceptions.DotBoxDRpcProtocolException>(
+        Assert.Throws<DotBoxD.Services.Exceptions.ServiceProtocolException>(
             () => canceled.Add(RpcCanceledInboundStreams.Capacity));
 
         canceled.Remove(0);

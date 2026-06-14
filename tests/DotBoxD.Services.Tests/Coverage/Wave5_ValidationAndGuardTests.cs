@@ -213,7 +213,7 @@ public sealed class Wave5_ValidationAndGuardTests
         var handle = new RpcStreamHandle(0, RpcStreamKind.Binary);
         var attachment = RpcStreamAttachment.FromStream(handle, stream);
 
-        Assert.Throws<DotBoxD.Services.Exceptions.DotBoxDRpcProtocolException>(
+        Assert.Throws<DotBoxD.Services.Exceptions.ServiceProtocolException>(
             () => RpcStreamValidation.ValidateOutboundAttachment(attachment));
     }
 
@@ -226,7 +226,7 @@ public sealed class Wave5_ValidationAndGuardTests
         var a1 = RpcStreamAttachment.FromStream(handle, s1);
         var a2 = RpcStreamAttachment.FromStream(handle, s2);
 
-        var ex = Assert.Throws<DotBoxD.Services.Exceptions.DotBoxDRpcProtocolException>(
+        var ex = Assert.Throws<DotBoxD.Services.Exceptions.ServiceProtocolException>(
             () => RpcStreamValidation.ValidateOutboundAttachments(new[] { a1, a2 }));
         Assert.Contains("Duplicate", ex.Message);
     }

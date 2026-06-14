@@ -38,7 +38,7 @@ public sealed class Round5_PeerDisposeChannelThrowsTests
         // WaitAsync times out instead.
         var error = await Assert.ThrowsAnyAsync<Exception>(
             () => invoke.WaitAsync(TimeSpan.FromSeconds(2)));
-        Assert.IsType<DotBoxDRpcConnectionException>(error);
+        Assert.IsType<ServiceConnectionException>(error);
     }
 
     private sealed class ThrowingDisposeChannel : IRpcChannel

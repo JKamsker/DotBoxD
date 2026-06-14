@@ -124,14 +124,14 @@ public sealed class Wave1_BugAndPerfTests
     }
 
     // ────────────────────────────────────────────────────────────────────
-    // CORRECTNESS: DotBoxDRpcPendingRequests.FailAll snapshot is needed to
+    // CORRECTNESS: PendingRequests.FailAll snapshot is needed to
     // prevent failing brand-new requests that race with teardown.
     // ────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void FailAll_Snapshot_ProtectsNewEntriesFromTeardown()
     {
-        var pending = new DotBoxDRpcPendingRequests();
+        var pending = new PendingRequests();
         for (var i = 1; i <= 100; i++)
         {
             pending.TryAdd(i, out _);

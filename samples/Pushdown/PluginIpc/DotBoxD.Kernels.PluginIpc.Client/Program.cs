@@ -8,7 +8,7 @@ if (args.Length != 1)
 }
 
 var pipeName = args[0];
-await using var connection = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
+await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var service = connection.Get<IPluginControlService>();
 Console.WriteLine("Initial settings:");
 foreach (var setting in await service.GetSettingsAsync()) {

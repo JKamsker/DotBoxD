@@ -96,7 +96,7 @@ public sealed class TypeAndLiteralValidationTests
         """)]
     public void Generic_type_strings_are_rejected_at_json_import(string _, string json)
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(json));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
     }

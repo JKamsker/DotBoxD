@@ -146,19 +146,19 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
         if (_declaredInboundStreams is null ||
             !_declaredInboundStreams.TryGetValue(handle.StreamId, out var declaredKind))
         {
-            throw new DotBoxDRpcProtocolException(
+            throw new ServiceProtocolException(
                 $"Inbound stream id '{handle.StreamId}' was not declared by the request.");
         }
 
         if (declaredKind != handle.Kind)
         {
-            throw new DotBoxDRpcProtocolException(
+            throw new ServiceProtocolException(
                 $"Inbound stream id '{handle.StreamId}' was declared as '{declaredKind}', not '{handle.Kind}'.");
         }
 
         if (!(_claimedInboundStreamIds ??= new HashSet<int>()).Add(handle.StreamId))
         {
-            throw new DotBoxDRpcProtocolException(
+            throw new ServiceProtocolException(
                 $"Inbound stream id '{handle.StreamId}' was already claimed.");
         }
     }
@@ -175,7 +175,7 @@ public sealed class RpcStreamingContext : IRpcStreamingContext
     {
         if (handle.Kind != expected)
         {
-            throw new DotBoxDRpcProtocolException($"Stream '{handle.StreamId}' is '{handle.Kind}', not '{expected}'.");
+            throw new ServiceProtocolException($"Stream '{handle.StreamId}' is '{handle.Kind}', not '{expected}'.");
         }
     }
 

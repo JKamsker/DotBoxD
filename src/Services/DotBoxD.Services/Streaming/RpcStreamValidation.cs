@@ -52,7 +52,7 @@ internal static class RpcStreamValidation
             ValidateOutboundAttachment(attachment);
             if (!streamIds.Add(attachment.Handle.StreamId))
             {
-                throw new DotBoxDRpcProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
+                throw new ServiceProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
             }
         }
     }
@@ -66,7 +66,7 @@ internal static class RpcStreamValidation
 
         if (attachment.Handle.StreamId == 0)
         {
-            throw new DotBoxDRpcProtocolException("Stream id must not be zero.");
+            throw new ServiceProtocolException("Stream id must not be zero.");
         }
 
         ValidateKind(attachment.Handle.Kind);
@@ -76,7 +76,7 @@ internal static class RpcStreamValidation
     {
         if (!IsKnownKind(kind))
         {
-            throw new DotBoxDRpcProtocolException($"Unknown stream kind '{kind}'.");
+            throw new ServiceProtocolException($"Unknown stream kind '{kind}'.");
         }
     }
 

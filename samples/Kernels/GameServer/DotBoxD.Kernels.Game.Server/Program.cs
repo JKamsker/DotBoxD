@@ -64,7 +64,7 @@ internal static class Program
         var pipeName = "dotboxd-game-" + Guid.NewGuid().ToString("N");
         var connected = new TaskCompletionSource<GamePluginControlService>(TaskCreationOptions.RunContinuationsAsynchronously);
         var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+        await using var host = RpcMessagePackIpc.ListenNamedPipe(
             pipeName,
             peer =>
             {

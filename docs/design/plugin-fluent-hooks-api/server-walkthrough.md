@@ -136,7 +136,7 @@ internal static class Program
         //     (see ownership-auth-and-policy.md §2 + §4).
         var pipeName = "dotboxd-game-" + Guid.NewGuid().ToString("N");
         var authenticator = new LocalProcessAuthenticator();   // server spawned the child → trusted
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
+        await using var host = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
         {
             var session = server.CreateSession(authenticator.Authenticate(peer));
             peer.ProvideGamePluginControlService(new GamePluginControlService(session, sink, world));

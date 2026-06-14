@@ -31,7 +31,7 @@ public sealed class JsonSourceMapTests
         }
         """;
 
-        var module = DotBoxDJsonImporter.Import(json);
+        var module = JsonImporter.Import(json);
         var body = module.Functions.Single().Body;
         var set = Assert.IsType<AssignmentStatement>(body[0]);
         var ret = Assert.IsType<ReturnStatement>(body[1]);
@@ -103,7 +103,7 @@ public sealed class JsonSourceMapTests
         }
         """;
 
-        var module = DotBoxDJsonImporter.Import(json);
+        var module = JsonImporter.Import(json);
         var body = module.Functions.Single().Body;
         var first = Assert.IsType<AssignmentStatement>(body[0]);
         var second = Assert.IsType<AssignmentStatement>(body[1]);

@@ -19,13 +19,13 @@ public class IpcRoundTripBenchmarks
     public async Task SetupAsync()
     {
         var pipeName = "dotboxd-ipc-bench-" + Guid.NewGuid().ToString("N");
-        _host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+        _host = RpcMessagePackIpc.ListenNamedPipe(
             pipeName,
             peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()),
             CreateServerOptions(LowAllocationProfile));
         await _host.StartAsync().ConfigureAwait(false);
 
-        _client = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(
+        _client = await RpcMessagePackIpc.ConnectNamedPipeAsync(
                 pipeName,
                 CreateClientOptions(LowAllocationProfile))
             .ConfigureAwait(false);

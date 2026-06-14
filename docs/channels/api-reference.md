@@ -209,7 +209,7 @@ Options for both `RpcPeer` and `RpcHost`.
 | `MaxConcurrentInboundDispatch` | `int` | 1 | Max inbound requests dispatched concurrently when `InboundQueueCapacity` is set. Default `1` dispatches serially per connection; raise it for bounded-concurrent per-connection dispatch. Ignored when `InboundQueueCapacity` is `null` |
 | `MaxInboundBytes` | `long?` | 64 MiB | Max total bytes of in-flight inbound request frames when `InboundQueueCapacity` is set. Caps peak memory independent of frame count; `null` disables. An oversized frame is still admitted when nothing else is in flight, so one large request never deadlocks. Ignored when `InboundQueueCapacity` is `null` |
 | `MaxPendingRequests` | `int` | 4096 | Max concurrent outbound calls awaiting responses |
-| `QueueFullMode` | `DotBoxDRpcQueueFullMode` | `Wait` | Policy when `InboundQueueCapacity` is set and the request queue is full (`Wait` applies backpressure; `DropIncoming` rejects) |
+| `QueueFullMode` | `QueueFullMode` | `Wait` | Policy when `InboundQueueCapacity` is set and the request queue is full (`Wait` applies backpressure; `DropIncoming` rejects) |
 
 The TCP transport additionally enforces a per-frame read idle timeout (`TcpConnection`, default 30s;
 `Timeout.InfiniteTimeSpan` disables), set via `TcpServerTransport.FrameReadIdleTimeout` /
@@ -346,11 +346,11 @@ public interface ISerializer
 
 | Exception | Description |
 |-----------|-------------|
-| `DotBoxDRpcException` | Base exception for all DotBoxD errors |
-| `DotBoxDRpcRemoteException` | Remote error (includes `RemoteExceptionType`); non-`DotBoxDRpcException` server failures are sanitized |
-| `DotBoxDRpcConnectionException` | Connection lost or failed |
-| `DotBoxDRpcTimeoutException` | Request timed out |
-| `DotBoxDRpcNotFoundException` | Service or method not found |
+| `ServiceException` | Base exception for all DotBoxD errors |
+| `RemoteServiceException` | Remote error (includes `RemoteExceptionType`); non-`ServiceException` server failures are sanitized |
+| `ServiceConnectionException` | Connection lost or failed |
+| `ServiceTimeoutException` | Request timed out |
+| `ServiceNotFoundException` | Service or method not found |
 
 ---
 
@@ -441,7 +441,7 @@ The proxy factories take an `IRpcInvoker` (an `RpcPeer` implements it), so pass 
 // In namespace DotBoxD.Services.Generated
 public static class DotBoxDGenerated
 {
-    public static IReadOnlyList<DotBoxDGeneratedService> Services { get; }
+    public static IReadOnlyList<GeneratedService> Services { get; }
     public static void RegisterServices(IDotBoxDServiceRegistrationSink sink);
     public static void RegisterGeneratedServices(IDotBoxDGeneratedServiceRegistrationSink sink);
     public static TService CreateProxy<TService>(IRpcInvoker invoker) where TService : class;
@@ -455,7 +455,7 @@ public static class DotBoxDGenerated
 `peer.Provide(dispatcher)`; `CreateProxy<TService>(invoker)` produces a proxy bound to the peer
 (equivalent to `peer.Get<TService>()` and the generated `Get...` extension).
 
-`DotBoxDGenerated.Services` is backed by a generated static array of `DotBoxDGeneratedService`
+`DotBoxDGenerated.Services` is backed by a generated static array of `GeneratedService`
 records. Each descriptor includes `ServiceType`, `ProxyType`, `DispatcherType`, and
 `ServiceName`, so hosts can build a service map without scanning assembly types.
 
@@ -484,7 +484,7 @@ public interface IDotBoxDGeneratedServiceRegistrationSink
 }
 ```
 
-The runtime registry is available as `DotBoxD.Services.Generated.DotBoxDServiceRegistry` and throws a clear diagnostic when no generated factory is registered for a service interface.
+The runtime registry is available as `DotBoxD.Services.Generated.GeneratedServiceRegistry` and throws a clear diagnostic when no generated factory is registered for a service interface.
 It also exposes `GetService(Type)`, `GetServices(Assembly)`, `GetServices(IEnumerable<Assembly>)`,
 and multi-assembly sink registration helpers for dynamic hosts that need generated metadata.
 See [Generated Service Registry](./generated-service-registry.md) for examples and assembly-scope details.

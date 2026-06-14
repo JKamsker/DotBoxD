@@ -86,7 +86,7 @@ public sealed class OpaqueIdLiteralTests
     [Fact]
     public void Opaque_id_literal_rejects_unsafe_characters()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(Module(
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(Module(
             "PlayerId",
             """{ "opaqueId": { "type": "PlayerId", "value": "../secret" } }""")));
 

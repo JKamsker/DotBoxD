@@ -28,7 +28,7 @@ public sealed class JsonPathLiteralTests
         var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
 
         var ex = Assert.Throws<SandboxValidationException>(() =>
-            DotBoxDJsonImporter.Import(ModuleWithReturn(expression)));
+            JsonImporter.Import(ModuleWithReturn(expression)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }
@@ -40,7 +40,7 @@ public sealed class JsonPathLiteralTests
     {
         var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
 
-        _ = DotBoxDJsonImporter.Import(ModuleWithReturn(expression));
+        _ = JsonImporter.Import(ModuleWithReturn(expression));
     }
 
     private static string ModuleWithReturn(string returnValue)

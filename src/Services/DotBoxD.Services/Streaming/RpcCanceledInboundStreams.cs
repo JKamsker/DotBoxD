@@ -135,6 +135,6 @@ internal sealed class RpcCanceledInboundStreams
     }
 
     private static void ThrowOverflow() =>
-        throw new DotBoxDRpcProtocolException(
+        throw new ServiceProtocolException(
             "Canceled inbound stream tombstone capacity was exceeded.");
 }

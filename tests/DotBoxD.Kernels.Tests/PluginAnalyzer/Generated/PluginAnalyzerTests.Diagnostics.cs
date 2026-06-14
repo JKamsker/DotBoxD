@@ -152,7 +152,7 @@ public sealed partial class PluginAnalyzerTests
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxDPluginAnalyzer());
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 

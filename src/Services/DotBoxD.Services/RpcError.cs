@@ -12,7 +12,7 @@ internal static class RpcErrors
         Exception exception,
         Func<Exception, RpcErrorInfo?>? transformer = null)
     {
-        if (exception is DotBoxDRpcNotFoundException notFound)
+        if (exception is ServiceNotFoundException notFound)
         {
             // Map to a distinct error type so the caller can branch on service vs method vs instance,
             // and preserve the (truncated) message so logs read clearly. The text only echoes names
@@ -61,11 +61,11 @@ internal static class RpcErrors
     public static RpcError Protocol(string message) =>
         new(Truncate(message), RpcErrorTypes.ProtocolError);
 
-    private static string NotFoundErrorType(DotBoxDRpcNotFoundException.NotFoundKind kind) =>
+    private static string NotFoundErrorType(ServiceNotFoundException.NotFoundKind kind) =>
         kind switch
         {
-            DotBoxDRpcNotFoundException.NotFoundKind.Method => RpcErrorTypes.MethodNotFound,
-            DotBoxDRpcNotFoundException.NotFoundKind.Instance => RpcErrorTypes.InstanceNotFound,
+            ServiceNotFoundException.NotFoundKind.Method => RpcErrorTypes.MethodNotFound,
+            ServiceNotFoundException.NotFoundKind.Instance => RpcErrorTypes.InstanceNotFound,
             _ => RpcErrorTypes.ServiceNotFound,
         };
 

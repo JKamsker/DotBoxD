@@ -3,7 +3,7 @@ namespace DotBoxD.Services.Transport;
 /// <summary>
 /// Controls what a bounded DotBoxD queue does when it is full.
 /// </summary>
-public enum DotBoxDRpcQueueFullMode
+public enum QueueFullMode
 {
     /// <summary>
     /// Waits for queue space instead of dropping the incoming frame.

@@ -34,7 +34,7 @@ public sealed class RpcPeerRegressionTests
 
         await serverConnection.DisposeAsync();
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        await Assert.ThrowsAsync<ServiceConnectionException>(
             () => call.WaitAsync(TimeSpan.FromSeconds(1)));
     }
 
@@ -61,7 +61,7 @@ public sealed class RpcPeerRegressionTests
         await host.StopAsync();
 
         Assert.False(acceptedPeer.IsConnected);
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        await Assert.ThrowsAsync<ServiceConnectionException>(
             () => game.GetServerStatusAsync().WaitAsync(TimeSpan.FromSeconds(1)));
     }
 
@@ -78,7 +78,7 @@ public sealed class RpcPeerRegressionTests
                 new RpcPeerOptions
                 {
                     InboundQueueCapacity = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -123,7 +123,7 @@ public sealed class RpcPeerRegressionTests
                 new RpcPeerOptions
                 {
                     InboundQueueCapacity = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.DropIncoming,
+                    QueueFullMode = QueueFullMode.DropIncoming,
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -150,7 +150,7 @@ public sealed class RpcPeerRegressionTests
 
         var successes = outcomes.Count(static exception => exception is null);
         var dropped = outcomes
-            .OfType<DotBoxDRpcRemoteException>()
+            .OfType<RemoteServiceException>()
             .Count(static ex => ex.RemoteExceptionType == RpcErrorTypes.QueueFull);
 
         Assert.Equal(1, dispatcher.MaxActive);
@@ -170,7 +170,7 @@ public sealed class RpcPeerRegressionTests
             .Provide<IGameService>(new TestGameService())
             .Start();
 
-        var wireName = DotBoxD.Services.Generated.DotBoxDServiceRegistry.GetService(typeof(IGameService)).ServiceName;
+        var wireName = DotBoxD.Services.Generated.GeneratedServiceRegistry.GetService(typeof(IGameService)).ServiceName;
 
         using var requestFrame = MessageFramer.FrameMessage(
             serializer,

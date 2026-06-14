@@ -144,7 +144,7 @@ public static SandboxType SandboxTypeOf(Type type)
 public static SandboxValue ToSandboxValue(object? value, Type type)
 public static string Export(PluginPackage package, bool indented = false)
 public static string PackageEnvelope => ReadResource(PluginPackageResourceName)
-public static string SchemaVersion => DotBoxDJsonSchemas.SchemaVersion
+public static string SchemaVersion => JsonSchemas.SchemaVersion
 public static TService Create<TService>(InstalledKernel kernel) where TService : class
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginServer server, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginSession session, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)

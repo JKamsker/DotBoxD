@@ -37,7 +37,7 @@ public sealed class RpcPeerInboundQueueRegressionTests
             new RpcPeerOptions
             {
                 InboundQueueCapacity = 2,
-                QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                QueueFullMode = QueueFullMode.Wait,
                 RequestTimeout = TimeSpan.FromSeconds(5),
             });
         server
@@ -173,7 +173,7 @@ public sealed class RpcPeerInboundQueueRegressionTests
         {
             if (method != "Call")
             {
-                throw new DotBoxDRpcNotFoundException($"Method '{method}' not found.");
+                throw new ServiceNotFoundException($"Method '{method}' not found.");
             }
 
             await _getNotifications().WhoAmIAsync(ct).ConfigureAwait(false);

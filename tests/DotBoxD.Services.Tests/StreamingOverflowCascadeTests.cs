@@ -15,7 +15,7 @@ namespace DotBoxD.Services.Tests;
 /// unconditionally before looking up the receiver. Once the tombstone tracker has been
 /// pushed past its 1024-entry capacity (by a misbehaving remote canceling 1025+ streams),
 /// the <c>_overflowed</c> latch is set to <c>true</c> permanently, and every subsequent
-/// call to <c>ThrowIfOverflowed</c> throws <see cref="DotBoxDRpcProtocolException"/> —
+/// call to <c>ThrowIfOverflowed</c> throws <see cref="ServiceProtocolException"/> —
 /// including calls for valid, already-registered receivers that were never canceled.
 ///
 /// Because <c>GetRegisteredInbound</c> is how handlers consume their inbound streams,
@@ -33,7 +33,7 @@ public sealed class StreamingOverflowCascadeTests
     /// canceled receiver (ID 1) MUST succeed.
     ///
     /// The test currently FAILS because <c>ThrowIfOverflowed()</c> on line 50 of
-    /// <c>RpcStreamManager.cs</c> throws <see cref="DotBoxDRpcProtocolException"/> regardless
+    /// <c>RpcStreamManager.cs</c> throws <see cref="ServiceProtocolException"/> regardless
     /// of whether the looked-up stream was ever canceled.
     /// </summary>
     [Fact]
@@ -92,13 +92,13 @@ public sealed class StreamingOverflowCascadeTests
             //
             // BUG: GetRegisteredInbound calls _canceledInbound.ThrowIfOverflowed() at line 50
             // of RpcStreamManager.cs before looking up the receiver.  Because _overflowed is
-            // permanently latched to true, this throws DotBoxDRpcProtocolException(
+            // permanently latched to true, this throws ServiceProtocolException(
             //   "Canceled inbound stream tombstone capacity was exceeded.")
             // even though stream ID 1 is a perfectly valid, live, never-canceled receiver.
             var ex = Record.Exception(
                 () => streams.GetRegisteredInbound(subjectHandle));
 
-            Assert.Null(ex); // RED: DotBoxDRpcProtocolException is thrown here today.
+            Assert.Null(ex); // RED: ServiceProtocolException is thrown here today.
         }
         finally
         {

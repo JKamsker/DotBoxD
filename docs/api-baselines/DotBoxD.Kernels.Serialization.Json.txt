@@ -2,9 +2,9 @@
 # Package: DotBoxD.Kernels.Serialization.Json
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
-public static class DotBoxDJsonExporter
-public static class DotBoxDJsonImporter
-public static class DotBoxDJsonSchemas
+public static class JsonExporter
+public static class JsonImporter
+public static class JsonSchemas
 public static class SandboxHostJsonExtensions
 public static SandboxModule Import(string json)
 public static string Export(SandboxModule module, bool indented = false)

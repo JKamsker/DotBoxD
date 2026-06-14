@@ -16,9 +16,9 @@
 
   <!--
     Versioned JSON ingestion schema artifact (CMP-0012). The checked-in module schema under
-    schemas/v1 is embedded so consumers can load the contract via DotBoxDJsonSchemas, and
+    schemas/v1 is embedded so consumers can load the contract via JsonSchemas, and
     packed so it ships with the NuGet package. LogicalName pins the resource name used by
-    DotBoxDJsonSchemas regardless of build host or link path. The plugin-package schema is
+    JsonSchemas regardless of build host or link path. The plugin-package schema is
     embedded by DotBoxD.Plugins (see PluginPackageJsonSchemas).
   -->
   <ItemGroup>

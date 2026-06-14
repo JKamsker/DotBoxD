@@ -29,9 +29,9 @@ The DotBoxD.Kernels DotBoxD MessagePack IPC convenience defaults leave the low-a
 
 ## Evidence
 
-- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:10` defines `DefaultClientOptions` with `RequestTimeout` and `RejectInboundCalls`, but it does not set `EnableLowAllocationValueTaskInvocations`.
-- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:14` defines bidirectional client defaults with only `RequestTimeout`.
-- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:23` passes server options through as provided, so default `ListenNamedPipe` callers also do not get the low-allocation server-side options used by the benchmarks.
+- `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs:10` defines `DefaultClientOptions` with `RequestTimeout` and `RejectInboundCalls`, but it does not set `EnableLowAllocationValueTaskInvocations`.
+- `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs:14` defines bidirectional client defaults with only `RequestTimeout`.
+- `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs:23` passes server options through as provided, so default `ListenNamedPipe` callers also do not get the low-allocation server-side options used by the benchmarks.
 - `benchmarks/DotBoxD.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:76` enables `EnableLowAllocationValueTaskInvocations` only when the explicit `--low-alloc` profile is selected, and `benchmarks/DotBoxD.Kernels.Benchmarks/Ipc/IpcAllocationProfile.cs:89` separately opts the server into low-allocation settings.
 - `benchmarks/DotBoxD.Kernels.Benchmarks/Program.cs:8` exposes this only as a manual profile mode; there is no allocation regression gate for the public DotBoxD.Kernels IPC defaults.
 
@@ -45,4 +45,4 @@ Either make the DotBoxD.Kernels IPC defaults use the low-allocation DotBoxD opti
 
 ## Benchmark/allocation test idea
 
-Add an allocation test or BenchmarkDotNet comparison for `DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe`/`ConnectNamedPipeAsync` with default options versus a low-allocation options factory. Measure `AddAsync` and struct echo bytes/call, and fail if the documented default/profile regresses beyond an explicit allocation budget.
+Add an allocation test or BenchmarkDotNet comparison for `RpcMessagePackIpc.ListenNamedPipe`/`ConnectNamedPipeAsync` with default options versus a low-allocation options factory. Measure `AddAsync` and struct echo bytes/call, and fail if the documented default/profile regresses beyond an explicit allocation budget.

@@ -2,16 +2,16 @@
 # Package: DotBoxD.Pushdown.Services
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
-public sealed record DotBoxDNamedPipeOptions(bool AllowUnsafeLowEntropyName = false)
-public static class DotBoxDDotBoxDRpcMessagePackIpc
-public static DotBoxDNamedPipeOptions Default { get; } = new()
-public static DotBoxDNamedPipeOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true)
+public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
+public static class RpcMessagePackIpc
+public static NamedPipeTransportOptions Default { get; } = new()
+public static NamedPipeTransportOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true)
 public static RpcHost Listen( IServerTransport transport, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null)
-public static RpcHost ListenNamedPipe( string pipeName, Action<RpcPeer> configurePeer, DotBoxDNamedPipeOptions namedPipeOptions, RpcPeerOptions? options = null)
+public static RpcHost ListenNamedPipe( string pipeName, Action<RpcPeer> configurePeer, NamedPipeTransportOptions namedPipeOptions, RpcPeerOptions? options = null)
 public static RpcHost ListenNamedPipe( string pipeName, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null)
 public static Task<RpcPeerSession> ConnectAsync( ITransport transport, Action<RpcPeer> configurePeer, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
 public static Task<RpcPeerSession> ConnectAsync( ITransport transport, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
-public static Task<RpcPeerSession> ConnectNamedPipeAsync( string pipeName, DotBoxDNamedPipeOptions namedPipeOptions, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
+public static Task<RpcPeerSession> ConnectNamedPipeAsync( string pipeName, NamedPipeTransportOptions namedPipeOptions, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
 public static Task<RpcPeerSession> ConnectNamedPipeAsync( string pipeName, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
-public static Task<RpcPeerSession> ConnectNamedPipeAsync( string serverName, string pipeName, DotBoxDNamedPipeOptions namedPipeOptions, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
+public static Task<RpcPeerSession> ConnectNamedPipeAsync( string serverName, string pipeName, NamedPipeTransportOptions namedPipeOptions, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)
 public static Task<RpcPeerSession> ConnectNamedPipeAsync( string serverName, string pipeName, RpcPeerOptions? options = null, CancellationToken cancellationToken = default)

@@ -31,7 +31,7 @@ public sealed class RpcPeerProtocolRegressionTests
 
         await client.DisposeAsync();
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        await Assert.ThrowsAsync<ServiceConnectionException>(
             () => call.WaitAsync(TimeSpan.FromSeconds(1)));
         await serverConnection.DisposeAsync();
     }
@@ -50,7 +50,7 @@ public sealed class RpcPeerProtocolRegressionTests
         var messageId = await ReadRequestIdAsync(serverConnection);
         await SendMalformedResponseAsync(serverConnection, messageId);
 
-        await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(
+        await Assert.ThrowsAsync<ServiceProtocolException>(
             () => call.WaitAsync(TimeSpan.FromSeconds(1)));
 
         var secondCall = client.InvokeAsync<int>("Service", "Method");
@@ -73,7 +73,7 @@ public sealed class RpcPeerProtocolRegressionTests
             .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
             .Start();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => client.InvokeAsync<int>(ThrowingDispatcher.Service, "Throw"));
 
         Assert.Equal("Internal error.", ex.Message);
@@ -97,7 +97,7 @@ public sealed class RpcPeerProtocolRegressionTests
             .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
             .Start();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => client.InvokeAsync<int>(ThrowingDispatcher.Service, "Throw"));
 
         // With the server opting in, the handler's real message and exception type reach the caller.
@@ -126,7 +126,7 @@ public sealed class RpcPeerProtocolRegressionTests
             .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
             .Start();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => client.InvokeAsync<int>(ThrowingDispatcher.Service, "Throw"));
 
         // The transformer maps the exception to a safe, caller-facing message and a custom type, and
@@ -152,7 +152,7 @@ public sealed class RpcPeerProtocolRegressionTests
             .Over(clientConnection, NewSerializer(), new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) })
             .Start();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => client.InvokeAsync<int>(ThrowingDispatcher.Service, "Throw"));
 
         // Returning null keeps the secure opaque default for that exception.
@@ -175,7 +175,7 @@ public sealed class RpcPeerProtocolRegressionTests
         var call = client.InvokeAsync<int>("Service", "Slow");
         var messageId = await ReadRequestIdAsync(serverConnection);
 
-        await Assert.ThrowsAsync<DotBoxDRpcTimeoutException>(
+        await Assert.ThrowsAsync<ServiceTimeoutException>(
             () => call.WaitAsync(TimeSpan.FromSeconds(2)));
 
         using var cancelFrame = await serverConnection.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(1));

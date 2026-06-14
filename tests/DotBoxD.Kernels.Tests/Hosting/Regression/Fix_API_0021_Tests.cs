@@ -3,10 +3,10 @@ using System.Text.RegularExpressions;
 namespace DotBoxD.Kernels.Tests;
 
 /// <summary>
-/// Regression coverage for API-0021: <see cref="DotBoxDJsonExporter"/> is a public module
+/// Regression coverage for API-0021: <see cref="JsonExporter"/> is a public module
 /// serialization API in the <c>DotBoxD.Kernels.Serialization.Json</c> package, but the public package
 /// guidance and the package-backed release smoke previously only proved JSON import and plugin
-/// package upload. A consumer could discover <c>DotBoxDJsonImporter</c> and
+/// package upload. A consumer could discover <c>JsonImporter</c> and
 /// <c>PluginPackageJsonSerializer</c> from the README/smoke while the module export surface was
 /// only visible in source and the API spec, so exporter namespace/package/dependency drift could
 /// slip past every release gate.
@@ -15,8 +15,8 @@ namespace DotBoxD.Kernels.Tests;
 /// consumer smoke so they cannot silently regress back to an import-only surface:
 /// <list type="bullet">
 ///   <item>the exporter actually round-trips a module through the public Export/Import pair;</item>
-///   <item>the README package list and common namespaces name <c>DotBoxDJsonExporter</c>;</item>
-///   <item>the package consumer smoke references and calls <c>DotBoxDJsonExporter.Export(...)</c>.</item>
+///   <item>the README package list and common namespaces name <c>JsonExporter</c>;</item>
+///   <item>the package consumer smoke references and calls <c>JsonExporter.Export(...)</c>.</item>
 /// </list>
 /// </summary>
 public sealed class Fix_API_0021_Tests
@@ -41,8 +41,8 @@ public sealed class Fix_API_0021_Tests
             ],
             new Dictionary<string, string>());
 
-        var json = DotBoxDJsonExporter.Export(module, indented: true);
-        var roundTrip = DotBoxDJsonImporter.Import(json);
+        var json = JsonExporter.Export(module, indented: true);
+        var roundTrip = JsonImporter.Import(json);
 
         Assert.Equal(module.Id, roundTrip.Id);
         var function = Assert.Single(roundTrip.Functions);
@@ -64,9 +64,9 @@ public sealed class Fix_API_0021_Tests
             new Regex(@"`DotBoxD.Kernels\.Serialization\.Json`:[^\r\n]*export", RegexOptions.IgnoreCase),
             readme);
 
-        // The common-namespaces guidance must name DotBoxDJsonExporter alongside the importer so the
+        // The common-namespaces guidance must name JsonExporter alongside the importer so the
         // documented round-trip entrypoint is discoverable from install guidance.
-        Assert.Contains("DotBoxDJsonExporter", readme, StringComparison.Ordinal);
+        Assert.Contains("JsonExporter", readme, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -77,11 +77,11 @@ public sealed class Fix_API_0021_Tests
         // The smoke must do more than reference the importer/upload types: it has to exercise the
         // packaged exporter so a dropped namespace, wrong package placement, or missing transitive
         // dependency fails to compile instead of passing on import-only coverage.
-        Assert.Contains("DotBoxDJsonExporter.Export(", script, StringComparison.Ordinal);
+        Assert.Contains("JsonExporter.Export(", script, StringComparison.Ordinal);
 
         // Round-tripping the exported JSON back through the importer and preparing it proves the
         // documented export -> import -> prepare path end to end through the public packages.
-        Assert.Contains("DotBoxDJsonImporter.Import(", script, StringComparison.Ordinal);
+        Assert.Contains("JsonImporter.Import(", script, StringComparison.Ordinal);
         Assert.Contains("PrepareAsync(reimported", script, StringComparison.Ordinal);
     }
 

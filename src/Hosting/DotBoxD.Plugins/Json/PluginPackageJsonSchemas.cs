@@ -7,7 +7,7 @@ using DotBoxD.Kernels.Serialization.Json;
 /// envelope accepted by <see cref="PluginPackageJsonSerializer.Import(string)"/>. The schema is
 /// checked into <c>schemas/v1/</c> and embedded into this assembly so consumers (admin UIs, upload
 /// validators, plugin authors) can validate JSON before sending it to a server. The module envelope
-/// and the shared <see cref="DotBoxDJsonSchemas.SchemaVersion"/> live in the purpose-agnostic
+/// and the shared <see cref="JsonSchemas.SchemaVersion"/> live in the purpose-agnostic
 /// <c>DotBoxD.Kernels.Serialization.Json</c> package.
 /// </summary>
 public static class PluginPackageJsonSchemas
@@ -17,9 +17,9 @@ public static class PluginPackageJsonSchemas
 
     /// <summary>
     /// Version of the JSON ingestion schema contract. Re-exposes
-    /// <see cref="DotBoxDJsonSchemas.SchemaVersion"/> so the module and plugin-package schemas cannot drift.
+    /// <see cref="JsonSchemas.SchemaVersion"/> so the module and plugin-package schemas cannot drift.
     /// </summary>
-    public static string SchemaVersion => DotBoxDJsonSchemas.SchemaVersion;
+    public static string SchemaVersion => JsonSchemas.SchemaVersion;
 
     /// <summary>
     /// JSON Schema document for the plugin package envelope

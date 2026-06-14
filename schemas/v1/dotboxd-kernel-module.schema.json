@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/JKamsker/Safe-IR/schemas/v1/dotboxd-kernel-module.schema.json",
   "title": "DotBoxD Kernel Module Envelope",
-  "description": "Versioned JSON Schema for the Safe IR module envelope accepted by DotBoxDJsonImporter.Import(string json). The schema mirrors the importer's strict shape: every object only allows the listed properties, statement operators and binary/unary operator names are restricted to the documented vocabulary, and literal/type shapes are enumerated. Schema version is tracked by the directory segment (v1) and the schemaVersion constant; bump both when the JSON contract changes.",
+  "description": "Versioned JSON Schema for the Safe IR module envelope accepted by JsonImporter.Import(string json). The schema mirrors the importer's strict shape: every object only allows the listed properties, statement operators and binary/unary operator names are restricted to the documented vocabulary, and literal/type shapes are enumerated. Schema version is tracked by the directory segment (v1) and the schemaVersion constant; bump both when the JSON contract changes.",
   "x-dotboxd-schema-version": "1.0.0",
   "type": "object",
   "additionalProperties": false,

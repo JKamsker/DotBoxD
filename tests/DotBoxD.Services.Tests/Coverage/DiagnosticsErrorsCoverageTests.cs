@@ -229,7 +229,7 @@ public sealed class DiagnosticsErrorsCoverageTests
         IServiceDispatcher dispatcher = new RootOnlyDispatcher();
         var output = new ArrayBufferWriter<byte>();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcNotFoundException>(() =>
+        var ex = await Assert.ThrowsAsync<ServiceNotFoundException>(() =>
             dispatcher.DispatchOnInstanceAsync(
                 "instance-1",
                 "Method",
@@ -335,89 +335,89 @@ public sealed class RpcErrorTypesCoverageTests
 /// <summary>
 /// Construction and property coverage for the DotBoxD exception hierarchy.
 /// </summary>
-public sealed class DotBoxDRpcExceptionCoverageTests
+public sealed class ServiceExceptionCoverageTests
 {
     [Fact]
-    public void DotBoxDRpcException_Parameterless_HasNoCustomMessageAndIsException()
+    public void ServiceException_Parameterless_HasNoCustomMessageAndIsException()
     {
-        var ex = new DotBoxDRpcException();
+        var ex = new ServiceException();
 
         Assert.IsAssignableFrom<Exception>(ex);
         Assert.Null(ex.InnerException);
     }
 
     [Fact]
-    public void DotBoxDRpcException_WithMessage_StoresMessage()
+    public void ServiceException_WithMessage_StoresMessage()
     {
-        var ex = new DotBoxDRpcException("explained");
+        var ex = new ServiceException("explained");
 
         Assert.Equal("explained", ex.Message);
     }
 
     [Fact]
-    public void DotBoxDRpcException_WithInnerException_StoresBoth()
+    public void ServiceException_WithInnerException_StoresBoth()
     {
         var inner = new InvalidOperationException("root cause");
-        var ex = new DotBoxDRpcException("wrapper", inner);
+        var ex = new ServiceException("wrapper", inner);
 
         Assert.Equal("wrapper", ex.Message);
         Assert.Same(inner, ex.InnerException);
     }
 
     [Fact]
-    public void DotBoxDRpcRemoteException_ExposesRemoteType()
+    public void RemoteServiceException_ExposesRemoteType()
     {
-        var ex = new DotBoxDRpcRemoteException("remote failed", "AppCustomError");
+        var ex = new RemoteServiceException("remote failed", "AppCustomError");
 
         Assert.Equal("remote failed", ex.Message);
         Assert.Equal("AppCustomError", ex.RemoteExceptionType);
-        Assert.IsAssignableFrom<DotBoxDRpcException>(ex);
+        Assert.IsAssignableFrom<ServiceException>(ex);
     }
 
     [Fact]
-    public void DotBoxDRpcConnectionException_WithInner_StoresBoth()
+    public void ServiceConnectionException_WithInner_StoresBoth()
     {
         var inner = new IOException("socket gone");
-        var ex = new DotBoxDRpcConnectionException("connection lost", inner);
+        var ex = new ServiceConnectionException("connection lost", inner);
 
         Assert.Equal("connection lost", ex.Message);
         Assert.Same(inner, ex.InnerException);
     }
 
     [Fact]
-    public void DotBoxDRpcTimeoutException_StoresMessage()
+    public void ServiceTimeoutException_StoresMessage()
     {
-        var ex = new DotBoxDRpcTimeoutException("timed out");
+        var ex = new ServiceTimeoutException("timed out");
 
         Assert.Equal("timed out", ex.Message);
-        Assert.IsAssignableFrom<DotBoxDRpcException>(ex);
+        Assert.IsAssignableFrom<ServiceException>(ex);
     }
 
     [Fact]
-    public void DotBoxDRpcProtocolException_StoresMessage()
+    public void ServiceProtocolException_StoresMessage()
     {
-        var ex = new DotBoxDRpcProtocolException("bad frame");
+        var ex = new ServiceProtocolException("bad frame");
 
         Assert.Equal("bad frame", ex.Message);
-        Assert.IsAssignableFrom<DotBoxDRpcException>(ex);
+        Assert.IsAssignableFrom<ServiceException>(ex);
     }
 
     [Fact]
-    public void DotBoxDRpcNotFoundException_DefaultKind_IsService()
+    public void ServiceNotFoundException_DefaultKind_IsService()
     {
-        var ex = new DotBoxDRpcNotFoundException("no service");
+        var ex = new ServiceNotFoundException("no service");
 
         Assert.Equal("no service", ex.Message);
-        Assert.Equal(DotBoxDRpcNotFoundException.NotFoundKind.Service, ex.Kind);
+        Assert.Equal(ServiceNotFoundException.NotFoundKind.Service, ex.Kind);
     }
 
     [Theory]
-    [InlineData(DotBoxDRpcNotFoundException.NotFoundKind.Service)]
-    [InlineData(DotBoxDRpcNotFoundException.NotFoundKind.Method)]
-    [InlineData(DotBoxDRpcNotFoundException.NotFoundKind.Instance)]
-    public void DotBoxDRpcNotFoundException_WithKind_StoresKind(DotBoxDRpcNotFoundException.NotFoundKind kind)
+    [InlineData(ServiceNotFoundException.NotFoundKind.Service)]
+    [InlineData(ServiceNotFoundException.NotFoundKind.Method)]
+    [InlineData(ServiceNotFoundException.NotFoundKind.Instance)]
+    public void ServiceNotFoundException_WithKind_StoresKind(ServiceNotFoundException.NotFoundKind kind)
     {
-        var ex = new DotBoxDRpcNotFoundException("missing", kind);
+        var ex = new ServiceNotFoundException("missing", kind);
 
         Assert.Equal(kind, ex.Kind);
         Assert.Equal("missing", ex.Message);
@@ -538,7 +538,7 @@ public sealed class EventArgsCoverageTests
     [Fact]
     public void RpcProtocolErrorEventArgs_FullConstructor_ExposesError()
     {
-        var error = new DotBoxDRpcProtocolException("decode failed");
+        var error = new ServiceProtocolException("decode failed");
         var args = new RpcProtocolErrorEventArgs("ep", 9, MessageType.Response, "decode failed", error);
 
         Assert.Equal(9, args.MessageId);

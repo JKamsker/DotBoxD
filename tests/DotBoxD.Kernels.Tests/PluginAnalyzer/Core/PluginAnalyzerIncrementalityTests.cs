@@ -71,7 +71,7 @@ public sealed class PluginAnalyzerIncrementalityTests
             disabledOutputs: IncrementalGeneratorOutputKind.None,
             trackIncrementalGeneratorSteps: true);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions,
             driverOptions: options);
 

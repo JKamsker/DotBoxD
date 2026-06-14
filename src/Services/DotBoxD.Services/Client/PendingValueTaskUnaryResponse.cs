@@ -103,14 +103,14 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
         {
             if (!response.IsSuccess)
             {
-                throw new DotBoxDRpcRemoteException(
+                throw new RemoteServiceException(
                     response.ErrorMessage ?? "Unknown error",
                     response.ErrorType ?? "Unknown");
             }
 
             if (response.Stream is not null)
             {
-                throw new DotBoxDRpcProtocolException(
+                throw new ServiceProtocolException(
                     "Response opened a stream for a non-streaming invocation.");
             }
 
@@ -161,7 +161,7 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
     {
         if (_source.GetStatus(_source.Version) == ValueTaskSourceStatus.Pending)
         {
-            _source.SetException(new DotBoxDRpcConnectionException("Request abandoned."));
+            _source.SetException(new ServiceConnectionException("Request abandoned."));
         }
 
         if (Volatile.Read(ref _valueTaskIssued) == 0)

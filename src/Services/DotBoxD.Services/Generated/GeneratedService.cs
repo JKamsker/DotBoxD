@@ -3,7 +3,7 @@ namespace DotBoxD.Services.Generated;
 /// <summary>
 /// Describes a source-generated DotBoxD service and its generated implementation types.
 /// </summary>
-public readonly record struct DotBoxDGeneratedService(
+public readonly record struct GeneratedService(
     Type ServiceType,
     Type ProxyType,
     Type DispatcherType,
@@ -12,17 +12,17 @@ public readonly record struct DotBoxDGeneratedService(
     /// <summary>
     /// Describes the RPC-facing methods generated for this service.
     /// </summary>
-    public IReadOnlyList<DotBoxDGeneratedMethod> Methods { get; init; } = Array.Empty<DotBoxDGeneratedMethod>();
+    public IReadOnlyList<GeneratedMethod> Methods { get; init; } = Array.Empty<GeneratedMethod>();
 
     /// <summary>
     /// Creates service metadata with generated method descriptors.
     /// </summary>
-    public DotBoxDGeneratedService(
+    public GeneratedService(
         Type serviceType,
         Type proxyType,
         Type dispatcherType,
         string serviceName,
-        IReadOnlyList<DotBoxDGeneratedMethod> methods)
+        IReadOnlyList<GeneratedMethod> methods)
         : this(serviceType, proxyType, dispatcherType, serviceName)
     {
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));

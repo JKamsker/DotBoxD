@@ -9,7 +9,7 @@ public sealed class JsonImporterBudgetTests
     {
         var json = new string(' ', 1_048_577);
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(json));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-LIMIT");
     }
@@ -19,7 +19,7 @@ public sealed class JsonImporterBudgetTests
     {
         var id = new string('a', 65_537);
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(MinimalModule(id)));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(MinimalModule(id)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-LIMIT");
     }
@@ -38,7 +38,7 @@ public sealed class JsonImporterBudgetTests
             builder.Append("""{ "id": "cap" }""");
         }
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import($$"""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import($$"""
         {
           "id": "wide",
           "version": "1.0.0",
@@ -75,7 +75,7 @@ public sealed class JsonImporterBudgetTests
 
         builder.Append('}');
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(builder.ToString()));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(builder.ToString()));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-LIMIT");
     }
@@ -94,7 +94,7 @@ public sealed class JsonImporterBudgetTests
             builder.Append(']');
         }
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(builder.ToString()));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(builder.ToString()));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-LIMIT");
     }
@@ -115,7 +115,7 @@ public sealed class JsonImporterBudgetTests
 
         builder.Append(']');
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(builder.ToString()));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(builder.ToString()));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-LIMIT");
     }
@@ -136,7 +136,7 @@ public sealed class JsonImporterBudgetTests
             builder.Append('"').Append('k').Append(i).Append("\":\"").Append(payload).Append('"');
         }
 
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import($$"""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import($$"""
         {
           "id": "aggregate-strings",
           "version": "1.0.0",

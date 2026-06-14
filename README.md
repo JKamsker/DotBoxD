@@ -47,13 +47,13 @@ using DotBoxD.Kernels.Transport.Ipc;   // IPC helper (ships in DotBoxD.Pushdown.
 using DotBoxD.Services.Generated;       // generated ProvideCatalogService / Get<T>
 
 // Host: turn every accepted connection into a peer that serves the contract.
-await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+await using var host = RpcMessagePackIpc.ListenNamedPipe(
     pipeName,
     peer => peer.ProvideCatalogService(new CatalogService(prices)));
 await host.StartAsync();
 
 // Client: connect and get a strongly typed proxy — calls go over the wire.
-await using var connection = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
+await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var catalog = connection.Get<ICatalogService>();
 
 var unitPrice = await catalog.GetUnitPriceAsync("sword"); // one remote round-trip
@@ -258,7 +258,7 @@ After installing, these are the entry points you'll reach for:
   `Provide{Service}` / `Get<TService>()` wiring.
 - `DotBoxD.Hosting`: `SandboxHost` — import, validate, prepare, and execute kernels under policy.
 - `DotBoxD.Kernels.Serialization.Json`: JSON IR import **and export** round-trip via
-  `DotBoxDJsonImporter` and `DotBoxDJsonExporter`.
+  `JsonImporter` and `JsonExporter`.
 - `DotBoxD.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
 
 ---

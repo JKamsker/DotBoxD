@@ -7,7 +7,7 @@ namespace DotBoxD.Kernels.Tests;
 
 /// <summary>
 /// Regression coverage for CMP-0012: the public JSON ingestion boundary (the module envelope
-/// accepted by <see cref="DotBoxDJsonImporter.Import(string)"/> and the plugin package envelope
+/// accepted by <see cref="JsonImporter.Import(string)"/> and the plugin package envelope
 /// accepted by <see cref="DotBoxD.Plugins.PluginPackageJsonSerializer.Import(string)"/>) is the
 /// documented text-ingestion path, yet the strict shape lived only in importer C# code. Consumers
 /// (plugin authors, admin UIs, upload validators, package tooling) had to infer the accepted JSON
@@ -15,7 +15,7 @@ namespace DotBoxD.Kernels.Tests;
 ///
 /// The fix ships versioned, machine-readable JSON Schema artifacts under <c>schemas/v1/</c>, embeds
 /// them in <c>DotBoxD.Kernels.Serialization.Json</c>, and exposes them through
-/// <see cref="DotBoxDJsonSchemas"/>. These tests pin the contract:
+/// <see cref="JsonSchemas"/>. These tests pin the contract:
 /// <list type="bullet">
 ///   <item>the artifacts exist on disk, are valid versioned JSON Schema, and are exposed via the
 ///   public API;</item>
@@ -29,7 +29,7 @@ public sealed class Fix_CMP_0012_Tests
     private const string PackageSchemaRelative = "schemas/v1/dotboxd-plugin-package.schema.json";
 
     private const string ImporterRelative =
-        "src/Kernels/DotBoxD.Kernels.Serialization.Json/DotBoxDJsonImporter.cs";
+        "src/Kernels/DotBoxD.Kernels.Serialization.Json/JsonImporter.cs";
 
     private const string ExpressionReaderRelative =
         "src/Kernels/DotBoxD.Kernels.Serialization.Json/Internal/JsonExpressionReader.cs";
@@ -79,14 +79,14 @@ public sealed class Fix_CMP_0012_Tests
         // documentation links and the in-package contract cannot drift apart.
         Assert.Equal(
             Normalize(File.ReadAllText(RepositoryPath(ModuleSchemaRelative))),
-            Normalize(DotBoxDJsonSchemas.ModuleEnvelope));
+            Normalize(JsonSchemas.ModuleEnvelope));
         Assert.Equal(
             Normalize(File.ReadAllText(RepositoryPath(PackageSchemaRelative))),
             Normalize(PluginPackageJsonSchemas.PackageEnvelope));
 
         // The exposed schema version must agree with the embedded documents and the v1 segment.
-        Assert.Equal(SchemaVersionOf(DotBoxDJsonSchemas.ModuleEnvelope), DotBoxDJsonSchemas.SchemaVersion);
-        Assert.Equal(SchemaVersionOf(PluginPackageJsonSchemas.PackageEnvelope), DotBoxDJsonSchemas.SchemaVersion);
+        Assert.Equal(SchemaVersionOf(JsonSchemas.ModuleEnvelope), JsonSchemas.SchemaVersion);
+        Assert.Equal(SchemaVersionOf(PluginPackageJsonSchemas.PackageEnvelope), JsonSchemas.SchemaVersion);
     }
 
     [Theory]

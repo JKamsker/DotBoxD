@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 [Generator(LanguageNames.CSharp)]
-public sealed class DotBoxDPluginPackageGenerator : IIncrementalGenerator
+public sealed class PluginPackageGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {

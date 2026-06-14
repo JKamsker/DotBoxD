@@ -24,6 +24,28 @@ Services, Kernels, and Pushdown.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.
+- **BREAKING — public de-brand:** over-branded public types had the redundant `DotBoxD` prefix
+  stripped now that their namespace already conveys the brand. The wire format is unchanged; only
+  the .NET type names changed. Renames:
+  `DotBoxDDotBoxDRpcMessagePackIpc` → `RpcMessagePackIpc` (also fixes a double-brand bug);
+  service exceptions in `DotBoxD.Services.Exceptions`:
+  `DotBoxDRpcException` → `ServiceException`,
+  `DotBoxDRpcNotFoundException` → `ServiceNotFoundException`,
+  `DotBoxDRpcTimeoutException` → `ServiceTimeoutException`,
+  `DotBoxDRpcProtocolException` → `ServiceProtocolException`,
+  `DotBoxDRpcConnectionException` → `ServiceConnectionException`,
+  `DotBoxDRpcRemoteException` → `RemoteServiceException`;
+  `DotBoxDRpcQueueFullMode` → `QueueFullMode`;
+  `DotBoxDJsonImporter` → `JsonImporter`, `DotBoxDJsonExporter` → `JsonExporter`,
+  `DotBoxDJsonSchemas` → `JsonSchemas`;
+  `DotBoxDServiceRegistry` → `GeneratedServiceRegistry`,
+  `DotBoxDGeneratedService` → `GeneratedService`, `DotBoxDGeneratedMethod` → `GeneratedMethod`,
+  `DotBoxDGeneratedParameter` → `GeneratedParameter`, `DotBoxDGeneratedReturnKind` → `GeneratedReturnKind`;
+  `DotBoxDNamedPipeOptions` → `NamedPipeTransportOptions`;
+  `DotBoxDPluginAnalyzer` → `PluginAnalyzer`, `DotBoxDPluginPackageGenerator` → `PluginPackageGenerator`.
+  Sanctioned public brand entry points are unchanged: `[DotBoxDService]` / `DotBoxDServiceAttribute`,
+  `[DotBoxDMethod]` / `DotBoxDMethodAttribute`, `DotBoxDGenerated`, `DotBoxDGeneratedExtensions`,
+  `DotBoxDInfo`, `DotBoxDServicesInfo`, and all `DotBoxD.*` assembly/namespace names.
 
 ---
 

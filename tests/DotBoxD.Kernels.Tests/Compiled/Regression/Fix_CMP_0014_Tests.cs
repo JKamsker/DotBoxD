@@ -9,8 +9,8 @@ namespace DotBoxD.Kernels.Tests;
 /// <summary>
 /// CMP-0014: the DotBoxD MessagePack IPC addon advertises a transport-agnostic public surface,
 /// but the maintained example only demonstrated the named-pipe convenience helpers. These tests
-/// drive the generic <see cref="DotBoxDDotBoxDRpcMessagePackIpc.Listen(IServerTransport, System.Action{DotBoxD.Services.RpcPeer}, DotBoxD.Services.RpcPeerOptions?)"/>
-/// and <see cref="DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(ITransport, DotBoxD.Services.RpcPeerOptions?, System.Threading.CancellationToken)"/>
+/// drive the generic <see cref="RpcMessagePackIpc.Listen(IServerTransport, System.Action{DotBoxD.Services.RpcPeer}, DotBoxD.Services.RpcPeerOptions?)"/>
+/// and <see cref="RpcMessagePackIpc.ConnectAsync(ITransport, DotBoxD.Services.RpcPeerOptions?, System.Threading.CancellationToken)"/>
 /// entry points over a deterministic in-memory (non-named-pipe) transport and exercise a
 /// plugin-control-style RPC round trip. Being part of the xUnit suite, this generic-transport path
 /// is now continuously checked on every supported CI operating system (Windows, Linux, macOS),
@@ -23,12 +23,12 @@ public sealed class Fix_CMP_0014_Tests
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
 
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        await using var host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<IGenericPluginControl>(new GenericPluginControl()));
         await host.StartAsync();
 
-        await using var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
             new SingleConnectionTransport(clientChannel, ownsConnection: true));
         var control = session.Get<IGenericPluginControl>();
 
@@ -46,12 +46,12 @@ public sealed class Fix_CMP_0014_Tests
     {
         var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
 
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        await using var host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<IGenericNotifier>(new GenericNotifier(peer.Get<IGenericObserver>())));
         await host.StartAsync();
 
-        await using var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
             new SingleConnectionTransport(clientChannel, ownsConnection: true),
             peer => peer.Provide<IGenericObserver>(new GenericObserver()));
         var notifier = session.Get<IGenericNotifier>();

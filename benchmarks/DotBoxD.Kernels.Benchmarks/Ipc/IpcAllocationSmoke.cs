@@ -10,12 +10,12 @@ internal static class IpcAllocationSmoke
     public static async Task RunAsync()
     {
         var pipeName = "dotboxd-ipc-smoke-" + Guid.NewGuid().ToString("N");
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+        await using var host = RpcMessagePackIpc.ListenNamedPipe(
             pipeName,
             peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()));
         await host.StartAsync().ConfigureAwait(false);
 
-        await using var client = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName)
+        await using var client = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName)
             .ConfigureAwait(false);
         var service = client.Get<IAllocationProbeService>();
         await service.AddAsync(1).ConfigureAwait(false);

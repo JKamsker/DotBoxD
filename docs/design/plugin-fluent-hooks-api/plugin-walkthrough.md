@@ -136,7 +136,7 @@ internal static class Program
 
         // (1) Connect to the server's control plane and wrap it in a server-shaped shim.
         await using var connection =
-            await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(args[0]);
+            await RpcMessagePackIpc.ConnectNamedPipeAsync(args[0]);
         var server = new RemotePluginServer(connection.Get<IGamePluginControlService>());
 
         // (2) Register each kernel as the implementation of a server service contract. Register

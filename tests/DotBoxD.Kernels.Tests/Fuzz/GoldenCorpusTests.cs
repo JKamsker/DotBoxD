@@ -9,7 +9,7 @@ public sealed class GoldenCorpusTests
     [InlineData("file-read", "2556a900395d83c3d5cc195c6a6ffe80751ceaa73c5f5ae92ec389470a8a882f")]
     public void Golden_modules_preserve_canonical_hashes(string name, string expectedHash)
     {
-        var module = DotBoxDJsonImporter.Import(GoldenJson(name));
+        var module = JsonImporter.Import(GoldenJson(name));
 
         Assert.Equal(expectedHash, CanonicalModuleHasher.Hash(module));
     }

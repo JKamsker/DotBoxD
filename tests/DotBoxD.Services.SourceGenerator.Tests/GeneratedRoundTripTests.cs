@@ -225,7 +225,7 @@ public class GeneratedRoundTripTests
 
         var h = Harness.Build(source, "RoundTrip.Errors.IThing", "RoundTrip.Errors.ThingServer");
 
-        var ex = await Assert.ThrowsAsync<DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException>(async () =>
+        var ex = await Assert.ThrowsAsync<DotBoxD.Services.Exceptions.ServiceNotFoundException>(async () =>
             await h.Dispatcher.DispatchToPayloadAsync(
                 "NoSuchMethod", System.ReadOnlyMemory<byte>.Empty, h.Serializer, new InstanceRegistry(), CancellationToken.None));
 

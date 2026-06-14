@@ -45,14 +45,14 @@ Console.WriteLine($"Catalog has {prices.Count} items; cart has {cartLines.Length
 Console.WriteLine();
 
 // ---- Stand up the host (Services mode) -----------------------------------------------------------
-await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+await using var host = RpcMessagePackIpc.ListenNamedPipe(
     pipeName,
     peer => peer.ProvideCatalogService(service));
 await host.StartAsync();
 Console.WriteLine($"[Services] Host listening on named pipe '{pipeName}'.");
 
 // ---- Connect a client and exercise both paths over the wire --------------------------------------
-await using var connection = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
+await using var connection = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName);
 var catalog = connection.Get<ICatalogService>();
 
 // (A) Naive composition: one remote call per cart line, summed on the client.

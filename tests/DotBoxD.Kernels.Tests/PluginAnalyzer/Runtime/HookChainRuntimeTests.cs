@@ -209,7 +209,7 @@ public sealed class HookChainRuntimeTests
                 .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
 

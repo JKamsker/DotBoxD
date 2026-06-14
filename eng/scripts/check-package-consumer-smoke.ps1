@@ -175,11 +175,11 @@ var policy = SandboxPolicyBuilder.Create()
     .GrantHttpGet(new[] { "example.com" }, 4096)
     .Build();
 
-var moduleImporter = typeof(DotBoxDJsonImporter);
+var moduleImporter = typeof(JsonImporter);
 var pluginUpload = typeof(PluginPackageJsonSerializer);
-var ipc = typeof(DotBoxDDotBoxDRpcMessagePackIpc);
+var ipc = typeof(RpcMessagePackIpc);
 
-// Prove the packaged DotBoxDJsonExporter module-export surface is reachable and that the
+// Prove the packaged JsonExporter module-export surface is reachable and that the
 // documented JSON IR round trip (export -> import -> prepare) works through the public
 // package references and namespaces. If the exporter is dropped from the package, lands in
 // the wrong namespace, or loses a transitive dependency, this consumer fails to compile or
@@ -205,8 +205,8 @@ var roundTripModule = new SandboxModule(
     },
     new Dictionary<string, string>());
 
-var exportedJson = DotBoxDJsonExporter.Export(roundTripModule, indented: true);
-var reimported = DotBoxDJsonImporter.Import(exportedJson);
+var exportedJson = JsonExporter.Export(roundTripModule, indented: true);
+var reimported = JsonImporter.Import(exportedJson);
 if (reimported.Id != "package-consumer-roundtrip")
 {
     throw new InvalidOperationException(`$"Unexpected round-tripped module id: {reimported.Id}");

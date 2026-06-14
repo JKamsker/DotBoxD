@@ -3,7 +3,7 @@ namespace DotBoxD.Services;
 /// <summary>
 /// The error returned to a remote caller for a handler exception, produced by
 /// <see cref="RpcPeerOptions.ExceptionTransformer"/> on the side that runs the service.
-/// <see cref="Message"/> becomes the caller's <c>DotBoxDRpcRemoteException</c> message and
+/// <see cref="Message"/> becomes the caller's <c>RemoteServiceException</c> message and
 /// <see cref="Type"/> its remote error-type name (e.g. a value from <see cref="RpcErrorTypes"/> or a
 /// custom application error code).
 /// </summary>

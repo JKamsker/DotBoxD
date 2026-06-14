@@ -8,7 +8,7 @@ internal static class DotBoxDGeneratedAssemblyCatalog
 {
     private const string GeneratedFactoryTypeName = "DotBoxD.Services.Generated.DotBoxDGenerated";
 
-    private static readonly ConcurrentDictionary<Assembly, IReadOnlyList<DotBoxDGeneratedService>> s_serviceCatalogs = new();
+    private static readonly ConcurrentDictionary<Assembly, IReadOnlyList<GeneratedService>> s_serviceCatalogs = new();
     private static readonly ConcurrentDictionary<Assembly, Lazy<bool>> s_registrationAttempts = new();
     private static readonly ConcurrentDictionary<Assembly, SinkRegistrar<IDotBoxDServiceRegistrationSink>> s_serviceSinks = new();
     private static readonly ConcurrentDictionary<Assembly, SinkRegistrar<IDotBoxDGeneratedServiceRegistrationSink>> s_generatedSinks = new();
@@ -71,10 +71,10 @@ internal static class DotBoxDGeneratedAssemblyCatalog
         }
     }
 
-    public static IReadOnlyList<DotBoxDGeneratedService> GetServices(Assembly assembly) =>
+    public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly) =>
         s_serviceCatalogs.GetOrAdd(assembly, static assembly => LoadGeneratedServices(assembly));
 
-    public static void PublishServices(Assembly assembly, IReadOnlyList<DotBoxDGeneratedService> services) =>
+    public static void PublishServices(Assembly assembly, IReadOnlyList<GeneratedService> services) =>
         s_serviceCatalogs[assembly] = services;
 
     public static void RegisterServices(Assembly assembly, IDotBoxDServiceRegistrationSink sink) =>
@@ -91,12 +91,12 @@ internal static class DotBoxDGeneratedAssemblyCatalog
                 "RegisterGeneratedServices"))
             .Invoke(sink);
 
-    private static IReadOnlyList<DotBoxDGeneratedService> LoadGeneratedServices(Assembly assembly)
+    private static IReadOnlyList<GeneratedService> LoadGeneratedServices(Assembly assembly)
     {
         var generatedType = FindGeneratedType(assembly);
         if (generatedType is null)
         {
-            return Array.Empty<DotBoxDGeneratedService>();
+            return Array.Empty<GeneratedService>();
         }
 
         EnsureRegistered(assembly);
@@ -106,7 +106,7 @@ internal static class DotBoxDGeneratedAssemblyCatalog
         }
 
         var property = generatedType.GetProperty("Services", BindingFlags.Public | BindingFlags.Static);
-        if (property?.GetValue(null) is IReadOnlyList<DotBoxDGeneratedService> legacyServices)
+        if (property?.GetValue(null) is IReadOnlyList<GeneratedService> legacyServices)
         {
             s_serviceCatalogs[assembly] = legacyServices;
             return legacyServices;

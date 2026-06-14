@@ -80,7 +80,7 @@ await using var peer = RpcPeer
           {
               RequestTimeout = TimeSpan.FromSeconds(5),
               InboundQueueCapacity = 256,
-              QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+              QueueFullMode = QueueFullMode.Wait,
           })
     .ProvidePluginHost(new PluginHost())
     .Start();

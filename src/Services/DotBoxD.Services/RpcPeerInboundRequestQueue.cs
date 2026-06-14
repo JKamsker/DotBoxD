@@ -37,7 +37,7 @@ internal sealed class RpcPeerInboundRequestQueue
 
     public RpcPeerInboundRequestQueue(
         int capacity,
-        DotBoxDRpcQueueFullMode mode,
+        QueueFullMode mode,
         int maxConcurrency,
         long? maxInboundBytes,
         Func<RpcPeerInboundRequest, Task> processAsync,
@@ -45,7 +45,7 @@ internal sealed class RpcPeerInboundRequestQueue
     {
         _processAsync = processAsync;
         _release = release;
-        _dropIncomingWhenFull = mode == DotBoxDRpcQueueFullMode.DropIncoming;
+        _dropIncomingWhenFull = mode == QueueFullMode.DropIncoming;
         _dispatchSerially = maxConcurrency == 1;
         // long.MaxValue == byte bound disabled (count-only). Otherwise total in-flight inbound frame
         // bytes are capped at maxInboundBytes, independent of the capacity (count) bound.

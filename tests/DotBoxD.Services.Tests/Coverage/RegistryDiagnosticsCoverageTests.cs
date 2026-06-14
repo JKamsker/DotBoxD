@@ -16,14 +16,14 @@ namespace DotBoxD.Services.Tests.Cov.RegistryDiag;
 /// with <c>[DotBoxDService]</c> and runs the DotBoxD source generator, so these public registry
 /// entry points resolve real generated proxy/dispatcher factories without any reflection hacks.
 /// </summary>
-public sealed class DotBoxDServiceRegistryCoverageTests
+public sealed class GeneratedServiceRegistryCoverageTests
 {
     private static Assembly SharedAssembly => typeof(IGameService).Assembly;
 
     [Fact]
     public void GetServices_ForGeneratedAssembly_ContainsRegisteredServices()
     {
-        var services = DotBoxDServiceRegistry.GetServices(SharedAssembly);
+        var services = GeneratedServiceRegistry.GetServices(SharedAssembly);
 
         Assert.NotEmpty(services);
         Assert.Contains(services, s => s.ServiceType == typeof(IGameService));
@@ -41,8 +41,8 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         // The second call hits the ConcurrentDictionary GetOrAdd cache in the catalog and must
         // return the very same list instance.
-        var first = DotBoxDServiceRegistry.GetServices(SharedAssembly);
-        var second = DotBoxDServiceRegistry.GetServices(SharedAssembly);
+        var first = GeneratedServiceRegistry.GetServices(SharedAssembly);
+        var second = GeneratedServiceRegistry.GetServices(SharedAssembly);
 
         Assert.Same(first, second);
     }
@@ -50,26 +50,26 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void GetServices_NullAssembly_ThrowsArgumentNull()
     {
-        Assert.Throws<ArgumentNullException>(() => DotBoxDServiceRegistry.GetServices((Assembly)null!));
+        Assert.Throws<ArgumentNullException>(() => GeneratedServiceRegistry.GetServices((Assembly)null!));
     }
 
     [Fact]
     public void GetServices_ForAssemblyWithoutGeneratedRegistry_IsEmpty()
     {
         // The test assembly itself runs no DotBoxD generator, so its catalog is empty (and cached).
-        var assembly = typeof(DotBoxDServiceRegistryCoverageTests).Assembly;
+        var assembly = typeof(GeneratedServiceRegistryCoverageTests).Assembly;
 
-        var services = DotBoxDServiceRegistry.GetServices(assembly);
+        var services = GeneratedServiceRegistry.GetServices(assembly);
 
         Assert.Empty(services);
-        Assert.Same(services, DotBoxDServiceRegistry.GetServices(assembly));
+        Assert.Same(services, GeneratedServiceRegistry.GetServices(assembly));
     }
 
     [Fact]
     public void GetServices_AssemblyEnumeration_AggregatesAcrossAssemblies()
     {
-        var combined = DotBoxDServiceRegistry.GetServices(
-            new[] { SharedAssembly, typeof(DotBoxDServiceRegistryCoverageTests).Assembly });
+        var combined = GeneratedServiceRegistry.GetServices(
+            new[] { SharedAssembly, typeof(GeneratedServiceRegistryCoverageTests).Assembly });
 
         Assert.Contains(combined, s => s.ServiceType == typeof(IGameService));
         Assert.Contains(combined, s => s.ServiceType == typeof(IPlayerNotifications));
@@ -78,14 +78,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void GetServices_NullAssemblyEnumeration_ThrowsArgumentNull()
     {
-        Assert.Throws<ArgumentNullException>(() => DotBoxDServiceRegistry.GetServices((IEnumerable<Assembly>)null!));
+        Assert.Throws<ArgumentNullException>(() => GeneratedServiceRegistry.GetServices((IEnumerable<Assembly>)null!));
     }
 
     [Fact]
     public void GetService_Generic_ReturnsMetadataMatchingTypedLookup()
     {
-        var typed = DotBoxDServiceRegistry.GetService<IGameService>();
-        var byType = DotBoxDServiceRegistry.GetService(typeof(IGameService));
+        var typed = GeneratedServiceRegistry.GetService<IGameService>();
+        var byType = GeneratedServiceRegistry.GetService(typeof(IGameService));
 
         Assert.Equal(typeof(IGameService), typed.ServiceType);
         Assert.Equal("IGameService", typed.ServiceName);
@@ -98,7 +98,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
         // This interface lives in the test assembly, which has no DotBoxD generated registry type,
         // so resolution must fail with the diagnostic that points at [DotBoxDService] + the generator.
         var ex = Assert.Throws<InvalidOperationException>(
-            () => DotBoxDServiceRegistry.GetService(typeof(IUngeneratedCoverageService)));
+            () => GeneratedServiceRegistry.GetService(typeof(IUngeneratedCoverageService)));
 
         Assert.Contains("No DotBoxD generated factory is registered", ex.Message);
         Assert.Contains("[DotBoxDService]", ex.Message);
@@ -110,7 +110,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         var invoker = new RecordingInvoker();
 
-        var proxy = DotBoxDServiceRegistry.CreateProxy<IGameService>(invoker);
+        var proxy = GeneratedServiceRegistry.CreateProxy<IGameService>(invoker);
 
         Assert.NotNull(proxy);
         Assert.IsAssignableFrom<IGameService>(proxy);
@@ -121,7 +121,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         var invoker = new RecordingInvoker();
 
-        var proxy = (IGameService)DotBoxDServiceRegistry.CreateProxy(typeof(IGameService), invoker);
+        var proxy = (IGameService)GeneratedServiceRegistry.CreateProxy(typeof(IGameService), invoker);
         var status = await proxy.GetServerStatusAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal("from-invoker", status.Version);
@@ -133,7 +133,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void CreateProxy_NullInvoker_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.CreateProxy(typeof(IGameService), null!));
+            () => GeneratedServiceRegistry.CreateProxy(typeof(IGameService), null!));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         // Resolve rejects non-interface service types regardless of generated state.
         var ex = Assert.Throws<ArgumentException>(
-            () => DotBoxDServiceRegistry.CreateProxy(typeof(TestGameService), new RecordingInvoker()));
+            () => GeneratedServiceRegistry.CreateProxy(typeof(TestGameService), new RecordingInvoker()));
 
         Assert.Contains("must be an interface", ex.Message);
     }
@@ -149,7 +149,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void CreateDispatcher_Typed_ReturnsDispatcherForServiceName()
     {
-        var dispatcher = DotBoxDServiceRegistry.CreateDispatcher<IGameService>(new TestGameService());
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IGameService>(new TestGameService());
 
         Assert.Equal("IGameService", dispatcher.ServiceName);
     }
@@ -157,7 +157,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void CreateDispatcher_ByType_ReturnsDispatcher()
     {
-        var dispatcher = DotBoxDServiceRegistry.CreateDispatcher(typeof(IGameService), new TestGameService());
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher(typeof(IGameService), new TestGameService());
 
         Assert.IsAssignableFrom<IServiceDispatcher>(dispatcher);
         Assert.Equal("IGameService", dispatcher.ServiceName);
@@ -167,7 +167,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void CreateDispatcher_NullImplementation_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.CreateDispatcher(typeof(IGameService), null!));
+            () => GeneratedServiceRegistry.CreateDispatcher(typeof(IGameService), null!));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
         // The implementation does not implement the requested interface, so dispatcher creation must
         // reject it with a descriptive ArgumentException.
         var ex = Assert.Throws<ArgumentException>(
-            () => DotBoxDServiceRegistry.CreateDispatcher(typeof(IGameService), new object()));
+            () => GeneratedServiceRegistry.CreateDispatcher(typeof(IGameService), new object()));
 
         Assert.Contains("does not implement", ex.Message);
     }
@@ -186,7 +186,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         var sink = new RecordingServiceSink();
 
-        DotBoxDServiceRegistry.RegisterServices(new[] { SharedAssembly }, sink);
+        GeneratedServiceRegistry.RegisterServices(new[] { SharedAssembly }, sink);
 
         Assert.Contains(typeof(IGameService), sink.ServiceTypes);
         Assert.Contains(typeof(IPlayerNotifications), sink.ServiceTypes);
@@ -196,14 +196,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void RegisterServices_NullAssemblies_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterServices(null!, new RecordingServiceSink()));
+            () => GeneratedServiceRegistry.RegisterServices(null!, new RecordingServiceSink()));
     }
 
     [Fact]
     public void RegisterServices_NullSink_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterServices(new[] { SharedAssembly }, (IDotBoxDServiceRegistrationSink)null!));
+            () => GeneratedServiceRegistry.RegisterServices(new[] { SharedAssembly }, (IDotBoxDServiceRegistrationSink)null!));
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         var sink = new RecordingGeneratedSink();
 
-        DotBoxDServiceRegistry.RegisterGeneratedServices(new[] { SharedAssembly }, sink);
+        GeneratedServiceRegistry.RegisterGeneratedServices(new[] { SharedAssembly }, sink);
 
         Assert.Contains(typeof(IGameService), sink.ServiceTypes);
         Assert.Contains(typeof(IPlayerNotifications), sink.ServiceTypes);
@@ -221,14 +221,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void RegisterGeneratedServices_NullAssemblies_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterGeneratedServices(null!, new RecordingGeneratedSink()));
+            () => GeneratedServiceRegistry.RegisterGeneratedServices(null!, new RecordingGeneratedSink()));
     }
 
     [Fact]
     public void RegisterGeneratedServices_NullSink_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterGeneratedServices(
+            () => GeneratedServiceRegistry.RegisterGeneratedServices(
                 new[] { SharedAssembly },
                 (IDotBoxDGeneratedServiceRegistrationSink)null!));
     }
@@ -237,23 +237,23 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void RegisterServices_NullAssemblyForCatalog_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterServices(
+            () => GeneratedServiceRegistry.RegisterServices(
                 (Assembly)null!,
-                DotBoxDServiceRegistry.GetServices(SharedAssembly)));
+                GeneratedServiceRegistry.GetServices(SharedAssembly)));
     }
 
     [Fact]
     public void RegisterServices_NullServicesForCatalog_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.RegisterServices(SharedAssembly, null!));
+            () => GeneratedServiceRegistry.RegisterServices(SharedAssembly, null!));
     }
 
     [Fact]
     public void Register_NullProxyFactory_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            DotBoxDServiceRegistry.Register<ICustomRegisteredService>(
+            GeneratedServiceRegistry.Register<ICustomRegisteredService>(
                 null!,
                 _ => new CustomDispatcher(),
                 ValidCustomService()));
@@ -263,7 +263,7 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void Register_NullDispatcherFactory_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            DotBoxDServiceRegistry.Register<ICustomRegisteredService>(
+            GeneratedServiceRegistry.Register<ICustomRegisteredService>(
                 _ => new CustomProxy(),
                 null!,
                 ValidCustomService()));
@@ -273,14 +273,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     public void Register_MetadataDescribingWrongServiceType_ThrowsArgumentException()
     {
         // ValidateService must reject metadata whose ServiceType disagrees with TService.
-        var mismatched = new DotBoxDGeneratedService(
+        var mismatched = new GeneratedService(
             typeof(IGameService),
             typeof(CustomProxy),
             typeof(CustomDispatcher),
             "Custom");
 
         var ex = Assert.Throws<ArgumentException>(() =>
-            DotBoxDServiceRegistry.Register<ICustomRegisteredService>(
+            GeneratedServiceRegistry.Register<ICustomRegisteredService>(
                 _ => new CustomProxy(),
                 _ => new CustomDispatcher(),
                 mismatched));
@@ -291,14 +291,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void Register_MetadataMissingServiceName_ThrowsArgumentException()
     {
-        var noName = new DotBoxDGeneratedService(
+        var noName = new GeneratedService(
             typeof(ICustomRegisteredService),
             typeof(CustomProxy),
             typeof(CustomDispatcher),
             string.Empty);
 
         var ex = Assert.Throws<ArgumentException>(() =>
-            DotBoxDServiceRegistry.Register<ICustomRegisteredService>(
+            GeneratedServiceRegistry.Register<ICustomRegisteredService>(
                 _ => new CustomProxy(),
                 _ => new CustomDispatcher(),
                 noName));
@@ -311,14 +311,14 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     {
         // A full round-trip: register a hand-authored service interface, then resolve its proxy,
         // dispatcher, and metadata through the public API.
-        DotBoxDServiceRegistry.Register<ICustomRegisteredService>(
+        GeneratedServiceRegistry.Register<ICustomRegisteredService>(
             _ => new CustomProxy(),
             _ => new CustomDispatcher(),
             ValidCustomService());
 
-        var metadata = DotBoxDServiceRegistry.GetService<ICustomRegisteredService>();
-        var proxy = DotBoxDServiceRegistry.CreateProxy<ICustomRegisteredService>(new RecordingInvoker());
-        var dispatcher = DotBoxDServiceRegistry.CreateDispatcher<ICustomRegisteredService>(new CustomImplementation());
+        var metadata = GeneratedServiceRegistry.GetService<ICustomRegisteredService>();
+        var proxy = GeneratedServiceRegistry.CreateProxy<ICustomRegisteredService>(new RecordingInvoker());
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<ICustomRegisteredService>(new CustomImplementation());
 
         Assert.Equal("Custom", metadata.ServiceName);
         Assert.IsType<CustomProxy>(proxy);
@@ -328,31 +328,31 @@ public sealed class DotBoxDServiceRegistryCoverageTests
     [Fact]
     public void Register_DuplicateRegistration_ReplacesPreviousFactory()
     {
-        DotBoxDServiceRegistry.Register<IReplaceableService>(
+        GeneratedServiceRegistry.Register<IReplaceableService>(
             _ => new ReplaceableProxyV1(),
             _ => new CustomDispatcher(),
-            new DotBoxDGeneratedService(
+            new GeneratedService(
                 typeof(IReplaceableService),
                 typeof(ReplaceableProxyV1),
                 typeof(CustomDispatcher),
                 "Replaceable"));
 
-        DotBoxDServiceRegistry.Register<IReplaceableService>(
+        GeneratedServiceRegistry.Register<IReplaceableService>(
             _ => new ReplaceableProxyV2(),
             _ => new CustomDispatcher(),
-            new DotBoxDGeneratedService(
+            new GeneratedService(
                 typeof(IReplaceableService),
                 typeof(ReplaceableProxyV2),
                 typeof(CustomDispatcher),
                 "Replaceable"));
 
-        var proxy = DotBoxDServiceRegistry.CreateProxy<IReplaceableService>(new RecordingInvoker());
+        var proxy = GeneratedServiceRegistry.CreateProxy<IReplaceableService>(new RecordingInvoker());
 
         // The latest registration wins.
         Assert.IsType<ReplaceableProxyV2>(proxy);
     }
 
-    private static DotBoxDGeneratedService ValidCustomService() =>
+    private static GeneratedService ValidCustomService() =>
         new(
             typeof(ICustomRegisteredService),
             typeof(CustomProxy),

@@ -16,7 +16,7 @@ public sealed class Fix_ALG_0006_Tests
         var json = PackageJson();
         var moduleText = ModuleRawText(json);
 
-        var standalone = DotBoxDJsonImporter.Import(moduleText);
+        var standalone = JsonImporter.Import(moduleText);
         var package = PluginPackageJsonSerializer.Import(json);
 
         var standaloneStatement = standalone.Functions

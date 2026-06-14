@@ -9,10 +9,10 @@ namespace DotBoxD.Services.Tests.Cov;
 /// <summary>
 /// Round 1 regression coverage for the <c>DispatchOnInstanceAsync</c>
 /// default interface member. A hand-written dispatcher that does not override the instance-scoped
-/// entry point must signal a not-found result whose <see cref="DotBoxDRpcNotFoundException.Kind"/> is
-/// <see cref="DotBoxDRpcNotFoundException.NotFoundKind.Instance"/> — the service exists, but it does not
+/// entry point must signal a not-found result whose <see cref="ServiceNotFoundException.Kind"/> is
+/// <see cref="ServiceNotFoundException.NotFoundKind.Instance"/> — the service exists, but it does not
 /// support instance-scoped dispatch. The default member currently uses the single-arg
-/// <c>DotBoxDRpcNotFoundException(string)</c> ctor, which chains to <c>NotFoundKind.Service</c>, so the
+/// <c>ServiceNotFoundException(string)</c> ctor, which chains to <c>NotFoundKind.Service</c>, so the
 /// wire-level error type is wrongly reported as ServiceNotFound instead of InstanceNotFound.
 /// </summary>
 public sealed class Round1_DispatchOnInstanceNotFoundKindTests
@@ -26,7 +26,7 @@ public sealed class Round1_DispatchOnInstanceNotFoundKindTests
         var output = new ArrayBufferWriter<byte>();
 
         // Act: invoking the default member must reject the call as not-found.
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcNotFoundException>(() =>
+        var ex = await Assert.ThrowsAsync<ServiceNotFoundException>(() =>
             dispatcher.DispatchOnInstanceAsync(
                 "instance-1",
                 "Method",
@@ -37,7 +37,7 @@ public sealed class Round1_DispatchOnInstanceNotFoundKindTests
 
         // Assert: the service exists but does not support instance-scoped dispatch, so the correct
         // classification is Instance (maps to InstanceNotFound on the wire), not Service.
-        Assert.Equal(DotBoxDRpcNotFoundException.NotFoundKind.Instance, ex.Kind);
+        Assert.Equal(ServiceNotFoundException.NotFoundKind.Instance, ex.Kind);
     }
 
     private sealed class RootOnlyDispatcher : IServiceDispatcher

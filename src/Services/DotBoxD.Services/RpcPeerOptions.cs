@@ -19,7 +19,7 @@ public sealed class RpcPeerOptions
     private int _maxPendingRequests = DefaultMaxPendingRequests;
     private int _maxConcurrentInboundDispatch = DefaultMaxConcurrentInboundDispatch;
     private long? _maxInboundBytes = DefaultMaxInboundBytes;
-    private DotBoxDRpcQueueFullMode _queueFullMode = DotBoxDRpcQueueFullMode.Wait;
+    private QueueFullMode _queueFullMode = QueueFullMode.Wait;
     private TimeSpan _requestTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
@@ -113,11 +113,11 @@ public sealed class RpcPeerOptions
     /// </summary>
     /// <remarks>
     /// A peer demuxes responses, cancels, and inbound requests over a single read loop. In
-    /// <see cref="DotBoxDRpcQueueFullMode.Wait"/> mode that loop parks when the request queue is full,
+    /// <see cref="QueueFullMode.Wait"/> mode that loop parks when the request queue is full,
     /// which also pauses reading responses to this peer's own outbound calls. For a bidirectional
     /// peer whose inbound handlers call back into the same peer, size this capacity above the
     /// maximum number of inbound requests that can arrive ahead of those callbacks' responses, or
-    /// use <see langword="null"/> (unbounded) or <see cref="DotBoxDRpcQueueFullMode.DropIncoming"/>;
+    /// use <see langword="null"/> (unbounded) or <see cref="QueueFullMode.DropIncoming"/>;
     /// otherwise an under-sized Wait queue can stall a reentrant response until
     /// <see cref="RequestTimeout"/>.
     /// </remarks>
@@ -209,12 +209,12 @@ public sealed class RpcPeerOptions
     }
 
     /// <summary>Policy used when <see cref="InboundQueueCapacity"/> is set and the request queue is full.</summary>
-    public DotBoxDRpcQueueFullMode QueueFullMode
+    public QueueFullMode QueueFullMode
     {
         get => _queueFullMode;
         init
         {
-            if (!Enum.IsDefined(typeof(DotBoxDRpcQueueFullMode), value))
+            if (!Enum.IsDefined(typeof(QueueFullMode), value))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(QueueFullMode),

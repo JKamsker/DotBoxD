@@ -84,7 +84,7 @@ internal sealed class RpcDispatchResponseBuilder
             await streaming.AbandonResponseAsync().ConfigureAwait(false);
             throw;
         }
-        catch (DotBoxDRpcProtocolException ex)
+        catch (ServiceProtocolException ex)
         {
             writer?.Dispose();
             await streaming.AbandonResponseAsync().ConfigureAwait(false);

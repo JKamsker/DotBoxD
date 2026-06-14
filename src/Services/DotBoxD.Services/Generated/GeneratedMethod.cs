@@ -3,11 +3,11 @@ namespace DotBoxD.Services.Generated;
 /// <summary>
 /// Describes a source-generated DotBoxD service method.
 /// </summary>
-public readonly record struct DotBoxDGeneratedMethod(
+public readonly record struct GeneratedMethod(
     string Name,
     string WireName,
     Type ReturnType,
     Type? ResultType,
-    DotBoxDGeneratedReturnKind ReturnKind,
+    GeneratedReturnKind ReturnKind,
     bool ReturnsNestedService,
-    IReadOnlyList<DotBoxDGeneratedParameter> Parameters);
+    IReadOnlyList<GeneratedParameter> Parameters);

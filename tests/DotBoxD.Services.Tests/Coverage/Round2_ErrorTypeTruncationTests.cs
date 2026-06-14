@@ -50,7 +50,7 @@ public sealed class Round2_ErrorTypeTruncationTests
                 new ThrowingGameService(() => new InvalidOperationException("ignored"))),
             serverOptions);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => pair.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
         // The (short) message is unaffected; only the type is the subject under test.

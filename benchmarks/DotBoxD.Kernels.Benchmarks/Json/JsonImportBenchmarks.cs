@@ -20,7 +20,7 @@ public class JsonImportBenchmarks
 
     [Benchmark]
     public SandboxModule Import()
-        => DotBoxDJsonImporter.Import(_json);
+        => JsonImporter.Import(_json);
 
     private static string BuildModuleJson(int statementCount, bool duplicateLiterals)
     {

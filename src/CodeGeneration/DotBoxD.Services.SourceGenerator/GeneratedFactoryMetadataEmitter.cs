@@ -32,7 +32,7 @@ internal static class GeneratedFactoryMetadataEmitter
         ServiceModel service,
         CancellationToken ct)
     {
-        sb.AppendLine($"        private static readonly global::DotBoxD.Services.Generated.DotBoxDGeneratedMethod[] {arrayName} =");
+        sb.AppendLine($"        private static readonly global::DotBoxD.Services.Generated.GeneratedMethod[] {arrayName} =");
         sb.AppendLine("        {");
 
         foreach (var method in service.Methods.Array)
@@ -55,14 +55,14 @@ internal static class GeneratedFactoryMetadataEmitter
         MethodModel method,
         CancellationToken ct)
     {
-        sb.AppendLine("            new global::DotBoxD.Services.Generated.DotBoxDGeneratedMethod(");
+        sb.AppendLine("            new global::DotBoxD.Services.Generated.GeneratedMethod(");
         sb.AppendLine($"                \"{LiteralHelpers.EscapeStringLiteral(IdentifierHelpers.UnescapeIdentifier(method.Name))}\",");
         sb.AppendLine($"                \"{LiteralHelpers.EscapeStringLiteral(method.RawRpcName)}\",");
         sb.AppendLine($"                typeof({method.MetadataReturnType}),");
         sb.AppendLine($"                {TypeExpression(method.MetadataResultType)},");
         sb.AppendLine($"                {ReturnKindExpression(method.ReturnKind)},");
         sb.AppendLine($"                {BoolLiteral(NamingHelpers.IsSubServiceReturn(method.ReturnKind))},");
-        sb.AppendLine("                new global::DotBoxD.Services.Generated.DotBoxDGeneratedParameter[]");
+        sb.AppendLine("                new global::DotBoxD.Services.Generated.GeneratedParameter[]");
         sb.AppendLine("                {");
         AppendParameters(sb, method.Parameters, ct);
         sb.AppendLine("                }),");
@@ -77,7 +77,7 @@ internal static class GeneratedFactoryMetadataEmitter
         {
             ct.ThrowIfCancellationRequested();
             var parameter = parameters.Array[i];
-            sb.AppendLine("                    new global::DotBoxD.Services.Generated.DotBoxDGeneratedParameter(");
+            sb.AppendLine("                    new global::DotBoxD.Services.Generated.GeneratedParameter(");
             sb.AppendLine($"                        \"{LiteralHelpers.EscapeStringLiteral(IdentifierHelpers.UnescapeIdentifier(parameter.Name))}\",");
             sb.AppendLine($"                        typeof({parameter.MetadataType}),");
             sb.AppendLine($"                        {i.ToString(System.Globalization.CultureInfo.InvariantCulture)},");
@@ -105,7 +105,7 @@ internal static class GeneratedFactoryMetadataEmitter
     }
 
     private static string ReturnKindExpression(MethodReturnKind returnKind) =>
-        "global::DotBoxD.Services.Generated.DotBoxDGeneratedReturnKind." + ReturnKindName(returnKind);
+        "global::DotBoxD.Services.Generated.GeneratedReturnKind." + ReturnKindName(returnKind);
 
     private static string ReturnKindName(MethodReturnKind returnKind) => returnKind switch
     {

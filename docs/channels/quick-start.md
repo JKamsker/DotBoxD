@@ -142,7 +142,7 @@ The source generator creates:
 2. **Dispatcher** (`MyServiceDispatcher`) - Provider-side router that deserializes and invokes
 3. **Extensions** (`peer.GetMyService()`, `peer.ProvideMyService(impl)`) - Convenience methods on `RpcPeer`
 4. **Registry factory** (`DotBoxDGenerated`) - Typed proxy/dispatcher factory backed by generated delegates
-5. **Service catalog** (`DotBoxDGenerated.Services`) - Array-backed `DotBoxDGeneratedService` descriptors
+5. **Service catalog** (`DotBoxDGenerated.Services`) - Array-backed `GeneratedService` descriptors
 6. **Registration sink** (`DotBoxDGenerated.RegisterServices(...)`) - Direct generic calls for service/proxy registrations
 7. **Generated implementation sink** (`DotBoxDGenerated.RegisterGeneratedServices(...)`) - Direct generic calls for service/proxy/dispatcher registrations
 

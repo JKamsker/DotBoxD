@@ -200,7 +200,7 @@ public sealed class PeerInboundCoverageTests
         Assert.False(response.IsSuccess);
     }
 
-    // ---- Dispatcher throws DotBoxDRpcNotFoundException(Method) -> MethodNotFound -------------------
+    // ---- Dispatcher throws ServiceNotFoundException(Method) -> MethodNotFound -------------------
 
     [Fact]
     public async Task HandlerThrowsMethodNotFound_ReturnsMethodNotFoundError()
@@ -428,9 +428,9 @@ public sealed class PeerInboundCoverageTests
             IInstanceRegistry registry,
             IBufferWriter<byte> output,
             CancellationToken ct = default) =>
-            throw new Exceptions.DotBoxDRpcNotFoundException(
+            throw new Exceptions.ServiceNotFoundException(
                 $"Method '{method}' not found.",
-                Exceptions.DotBoxDRpcNotFoundException.NotFoundKind.Method);
+                Exceptions.ServiceNotFoundException.NotFoundKind.Method);
     }
 
     private sealed class ThrowingDispatcher : IServiceDispatcher

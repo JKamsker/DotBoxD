@@ -25,7 +25,7 @@ public sealed class RpcStreamManagerRegressionTests
 
         streams.RemoveInbound(handle.StreamId);
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() =>
+        await Assert.ThrowsAsync<ServiceConnectionException>(() =>
             receiver.ReadChunkAsync(CancellationToken.None).AsTask().WaitAsync(Timeout));
         Assert.Equal(0, streams.InboundReceiverCount);
     }
@@ -40,7 +40,7 @@ public sealed class RpcStreamManagerRegressionTests
 
         streams.RemoveInbound(handle.StreamId);
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() =>
+        await Assert.ThrowsAsync<ServiceConnectionException>(() =>
             pipe.Reader.ReadAsync().AsTask().WaitAsync(Timeout));
         await pipe.Reader.CompleteAsync();
     }

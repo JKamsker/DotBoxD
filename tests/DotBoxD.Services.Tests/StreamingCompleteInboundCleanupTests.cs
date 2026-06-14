@@ -14,7 +14,7 @@ namespace DotBoxD.Services.Tests;
 /// 1. <see cref="RpcStreamManager.InboundReceiverCount"/> remains non-zero even after the remote
 ///    sends <c>StreamComplete</c>, making diagnostics misleading.
 /// 2. Re-registering the same stream ID (e.g. after reconnect) throws
-///    <see cref="DotBoxDRpcProtocolException"/> ("Inbound stream id 'X' is already active.") because
+///    <see cref="ServiceProtocolException"/> ("Inbound stream id 'X' is already active.") because
 ///    <c>RegisterInbound</c> calls <c>_receivers.TryAdd</c>, which sees the stale completed entry.
 ///
 /// Compare: <see cref="RpcStreamManager.RemoveInbound"/> → <c>AbortInbound</c> DOES call
@@ -63,7 +63,7 @@ public sealed class StreamingCompleteInboundCleanupTests
     /// <c>RegisterInboundResponse</c> for the same stream ID must succeed without throwing.
     ///
     /// CURRENTLY FAILS: The stale entry blocks <c>_receivers.TryAdd</c>, causing
-    /// <see cref="DotBoxDRpcProtocolException"/> ("Inbound stream id '50002' is already active.").
+    /// <see cref="ServiceProtocolException"/> ("Inbound stream id '50002' is already active.").
     /// </summary>
     [Fact]
     public void CompleteInbound_AllowsReregistrationWithSameStreamId()
@@ -77,7 +77,7 @@ public sealed class StreamingCompleteInboundCleanupTests
         streams.CompleteInbound(handle.StreamId);
 
         // Assert — re-registration must not throw
-        // CURRENTLY FAILS: throws DotBoxDRpcProtocolException("Inbound stream id '50002' is already active.")
+        // CURRENTLY FAILS: throws ServiceProtocolException("Inbound stream id '50002' is already active.")
         var exception = Record.Exception(() =>
             streams.RegisterInboundResponse(handle, CancellationToken.None));
 

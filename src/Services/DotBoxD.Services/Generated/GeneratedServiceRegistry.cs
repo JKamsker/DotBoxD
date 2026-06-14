@@ -7,7 +7,7 @@ namespace DotBoxD.Services.Generated;
 /// <summary>
 /// Runtime registry populated by DotBoxD-generated service factories.
 /// </summary>
-public static class DotBoxDServiceRegistry
+public static class GeneratedServiceRegistry
 {
     private static readonly ConcurrentDictionary<Type, RegisteredService> s_services = new();
 
@@ -21,7 +21,7 @@ public static class DotBoxDServiceRegistry
         Register(
             proxyFactory,
             dispatcherFactory,
-            new DotBoxDGeneratedService(
+            new GeneratedService(
                 typeof(TService),
                 typeof(TService),
                 typeof(IServiceDispatcher),
@@ -33,7 +33,7 @@ public static class DotBoxDServiceRegistry
     public static void Register<TService>(
         Func<IRpcInvoker, TService> proxyFactory,
         Func<object, IServiceDispatcher> dispatcherFactory,
-        DotBoxDGeneratedService service)
+        GeneratedService service)
         where TService : class
     {
         if (proxyFactory is null)
@@ -57,20 +57,20 @@ public static class DotBoxDServiceRegistry
     /// <summary>
     /// Gets generated metadata for <typeparamref name="TService"/>.
     /// </summary>
-    public static DotBoxDGeneratedService GetService<TService>()
+    public static GeneratedService GetService<TService>()
         where TService : class =>
         GetService(typeof(TService));
 
     /// <summary>
     /// Gets generated metadata for <paramref name="serviceInterface"/>.
     /// </summary>
-    public static DotBoxDGeneratedService GetService(Type serviceInterface) =>
+    public static GeneratedService GetService(Type serviceInterface) =>
         Resolve(serviceInterface).Service;
 
     /// <summary>
     /// Gets generated service metadata from <paramref name="assembly"/> without scanning its types.
     /// </summary>
-    public static IReadOnlyList<DotBoxDGeneratedService> GetServices(Assembly assembly)
+    public static IReadOnlyList<GeneratedService> GetServices(Assembly assembly)
     {
         if (assembly is null)
         {
@@ -83,14 +83,14 @@ public static class DotBoxDServiceRegistry
     /// <summary>
     /// Gets generated service metadata from multiple assemblies without scanning their types.
     /// </summary>
-    public static IReadOnlyList<DotBoxDGeneratedService> GetServices(IEnumerable<Assembly> assemblies)
+    public static IReadOnlyList<GeneratedService> GetServices(IEnumerable<Assembly> assemblies)
     {
         if (assemblies is null)
         {
             throw new ArgumentNullException(nameof(assemblies));
         }
 
-        var services = new List<DotBoxDGeneratedService>();
+        var services = new List<GeneratedService>();
         foreach (var assembly in assemblies)
         {
             services.AddRange(GetServices(assembly));
@@ -102,7 +102,7 @@ public static class DotBoxDServiceRegistry
     /// <summary>
     /// Registers generated service metadata for <paramref name="assembly"/>.
     /// </summary>
-    public static void RegisterServices(Assembly assembly, IReadOnlyList<DotBoxDGeneratedService> services)
+    public static void RegisterServices(Assembly assembly, IReadOnlyList<GeneratedService> services)
     {
         if (assembly is null)
             throw new ArgumentNullException(nameof(assembly));
@@ -240,7 +240,7 @@ public static class DotBoxDServiceRegistry
             $"Assembly: {assemblyName}.");
     }
 
-    private static void ValidateService<TService>(DotBoxDGeneratedService service)
+    private static void ValidateService<TService>(GeneratedService service)
         where TService : class
     {
         if (service.ServiceType is null)
@@ -275,7 +275,7 @@ public static class DotBoxDServiceRegistry
         public RegisteredService(
             Func<IRpcInvoker, object> proxyFactory,
             Func<object, IServiceDispatcher> dispatcherFactory,
-            DotBoxDGeneratedService service)
+            GeneratedService service)
         {
             CreateProxy = proxyFactory;
             CreateDispatcher = dispatcherFactory;
@@ -286,6 +286,6 @@ public static class DotBoxDServiceRegistry
 
         public Func<object, IServiceDispatcher> CreateDispatcher { get; }
 
-        public DotBoxDGeneratedService Service { get; }
+        public GeneratedService Service { get; }
     }
 }

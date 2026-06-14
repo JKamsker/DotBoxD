@@ -64,14 +64,14 @@ internal class PendingUnaryResponse<TResponse> :
         {
             if (!response.IsSuccess)
             {
-                throw new DotBoxDRpcRemoteException(
+                throw new RemoteServiceException(
                     response.ErrorMessage ?? "Unknown error",
                     response.ErrorType ?? "Unknown");
             }
 
             if (response.Stream is not null)
             {
-                throw new DotBoxDRpcProtocolException(
+                throw new ServiceProtocolException(
                     "Response opened a stream for a non-streaming invocation.");
             }
 
@@ -109,7 +109,7 @@ internal class PendingUnaryResponse<TResponse> :
     }
 
     protected virtual Exception CreateTimeoutException() =>
-        new DotBoxDRpcTimeoutException("Request timed out.");
+        new ServiceTimeoutException("Request timed out.");
 
     private bool IsDirectCompletion =>
         Volatile.Read(ref _directOwner) is not null;
@@ -148,10 +148,10 @@ internal class PendingUnaryResponse<TResponse> :
 internal class CancellablePendingUnaryResponse<TResponse> :
     PendingUnaryResponse<TResponse>
 {
-    private readonly DotBoxDRpcPendingRequests _owner;
+    private readonly PendingRequests _owner;
     private int _cancellationKind;
 
-    public CancellablePendingUnaryResponse(DotBoxDRpcPendingRequests owner, int messageId)
+    public CancellablePendingUnaryResponse(PendingRequests owner, int messageId)
         : base(messageId)
     {
         _owner = owner;
@@ -178,7 +178,7 @@ internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
     private long _timeoutDeadline = long.MaxValue;
 
     public PendingUnaryResponseWithTimeout(
-        DotBoxDRpcPendingRequests owner,
+        PendingRequests owner,
         int messageId,
         string service,
         string method)
@@ -194,5 +194,5 @@ internal sealed class PendingUnaryResponseWithTimeout<TResponse> :
         Volatile.Write(ref _timeoutDeadline, deadline);
 
     protected override Exception CreateTimeoutException() =>
-        new DotBoxDRpcTimeoutException($"Request to {_service}.{_method} timed out.");
+        new ServiceTimeoutException($"Request to {_service}.{_method} timed out.");
 }

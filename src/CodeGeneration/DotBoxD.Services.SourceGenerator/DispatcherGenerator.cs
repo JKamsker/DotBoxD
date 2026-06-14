@@ -104,7 +104,7 @@ internal static class DispatcherGenerator
         {
             sb.AppendLine($"            if (!registry.TryGet(\"{service.ServiceName}\", instanceId, out var __obj) || __obj is not {qualifiedInterface} __inst)");
             sb.AppendLine("            {");
-            sb.AppendLine($"                throw new global::DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", global::DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException.NotFoundKind.Instance);");
+            sb.AppendLine($"                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException(\"Instance '\" + instanceId + \"' not found for service '{service.ServiceName}'.\", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);");
             sb.AppendLine("            }");
             receiver = "__inst";
         }
@@ -123,7 +123,7 @@ internal static class DispatcherGenerator
         }
 
         sb.AppendLine("                default:");
-        sb.AppendLine($"                    throw new global::DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException(\"Method '\" + method + \"' not found on service '{service.ServiceName}'.\", global::DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException.NotFoundKind.Method);");
+        sb.AppendLine($"                    throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException(\"Method '\" + method + \"' not found on service '{service.ServiceName}'.\", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Method);");
         sb.AppendLine("            }");
         sb.AppendLine("        }");
     }
@@ -136,7 +136,7 @@ internal static class DispatcherGenerator
         CancellationToken ct)
     {
         // Methods whose shape we cannot marshal (ref/in/out parameters) get no switch case;
-        // an inbound call for them falls through to the default DotBoxDRpcNotFoundException
+        // an inbound call for them falls through to the default ServiceNotFoundException
         // branch, which is the same behaviour as calling an unknown method name.
         if (method.UnsupportedReason is not null)
         {

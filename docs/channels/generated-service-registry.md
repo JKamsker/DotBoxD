@@ -29,10 +29,10 @@ the generator emits:
 - `DotBoxDGenerated.RegisterGeneratedServices(...)`, a generic callback for service/proxy/dispatcher triples
 
 The generated `DotBoxDGenerated` type registers the service with
-`DotBoxD.Services.Generated.DotBoxDServiceRegistry` through generated delegates. No runtime
+`DotBoxD.Services.Generated.GeneratedServiceRegistry` through generated delegates. No runtime
 type scan is needed.
 
-Each `DotBoxDGeneratedService` descriptor contains:
+Each `GeneratedService` descriptor contains:
 
 - `ServiceType` - the `[DotBoxDService]` interface type
 - `ProxyType` - the generated client proxy implementation type
@@ -185,8 +185,8 @@ same catalog that the generated static constructor published:
 ```csharp
 using DotBoxD.Services.Generated;
 
-IReadOnlyList<DotBoxDGeneratedService> services =
-    DotBoxDServiceRegistry.GetServices(contractAssembly);
+IReadOnlyList<GeneratedService> services =
+    GeneratedServiceRegistry.GetServices(contractAssembly);
 ```
 
 This is useful for plugin hosts that load contract assemblies dynamically and want
@@ -197,11 +197,11 @@ For hosts that load several contract assemblies, pass the assembly set once:
 ```csharp
 Assembly[] contractAssemblies = pluginContracts.Select(p => p.Assembly).ToArray();
 
-IReadOnlyList<DotBoxDGeneratedService> allServices =
-    DotBoxDServiceRegistry.GetServices(contractAssemblies);
+IReadOnlyList<GeneratedService> allServices =
+    GeneratedServiceRegistry.GetServices(contractAssemblies);
 
-DotBoxDServiceRegistry.RegisterServices(contractAssemblies, new MySink(services));
-DotBoxDServiceRegistry.RegisterGeneratedServices(contractAssemblies, new GeneratedSink());
+GeneratedServiceRegistry.RegisterServices(contractAssemblies, new MySink(services));
+GeneratedServiceRegistry.RegisterGeneratedServices(contractAssemblies, new GeneratedSink());
 ```
 
 The multi-assembly helpers perform a targeted lookup for
@@ -215,9 +215,9 @@ The lower-level runtime registry is public for advanced hosts:
 ```csharp
 using DotBoxD.Services.Generated;
 
-var service = DotBoxDServiceRegistry.GetService<IChatService>();
-var proxy = DotBoxDServiceRegistry.CreateProxy<IChatService>(peer);
-var dispatcher = DotBoxDServiceRegistry.CreateDispatcher<IChatService>(implementation);
+var service = GeneratedServiceRegistry.GetService<IChatService>();
+var proxy = GeneratedServiceRegistry.CreateProxy<IChatService>(peer);
+var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IChatService>(implementation);
 ```
 
 Like the typed factory, `CreateProxy<IChatService>` takes an `IRpcInvoker`, so pass the
@@ -234,7 +234,7 @@ assemblies, each assembly gets its own `DotBoxD.Services.Generated.DotBoxDGenera
 registers the services declared in that assembly.
 
 When a registry lookup is requested and the service has not been registered yet,
-`DotBoxDServiceRegistry` performs one targeted lookup for the generated registration type
+`GeneratedServiceRegistry` performs one targeted lookup for the generated registration type
 in the service interface's assembly and runs its static constructor. It does not enumerate
 all types in the assembly.
 

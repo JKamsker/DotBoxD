@@ -159,7 +159,7 @@ lambda lowering, not a new runtime value-passing protocol. This keeps the existi
 complexity stays in the analyzer.
 
 ### C1. Detection (new second generator branch)
-Add a `CreateSyntaxProvider` in `DotBoxDPluginPackageGenerator.cs` keyed on invocation syntax
+Add a `CreateSyntaxProvider` in `PluginPackageGenerator.cs` keyed on invocation syntax
 (predicate: member-access named `Where`/`Select`/`InvokeKernel`, allocation-free). Semantic
 transform: require the receiver type to be `DotBoxD.Plugins.HookPipeline<T>`/`EventPipeline<T>`
 (rejects LINQ), transform **only the terminal** node, walk down the receiver chain to the
@@ -182,7 +182,7 @@ self-registration into `KernelPackageRegistry` (B4 contract); registry keys must
 
 ### C4. Constraints + diagnostics
 Lowerable subset = exactly what the lowerer accepts today. Extend the forbidden-host-API analyzer
-(`DotBoxDPluginAnalyzer`, `DBXK001`) to also fire inside to-be-lowered lambdas. New diagnostics
+(`PluginAnalyzer`, `DBXK001`) to also fire inside to-be-lowered lambdas. New diagnostics
 `DBXK110`–`DBXK114` (unsupported construct in chain lambda; unsupported `Select` type; unmappable
 captured variable; chain not statically resolvable → runs native, informational; `InvokeKernel`
 terminal not a single `Send`). Add to `AnalyzerReleases.Unshipped.md`.
@@ -213,7 +213,7 @@ lowers, ships, and runs sandboxed.
 - **B:** `src/DotBoxD.Plugins/Runtime/HookRegistry.cs`, `src/DotBoxD.Plugins/PluginServer.cs`,
   new `src/DotBoxD.Plugins/Runtime/KernelPackageRegistry.cs`,
   new `src/DotBoxD.Plugins/Runtime/EventRegistry.cs`, `docs/api-baselines/DotBoxD.Plugins.txt`.
-- **C:** `src/DotBoxD.Plugins.Analyzer/Analysis/DotBoxDPluginPackageGenerator.cs`,
+- **C:** `src/DotBoxD.Plugins.Analyzer/Analysis/PluginPackageGenerator.cs`,
   `.../DotBoxDPackageSourceEmitter.cs`,
   `.../Lowering/Expressions/DotBoxDExpressionLoweringContext.cs`,
   `.../Lowering/DotBoxDGenerationNames.cs`, `.../PluginAnalyzerDiagnostics.cs`,

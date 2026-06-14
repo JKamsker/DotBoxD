@@ -9,7 +9,7 @@ using Xunit;
 namespace DotBoxD.Services.Tests.Cov.Round2Public;
 
 /// <summary>
-/// Round-2 coverage for the remaining <see cref="DotBoxDServiceRegistry"/> guard/metadata branches the
+/// Round-2 coverage for the remaining <see cref="GeneratedServiceRegistry"/> guard/metadata branches the
 /// round-1 registry suite did not reach: the two-argument <c>Register</c> overload (default metadata
 /// construction), the <c>Resolve</c> null-type guard, the non-interface guard via a framework type,
 /// and the <c>ValidateService</c> missing-proxy/dispatcher/name validations. All driven through the
@@ -18,21 +18,21 @@ namespace DotBoxD.Services.Tests.Cov.Round2Public;
 /// </summary>
 public sealed class RegistryGuardCoverageTests
 {
-    // ----- Two-arg Register overload builds default metadata (DotBoxDServiceRegistry 21-28) -----
+    // ----- Two-arg Register overload builds default metadata (GeneratedServiceRegistry 21-28) -----
 
     [Fact]
     public void Register_TwoArgOverload_BuildsDefaultMetadataAndResolves()
     {
-        // The metadata-less overload synthesizes DotBoxDGeneratedService(TService, TService,
+        // The metadata-less overload synthesizes GeneratedService(TService, TService,
         // IServiceDispatcher, TService.Name) for us. After registering, the metadata, proxy, and
         // dispatcher must all resolve from the hand-supplied factories.
-        DotBoxDServiceRegistry.Register<IDefaultMetadataService>(
+        GeneratedServiceRegistry.Register<IDefaultMetadataService>(
             _ => new DefaultMetadataProxy(),
             _ => new DefaultMetadataDispatcher());
 
-        var metadata = DotBoxDServiceRegistry.GetService<IDefaultMetadataService>();
-        var proxy = DotBoxDServiceRegistry.CreateProxy<IDefaultMetadataService>(new NoopInvoker());
-        var dispatcher = DotBoxDServiceRegistry.CreateDispatcher<IDefaultMetadataService>(
+        var metadata = GeneratedServiceRegistry.GetService<IDefaultMetadataService>();
+        var proxy = GeneratedServiceRegistry.CreateProxy<IDefaultMetadataService>(new NoopInvoker());
+        var dispatcher = GeneratedServiceRegistry.CreateDispatcher<IDefaultMetadataService>(
             new DefaultMetadataImpl());
 
         // Default metadata: ServiceType == ProxyType == the interface, name defaults to the type name.
@@ -44,41 +44,41 @@ public sealed class RegistryGuardCoverageTests
         Assert.IsAssignableFrom<IServiceDispatcher>(dispatcher);
     }
 
-    // ----- Resolve null-type guard via CreateProxy (DotBoxDServiceRegistry 211-213) -----
+    // ----- Resolve null-type guard via CreateProxy (GeneratedServiceRegistry 211-213) -----
 
     [Fact]
     public void CreateProxy_NullServiceInterface_ThrowsArgumentNull()
     {
         // The invoker is non-null, so the call proceeds into Resolve(null) which rejects the null type.
         var ex = Assert.Throws<ArgumentNullException>(
-            () => DotBoxDServiceRegistry.CreateProxy((Type)null!, new NoopInvoker()));
+            () => GeneratedServiceRegistry.CreateProxy((Type)null!, new NoopInvoker()));
         Assert.Equal("serviceInterface", ex.ParamName);
     }
 
-    // ----- Non-interface guard with a framework type (DotBoxDServiceRegistry 215-220) -----
+    // ----- Non-interface guard with a framework type (GeneratedServiceRegistry 215-220) -----
 
     [Fact]
     public void CreateProxy_StringType_ThrowsArgumentExceptionMustBeInterface()
     {
         var ex = Assert.Throws<ArgumentException>(
-            () => DotBoxDServiceRegistry.CreateProxy(typeof(string), new NoopInvoker()));
+            () => GeneratedServiceRegistry.CreateProxy(typeof(string), new NoopInvoker()));
         Assert.Contains("must be an interface", ex.Message);
         Assert.Equal("serviceInterface", ex.ParamName);
     }
 
-    // ----- ValidateService missing ProxyType (DotBoxDServiceRegistry 251-252) -----
+    // ----- ValidateService missing ProxyType (GeneratedServiceRegistry 251-252) -----
 
     [Fact]
     public void Register_MetadataMissingProxyType_ThrowsArgumentException()
     {
-        var noProxy = new DotBoxDGeneratedService(
+        var noProxy = new GeneratedService(
             typeof(IValidationProbeService),
             ProxyType: null!,
             typeof(ProbeDispatcher),
             "Probe");
 
         var ex = Assert.Throws<ArgumentException>(() =>
-            DotBoxDServiceRegistry.Register<IValidationProbeService>(
+            GeneratedServiceRegistry.Register<IValidationProbeService>(
                 _ => new ProbeProxy(),
                 _ => new ProbeDispatcher(),
                 noProxy));
@@ -87,19 +87,19 @@ public sealed class RegistryGuardCoverageTests
         Assert.Equal("service", ex.ParamName);
     }
 
-    // ----- ValidateService missing DispatcherType (DotBoxDServiceRegistry 255-256) -----
+    // ----- ValidateService missing DispatcherType (GeneratedServiceRegistry 255-256) -----
 
     [Fact]
     public void Register_MetadataMissingDispatcherType_ThrowsArgumentException()
     {
-        var noDispatcher = new DotBoxDGeneratedService(
+        var noDispatcher = new GeneratedService(
             typeof(IValidationProbeService),
             typeof(ProbeProxy),
             DispatcherType: null!,
             "Probe");
 
         var ex = Assert.Throws<ArgumentException>(() =>
-            DotBoxDServiceRegistry.Register<IValidationProbeService>(
+            GeneratedServiceRegistry.Register<IValidationProbeService>(
                 _ => new ProbeProxy(),
                 _ => new ProbeDispatcher(),
                 noDispatcher));
@@ -108,19 +108,19 @@ public sealed class RegistryGuardCoverageTests
         Assert.Equal("service", ex.ParamName);
     }
 
-    // ----- ValidateService missing ServiceType (DotBoxDServiceRegistry 247-248) -----
+    // ----- ValidateService missing ServiceType (GeneratedServiceRegistry 247-248) -----
 
     [Fact]
     public void Register_MetadataMissingServiceType_ThrowsArgumentException()
     {
-        var noServiceType = new DotBoxDGeneratedService(
+        var noServiceType = new GeneratedService(
             ServiceType: null!,
             typeof(ProbeProxy),
             typeof(ProbeDispatcher),
             "Probe");
 
         var ex = Assert.Throws<ArgumentException>(() =>
-            DotBoxDServiceRegistry.Register<IValidationProbeService>(
+            GeneratedServiceRegistry.Register<IValidationProbeService>(
                 _ => new ProbeProxy(),
                 _ => new ProbeDispatcher(),
                 noServiceType));

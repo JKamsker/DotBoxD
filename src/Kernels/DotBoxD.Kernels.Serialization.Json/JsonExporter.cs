@@ -4,7 +4,7 @@ using System.Buffers;
 using System.Text;
 using System.Text.Json;
 
-public static class DotBoxDJsonExporter
+public static class JsonExporter
 {
     public static string Export(SandboxModule module, bool indented = false)
     {

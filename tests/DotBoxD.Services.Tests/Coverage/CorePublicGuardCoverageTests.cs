@@ -168,7 +168,7 @@ public sealed class RpcPeerPublicGuardCoverageTests
     {
         // Drive the closed-but-not-disposed branch: an empty inbound frame makes the read loop run
         // its remote-close teardown, which marks the peer closed (MarkClosed) without disposing it.
-        // A subsequent Provide must hit the _closed guard (DotBoxDRpcConnectionException) rather than the
+        // A subsequent Provide must hit the _closed guard (ServiceConnectionException) rather than the
         // disposed guard.
         await using var channel = new ScriptedConnection();
         var peer = RpcPeer.Over(channel, NewSerializer(), Options());
@@ -180,7 +180,7 @@ public sealed class RpcPeerPublicGuardCoverageTests
         // fixed sleep, then assert Provide is rejected with the closed-connection error.
         await WaitUntilAsync(() => !peer.IsConnected, Timeout);
 
-        var ex = Assert.Throws<DotBoxDRpcConnectionException>(
+        var ex = Assert.Throws<ServiceConnectionException>(
             () => peer.Provide((IServiceDispatcher)new NoopDispatcher()));
         Assert.Contains("closed", ex.Message);
 
@@ -242,7 +242,7 @@ public sealed class RpcPeerPublicGuardCoverageTests
 
         await peer.DisposeAsync().AsTask().WaitAsync(Timeout);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() => inFlight.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<ServiceConnectionException>(() => inFlight.WaitAsync(Timeout));
         Assert.Contains("closed", ex.Message);
         Assert.False(peer.IsConnected);
 

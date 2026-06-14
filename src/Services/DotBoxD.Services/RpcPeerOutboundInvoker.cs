@@ -20,7 +20,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
     private readonly Func<PooledBufferWriter, CancellationToken, ValueTask>? _sendFrameAsync;
     private readonly RpcStreamManager _streams;
     private readonly RpcPeerStreamingCalls _streamingCalls;
-    private readonly DotBoxDRpcPendingRequests _pending = new();
+    private readonly PendingRequests _pending = new();
     private readonly RpcPeerCancelFrameSender _cancelFrames;
     private int _messageIdCounter;
     private int _pendingCount;
@@ -179,7 +179,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         {
             _pending.TryFail(
                 messageId,
-                new DotBoxDRpcProtocolException("Malformed response frame."));
+                new ServiceProtocolException("Malformed response frame."));
             return false;
         }
 
@@ -192,7 +192,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         {
             _pending.TryFail(
                 messageId,
-                new DotBoxDRpcProtocolException("Malformed response envelope."));
+                new ServiceProtocolException("Malformed response envelope."));
             return false;
         }
 
@@ -200,7 +200,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         {
             _pending.TryFail(
                 messageId,
-                new DotBoxDRpcProtocolException("Malformed error response frame."));
+                new ServiceProtocolException("Malformed error response frame."));
             return false;
         }
 
@@ -249,7 +249,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
     {
         if (received.Response.Stream is not null)
         {
-            throw new DotBoxDRpcProtocolException(
+            throw new ServiceProtocolException(
                 "Response opened a stream for a non-streaming invocation.");
         }
     }
@@ -400,7 +400,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
                     }
 
                     ct.ThrowIfCancellationRequested();
-                    throw new DotBoxDRpcTimeoutException($"Request to {service}.{method} timed out.");
+                    throw new ServiceTimeoutException($"Request to {service}.{method} timed out.");
                 }
                 catch (OperationCanceledException) when (pending.CancellationKind == PendingCancellationKind.Caller)
                 {
@@ -416,7 +416,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
 
             if (!received.Response.IsSuccess)
             {
-                var error = new DotBoxDRpcRemoteException(
+                var error = new RemoteServiceException(
                     received.Response.ErrorMessage ?? "Unknown error",
                     received.Response.ErrorType ?? "Unknown");
                 received.Dispose();

@@ -42,7 +42,7 @@ public sealed class PeerInboundQueueCoverageTests
                 {
                     InboundQueueCapacity = 1,
                     MaxInboundBytes = null, // byte budget disabled -> TryAdmitBytes short-circuits true
-                    QueueFullMode = DotBoxDRpcQueueFullMode.DropIncoming,
+                    QueueFullMode = QueueFullMode.DropIncoming,
                     RequestTimeout = ShortTimeout,
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -81,7 +81,7 @@ public sealed class PeerInboundQueueCoverageTests
                 {
                     InboundQueueCapacity = 100, // count never binds; the 1-byte budget binds instead
                     MaxInboundBytes = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.DropIncoming,
+                    QueueFullMode = QueueFullMode.DropIncoming,
                     RequestTimeout = ShortTimeout,
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -118,7 +118,7 @@ public sealed class PeerInboundQueueCoverageTests
                 {
                     InboundQueueCapacity = 4,
                     MaxInboundBytes = null, // disabled: AdmitBytesAsync and ReleaseBytes both fast-return
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = ShortTimeout,
                 })
             .Provide((IServiceDispatcher)new EchoNumberDispatcher())
@@ -159,7 +159,7 @@ public sealed class PeerInboundQueueCoverageTests
                 {
                     InboundQueueCapacity = 4,
                     MaxConcurrentInboundDispatch = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = ShortTimeout,
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -193,7 +193,7 @@ public sealed class PeerInboundQueueCoverageTests
                 {
                     InboundQueueCapacity = 4,
                     MaxConcurrentInboundDispatch = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromMinutes(5),
                 })
             .Provide((IServiceDispatcher)dispatcher)
@@ -272,7 +272,7 @@ public sealed class PeerInboundQueueCoverageTests
     public void QueueFullMode_UndefinedValue_Throws()
     {
         var ex = Assert.Throws<ArgumentOutOfRangeException>(
-            () => new RpcPeerOptions { QueueFullMode = (DotBoxDRpcQueueFullMode)99 });
+            () => new RpcPeerOptions { QueueFullMode = (QueueFullMode)99 });
         Assert.Equal("QueueFullMode", ex.ParamName);
         Assert.Contains("Unknown queue full mode", ex.Message);
     }

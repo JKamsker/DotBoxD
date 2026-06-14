@@ -44,7 +44,7 @@ public sealed class StreamingBatchRegistrationTombstoneTests
         // "Inbound stream id '5' is already active.", triggering the catch block.
         // The catch block removes the first receiver from _receivers and calls Abort(),
         // but — due to the bug — does NOT call RemoveCanceledInbound, so no tombstone is added.
-        var ex = Assert.Throws<DotBoxDRpcProtocolException>(() =>
+        var ex = Assert.Throws<ServiceProtocolException>(() =>
             streams.RegisterInbound(new[] { handle, handle }, CancellationToken.None));
 
         Assert.Contains($"'{streamId}' is already active", ex.Message);

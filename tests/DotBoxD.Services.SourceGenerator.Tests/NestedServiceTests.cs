@@ -160,7 +160,7 @@ public class NestedServiceTests
             "instance-scoped dispatch must invoke the registry-resolved service, not the constructor service");
 
         // An unknown instance id must fail loudly with the framework's NotFound exception.
-        await Assert.ThrowsAsync<DotBoxD.Services.Exceptions.DotBoxDRpcNotFoundException>(async () =>
+        await Assert.ThrowsAsync<DotBoxD.Services.Exceptions.ServiceNotFoundException>(async () =>
             await dispatcher.DispatchOnInstanceToPayloadAsync("does-not-exist", "CountAsync", System.ReadOnlyMemory<byte>.Empty, serializer, registry, CancellationToken.None));
     }
 

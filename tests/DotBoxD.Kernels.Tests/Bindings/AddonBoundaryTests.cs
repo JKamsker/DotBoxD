@@ -21,7 +21,7 @@ public sealed class AddonBoundaryTests
 
     private static readonly string[] ForbiddenCoreTokens = [
         "System.Text.Json",
-        "DotBoxDJsonImporter",
+        "JsonImporter",
         "JsonDocument",
         "JsonElement",
         "SafeHttp",

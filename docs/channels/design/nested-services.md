@@ -85,7 +85,7 @@ public interface IServiceDispatcher
     Task<byte[]> DispatchOnInstanceAsync(
         string instanceId, string method, byte[] payload, ISerializer serializer,
         IInstanceRegistry registry, CancellationToken ct = default)
-        => throw new DotBoxDRpcNotFoundException(
+        => throw new ServiceNotFoundException(
             $"Service '{ServiceName}' does not support instance-scoped dispatch.");
 }
 ```
@@ -186,7 +186,7 @@ Generated `SubServiceDispatcher.DispatchOnInstanceAsync`:
 public async Task<byte[]> DispatchOnInstanceAsync(string instanceId, string method, byte[] payload, ISerializer serializer, IInstanceRegistry registry, CancellationToken ct)
 {
     if (!registry.TryGet("ISubService", instanceId, out var obj) || obj is not global::App.ISubService inst)
-        throw new DotBoxDRpcNotFoundException($"Instance '{instanceId}' not found for service 'ISubService'.");
+        throw new ServiceNotFoundException($"Instance '{instanceId}' not found for service 'ISubService'.");
     switch (method) { case "CountAsync": return serializer.Serialize(await inst.CountAsync(ct)); /* ... */ }
 }
 ```

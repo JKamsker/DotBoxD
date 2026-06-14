@@ -180,7 +180,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                     }
 
                     ct.ThrowIfCancellationRequested();
-                    throw new DotBoxDRpcTimeoutException($"Request to {service}.{method} timed out.");
+                    throw new ServiceTimeoutException($"Request to {service}.{method} timed out.");
                 }
                 catch (OperationCanceledException) when (pending.CancellationKind == PendingCancellationKind.Caller)
                 {

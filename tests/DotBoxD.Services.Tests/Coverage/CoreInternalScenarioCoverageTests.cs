@@ -179,7 +179,7 @@ public sealed class CoreInternalScenarioCoverageTests
                 {
                     InboundQueueCapacity = 1,
                     MaxInboundBytes = null,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.DropIncoming,
+                    QueueFullMode = QueueFullMode.DropIncoming,
                     RequestTimeout = Timeout5s,
                 })
             .Provide((IServiceDispatcher)dispatcher)

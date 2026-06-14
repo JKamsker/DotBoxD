@@ -29,8 +29,8 @@ duplicate_of:
 
 ## Evidence
 
-- `src/DotBoxD.Plugins.Analyzer/Analysis/DotBoxDPluginAnalyzer.cs:12` defines `DBXK001` for forbidden host APIs in plugin kernels.
-- `src/DotBoxD.Plugins.Analyzer/Analysis/DotBoxDPluginAnalyzer.cs:22` defines `DBXK020` for unsupported live setting types.
+- `src/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs:12` defines `DBXK001` for forbidden host APIs in plugin kernels.
+- `src/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs:22` defines `DBXK020` for unsupported live setting types.
 - `src/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzerDiagnostics.cs:7` defines `DBXK100` for unsupported plugin kernel generation shapes.
 - `src/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Shipped.md:8` tracks `DBXK001` and `DBXK020`, and `src/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md:8` tracks `DBXK100`, so the package already treats the IDs as user-facing analyzer rules.
 - `README.md:19` only lists `DotBoxD.Plugins.Analyzer` as a source generator/analyzer package, without showing diagnostic IDs, categories, supported language subset, or fixes.

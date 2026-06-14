@@ -230,7 +230,7 @@ public class EnvelopeRoundTripTests
             MessageId = 9,
             IsSuccess = false,
             ErrorMessage = "boom",
-            ErrorType = "DotBoxDRpcRemoteException",
+            ErrorType = "RemoteServiceException",
         };
 
         var result = RoundTrip(serializer, response);
@@ -238,7 +238,7 @@ public class EnvelopeRoundTripTests
         Assert.Equal(9, result.MessageId);
         Assert.False(result.IsSuccess);
         Assert.Equal("boom", result.ErrorMessage);
-        Assert.Equal("DotBoxDRpcRemoteException", result.ErrorType);
+        Assert.Equal("RemoteServiceException", result.ErrorType);
     }
 
     [Fact]

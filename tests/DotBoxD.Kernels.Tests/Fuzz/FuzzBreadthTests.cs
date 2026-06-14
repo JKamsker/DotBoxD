@@ -19,7 +19,7 @@ public sealed class FuzzBreadthTests
         {
             var json = ModuleJson(i, InvalidExpression(random).ToJsonString(JsonOptions));
 
-            var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(json));
+            var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
             Assert.NotEmpty(ex.Diagnostics);
             Assert.All(ex.Diagnostics, d => Assert.StartsWith("E-JSON-", d.Code, StringComparison.Ordinal));
@@ -34,8 +34,8 @@ public sealed class FuzzBreadthTests
         for (var i = 0; i < 40; i++)
         {
             var expression = ValidExpression(random, depth: 4).ToJsonString(JsonOptions);
-            var first = DotBoxDJsonImporter.Import(ModuleJson(i, expression, shuffled: false));
-            var second = DotBoxDJsonImporter.Import(ModuleJson(i, expression, shuffled: true));
+            var first = JsonImporter.Import(ModuleJson(i, expression, shuffled: false));
+            var second = JsonImporter.Import(ModuleJson(i, expression, shuffled: true));
 
             Assert.Equal(CanonicalModuleHasher.Hash(first), CanonicalModuleHasher.Hash(second));
         }

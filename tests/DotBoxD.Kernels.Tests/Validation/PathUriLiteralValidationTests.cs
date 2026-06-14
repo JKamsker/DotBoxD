@@ -14,7 +14,7 @@ public sealed class PathUriLiteralValidationTests
         var expression = $$"""{ "uri": {{JsonSerializer.Serialize(uri)}} }""";
 
         var ex = Assert.Throws<SandboxValidationException>(() =>
-            DotBoxDJsonImporter.Import(ModuleWithReturn("SandboxUri", expression)));
+            JsonImporter.Import(ModuleWithReturn("SandboxUri", expression)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-URI");
     }
@@ -22,7 +22,7 @@ public sealed class PathUriLiteralValidationTests
     [Fact]
     public void Uri_literals_allow_absolute_values_without_user_info()
     {
-        _ = DotBoxDJsonImporter.Import(ModuleWithReturn("SandboxUri", """{ "uri": "https://api.example.com/config" }"""));
+        _ = JsonImporter.Import(ModuleWithReturn("SandboxUri", """{ "uri": "https://api.example.com/config" }"""));
     }
 
     [Theory]
@@ -52,7 +52,7 @@ public sealed class PathUriLiteralValidationTests
         var expression = $$"""{ "path": {{JsonSerializer.Serialize(path)}} }""";
 
         var ex = Assert.Throws<SandboxValidationException>(() =>
-            DotBoxDJsonImporter.Import(ModuleWithReturn("SandboxPath", expression)));
+            JsonImporter.Import(ModuleWithReturn("SandboxPath", expression)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-PATH");
     }

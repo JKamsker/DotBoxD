@@ -64,13 +64,13 @@ public sealed class Fix_PAL_0014_Tests
             }
             : null;
 
-        await using var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+        await using var host = RpcMessagePackIpc.Listen(
             new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
             peer => peer.Provide<IAllocProbe>(new AllocProbe()),
             serverOptions);
         await host.StartAsync().ConfigureAwait(false);
 
-        await using var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+        await using var session = await RpcMessagePackIpc.ConnectAsync(
                 new SingleConnectionTransport(clientChannel, ownsConnection: true),
                 clientOptions)
             .ConfigureAwait(false);

@@ -18,7 +18,7 @@ public static partial class PluginPackageJsonSerializer
         writer.WritePropertyName("entrypoints");
         WriteEntrypoints(writer, package.Entrypoints);
         writer.WritePropertyName("module");
-        DotBoxDJsonExporter.Write(writer, package.Module);
+        JsonExporter.Write(writer, package.Module);
         writer.WriteEndObject();
     }
 

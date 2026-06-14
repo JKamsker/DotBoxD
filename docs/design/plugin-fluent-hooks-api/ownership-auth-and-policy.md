@@ -172,10 +172,10 @@ internal void Add(InstalledKernel kernel)
 
 The control service is created **per peer** and bound to a session; when the DotBoxD peer disconnects,
 the session is disposed. DotBoxD's `ForEachPeer` gives the per-connection hook
-([DotBoxDDotBoxDRpcMessagePackIpc.cs:41-49](../../../src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs)):
+([RpcMessagePackIpc.cs:41-49](../../../src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs)):
 
 ```csharp
-await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
+await using var host = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
 {
     var identity = authenticator.Authenticate(peer);          // §4
     var session  = pluginServer.CreateSession(identity);
@@ -293,7 +293,7 @@ public interface IPluginAuthenticator
 - **`LocalProcessAuthenticator`** (named pipe / stdio, server-spawned). The server *launched* the
   child, so the child is trusted by construction; identity is taken from launch config. Hardening:
   - the pipe name already requires a 128-bit random component
-    ([DotBoxDDotBoxDRpcMessagePackIpc.cs:122-142](../../../src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs)) —
+    ([RpcMessagePackIpc.cs:122-142](../../../src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs)) —
     keep that (it stops other local processes guessing the pipe);
   - tighten the **named-pipe ACL to the current user** so a different local user can't connect;
   - pass a **one-time bootstrap token** to the child (env var / first stdin line) that it echoes on

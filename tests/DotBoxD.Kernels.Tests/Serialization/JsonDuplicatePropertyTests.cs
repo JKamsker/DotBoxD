@@ -5,7 +5,7 @@ public sealed class JsonDuplicatePropertyTests
     [Fact]
     public void Module_rejects_duplicate_properties()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import("""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import("""
         {
           "id": "first",
           "id": "second",
@@ -28,7 +28,7 @@ public sealed class JsonDuplicatePropertyTests
     [Fact]
     public void Metadata_rejects_duplicate_properties()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import("""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import("""
         {
           "id": "metadata-dupe",
           "version": "1.0.0",
@@ -130,7 +130,7 @@ public sealed class JsonDuplicatePropertyTests
         """)]
     public void Nested_shapes_reject_duplicate_properties(string json)
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(json));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(json));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-SCHEMA");
     }

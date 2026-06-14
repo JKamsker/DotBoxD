@@ -29,7 +29,7 @@ JSON module and plugin package import perform a full UTF-8 encoding/token scan i
 
 ## Evidence
 
-- `src/DotBoxD.Kernels.Serialization.Json/DotBoxDJsonImporter.cs:12` calls `JsonImportBudgetGuard.Validate(json)` before `JsonDocument.Parse` at `src/DotBoxD.Kernels.Serialization.Json/DotBoxDJsonImporter.cs:13`, then always calls `JsonSourceMap.Create(json, document.RootElement)` at `src/DotBoxD.Kernels.Serialization.Json/DotBoxDJsonImporter.cs:20`.
+- `src/DotBoxD.Kernels.Serialization.Json/JsonImporter.cs:12` calls `JsonImportBudgetGuard.Validate(json)` before `JsonDocument.Parse` at `src/DotBoxD.Kernels.Serialization.Json/JsonImporter.cs:13`, then always calls `JsonSourceMap.Create(json, document.RootElement)` at `src/DotBoxD.Kernels.Serialization.Json/JsonImporter.cs:20`.
 - `src/DotBoxD.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs:25` and `src/DotBoxD.Kernels.Serialization.Json/PluginPackageJsonSerializer.cs:26` repeat the same preflight-then-parse pattern for package JSON before the package importer reaches the embedded module path.
 - `src/DotBoxD.Kernels.Serialization.Json/Internal/JsonImportBudgetGuard.cs:19` encodes the entire input string with `Encoding.UTF8.GetBytes(json)`, and `src/DotBoxD.Kernels.Serialization.Json/Internal/JsonImportBudgetGuard.cs:30` scans that byte array with `Utf8JsonReader` only to enforce import limits.
 - `src/DotBoxD.Kernels.Serialization.Json/Internal/JsonSourceMap.cs:56` encodes the module JSON to UTF-8 again, and `src/DotBoxD.Kernels.Serialization.Json/Internal/JsonSourceMap.cs:57` creates another `Utf8JsonReader` to collect token positions for spans.
@@ -45,4 +45,4 @@ Keep the fail-closed import limits, but avoid independent full-payload passes. P
 
 ## Benchmark/allocation test idea
 
-Extend `benchmarks/DotBoxD.Kernels.Benchmarks/Json/JsonImportBenchmarks.cs` with generated modules and plugin packages at 100, 1,000, and 10,000 statements plus metadata/live settings. Measure elapsed time and allocated bytes in `DotBoxDJsonImporter.Import` and `PluginPackageJsonSerializer.Import`, and assert steady-state import does not allocate multiple full UTF-8 buffers or run multiple full token scans for the same JSON payload.
+Extend `benchmarks/DotBoxD.Kernels.Benchmarks/Json/JsonImportBenchmarks.cs` with generated modules and plugin packages at 100, 1,000, and 10,000 statements plus metadata/live settings. Measure elapsed time and allocated bytes in `JsonImporter.Import` and `PluginPackageJsonSerializer.Import`, and assert steady-state import does not allocate multiple full UTF-8 buffers or run multiple full token scans for the same JSON payload.

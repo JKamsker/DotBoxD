@@ -16,7 +16,7 @@ namespace DotBoxD.Services.Tests.Cov.PeerOutbound;
 /// Behavioral coverage for the outbound (client) half of <see cref="RpcPeer"/>: request framing,
 /// response correlation, remote-error surfacing, timeouts, cancellation (cancel frames), send
 /// failures, and the disposal path that faults pending requests. These drive the internal
-/// <c>RpcPeerOutboundInvoker</c>, <c>DotBoxDRpcPendingRequests</c>, <c>ReceivedResponse</c>,
+/// <c>RpcPeerOutboundInvoker</c>, <c>PendingRequests</c>, <c>ReceivedResponse</c>,
 /// <c>RpcPeerSender</c>, and <c>RpcPeerCancelFrameSender</c> purely through the public
 /// <see cref="RpcPeer"/> API plus frame injection over <see cref="IRpcChannel"/>.
 /// </summary>
@@ -229,7 +229,7 @@ public sealed class PeerOutboundCoverageTests
         var call = peer.InvokeAsync<int, string>(Service, Method, request: 1);
         channel.Enqueue(ErrorFrame(serializer, messageId: 1, "boom", "MyError"));
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(() => call.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(() => call.WaitAsync(Timeout));
         Assert.Equal("boom", ex.Message);
         Assert.Equal("MyError", ex.RemoteExceptionType);
     }
@@ -250,7 +250,7 @@ public sealed class PeerOutboundCoverageTests
             new RpcResponse { MessageId = 1, IsSuccess = false },
             ReadOnlySpan<byte>.Empty));
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(() => call.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(() => call.WaitAsync(Timeout));
         Assert.Equal("Unknown error", ex.Message);
         Assert.Equal("Unknown", ex.RemoteExceptionType);
     }
@@ -271,7 +271,7 @@ public sealed class PeerOutboundCoverageTests
         var frame = MessageFramerTestExtensions.FrameToPayloadWithGarbageEnvelope(messageId: 1, garbageEnvelope);
         channel.Enqueue(frame);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(() => call.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<ServiceProtocolException>(() => call.WaitAsync(Timeout));
         Assert.Contains("Malformed response envelope", ex.Message);
     }
 
@@ -291,7 +291,7 @@ public sealed class PeerOutboundCoverageTests
         // disposes the frame, and the real request (id 1) is left to time out.
         channel.Enqueue(ResponseFrame(serializer, messageId: 999, result: "stray"));
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcTimeoutException>(() => call.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<ServiceTimeoutException>(() => call.WaitAsync(Timeout));
         Assert.Contains("timed out", ex.Message);
     }
 
@@ -325,7 +325,7 @@ public sealed class PeerOutboundCoverageTests
             serializer,
             Options(requestTimeout: TimeSpan.FromMilliseconds(200))).Start();
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcTimeoutException>(
+        var ex = await Assert.ThrowsAsync<ServiceTimeoutException>(
             () => peer.InvokeAsync<int, string>(Service, Method, request: 1).WaitAsync(Timeout));
         Assert.Contains($"{Service}.{Method}", ex.Message);
     }
@@ -404,8 +404,8 @@ public sealed class PeerOutboundCoverageTests
 
         await peer.DisposeAsync();
 
-        // DisposeCoreAsync -> FailPending(DotBoxDRpcConnectionException("Connection closed.")).
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() => call.WaitAsync(Timeout));
+        // DisposeCoreAsync -> FailPending(ServiceConnectionException("Connection closed.")).
+        var ex = await Assert.ThrowsAsync<ServiceConnectionException>(() => call.WaitAsync(Timeout));
         Assert.Contains("closed", ex.Message);
 
         await channel.DisposeAsync();
@@ -422,7 +422,7 @@ public sealed class PeerOutboundCoverageTests
         var call = peer.InvokeAsync<int, string>(Service, Method, request: 1);
         await peer.CloseAsync();
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() => call.WaitAsync(Timeout));
+        await Assert.ThrowsAsync<ServiceConnectionException>(() => call.WaitAsync(Timeout));
 
         await channel.DisposeAsync();
     }
@@ -448,12 +448,12 @@ public sealed class PeerOutboundCoverageTests
     public async Task InvokeAsync_WhenSendFails_SurfacesSendException()
     {
         var serializer = NewSerializer();
-        await using var channel = new ThrowingSendChannel(new DotBoxDRpcConnectionException("send-broke"));
+        await using var channel = new ThrowingSendChannel(new ServiceConnectionException("send-broke"));
         await using var peer = RpcPeer.Over(channel, serializer, Options()).Start();
 
         // _sender.SendAsync -> _channel.SendAsync throws; SendFrameAndAwaitAsync never sets requestSent,
         // and the exception propagates out of InvokeAsync after releasing the reserved slot.
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        var ex = await Assert.ThrowsAsync<ServiceConnectionException>(
             () => peer.InvokeAsync<int, string>(Service, Method, request: 1).WaitAsync(Timeout));
         Assert.Equal("send-broke", ex.Message);
     }
@@ -487,10 +487,10 @@ public sealed class PeerOutboundCoverageTests
         var inFlight = peer.InvokeAsync<int, string>(Service, Method, request: 1);
 
         // An empty frame signals the channel closed; the read loop runs StopAfterRemoteCloseAsync,
-        // which marks the peer closed and FailPending(DotBoxDRpcConnectionException("Connection closed.")).
+        // which marks the peer closed and FailPending(ServiceConnectionException("Connection closed.")).
         channel.Enqueue(Payload.Empty);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() => inFlight.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<ServiceConnectionException>(() => inFlight.WaitAsync(Timeout));
         Assert.Contains("closed", ex.Message);
 
         // Once closed, the IsConnected projection flips and any new send fast-fails through the sender's
@@ -498,7 +498,7 @@ public sealed class PeerOutboundCoverageTests
         // loop) without a fixed sleep.
         await WaitUntilAsync(() => !peer.IsConnected, Timeout);
 
-        await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(
+        await Assert.ThrowsAsync<ServiceConnectionException>(
             () => peer.InvokeAsync<int, string>(Service, Method, request: 2).WaitAsync(Timeout));
     }
 
@@ -532,8 +532,8 @@ public sealed class PeerOutboundCoverageTests
         // First call occupies the single slot and parks awaiting a response.
         var first = peer.InvokeAsync<int, string>(Service, Method, request: 1);
 
-        // Second call cannot reserve a slot (pendingCount would exceed 1) -> DotBoxDRpcException.
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcException>(
+        // Second call cannot reserve a slot (pendingCount would exceed 1) -> ServiceException.
+        var ex = await Assert.ThrowsAsync<ServiceException>(
             () => peer.InvokeAsync<int, string>(Service, Method, request: 2).WaitAsync(Timeout));
         Assert.Contains("Maximum pending requests", ex.Message);
 

@@ -5,7 +5,7 @@ using DotBoxD.Services.Transport;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Transports.NamedPipes;
 
-public static class DotBoxDDotBoxDRpcMessagePackIpc
+public static class RpcMessagePackIpc
 {
     private const int MinimumSafePipeNameLength = 32;
     private const int MinimumSafePipeNameDistinctCharacters = 8;
@@ -76,12 +76,12 @@ public static class DotBoxDDotBoxDRpcMessagePackIpc
         string pipeName,
         Action<RpcPeer> configurePeer,
         RpcPeerOptions? options = null)
-        => ListenNamedPipe(pipeName, configurePeer, DotBoxDNamedPipeOptions.Default, options);
+        => ListenNamedPipe(pipeName, configurePeer, NamedPipeTransportOptions.Default, options);
 
     public static RpcHost ListenNamedPipe(
         string pipeName,
         Action<RpcPeer> configurePeer,
-        DotBoxDNamedPipeOptions namedPipeOptions,
+        NamedPipeTransportOptions namedPipeOptions,
         RpcPeerOptions? options = null)
     {
         ValidatePipeName(pipeName, namedPipeOptions);
@@ -96,7 +96,7 @@ public static class DotBoxDDotBoxDRpcMessagePackIpc
 
     public static Task<RpcPeerSession> ConnectNamedPipeAsync(
         string pipeName,
-        DotBoxDNamedPipeOptions namedPipeOptions,
+        NamedPipeTransportOptions namedPipeOptions,
         RpcPeerOptions? options = null,
         CancellationToken cancellationToken = default)
         => ConnectNamedPipeAsync(".", pipeName, namedPipeOptions, options, cancellationToken);
@@ -106,12 +106,12 @@ public static class DotBoxDDotBoxDRpcMessagePackIpc
         string pipeName,
         RpcPeerOptions? options = null,
         CancellationToken cancellationToken = default)
-        => ConnectNamedPipeAsync(serverName, pipeName, DotBoxDNamedPipeOptions.Default, options, cancellationToken);
+        => ConnectNamedPipeAsync(serverName, pipeName, NamedPipeTransportOptions.Default, options, cancellationToken);
 
     public static Task<RpcPeerSession> ConnectNamedPipeAsync(
         string serverName,
         string pipeName,
-        DotBoxDNamedPipeOptions namedPipeOptions,
+        NamedPipeTransportOptions namedPipeOptions,
         RpcPeerOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -119,7 +119,7 @@ public static class DotBoxDDotBoxDRpcMessagePackIpc
         return ConnectAsync(new NamedPipeClientTransport(serverName, pipeName), options, cancellationToken);
     }
 
-    private static void ValidatePipeName(string pipeName, DotBoxDNamedPipeOptions options)
+    private static void ValidatePipeName(string pipeName, NamedPipeTransportOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (string.IsNullOrWhiteSpace(pipeName) || pipeName.Any(char.IsControl))
@@ -142,8 +142,8 @@ public static class DotBoxDDotBoxDRpcMessagePackIpc
     }
 }
 
-public sealed record DotBoxDNamedPipeOptions(bool AllowUnsafeLowEntropyName = false)
+public sealed record NamedPipeTransportOptions(bool AllowUnsafeLowEntropyName = false)
 {
-    public static DotBoxDNamedPipeOptions Default { get; } = new();
-    public static DotBoxDNamedPipeOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true);
+    public static NamedPipeTransportOptions Default { get; } = new();
+    public static NamedPipeTransportOptions UnsafeDevelopment { get; } = new(AllowUnsafeLowEntropyName: true);
 }

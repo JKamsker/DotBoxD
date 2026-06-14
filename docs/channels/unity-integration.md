@@ -842,23 +842,23 @@ try
 {
     var result = await NetworkManager.Instance.GameService.GetPlayerAsync(playerId);
 }
-catch (DotBoxDRpcTimeoutException)
+catch (ServiceTimeoutException)
 {
     // Request timed out
     Debug.LogWarning("Request timed out - server may be overloaded");
 }
-catch (DotBoxDRpcRemoteException ex)
+catch (RemoteServiceException ex)
 {
     // Server threw an exception
     Debug.LogError($"Server error ({ex.RemoteExceptionType}): {ex.Message}");
 }
-catch (DotBoxDRpcConnectionException)
+catch (ServiceConnectionException)
 {
     // Connection lost
     Debug.LogError("Connection lost");
     // Trigger reconnection logic
 }
-catch (DotBoxDRpcException ex)
+catch (ServiceException ex)
 {
     // Other RPC errors
     Debug.LogError($"RPC error: {ex.Message}");
@@ -885,19 +885,19 @@ public static class RpcHelper
         {
             return await call();
         }
-        catch (DotBoxDRpcTimeoutException ex)
+        catch (ServiceTimeoutException ex)
         {
             Debug.LogWarning($"RPC timeout: {ex.Message}");
             onError?.Invoke(ex);
             return defaultValue;
         }
-        catch (DotBoxDRpcRemoteException ex)
+        catch (RemoteServiceException ex)
         {
             Debug.LogError($"Server error: {ex.Message}");
             onError?.Invoke(ex);
             return defaultValue;
         }
-        catch (DotBoxDRpcConnectionException ex)
+        catch (ServiceConnectionException ex)
         {
             Debug.LogError($"Connection error: {ex.Message}");
             onError?.Invoke(ex);

@@ -15,7 +15,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Forbidden_host_api_rule_links_to_shipped_reference()
     {
-        var rule = DotBoxDPluginAnalyzer.ForbiddenHostApiRule;
+        var rule = PluginAnalyzer.ForbiddenHostApiRule;
 
         Assert.Equal("DBXK001", rule.Id);
         AssertHelpLink(rule, "AnalyzerReleases.Shipped.md", "DBXK001");
@@ -24,7 +24,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Live_setting_type_rule_links_to_shipped_reference()
     {
-        var rule = DotBoxDPluginAnalyzer.LiveSettingTypeRule;
+        var rule = PluginAnalyzer.LiveSettingTypeRule;
 
         Assert.Equal("DBXK020", rule.Id);
         AssertHelpLink(rule, "AnalyzerReleases.Shipped.md", "DBXK020");
@@ -33,7 +33,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Every_supported_diagnostic_exposes_a_help_link_for_its_id()
     {
-        var analyzer = new DotBoxDPluginAnalyzer();
+        var analyzer = new PluginAnalyzer();
 
         Assert.NotEmpty(analyzer.SupportedDiagnostics);
         foreach (var rule in analyzer.SupportedDiagnostics)

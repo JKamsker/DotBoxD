@@ -61,9 +61,9 @@ public interface IServiceDispatcher
         IInstanceRegistry registry,
         IBufferWriter<byte> output,
         CancellationToken ct = default) =>
-        throw new DotBoxDRpcNotFoundException(
+        throw new ServiceNotFoundException(
             $"Service '{ServiceName}' does not support instance-scoped dispatch.",
-            DotBoxDRpcNotFoundException.NotFoundKind.Instance);
+            ServiceNotFoundException.NotFoundKind.Instance);
 
     /// <summary>
     /// Dispatches an instance-scoped request with access to streamed arguments and streamed

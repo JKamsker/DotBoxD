@@ -45,17 +45,17 @@ internal sealed class RpcStreamManager
     {
         if (handle.StreamId == 0)
         {
-            throw new DotBoxDRpcProtocolException("Stream id must not be zero.");
+            throw new ServiceProtocolException("Stream id must not be zero.");
         }
         RpcStreamValidation.ValidateKind(handle.Kind);
         if (!_receivers.TryGetValue(handle.StreamId, out var existing))
         {
             _canceledInbound.ThrowIfOverflowed();
-            throw new DotBoxDRpcProtocolException($"Inbound stream id '{handle.StreamId}' was not registered.");
+            throw new ServiceProtocolException($"Inbound stream id '{handle.StreamId}' was not registered.");
         }
         if (existing.Handle.Kind != handle.Kind)
         {
-            throw new DotBoxDRpcProtocolException(
+            throw new ServiceProtocolException(
                 $"Inbound stream id '{handle.StreamId}' is '{existing.Handle.Kind}', not '{handle.Kind}'.");
         }
 
@@ -84,11 +84,11 @@ internal sealed class RpcStreamManager
     {
         if (streamId == 0)
         {
-            throw new DotBoxDRpcProtocolException("Stream id must not be zero.");
+            throw new ServiceProtocolException("Stream id must not be zero.");
         }
         if (_senders.ContainsKey(streamId) || !_reservedOutbound.TryAdd(streamId, 0))
         {
-            throw new DotBoxDRpcProtocolException($"Duplicate outbound stream id '{streamId}'.");
+            throw new ServiceProtocolException($"Duplicate outbound stream id '{streamId}'.");
         }
     }
     internal void ReleaseOutboundReservation(int streamId)
@@ -149,7 +149,7 @@ internal sealed class RpcStreamManager
                     {
                         RpcDiagnostics.Report("Rolled back inbound stream tracking failed", ex);
                     }
-                    receiver.Abort(new DotBoxDRpcProtocolException("Inbound stream registration failed."));
+                    receiver.Abort(new ServiceProtocolException("Inbound stream registration failed."));
                 }
             }
             throw;
@@ -159,7 +159,7 @@ internal sealed class RpcStreamManager
     {
         if (handle.StreamId == 0)
         {
-            throw new DotBoxDRpcProtocolException("Stream id must not be zero.");
+            throw new ServiceProtocolException("Stream id must not be zero.");
         }
         RpcStreamValidation.ValidateKind(handle.Kind);
         var receiver = new RpcStreamReceiver(this, handle);
@@ -168,7 +168,7 @@ internal sealed class RpcStreamManager
             _canceledInbound.ThrowIfOverflowed();
             if (_canceledInbound.Contains(handle.StreamId))
             {
-                throw new DotBoxDRpcProtocolException(
+                throw new ServiceProtocolException(
                     $"Inbound stream id '{handle.StreamId}' is awaiting a terminal frame after local cancellation.");
             }
             if (!_receivers.TryAdd(handle.StreamId, receiver) &&
@@ -176,7 +176,7 @@ internal sealed class RpcStreamManager
                  !existing.IsCompleted ||
                  !_receivers.TryUpdate(handle.StreamId, receiver, existing)))
             {
-                throw new DotBoxDRpcProtocolException($"Inbound stream id '{handle.StreamId}' is already active.");
+                throw new ServiceProtocolException($"Inbound stream id '{handle.StreamId}' is already active.");
             }
             Interlocked.Increment(ref _activeInboundCount);
         }
@@ -203,7 +203,7 @@ internal sealed class RpcStreamManager
                 if (!_senders.TryAdd(state.StreamId, state))
                 {
                     state.Dispose();
-                    throw new DotBoxDRpcProtocolException($"Duplicate outbound stream id '{attachments[i].Handle.StreamId}'.");
+                    throw new ServiceProtocolException($"Duplicate outbound stream id '{attachments[i].Handle.StreamId}'.");
                 }
                 added[addedCount++] = state;
                 DrainPendingOutbound(state);
@@ -244,7 +244,7 @@ internal sealed class RpcStreamManager
         {
             if (!_senders.TryAdd(state.StreamId, state))
             {
-                throw new DotBoxDRpcProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
+                throw new ServiceProtocolException($"Duplicate outbound stream id '{attachment.Handle.StreamId}'.");
             }
 
             added = true;
@@ -312,7 +312,7 @@ internal sealed class RpcStreamManager
         }
         CompleteInbound(
             streamId,
-            new DotBoxDRpcRemoteException(
+            new RemoteServiceException(
                 response.ErrorMessage ?? "Remote stream failed.",
                 response.ErrorType ?? "Unknown"));
         return true;
@@ -509,7 +509,7 @@ internal sealed class RpcStreamManager
         }
         foreach (var receiver in receivers)
         {
-            receiver.Abort(new DotBoxDRpcConnectionException("Connection closed."));
+            receiver.Abort(new ServiceConnectionException("Connection closed."));
         }
         foreach (var pair in _senders)
         {
@@ -522,7 +522,7 @@ internal sealed class RpcStreamManager
     private RpcStreamSendState GetSender(int streamId) =>
         _senders.TryGetValue(streamId, out var state)
             ? state
-            : throw new DotBoxDRpcConnectionException($"Stream '{streamId}' is no longer active.");
+            : throw new ServiceConnectionException($"Stream '{streamId}' is no longer active.");
     private void DrainPendingOutbound(RpcStreamSendState state)
     {
         if (_canceledOutbound.TryRemove(state.StreamId, out _))
@@ -545,7 +545,7 @@ internal sealed class RpcStreamManager
     {
         if (_receivers.TryRemove(streamId, out var receiver))
         {
-            receiver.Abort(new DotBoxDRpcConnectionException($"Stream '{streamId}' is no longer active."));
+            receiver.Abort(new ServiceConnectionException($"Stream '{streamId}' is no longer active."));
         }
     }
     private async Task SendControlAsync(int streamId, MessageType type, CancellationToken ct)

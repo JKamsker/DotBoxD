@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class DotBoxDPluginAnalyzer : DiagnosticAnalyzer
+public sealed class PluginAnalyzer : DiagnosticAnalyzer
 {
     public static readonly DiagnosticDescriptor ForbiddenHostApiRule = new(
         "DBXK001",

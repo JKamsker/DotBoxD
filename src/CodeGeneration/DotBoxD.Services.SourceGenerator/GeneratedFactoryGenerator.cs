@@ -21,7 +21,7 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("    {");
         GeneratedFactoryMetadataEmitter.AppendMethodArrays(sb, services, ct);
         sb.AppendLine();
-        sb.AppendLine("        private static readonly global::DotBoxD.Services.Generated.DotBoxDGeneratedService[] s_services =");
+        sb.AppendLine("        private static readonly global::DotBoxD.Services.Generated.GeneratedService[] s_services =");
         sb.AppendLine("        {");
 
         for (var i = 0; i < services.Array.Length; i++)
@@ -33,7 +33,7 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
-            sb.AppendLine("            new global::DotBoxD.Services.Generated.DotBoxDGeneratedService(");
+            sb.AppendLine("            new global::DotBoxD.Services.Generated.GeneratedService(");
             sb.AppendLine($"                typeof({fullInterfaceName}),");
             sb.AppendLine($"                typeof({fullProxyName}),");
             sb.AppendLine($"                typeof({fullDispatcherName}),");
@@ -48,7 +48,7 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine();
         sb.AppendLine("        static DotBoxDGenerated()");
         sb.AppendLine("        {");
-        sb.AppendLine("            global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.RegisterServices(");
+        sb.AppendLine("            global::DotBoxD.Services.Generated.GeneratedServiceRegistry.RegisterServices(");
         sb.AppendLine("                typeof(global::DotBoxD.Services.Generated.DotBoxDGenerated).Assembly,");
         sb.AppendLine("                s_services);");
 
@@ -61,7 +61,7 @@ internal static class GeneratedFactoryGenerator
             var fullProxyName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Proxy");
             var fullDispatcherName = IdentifierHelpers.QualifyTypeName(service.Namespace, serviceName + "Dispatcher");
 
-            sb.AppendLine($"            global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.Register<{fullInterfaceName}>(");
+            sb.AppendLine($"            global::DotBoxD.Services.Generated.GeneratedServiceRegistry.Register<{fullInterfaceName}>(");
             sb.AppendLine($"                static client => new {fullProxyName}(client),");
             sb.AppendLine($"                static implementation => new {fullDispatcherName}(({fullInterfaceName})implementation),");
             sb.AppendLine($"                s_services[{i.ToString(System.Globalization.CultureInfo.InvariantCulture)}]);");
@@ -72,7 +72,7 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("        /// <summary>");
         sb.AppendLine("        /// Gets the services generated into this assembly without scanning for generated types.");
         sb.AppendLine("        /// </summary>");
-        sb.AppendLine("        public static global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.DotBoxDGeneratedService> Services");
+        sb.AppendLine("        public static global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.GeneratedService> Services");
         sb.AppendLine("            => s_services;");
         sb.AppendLine();
         sb.AppendLine("        /// <summary>");
@@ -127,26 +127,26 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("        /// </summary>");
         sb.AppendLine("        public static TService CreateProxy<TService>(global::DotBoxD.Services.IRpcInvoker invoker)");
         sb.AppendLine("            where TService : class");
-        sb.AppendLine("            => global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.CreateProxy<TService>(invoker);");
+        sb.AppendLine("            => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateProxy<TService>(invoker);");
         sb.AppendLine();
         sb.AppendLine("        /// <summary>");
         sb.AppendLine("        /// Creates the generated proxy for <paramref name=\"serviceInterface\" /> over an invoker.");
         sb.AppendLine("        /// </summary>");
         sb.AppendLine("        public static object CreateProxy(global::System.Type serviceInterface, global::DotBoxD.Services.IRpcInvoker invoker)");
-        sb.AppendLine("            => global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.CreateProxy(serviceInterface, invoker);");
+        sb.AppendLine("            => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateProxy(serviceInterface, invoker);");
         sb.AppendLine();
         sb.AppendLine("        /// <summary>");
         sb.AppendLine("        /// Creates the generated server dispatcher for <paramref name=\"implementation\" />.");
         sb.AppendLine("        /// </summary>");
         sb.AppendLine("        public static global::DotBoxD.Services.Server.IServiceDispatcher CreateDispatcher<TService>(TService implementation)");
         sb.AppendLine("            where TService : class");
-        sb.AppendLine("            => global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.CreateDispatcher<TService>(implementation);");
+        sb.AppendLine("            => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateDispatcher<TService>(implementation);");
         sb.AppendLine();
         sb.AppendLine("        /// <summary>");
         sb.AppendLine("        /// Creates the generated server dispatcher for <paramref name=\"implementation\" />.");
         sb.AppendLine("        /// </summary>");
         sb.AppendLine("        public static global::DotBoxD.Services.Server.IServiceDispatcher CreateDispatcher(global::System.Type serviceInterface, object implementation)");
-        sb.AppendLine("            => global::DotBoxD.Services.Generated.DotBoxDServiceRegistry.CreateDispatcher(serviceInterface, implementation);");
+        sb.AppendLine("            => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateDispatcher(serviceInterface, implementation);");
         sb.AppendLine("    }");
         sb.AppendLine("}");
 

@@ -68,7 +68,7 @@ public sealed class StreamingWave12RegressionTests
         var receiver = streams.RegisterInboundResponse(handle, CancellationToken.None);
         await receiver.CancelAsync();
 
-        var error = Assert.Throws<DotBoxDRpcProtocolException>(() =>
+        var error = Assert.Throws<ServiceProtocolException>(() =>
             streams.RegisterInboundResponse(handle, CancellationToken.None));
         Assert.Contains("awaiting a terminal frame", error.Message);
         Assert.Equal(0, streams.InboundReceiverCount);

@@ -14,7 +14,7 @@ namespace DotBoxD.Services.Tests.Cov.PeerOutbound;
 
 /// <summary>
 /// Lifecycle/teardown coverage that complements <see cref="PeerOutboundCoverageTests"/>: faulting many
-/// in-flight requests at once on dispose (the <c>DotBoxDRpcPendingRequests.FailAll</c> snapshot path), the
+/// in-flight requests at once on dispose (the <c>PendingRequests.FailAll</c> snapshot path), the
 /// <c>ReceivedResponse.DisposeWhenAvailable</c> deferred-disposal path for an unconsumed response, and
 /// the inbound byte-gate wait that drives <c>RpcTaskWaiter</c> being cancelled by peer shutdown.
 /// </summary>
@@ -52,10 +52,10 @@ public sealed class PeerOutboundLifecycleCoverageTests
 
         await peer.DisposeAsync();
 
-        // FailAll snapshots the dictionary and faults every captured completion with DotBoxDRpcConnectionException.
+        // FailAll snapshots the dictionary and faults every captured completion with ServiceConnectionException.
         foreach (var call in calls)
         {
-            var ex = await Assert.ThrowsAsync<DotBoxDRpcConnectionException>(() => call.WaitAsync(Timeout));
+            var ex = await Assert.ThrowsAsync<ServiceConnectionException>(() => call.WaitAsync(Timeout));
             Assert.Contains("closed", ex.Message);
         }
 
@@ -83,7 +83,7 @@ public sealed class PeerOutboundLifecycleCoverageTests
         {
             value = await call.WaitAsync(Timeout);
         }
-        catch (DotBoxDRpcConnectionException ex)
+        catch (ServiceConnectionException ex)
         {
             failure = ex;
         }
@@ -118,7 +118,7 @@ public sealed class PeerOutboundLifecycleCoverageTests
                 {
                     InboundQueueCapacity = 100,
                     MaxInboundBytes = 1,
-                    QueueFullMode = DotBoxDRpcQueueFullMode.Wait,
+                    QueueFullMode = QueueFullMode.Wait,
                     RequestTimeout = TimeSpan.FromSeconds(30),
                 })
             .Provide((IServiceDispatcher)dispatcher)

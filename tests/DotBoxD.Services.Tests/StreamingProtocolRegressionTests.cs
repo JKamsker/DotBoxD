@@ -161,7 +161,7 @@ public sealed class StreamingProtocolRegressionTests
             SendAndCompleteErrorAsync,
             streams);
 
-        await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(() =>
+        await Assert.ThrowsAsync<RemoteServiceException>(() =>
             invoker.InvokeAsync<int>("Svc", "Bad", CancellationToken.None));
 
         Assert.Equal(0, streams.InboundReceiverCount);
@@ -347,7 +347,7 @@ public sealed class StreamingProtocolRegressionTests
             RpcStreamAttachment.FromStream(handle, new MemoryStream(new byte[] { 2 })),
         };
 
-        Assert.Throws<DotBoxDRpcProtocolException>(() =>
+        Assert.Throws<ServiceProtocolException>(() =>
             streams.RegisterOutbound(attachments, CancellationToken.None));
 
         Assert.Equal(0, streams.OutboundSenderCount);
@@ -376,7 +376,7 @@ public sealed class StreamingProtocolRegressionTests
             RpcStreamAttachment.FromStream(handle, new MemoryStream(new byte[] { 2 })),
         };
 
-        await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(() =>
+        await Assert.ThrowsAsync<ServiceProtocolException>(() =>
             invoker.InvokeAsync<(RpcStreamHandle, RpcStreamHandle), int>(
                 "Svc",
                 "Upload",

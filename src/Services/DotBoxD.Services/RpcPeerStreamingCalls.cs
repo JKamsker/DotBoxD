@@ -102,18 +102,18 @@ internal sealed class RpcPeerStreamingCalls
         RpcStreamKind expectedKind)
     {
         var handle = received.Response.Stream ??
-            throw new DotBoxDRpcProtocolException("Response did not open a stream.");
+            throw new ServiceProtocolException("Response did not open a stream.");
         if (handle.Kind != expectedKind || received.Stream is null)
         {
-            throw new DotBoxDRpcProtocolException($"Response stream kind was '{handle.Kind}', expected '{expectedKind}'.");
+            throw new ServiceProtocolException($"Response stream kind was '{handle.Kind}', expected '{expectedKind}'.");
         }
         if (!received.Payload.IsEmpty)
         {
-            throw new DotBoxDRpcProtocolException("Streaming response payload must be empty.");
+            throw new ServiceProtocolException("Streaming response payload must be empty.");
         }
 
         var stream = received.DetachStream() ??
-            throw new DotBoxDRpcProtocolException("Response stream receiver was already claimed.");
+            throw new ServiceProtocolException("Response stream receiver was already claimed.");
         if (received.DetachOutboundStreams() is { } outboundStreams)
         {
             stream.AttachOutboundStreams(outboundStreams);

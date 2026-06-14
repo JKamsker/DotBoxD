@@ -9,7 +9,7 @@ internal sealed partial class RpcPeerOutboundInvoker
     {
         if (!TryEnterPendingSlot())
         {
-            throw new DotBoxDRpcException("Maximum pending requests reached.");
+            throw new ServiceException("Maximum pending requests reached.");
         }
 
         try
@@ -24,7 +24,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 }
             }
 
-            throw new DotBoxDRpcException("Unable to reserve a request message id.");
+            throw new ServiceException("Unable to reserve a request message id.");
         }
         catch
         {
@@ -40,7 +40,7 @@ internal sealed partial class RpcPeerOutboundInvoker
     {
         if (!TryEnterPendingSlot())
         {
-            throw new DotBoxDRpcException("Maximum pending requests reached.");
+            throw new ServiceException("Maximum pending requests reached.");
         }
 
         try
@@ -62,7 +62,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 }
             }
 
-            throw new DotBoxDRpcException("Unable to reserve a request message id.");
+            throw new ServiceException("Unable to reserve a request message id.");
         }
         catch
         {
@@ -76,7 +76,7 @@ internal sealed partial class RpcPeerOutboundInvoker
     {
         if (!TryEnterPendingSlot())
         {
-            throw new DotBoxDRpcException("Maximum pending requests reached.");
+            throw new ServiceException("Maximum pending requests reached.");
         }
 
         try
@@ -91,7 +91,7 @@ internal sealed partial class RpcPeerOutboundInvoker
                 }
             }
 
-            throw new DotBoxDRpcException("Unable to reserve a request message id.");
+            throw new ServiceException("Unable to reserve a request message id.");
         }
         catch
         {

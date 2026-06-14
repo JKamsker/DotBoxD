@@ -52,7 +52,7 @@ public class GeneratedFactoryRegistryTests
         var dispatcher = generated
             .GetMethod("CreateDispatcher", new[] { typeof(Type), typeof(object) })!
             .Invoke(null, new[] { interfaceType, implementation });
-        var services = Assert.IsAssignableFrom<IReadOnlyList<DotBoxDGeneratedService>>(
+        var services = Assert.IsAssignableFrom<IReadOnlyList<GeneratedService>>(
             generated.GetProperty("Services")!.GetValue(null));
 
         Assert.True(interfaceType.IsInstanceOfType(proxy));
@@ -78,23 +78,23 @@ public class GeneratedFactoryRegistryTests
         Assert.Equal("GreeterProxy", generatedSinkService.ProxyType.Name);
         Assert.Equal("GreeterDispatcher", generatedSinkService.DispatcherType.Name);
 
-        var assemblyServices = DotBoxDServiceRegistry.GetServices(assembly);
+        var assemblyServices = GeneratedServiceRegistry.GetServices(assembly);
         Assert.Same(services, assemblyServices);
 
-        var combinedServices = DotBoxDServiceRegistry.GetServices(new[] { assembly, typeof(NullClient).Assembly });
+        var combinedServices = GeneratedServiceRegistry.GetServices(new[] { assembly, typeof(NullClient).Assembly });
         Assert.Contains(combinedServices, service => service.ServiceType == interfaceType);
 
         var multiSink = new RegistrationSink();
-        DotBoxDServiceRegistry.RegisterServices(new[] { assembly }, multiSink);
+        GeneratedServiceRegistry.RegisterServices(new[] { assembly }, multiSink);
         Assert.Equal(interfaceType, Assert.Single(multiSink.Services).ServiceType);
 
         var multiGeneratedSink = new GeneratedRegistrationSink();
-        DotBoxDServiceRegistry.RegisterGeneratedServices(new[] { assembly }, multiGeneratedSink);
+        GeneratedServiceRegistry.RegisterGeneratedServices(new[] { assembly }, multiGeneratedSink);
         Assert.Equal(interfaceType, Assert.Single(multiGeneratedSink.Services).ServiceType);
 
-        var registryProxy = DotBoxDServiceRegistry.CreateProxy(interfaceType, client);
-        var registryDispatcher = DotBoxDServiceRegistry.CreateDispatcher(interfaceType, implementation);
-        var registryService = DotBoxDServiceRegistry.GetService(interfaceType);
+        var registryProxy = GeneratedServiceRegistry.CreateProxy(interfaceType, client);
+        var registryDispatcher = GeneratedServiceRegistry.CreateDispatcher(interfaceType, implementation);
+        var registryService = GeneratedServiceRegistry.GetService(interfaceType);
 
         Assert.True(interfaceType.IsInstanceOfType(registryProxy));
         Assert.Equal("IGreeter", registryDispatcher.ServiceName);
@@ -139,7 +139,7 @@ public class GeneratedFactoryRegistryTests
         var childType = assembly.GetType("Metadata.Sample.IChild")!;
         var generated = assembly.GetType("DotBoxD.Services.Generated.DotBoxDGenerated")
             ?? throw new InvalidOperationException("Generated factory type not found.");
-        var services = Assert.IsAssignableFrom<IReadOnlyList<DotBoxDGeneratedService>>(
+        var services = Assert.IsAssignableFrom<IReadOnlyList<GeneratedService>>(
             generated.GetProperty("Services")!.GetValue(null));
 
         var root = services.Single(service => service.ServiceType == rootType);
@@ -153,7 +153,7 @@ public class GeneratedFactoryRegistryTests
         Assert.Equal("sum", add.WireName);
         Assert.Equal(typeof(Task<int>), add.ReturnType);
         Assert.Equal(typeof(int), add.ResultType);
-        Assert.Equal(DotBoxDGeneratedReturnKind.TaskOfT, add.ReturnKind);
+        Assert.Equal(GeneratedReturnKind.TaskOfT, add.ReturnKind);
         Assert.False(add.ReturnsNestedService);
 
         Assert.Equal(3, add.Parameters.Count);
@@ -179,26 +179,26 @@ public class GeneratedFactoryRegistryTests
         var name = root.Methods.Single(method => method.Name == "NameAsync");
         Assert.Equal(typeof(ValueTask<string>), name.ReturnType);
         Assert.Equal(typeof(string), name.ResultType);
-        Assert.Equal(DotBoxDGeneratedReturnKind.ValueTaskOfT, name.ReturnKind);
+        Assert.Equal(GeneratedReturnKind.ValueTaskOfT, name.ReturnKind);
         Assert.Equal(7, name.Parameters.Single().DefaultValue);
 
         var open = root.Methods.Single(method => method.Name == "OpenAsync");
         Assert.Equal(typeof(Task<>).MakeGenericType(childType), open.ReturnType);
         Assert.Equal(childType, open.ResultType);
-        Assert.Equal(DotBoxDGeneratedReturnKind.TaskOfNestedService, open.ReturnKind);
+        Assert.Equal(GeneratedReturnKind.TaskOfNestedService, open.ReturnKind);
         Assert.True(open.ReturnsNestedService);
 
         var sync = root.Methods.Single(method => method.Name == "Sync");
         Assert.Equal(typeof(int), sync.ReturnType);
         Assert.Null(sync.ResultType);
-        Assert.Equal(DotBoxDGeneratedReturnKind.Sync, sync.ReturnKind);
+        Assert.Equal(GeneratedReturnKind.Sync, sync.ReturnKind);
 
         var ping = root.Methods.Single(method => method.Name == "Ping");
         Assert.Equal(typeof(void), ping.ReturnType);
         Assert.Null(ping.ResultType);
-        Assert.Equal(DotBoxDGeneratedReturnKind.Void, ping.ReturnKind);
+        Assert.Equal(GeneratedReturnKind.Void, ping.ReturnKind);
 
-        var registryService = DotBoxDServiceRegistry.GetService(rootType);
+        var registryService = GeneratedServiceRegistry.GetService(rootType);
         Assert.Same(root.Methods, registryService.Methods);
     }
 
@@ -206,7 +206,7 @@ public class GeneratedFactoryRegistryTests
     public void Registry_ReportsClearDiagnosticWhenGeneratorDidNotRun()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            DotBoxDServiceRegistry.CreateProxy(typeof(INotGeneratedService), new NullClient()));
+            GeneratedServiceRegistry.CreateProxy(typeof(INotGeneratedService), new NullClient()));
 
         Assert.Contains("No DotBoxD generated factory is registered", ex.Message);
         Assert.Contains("[DotBoxDService]", ex.Message);
@@ -218,10 +218,10 @@ public class GeneratedFactoryRegistryTests
     {
         var assembly = typeof(GeneratedFactoryRegistryTests).Assembly;
 
-        var services = DotBoxDServiceRegistry.GetServices(assembly);
+        var services = GeneratedServiceRegistry.GetServices(assembly);
 
         Assert.Empty(services);
-        Assert.Same(services, DotBoxDServiceRegistry.GetServices(assembly));
+        Assert.Same(services, GeneratedServiceRegistry.GetServices(assembly));
     }
 
     [Fact]
@@ -250,28 +250,28 @@ public class GeneratedFactoryRegistryTests
             {
                 public static class DotBoxDGenerated
                 {
-                    private static readonly DotBoxDGeneratedService[] s_services =
+                    private static readonly GeneratedService[] s_services =
                     {
-                        new DotBoxDGeneratedService(
+                        new GeneratedService(
                             typeof(global::Legacy.Sample.ILegacyService),
                             typeof(global::Legacy.Sample.LegacyServiceProxy),
                             typeof(global::Legacy.Sample.LegacyServiceDispatcher),
                             "ILegacyService"),
                     };
 
-                    public static IReadOnlyList<DotBoxDGeneratedService> Services => s_services;
+                    public static IReadOnlyList<GeneratedService> Services => s_services;
                 }
             }
             """;
 
         var assembly = CompileAndLoad(source);
 
-        var services = DotBoxDServiceRegistry.GetServices(assembly);
+        var services = GeneratedServiceRegistry.GetServices(assembly);
 
         var service = Assert.Single(services);
         Assert.Equal("ILegacyService", service.ServiceName);
         Assert.Equal("LegacyServiceProxy", service.ProxyType.Name);
-        Assert.Same(services, DotBoxDServiceRegistry.GetServices(assembly));
+        Assert.Same(services, GeneratedServiceRegistry.GetServices(assembly));
     }
 
     [Fact]
@@ -306,7 +306,7 @@ public class GeneratedFactoryRegistryTests
 
         var generated = assembly.GetType("DotBoxD.Services.Generated.DotBoxDGenerated")
             ?? throw new InvalidOperationException("Generated factory type not found.");
-        var services = Assert.IsAssignableFrom<IReadOnlyList<DotBoxDGeneratedService>>(
+        var services = Assert.IsAssignableFrom<IReadOnlyList<GeneratedService>>(
             generated.GetProperty("Services")!.GetValue(null));
         var dispatcher = (IServiceDispatcher)generated
             .GetMethod("CreateDispatcher", new[] { typeof(Type), typeof(object) })!

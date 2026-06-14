@@ -35,7 +35,7 @@ The package boundary promises more than named pipes: hosts should be able to reu
 
 - `README.md:14` describes `DotBoxD.Pushdown.Services` as a preview MessagePack IPC addon built on DotBoxD generic transports, with named-pipe convenience helpers.
 - `docs/Specs/Initial/dotboxd-sandbox-spec/spec/03-architecture.md:126` through `docs/Specs/Initial/dotboxd-sandbox-spec/spec/03-architecture.md:132` lists the addon responsibilities as DotBoxD MessagePack transport-agnostic helpers, named-pipe convenience wrappers, and plugin-control IPC transport primitives.
-- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:21` exposes `Listen(IServerTransport, ...)`, and `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs:31` plus `:40` expose `ConnectAsync(ITransport, ...)` for the generic transport path.
+- `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs:21` exposes `Listen(IServerTransport, ...)`, and `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs:31` plus `:40` expose `ConnectAsync(ITransport, ...)` for the generic transport path.
 - The public walkthrough remains named-pipe-only: `README.md:132` through `README.md:143` runs the named-pipe server/client, and `docs/Specs/Addendum/Examples.md:328` through `docs/Specs/Addendum/Examples.md:344` documents only the named-pipe sample.
 - `examples/PluginIpc/DotBoxD.Kernels.PluginIpc.Server/Program.cs:14` calls `ListenNamedPipe(...)`, and `examples/PluginIpc/DotBoxD.Kernels.PluginIpc.Client/Program.cs:11` calls `ConnectNamedPipeAsync(...)`; no example project demonstrates `Listen(...)` or `ConnectAsync(...)` with a non-named-pipe DotBoxD transport.
 - `scripts/check-docs-smoke.ps1:135` skips the IPC smoke on non-Windows runners because the maintained sample is named-pipe-specific.
@@ -44,7 +44,7 @@ The package boundary promises more than named pipes: hosts should be able to reu
 
 ## Suggested acceptance test
 
-Add a small public example or docs-smoke fixture that wires a deterministic non-named-pipe DotBoxD transport through `DotBoxDDotBoxDRpcMessagePackIpc.Listen(...)` and `ConnectAsync(...)`, performs one plugin-control call or minimal RPC call, and runs on Windows, Linux, and macOS. Keep the existing named-pipe sample for deployment guidance, but make the generic transport path visible and continuously checked.
+Add a small public example or docs-smoke fixture that wires a deterministic non-named-pipe DotBoxD transport through `RpcMessagePackIpc.Listen(...)` and `ConnectAsync(...)`, performs one plugin-control call or minimal RPC call, and runs on Windows, Linux, and macOS. Keep the existing named-pipe sample for deployment guidance, but make the generic transport path visible and continuously checked.
 
 ## Suggested fix direction
 
@@ -61,6 +61,6 @@ Do not change IPC authentication, prerelease dependency policy, or package layou
 ## Verification checklist
 
 - [ ] Public docs show `Listen(IServerTransport, ...)` and `ConnectAsync(ITransport, ...)` usage outside the named-pipe wrappers.
-- [ ] A runnable example demonstrates a non-named-pipe DotBoxD transport through `DotBoxDDotBoxDRpcMessagePackIpc`.
+- [ ] A runnable example demonstrates a non-named-pipe DotBoxD transport through `RpcMessagePackIpc`.
 - [ ] Docs smoke runs that generic transport example on all supported CI operating systems.
 - [ ] Existing named-pipe docs remain available and clearly scoped to trusted local control-plane deployments.

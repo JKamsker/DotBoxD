@@ -38,18 +38,18 @@ public sealed class ReviewFixRegressionTests
             .Start();
 
         // Each call fails while serializing its argument. With the slot leaked, the SECOND such
-        // call would already throw DotBoxDRpcException("Maximum pending requests reached.") instead of
+        // call would already throw ServiceException("Maximum pending requests reached.") instead of
         // the serialization error.
         for (var i = 0; i < 5; i++)
         {
             var failure = await Assert.ThrowsAnyAsync<Exception>(
                 () => peer.InvokeAsync<PoisonArgument, int>("Service", "Method", new PoisonArgument()));
-            Assert.IsNotType<DotBoxDRpcException>(failure);
+            Assert.IsNotType<ServiceException>(failure);
         }
 
         // A subsequent well-formed call still gets a slot and reaches the wire, timing out because
         // the black-hole connection never answers — proving the slots were reclaimed.
-        await Assert.ThrowsAsync<DotBoxDRpcTimeoutException>(
+        await Assert.ThrowsAsync<ServiceTimeoutException>(
             () => peer.InvokeAsync<int>("Service", "Method").WaitAsync(TimeSpan.FromSeconds(2)));
     }
 

@@ -24,7 +24,7 @@ public sealed class UnaryTimeoutCoverageTests
 
         var call = peer.InvokeAsync<int>("Svc", "Op");
 
-        await Assert.ThrowsAsync<DotBoxDRpcTimeoutException>(() => call.WaitAsync(Timeout));
+        await Assert.ThrowsAsync<ServiceTimeoutException>(() => call.WaitAsync(Timeout));
         Assert.False(call.IsCanceled);
     }
 

@@ -8,8 +8,8 @@ public sealed class JsonImporterTests
     [Fact]
     public void Canonical_hash_is_stable_across_json_property_order()
     {
-        var first = DotBoxDJsonImporter.Import(SandboxTestHost.PureScoreJson());
-        var second = DotBoxDJsonImporter.Import("""
+        var first = JsonImporter.Import(SandboxTestHost.PureScoreJson());
+        var second = JsonImporter.Import("""
         {
           "functions": [
             {
@@ -40,7 +40,7 @@ public sealed class JsonImporterTests
     [Fact]
     public void Capability_requests_reject_untrusted_grant_parameters()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import("""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import("""
         {
           "id": "bad",
           "version": "1.0.0",
@@ -65,7 +65,7 @@ public sealed class JsonImporterTests
     [Fact]
     public void Module_root_rejects_unsupported_properties()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(MinimalModule(
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(MinimalModule(
             """
             "assemblyName": "System.IO.File",
             """)));
@@ -76,7 +76,7 @@ public sealed class JsonImporterTests
     [Fact]
     public void Expression_rejects_mixed_shapes()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(MinimalModule(
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(MinimalModule(
             "",
             """{ "i32": 1, "call": "math.abs", "args": [{ "i32": 1 }] }""")));
 
@@ -90,7 +90,7 @@ public sealed class JsonImporterTests
     [InlineData("""{ "bool": 1 }""")]
     public void Literal_values_reject_wrong_json_kinds(string expression)
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(MinimalModule("", expression)));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(MinimalModule("", expression)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
     }
@@ -98,7 +98,7 @@ public sealed class JsonImporterTests
     [Fact]
     public void If_else_rejects_non_array_shape()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import("""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import("""
         {
           "id": "bad-else",
           "version": "1.0.0",
@@ -127,7 +127,7 @@ public sealed class JsonImporterTests
     [Fact]
     public void Function_rejects_unknown_visibility()
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import("""
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import("""
         {
           "id": "bad-visibility",
           "version": "1.0.0",
@@ -224,7 +224,7 @@ public sealed class JsonImporterTests
     [InlineData("""{ "unary": "bitwiseNot", "operand": { "i32": 1 } }""")]
     public void Unknown_expression_operators_are_rejected_during_import(string expression)
     {
-        var ex = Assert.Throws<SandboxValidationException>(() => DotBoxDJsonImporter.Import(MinimalModule("", expression)));
+        var ex = Assert.Throws<SandboxValidationException>(() => JsonImporter.Import(MinimalModule("", expression)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-OP");
     }

@@ -81,8 +81,8 @@ public sealed class Fix_API_0022_Tests
         Assert.DoesNotContain(baseline, e => e.Contains("DotBoxDExpressionLoweringContext(", StringComparison.Ordinal));
 
         // Genuinely public analyzer surface (must stay public for Roslyn discovery).
-        Assert.Contains(baseline, e => e.Contains("class DotBoxDPluginAnalyzer", StringComparison.Ordinal));
-        Assert.Contains(baseline, e => e.Contains("class DotBoxDPluginPackageGenerator", StringComparison.Ordinal));
+        Assert.Contains(baseline, e => e.Contains("class PluginAnalyzer", StringComparison.Ordinal));
+        Assert.Contains(baseline, e => e.Contains("class PluginPackageGenerator", StringComparison.Ordinal));
     }
 
     private static bool MentionsMember(string baselineEntry, string memberName)

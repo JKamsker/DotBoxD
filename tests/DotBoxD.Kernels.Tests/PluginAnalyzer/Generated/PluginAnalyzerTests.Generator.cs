@@ -41,7 +41,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
@@ -84,7 +84,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
@@ -121,7 +121,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
@@ -154,7 +154,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
@@ -189,7 +189,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
@@ -222,7 +222,7 @@ public sealed partial class PluginAnalyzerTests
             }
             """);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new DotBoxDPluginPackageGenerator().AsSourceGenerator()],
+            [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(

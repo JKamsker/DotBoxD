@@ -11,7 +11,7 @@ if (args.Length != 1)
 var pipeName = args[0];
 var service = await PluginControlService.CreateAsync();
 
-await using var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+await using var host = RpcMessagePackIpc.ListenNamedPipe(
     pipeName,
     peer => peer.ProvidePluginControlService(service));
 

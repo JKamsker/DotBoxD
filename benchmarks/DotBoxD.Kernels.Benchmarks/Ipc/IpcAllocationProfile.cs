@@ -44,24 +44,24 @@ internal static class IpcAllocationProfile
         var serverOptions = CreateServerOptions(disableTimeout, lowAllocationProfile);
         if (transport.Equals(NamedPipeTransport, StringComparison.OrdinalIgnoreCase)) {
             var pipeName = "dotboxd-ipc-profile-" + Guid.NewGuid().ToString("N");
-            var host = DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(
+            var host = RpcMessagePackIpc.ListenNamedPipe(
                 pipeName,
                 peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()),
                 serverOptions);
             await host.StartAsync().ConfigureAwait(false);
-            var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, clientOptions)
+            var session = await RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, clientOptions)
                 .ConfigureAwait(false);
             return new ProfileFixture(host, session);
         }
 
         if (transport.Equals(InMemoryTransport, StringComparison.OrdinalIgnoreCase)) {
             var (serverChannel, clientChannel) = InMemoryRpcChannel.CreatePair();
-            var host = DotBoxDDotBoxDRpcMessagePackIpc.Listen(
+            var host = RpcMessagePackIpc.Listen(
                 new SingleConnectionServerTransport(serverChannel, ownsConnection: true),
                 peer => peer.Provide<IAllocationProbeService>(new AllocationProbeService()),
                 serverOptions ?? new RpcPeerOptions { RequestTimeout = TimeSpan.FromSeconds(5) });
             await host.StartAsync().ConfigureAwait(false);
-            var session = await DotBoxDDotBoxDRpcMessagePackIpc.ConnectAsync(
+            var session = await RpcMessagePackIpc.ConnectAsync(
                     new SingleConnectionTransport(clientChannel, ownsConnection: true),
                     clientOptions)
                 .ConfigureAwait(false);

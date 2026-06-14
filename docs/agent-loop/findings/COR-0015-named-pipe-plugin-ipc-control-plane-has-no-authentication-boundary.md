@@ -31,7 +31,7 @@ The DotBoxD named-pipe plugin IPC helper and runnable sample expose a plugin con
 
 ## Evidence
 
-- `src/DotBoxD.Pushdown.Services/DotBoxDDotBoxDRpcMessagePackIpc.cs` exposes `ListenNamedPipe(string pipeName, ...)` as `Listen(new NamedPipeServerTransport(pipeName), configurePeer, options)` and `ConnectNamedPipeAsync(...)` as `ConnectAsync(new NamedPipeClientTransport(...), ...)`. The DotBoxD.Kernels wrapper adds client `RejectInboundCalls = true`, but it does not add server-side authentication, caller authorization, pipe-name validation, or a shared-secret/session handshake.
+- `src/DotBoxD.Pushdown.Services/RpcMessagePackIpc.cs` exposes `ListenNamedPipe(string pipeName, ...)` as `Listen(new NamedPipeServerTransport(pipeName), configurePeer, options)` and `ConnectNamedPipeAsync(...)` as `ConnectAsync(new NamedPipeClientTransport(...), ...)`. The DotBoxD.Kernels wrapper adds client `RejectInboundCalls = true`, but it does not add server-side authentication, caller authorization, pipe-name validation, or a shared-secret/session handshake.
 - `examples/PluginIpc/DotBoxD.Kernels.PluginIpc.Server/Program.cs` accepts a single command-line pipe name and immediately publishes `PluginControlService` to every peer via `peer.ProvidePluginControlService(service)`.
 - `examples/PluginIpc/DotBoxD.Kernels.PluginIpc.Shared/PluginControlContracts.cs` exposes state-changing methods over that pipe: `SetSettingAsync`, `ModifySettingsAsync`, and `PublishDamageAsync`.
 - `docs/Specs/Addendum/Examples.md` explicitly says the pipe name is a trusted local control-plane endpoint and asks operators to pass a high-entropy or deployment-scoped name, but the code path does not enforce that posture.

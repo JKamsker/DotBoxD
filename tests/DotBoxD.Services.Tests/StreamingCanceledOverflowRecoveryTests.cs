@@ -56,7 +56,7 @@ public sealed class StreamingCanceledOverflowRecoveryTests
             }
 
             // Phase 2 — the 1025th entry triggers the overflow latch.
-            // TryCompleteForCancel catches the DotBoxDRpcProtocolException and fires the diagnostic.
+            // TryCompleteForCancel catches the ServiceProtocolException and fires the diagnostic.
             var handle1025 = new RpcStreamHandle(21_024, RpcStreamKind.Binary);
             var receiver1025 = streams.RegisterInboundResponse(handle1025, CancellationToken.None);
             receiver1025.Cancel();
@@ -86,7 +86,7 @@ public sealed class StreamingCanceledOverflowRecoveryTests
             var ex = Record.Exception(
                 () => streams.RegisterInboundResponse(newHandle, CancellationToken.None));
 
-            Assert.Null(ex); // Fails today — DotBoxDRpcProtocolException is thrown instead.
+            Assert.Null(ex); // Fails today — ServiceProtocolException is thrown instead.
 
             // Clean up so the manager does not leak the registered receiver.
             streams.CompleteInbound(newHandle.StreamId);

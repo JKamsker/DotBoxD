@@ -59,7 +59,7 @@ public sealed class RpcPeerLifecycleRegressionTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new RpcPeerOptions { InboundQueueCapacity = 0 });
         Assert.Throws<ArgumentOutOfRangeException>(() => new RpcPeerOptions { MaxPendingRequests = 0 });
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new RpcPeerOptions { QueueFullMode = (DotBoxDRpcQueueFullMode)42 });
+            () => new RpcPeerOptions { QueueFullMode = (QueueFullMode)42 });
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class RpcPeerLifecycleRegressionTests
         var first = peer.InvokeAsync<int>("Service", "Method");
         await connection.FirstSend.WaitAsync(TimeSpan.FromSeconds(1));
 
-        await Assert.ThrowsAsync<DotBoxDRpcException>(() => peer.InvokeAsync<int>("Service", "Method"));
+        await Assert.ThrowsAsync<ServiceException>(() => peer.InvokeAsync<int>("Service", "Method"));
         _ = first.ContinueWith(
             static task => _ = task.Exception,
             CancellationToken.None,

@@ -43,3 +43,15 @@ none of them block the current green build.
   `CentralPackageTransitivePinningEnabled` is off (disabled during the merge + rebrand churn — see
   `Directory.Build.props` / `Directory.Packages.props`). Re-enable both and regenerate the lock files in
   the CI/release phase once project names are final.
+
+- [ ] **De-brand internal analyzer/helper implementation types.** A first de-brand pass stripped the
+  redundant `DotBoxD` prefix from over-branded *public* types (exceptions, generated metadata, JSON
+  importer/exporter, IPC bridge, plugin analyzer/generator). The following *internal*,
+  non-breaking helper types still carry the brand and should be de-branded in a later mechanical pass
+  (internal only, so no public-API break and no api-baseline churn):
+  `DotBoxDRpcGenerator`, `DotBoxDRpcJsonLowerer`, `DotBoxDRpcTypeMapper`,
+  `DotBoxDGeneratedAssemblyCatalog`, `DotBoxDGenerationNames`, and all the analyzer
+  `DotBoxD*ExpressionLowerer` / `*ModelFactory` / `*BodyModelFactory` / `*Model` / `*Emitter` /
+  `*Promoter` / `*Inliner` / `*Reader` internal helpers. Keep the sanctioned public brand entry
+  points untouched (`DotBoxDServiceAttribute`, `DotBoxDMethodAttribute`, `DotBoxDGenerated`,
+  `DotBoxDGeneratedExtensions`, `DotBoxDInfo`, `DotBoxDServicesInfo`).

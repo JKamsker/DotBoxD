@@ -124,7 +124,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             throw new ArgumentNullException(nameof(implementation));
         }
 
-        return Provide(DotBoxDServiceRegistry.CreateDispatcher<TService>(implementation));
+        return Provide(GeneratedServiceRegistry.CreateDispatcher<TService>(implementation));
     }
 
     /// <summary>Resolves and provides a local implementation of <typeparamref name="TService"/> from the configured service provider.</summary>
@@ -161,7 +161,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
             if (_closed != 0)
             {
-                throw new DotBoxDRpcConnectionException("Connection closed.");
+                throw new ServiceConnectionException("Connection closed.");
             }
 
             if (_started != 0)
@@ -189,7 +189,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             }
         }
 
-        return DotBoxDServiceRegistry.CreateProxy<TService>(this);
+        return GeneratedServiceRegistry.CreateProxy<TService>(this);
     }
 
     /// <summary>Begins the read loop. Idempotent; safe to call from a fluent chain.</summary>
@@ -210,7 +210,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
             if (_closed != 0)
             {
-                throw new DotBoxDRpcConnectionException("Connection closed.");
+                throw new ServiceConnectionException("Connection closed.");
             }
 
             if (_started != 0)
@@ -364,7 +364,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
         }
 
         await _outbound.StopCancelFramesAsync().ConfigureAwait(false);
-        _outbound.FailPending(new DotBoxDRpcConnectionException("Connection closed."));
+        _outbound.FailPending(new ServiceConnectionException("Connection closed."));
         _streams.Stop();
         await _inbound.StopAsync().ConfigureAwait(false);
 

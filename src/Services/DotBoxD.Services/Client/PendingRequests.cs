@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace DotBoxD.Services.Client;
 
-internal sealed class DotBoxDRpcPendingRequests : IDisposable
+internal sealed class PendingRequests : IDisposable
 {
     private readonly object _requestsGate = new();
     private readonly object _timeoutGate = new();
@@ -11,10 +11,10 @@ internal sealed class DotBoxDRpcPendingRequests : IDisposable
     private long _nextTimeoutTimestamp = long.MaxValue;
     private int _disposed;
 
-    public DotBoxDRpcPendingRequests()
+    public PendingRequests()
     {
         _timeoutTimer = new Timer(
-            static state => ((DotBoxDRpcPendingRequests)state!).CancelExpired(),
+            static state => ((PendingRequests)state!).CancelExpired(),
             this,
             Timeout.Infinite,
             Timeout.Infinite);

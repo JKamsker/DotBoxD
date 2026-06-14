@@ -3,7 +3,7 @@ namespace DotBoxD.Services.Generated;
 /// <summary>
 /// Classifies the generated RPC-facing return shape of a service method.
 /// </summary>
-public enum DotBoxDGeneratedReturnKind
+public enum GeneratedReturnKind
 {
     Void,
     Sync,

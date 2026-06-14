@@ -37,7 +37,7 @@ public sealed class Round10_ProtocolRegressionTests
         var call = peer.InvokeAsync<int, string>("Svc", "Op", request: 1);
         channel.Enqueue(BuildContradictoryErrorFrame(serializer, messageId: 1));
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcProtocolException>(() => call.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<ServiceProtocolException>(() => call.WaitAsync(Timeout));
         Assert.Contains("error response", ex.Message);
     }
 

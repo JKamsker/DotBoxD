@@ -72,7 +72,7 @@ public sealed class HookChainDetectionTests
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginServer).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxDPluginAnalyzer());
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 

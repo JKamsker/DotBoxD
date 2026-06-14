@@ -13,8 +13,8 @@ This keeps Safe-IR's addon boundary intact while letting hosts use named pipes, 
 The original addon shape was effectively named-pipe-specific:
 
 ```csharp
-DotBoxDDotBoxDRpcMessagePackIpc.ListenNamedPipe(...);
-DotBoxDDotBoxDRpcMessagePackIpc.ConnectNamedPipeAsync(...);
+RpcMessagePackIpc.ListenNamedPipe(...);
+RpcMessagePackIpc.ConnectNamedPipeAsync(...);
 ```
 
 The client handle also owns a concrete `NamedPipeClientTransport`. That makes the addon harder to reuse when the host wants another DotBoxD transport, even though DotBoxD itself is already built around:

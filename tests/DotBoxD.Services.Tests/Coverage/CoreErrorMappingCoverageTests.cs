@@ -13,10 +13,10 @@ namespace DotBoxD.Services.Tests.Cov.Round2Public;
 /// <summary>
 /// Round-2 behavioral coverage for the internal <c>RpcErrors</c> exception-to-wire mapping, reached
 /// only through the public peer stack (the type itself is internal). Covers the not-found typed
-/// mapping for a handler-thrown <see cref="DotBoxDRpcNotFoundException"/>, the faulting-transformer
+/// mapping for a handler-thrown <see cref="ServiceNotFoundException"/>, the faulting-transformer
 /// fallback (which reports to diagnostics and returns the opaque default), and the long-message
 /// truncation. Each scenario drives a real client/server <see cref="RpcPeer"/> pair over an in-memory
-/// pipe and asserts what the caller observes on the <see cref="DotBoxDRpcRemoteException"/>.
+/// pipe and asserts what the caller observes on the <see cref="RemoteServiceException"/>.
 /// </summary>
 public sealed class CoreErrorMappingCoverageTests
 {
@@ -30,21 +30,21 @@ public sealed class CoreErrorMappingCoverageTests
     private static RpcPeerOptions ClientOptions() =>
         new() { RequestTimeout = TimeSpan.FromSeconds(8) };
 
-    // ----- Handler throws DotBoxDRpcNotFoundException(Service) -> typed ServiceNotFound (RpcError 69) ---
+    // ----- Handler throws ServiceNotFoundException(Service) -> typed ServiceNotFound (RpcError 69) ---
 
     [Fact]
     public async Task HandlerThrowsNotFoundService_MapsToServiceNotFoundTypeAndKeepsMessage()
     {
-        // A handler that throws DotBoxDRpcNotFoundException with the default (Service) kind flows through
+        // A handler that throws ServiceNotFoundException with the default (Service) kind flows through
         // RpcErrors.FromException -> the not-found branch -> NotFoundErrorType default case. This is NOT
         // routed through the (absent) transformer, and the (short) message is preserved verbatim.
         const string detail = "no such widget";
         await using var pair = await PeerPair.StartAsync(
             server => server.Provide<IGameService>(
-                new ThrowingGameService(() => new DotBoxDRpcNotFoundException(detail))),
+                new ThrowingGameService(() => new ServiceNotFoundException(detail))),
             serverOptions: null);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => pair.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
         Assert.Equal(RpcErrorTypes.ServiceNotFound, ex.RemoteExceptionType);
@@ -58,11 +58,11 @@ public sealed class CoreErrorMappingCoverageTests
         // is observably kind-sensitive (and not just always-Service).
         await using var pair = await PeerPair.StartAsync(
             server => server.Provide<IGameService>(
-                new ThrowingGameService(() => new DotBoxDRpcNotFoundException(
-                    "missing method", DotBoxDRpcNotFoundException.NotFoundKind.Method))),
+                new ThrowingGameService(() => new ServiceNotFoundException(
+                    "missing method", ServiceNotFoundException.NotFoundKind.Method))),
             serverOptions: null);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => pair.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
         Assert.Equal(RpcErrorTypes.MethodNotFound, ex.RemoteExceptionType);
@@ -104,7 +104,7 @@ public sealed class CoreErrorMappingCoverageTests
                         new ThrowingGameService(() => new KeyNotFoundException("handler boom"))),
                     serverOptions);
 
-                var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+                var ex = await Assert.ThrowsAsync<RemoteServiceException>(
                     () => pair.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
                 // Caller sees the opaque default, never the transformer's own fault or the handler detail.
@@ -147,7 +147,7 @@ public sealed class CoreErrorMappingCoverageTests
                 new ThrowingGameService(() => new InvalidOperationException("ignored"))),
             serverOptions);
 
-        var ex = await Assert.ThrowsAsync<DotBoxDRpcRemoteException>(
+        var ex = await Assert.ThrowsAsync<RemoteServiceException>(
             () => pair.Game.GetServerStatusAsync().WaitAsync(Timeout));
 
         Assert.Equal("APP_LONG", ex.RemoteExceptionType);
@@ -230,7 +230,7 @@ public sealed class CoreErrorMappingCoverageTests
 /// Round-2 coverage for <c>DotBoxDGeneratedAssemblyCatalog</c> sink registration over an assembly that
 /// runs no DotBoxD generator: the sink registrar short-circuits to a no-op (returns <c>default</c>) so
 /// the supplied sink receives nothing rather than faulting. Reached via the public
-/// <see cref="DotBoxDServiceRegistry"/> sink overloads. The catalog type is internal; this exercises
+/// <see cref="GeneratedServiceRegistry"/> sink overloads. The catalog type is internal; this exercises
 /// the empty-assembly branch the round-1 suite (which only used the generated Shared assembly) missed.
 /// </summary>
 public sealed class CatalogEmptyAssemblyCoverageTests
@@ -244,7 +244,7 @@ public sealed class CatalogEmptyAssemblyCoverageTests
 
         // No generated factory type in the test assembly -> CreateSinkRegistrar returns a no-op
         // registrar -> the sink is never called.
-        DotBoxDServiceRegistry.RegisterServices(new[] { TestAssemblyWithoutGenerator }, sink);
+        GeneratedServiceRegistry.RegisterServices(new[] { TestAssemblyWithoutGenerator }, sink);
 
         Assert.Empty(sink.ServiceTypes);
     }
@@ -254,7 +254,7 @@ public sealed class CatalogEmptyAssemblyCoverageTests
     {
         var sink = new RecordingGeneratedSink();
 
-        DotBoxDServiceRegistry.RegisterGeneratedServices(new[] { TestAssemblyWithoutGenerator }, sink);
+        GeneratedServiceRegistry.RegisterGeneratedServices(new[] { TestAssemblyWithoutGenerator }, sink);
 
         Assert.Empty(sink.ServiceTypes);
     }
@@ -266,7 +266,7 @@ public sealed class CatalogEmptyAssemblyCoverageTests
 
         // One generated assembly (Shared) + one without a generator (the test assembly). Only the
         // generated one feeds the sink; the empty one is a silent no-op.
-        DotBoxDServiceRegistry.RegisterServices(
+        GeneratedServiceRegistry.RegisterServices(
             new[] { typeof(IGameService).Assembly, TestAssemblyWithoutGenerator },
             sink);
 

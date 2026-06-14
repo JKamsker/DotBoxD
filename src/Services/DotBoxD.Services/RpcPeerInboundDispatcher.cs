@@ -258,7 +258,7 @@ internal sealed class RpcPeerInboundDispatcher
         {
             _streams.RegisterInbound(request.Streams, inbound.CancellationToken);
         }
-        catch (DotBoxDRpcProtocolException ex)
+        catch (ServiceProtocolException ex)
         {
             _activeInbound.Remove(messageId, requestCts);
             requestCts?.Dispose();
