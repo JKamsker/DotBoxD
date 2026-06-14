@@ -105,18 +105,24 @@ if (result.Succeeded && result.Value is I32Value total)
 ### 3. Pushdown — compose host services next to the data
 
 A naive client makes one remote call per cart line, then sums the results. With pushdown, the host
-exposes a contract method that composes its **own** catalog data into the kernel's inputs and runs
-the validated kernel server-side — so the client submits the whole cart in **one** round-trip.
+exposes a **service method** — `ComputeCartTotalAsync`, part of the same `[DotBoxdService]` contract —
+that composes its **own** catalog data and runs a validated **kernel** server-side, so the client
+submits the whole cart in **one** round-trip.
+
+> The method is *not itself* a kernel — it's an ordinary service method that **runs** one. The kernel is
+> `CartTotalKernel` from step 2 (sandboxed JSON IR, validated + fuel-metered by `SandboxHost`); here it
+> is invoked as `_kernel`.
 
 ```csharp
-// Host side: ComputeCartTotalAsync composes catalog data, then runs the sandboxed kernel.
+// Host side: a normal [DotBoxdService] method that runs the validated CartTotalKernel server-side.
 public async ValueTask<CartTotal> ComputeCartTotalAsync(Cart cart, CancellationToken ct = default)
 {
+    // Host-side composition: turn each cart line into a subtotal using the host's own catalog.
     var subtotals = new int[cart.Lines.Length];
     for (var i = 0; i < cart.Lines.Length; i++)
         subtotals[i] = PriceOf(cart.Lines[i].ItemId) * cart.Lines[i].Quantity;
 
-    // The summation runs inside the metered kernel, right next to the service.
+    // _kernel is the CartTotalKernel: the summation runs inside the metered sandbox, next to the service.
     var (total, fuelUsed) = await _kernel.RunAsync(subtotals, ct);
     return new CartTotal(total, fuelUsed);
 }
@@ -226,6 +232,17 @@ and `DBXK###` (kernels/plugins). See [`docs/index.md`](docs/index.md) for the fu
 
 `DotBoxd.Pushdown.Services` is published on a **prerelease** channel while its upstream net10.0
 dependencies are prerelease; stable release gates fail if it is included in a stable package set.
+
+### Common namespaces & key types
+
+After installing, these are the entry points you'll reach for:
+
+- `DotBoxd.Services`: `[DotBoxdService]` contracts, `RpcPeer` / `RpcHost`, and the generated
+  `Provide{Service}` / `Get<TService>()` wiring.
+- `DotBoxd.Hosting`: `SandboxHost` — import, validate, prepare, and execute kernels under policy.
+- `DotBoxd.Kernels.Serialization.Json`: JSON IR import **and export** round-trip via
+  `DotBoxdJsonImporter` and `DotBoxdJsonExporter`.
+- `DotBoxd.Pushdown.Services`: the MessagePack IPC bridge that runs kernels next to host services.
 
 ---
 

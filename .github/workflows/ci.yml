@@ -65,10 +65,28 @@ jobs:
         run: dotnet build DotBoxd.slnx -c Release --no-restore
 
       - name: Test
-        run: >-
-          dotnet test DotBoxd.slnx -c Release --no-build
-          --logger "trx;LogFileName=tests.trx"
-          --results-directory artifacts/test-results
+        shell: pwsh
+        # Run test projects sequentially rather than `dotnet test DotBoxd.slnx` (all assemblies at
+        # once): the sandbox's wall-clock deadline/quota tests can flip to Timeout under concurrent
+        # multi-assembly load on shared CI runners. Each project passes reliably on its own.
+        run: |
+          $projects = @(
+            'tests/DotBoxd.Services.SourceGenerator.Tests/DotBoxd.Services.SourceGenerator.Tests.csproj',
+            'tests/DotBoxd.Services.Tests/DotBoxd.Services.Tests.csproj',
+            'tests/DotBoxd.Kernels.Tests/DotBoxd.Kernels.Tests.csproj',
+            'tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj'
+          )
+          $failed = $false
+          foreach ($p in $projects) {
+            $name = Split-Path $p -LeafBase
+            Write-Host "::group::dotnet test $name"
+            dotnet test $p -c Release --no-build `
+              --logger "trx;LogFileName=$name.trx" `
+              --results-directory artifacts/test-results
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+            Write-Host "::endgroup::"
+          }
+          if ($failed) { throw "One or more test projects failed." }
 
       - name: Upload test results (TRX)
         if: always()
