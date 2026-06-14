@@ -126,7 +126,7 @@ public sealed partial class InstalledKernel
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             ValidateFor(adapter);
-            var input = BuildInput(adapter, e);
+            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             return AsShouldHandleResult(result);
@@ -147,7 +147,7 @@ public sealed partial class InstalledKernel
         {
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
             ValidateFor(adapter);
-            var input = BuildInput(adapter, e);
+            var input = BuildInput(adapter, e, _entrypoints.Handle);
             _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
             PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
         }
@@ -180,13 +180,19 @@ public sealed partial class InstalledKernel
             }
 
             ValidateFor(adapter);
-            var input = BuildInput(adapter, e);
+            var input = BuildInput(adapter, e, _entrypoints.ShouldHandle);
             var result = await ExecutePreparedAsync(_entrypoints.ShouldHandle, input, cancellationToken).ConfigureAwait(false);
             if (AsShouldHandleResult(result))
             {
                 if (IsRevoked)
                 {
                     return;
+                }
+
+                if (UsesReusableNoAuditInput(_entrypoints.ShouldHandle) &&
+                    !UsesReusableNoAuditInput(_entrypoints.Handle))
+                {
+                    input = SnapshotInput(input);
                 }
 
                 _ = await ExecutePreparedAsync(_entrypoints.Handle, input, cancellationToken).ConfigureAwait(false);
@@ -238,15 +244,6 @@ public sealed partial class InstalledKernel
 
     internal void ValidateFor<TEvent>(IPluginEventAdapter<TEvent> adapter)
         => _adapterValidation.Validate(Manifest, _plan, _entrypoints, adapter);
-
-    private SandboxValue BuildInput<TEvent>(IPluginEventAdapter<TEvent> adapter, TEvent e)
-        => PluginKernelInputBuilder.Build(
-            adapter,
-            e,
-            _liveStateSync.SynchronizeForInput(),
-            Manifest.LiveSettings,
-            Value,
-            _pendingLiveUpdates.Enqueue);
 
     private void RefreshTypedValuesFromStore()
     {

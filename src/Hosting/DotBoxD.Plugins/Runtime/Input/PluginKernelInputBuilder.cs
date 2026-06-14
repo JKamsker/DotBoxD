@@ -24,6 +24,27 @@ internal static class PluginKernelInputBuilder
         return input;
     }
 
+    public static SandboxValue BuildWithReusableBuffer<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        TEvent e,
+        IReadOnlyList<Action> deferredUpdates,
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        LiveSettingStore value,
+        Action<Action> enqueueUpdate,
+        ref SandboxValue[]? buffer)
+    {
+        var input = adapter is IPluginEventValueWriter<TEvent> writer
+            ? BuildWithReusableBuffer(writer, e, liveSettings, value, ref buffer)
+            : BuildWithReusableBuffer(adapter.ToSandboxValues(e), liveSettings, value, ref buffer);
+
+        foreach (var update in deferredUpdates)
+        {
+            enqueueUpdate(update);
+        }
+
+        return input;
+    }
+
     private static SandboxValue Build(
         IReadOnlyList<SandboxValue> eventValues,
         IReadOnlyList<LiveSettingDefinition> liveSettings,
@@ -90,4 +111,75 @@ internal static class PluginKernelInputBuilder
 
         return SandboxValue.FromOwnedList(values, values[0].Type);
     }
+
+    private static SandboxValue BuildWithReusableBuffer(
+        IReadOnlyList<SandboxValue> eventValues,
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        LiveSettingStore value,
+        ref SandboxValue[]? buffer)
+    {
+        var valueCount = eventValues.Count + liveSettings.Count;
+        return valueCount switch
+        {
+            0 => SandboxValue.Unit,
+            1 => eventValues.Count == 1 ? eventValues[0] : value.ToSandboxValue(liveSettings[0]),
+            _ => BuildListWithReusableBuffer(eventValues, liveSettings, value, ref buffer)
+        };
+    }
+
+    private static SandboxValue BuildWithReusableBuffer<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        LiveSettingStore value,
+        ref SandboxValue[]? buffer)
+    {
+        var eventValueCount = writer.EventValueCount;
+        var valueCount = eventValueCount + liveSettings.Count;
+        return valueCount switch
+        {
+            0 => SandboxValue.Unit,
+            1 => eventValueCount == 1 ? writer.ToSandboxValue(e, 0) : value.ToSandboxValue(liveSettings[0]),
+            _ => BuildListWithReusableBuffer(writer, e, liveSettings, value, ref buffer)
+        };
+    }
+
+    private static SandboxValue BuildListWithReusableBuffer(
+        IReadOnlyList<SandboxValue> eventValues,
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        LiveSettingStore value,
+        ref SandboxValue[]? buffer)
+    {
+        var values = RentBuffer(eventValues.Count + liveSettings.Count, ref buffer);
+        for (var i = 0; i < eventValues.Count; i++)
+        {
+            values[i] = eventValues[i];
+        }
+
+        value.CopySandboxValues(liveSettings, values, eventValues.Count);
+        return SandboxValue.FromOwnedList(values, values[0].Type);
+    }
+
+    private static SandboxValue BuildListWithReusableBuffer<TEvent>(
+        IPluginEventValueWriter<TEvent> writer,
+        TEvent e,
+        IReadOnlyList<LiveSettingDefinition> liveSettings,
+        LiveSettingStore value,
+        ref SandboxValue[]? buffer)
+    {
+        var eventValueCount = writer.EventValueCount;
+        var values = RentBuffer(eventValueCount + liveSettings.Count, ref buffer);
+        writer.CopySandboxValues(e, values, 0);
+        if (liveSettings.Count > 0)
+        {
+            value.CopySandboxValues(liveSettings, values, eventValueCount);
+        }
+
+        return SandboxValue.FromOwnedList(values, values[0].Type);
+    }
+
+    private static SandboxValue[] RentBuffer(int valueCount, ref SandboxValue[]? buffer)
+        => buffer is { Length: var length } values && length == valueCount
+            ? values
+            : buffer = new SandboxValue[valueCount];
 }
