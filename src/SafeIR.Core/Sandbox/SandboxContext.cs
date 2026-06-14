@@ -94,6 +94,9 @@ public sealed partial class SandboxContext
         Budget.ChargeLoopIterations(iterations, fuelPerIteration);
     }
 
+    internal bool CanBulkChargeLoopIterations(long iterations, long fuelPerIteration)
+        => Budget.CanChargeLoopIterations(iterations, fuelPerIteration);
+
     public void Checkpoint()
     {
         CancellationToken.ThrowIfCancellationRequested();

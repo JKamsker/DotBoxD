@@ -11,7 +11,9 @@ internal sealed class MethodEmitter
     private readonly ILGenerator _il;
     private readonly SandboxFunction _function;
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functionModels;
+    private readonly IBindingCatalog _bindings;
     private readonly Dictionary<string, (LocalBuilder Local, StackKind Kind)> _locals = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _nonNegativeF64Locals = new(StringComparer.Ordinal);
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
 
@@ -26,6 +28,7 @@ internal sealed class MethodEmitter
         _il = il;
         _function = function;
         _functionModels = functionModels;
+        _bindings = bindings;
         _stackPlan = new LocalStackKindPlanner(function, bindings, functionAnalysis);
         _expressions = new ExpressionEmitter(il, functions, bindings, functionAnalysis, _locals, _stackPlan);
     }
@@ -78,6 +81,7 @@ internal sealed class MethodEmitter
                 var (local, kind) = Declare(assignment.Name);
                 _expressions.EmitAs(assignment.Value, kind);
                 _il.Emit(OpCodes.Stloc, local);
+                UpdateF64Facts(assignment.Name, assignment.Value);
                 return false;
             case ReturnStatement ret:
                 _expressions.EmitAs(ret.Value, StackKind.Boxed);
@@ -102,6 +106,7 @@ internal sealed class MethodEmitter
 
     private bool EmitIf(IfStatement branch)
     {
+        _nonNegativeF64Locals.Clear();
         var elseLabel = _il.DefineLabel();
         var endLabel = _il.DefineLabel();
         _expressions.EmitAs(branch.Condition, StackKind.Bool);
@@ -119,16 +124,43 @@ internal sealed class MethodEmitter
             _il.MarkLabel(endLabel);
         }
 
+        _nonNegativeF64Locals.Clear();
         return thenReturns && elseReturns;
     }
 
     private void EmitForRange(ForRangeStatement range)
     {
-        if (I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, Declare))
+        if (F64LoopFastPathEmitter.TryEmit(
+            range,
+            _il,
+            _stackPlan,
+            _bindings,
+            _nonNegativeF64Locals,
+            Declare,
+            out var nonNegativeTarget))
         {
+            _nonNegativeF64Locals.Clear();
+            if (nonNegativeTarget is not null)
+            {
+                _nonNegativeF64Locals.Add(nonNegativeTarget);
+            }
+
             return;
         }
 
+        if (StringLengthLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _bindings, Declare))
+        {
+            _nonNegativeF64Locals.Clear();
+            return;
+        }
+
+        if (I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, Declare))
+        {
+            _nonNegativeF64Locals.Clear();
+            return;
+        }
+
+        _nonNegativeF64Locals.Clear();
         var index = _il.DeclareLocal(typeof(int));
         var end = _il.DeclareLocal(typeof(int));
         _expressions.EmitAs(range.Start, StackKind.I32);
@@ -154,10 +186,12 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, index);
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);
+        _nonNegativeF64Locals.Clear();
     }
 
     private void EmitWhile(WhileStatement loop)
     {
+        _nonNegativeF64Locals.Clear();
         var startLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
@@ -165,6 +199,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Brfalse, finishLabel);
         CompiledMeterEmitter.LoopIteration(_il, 5);
         EmitBlock(loop.Body);
+        _nonNegativeF64Locals.Clear();
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);
     }
@@ -205,4 +240,26 @@ internal sealed class MethodEmitter
 
     private static Exception Unsupported(string message)
         => new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, message));
+
+    private void UpdateF64Facts(string name, Expression expression)
+    {
+        if (_stackPlan.LocalKind(name) == StackKind.F64 && IsNonNegativeF64(expression))
+        {
+            _nonNegativeF64Locals.Add(name);
+        }
+        else
+        {
+            _nonNegativeF64Locals.Remove(name);
+        }
+    }
+
+    private bool IsNonNegativeF64(Expression expression)
+        => expression switch {
+            LiteralExpression { Value: F64Value value } => value.Value >= 0,
+            VariableExpression variable => _nonNegativeF64Locals.Contains(variable.Name),
+            CallExpression { Name: "math.sqrt", Arguments.Count: 1 } call => IsNonNegativeF64(call.Arguments[0]),
+            CallExpression { Name: "math.floor" or "math.ceil" or "math.round", Arguments.Count: 1 } call
+                => IsNonNegativeF64(call.Arguments[0]),
+            _ => false
+        };
 }

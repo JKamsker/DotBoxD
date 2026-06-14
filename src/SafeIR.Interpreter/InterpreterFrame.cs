@@ -7,13 +7,20 @@ internal sealed class InterpreterFrame
     private readonly FunctionFrameLayout _layout;
     private readonly SandboxValue?[] _slots;
     private readonly int[] _i32Slots;
+    private readonly double[] _f64Slots;
     private readonly bool[] _assigned;
 
-    private InterpreterFrame(FunctionFrameLayout layout, SandboxValue?[] slots, int[] i32Slots, bool[] assigned)
+    private InterpreterFrame(
+        FunctionFrameLayout layout,
+        SandboxValue?[] slots,
+        int[] i32Slots,
+        double[] f64Slots,
+        bool[] assigned)
     {
         _layout = layout;
         _slots = slots;
         _i32Slots = i32Slots;
+        _f64Slots = f64Slots;
         _assigned = assigned;
     }
 
@@ -31,6 +38,13 @@ internal sealed class InterpreterFrame
                 : throw Unassigned(name);
         }
 
+        if (_layout.IsF64Slot(slot))
+        {
+            return _assigned[slot]
+                ? SandboxValue.FromDouble(_f64Slots[slot])
+                : throw Unassigned(name);
+        }
+
         return _slots[slot]
             ?? throw Unassigned(name);
     }
@@ -42,12 +56,16 @@ internal sealed class InterpreterFrame
         {
             _i32Slots[slot] = ((I32Value)value).Value;
         }
+        else if (_layout.IsF64Slot(slot))
+        {
+            _f64Slots[slot] = ((F64Value)value).Value;
+        }
         else
         {
             _slots[slot] = value;
         }
 
-        if (_layout.HasI32Slots)
+        if (_layout.HasRawSlots)
         {
             _assigned[slot] = true;
         }
@@ -64,6 +82,10 @@ internal sealed class InterpreterFrame
     public bool IsInt32Local(string name) => _layout.IsI32Slot(name);
 
     public bool IsInt32Slot(int slot) => _layout.IsI32Slot(slot);
+
+    public bool IsF64Slot(int slot) => _layout.IsF64Slot(slot);
+
+    public bool IsF64Slot(string name) => _layout.IsF64Slot(name);
 
     public int ReadInt32(string name)
     {
@@ -82,6 +104,41 @@ internal sealed class InterpreterFrame
             : _slots[slot] is I32Value value ? value.Value : throw UnassignedSlot();
 
     public int ReadRawInt32Slot(int slot) => _i32Slots[slot];
+
+    public bool TryGetStringSlot(string name, out int slot)
+    {
+        slot = _layout.GetSlot(name);
+        return _slots[slot] is StringValue;
+    }
+
+    public int ReadStringLengthSlot(int slot)
+        => _slots[slot] is StringValue value ? value.Value.Length : throw UnassignedSlot();
+
+    public bool TryReadDouble(string name, out double value)
+    {
+        var slot = _layout.GetSlot(name);
+        if (_layout.IsF64Slot(slot))
+        {
+            value = _assigned[slot] ? _f64Slots[slot] : 0;
+            return _assigned[slot];
+        }
+
+        if (_slots[slot] is F64Value f64)
+        {
+            value = f64.Value;
+            return true;
+        }
+
+        value = 0;
+        return false;
+    }
+
+    public double ReadDoubleSlot(int slot)
+        => _layout.IsF64Slot(slot)
+            ? _assigned[slot] ? _f64Slots[slot] : throw UnassignedSlot()
+            : _slots[slot] is F64Value value ? value.Value : throw UnassignedSlot();
+
+    public double ReadRawDoubleSlot(int slot) => _f64Slots[slot];
 
     public void WriteInt32(string name, int value)
     {
@@ -114,6 +171,24 @@ internal sealed class InterpreterFrame
         _assigned[slot] = true;
     }
 
+    public void WriteDoubleSlot(int slot, double value)
+    {
+        if (!_layout.IsF64Slot(slot))
+        {
+            _slots[slot] = SandboxValue.FromDouble(value);
+            return;
+        }
+
+        _f64Slots[slot] = value;
+        _assigned[slot] = true;
+    }
+
+    public void WriteRawDoubleSlot(int slot, double value)
+    {
+        _f64Slots[slot] = value;
+        _assigned[slot] = true;
+    }
+
     public static InterpreterFrame Create(
         FunctionFrameLayout layout,
         SandboxFunction function,
@@ -123,7 +198,8 @@ internal sealed class InterpreterFrame
             ? System.Array.Empty<SandboxValue?>()
             : new SandboxValue?[layout.SlotCount];
         var i32Slots = layout.HasI32Slots ? new int[layout.SlotCount] : System.Array.Empty<int>();
-        var assigned = layout.HasI32Slots ? new bool[layout.SlotCount] : System.Array.Empty<bool>();
+        var f64Slots = layout.HasF64Slots ? new double[layout.SlotCount] : System.Array.Empty<double>();
+        var assigned = layout.HasRawSlots ? new bool[layout.SlotCount] : System.Array.Empty<bool>();
 
         // Parameters occupy the leading slots in declaration order (see
         // FunctionFrameLayout.Build), so positional arguments map directly.
@@ -132,18 +208,22 @@ internal sealed class InterpreterFrame
             {
                 i32Slots[i] = ((I32Value)args[i]).Value;
             }
+            else if (layout.IsF64Slot(i))
+            {
+                f64Slots[i] = ((F64Value)args[i]).Value;
+            }
             else
             {
                 slots[i] = args[i];
             }
 
-            if (layout.HasI32Slots)
+            if (layout.HasRawSlots)
             {
                 assigned[i] = true;
             }
         }
 
-        return new InterpreterFrame(layout, slots, i32Slots, assigned);
+        return new InterpreterFrame(layout, slots, i32Slots, f64Slots, assigned);
     }
 
     private static SandboxRuntimeException Unassigned(string name)

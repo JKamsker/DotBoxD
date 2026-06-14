@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace SafeIR;
 
-public sealed class ResourceMeter
+public sealed partial class ResourceMeter
 {
     private const int FuelDeadlineCheckInterval = 64;
     private const int LoopDeadlineCheckInterval = 4096;
@@ -89,24 +89,6 @@ public sealed class ResourceMeter
         }
 
         ChargeFuel(fuelAmount, LoopDeadlineCheckInterval);
-    }
-
-    public void ChargeLoopIterations(long iterations, long fuelPerIteration)
-    {
-        if (iterations < 0) { throw new ArgumentOutOfRangeException(nameof(iterations)); }
-        if (fuelPerIteration <= 0) { throw new ArgumentOutOfRangeException(nameof(fuelPerIteration)); }
-        if (iterations == 0)
-        {
-            return;
-        }
-
-        LoopIterations = AddChecked(LoopIterations, iterations, "loop iteration budget exhausted");
-        if (LoopIterations > Limits.MaxLoopIterations)
-        {
-            throw Quota("loop iteration budget exhausted");
-        }
-
-        ChargeFuel(MultiplyChecked(iterations, fuelPerIteration, "fuel exhausted"));
     }
 
     public void ChargeAllocation(long bytes)

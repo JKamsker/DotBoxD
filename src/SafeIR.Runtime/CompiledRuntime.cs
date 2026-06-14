@@ -23,7 +23,7 @@ using static System.Runtime.CompilerServices.MethodImplOptions;
 /// are kept in lockstep with the verifier allowlist and runtime-facade hash.
 /// </remarks>
 [EditorBrowsable(EditorBrowsableState.Never)]
-public static class CompiledRuntime
+public static partial class CompiledRuntime
 {
     [MethodImpl(AggressiveInlining)] public static void ChargeFuel(SandboxContext context, int amount) => context.ChargeFuel(amount);
     [MethodImpl(AggressiveInlining)] public static void ChargeLoopIteration(SandboxContext context, int fuelAmount) => context.ChargeLoopIteration(fuelAmount);
@@ -138,7 +138,7 @@ public static class CompiledRuntime
 
     public static SandboxValue Or(SandboxValue left, SandboxValue right) => Bool(AsBool(left) || AsBool(right));
 
-    public static SandboxValue StringLength(SandboxValue value) => I32(((StringValue)value).Value.Length);
+    public static SandboxValue StringLength(SandboxValue value) => I32(StringLengthRaw(value));
 
     public static SandboxValue ConcatString(SandboxContext context, SandboxValue left, SandboxValue right)
     {
@@ -174,7 +174,6 @@ public static class CompiledRuntime
     }
 
     public static SandboxValue SqrtF64(SandboxValue value) => F64(Math.Sqrt(AsF64(value)));
-    [MethodImpl(AggressiveInlining)] public static double SqrtF64Raw(double value) { var result = Math.Sqrt(value); return double.IsFinite(result) ? result : throw InvalidInput("f64 value must be finite"); }
 
     public static SandboxValue FloorF64(SandboxValue value) => F64(Math.Floor(AsF64(value)));
 

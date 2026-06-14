@@ -11,15 +11,16 @@ using SafeIR;
 internal sealed class FunctionFrameLayout
 {
     private readonly Dictionary<string, int> _slots;
-    private readonly bool[] _i32Slots;
+    private readonly SlotKind[] _slotKinds;
 
-    private FunctionFrameLayout(string functionId, Dictionary<string, int> slots, bool[] i32Slots)
+    private FunctionFrameLayout(string functionId, Dictionary<string, int> slots, SlotKind[] slotKinds)
     {
         FunctionId = functionId;
         _slots = slots;
-        _i32Slots = i32Slots;
+        _slotKinds = slotKinds;
         SlotCount = slots.Count;
-        HasI32Slots = Array.IndexOf(i32Slots, true) >= 0;
+        HasI32Slots = Array.IndexOf(slotKinds, SlotKind.I32) >= 0;
+        HasF64Slots = Array.IndexOf(slotKinds, SlotKind.F64) >= 0;
     }
 
     public string FunctionId { get; }
@@ -27,6 +28,10 @@ internal sealed class FunctionFrameLayout
     public int SlotCount { get; }
 
     public bool HasI32Slots { get; }
+
+    public bool HasF64Slots { get; }
+
+    public bool HasRawSlots => HasI32Slots || HasF64Slots;
 
     public static FunctionFrameLayout Build(
         SandboxFunction function,
@@ -42,7 +47,7 @@ internal sealed class FunctionFrameLayout
         }
 
         CollectStatements(function.Body, slots);
-        return new FunctionFrameLayout(function.Id, slots, BuildI32Slots(function, functionAnalysis, bindings, slots));
+        return new FunctionFrameLayout(function.Id, slots, BuildSlotKinds(function, functionAnalysis, bindings, slots));
     }
 
     public int GetSlot(string name)
@@ -50,9 +55,13 @@ internal sealed class FunctionFrameLayout
             ? slot
             : throw Unknown(name);
 
-    public bool IsI32Slot(int slot) => _i32Slots[slot];
+    public bool IsI32Slot(int slot) => _slotKinds[slot] == SlotKind.I32;
 
     public bool IsI32Slot(string name) => IsI32Slot(GetSlot(name));
+
+    public bool IsF64Slot(int slot) => _slotKinds[slot] == SlotKind.F64;
+
+    public bool IsF64Slot(string name) => IsF64Slot(GetSlot(name));
 
     private static void CollectStatements(IReadOnlyList<Statement> statements, Dictionary<string, int> slots)
     {
@@ -88,26 +97,26 @@ internal sealed class FunctionFrameLayout
         }
     }
 
-    private static bool[] BuildI32Slots(
+    private static SlotKind[] BuildSlotKinds(
         SandboxFunction function,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
         IBindingCatalog bindings,
         Dictionary<string, int> slots)
     {
-        var candidates = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var candidates = new Dictionary<string, SlotKind>(StringComparer.Ordinal);
         foreach (var parameter in function.Parameters)
         {
-            Observe(candidates, parameter.Name, IsI32(parameter.Type));
+            Observe(candidates, parameter.Name, KindOf(parameter.Type));
         }
 
         ScanLocalKinds(function.Body, function, functionAnalysis, bindings, candidates);
-        var i32Slots = new bool[slots.Count];
+        var slotKinds = new SlotKind[slots.Count];
         foreach (var pair in slots)
         {
-            i32Slots[pair.Value] = candidates.TryGetValue(pair.Key, out var i32) && i32;
+            slotKinds[pair.Value] = candidates.TryGetValue(pair.Key, out var kind) ? kind : SlotKind.Boxed;
         }
 
-        return i32Slots;
+        return slotKinds;
     }
 
     private static void ScanLocalKinds(
@@ -115,21 +124,21 @@ internal sealed class FunctionFrameLayout
         SandboxFunction function,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
         IBindingCatalog bindings,
-        Dictionary<string, bool> candidates)
+        Dictionary<string, SlotKind> candidates)
     {
         foreach (var statement in statements)
         {
             switch (statement)
             {
                 case AssignmentStatement assignment:
-                    Observe(candidates, assignment.Name, IsI32(InferType(assignment.Value, function, functionAnalysis, bindings, candidates)));
+                    Observe(candidates, assignment.Name, KindOf(InferType(assignment.Value, function, functionAnalysis, bindings, candidates)));
                     break;
                 case IfStatement branch:
                     ScanLocalKinds(branch.Then, function, functionAnalysis, bindings, candidates);
                     ScanLocalKinds(branch.Else, function, functionAnalysis, bindings, candidates);
                     break;
                 case ForRangeStatement range:
-                    Observe(candidates, range.LocalName, i32: true);
+                    Observe(candidates, range.LocalName, SlotKind.I32);
                     ScanLocalKinds(range.Body, function, functionAnalysis, bindings, candidates);
                     break;
                 case WhileStatement loop:
@@ -139,15 +148,15 @@ internal sealed class FunctionFrameLayout
         }
     }
 
-    private static void Observe(Dictionary<string, bool> candidates, string name, bool i32)
+    private static void Observe(Dictionary<string, SlotKind> candidates, string name, SlotKind kind)
     {
         if (!candidates.TryGetValue(name, out var existing))
         {
-            candidates[name] = i32;
+            candidates[name] = kind;
             return;
         }
 
-        candidates[name] = existing && i32;
+        candidates[name] = existing == kind ? existing : SlotKind.Boxed;
     }
 
     private static SandboxType? InferType(
@@ -155,12 +164,12 @@ internal sealed class FunctionFrameLayout
         SandboxFunction function,
         IReadOnlyDictionary<string, FunctionAnalysis> functionAnalysis,
         IBindingCatalog bindings,
-        IReadOnlyDictionary<string, bool> candidates)
+        IReadOnlyDictionary<string, SlotKind> candidates)
         => expression switch
         {
             LiteralExpression literal => literal.Value.Type,
-            VariableExpression variable => candidates.TryGetValue(variable.Name, out var i32) && i32
-                ? SandboxType.I32
+            VariableExpression variable => candidates.TryGetValue(variable.Name, out var kind) && TypeOf(kind) is { } type
+                ? type
                 : ParameterType(function, variable.Name),
             UnaryExpression { Operator: "!" } => SandboxType.Bool,
             UnaryExpression unary => InferType(unary.Operand, function, functionAnalysis, bindings, candidates),
@@ -194,8 +203,27 @@ internal sealed class FunctionFrameLayout
         return null;
     }
 
-    private static bool IsI32(SandboxType? type) => type is { Name: "I32" };
+    private static SlotKind KindOf(SandboxType? type)
+        => type switch {
+            { Name: "I32" } => SlotKind.I32,
+            { Name: "F64" } => SlotKind.F64,
+            _ => SlotKind.Boxed
+        };
+
+    private static SandboxType? TypeOf(SlotKind kind)
+        => kind switch {
+            SlotKind.I32 => SandboxType.I32,
+            SlotKind.F64 => SandboxType.F64,
+            _ => null
+        };
 
     private static SandboxRuntimeException Unknown(string name)
         => new(new SandboxError(SandboxErrorCode.ValidationError, $"unknown local '{name}' at runtime"));
+
+    private enum SlotKind
+    {
+        Boxed,
+        I32,
+        F64
+    }
 }

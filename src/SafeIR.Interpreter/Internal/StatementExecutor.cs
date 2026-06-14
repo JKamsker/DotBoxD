@@ -223,7 +223,17 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
+        if (StringLengthForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        {
+            return default;
+        }
+
         if (I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
+        {
+            return default;
+        }
+
+        if (F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
         {
             return default;
         }
