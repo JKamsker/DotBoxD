@@ -238,19 +238,7 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
-        // Try each unboxed loop fast-path in order; `||` short-circuits so the first match runs and wins.
-        if (MapGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            ListGetI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            ListCountForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            StringLengthForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            I32RepeatedAddCallForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            I32RemainderAccumulatorCallForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            I32ModuloBranchAccumulatorForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            BranchedI32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            BranchedF64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options, _calls) ||
-            F64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options) ||
-            I64ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        if (ForLoopFastPathRunner.TryRun(statement, start, end, frame, _context, _options, _calls))
         {
             return default;
         }

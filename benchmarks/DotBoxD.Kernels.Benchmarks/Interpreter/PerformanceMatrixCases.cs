@@ -26,8 +26,8 @@ internal static class PerformanceMatrixCases
             new("branch in loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchLoop, PerformanceMatrixControlFlowCases.BranchLoopJson()),
             new("while loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenWhileLoop, PerformanceMatrixControlFlowCases.WhileLoopJson()),
             new("i64 arithmetic loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenI64Arithmetic, PerformanceMatrixControlFlowCases.I64ArithmeticJson()),
-            new("branched f64 loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchedF64Loop, PerformanceMatrixControlFlowCases.BranchedF64LoopJson())
-        ];
+            new("branched f64 loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchedF64Loop, PerformanceMatrixControlFlowCases.BranchedF64LoopJson()),
+        };
         cases.AddRange(PerformanceMatrixControlFlowCases.All());
         return cases;
     }
