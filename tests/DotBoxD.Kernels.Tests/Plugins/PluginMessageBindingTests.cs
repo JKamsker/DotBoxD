@@ -69,6 +69,63 @@ public sealed class PluginMessageBindingTests
     }
 
     [Fact]
+    public async Task Plugin_message_binding_compiles_without_interpreter_fallback()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var host = Hosting.SandboxHost.Create(builder =>
+        {
+            builder.AddDefaultPureBindings();
+            builder.AddPluginMessageBindings(messages);
+            builder.UseInterpreter();
+            builder.UseCompilerIfAvailable();
+        });
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "plugin-message-compiled",
+          "version": "1.0.0",
+          "capabilityRequests": [{ "id": "host.message.write" }],
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [],
+              "returnType": "Unit",
+              "body": [
+                {
+                  "op": "return",
+                  "value": {
+                    "call": "host.message.send",
+                    "args": [
+                      { "string": "player-1" },
+                      { "string": "compiled message" }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create()
+            .GrantHostMessageWrite()
+            .WithFuel(10_000)
+            .Build());
+
+        var result = await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.Unit,
+            new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false });
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("player-1", message.TargetId);
+        Assert.Equal("compiled message", message.Message);
+        Assert.Contains(result.AuditEvents, e => e.Kind == "PluginMessage");
+    }
+
+    [Fact]
     public async Task Plugin_message_binding_redacts_audit_message_without_changing_sink_payload()
     {
         var messages = new InMemoryPluginMessageSink();

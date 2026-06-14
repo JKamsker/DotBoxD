@@ -13,12 +13,12 @@ internal static class BindingCallEmitter
         ILGenerator il,
         Action<Expression> emitExpression)
     {
-        if (!bindings.TryGet(call.Name, out var binding) || !IsCompiledPureBinding(binding))
+        if (!bindings.TryGet(call.Name, out var binding) || !CanEmitCompiledBinding(binding))
         {
             return false;
         }
 
-        if (CanEmitDirectIntrinsic(binding))
+        if (CanEmitDirectRuntimeMethod(binding))
         {
             var locals = new LocalBuilder[call.Arguments.Count];
             for (var i = 0; i < call.Arguments.Count; i++)
@@ -76,15 +76,20 @@ internal static class BindingCallEmitter
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CallBinding)));
     }
 
-    private static bool IsCompiledPureBinding(BindingSignature binding)
+    private static bool CanEmitCompiledBinding(BindingSignature binding)
+        => CanEmitGenericRuntimeStub(binding) || CanEmitDirectRuntimeMethod(binding);
+
+    private static bool CanEmitGenericRuntimeStub(BindingSignature binding)
         => binding.Compiled.Kind == "RuntimeStub" &&
            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.RequiredCapability is null &&
-           binding.Safety is BindingSafety.PureHostFacade or BindingSafety.PureIntrinsic &&
-           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None;
+           binding.Compiled.Method == nameof(CompiledRuntime.CallBinding);
 
-    private static bool CanEmitDirectIntrinsic(BindingSignature binding)
-        => binding.Compiled.Method != nameof(CompiledRuntime.CallBinding) &&
+    private static bool CanEmitDirectRuntimeMethod(BindingSignature binding)
+        => binding.Compiled.Kind == "RuntimeStub" &&
+           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
+           binding.Compiled.Method != nameof(CompiledRuntime.CallBinding) &&
+           binding.RequiredCapability is null &&
            binding.Safety == BindingSafety.PureIntrinsic &&
+           (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None &&
            binding.AuditLevel == AuditLevel.None;
 }
