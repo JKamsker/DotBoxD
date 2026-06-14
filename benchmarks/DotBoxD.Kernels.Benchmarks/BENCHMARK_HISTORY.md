@@ -482,3 +482,50 @@ cyclic-index detector (`i % 3`), restored by recognizing it in `TryGetRawVariabl
   the handwritten and sandbox sides); also hard to benchmark fairly since constant-operand concats fold. Not a
   boxing/fast-path gap.
 - **Record field access loops.** Not probed.
+
+## Compiled fully at target (branched + while fast-paths)
+
+Extracted the unboxed i32 expression plan (`RawI32ExpressionPlan`) and added `BranchedI32LoopFastPathEmitter`
+and `WhileI32LoopFastPathEmitter`. These emit the condition + body as raw i32 with **bulk** per-iteration
+metering (loop base + if/condition in the loop meter; each branch/body charges its fuel once) instead of the
+general path's ~10 per-node metering calls — byte-identical total fuel, full suite + verifier green.
+
+- branch-in-loop compiled 7.2x -> **1.3x**
+- while-loop compiled 6.0x -> **1.3x**
+
+**Compiled now meets <=2x on every benchmark** except: `f64 arithmetic` (~6x — proven finiteness/FMA floor) and
+`trivial` (~15x — host-invocation diagnostic on a no-op). Both are documented floors, not open work.
+
+### Closed-ledger state (clean run)
+
+```
+case                  compiled x   interpreted x   status
+i32 add/rem              1.0          3.5          both at target
+math.sqrt /x3            ~1.0         1.6-1.8      both at target
+string.length            1.4          4.5          both at target
+list.count               1.3          4.3          both at target
+list.get                 0.6          2.9          both at target
+map.get                  0.1          0.1          both at target
+nested loop              1.1          4.3          both at target
+local function call      1.1          6.9          compiled target; interp = tree-walk floor
+branch in loop           1.3          7.3          compiled target; interp = tree-walk floor
+while loop               1.3          9.0          compiled target; interp = tree-walk floor
+f64 arithmetic           6.1          19.9         finiteness/FMA floor (both)
+trivial (diagnostic)     14.8         1.7          host-overhead floor (compiled)
+```
+
+### Interpreter tree-walking floor (the remaining interpreted over-5x cases)
+
+`local function call`, `branch`, `while` interpreted (~7-9x) and `f64` (~20x) are now boxing-free (unboxed i32/f64
+plans, reciprocal modulo). The residual is the interpreter's per-iteration **plan-tree dispatch** — recursively
+evaluating condition + body nodes each iteration — plus, for f64, the mandatory finiteness check. Eliminating
+tree-walk overhead means compiling the body to a delegate/IL, which **is** the compiled mode; for every one of
+these shapes the compiled path is at target (<=1.3x). So the interpreter floor here is architectural: the
+compiled tier is the fast path, and it meets target. (i32/nested modulo loops stay <=5x because their single
+fused body amortizes dispatch; structured loops with a condition + multiple nodes per iteration do not.)
+
+### The one remaining open (non-floor) gap: i64
+
+i64 arithmetic still boxes in both modes — no `I64` `StackKind` (compiler) or raw i64 frame slots (interpreter).
+Closing it needs that infrastructure across both tiers (larger than the entire f64 effort) for an uncommon type.
+This is the sole remaining *fixable* (not floor) corpus gap; deferred on cost/benefit, not on possibility.
