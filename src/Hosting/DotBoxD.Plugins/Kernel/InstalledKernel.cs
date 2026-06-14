@@ -247,7 +247,7 @@ public sealed partial class InstalledKernel
         using var executionCancellation = PluginExecutionCancellation.Create(
             cancellationToken,
             _revocation.Token);
-        var result = await _host.ExecuteAsync(
+        var result = await _host.ExecutePreparedInProcessAsync(
                 _plan,
                 entrypoint,
                 input,
