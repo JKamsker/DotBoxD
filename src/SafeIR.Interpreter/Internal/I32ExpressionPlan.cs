@@ -34,6 +34,22 @@ internal sealed class I32ExpressionPlan
     public static I32ExpressionPlan InlineCall(I32ExpressionPlan body)
         => new(ExpressionKind.InlineCall, 0, body, fuelCost: body.FuelCost + 4);
 
+    public bool TryGetRawVariableRemainderConstant(out int slot, out int divisor)
+    {
+        if (_kind == ExpressionKind.Remainder &&
+            _left is { _kind: ExpressionKind.RawVariable } variable &&
+            _right is { _kind: ExpressionKind.Literal } literal)
+        {
+            slot = variable._value;
+            divisor = literal._value;
+            return true;
+        }
+
+        slot = 0;
+        divisor = 0;
+        return false;
+    }
+
     public static bool TryCreate(
         Expression expression,
         InterpreterFrame frame,

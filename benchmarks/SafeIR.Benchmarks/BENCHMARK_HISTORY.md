@@ -32,7 +32,8 @@ dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompila
 | Direct `map.get` I32 loop adapter | `fe6cb0c` | `--probe-matrix` | `map.get` improved from compiled 220.4 ms / 44.4x and interpreted 170.0 ms / 34.2x to compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x by bulk-charging map read fuel while preserving per-iteration key literal charging. |
 | Hoisted `map.get` literal-key lookup | `99db2cb` | `--probe-matrix` | `map.get` improved from compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x to compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x by resolving the immutable literal-key lookup once and still charging the key literal in the loop. |
 | Bulk `map.get` key literal charging | `87765f0` | `--probe-matrix` | `map.get` improved from compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x to compiled 19.7 ms / 4.1x and interpreted 0.5 ms / 0.1x by bulk-charging the literal key value and reusing the hoisted key/result in the loop. |
-| Direct `list.get` I32 reader | this commit | `--probe-matrix` | `list.get` improved from compiled 25.0 ms / 47.7x and interpreted 18.2 ms / 34.8x to compiled 19.3 ms / 36.6x and interpreted 11.0 ms / 20.9x by building an I32 reader once and reusing raw items in the loop. |
+| Direct `list.get` I32 reader | `aa15dd2` | `--probe-matrix` | `list.get` improved from compiled 25.0 ms / 47.7x and interpreted 18.2 ms / 34.8x to compiled 19.3 ms / 36.6x and interpreted 11.0 ms / 20.9x by building an I32 reader once and reusing raw items in the loop. |
+| Direct `list.get` modulo index shortcut | this commit | `--probe-matrix` | `list.get` interpreted improved from 11.0 ms / 20.9x to 1.7 ms / 3.3x by recognizing raw variable remainder indexes such as `i % 3`; compiled stayed about flat at 19.7 ms / 37.4x. |
 
 ## Matrix After `31fa6fe`
 
@@ -151,8 +152,21 @@ map.get intrinsic                 4.8 ms     18.3 ms   3.8        0.5 ms    0.1
 local function call               0.2 ms     21.2 ms 104.9       23.1 ms  114.6
 ```
 
+## Matrix After Direct List Get Modulo Index Shortcut
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.1 ms     39.8 ms   1.7      102.7 ms    4.4
+math.sqrt binding                 7.7 ms     24.2 ms   3.1       18.4 ms    2.4
+string.length binding             0.2 ms     17.3 ms  85.9        1.0 ms    4.9
+list.count intrinsic              0.2 ms     17.5 ms  80.9        1.0 ms    4.5
+list.get intrinsic                0.5 ms     19.7 ms  37.4        1.7 ms    3.3
+map.get intrinsic                 4.9 ms     20.3 ms   4.2        0.6 ms    0.1
+local function call               0.2 ms     22.3 ms 109.9       23.0 ms  113.4
+```
+
 ## Current Gaps
 
 The broad performance target is not met yet. The matrix still exposes several
-bad cases, especially local function calls, compiled `math.sqrt`, `list.get`,
+bad cases, especially local function calls, compiled `math.sqrt`, compiled `list.get`,
 and tiny operations where the handwritten timing is sub-millisecond.

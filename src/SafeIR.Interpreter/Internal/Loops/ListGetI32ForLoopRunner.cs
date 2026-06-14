@@ -34,12 +34,15 @@ internal static class ListGetI32ForLoopRunner
         context.ChargeLoopIterations(iterations, plan.LoopFuelPerIteration);
         context.ChargeBulkFuel(readFuel, iterations);
 
+        var hasRemainderIndex = plan.Index.TryGetRawVariableRemainderConstant(out var remainderSlot, out var remainderDivisor);
         var loopSlot = frame.GetSlot(statement.LocalName);
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
-            var item = ReadItem(items, plan.Index.Evaluate(frame, context));
+            var item = ReadItem(items, hasRemainderIndex
+                ? SandboxInt32Math.Remainder(frame.ReadRawInt32Slot(remainderSlot), remainderDivisor)
+                : plan.Index.Evaluate(frame, context));
             var value = plan.AddToTarget
                 ? SandboxInt32Math.Add(frame.ReadRawInt32Slot(plan.TargetSlot), item)
                 : item;

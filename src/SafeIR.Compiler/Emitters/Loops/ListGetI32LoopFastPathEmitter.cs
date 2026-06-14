@@ -166,6 +166,14 @@ internal static class ListGetI32LoopFastPathEmitter
         Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         il.Emit(OpCodes.Ldloc, reader);
+        if (plan.Index.TryGetVariableRemainderConstant(out var name, out var divisor))
+        {
+            il.Emit(OpCodes.Ldloc, declare(name).Local);
+            EmitInt32(il, divisor);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderGetRemainderRaw)));
+            return;
+        }
+
         plan.Index.Emit(il, declare);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListI32ReaderGetRaw)));
     }

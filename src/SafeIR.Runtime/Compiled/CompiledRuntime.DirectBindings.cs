@@ -89,6 +89,10 @@ public static partial class CompiledRuntime
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ListI32ReaderGetRemainderRaw(object reader, int value, int divisor)
+        => ListI32ReaderGetRaw(reader, SandboxInt32Math.Remainder(value, divisor));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int MapCountRaw(SandboxValue value)
         => value is MapValue map ? map.Values.Count : throw InvalidInput("expected map value");
 

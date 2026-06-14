@@ -30,6 +30,22 @@ internal sealed class I32IndexExpressionPlan
 
     public int FuelCost { get; }
 
+    public bool TryGetVariableRemainderConstant(out string name, out int divisor)
+    {
+        if (_kind == ExpressionKind.Remainder &&
+            _left is { _kind: ExpressionKind.Variable, _name: { } variable } &&
+            _right is { _kind: ExpressionKind.Literal } literal)
+        {
+            name = variable;
+            divisor = literal._literal;
+            return true;
+        }
+
+        name = "";
+        divisor = 0;
+        return false;
+    }
+
     public static bool TryCreate(
         Expression expression,
         LocalStackKindPlanner stackPlan,

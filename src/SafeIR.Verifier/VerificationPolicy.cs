@@ -126,6 +126,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ListGetI32Raw", $"{SandboxValueName},{Int32Name}", Int32Name),
                 RuntimeMember("ListI32ReaderRaw", SandboxValueName, ObjectName),
                 RuntimeMember("ListI32ReaderGetRaw", $"{ObjectName},{Int32Name}", Int32Name),
+                RuntimeMember("ListI32ReaderGetRemainderRaw", $"{ObjectName},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("MapCountRaw", SandboxValueName, Int32Name),
                 RuntimeMember("MapGetI32Raw", $"{SandboxValueName},{SandboxValueName}", Int32Name),
                 RuntimeMember("ConcatString", $"{SandboxContextName},{SandboxValueName},{SandboxValueName}", SandboxValueName),
