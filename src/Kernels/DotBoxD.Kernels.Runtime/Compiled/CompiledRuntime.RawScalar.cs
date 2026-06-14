@@ -38,6 +38,13 @@ public static partial class CompiledRuntime
     [MethodImpl(AggressiveInlining)] public static long RemI64Raw(long left, long right) => SandboxInt64Math.Remainder(left, right);
     [MethodImpl(AggressiveInlining)] public static long NegI64Raw(long value) => SandboxInt64Math.Negate(value);
 
+    [MethodImpl(AggressiveInlining)] public static bool LtI64Raw(long left, long right) => left < right;
+    [MethodImpl(AggressiveInlining)] public static bool LteI64Raw(long left, long right) => left <= right;
+    [MethodImpl(AggressiveInlining)] public static bool GtI64Raw(long left, long right) => left > right;
+    [MethodImpl(AggressiveInlining)] public static bool GteI64Raw(long left, long right) => left >= right;
+    [MethodImpl(AggressiveInlining)] public static bool EqI64Raw(long left, long right) => left == right;
+    [MethodImpl(AggressiveInlining)] public static bool NeI64Raw(long left, long right) => left != right;
+
     [MethodImpl(AggressiveInlining)] public static bool LtF64Raw(double left, double right) => left < right;
     [MethodImpl(AggressiveInlining)] public static bool LteF64Raw(double left, double right) => left <= right;
     [MethodImpl(AggressiveInlining)] public static bool GtF64Raw(double left, double right) => left > right;
