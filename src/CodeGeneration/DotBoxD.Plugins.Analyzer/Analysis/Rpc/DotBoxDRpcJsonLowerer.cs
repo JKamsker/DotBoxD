@@ -8,10 +8,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// <summary>
 /// Lowers a <c>[KernelRpcService]</c> batch method body to DotBoxD.Kernels JSON IR (statements + expressions),
 /// the same JSON the host imports at install. Supports the canonical batch shape: local declarations, a
-/// <c>foreach</c> over a list, <c>if</c>/<c>else</c>, host-binding calls via <c>ctx.Host&lt;T&gt;()</c>,
-/// building DTOs (<c>new T(...)</c>/<c>new T{...}</c> → <c>record.new</c>) and accumulating into a list
-/// (<c>list.Add</c> → <c>list.add</c>), and <c>return</c>. Capabilities/effects from host bindings are
-/// collected. Unsupported shapes throw <see cref="NotSupportedException"/> so the kernel fails safe. The
+/// <c>foreach</c> over a list, <c>if</c>/<c>else</c>, host-binding calls via <c>ctx.Host&lt;T&gt;()</c> or
+/// constructor-injected service fields, building DTOs (<c>new T(...)</c>/<c>new T{...}</c> →
+/// <c>record.new</c>) and accumulating into a list (<c>list.Add</c> → <c>list.add</c>), and
+/// <c>return</c>. Capabilities/effects from host bindings are collected. Unsupported shapes throw
+/// <see cref="NotSupportedException"/> so the kernel fails safe. The
 /// expression half lives in the partial <c>DotBoxDRpcJsonLowerer.Expressions.cs</c>.
 /// </summary>
 internal sealed partial class DotBoxDRpcJsonLowerer

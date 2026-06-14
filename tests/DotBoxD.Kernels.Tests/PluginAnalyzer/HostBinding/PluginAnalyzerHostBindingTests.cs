@@ -68,6 +68,36 @@ public sealed class PluginAnalyzerHostBindingTests
         }
         """;
 
+    private const string InjectedProbeSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IProbeWorld
+        {
+            [HostBinding("host.probe.getValue", "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+            int GetValue(string id);
+        }
+
+        public sealed record ProbeEvent(string TargetId, string Message, int Threshold);
+
+        [Plugin("injected-host-binding-probe")]
+        public sealed partial class InjectedProbeKernel : IEventKernel<ProbeEvent>
+        {
+            private readonly IProbeWorld _world;
+
+            public InjectedProbeKernel(IProbeWorld world) => _world = world;
+
+            public bool ShouldHandle(ProbeEvent e, HookContext ctx)
+                => _world.GetValue(e.TargetId) >= e.Threshold;
+
+            public void Handle(ProbeEvent e, HookContext ctx)
+                => ctx.Messages.Send(e.TargetId, e.Message);
+        }
+        """;
+
     private const string GatedPropertySource = """
         using DotBoxD.Plugins;
         using DotBoxD.Abstractions;
@@ -115,6 +145,24 @@ public sealed class PluginAnalyzerHostBindingTests
 
         var adapter = new ProbeEventAdapter();
         // The host.probe.getValue binding returns 42.
+        Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 10)));
+        Assert.False(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 50)));
+    }
+
+    [Fact]
+    public async Task Host_binding_call_can_use_a_constructor_injected_service_field()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            InjectedProbeSource, "Sample.InjectedProbePluginPackage");
+        Assert.Contains("probe.read.value", package.Manifest.RequiredCapabilities);
+
+        using var server = PluginServer.Create(
+            configureHost: AddProbeBindings,
+            defaultPolicy: ProbeReadPolicy());
+
+        var kernel = await server.InstallAsync(package);
+        var adapter = new ProbeEventAdapter();
+
         Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 10)));
         Assert.False(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 50)));
     }

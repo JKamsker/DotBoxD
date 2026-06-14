@@ -5,8 +5,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
-/// Lowers a host-service call the kernel reaches through <c>ctx.Host&lt;T&gt;()</c> — e.g.
-/// <c>ctx.Host&lt;IGameWorldAccess&gt;().GetHealth(e.MonsterId)</c> — into a sandbox
+/// Lowers a host-service call the kernel reaches through <c>ctx.Host&lt;T&gt;()</c> or a
+/// constructor-injected service field — e.g. <c>_world.GetHealth(e.MonsterId)</c> — into a sandbox
 /// <c>CallExpression(bindingId, args)</c>. The called method must carry
 /// <c>[HostBinding(bindingId, capability)]</c>; the capability is collected so it lands in the
 /// manifest's required capabilities and gates the install (the host registers a matching binding whose

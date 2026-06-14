@@ -46,6 +46,43 @@ public sealed class RpcKernelGenerationTests
         }
         """;
 
+    private const string InjectedMonsterKillerSource = """
+        using System.Collections.Generic;
+        using DotBoxD.Kernels;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IGameWorld
+        {
+            [HostBinding("host.world.kill", "game.world.monster.write.kill", SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
+            bool Kill(int id);
+        }
+
+        public readonly record struct KillResult(int MonsterId, bool Success);
+
+        [KernelRpcService("monster-killer")]
+        public sealed partial class MonsterKillerKernel
+        {
+            private readonly IGameWorld _world;
+
+            public MonsterKillerKernel(IGameWorld world) => _world = world;
+
+            public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
+            {
+                var results = new List<KillResult>();
+                foreach (var id in monsterIds)
+                {
+                    var ok = _world.Kill(id);
+                    results.Add(new KillResult(id, ok));
+                }
+
+                return results;
+            }
+        }
+        """;
+
     [Fact]
     public async Task A_generated_batch_kernel_installs_and_returns_a_list_of_dtos_in_one_roundtrip()
     {
@@ -67,6 +104,29 @@ public sealed class RpcKernelGenerationTests
         AssertKill(list.Values[0], 10, true);
         AssertKill(list.Values[1], 11, false);
         AssertKill(list.Values[2], 12, true);
+    }
+
+    [Fact]
+    public async Task A_generated_batch_kernel_can_call_an_injected_host_service()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            InjectedMonsterKillerSource, "Sample.MonsterKillerPluginPackage");
+        Assert.Equal("KillMonsters", package.Manifest.RpcEntrypoint);
+        Assert.Contains("game.world.monster.write.kill", package.Manifest.RequiredCapabilities);
+
+        using var server = PluginServer.Create(configureHost: AddKillBinding, defaultPolicy: KillPolicy());
+        var kernel = await server.InstallRpcAsync(package);
+
+        var ids = SandboxValue.FromList(
+            [SandboxValue.FromInt32(20), SandboxValue.FromInt32(21)],
+            SandboxType.I32);
+
+        var result = await kernel.InvokeRpcAsync([ids]);
+
+        var list = Assert.IsType<ListValue>(result);
+        Assert.Equal(2, list.Values.Count);
+        AssertKill(list.Values[0], 20, true);
+        AssertKill(list.Values[1], 21, false);
     }
 
     private static void AssertKill(SandboxValue value, int expectedId, bool expectedSuccess)

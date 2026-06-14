@@ -20,21 +20,25 @@ public readonly record struct MonsterKillResult(
 [KernelRpcService("monster-killer")]
 public sealed partial class MonsterKillerKernel
 {
+    private readonly IGameWorldAccess _world;
+
+    public MonsterKillerKernel(IGameWorldAccess world) => _world = world;
+
     public List<MonsterKillResult> KillMonsters(List<string> monsterIds, HookContext ctx)
     {
         var results = new List<MonsterKillResult>();
         foreach (var id in monsterIds)
         {
-            var healthBefore = ctx.Host<IGameWorldAccess>().GetHealth(id);
-            var wasMonster = ctx.Host<IGameWorldAccess>().IsMonster(id);
-            var level = ctx.Host<IGameWorldAccess>().GetLevel(id);
-            var position = ctx.Host<IGameWorldAccess>().GetPosition(id);
+            var healthBefore = _world.GetHealth(id);
+            var wasMonster = _world.IsMonster(id);
+            var level = _world.GetLevel(id);
+            var position = _world.GetPosition(id);
             var killed = false;
             if (wasMonster)
             {
                 if (healthBefore > 0)
                 {
-                    killed = ctx.Host<IGameWorldAccess>().KillMonster(id);
+                    killed = _world.KillMonster(id);
                 }
             }
 

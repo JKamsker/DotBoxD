@@ -13,8 +13,8 @@ public sealed class LiveSettingAttribute : Attribute;
 
 /// <summary>
 /// Marks a host-service method as a sandbox binding the DotBoxD.Kernels generator may call from verified kernel
-/// IR. A kernel reaches the service through <see cref="HookContext.Host{THost}"/> (e.g.
-/// <c>ctx.Host&lt;IGameWorldAccess&gt;().GetHealth(id)</c>); the generator lowers that call to a
+/// IR. A kernel reaches the service through <see cref="HookContext.Host{THost}"/> or through a
+/// constructor-injected service field (e.g. <c>_world.GetHealth(id)</c>); the generator lowers that call to a
 /// <c>CallExpression(<paramref name="bindingId"/>, …)</c>, records <paramref name="capability"/> in the
 /// manifest's required capabilities, and adds <paramref name="effects"/> to the manifest's effects. The
 /// host registers a matching binding (same id, capability, and effects) so install-time policy and
@@ -79,17 +79,20 @@ public sealed class KernelMethodAttribute : Attribute;
 /// the server runs request/response in a single roundtrip, so a loop over many entities executes
 /// server-side (calling the host's existing bindings) instead of one network call per entity. The
 /// generator lowers the class's single public batch method — its body may use locals, a <c>foreach</c>
-/// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c>, and may build and return complex
-/// objects (records/DTOs) and lists of them. For example:
+/// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c> or constructor-injected service
+/// fields, and may build and return complex objects (records/DTOs) and lists of them. For example:
 /// <code>
 /// [KernelRpcService("monster-killer")]
 /// public sealed partial class MonsterKillerKernel
 /// {
+///     private readonly IGameWorld _world;
+///     public MonsterKillerKernel(IGameWorld world) =&gt; _world = world;
+///
 ///     public List&lt;KillResult&gt; KillMonsters(List&lt;int&gt; monsterIds, HookContext ctx)
 ///     {
 ///         var results = new List&lt;KillResult&gt;();
 ///         foreach (var id in monsterIds)
-///             results.Add(new KillResult(id, ctx.Host&lt;IGameWorld&gt;().Kill(id)));
+///             results.Add(new KillResult(id, _world.Kill(id)));
 ///         return results;
 ///     }
 /// }
