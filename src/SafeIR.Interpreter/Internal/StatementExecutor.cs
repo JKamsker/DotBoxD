@@ -79,6 +79,12 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> ExecuteAssignment(AssignmentStatement assignment, InterpreterFrame frame)
     {
+        if (_expressions.TryEvaluateInt32(assignment.Value, frame, out var i32Value))
+        {
+            frame.WriteInt32(assignment.Name, i32Value);
+            return default;
+        }
+
         var valueTask = EvaluateAsync(assignment.Value, frame);
         if (valueTask.IsCompletedSuccessfully)
         {
@@ -161,6 +167,13 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> ExecuteForAsync(ForRangeStatement statement, InterpreterFrame frame)
     {
+        if (_expressions.TryEvaluateInt32(statement.Start, frame, out var start))
+        {
+            return _expressions.TryEvaluateInt32(statement.End, frame, out var end)
+                ? RunForLoop(statement, start, end, frame)
+                : RunForLoopFromAsyncEnd(statement, start, frame);
+        }
+
         var startTask = EvaluateAsync(statement.Start, frame);
         if (!startTask.IsCompletedSuccessfully)
         {
@@ -174,6 +187,15 @@ internal sealed class StatementExecutor
         }
 
         return RunForLoop(statement, ((I32Value)startTask.Result).Value, ((I32Value)endTask.Result).Value, frame);
+    }
+
+    private async ValueTask<SandboxValue?> RunForLoopFromAsyncEnd(
+        ForRangeStatement statement,
+        int start,
+        InterpreterFrame frame)
+    {
+        var end = ((I32Value)await EvaluateAsync(statement.End, frame).ConfigureAwait(false)).Value;
+        return await RunForLoop(statement, start, end, frame).ConfigureAwait(false);
     }
 
     private async ValueTask<SandboxValue?> AwaitForBounds(
@@ -198,10 +220,15 @@ internal sealed class StatementExecutor
 
     private ValueTask<SandboxValue?> RunForLoop(ForRangeStatement statement, int start, int end, InterpreterFrame frame)
     {
+        if (I32ForLoopRunner.TryRun(statement, start, end, frame, _context, _options))
+        {
+            return default;
+        }
+
         for (var i = start; i < end; i++)
         {
             _context.ChargeLoopIteration(5);
-            frame.Write(statement.LocalName, SandboxValue.FromInt32(i));
+            frame.WriteInt32(statement.LocalName, i);
             var bodyTask = ExecuteBlockAsync(statement.Body, frame);
             if (!bodyTask.IsCompletedSuccessfully)
             {
@@ -234,7 +261,7 @@ internal sealed class StatementExecutor
         for (var i = nextIndex; i < end; i++)
         {
             _context.ChargeLoopIteration(5);
-            frame.Write(statement.LocalName, SandboxValue.FromInt32(i));
+            frame.WriteInt32(statement.LocalName, i);
             value = await ExecuteBlockAsync(statement.Body, frame).ConfigureAwait(false);
             if (value is not null)
             {

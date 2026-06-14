@@ -88,6 +88,18 @@ public sealed partial class SandboxContext
         Budget.ChargeLoopIteration(fuelAmount);
     }
 
+    public void ChargeLoopIterations(long iterations, long fuelPerIteration)
+    {
+        CancellationToken.ThrowIfCancellationRequested();
+        Budget.ChargeLoopIterations(iterations, fuelPerIteration);
+    }
+
+    public void Checkpoint()
+    {
+        CancellationToken.ThrowIfCancellationRequested();
+        Budget.CheckDeadline();
+    }
+
     public void EnterCall()
     {
         if (++_callDepth > Budget.Limits.MaxCallDepth)

@@ -69,6 +69,56 @@ public sealed class Fix_ALG_0012_Tests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-LOCAL-UNKNOWN");
     }
 
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted, false)]
+    [InlineData(ExecutionMode.Compiled, true)]
+    public async Task Sibling_branch_locals_can_reuse_name_with_different_types(
+        ExecutionMode mode,
+        bool compiler)
+    {
+        var host = SandboxTestHost.Create(compiler: compiler);
+        var module = await host.ImportJsonAsync("""
+        {
+          "id": "alg-0012-sibling-type-reuse",
+          "version": "1.0.0",
+          "functions": [
+            {
+              "id": "main",
+              "visibility": "entrypoint",
+              "parameters": [{ "name": "flag", "type": "Bool" }],
+              "returnType": "I32",
+              "body": [
+                {
+                  "op": "if",
+                  "condition": { "var": "flag" },
+                  "then": [
+                    { "op": "set", "name": "value", "value": { "i32": 7 } },
+                    { "op": "return", "value": { "var": "value" } }
+                  ],
+                  "else": [
+                    { "op": "set", "name": "value", "value": { "bool": true } },
+                    { "op": "return", "value": { "i32": 3 } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """);
+        var plan = await host.PrepareAsync(module, SandboxPolicyBuilder.Create().WithFuel(1_000).Build());
+        var options = new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false };
+
+        var trueResult = await host.ExecuteAsync(plan, "main", SandboxValue.FromBool(true), options);
+        var falseResult = await host.ExecuteAsync(plan, "main", SandboxValue.FromBool(false), options);
+
+        Assert.True(trueResult.Succeeded, trueResult.Error?.SafeMessage);
+        Assert.True(falseResult.Succeeded, falseResult.Error?.SafeMessage);
+        Assert.Equal(mode, trueResult.ActualMode);
+        Assert.Equal(mode, falseResult.ActualMode);
+        Assert.Equal(7, ((I32Value)trueResult.Value!).Value);
+        Assert.Equal(3, ((I32Value)falseResult.Value!).Value);
+    }
+
     [Fact]
     public async Task Parent_local_is_visible_and_reassignable_inside_nested_blocks()
     {

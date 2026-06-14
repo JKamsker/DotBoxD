@@ -84,6 +84,24 @@ public sealed class ResourceMeter
         ChargeFuel(fuelAmount);
     }
 
+    public void ChargeLoopIterations(long iterations, long fuelPerIteration)
+    {
+        if (iterations < 0) { throw new ArgumentOutOfRangeException(nameof(iterations)); }
+        if (fuelPerIteration <= 0) { throw new ArgumentOutOfRangeException(nameof(fuelPerIteration)); }
+        if (iterations == 0)
+        {
+            return;
+        }
+
+        LoopIterations = AddChecked(LoopIterations, iterations, "loop iteration budget exhausted");
+        if (LoopIterations > Limits.MaxLoopIterations)
+        {
+            throw Quota("loop iteration budget exhausted");
+        }
+
+        ChargeFuel(MultiplyChecked(iterations, fuelPerIteration, "fuel exhausted"));
+    }
+
     public void ChargeAllocation(long bytes)
     {
         ThrowIfNegative(bytes, nameof(bytes));
@@ -293,6 +311,18 @@ public sealed class ResourceMeter
         try
         {
             return checked(current + amount);
+        }
+        catch (OverflowException)
+        {
+            throw Quota(quotaMessage);
+        }
+    }
+
+    private static long MultiplyChecked(long left, long right, string quotaMessage)
+    {
+        try
+        {
+            return checked(left * right);
         }
         catch (OverflowException)
         {

@@ -2,7 +2,7 @@ namespace SafeIR.Interpreter;
 
 using SafeIR;
 
-internal sealed class InterpreterEvaluator
+internal sealed class InterpreterEvaluator : I32CallEvaluator
 {
     private readonly SandboxContext _context;
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functions;
@@ -36,6 +36,34 @@ internal sealed class InterpreterEvaluator
     }
 
     public bool TryGetFunction(string id, out SandboxFunction function) => _functions.TryGetValue(id, out function!);
+
+    public bool CanEvaluateInt32Call(CallExpression call)
+        => call.Arguments.Count == 0 &&
+           _functions.TryGetValue(call.Name, out var function) &&
+           function.Parameters.Count == 0 &&
+           function.ReturnType == SandboxType.I32 &&
+           TryGetConstantInt32Return(function, out _);
+
+    public int EvaluateInt32Call(CallExpression call)
+    {
+        if (!_functions.TryGetValue(call.Name, out var function) ||
+            !TryGetConstantInt32Return(function, out var expression))
+        {
+            throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, $"unknown call '{call.Name}' at runtime"));
+        }
+
+        _context.EnterCall();
+        try
+        {
+            _context.ChargeFuel(1);
+            _context.ChargeFuel(1);
+            return I32ExpressionEvaluator.Evaluate(expression, frame: null, _context, calls: null);
+        }
+        finally
+        {
+            _context.ExitCall();
+        }
+    }
 
     // Non-async invocation: a function whose body is fully synchronous (no pending
     // host binding) completes without ever allocating an async state machine, so a
@@ -118,10 +146,24 @@ internal sealed class InterpreterEvaluator
     {
         if (!_frameLayouts.TryGetValue(function.Id, out var layout))
         {
-            layout = FunctionFrameLayout.Build(function);
+            layout = FunctionFrameLayout.Build(function, _functionAnalysis, _context.Bindings);
             _frameLayouts[function.Id] = layout;
         }
 
         return layout;
+    }
+
+    private static bool TryGetConstantInt32Return(SandboxFunction function, out Expression expression)
+    {
+        if (function.Body.Count == 1 &&
+            function.Body[0] is ReturnStatement ret &&
+            I32ExpressionEvaluator.CanEvaluate(ret.Value, frame: null))
+        {
+            expression = ret.Value;
+            return true;
+        }
+
+        expression = null!;
+        return false;
     }
 }

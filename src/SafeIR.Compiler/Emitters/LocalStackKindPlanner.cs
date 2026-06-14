@@ -84,12 +84,7 @@ internal sealed class LocalStackKindPlanner
             return;
         }
 
-        if (existing == kind)
-        {
-            return;
-        }
-
-        candidates[name] = existing == StackKind.Boxed ? kind : kind == StackKind.Boxed ? existing : StackKind.Boxed;
+        candidates[name] = existing == kind ? existing : StackKind.Boxed;
     }
 
     private static StackKind KindOf(SandboxType? type)

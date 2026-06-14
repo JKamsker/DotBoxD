@@ -30,6 +30,13 @@ internal sealed class ExpressionEvaluator
     // binding whose ValueTask is still pending) walks the async continuation path.
     public ValueTask<SandboxValue> EvaluateAsync(Expression expression, InterpreterFrame frame)
     {
+        if (!_options.EnableDebugTrace &&
+            I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        {
+            return new ValueTask<SandboxValue>(
+                SandboxValue.FromInt32(I32ExpressionEvaluator.Evaluate(expression, frame, _context, _interpreter)));
+        }
+
         _context.ChargeFuel(1);
         InterpreterTrace.Write(
             _context,
@@ -48,6 +55,18 @@ internal sealed class ExpressionEvaluator
             CallExpression call => EvaluateCall(call, frame),
             _ => throw new SandboxRuntimeException(new SandboxError(SandboxErrorCode.ValidationError, "unsupported expression"))
         };
+    }
+
+    public bool TryEvaluateInt32(Expression expression, InterpreterFrame frame, out int value)
+    {
+        if (!_options.EnableDebugTrace && I32ExpressionEvaluator.CanEvaluate(expression, frame, _interpreter))
+        {
+            value = I32ExpressionEvaluator.Evaluate(expression, frame, _context, _interpreter);
+            return true;
+        }
+
+        value = 0;
+        return false;
     }
 
     private ValueTask<SandboxValue> EvaluateUnary(UnaryExpression unary, InterpreterFrame frame)
