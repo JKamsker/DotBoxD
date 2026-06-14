@@ -2,6 +2,7 @@
 # Package: SafeIR.Plugins
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
+protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 public async ValueTask FlushUpdatesAsync(CancellationToken cancellationToken = default)
 public async ValueTask HandleAsync<TEvent>( IPluginEventAdapter<TEvent> adapter, TEvent e, CancellationToken cancellationToken = default)
 public async ValueTask ModifySettingsAsync( IReadOnlyDictionary<string, object?> values, bool atomic = false, CancellationToken cancellationToken = default)
@@ -11,10 +12,12 @@ public async ValueTask<bool> ShouldHandleAsync<TEvent>( IPluginEventAdapter<TEve
 public async ValueTask<InstalledKernel> InstallAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public async ValueTask<InstalledKernel> InstallRpcAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public async ValueTask<SandboxValue> InvokeRpcAsync( IReadOnlyList<SandboxValue> arguments, CancellationToken cancellationToken = default)
+public async ValueTask<string> RegisterRpcServiceAsync<TService, TKernel>( SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public bool IsRevoked => Volatile.Read(ref _revoked) != 0
 public bool Owns(string pluginId)
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool Uninstall(string pluginId)
+public class KernelRpcServiceProxy : DispatchProxy
 public const string CapabilityId = "host.message.write"
 public const string SendBindingId = "host.message.send"
 public enum LiveUpdateMode
@@ -105,10 +108,11 @@ public sealed class LiveContext<T> where T : class
 public sealed class LiveSettingStore
 public sealed class LiveValue<T> : ICoercibleLiveSetting
 public sealed class PluginEventAdapterRegistry
-public sealed class PluginServer : IDisposable
 public sealed class PluginSession : IDisposable, IAsyncDisposable
 public sealed class TypedInstalledKernel<TSettings> where TSettings : class
 public sealed partial class InstalledKernel
+public sealed partial class PluginServer
+public sealed partial class PluginServer : IDisposable
 public sealed record HookSubscriptionManifest(string Event, string Kernel)
 public sealed record KernelEntrypoints(string ShouldHandle, string Handle)
 public sealed record LiveSettingDefinition( string Name, string Type, object? DefaultValue, object? Min = null, object? Max = null)
@@ -120,11 +124,13 @@ public static BindingDescriptor CreateSend(IPluginMessageSink sink)
 public static bool TryGetReference(string code, out PluginDiagnosticReference reference)
 public static class HostMessagePolicyBuilderExtensions
 public static class KernelPackageRegistry
+public static class KernelRpcMarshaller
 public static class PluginDiagnosticCodes
 public static class PluginMessageBindings
 public static class PluginPackageJsonSchemas
 public static class PluginServerJsonExtensions
 public static IReadOnlyList<PluginDiagnosticReference> All => References
+public static object? FromSandboxValue(SandboxValue value, Type type)
 public static partial class PluginPackageJsonSerializer
 public static PluginPackage Create( PluginManifest manifest, SandboxModule module, KernelEntrypoints? entrypoints = null)
 public static PluginPackage Import(string json)
@@ -134,9 +140,12 @@ public static PluginServer Create( IPluginMessageSink? messages = null, Action<S
 public static SandboxHostBuilder AddPluginMessageBindings( this SandboxHostBuilder builder, IPluginMessageSink sink)
 public static SandboxPolicyBuilder GrantHostMessageWrite( this SandboxPolicyBuilder builder, IEnumerable<string>? allowedTargets = null, IEnumerable<string>? targetPrefixes = null, int? maxMessageLength = null)
 public static SandboxPolicyBuilder GrantHostMessageWrite(this SandboxPolicyBuilder builder)
+public static SandboxType SandboxTypeOf(Type type)
+public static SandboxValue ToSandboxValue(object? value, Type type)
 public static string Export(PluginPackage package, bool indented = false)
 public static string PackageEnvelope => ReadResource(PluginPackageResourceName)
 public static string SchemaVersion => SafeIrJsonSchemas.SchemaVersion
+public static TService Create<TService>(InstalledKernel kernel) where TService : class
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginServer server, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginSession session, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public static void Register(Type kernelType, Func<PluginPackage> factory)
@@ -147,6 +156,7 @@ public T As<T>() where T : class => LiveContextProxy<T>.Create(this)
 public T Get<T>(string name)
 public T Value
 public T Value { get; }
+public TService RpcService<TService>() where TService : class
 public TSettings Value { get; }
 public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
 public ValueTask DisposeAsync()

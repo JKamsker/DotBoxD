@@ -178,6 +178,18 @@ public static class PluginDiagnosticCodes
             "A generated hook-chain package was wired into a pipeline that has no installer.",
             "UseGeneratedChain was called on a HookPipeline created without a PluginServer-backed installer.",
             "Create the hook pipeline from PluginServer (server.Hooks) so generated chains can be installed."),
+        new("SGP070", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A kernel RPC service package does not declare an rpcEntrypoint.",
+            "A package was installed via InstallRpcAsync but its manifest has no rpcEntrypoint naming the batch entrypoint.",
+            "Author the kernel with [KernelRpcService] so the generator emits an rpcEntrypoint, or set it on the manifest."),
+        new("SGP071", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A kernel RPC service's rpcEntrypoint does not resolve to a public entrypoint function.",
+            "The manifest's rpcEntrypoint names a function that is missing from the module or is not a public entrypoint.",
+            "Ensure the batch method is a public entrypoint and matches the manifest's rpcEntrypoint name."),
+        new("SGP072", PluginDiagnosticPhase.PreparedPackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A kernel RPC service entrypoint returns an unsupported type.",
+            "The verified RPC entrypoint's return type is not a supported sandbox type (scalar, list, or record).",
+            "Return a supported scalar, a List of one, or a DTO/record built from supported field types."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =

@@ -5,7 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using SafeIR;
 using SafeIR.Hosting;
 
-public sealed class PluginServer : IDisposable
+public sealed partial class PluginServer : IDisposable
 {
     private readonly SandboxHost _host;
     private readonly SandboxPolicy _defaultPolicy;

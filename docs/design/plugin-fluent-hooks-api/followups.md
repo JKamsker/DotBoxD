@@ -87,4 +87,84 @@ under a wildcard grant), and the multi-statement-body fail-safe (no chain packag
 
 ## 2. Kernel RPC services
 
-See the second half of this document (added with the feature).
+### Goal
+
+Let a plugin ship a **batch operation** that runs server-side in a single roundtrip, so a loop over many
+entities executes on the server (calling the host's existing bindings) instead of one network call per
+entity — and so it can take and return **complex objects and lists of objects**. The motivating shape:
+
+```csharp
+await server.RegisterKernelRpcService<IMonsterKillerService, MonsterKillerKernel>();
+List<KillResult> killed = server.KernelRpcService<IMonsterKillerService>().KillMonsters(ids); // one roundtrip
+
+public interface IMonsterKillerService { List<KillResult> KillMonsters(List<int> monsterIds); }
+public readonly record struct KillResult(int MonsterId, bool Success);
+
+[KernelRpcService("monster-killer")]
+public sealed partial class MonsterKillerKernel
+{
+    public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
+    {
+        var results = new List<KillResult>();
+        foreach (var id in monsterIds)
+            results.Add(new KillResult(id, ctx.Host<IGameWorld>().Kill(id)));
+        return results;
+    }
+}
+```
+
+### Why it is a sandboxed kernel (not trusted RPC)
+
+In the target deployment the **server is frozen at release**; only plugins change. So the batch logic
+must be shipped by the plugin and run on the server — and to be safe that means **verified, sandboxed
+IR** (the same trust model as event kernels), calling only the host bindings the server already exposes.
+A bespoke trusted RPC endpoint per plugin is impossible (the server cannot be recompiled).
+
+### The record type — complex objects in the sandbox
+
+Complex objects required a new composite **`Record`** type in the IR (§ "IR record/object type" commit):
+`SandboxType.Record([fieldTypes])` + `RecordValue` + the `record.new`/`record.get` intrinsics, threaded
+through the interpreter, validator, value validation, shape metering, canonical hashing, and JSON. A
+record is a **positional** tuple; field *names* live in the analyzer and the host marshaling layer, which
+map a C# DTO's members to record fields by **declaration order**. `List<Record>` is a list of objects.
+
+Records run in the **interpreter** (the full sandbox semantics: validation, capabilities, resource
+limits). Compiled-mode record emission is deferred — the verifier permits `newarr` only for
+`SandboxValue`, so variable-arity record *types* can't yet be emitted as IL — so RPC kernels always
+install interpreted (`PluginServer.InstallRpcAsync`).
+
+### The pieces
+
+| Layer | What it does |
+|---|---|
+| **Authoring** ([`[KernelRpcService]`](../../../src/SafeIR.Server.Abstractions/Contracts.cs)) | Marks the class; its one public batch method (trailing `HookContext` = host-binding marker) is the entrypoint. |
+| **Lowering** ([`RpcKernelModelFactory`](../../../src/SafeIR.PluginAnalyzer/Analysis/Rpc/RpcKernelModelFactory.cs), [`SafeIrRpcJsonLowerer`](../../../src/SafeIR.PluginAnalyzer/Analysis/Rpc/SafeIrRpcJsonLowerer.cs)) | Lowers the method body to verified IR **JSON** and emits a `<Name>PluginPackage` whose `Create()` imports it — so it ships exactly like an event kernel. Supports locals, a `foreach` over a list, `if`/`else`, host bindings, DTO construction (`new T(...)`/`new T{...}` → `record.new`), list accumulation (`list.Add` → `list.add`), indexing/`.Count`, and `return`. |
+| **Package + install** ([`PluginManifest.RpcEntrypoint`](../../../src/SafeIR.Plugins/PluginManifest.cs), [`RpcKernelPackageValidator`](../../../src/SafeIR.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)) | A distinct package shape (no event subscription/contract) validated and installed via `InstallRpcAsync` / `PluginSession.InstallRpcAsync` (owned + revoked on disconnect, like event kernels). |
+| **Invoke** ([`InstalledKernel.InvokeRpcAsync`](../../../src/SafeIR.Plugins/Kernel/InstalledKernel.Rpc.cs)) | Binds caller args to the entrypoint's leading parameters (live settings fill the trailing ones), runs the IR once under the execution gate, and **returns** the result value (not discarded). |
+| **Typed surface** ([`KernelRpcMarshaller`](../../../src/SafeIR.Plugins/Runtime/Rpc/KernelRpcMarshaller.cs), [`KernelRpcServiceProxy`](../../../src/SafeIR.Plugins/Runtime/Rpc/KernelRpcServiceProxy.cs), [`PluginServer.RpcService`](../../../src/SafeIR.Plugins/Runtime/Rpc/PluginServer.Rpc.cs)) | `RegisterRpcServiceAsync<TService, TKernel>()` installs the kernel and binds the contract; `RpcService<TService>()` returns a runtime proxy that marshals C# args ↔ sandbox values (scalars, lists, DTOs, lists of DTOs) so `service.KillMonsters(ids)` returns real `List<KillResult>`. |
+
+### Capabilities and effects
+
+Host bindings called in the body contribute their capability and effects to the manifest exactly as in
+event kernels (deny-at-install if the policy lacks them); the manifest declares `Cpu` + `Alloc` (when it
+builds lists/records) + the binding effects, matched against the verified entrypoint.
+
+### Constraints / current scope
+
+- **Interpreted only** (compiled-mode record emission deferred, as above).
+- One batch method per service; parameters/return/DTO fields use the supported scalars, lists, or nested
+  DTOs. DTO fields map by **declaration order** (positional records → constructor-parameter order).
+- The typed proxy supports synchronous, `Task<T>`, and `ValueTask<T>` return shapes.
+- **Over IPC:** the in-process `RegisterRpcServiceAsync`/`RpcService<T>` surface is the model; a remote
+  facade forwards `InstallRpcAsync` + an invoke call (marshaling args/result) over the existing control
+  service — mechanically identical to the GameServer event-kernel plumbing.
+
+### Tests
+
+[`RpcKernelRuntimeTests`](../../../tests/SafeIR.Tests/Plugins/Rpc/RpcKernelRuntimeTests.cs) (loop →
+host binding per element → `List<Record>` in one roundtrip; JSON round-trip; capability deny;
+arg-count guard), [`RpcKernelGenerationTests`](../../../tests/SafeIR.Tests/Plugins/Rpc/RpcKernelGenerationTests.cs)
+(plain-C# `[KernelRpcService]` → generated IR → install → invoke), and
+[`KernelRpcServiceProxyTests`](../../../tests/SafeIR.Tests/Plugins/Rpc/KernelRpcServiceProxyTests.cs)
+(the typed proxy + `RegisterRpcServiceAsync`/`RpcService` + DTO/list marshaller round-trips), plus the
+record-type foundation in [`SafeRecordCollectionTests`](../../../tests/SafeIR.Tests/Collections/SafeRecordCollectionTests.cs).

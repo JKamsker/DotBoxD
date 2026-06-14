@@ -42,6 +42,10 @@
           "type": "array",
           "description": "Analyzer-derived capabilities the verified IR requires. Optional for back-compat.",
           "items": { "type": "string" }
+        },
+        "rpcEntrypoint": {
+          "type": "string",
+          "description": "For a kernel RPC service: the request/response batch entrypoint function id. Absent for event kernels."
         }
       }
     },

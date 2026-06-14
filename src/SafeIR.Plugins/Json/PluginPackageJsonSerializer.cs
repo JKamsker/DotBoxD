@@ -56,112 +56,6 @@ public static partial class PluginPackageJsonSerializer
         }
     }
 
-    private static void WritePackage(Utf8JsonWriter writer, PluginPackage package)
-    {
-        writer.WriteStartObject();
-        WriteManifest(writer, package.Manifest);
-        writer.WritePropertyName("entrypoints");
-        WriteEntrypoints(writer, package.Entrypoints);
-        writer.WritePropertyName("module");
-        SafeIrJsonExporter.Write(writer, package.Module);
-        writer.WriteEndObject();
-    }
-
-    private static void WriteStringArray(
-        Utf8JsonWriter writer,
-        string name,
-        IReadOnlyList<string> values)
-    {
-        writer.WritePropertyName(name);
-        writer.WriteStartArray();
-        foreach (var value in values) {
-            writer.WriteStringValue(value);
-        }
-
-        writer.WriteEndArray();
-    }
-
-    private static void WriteLiveSettings(
-        Utf8JsonWriter writer,
-        IReadOnlyList<LiveSettingDefinition> settings)
-    {
-        writer.WritePropertyName("liveSettings");
-        writer.WriteStartArray();
-        foreach (var setting in settings) {
-            writer.WriteStartObject();
-            writer.WriteString("name", setting.Name);
-            writer.WriteString("type", setting.Type);
-            writer.WritePropertyName("defaultValue");
-            WriteLiveSettingValue(writer, setting.DefaultValue, "defaultValue");
-            if (setting.Min is not null) {
-                writer.WritePropertyName("min");
-                WriteLiveSettingValue(writer, setting.Min, "min");
-            }
-
-            if (setting.Max is not null) {
-                writer.WritePropertyName("max");
-                WriteLiveSettingValue(writer, setting.Max, "max");
-            }
-
-            writer.WriteEndObject();
-        }
-
-        writer.WriteEndArray();
-    }
-
-    private static void WriteLiveSettingValue(Utf8JsonWriter writer, object? value, string name)
-    {
-        switch (value) {
-            case null:
-                writer.WriteNullValue();
-                break;
-            case bool boolean:
-                writer.WriteBooleanValue(boolean);
-                break;
-            case int integer:
-                writer.WriteNumberValue(integer);
-                break;
-            case long integer:
-                writer.WriteNumberValue(integer);
-                break;
-            case double number when double.IsFinite(number):
-                writer.WriteNumberValue(number);
-                break;
-            case float number when float.IsFinite(number):
-                writer.WriteNumberValue(number);
-                break;
-            case string text:
-                writer.WriteStringValue(text);
-                break;
-            default:
-                throw Error("E-JSON-EXPORT", $"live setting value '{name}' must be a JSON scalar");
-        }
-    }
-
-    private static void WriteSubscriptions(
-        Utf8JsonWriter writer,
-        IReadOnlyList<HookSubscriptionManifest> subscriptions)
-    {
-        writer.WritePropertyName("subscriptions");
-        writer.WriteStartArray();
-        foreach (var subscription in subscriptions) {
-            writer.WriteStartObject();
-            writer.WriteString("event", subscription.Event);
-            writer.WriteString("kernel", subscription.Kernel);
-            writer.WriteEndObject();
-        }
-
-        writer.WriteEndArray();
-    }
-
-    private static void WriteEntrypoints(Utf8JsonWriter writer, KernelEntrypoints entrypoints)
-    {
-        writer.WriteStartObject();
-        writer.WriteString("shouldHandle", entrypoints.ShouldHandle);
-        writer.WriteString("handle", entrypoints.Handle);
-        writer.WriteEndObject();
-    }
-
     private static PluginPackage ReadPackage(JsonElement element)
     {
         RequireAllowedProperties(element, "plugin package", ["manifest", "module", "entrypoints"]);
@@ -173,6 +67,32 @@ public static partial class PluginPackageJsonSerializer
             : null;
 
         return PluginPackage.Create(manifest, module, entrypoints);
+    }
+
+    private static PluginManifest ReadManifest(JsonElement element)
+    {
+        RequireAllowedProperties(
+            element,
+            "plugin manifest",
+            ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions", "requiredCapabilities", "rpcEntrypoint"]);
+
+        return new PluginManifest(
+            RequiredString(element, "pluginId"),
+            RequiredString(element, "contract"),
+            ReadExecutionMode(RequiredString(element, "mode")),
+            ReadStringArray(RequiredArray(element, "effects"), "effects"),
+            ReadLiveSettings(RequiredArray(element, "liveSettings")),
+            ReadSubscriptions(RequiredArray(element, "subscriptions")))
+        {
+            // Optional for back-compat: manifests exported before required-capability derivation omit it.
+            RequiredCapabilities = element.TryGetProperty("requiredCapabilities", out var requiredCapabilities)
+                ? ReadStringArray(requiredCapabilities, "requiredCapabilities")
+                : [],
+            // Present only for kernel RPC service kernels; event kernels omit it.
+            RpcEntrypoint = element.TryGetProperty("rpcEntrypoint", out var rpcEntrypoint)
+                ? ReadStringValue(rpcEntrypoint, "rpcEntrypoint")
+                : null
+        };
     }
 
     private static ExecutionMode ReadExecutionMode(string value)
