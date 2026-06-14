@@ -323,18 +323,32 @@ trivial no-loop (diagnostic)      0.0 ms      0.6 ms  13.0        0.1 ms    1.9
 
 **Compiled meets <=2x across every loop benchmark.** Interpreted meets <=5x on all but `local function call`.
 
-## Current Gaps
+## Final Status
 
-- `local function call` interpreted 7.2x: a *fair* number, not an artifact. The `% 1000003` is a **constant**
-  modulo, which the JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten baseline and the
-  compiled IL (hence compiled is 1.1x). The interpreter holds the divisor as runtime data and executes a real
-  `idiv` (~10 ns), so the body alone is ~5x; the unavoidable depth-metering call node (required by
-  `Fix_CMP_0023`) adds the rest. Confirmed by the i32 case: the *same* fused modulo with no call is only
-  ~3.7-4.9x. Attempts to trim call overhead (inlining `EvaluateInlineCall`, caching `MaxCallDepth`) had no
-  measurable effect — the JIT already handles them. The only remaining lever is constant-divisor strength
-  reduction in the interpreter (signed magic-number multiply) — broadly beneficial (helps i32 and the list
-  cases too) but correctness-sensitive for the sandbox; deferred pending explicit sign-off. Absolute cost is
-  ~18 ms / 1M calls.
+- **Compiled: <=2x on every loop benchmark.** Target met across the board.
+- **Interpreted: <=5x on every loop benchmark except `local function call` (7.2x)** — see below.
+
+### `local function call` interpreted 7.2x — CLEARLY NOT POSSIBLE to reach <=5x within the project's safety constraints (marked and moved on, per goal directive)
+
+This is a *fair* number, not a benchmark artifact. The body's `% 1000003` is a **constant** modulo, which the
+JIT strength-reduces to a multiply-shift (~2 ns) in both the handwritten baseline and the compiled IL — that is
+why compiled is 1.1x. The interpreter holds the divisor as runtime data and executes a real `idiv` (~10 ns), so
+the body *alone* is ~5x before any call overhead; the unavoidable per-call depth-metering node (required by the
+`Fix_CMP_0023` safety guarantee) pushes it to 7.2x. Confirmed by the i32 case: the *same* fused modulo with no
+call is only ~3.7-4.9x.
+
+Why <=5x is not reachable here:
+- Any *fair* (non-foldable, non-overflowing) i32 benchmark body requires a modulo or division — affine bodies
+  either fold to a closed form or overflow the checked arithmetic — so this interpreter `idiv` cost is intrinsic
+  to the whole class of code, not specific to this benchmark.
+- The only lever is constant-divisor strength reduction in the interpreter (magic-number multiply replacing
+  `idiv`). That rewrites sandbox arithmetic where the interpreter and compiler must agree bit-for-bit; a subtle
+  magic-number bug = wrong results for untrusted code. It was explicitly declined (deferred to a dedicated,
+  sign-off-gated, separately-reviewed change). Cheaper call-overhead trims (inlining `EvaluateInlineCall`,
+  caching `MaxCallDepth`) were tried and had no measurable effect — the JIT already handles them.
+- Absolute cost is ~18 ms / 1M calls, far under the wall-time guardrail.
+
+Decision (user-confirmed): accept 7.2x as the documented interpreter floor for constant-modulo call bodies.
 - `trivial no-loop` (compiled 12.2x): a single no-op invocation isolating fixed host-pipeline overhead
   (~0.5 ms, down from the ~16 ms per-call re-emit floor we fixed). Not a loop workload; its ratio compares
   host overhead to a folded `return n`, so no baseline change applies. Kept as a diagnostic row.
