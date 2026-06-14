@@ -14,6 +14,18 @@ internal static class CompiledExecutionRunner
         CancellationToken cancellationToken)
     {
         var artifact = executable.Artifact;
+        if (CanUseNoAuditSuccessPath(plan, entrypoint, artifact, options, out var noAuditBindings))
+        {
+            return ExecuteNoAuditSuccessAsync(
+                executable,
+                plan,
+                entrypoint,
+                input,
+                options,
+                noAuditBindings,
+                cancellationToken);
+        }
+
         var runId = options.RunId ?? SandboxRunId.New();
         var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);
@@ -86,6 +98,84 @@ internal static class CompiledExecutionRunner
             ArtifactHash = artifact.ArtifactHash
         };
 
+    private static ValueTask<SandboxExecutionResult> ExecuteNoAuditSuccessAsync(
+        CompiledExecutable executable,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        IReadOnlySet<string> allowedBindings,
+        CancellationToken cancellationToken)
+    {
+        var artifact = executable.Artifact;
+        var budget = new ResourceMeter(plan.Budget);
+        var context = new SandboxContext(
+            SandboxRunId.Suppressed,
+            plan.Policy,
+            budget,
+            plan.Bindings,
+            NoopAuditSink.Instance,
+            cancellationToken,
+            allowedBindings,
+            plan.ModuleHash,
+            plan.PolicyHash);
+
+        try
+        {
+            budget.CheckDeadline();
+            context.ChargeValue(input);
+            var value = artifact.Entrypoint(context, input);
+            EnsureReturnType(plan, entrypoint, value);
+            return ValueTask.FromResult(NoAuditSuccessResult(plan, artifact, budget, value));
+        }
+        catch (OperationCanceledException)
+        {
+            var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
+            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, error));
+        }
+        catch (SandboxRuntimeException ex)
+        {
+            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, ex.Error));
+        }
+        catch (Exception)
+        {
+            var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
+            return ValueTask.FromResult(FailureResult(plan, executable, options, budget, error));
+        }
+    }
+
+    private static SandboxExecutionResult NoAuditSuccessResult(
+        ExecutionPlan plan,
+        CompiledArtifact artifact,
+        ResourceMeter budget,
+        SandboxValue value)
+        => new()
+        {
+            Succeeded = true,
+            Value = value,
+            ResourceUsage = budget.Snapshot(),
+            AuditEvents = InMemoryAuditSink.EmptyEventSnapshot,
+            ActualMode = ExecutionMode.Compiled,
+            ExecutionDispatched = true,
+            ModuleHash = plan.ModuleHash,
+            PlanHash = plan.PlanHash,
+            PolicyHash = plan.PolicyHash,
+            ArtifactHash = artifact.ArtifactHash
+        };
+
+    private static SandboxExecutionResult FailureResult(
+        ExecutionPlan plan,
+        CompiledExecutable executable,
+        SandboxExecutionOptions options,
+        ResourceMeter budget,
+        SandboxError error)
+    {
+        var runId = options.RunId ?? SandboxRunId.New();
+        var audit = new InMemoryAuditSink();
+        WriteSummary(audit, runId, AuditTime(plan), plan, executable, budget, false, error);
+        return Result(plan, executable.Artifact, budget, audit, false, null, error);
+    }
+
     private static void WriteSummary(
         InMemoryAuditSink audit,
         SandboxRunId runId,
@@ -120,6 +210,25 @@ internal static class CompiledExecutionRunner
                      $"plan={plan.PlanHash} policy={plan.PolicyHash} policyId={fields["policyId"]} bindings={plan.BindingManifestHash} " +
                      $"fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
             Fields: fields));
+    }
+
+    private static bool CanUseNoAuditSuccessPath(
+        ExecutionPlan plan,
+        string entrypoint,
+        CompiledArtifact artifact,
+        SandboxExecutionOptions options,
+        out IReadOnlySet<string> allowedBindings)
+    {
+        if (options.SuppressSuccessfulRunSummaryAudit &&
+            artifact.CacheInvalidReason is null &&
+            plan.BindingReferences.TryGetValue(entrypoint, out allowedBindings!) &&
+            allowedBindings.Count == 0)
+        {
+            return true;
+        }
+
+        allowedBindings = default!;
+        return false;
     }
 
     private static void WriteCacheInvalidated(

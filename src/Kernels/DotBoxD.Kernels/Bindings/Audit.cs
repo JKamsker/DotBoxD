@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 
 public sealed record SandboxRunId(Guid Value)
 {
+    internal static SandboxRunId Suppressed { get; } = new(Guid.Empty);
+
     public static SandboxRunId New() => new(Guid.NewGuid());
 
     public override string ToString() => Value.ToString("N");
@@ -64,6 +66,8 @@ public sealed class InMemoryAuditSink : IAuditSink
 {
     private static readonly IReadOnlyList<SandboxAuditEvent> EmptySnapshot =
         new OwnedAuditEventSnapshot(Array.Empty<SandboxAuditEvent>());
+
+    internal static IReadOnlyList<SandboxAuditEvent> EmptyEventSnapshot => EmptySnapshot;
 
     private List<SandboxAuditEvent>? _events;
     private long _sequence;
@@ -189,4 +193,25 @@ public sealed class InMemoryAuditSink : IAuditSink
                 out var parsed) &&
             parsed >= 0;
     }
+}
+
+internal sealed class NoopAuditSink : IAuditSink
+{
+    public static NoopAuditSink Instance { get; } = new();
+
+    public long EventsWritten => 0;
+
+    public void Write(SandboxAuditEvent auditEvent)
+    {
+    }
+
+    public bool HasBindingAuditSince(
+        BindingDescriptor descriptor,
+        long checkpoint,
+        bool success,
+        SandboxErrorCode? expectedErrorCode,
+        SandboxRunId runId,
+        string moduleHash,
+        string policyHash)
+        => false;
 }
