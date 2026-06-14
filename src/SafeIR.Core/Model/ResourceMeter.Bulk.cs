@@ -60,4 +60,48 @@ public sealed partial class ResourceMeter
             : count;
         _callsByBinding[bindingId] = bindingCalls;
     }
+
+    internal bool CanChargeStringValues(string value, long count)
+    {
+        if (count < 0 || value.Length > Limits.MaxStringLength)
+        {
+            return false;
+        }
+
+        try
+        {
+            var bytes = MultiplyChecked(
+                SandboxLiteralConstraints.StringByteCount(value.Length),
+                count,
+                "string byte budget exhausted");
+            return AllocatedBytes <= Limits.MaxAllocatedBytes - bytes &&
+                   StringBytes <= Limits.MaxTotalStringBytes - bytes;
+        }
+        catch (SandboxRuntimeException)
+        {
+            return false;
+        }
+    }
+
+    internal void ChargeStringValues(string value, long count)
+    {
+        if (count == 0)
+        {
+            return;
+        }
+
+        if (!CanChargeStringValues(value, count))
+        {
+            throw Quota(value.Length > Limits.MaxStringLength
+                ? "string length budget exhausted"
+                : "string byte budget exhausted");
+        }
+
+        var bytes = MultiplyChecked(
+            SandboxLiteralConstraints.StringByteCount(value.Length),
+            count,
+            "string byte budget exhausted");
+        ChargeAllocation(bytes);
+        StringBytes = AddChecked(StringBytes, bytes, "string byte budget exhausted");
+    }
 }

@@ -102,17 +102,29 @@ internal static class MapGetI32LoopFastPathEmitter
         il.Emit(OpCodes.Ldloc, iterations);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CanBulkChargeFuel)));
         il.Emit(OpCodes.Brfalse, fallback);
+        CompiledMeterEmitter.Fuel(il, 1);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldloc, key);
+        il.Emit(OpCodes.Ldloc, iterations);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CanBulkChargeSandboxValue)));
+        il.Emit(OpCodes.Brfalse, fallback);
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldloc, readFuel);
         il.Emit(OpCodes.Ldloc, iterations);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBulkFuel)));
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldloc, key);
+        il.Emit(OpCodes.Ldloc, iterations);
+        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeSandboxValues)));
+        CompiledMeterEmitter.Fuel(il, 1);
         EmitMapGet(plan, key, item, il, declare);
-        EmitLoopBody(fastLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: false);
+        EmitLoopBody(fastLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: false, chargeKey: false);
 
         il.MarkLabel(fallback);
+        CompiledMeterEmitter.Fuel(il, 1);
         EmitMapGet(plan, key, item, il, declare);
-        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: true);
+        EmitLoopBody(fallbackLoop, finish, index, end, readFuel, key, item, range.LocalName, plan, il, declare, chargeReadFuel: true, chargeKey: true);
         il.MarkLabel(finish);
     }
 
@@ -128,7 +140,8 @@ internal static class MapGetI32LoopFastPathEmitter
         LoopPlan plan,
         ILGenerator il,
         Func<string, (LocalBuilder Local, StackKind Kind)> declare,
-        bool chargeReadFuel)
+        bool chargeReadFuel,
+        bool chargeKey)
     {
         il.MarkLabel(loop);
         il.Emit(OpCodes.Ldloc, index);
@@ -144,9 +157,13 @@ internal static class MapGetI32LoopFastPathEmitter
 
         il.Emit(OpCodes.Ldloc, index);
         il.Emit(OpCodes.Stloc, declare(loopLocal).Local);
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldloc, key);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeSandboxValue)));
+        if (chargeKey)
+        {
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldloc, key);
+            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeSandboxValue)));
+        }
+
         if (plan.AddToTarget)
         {
             il.Emit(OpCodes.Ldloc, declare(plan.Target).Local);

@@ -26,13 +26,15 @@ internal static class MapGetI32ForLoopRunner
         var count = frame.ReadMapCountSlot(plan.SourceSlot);
         var readFuel = SandboxCollectionFuel.Read(count);
         if (!context.CanBulkChargeLoopIterations(iterations, plan.LoopFuelPerIteration) ||
-            !context.CanBulkChargeFuel(readFuel, iterations))
+            !context.CanBulkChargeFuel(readFuel, iterations) ||
+            !context.CanBulkChargeValue(plan.Key, iterations))
         {
             return false;
         }
 
         context.ChargeLoopIterations(iterations, plan.LoopFuelPerIteration);
         context.ChargeBulkFuel(readFuel, iterations);
+        context.ChargeBulkValue(plan.Key, iterations);
 
         var item = frame.ReadMapInt32ValueSlot(plan.SourceSlot, plan.Key);
         var loopSlot = frame.GetSlot(statement.LocalName);
@@ -40,7 +42,6 @@ internal static class MapGetI32ForLoopRunner
         for (var i = start; i < end; i++)
         {
             frame.WriteRawInt32Slot(loopSlot, i);
-            context.ChargeValue(plan.Key);
             var value = plan.AddToTarget
                 ? SandboxInt32Math.Add(frame.ReadRawInt32Slot(plan.TargetSlot), item)
                 : item;

@@ -20,6 +20,7 @@ public sealed class Fix_CMP_0026_Tests
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
         Assert.Equal(28, ((I32Value)result.Value!).Value);
         Assert.True(result.ResourceUsage.FuelUsed >= 4 * SandboxCollectionFuel.Read(1));
+        Assert.True(result.ResourceUsage.StringBytes >= 4 * "alice".Length * sizeof(char));
         Assert.Equal(mode, result.ActualMode);
     }
 

@@ -30,7 +30,8 @@ dotnet run -c Release --project benchmarks/SafeIR.Benchmarks -p:UseSharedCompila
 | Direct `list.count` loop adapter | `23551ba` | `--probe-matrix` | `list.count` improved from compiled 72.9 ms / 314.8x and interpreted 196.6 ms / 848.5x to compiled 18.2 ms / 83.6x and interpreted 1.0 ms / 4.6x by bulk-charging collection read fuel and reusing the raw count in the loop. |
 | Direct `list.get` I32 loop adapter | `904087c` | `--probe-matrix` | `list.get` improved from compiled 74.7 ms / 137.6x and interpreted 270.1 ms / 497.7x to compiled 24.0 ms / 45.9x and interpreted 18.2 ms / 34.7x by bulk-charging collection read fuel and emitting raw I32 index/value operations. |
 | Direct `map.get` I32 loop adapter | `fe6cb0c` | `--probe-matrix` | `map.get` improved from compiled 220.4 ms / 44.4x and interpreted 170.0 ms / 34.2x to compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x by bulk-charging map read fuel while preserving per-iteration key literal charging. |
-| Hoisted `map.get` literal-key lookup | this commit | `--probe-matrix` | `map.get` improved from compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x to compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x by resolving the immutable literal-key lookup once and still charging the key literal in the loop. |
+| Hoisted `map.get` literal-key lookup | `99db2cb` | `--probe-matrix` | `map.get` improved from compiled 155.2 ms / 32.1x and interpreted 149.5 ms / 31.0x to compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x by resolving the immutable literal-key lookup once and still charging the key literal in the loop. |
+| Bulk `map.get` key literal charging | this commit | `--probe-matrix` | `map.get` improved from compiled 98.3 ms / 20.3x and interpreted 53.7 ms / 11.1x to compiled 19.7 ms / 4.1x and interpreted 0.5 ms / 0.1x by bulk-charging the literal key value and reusing the hoisted key/result in the loop. |
 
 ## Matrix After `31fa6fe`
 
@@ -123,10 +124,21 @@ map.get intrinsic                 4.8 ms     98.3 ms  20.3       53.7 ms   11.1
 local function call               0.2 ms     22.1 ms 106.7       24.1 ms  116.2
 ```
 
+## Matrix After Bulk Map Get Key Literal Charging
+
+```text
+case                         handwritten   compiled      x   interpreted      x
+i32 add/rem loop                 23.1 ms     39.4 ms   1.7      103.2 ms    4.5
+math.sqrt binding                 7.7 ms     26.0 ms   3.4       18.2 ms    2.4
+string.length binding             0.2 ms     16.1 ms  80.5        0.9 ms    4.7
+list.count intrinsic              0.2 ms     16.5 ms  77.9        0.9 ms    4.4
+list.get intrinsic                0.5 ms     25.0 ms  47.7       18.2 ms   34.8
+map.get intrinsic                 4.8 ms     19.7 ms   4.1        0.5 ms    0.1
+local function call               0.2 ms     22.0 ms 109.2       23.0 ms  113.8
+```
+
 ## Current Gaps
 
 The broad performance target is not met yet. The matrix still exposes several
-bad cases, especially map access, local function calls, and tiny operations
-where the handwritten timing is sub-millisecond. The current `map.get` adapter
-still leaves per-iteration key literal charging in place, so bulk literal
-charging or deeper map/key specialization remains necessary.
+bad cases, especially local function calls, compiled `math.sqrt`, `list.get`,
+and tiny operations where the handwritten timing is sub-millisecond.

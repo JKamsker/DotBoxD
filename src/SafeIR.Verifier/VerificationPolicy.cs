@@ -53,6 +53,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ChargeBulkFuel", $"{SandboxContextName},{Int64Name},{Int32Name}", VoidName),
                 RuntimeMember("ChargeFuel64", $"{SandboxContextName},{Int64Name}", VoidName),
                 RuntimeMember("ChargeSandboxValue", $"{SandboxContextName},{SandboxValueName}", VoidName),
+                RuntimeMember("CanBulkChargeSandboxValue", $"{SandboxContextName},{SandboxValueName},{Int32Name}", BooleanName),
+                RuntimeMember("ChargeSandboxValues", $"{SandboxContextName},{SandboxValueName},{Int32Name}", VoidName),
                 RuntimeMember("ChargeBindingCall", $"{SandboxContextName},{StringName}", VoidName),
                 RuntimeMember("CanBulkChargeBindingCalls", $"{SandboxContextName},{StringName},{Int32Name}", BooleanName),
                 RuntimeMember("ChargeBindingCalls", $"{SandboxContextName},{StringName},{Int32Name}", VoidName),

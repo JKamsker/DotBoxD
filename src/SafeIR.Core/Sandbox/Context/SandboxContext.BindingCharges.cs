@@ -36,6 +36,22 @@ public sealed partial class SandboxContext
         ChargeFuel(CheckedFuel(units, fuelPerUnit));
     }
 
+    internal bool CanBulkChargeValue(SandboxValue value, long count)
+        => value is StringValue text && Budget.CanChargeStringValues(text.Value, count);
+
+    internal void ChargeBulkValue(SandboxValue value, long count)
+    {
+        if (value is not StringValue text)
+        {
+            throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.ValidationError,
+                "bulk value charging supports string literals only"));
+        }
+
+        CancellationToken.ThrowIfCancellationRequested();
+        Budget.ChargeStringValues(text.Value, count);
+    }
+
     internal bool CanBulkChargeBindingCalls(BindingDescriptor descriptor, long calls)
     {
         if (calls < 0 ||
