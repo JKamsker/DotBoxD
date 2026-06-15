@@ -20,7 +20,7 @@ internal sealed class RemotePluginServer
         _control = control;
         Kernels = new RemoteKernelControl(control);
         KernelRpc = new RemoteKernelRpcControl(control);
-        World = new RemoteWorldControl(control);
+        World = new RemoteWorldControl(control, KernelRpc);
     }
 
     public RemoteKernelControl Kernels { get; }
@@ -60,9 +60,10 @@ internal sealed class RemoteKernelControl
            ?? throw new InvalidOperationException($"Kernel '{kernelType.FullName}' has no [Plugin] id.");
 }
 
-internal sealed class RemoteKernelRpcControl : IKernelRpcWireClient
+internal sealed class RemoteKernelRpcControl : IKernelRpcClientRegistry
 {
     private readonly IGamePluginControlService _control;
+    private readonly Dictionary<Type, string> _services = new();
 
     public RemoteKernelRpcControl(IGamePluginControlService control) => _control = control;
 
@@ -71,8 +72,17 @@ internal sealed class RemoteKernelRpcControl : IKernelRpcWireClient
         where TKernel : class
     {
         var json = PluginPackageJsonSerializer.Export(KernelPackageRegistry.Resolve<TKernel>());
-        return await _control.InstallKernelRpcAsync(json).ConfigureAwait(false);
+        var pluginId = await _control.InstallKernelRpcAsync(json).ConfigureAwait(false);
+        _services[typeof(TService)] = pluginId;
+        return pluginId;
     }
+
+    public string PluginId<TService>()
+        where TService : class
+        => _services.TryGetValue(typeof(TService), out var pluginId)
+            ? pluginId
+            : throw new InvalidOperationException(
+                $"Kernel RPC service '{typeof(TService).FullName}' has not been registered.");
 
     public ValueTask<byte[]> InvokeKernelRpcAsync(
         string pluginId,
@@ -83,15 +93,41 @@ internal sealed class RemoteKernelRpcControl : IKernelRpcWireClient
 
 internal sealed class RemoteWorldControl
 {
+    public RemoteWorldControl(IGamePluginControlService control, IKernelRpcClientRegistry kernelRpc)
+    {
+        Monsters = new RemoteMonsterControl(control, kernelRpc);
+        Entities = new RemoteEntityControl(control);
+    }
+
+    public RemoteMonsterControl Monsters { get; }
+
+    public RemoteEntityControl Entities { get; }
+}
+
+internal sealed class RemoteMonsterControl
+{
     private readonly IGamePluginControlService _control;
 
-    public RemoteWorldControl(IGamePluginControlService control) => _control = control;
+    public RemoteMonsterControl(IGamePluginControlService control, IKernelRpcClientRegistry kernelRpc)
+    {
+        _control = control;
+        KernelRpc = kernelRpc;
+    }
 
-    public ValueTask<bool> KillMonsterAsync(string monsterId)
+    internal IKernelRpcClientRegistry KernelRpc { get; }
+
+    public ValueTask<bool> KillAsync(string monsterId)
         => _control.KillMonsterAsync(monsterId);
 
     public ValueTask<bool> IsMonsterAsync(string entityId)
         => _control.IsMonsterAsync(entityId);
+}
+
+internal sealed class RemoteEntityControl
+{
+    private readonly IGamePluginControlService _control;
+
+    public RemoteEntityControl(IGamePluginControlService control) => _control = control;
 
     public ValueTask<int> GetHealthAsync(string entityId)
         => _control.GetEntityHealthAsync(entityId);

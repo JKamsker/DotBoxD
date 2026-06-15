@@ -38,6 +38,20 @@ internal static class RpcKernelModelFactory
         try
         {
             var method = ResolveBatchMethod(type);
+            IMethodSymbol? serviceMethod = null;
+            RpcKernelClientExtensions? clientExtensions = null;
+            if (serviceType is not null)
+            {
+                serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(serviceType, method);
+                clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
+            }
+            else if (RpcKernelClientExtensionModelFactory.HasExtensionAttribute(type) ||
+                     RpcKernelClientExtensionModelFactory.HasExtensionAttribute(method))
+            {
+                throw new NotSupportedException(
+                    "Kernel RPC client extensions require [KernelRpcService] to specify a service interface type.");
+            }
+
             var body = MethodBody(method, cancellationToken);
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
             var effects = new SortedSet<string>(StringComparer.Ordinal);
@@ -50,7 +64,16 @@ internal static class RpcKernelModelFactory
                 effects.Add("Alloc");
             }
 
-            var source = EmitPackage(type, pluginId!, method, bodyJson, effects, capabilities, serviceType);
+            var source = EmitPackage(
+                type,
+                pluginId!,
+                method,
+                bodyJson,
+                effects,
+                capabilities,
+                serviceType,
+                serviceMethod,
+                clientExtensions);
             return new RpcKernelModelResult(source, null);
         }
         catch (NotSupportedException ex)
@@ -108,7 +131,9 @@ internal static class RpcKernelModelFactory
         string bodyJson,
         SortedSet<string> effects,
         SortedSet<string> capabilities,
-        INamedTypeSymbol? serviceType)
+        INamedTypeSymbol? serviceType,
+        IMethodSymbol? serviceMethod,
+        RpcKernelClientExtensions? clientExtensions)
     {
         var methodName = method.Name;
         var returnType = DotBoxDRpcTypeMapper.JsonType(method.ReturnType);
@@ -141,14 +166,17 @@ internal static class RpcKernelModelFactory
             $"\"returnType\":{returnType}," +
             $"\"body\":{bodyJson}}}]}}}}";
 
-        return new GeneratedPluginPackage(HintName(type), BuildSource(type, json, method, serviceType));
+        return new GeneratedPluginPackage(
+            HintName(type),
+            BuildSource(type, json, serviceType, serviceMethod, clientExtensions));
     }
 
     private static string BuildSource(
         INamedTypeSymbol type,
         string json,
-        IMethodSymbol method,
-        INamedTypeSymbol? serviceType)
+        INamedTypeSymbol? serviceType,
+        IMethodSymbol? serviceMethod,
+        RpcKernelClientExtensions? clientExtensions)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
         var builder = new System.Text.StringBuilder();
@@ -167,10 +195,15 @@ internal static class RpcKernelModelFactory
             .Append(json.Replace("\\", "\\\\").Replace("\"", "\\\""))
             .AppendLine("\");");
         builder.AppendLine("}");
-        if (serviceType is not null)
+        if (serviceType is not null && serviceMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelClientProxyEmitter.Emit(type, method, serviceType));
+            builder.Append(RpcKernelClientProxyEmitter.Emit(type, serviceType, serviceMethod));
+            if (clientExtensions is { IsEmpty: false })
+            {
+                builder.AppendLine();
+                builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions));
+            }
         }
 
         return builder.ToString();

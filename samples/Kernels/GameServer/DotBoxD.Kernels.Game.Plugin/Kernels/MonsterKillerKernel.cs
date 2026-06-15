@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Game.Plugin.Client;
+
 namespace DotBoxD.Kernels.Game.Plugin;
 
 public interface IMonsterKillerService
@@ -17,6 +19,7 @@ public readonly record struct MonsterKillResult(
 /// Plugin-owned batch operation. The class and service contract live in the plugin assembly, but the
 /// generated verified IR is installed and executed on the server through the kernel RPC IPC bridge.
 /// </summary>
+[KernelRpcClientProperty(typeof(RemoteMonsterControl))]
 [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
 public sealed partial class MonsterKillerKernel
 {
@@ -24,6 +27,7 @@ public sealed partial class MonsterKillerKernel
 
     public MonsterKillerKernel(IGameWorldAccess world) => _world = world;
 
+    [KernelRpcClientMethod(typeof(RemoteMonsterControl), "KillMonstersAsync")]
     public List<MonsterKillResult> KillMonsters(List<string> monsterIds, HookContext ctx)
     {
         var results = new List<MonsterKillResult>();

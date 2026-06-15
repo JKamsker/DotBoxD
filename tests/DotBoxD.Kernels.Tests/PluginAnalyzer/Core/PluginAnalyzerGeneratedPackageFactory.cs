@@ -21,14 +21,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
 
     public static Assembly CreateAssembly(string source)
     {
-        var compilation = CSharpCompilation.Create(
-            "DotBoxDGeneratedPackageRuntimeTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var compilation = CreateCompilation(source);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
@@ -48,6 +41,32 @@ internal static class PluginAnalyzerGeneratedPackageFactory
 
         return Assembly.Load(assembly.ToArray());
     }
+
+    public static IReadOnlyList<Diagnostic> Diagnostics(string source)
+    {
+        var compilation = CreateCompilation(source);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        return generatorDiagnostics
+            .Concat(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)))
+            .ToArray();
+    }
+
+    private static CSharpCompilation CreateCompilation(string source)
+        => CSharpCompilation.Create(
+            "DotBoxDGeneratedPackageRuntimeTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

@@ -44,13 +44,13 @@ internal static class Program
 
         // Ordinary IPC can expose direct server APIs too. This call goes straight to the server's
         // world service and kills one monster in one IPC call.
-        var directKilled = await server.World.KillMonsterAsync("monster-4").ConfigureAwait(false);
+        var directKilled = await server.World.Monsters.KillAsync("monster-4").ConfigureAwait(false);
         Console.WriteLine($"[plugin] ordinary IPC KillMonster(monster-4) => {directKilled}.");
 
         // Kernel RPC keeps the plugin-owned loop on the server. The plugin sends one request, the
         // server executes the generated verified IR, and the result list comes back as plugin DTOs.
-        var monsterKiller = MonsterKillerKernelRpcClient.Create(server.KernelRpc, killerId);
-        var killResults = await monsterKiller
+        // The generated property flavor is also available as server.World.Monsters.MonsterKiller.
+        var killResults = await server.World.Monsters
             .KillMonstersAsync(["monster-3", "monster-4", "player-1", "monster-missing"])
             .ConfigureAwait(false);
         Console.WriteLine("[plugin] kernel RPC KillMonsters(...) => " + FormatKillResults(killResults));

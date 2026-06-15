@@ -120,6 +120,32 @@ public sealed class KernelRpcServiceAttribute : Attribute
     public Type? ServiceType { get; }
 }
 
+/// <summary>
+/// Requests a generated C# 14 extension property on <paramref name="receiverType"/> that resolves the
+/// source-generated kernel RPC client for this service. The receiver type must expose a <c>KernelRpc</c>
+/// property whose value can invoke kernel RPC and resolve the installed service id.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class KernelRpcClientPropertyAttribute(Type receiverType, string? name = null) : Attribute
+{
+    public Type ReceiverType { get; } = receiverType;
+
+    public string? Name { get; } = name;
+}
+
+/// <summary>
+/// Requests a generated C# 14 extension method on <paramref name="receiverType"/> that forwards to the
+/// source-generated kernel RPC client. When <paramref name="name"/> is omitted, the kernel method name
+/// is used; supply a custom name to make the receiver's domain API read naturally or avoid conflicts.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class KernelRpcClientMethodAttribute(Type receiverType, string? name = null) : Attribute
+{
+    public Type ReceiverType { get; } = receiverType;
+
+    public string? Name { get; } = name;
+}
+
 public interface IEventKernel<TEvent>
 {
     bool ShouldHandle(TEvent e, HookContext context);

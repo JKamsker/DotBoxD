@@ -12,3 +12,12 @@ public interface IKernelRpcWireClient
         byte[] arguments,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Adds service-contract lookup for generated domain-style kernel RPC client extensions.
+/// </summary>
+public interface IKernelRpcClientRegistry : IKernelRpcWireClient
+{
+    string PluginId<TService>()
+        where TService : class;
+}

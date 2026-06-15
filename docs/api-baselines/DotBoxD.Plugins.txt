@@ -84,6 +84,7 @@ public IEnumerator<InstalledKernel> GetEnumerator() => Snapshot().GetEnumerator(
 public InstalledKernel Get(string pluginId)
 public InstalledKernel Kernel { get; }
 public int Int32Value
+public interface IKernelRpcClientRegistry : IKernelRpcWireClient
 public interface IKernelRpcWireClient
 public interface ILiveSetting
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()

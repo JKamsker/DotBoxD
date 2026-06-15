@@ -11,17 +11,30 @@ internal static partial class RpcKernelClientProxyEmitter
         IMethodSymbol kernelMethod,
         INamedTypeSymbol serviceType)
     {
+        var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod);
+        return Emit(kernelType, serviceType, serviceMethod);
+    }
+
+    public static string Emit(
+        INamedTypeSymbol kernelType,
+        INamedTypeSymbol serviceType,
+        IMethodSymbol serviceMethod)
+    {
         if (serviceType.TypeKind != TypeKind.Interface)
         {
             throw new NotSupportedException("Kernel RPC service client generation requires an interface contract type.");
         }
 
-        var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod);
         return new ProxySourceWriter(kernelType, serviceType, serviceMethod).Emit();
     }
 
-    private static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
+    internal static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
     {
+        if (serviceType.TypeKind != TypeKind.Interface)
+        {
+            throw new NotSupportedException("Kernel RPC service client generation requires an interface contract type.");
+        }
+
         var methods = new List<IMethodSymbol>();
         foreach (var member in serviceType.GetMembers())
         {

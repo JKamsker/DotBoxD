@@ -25,6 +25,8 @@ internal static class DotBoxDGenerationNames
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
         public const string KernelRpcServiceAttribute = "DotBoxD.Abstractions.KernelRpcServiceAttribute";
+        public const string KernelRpcClientPropertyAttribute = "DotBoxD.Abstractions.KernelRpcClientPropertyAttribute";
+        public const string KernelRpcClientMethodAttribute = "DotBoxD.Abstractions.KernelRpcClientMethodAttribute";
         public const string HookContextType = "DotBoxD.Abstractions.HookContext";
     }
 
