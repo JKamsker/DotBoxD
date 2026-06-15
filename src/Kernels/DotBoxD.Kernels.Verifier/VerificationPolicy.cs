@@ -51,6 +51,8 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ChargeLoopIteration", $"{SandboxContextName},{Int32Name}", VoidName),
                 RuntimeMember("AccumulateLinearI32", $"{SandboxContextName},{Int32Name},{Int32Name},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("CanBulkChargeLoopIterations", $"{SandboxContextName},{Int32Name},{Int32Name}", BooleanName),
+                RuntimeMember("StringEqualsRaw", $"{SandboxValueName},{SandboxValueName}", BooleanName),
+                RuntimeMember("GteI32Raw", $"{Int32Name},{Int32Name}", BooleanName),
                 RuntimeMember("CanBulkChargeFuel", $"{SandboxContextName},{Int64Name},{Int32Name}", BooleanName),
                 RuntimeMember("ChargeBulkFuel", $"{SandboxContextName},{Int64Name},{Int32Name}", VoidName),
                 RuntimeMember("ChargeFuel64", $"{SandboxContextName},{Int64Name}", VoidName),

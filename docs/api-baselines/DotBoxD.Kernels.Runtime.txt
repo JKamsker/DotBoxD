@@ -20,6 +20,7 @@ public static bool CanBulkChargeBindingCallsScaled( SandboxContext context, stri
 public static bool CanBulkChargeFuel(SandboxContext context, long fuelPerUnit, int count)
 public static bool CanBulkChargeLoopIterations(SandboxContext context, int count, int fuelPerIteration)
 public static bool CanBulkChargeSandboxValue(SandboxContext context, SandboxValue value, int count)
+public static bool StringEqualsRaw(SandboxValue left, SandboxValue right)
 public static class DefaultSandboxBindings
 public static class MathBindings
 public static class SafeFileBindings
@@ -51,7 +52,7 @@ public static partial class SafeLogBindings
 public static SandboxType TypeList(SandboxType itemType) => SandboxType.List(itemType)
 public static SandboxType TypeMap(SandboxType keyType, SandboxType valueType) => SandboxType.Map(keyType, valueType)
 public static SandboxType TypeRecord(SandboxType[] fieldTypes) => SandboxType.Record(fieldTypes)
-public static SandboxType TypeScalar(string name) => SandboxType.Scalar(name)
+public static SandboxType TypeScalar(string name)
 public static SandboxType[] CreateTypeArray(int count)
 public static SandboxValue AbsI32(SandboxValue value)
 public static SandboxValue Add(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Add(left, right)

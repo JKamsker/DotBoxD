@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 public sealed partial class SandboxContext
 {
     private DeterministicRandom? _deterministicRandom;
+    private BindingReturnCreditTracker? _returnCredits;
     private int _callDepth;
-    private readonly BindingReturnCreditTracker _returnCredits = new();
 
     public SandboxContext(
         SandboxRunId runId,
@@ -153,7 +153,7 @@ public sealed partial class SandboxContext
     {
         CancellationToken.ThrowIfCancellationRequested();
         Budget.ChargeString(value);
-        _returnCredits.RecordString(value);
+        ReturnCredits.RecordString(value);
     }
 
     public void ChargeStringAllocation(int charLength)
@@ -167,7 +167,7 @@ public sealed partial class SandboxContext
         var length = CheckedCharLength(left.Length, right.Length);
         ChargeStringAllocation(length);
         var text = string.Concat(left, right);
-        _returnCredits.RecordString(text);
+        ReturnCredits.RecordString(text);
         return text;
     }
 
@@ -182,14 +182,14 @@ public sealed partial class SandboxContext
 
         ChargeStringAllocation(length);
         var text = value.Substring(startIndex, length);
-        _returnCredits.RecordString(text);
+        ReturnCredits.RecordString(text);
         return text;
     }
 
     internal void RecordStringReturnCredit(string value)
-        => _returnCredits.RecordString(value);
+        => ReturnCredits.RecordString(value);
 
-    public IDisposable BeginBindingReturnCreditScope() => _returnCredits.BeginScope();
+    public IDisposable BeginBindingReturnCreditScope() => ReturnCredits.BeginScope();
 
     public void ChargeLogEvent(string message) => Budget.ChargeLogEvent(message);
 
@@ -277,7 +277,7 @@ public sealed partial class SandboxContext
             CancellationToken,
             Budget);
 
-        if (!_returnCredits.TryConsume(value))
+        if (_returnCredits is null || !_returnCredits.TryConsume(value))
         {
             Budget.ChargeValueShape(shape);
         }
@@ -291,6 +291,8 @@ public sealed partial class SandboxContext
     }
 
     private SharedWallTimeTokenSource? _sharedWallTimeToken;
+
+    private BindingReturnCreditTracker ReturnCredits => _returnCredits ??= new();
 
     public CancellationTokenSource CreateWallTimeToken()
     {
