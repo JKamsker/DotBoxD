@@ -71,7 +71,9 @@ internal static class SandboxValueShapeMeter
     /// <see cref="ValueShapeCache"/> to charge collection add/set incrementally without re-walking the whole
     /// collection, while keeping the charged shape and fuel identical to a full walk.
     /// </summary>
-    public static (ValueShape Shape, long Nodes) MeasureWithNodes(SandboxValue value)
+    public static (ValueShape Shape, long Nodes) MeasureWithNodes(
+        SandboxValue value,
+        CancellationToken cancellationToken = default)
     {
         var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var stack = new Stack<Frame>();
@@ -80,6 +82,7 @@ internal static class SandboxValueShapeMeter
         stack.Push(new Frame(value, Depth: 0, Exit: false));
         while (stack.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             nodes++;
             var frame = stack.Pop();
             if (frame.Exit)

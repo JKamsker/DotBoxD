@@ -24,7 +24,13 @@ internal static class I64ForLoopRunner
             return false;
         }
 
-        context.ChargeLoopIterations((long)end - start, fuelPerIteration);
+        var iterations = (long)end - start;
+        if (!context.CanBulkChargeLoopIterations(iterations, fuelPerIteration))
+        {
+            return false;
+        }
+
+        context.ChargeLoopIterations(iterations, fuelPerIteration);
         var loopSlot = frame.GetSlot(statement.LocalName);
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
@@ -60,11 +66,12 @@ internal static class I64ForLoopRunner
         }
 
         var plans = new AssignmentPlan[statement.Body.Count];
+        var assignedSlots = new HashSet<int>();
         var fuel = LoopFuel;
         for (var i = 0; i < statement.Body.Count; i++)
         {
             if (statement.Body[i] is not AssignmentStatement assignment ||
-                !I64ExpressionPlan.TryCreate(assignment.Value, frame, out var expression))
+                !I64ExpressionPlan.TryCreate(assignment.Value, frame, CanReadSlot, out var expression))
             {
                 return false;
             }
@@ -76,12 +83,15 @@ internal static class I64ForLoopRunner
             }
 
             plans[i] = new AssignmentPlan(targetSlot, expression);
+            assignedSlots.Add(targetSlot);
             fuel += 1 + expression.FuelCost;
         }
 
         body = plans;
         fuelPerIteration = fuel;
         return true;
+
+        bool CanReadSlot(int slot) => frame.IsSlotAssigned(slot) || assignedSlots.Contains(slot);
     }
 
     private readonly record struct AssignmentPlan(int TargetSlot, I64ExpressionPlan Expression);

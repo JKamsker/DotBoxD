@@ -308,7 +308,7 @@ one idiv (byte-identical fuel, identical checked-overflow semantics). Interprete
 
 Final `--probe-matrix` (after fairness + fused opcode, full suite green; ratios on a lightly-loaded run):
 
-```
+```text
 case                         handwritten   compiled      x   interpreted      x
 i32 add/rem loop                 24.3 ms     25.1 ms   1.0      118.9 ms    4.9
 math.sqrt binding                 8.0 ms      8.2 ms   1.0       19.5 ms    2.4
@@ -367,7 +367,7 @@ never exercised. Both were fixed by extending the unboxed-scalar codegen:
 
 Latest `--probe-matrix` (machine lightly loaded; interpreted figures are GC-noisy on this run):
 
-```
+```text
 case                         handwritten   compiled      x   interpreted      x
 i32 add/rem loop                 23.1 ms     23.7 ms   1.0       86.5 ms    3.8
 math.sqrt binding                 7.7 ms      8.0 ms   1.0       18.4 ms    2.4
@@ -403,7 +403,7 @@ interpreter/compiled equivalence green every step).
 
 Latest `--probe-matrix` (GC-noisy on interpreted; ratios stable to +-20%):
 
-```
+```text
 case                         handwritten   compiled      x   interpreted      x
 i32 add/rem loop                 24.4 ms     25.5 ms   1.0      120.9 ms    4.9
 math.sqrt binding                 8.3 ms      8.7 ms   1.0       19.9 ms    2.4
@@ -498,7 +498,7 @@ general path's ~10 per-node metering calls — byte-identical total fuel, full s
 
 ### Closed-ledger state (clean run)
 
-```
+```text
 case                  compiled x   interpreted x   status
 i32 add/rem              1.0          3.5          both at target
 math.sqrt /x3            ~1.0         1.6-1.8      both at target
@@ -559,7 +559,7 @@ i64 is now unboxed in both tiers.
 
 ### Final closed state
 
-```
+```text
 case                  compiled x   interpreted x   status
 i32 / nested             1.0/1.2      4.6/4.2      both at target
 math.sqrt /x3            ~1.0         1.7-2.4      both at target

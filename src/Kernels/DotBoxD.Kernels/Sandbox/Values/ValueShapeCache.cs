@@ -23,12 +23,12 @@ internal static class ValueShapeCache
     private static readonly ConditionalWeakTable<SandboxValue, StrongBox<ShapeInfo>> Cache = new();
 
     /// <summary>Returns the cached shape/frame-count for a value, measuring and caching collections on miss.</summary>
-    public static ShapeInfo GetOrMeasure(SandboxValue value)
+    public static ShapeInfo GetOrMeasure(SandboxValue value, CancellationToken cancellationToken = default)
     {
         // Scalars and text are O(1) to measure and not worth caching (one frame, no children).
         if (value is not (ListValue or MapValue or RecordValue))
         {
-            var (shape, nodes) = SandboxValueShapeMeter.MeasureWithNodes(value);
+            var (shape, nodes) = SandboxValueShapeMeter.MeasureWithNodes(value, cancellationToken);
             return new ShapeInfo(shape, nodes);
         }
 
@@ -37,7 +37,7 @@ internal static class ValueShapeCache
             return box.Value;
         }
 
-        var measured = SandboxValueShapeMeter.MeasureWithNodes(value);
+        var measured = SandboxValueShapeMeter.MeasureWithNodes(value, cancellationToken);
         var info = new ShapeInfo(measured.Shape, measured.Nodes);
         Cache.AddOrUpdate(value, new StrongBox<ShapeInfo>(info));
         return info;
@@ -60,8 +60,9 @@ internal static class ValueShapeCache
         SandboxValue appended,
         int newCount)
     {
-        var sourceInfo = GetOrMeasure(source);
-        var itemInfo = GetOrMeasure(item);
+        var cancellationToken = context.CancellationToken;
+        var sourceInfo = GetOrMeasure(source, cancellationToken);
+        var itemInfo = GetOrMeasure(item, cancellationToken);
         var combined = sourceInfo.Shape.Combine(itemInfo.Shape);
         var shape = combined with
         {
@@ -88,9 +89,10 @@ internal static class ValueShapeCache
         SandboxValue updated,
         int newCount)
     {
-        var sourceInfo = GetOrMeasure(source);
-        var keyInfo = GetOrMeasure(key);
-        var valueInfo = GetOrMeasure(value);
+        var cancellationToken = context.CancellationToken;
+        var sourceInfo = GetOrMeasure(source, cancellationToken);
+        var keyInfo = GetOrMeasure(key, cancellationToken);
+        var valueInfo = GetOrMeasure(value, cancellationToken);
         var combined = sourceInfo.Shape.Combine(keyInfo.Shape).Combine(valueInfo.Shape);
         var shape = combined with
         {

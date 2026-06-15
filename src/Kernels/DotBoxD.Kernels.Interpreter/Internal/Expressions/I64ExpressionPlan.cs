@@ -61,24 +61,38 @@ internal sealed class I64ExpressionPlan
         => divisor > 1 ? (ulong)((System.UInt128.One << 64) / (System.UInt128)(ulong)divisor) : 0u;
 
     public static bool TryCreate(Expression expression, InterpreterFrame frame, out I64ExpressionPlan plan)
+        => TryCreate(expression, frame, frame.IsSlotAssigned, out plan);
+
+    public static bool TryCreate(
+        Expression expression,
+        InterpreterFrame frame,
+        System.Func<int, bool> canReadSlot,
+        out I64ExpressionPlan plan)
     {
         switch (expression)
         {
             case LiteralExpression { Value: I64Value value }:
                 plan = new I64ExpressionPlan(ExpressionKind.Literal, literal: value.Value);
                 return true;
-            case VariableExpression variable when frame.IsI64Slot(frame.GetSlot(variable.Name)):
-                plan = new I64ExpressionPlan(ExpressionKind.RawVariable, frame.GetSlot(variable.Name));
+            case VariableExpression variable:
+                var slot = frame.GetSlot(variable.Name);
+                if (!frame.IsI64Slot(slot) || !canReadSlot(slot))
+                {
+                    plan = null!;
+                    return false;
+                }
+
+                plan = new I64ExpressionPlan(ExpressionKind.RawVariable, slot);
                 return true;
-            case UnaryExpression { Operator: "-" } unary when TryCreate(unary.Operand, frame, out var operand):
+            case UnaryExpression { Operator: "-" } unary when TryCreate(unary.Operand, frame, canReadSlot, out var operand):
                 plan = new I64ExpressionPlan(ExpressionKind.Negate, left: operand);
                 return true;
             case BinaryExpression { Operator: "%", Right: LiteralExpression { Value: I64Value divisor } } modByConst
-                when divisor.Value > 0 && TryCreate(modByConst.Left, frame, out var dividend):
+                when divisor.Value > 0 && TryCreate(modByConst.Left, frame, canReadSlot, out var dividend):
                 plan = new I64ExpressionPlan(ExpressionKind.RemainderByConst, literal: divisor.Value, magic: MagicFor(divisor.Value), left: dividend);
                 return true;
             case BinaryExpression { Operator: "+" or "-" or "*" or "/" or "%" } binary
-                when TryCreate(binary.Left, frame, out var left) && TryCreate(binary.Right, frame, out var right):
+                when TryCreate(binary.Left, frame, canReadSlot, out var left) && TryCreate(binary.Right, frame, canReadSlot, out var right):
                 plan = new I64ExpressionPlan(BinaryKind(binary.Operator), left: left, right: right);
                 return true;
             default:

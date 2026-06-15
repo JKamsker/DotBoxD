@@ -4,9 +4,10 @@ using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Checked 64-bit integer arithmetic with sandbox error semantics. Overflow is detected with branchless
-/// bit tests (no closures, no <c>try/catch</c>) so each operation is allocation-free and inlineable on the
-/// compiler's unboxed fast path and the interpreter alike — mirroring <see cref="SandboxInt32Math"/>. Every
-/// overflow / divide-by-zero raises the same <see cref="SandboxErrorCode.InvalidInput"/> error.
+/// bit tests for add/subtract and a minimized checked multiply path, so each operation is allocation-free and
+/// inlineable on the compiler's unboxed fast path and the interpreter alike — mirroring
+/// <see cref="SandboxInt32Math"/>. Every overflow / divide-by-zero raises the same
+/// <see cref="SandboxErrorCode.InvalidInput"/> error.
 /// </summary>
 public static class SandboxInt64Math
 {
