@@ -49,10 +49,10 @@ go through the identical install + capability-gating + session-ownership path as
 
 The builder (Phase 1) is a self-contained, low-risk runtime facade with **zero generator and zero
 wire-protocol change**. `InvokeAsync` is a substantially larger investment that touches the analyzer
-(a new interceptor pipeline + capture analysis + lambda lowering), the runtime wire protocol (a response
-that carries mutated captures alongside the return value), and the IPC contract. It is split across
-Phases 2–4 so each is independently shippable with green build + tests. The richer
-`world.Monsters.Get(id).Name` object surface is its own **Phase 4** (fully planned below, not just stated).
+(a new interceptor pipeline + capture analysis + lambda lowering) and the runtime invocation path
+(argument encoding plus an optional response record for capture-bag sync-out). It keeps the existing
+`InvokeKernelRpcAsync` IPC contract. It is split across Phases 2–4 so each is independently shippable with
+green build + tests. The richer flat snapshot surface `world.GetMonster(id).Name` is its own **Phase 4**.
 
 > **Decided (user):** The builder follows the ASP.NET Core `HostBuilder` lifecycle — a **synchronous
 > `Build()`** that constructs the server, then an **async `StartAsync()` / `RunAsync()`** that performs the
@@ -257,13 +257,12 @@ the imperative and `--use-builder` paths with identical output; existing
 
 ---
 
-## Phase 2 — `InvokeAsync`: detection, lambda lowering, sync-in only (flat world surface)
+## Phase 2 — `InvokeAsync`: detection and no-capture lambda lowering
 
 **Goal.** Detect `server.Kernels.InvokeAsync(lambda)` at compile time, lower the **block-body** lambda to
 verified IR via the existing RPC lowerer, ship it as an anonymous RPC kernel, run it server-side, and
-return the typed result. **Sync-in captures only** (locals read inside the lambda). **No sync-out** and
-**no object-returning world bindings** in this phase. The flat `IGameWorldAccess` scalar surface is used
-exactly as `MonsterKillerKernel` already uses it.
+return the typed result. Lambda-only calls are no-capture. Capture sync-in/out is provided by the explicit
+mutable capture-bag overload because generated C# interceptors cannot directly access caller locals.
 
 ### Decisions folded in from review
 
@@ -274,9 +273,9 @@ exactly as `MonsterKillerKernel` already uses it.
   is not sufficient.
 - **Lambda shape.** Exactly one explicitly-typed parameter whose type is the host-access interface
   (`IGameWorldAccess`), **block body** (expression-body lambdas are out of scope; use `InvokeKernel`).
-- **Capture analysis via `SemanticModel.AnalyzeDataFlow(block)`.** Sync-in = `DataFlowsIn` ∩
-  enclosing-scope locals/params, minus the lambda parameter. Each capture's type must be supported by
-  `DotBoxDRpcTypeMapper.JsonType`; unsupported types fail safe (no output).
+- **Capture analysis via `SemanticModel.AnalyzeDataFlow(block)`.** Lambda-only calls reject ambient
+  `DataFlowsIn` / `DataFlowsOut` symbols other than the lambda parameter. Captured locals produce no package;
+  explicit capture-bag sync-in/out is Phase 3.
 - **Capture marshalling is explicit, NOT closure reflection.** Reading captured fields from
   `delegate.Target` via `GetField("name")` relies on Roslyn closure name-mangling, which is **not
   spec-guaranteed** (the design even mis-guessed `"<lastMonsterName>i__Field"`). Reflection-on-closure
@@ -285,19 +284,17 @@ exactly as `MonsterKillerKernel` already uses it.
   is provided by an explicit mutable capture-bag overload. The bag is encoded as a record argument, and
   assigned bag properties are decoded from a response record and written back after the await.
 - **Lowerer reuse is partial, stated honestly.** `DotBoxDRpcJsonLowerer.LowerBody` lowers the body
-  **statements** unchanged. Net-new generator code: (a) building the IR parameter list from the sync-in
-  captures, and (b) ensuring captured-local **reads** resolve to the IR parameters. The lowerer resolves
-  every identifier to `Var(name)` with no rename hook (`DotBoxDRpcJsonLowerer.Expressions.cs`), so the IR
-  parameters **must use the original capture names** (no `__cap_` prefix) — accepting that a kernel-local
-  may not shadow a capture name. No identifier-rename pass is invented.
+  **statements** unchanged. Phase 2 builds a zero-argument IR function for no-capture lambdas. Phase 3 adds
+  the capture-bag record parameter, generated sync-out locals, and the assignment override for bag-property
+  writes. No identifier-rename pass is invented.
 - **Anonymous kernel identity.** `pluginId = "$anon:" + HookChainIdentity.Compute(invocation)` (FNV-1a of
   file path + span start). Verified to pass `ValidateText` / descriptor guards. The generator emits
   `module.id == pluginId` and `module.metadata.pluginId == pluginId` identically (the existing RPC factory
   pattern). Per-connection `RemoteKernelControl` construction naturally clears the install cache on
   reconnect.
 - **Concurrency-safe install is mandatory.** `EnsureAnonymousKernelAsync` uses
-  `ConcurrentDictionary<string, Task<string>>` (install-once-per-id-per-connection via `GetOrAdd` of a
-  `Task`). A plain check-then-install races: two concurrent first-calls double-install, and the same-owner
+  `ConcurrentDictionary<string, Lazy<Task<string>>>` (install-once-per-id-per-connection via `GetOrAdd` of a
+  lazy task). A plain check-then-install races: two concurrent first-calls double-install, and the same-owner
   reinstall guard (`KernelRegistry.Add`, DBXK060) **revokes the in-flight kernel mid-execution**.
 - **`InterceptsLocationAttribute` emission must be deduplicated up front.**
   `DotBoxDHookChainInterceptorEmitter.Emit` calls `AddSource("DotBoxDInterceptsLocationAttribute.g.cs", ...)`.
@@ -308,32 +305,27 @@ exactly as `MonsterKillerKernel` already uses it.
 - **Null-interception is a visible diagnostic.** If `GetInterceptableLocation` returns null, emit a build
   diagnostic instead of silently leaving a throwing stub. Ensure the `InvokeAsync<TReturn>(Func<...>)`
   overload is the **sole** candidate at the call site to avoid overload-resolution mis-binding.
-- **World surface = flat scalars only.** All v2-style `world.Monsters.Get(id)` / `monster.Name` references
-  are removed from Phase-2 examples. `DotBoxDRpcJsonLowerer.LowerInvocation` accepts only
-  `[HostBinding]`-annotated methods called directly on the lambda parameter
-  (`world.GetHealth(id)`, `world.GetLevel(id)`, `world.GetPosition(id)`, `world.IsMonster(id)`,
-  `world.KillMonster(id)`, `world.GetThreat(id)`). The kernel body assembles any DTO from those scalars,
-  exactly as `MonsterKillerKernel` does.
+- **World surface.** Object snapshots use the flat `world.GetMonster(id)` host binding. Member access such
+  as `monster.Health` lowers through `record.get` by `MonsterSnapshot` declaration order.
 
 ### File-level tasks
 
 | File | Action |
 |---|---|
 | `src/CodeGeneration/.../HookChains/InterceptsLocationAttributeEmitter.cs` | **Create.** Shared one-shot emitter for `DotBoxDInterceptsLocationAttribute.g.cs`. Refactor `DotBoxDHookChainInterceptorEmitter.Emit` to call it instead of emitting the attribute itself. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Create.** Detection (receiver-type guard), lambda-shape validation, `AnalyzeDataFlow` sync-in capture analysis, `DotBoxDRpcJsonLowerer.LowerBody` invocation, IR function construction (sync-in captures as leading params using original names), manifest + package JSON (mirrors `RpcKernelModelFactory.EmitPackage`: `mode=Auto`, `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=function id, `requiredCapabilities` from the host-binding sink). Returns `InvokeAsyncResult(Package, Interception)`. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode sync-in captures → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits a null-interception diagnostic when location is null. |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Create.** Detection (receiver-type guard), lambda-shape validation, ambient-capture rejection, `DotBoxDRpcJsonLowerer.LowerBody` invocation, zero-argument IR function construction, manifest + package JSON (mirrors `RpcKernelModelFactory.EmitPackage`: `mode=Auto`, `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=function id, `requiredCapabilities` from the host-binding sink). Returns `InvokeAsyncResult(Package, Interception)`. |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode zero arguments → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits a null-interception diagnostic when location is null. |
 | `src/CodeGeneration/.../PluginPackageGenerator.cs` | **Modify.** Add the fourth `CreateSyntaxProvider` pipeline; register the package output (reuse `AddSource(package.HintName, package.Source)`); wire the combined attribute-dedup provider; register the interceptor output. |
 | `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs` | **Modify.** Add `Metadata.KernelInvocationSurfaceType` constant (FQN of `RemoteKernelControl`). |
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` | **Modify `RemoteKernelControl`.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Task<string>>` caching, calling `_control.InstallKernelRpcAsync`. |
+| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
 
 ### Generator / runtime / wire pieces that change
 
 - **Generator:** new pipeline + two new emitters + shared attribute emitter. Reuses `DotBoxDRpcJsonLowerer`,
   `DotBoxDHostBindingExpressionLowerer` (capability sink), `DotBoxDRpcTypeMapper`, `HookChainIdentity`.
-- **Runtime:** new `RemoteKernelControl` members only. **No new IPC method this phase** — sync-in uses the
-  existing `InstallKernelRpcAsync` + `InvokeKernelRpcAsync(pluginId, byte[]) → byte[]` (the response is the
-  bare return value, no envelope needed yet).
-- **Wire:** unchanged. `EncodeArguments(syncInCaptures)` → existing `InvokeKernelRpcAsync` →
+- **Runtime:** new `RemoteKernelControl` members only. **No new IPC method this phase** — no-capture calls use
+  the existing `InstallKernelRpcAsync` + `InvokeKernelRpcAsync(pluginId, byte[]) → byte[]` path.
+- **Wire:** unchanged. `EncodeArguments(Array.Empty<KernelRpcValue>())` → existing `InvokeKernelRpcAsync` →
   `DecodeValue(returnValue)`.
 
 ### Tests (Phase 2)
@@ -342,8 +334,8 @@ Generator tests (in `tests/DotBoxD.Kernels.Tests/Plugins/Rpc/`, the existing ext
 self-contained string fixtures with inline stub `RemoteKernelControl`/`IGameWorldAccess`):
 
 - `InvokeAsync_block_body_lambda_generates_interceptor_and_package`.
-- `InvokeAsync_capture_read_adds_leading_ir_parameter` — IR function has `1 + captureCount` params.
-- `InvokeAsync_unsupported_capture_type_emits_no_output` — fails safe.
+- `InvokeAsync_no_capture_block_body_generates_zero_argument_package`.
+- `Captured_lambda_is_ignored_until_capture_marshalling_strategy_is_corrected` — fails safe for ambient captures.
 - `InvokeAsync_expression_body_lambda_is_ignored` (use `InvokeKernel` instead).
 - `InvokeAsync_null_interceptable_location_emits_diagnostic`.
 - `InterceptsLocationAttribute_emitted_once_when_both_hookchain_and_invokeasync_present` — the dedup guard.
@@ -355,117 +347,61 @@ Runtime/round-trip tests (the anonymous package validated + executed via `Plugin
   `ValidatePrepared` accept the `$anon:` package (rpcEntrypoint set, return type known).
 - `Anonymous_kernel_capability_gating_derived_from_lambda_body` — required capabilities equal exactly the
   host-binding set; install fails when a grant is missing.
-- `Invoke_single_capture_passes_bare_value` and `Invoke_multi_mixed_type_captures_round_trip` — exercise the
-  1-param bare path and the N-param `FromList(values, values[0].Type)` heterogeneous frame.
+- `No_capture_invoke_uses_empty_argument_frame` — exercises the zero-argument `BuildRpcInput` path.
 - `Concurrent_first_invokes_install_once` — `EnsureAnonymousKernelAsync` does not double-install.
 
 ### Exit criteria (Phase 2)
 
-Build green; a GameServer sample `InvokeAsync` call that reads a captured `monsterId` local and returns a
-`MonsterDto[]` assembled from flat bindings compiles, lowers, installs, runs sandboxed, and returns the
-correct value end-to-end; capability gating denies a lambda that touches an ungranted binding.
+Build green; a GameServer sample `InvokeAsync` call that uses a no-capture `world.GetMonster("monster-2")`
+lambda compiles, lowers, installs, runs sandboxed, and returns the correct value end-to-end; capability gating
+denies a lambda that touches an ungranted binding.
 
 ---
 
-## Phase 3 — `InvokeAsync` sync-out (closure write-back via response envelope)
+## Phase 3 — `InvokeAsync` explicit capture-bag sync-in/out
 
-**Goal.** Support locals **assigned** inside the lambda being written back into the caller's closure after
-the await. This requires (a) lowering write-back captures, (b) a response that carries mutated captures
-alongside the return value, (c) the interceptor writing them back.
+**Goal.** Support sync-in/out without relying on compiler closure internals. The caller passes a mutable
+capture object explicitly, and the lambda takes that object as its second parameter:
 
-### Decisions folded in from review
+```csharp
+await server.Kernels.InvokeAsync(capture, (IGameWorldAccess world, MonsterProbeCapture bag) =>
+{
+    var monster = world.GetMonster(bag.MonsterId);
+    bag.LastHealth = monster.Health;
+    return monster.Name;
+});
+```
 
-- **Sync-out cannot widen the interceptor signature.** A C# interceptor's non-receiver parameters must
-  match the intercepted method exactly; it cannot add `out`/`ref`. Write-back therefore happens **inside
-  the generated interceptor body** (which replaces the call expression in the caller's method, where the
-  caller's locals are in scope), assigning the decoded sync-out values back to those locals. No
-  closure reflection.
-- **Sync-out captures = `WrittenInside` ∩ enclosing-scope locals, minus lambda-declared locals.** A
-  capture that is both read and written is a sync-in **parameter** that the IR body reassigns via `set`
-  (the interpreter shares one slot space for params + locals, so reassigning a parameter is legal and is
-  read back at return). A **write-only** capture (assigned, never read inside) has no leading param and the
-  generator must declare an IR local slot for it.
-- **Response envelope, not `PluginManifest.Metadata`.** `PluginManifest` has **no** `Metadata` member
-  (verified). Two viable carriers for the per-kernel `syncOutCount`:
-  - **Module metadata** — `module.metadata` is an open string→string dictionary the JSON importer
-    enumerates without a key whitelist (verified: `JsonImporter.ReadMetadata`). Emit
-    `"$anon.syncOutCount":"N"` and read via `kernel.Package.Module.Metadata["$anon.syncOutCount"]`.
-  - **Field-count inference** — the entrypoint returns `Record([syncOut0,…,syncOutK-1, returnValue])`;
-    `syncOutCount = ((RecordValue)result).Fields.Count - 1`. **Recommended** (no importer dependency), with
-    an install-time shape validator (new diagnostic `DBXK073`) asserting the IR return type is a Record
-    whose arity ≥ 1.
-- **Return-wrapping must be structural, not string substitution.** Scanning the lowered JSON for
-  `{"op":"return","value":` is unsound: bodies have **multiple** returns (inside `if`/`else`, nested
-  blocks). The `record.new([captures…, userReturn])` wrapping is emitted by the **new factory** at every
-  return site, by lowering each return statement's value through the lowerer and wrapping it — i.e. the
-  factory drives `DotBoxDRpcJsonLowerer` per return-statement and synthesizes the record, rather than
-  post-processing the body string. (If a single-return constraint is acceptable for v1 sync-out, the
-  factory may reject multi-return lambdas with a clear diagnostic instead — see Risks.)
-- **New IPC method `InvokeAnonymousKernelRpcAsync`** because the response now carries an envelope. Add a
-  small `AnonResponseCodec` (`[varint syncOutCount][syncOut values…][returnValue]`) reusing the codec
-  primitives — which requires making `KernelRpcBinaryCodec.WriteLength`/`WriteValue`/`Reader` **internal**
-  (they are currently private). `AnonResponseCodec.Decode(ReadOnlyMemory<byte>)` drives the `ref struct
-  Reader` by ref and **must call `EnsureConsumed()`** to preserve the existing trailing-byte tamper guard.
-  Alternative that avoids any IPC contract change: encode the envelope **as a single `Record` value**
-  through the existing `InvokeKernelRpcAsync` (the server already returns one `KernelRpcValue`; a
-  `Record(returnValue, syncOut0, …)` fits). **Recommended:** the single-Record-over-existing-IPC approach
-  for minimal surface; promote to a dedicated `AnonResponseCodec` + IPC method only if a non-record return
-  type makes the wrapper ambiguous.
-- **Nullable-reference captures are rejected in v1 sync-out (and sync-in).** `KernelRpcValue.String(null)`
-  coerces to empty, and `KernelRpcValueConverter.ToSandboxValue` validates each value's kind against the
-  IR-declared `SandboxType`; a `string` IR parameter cannot receive a `Unit`-kind value. So a
-  `string? lastMonsterName` capture cannot be both String-typed and null-tolerant. **v1 emits a clear
-  diagnostic for nullable-reference-type captures**; the spec example must use a non-nullable `string`
-  (`firstMonsterName`) for the captured value, or accept that null becomes empty-string with a documented
-  caveat.
+### Implemented decisions
 
-### File-level tasks
-
-| File | Action |
-|---|---|
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Modify.** Add sync-out capture classification; declare IR slots for write-only captures; lower each return to wrap `record.new([captures…, userReturn])`; reject nullable-reference captures and (if chosen) multi-return lambdas with diagnostics. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Modify.** After the await, decode the response Record and assign each sync-out field back to the caller's local. |
-| `src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs` (or new `AnonymousKernelPackageValidator.cs`) | **Modify/Create.** `DBXK073`: anonymous entrypoint return type must be a Record with arity == syncOutCount + 1. |
-| `src/Hosting/DotBoxD.Plugins/Runtime/Rpc/KernelRpcBinaryCodec.cs` | **Modify (only if the dedicated-codec path is chosen).** Make `WriteLength`/`WriteValue`/`Reader` internal. |
-| `src/Hosting/DotBoxD.Plugins/Runtime/Rpc/AnonResponseCodec.cs` | **Create (only if the dedicated-codec path is chosen).** Encode/decode envelope; `Decode` calls `EnsureConsumed`. |
-| `samples/.../Server.Abstractions/Ipc/IGamePluginControlService.cs` + `samples/.../Server/Ipc/GamePluginControlService.cs` | **Modify (only if the dedicated-codec path is chosen).** Add `InvokeAnonymousKernelRpcAsync(pluginId, byte[]) → byte[]` that reads `syncOutCount` from module metadata or infers it, splits the result Record into `(syncOut[], returnValue)`, and returns the envelope. |
+- Ambient closure captures are rejected for both lambda-only and capture-bag calls.
+- The capture bag is encoded as one `KernelRpcValue.Record` argument.
+- Reads like `bag.MonsterId` lower to `record.get(Var("bag"), index)`.
+- Simple assignments to settable bag properties lower to generated sync-out locals.
+- If sync-out exists, each return is structurally wrapped as `Record([returnValue, syncOut0, ...])`.
+- The existing `InvokeKernelRpcAsync` response carries that single record; no new IPC method or codec is
+  needed.
+- The generated interceptor checks the expected response field count and writes decoded sync-out values
+  back onto the same bag object after the await.
 
 ### Tests (Phase 3)
 
-- `Invoke_with_write_capture_writes_back_to_local_after_await`.
-- `Invoke_read_and_write_capture_round_trips_via_set_and_return_record`.
-- `Write_only_capture_gets_dedicated_ir_slot`.
-- `Nullable_reference_capture_emits_diagnostic`.
-- `Multi_return_lambda_wraps_every_return` (or `…emits_diagnostic` if the single-return constraint is taken).
-- `Response_record_shape_mismatch_fails_install_DBXK073`.
-- `AnonResponseCodec_round_trips_and_rejects_trailing_bytes` (if the dedicated codec is used).
-
-### Exit criteria (Phase 3)
-
-The full spec example — `lastMonsterName` synced in, reassigned inside the lambda, synced out, and
-`MonsterDto[]` returned — works end-to-end with non-nullable captures, with capability gating intact.
+- Generation coverage for capture-bag parameter JSON and sync-out assignment emission.
+- Runtime coverage for record argument encoding, response envelope decoding, and bag write-back.
+- GameServer end-to-end sample coverage through the real server IPC path.
 
 ---
 
-## Phase 4 — richer object-returning world surface (sequenced last, fully planned)
+## Phase 4 — richer object-returning world surface
 
-**Goal.** Support the literal spec surface: `world.Monsters.Get(id)` returns an object whose
-`.Name/.Id/.Health/.Level` the lambda reads, instead of the kernel assembling a DTO from flat scalar bindings.
-This is sequenced last because it is the only piece that touches the **host-binding type system** (object/
-record-returning bindings + member-access lowering on a binding result) — Phases 1–3 deliberately avoid it so
-they ship on the existing scalar surface. It is a real planned phase, not a vague follow-up; it just depends
-on Phases 2–3 landing first.
+**Goal.** Support `world.GetMonster(id)` returning an object snapshot whose
+`.Name/.Id/.Health/.Level` the lambda reads, instead of forcing the kernel to assemble values from separate
+scalar bindings.
 
 ### Why it is the heaviest piece (verified)
 
-`DotBoxDHostBindingExpressionLowerer` accepts only scalar binding return types today — a non-scalar return
-flows through `DotBoxDTypeNameReader.SandboxTypeName` and comes back `"unsupported"`, failing the lower safe.
-So the object surface is not a config change; it requires teaching the lowerer to emit a **Record-typed**
-binding call and to route subsequent member access through the existing `record.get(index)` intrinsic. The IR
-foundation already exists (`SandboxType.Record` / `RecordValue` / `record.get`, added for `[KernelRpcService]`
-DTOs — see `docs/design/plugin-fluent-hooks-api/followups.md` §2), and `DotBoxDRpcJsonLowerer.LowerMemberAccess`
-already emits `record.get`; the gap is purely on the **host-binding** side (binding result typed as a Record)
-plus the matching server-side binding descriptor.
+`DotBoxDRpcJsonLowerer` already lowers record DTO member access to `record.get`; the implementation adds the
+server-side `MonsterSnapshot` binding descriptor and uses that existing member-access path.
 
 ### Decisions / design
 
@@ -486,18 +422,14 @@ plus the matching server-side binding descriptor.
 
 | File | Action |
 |---|---|
-| `samples/.../Server.Abstractions/IGameWorldAccess.cs` | **Modify.** Add `MonsterSnapshot GetMonster(string entityId)` (positional record `MonsterSnapshot(string Id, string Name, int Health, int Level, int Position)`) with `[HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]`. |
+| `samples/.../Server.Abstractions/IGameWorldAccess.cs` | **Modify.** Add `MonsterSnapshot GetMonster(string entityId)` (positional record `MonsterSnapshot(string Id, string Name, int Health, int Level, int Position)`) with `[HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu \| SandboxEffect.Alloc \| SandboxEffect.HostStateRead)]`. |
 | `samples/.../Server/Simulation/GameWorldHost.cs` (binding registration) | **Modify.** Register the matching binding with `ReturnType = SandboxType.Record([String,String,Int,Int,Int])` backed by the live `GameWorld`/`GameEntity` lookup. `BindingRegistryValidator` already accepts Records recursively — not a blocker. |
-| `src/CodeGeneration/.../Lowering/DotBoxDTypeNameReader.cs` | **Modify.** Map the `MonsterSnapshot` symbol to its `SandboxType.Record([...])` (instead of `"unsupported"`), so host-binding return-type resolution succeeds. |
-| `src/CodeGeneration/.../Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs` | **Modify.** Accept a Record binding return type; emit the binding `CallExpression` typed as the Record; allow a subsequent `MemberAccessExpressionSyntax` on the result to lower via `record.get(fieldIndex)` (reuse `DotBoxDRpcJsonLowerer.LowerMemberAccess`, resolving the member→index from the snapshot's declaration order). |
+| `src/CodeGeneration/.../Rpc/DotBoxDRpcJsonLowerer.Expressions.cs` | **Reuse.** Record DTO member access already lowers via `record.get(fieldIndex)` by declaration order. |
 | `samples/.../Plugin/Client/RemotePluginServer.cs` (`RemoteMonsterControl`) | **Modify (optional).** Add an ordinary IPC `GetMonsterAsync(id)` only if non-sandbox plugin code (outside `InvokeAsync`) also needs the snapshot. Not required for the `InvokeAsync` lambda path. |
-| `samples/.../Plugin/Program.cs` | **Modify.** Add the literal-spec `InvokeAsync` example using `world.Monsters.Get(id).Name` to demonstrate the object surface end-to-end. |
+| `samples/.../Plugin/Program.cs` | **Modify.** Add `InvokeAsync` examples using `world.GetMonster(id).Health` and the capture-bag path using `world.GetMonster(id).Name`. |
 
-> The `world.Monsters.Get(id)` spelling (a `.Monsters.Get` sub-object) vs a flat `world.GetMonster(id)`:
-> the binding is flat (`host.world.getMonster`); the `world.Monsters.Get(...)` shape would require the lowerer
-> to also recognize a `.Monsters` grouping property on the lambda parameter. Recommended: expose it as flat
-> `world.GetMonster(id)` to match every other binding, OR add a thin analyzer-recognized `Monsters.Get`
-> grouping alias if the nested spelling is wanted — decide at Phase 4 start.
+The nested spelling `world.Monsters.Get(id)` remains a possible ergonomic alias, but the implemented verified
+binding is flat and matches the rest of `IGameWorldAccess`.
 
 ### Tests (Phase 4)
 
@@ -506,21 +438,14 @@ plus the matching server-side binding descriptor.
 - `Snapshot_field_order_mismatch_fails_registration`.
 - `Method_call_on_snapshot_fails_safe` (no package emitted).
 - `Snapshot_read_contributes_only_its_own_capability` (install deny without the grant).
-- End-to-end: an `InvokeAsync` lambda using `world.Monsters.Get("monster-3").Health` returns the live value.
+- End-to-end: an `InvokeAsync` lambda using `world.GetMonster("monster-2").Health` returns the live value.
 
 ### Exit criteria (Phase 4)
 
-The literal spec example — `world.Monsters.Get(id)` with `.Name/.Id/.Health/.Level` reads inside the
+The flat snapshot example — `world.GetMonster(id)` with `.Name/.Id/.Health/.Level` reads inside the
 `InvokeAsync` lambda — compiles, lowers (Record binding + `record.get` member access), installs under the
-snapshot capability, runs sandboxed, and returns the correct `MonsterDto[]`. The flat-surface path from
-Phases 2–3 still works unchanged.
-
-### v1 fallback (Phases 2–3, until Phase 4 lands)
-
-Keep the flat surface and let the lambda assemble any DTO from
-`world.GetHealth/GetLevel/GetPosition(...)`, exactly as `MonsterKillerKernel` already does — **no** binding,
-lowerer, or IPC change. This fully covers the data-fetching use case; Phase 4 is the ergonomics upgrade to the
-literal object spelling.
+snapshot capability, runs sandboxed, and returns the correct value. The scalar binding path still works
+unchanged.
 
 ---
 
@@ -550,9 +475,9 @@ literal object spelling.
 - **Anonymous `InvokeAsync` kernels reuse the existing ownership + revocation path.** They install through
   `InstallKernelRpcAsync`, are added to the session's `_owned` set, and are revoked on disconnect like any
   named kernel. No new lifecycle.
-- **Wire/IPC compatibility.** Phase 1 and Phase 2 add **no** wire or IPC contract change. Phase 3 adds at
-  most one **additive** IPC method (or zero, if the single-Record-over-existing-IPC option is taken); the
-  existing `InvokeKernelRpcAsync` and `InstallKernelRpcAsync` are unchanged.
+- **Wire/IPC compatibility.** All phases keep the existing IPC contract. Phase 3 carries sync-out as one
+  `KernelRpcValue.Record` returned by the existing `InvokeKernelRpcAsync` method; `InstallKernelRpcAsync` is
+  unchanged.
 
 ---
 
@@ -566,18 +491,18 @@ literal object spelling.
   chain and an `InvokeAsync` would crash the generator on a duplicate `AddSource`. Resolved by the shared
   one-shot emitter (Phase 2 prerequisite).
 - **[HIGH→resolved] Concurrent anonymous-kernel install race.** Without serialization, a second same-owner
-  install revokes the in-flight kernel mid-execution. Resolved by `ConcurrentDictionary<string,Task<string>>`
-  install-once-per-id.
+  install revokes the in-flight kernel mid-execution. Resolved by
+  `ConcurrentDictionary<string, Lazy<Task<string>>>` install-once-per-id.
 - **[MEDIUM] Multi-return sync-out wrapping.** Wrapping `record.new` at every return site is the correct,
   structural approach; the simpler single-return constraint (with a diagnostic) is an acceptable v1
   reduction if schedule-bound. Either is sound; **string substitution on the lowered JSON is not** and is
   excluded.
-- **[MEDIUM] `syncOutCount` storage.** `PluginManifest.Metadata` does not exist. Use field-count inference
-  + an install-time shape validator (recommended) or `module.metadata` (verified open dictionary). Do not
-  invent a manifest field.
-- **[MEDIUM] Nullable-reference captures.** Rejected in v1 because the IR scalar type system cannot model
-  "String-or-null." The spec's `string? lastMonsterName` must use a non-nullable capture or accept
-  null→empty with a documented caveat.
+- **[MEDIUM] Sync-out response field count.** `PluginManifest.Metadata` does not exist. The implementation
+  uses the generated interceptor's expected field count and validates the response record before assigning
+  sync-out values. Do not invent a manifest field.
+- **[MEDIUM] Nullable-reference capture-bag fields.** The IR scalar type system cannot model
+  "String-or-null"; `KernelRpcValue.String(null)` coerces to empty. Capture bags should use non-nullable
+  fields or accept null→empty with a documented caveat.
 - **[MEDIUM] Builder testability.** `tests/DotBoxD.Kernels.Tests` cannot see sample-internal types; a new
   sample-side test project with `InternalsVisibleTo` is required (Phase 1). Do not claim the existing test
   harness is reused unchanged for builder runtime tests.
@@ -585,10 +510,8 @@ literal object spelling.
   validates each wire arg against its own IR parameter type; `BuildRpcInput`'s
   `FromList(values, values[0].Type)` element-type tag is an internal positional-frame detail. Covered by a
   test.
-- **[MEDIUM] Object-returning world surface is the only host-binding-type-system change (Phase 4).** It is
-  fully planned (above) but sequenced last because it is the heaviest, highest-risk piece: the host-binding
-  lowerer accepts only scalar returns today. Phases 1–3 ship on the flat scalar surface; Phase 4 is the
-  ergonomics upgrade to the literal `world.Monsters.Get(id).Name` spelling.
+- **[MEDIUM→resolved] Object-returning world surface.** Implemented as the flat `world.GetMonster(id)`
+  snapshot binding with record-member access lowered through `record.get`.
 
 ---
 
@@ -604,28 +527,22 @@ literal object spelling.
   `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs`,
   `samples/.../Examples.GameServer.Plugin/Client/RemotePluginServer.cs` (`RemoteKernelControl`).
 - **Phase 3:** `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs`,
-  `…/InvokeAsyncInterceptorEmitter.cs`,
-  `src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs` (or new
-  `AnonymousKernelPackageValidator.cs`), and — only if the dedicated-codec path is chosen —
-  `KernelRpcBinaryCodec.cs`, `AnonResponseCodec.cs` (new), `IGamePluginControlService.cs` +
-  `GamePluginControlService.cs`.
-- **Phase 4 (deferred):** `samples/.../Server.Abstractions/IGameWorldAccess.cs`,
+  `…/InvokeAsyncCallShape*.cs`, `…/InvokeAsyncArgumentWriterSource.cs`,
+  `…/InvokeAsyncInterceptorEmitter.cs`, and `…/Rpc/DotBoxDRpcJsonLowerer.cs`.
+- **Phase 4:** `samples/.../Server.Abstractions/IGameWorldAccess.cs`,
   `samples/.../Server/Simulation/GameWorldHost.cs`,
-  `src/CodeGeneration/.../Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs`,
-  `src/CodeGeneration/.../Lowering/DotBoxDTypeNameReader.cs`.
+  `samples/.../Server/Simulation/GameWorld.cs`, and `samples/.../Plugin/Program.cs`.
 
 ## Docs
 
 Following `docs/design/plugin-fluent-hooks-api/`, new docs live under
 `docs/design/remote-plugin-server-builder/`:
 - `plan.md` — this document.
-- `invoke-async.md` — the InvokeAsync closure-capture inline-kernel deep dive (detection, lowering,
-  capture marshalling, wire envelope, capability gating, identity).
+- `invoke-async.md` — the InvokeAsync inline-kernel deep dive (detection, lowering, explicit capture-bag
+  marshalling, wire envelope, capability gating, identity).
 
 ## Suggested delivery
 
-Land **Phase 1** first (visible request, zero generator/wire risk, green CI). Then **Phase 2** (detection +
-lowering + sync-in, with the attribute-dedup and concurrency-safe install as hard prerequisites). Then
-**Phase 3** (sync-out). Then **Phase 4** (object-returning world surface — the literal `world.Monsters.Get(id)`
-spelling), sequenced last because it is the only host-binding-type-system change. Each phase is a separate
-commit/PR with its own green build + tests.
+Land **Phase 1** first (builder). Then **Phase 2** (anonymous no-capture InvokeAsync). Then **Phase 3**
+(explicit capture-bag sync-in/out). Then **Phase 4** (flat object snapshot surface via `world.GetMonster`).
+Each phase is a separate commit/PR with its own green build + tests.
