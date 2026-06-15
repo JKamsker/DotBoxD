@@ -42,7 +42,7 @@ public sealed class PluginInputAllocationTests
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await kernel.HandleAsync(new MismatchedWriterEventAdapter(), new IndexOnlyEvent("player-1")).AsTask());
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP033");
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK036");
         Assert.Empty(messages.Messages);
     }
 
@@ -54,7 +54,7 @@ public sealed class PluginInputAllocationTests
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.RegisterEventAdapter(new MismatchedWriterEventAdapter()));
 
-        Assert.Contains(ex.Diagnostics, d => d.Code == "SGP033");
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK036");
     }
 
     [Fact]

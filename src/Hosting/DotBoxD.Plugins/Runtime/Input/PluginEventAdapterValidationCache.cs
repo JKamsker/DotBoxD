@@ -40,7 +40,7 @@ internal static class PluginEventValueWriterShapeValidator
             writer.EventValueCount != parameters.Count)
         {
             throw new SandboxValidationException([
-                new SandboxDiagnostic("SGP033", "Plugin event value writer count does not match adapter parameters.")
+                new SandboxDiagnostic("DBXK036", "Plugin event value writer count does not match adapter parameters.")
             ]);
         }
     }
