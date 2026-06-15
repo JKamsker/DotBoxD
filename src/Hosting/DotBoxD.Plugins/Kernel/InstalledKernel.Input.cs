@@ -38,8 +38,14 @@ public sealed partial class InstalledKernel
            _plan.BindingReferences.TryGetValue(entrypoint, out var bindings) &&
            bindings.Count == 0;
 
-    private static SandboxValue SnapshotInput(SandboxValue input)
+    // Defensively copies a reused-buffer input before handing it to a second execution (the Handle
+    // hop after a reusing ShouldHandle). A shallow wrapper copy would still share the kernel's
+    // backing array, so a later same-shaped dispatch overwriting that array in place could corrupt a
+    // reference the second execution retained past the call (e.g. through escaped async). Copying the
+    // current elements into a fresh owned array makes the snapshot independent of any later reuse.
+    // Internal for regression coverage (see Fix_PAL_0046).
+    internal static SandboxValue SnapshotInput(SandboxValue input)
         => input is ListValue list
-            ? SandboxValue.FromList(list.Values, list.ItemType)
+            ? SandboxValue.FromOwnedList([.. list], list.ItemType)
             : input;
 }
