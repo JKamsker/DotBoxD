@@ -47,6 +47,7 @@
   <Folder Name="/src/CodeGeneration/">
     <Project Path="src/CodeGeneration/DotBoxD.Services.SourceGenerator/DotBoxD.Services.SourceGenerator.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
+    <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
 
   <Folder Name="/tests/">

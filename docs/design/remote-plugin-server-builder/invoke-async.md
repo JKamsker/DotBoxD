@@ -2,8 +2,9 @@
 
 This document specifies how `server.Kernels.InvokeAsync(lambda)` is detected, lowered to verified sandboxed
 IR at compile time, shipped over async IPC, and executed server-side. It also documents both capture paths:
-an explicit mutable capture bag, and a reflection-backed implicit-capture convenience path. The server never
-compiles plugin source; only verified IR crosses the boundary.
+an explicit mutable capture bag, and an implicit-capture convenience path whose generated reflection fallback
+can be statically rewritten by the DotBoxD Fody weaver. The server never compiles plugin source; only
+verified IR crosses the boundary.
 
 It corrects the reviewed designs where they were unsound and states every deferral explicitly.
 
@@ -53,8 +54,10 @@ var monsterName = await server.Kernels.InvokeAsync((IGameWorldAccess world) =>
 });
 ```
 
-Implicit captures use `lambda.Target` reflection in the generated interceptor. This is intentionally a
-convenience path; the explicit capture-bag overload remains the compiler-stable path.
+Implicit captures are emitted as `lambda.Target` reflection in the generated interceptor. When the
+`DotBoxD.Plugins.Fody` weaver runs and can prove the compiler-generated closure shape, it rewrites those
+helper calls to direct closure-field load/store IL. This remains a convenience path; the explicit capture-bag
+overload is the source-level, compiler-stable path.
 
 ### Object snapshot surface
 
@@ -110,7 +113,8 @@ var flow = semanticModel.AnalyzeDataFlow(lambdaBlock);
 - Lambda-only calls with no ambient captures lower to a zero-argument anonymous kernel.
 - Lambda-only calls with ambient local/parameter captures lower those captured symbols to IR parameters named
   after the source symbols. The generated interceptor reads and writes the compiler closure fields by source
-  symbol name via `lambda.Target` reflection.
+  symbol name via `lambda.Target` reflection, and the optional Fody weaver rewrites those helper calls to
+  static field access when the compiled call site exposes a safe compiler-generated display class.
 - Capture-bag calls also reject ambient `DataFlowsIn` / `DataFlowsOut`; only the explicit bag parameter can
   carry values across the boundary.
 - **Capture-bag sync-in** = the capture-bag object encoded as a `KernelRpcValue.Record`.
@@ -219,6 +223,19 @@ captured locals/parameters, emits IR parameters with their source symbol names, 
 that read/write fields with those names from `lambda.Target`. If the compiler does not expose a matching
 closure field, the interceptor throws a clear `NotSupportedException` and the caller should switch to the
 explicit capture bag.
+
+When `DotBoxD.Plugins.Fody` is enabled, it post-processes the compiled assembly after C# lowering:
+
+1. Find calls into the generated `DotBoxD.Plugins.Generated.InvokeAsyncInterceptors.InvokeAsync_*` methods.
+2. Read the delegate construction IL feeding each interceptor call to discover the compiler display-class
+   type for that source location.
+3. Find the generated async state machine for that interceptor.
+4. Replace `__ReadCapture(lambda, "field")` and `__WriteCapture(lambda, "field", value)` calls in
+   `MoveNext` with `lambda.Target`, a cast to the display class, and direct `ldfld` / `stfld` instructions.
+
+The weaver widens only the compiler-generated display class from private nested visibility to assembly
+visibility when needed. If any proof step fails, or if a field/type shape is not safely accessible, it leaves
+the original helper call in place, so the reflection fallback continues to work.
 
 ### Generated interceptor (no-capture)
 
@@ -385,5 +402,6 @@ refactored to call it.
 `DotBoxDGenerationNames.Metadata.KernelInvocationSurfaceType`,
 `DotBoxDGenerationNames.Metadata.KernelInvocationDelegateType`, `RemoteKernelControl` members
 (`InvokeAsync<TReturn>` stub, capture-bag `InvokeAsync<TCaptures,TReturn>` stub, `WireClient`,
-`EnsureAnonymousKernelAsync`), reflection capture helpers in generated interceptors, and the sample
-`world.GetMonster(id)` snapshot binding.
+`EnsureAnonymousKernelAsync`), reflection capture helpers in generated interceptors,
+`DotBoxD.Plugins.Fody` for safe static implicit-capture rewriting, and the sample `world.GetMonster(id)`
+snapshot binding.

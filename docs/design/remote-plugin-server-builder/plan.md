@@ -20,8 +20,9 @@ The user wants two additions, **without removing the imperative APIs**:
 2. **A new `server.Kernels.InvokeAsync(lambda)`** that lowers an anonymous block-body lambda to verified
    sandboxed IR at compile time (like the existing `InvokeKernel(lambda)` interceptor path), ships it over
    async IPC, and runs it server-side. No-capture lambdas and reflection-backed implicit local/parameter
-   captures use the lambda-only overload. Capture sync-in/out also has the implemented explicit mutable
-   capture-bag overload for compiler-stable marshalling.
+   captures use the lambda-only overload; the DotBoxD Fody weaver can rewrite safe implicit captures to
+   static closure-field IL. Capture sync-in/out also has the implemented explicit mutable capture-bag
+   overload for compiler-stable marshalling.
 
 ### The DotBoxD invariant (preserved throughout)
 
@@ -283,7 +284,9 @@ capture-bag overload because generated C# interceptors cannot directly access ca
   bag is encoded as a record argument, and assigned bag properties are decoded from a response record and
   written back after the await. The convenience mode is lambda-only implicit capture: the generated
   interceptor uses `lambda.Target` reflection and source symbol names to read/write compiler closure fields.
-  If the compiler shape does not expose the expected field, it throws and the caller can switch to the bag.
+  `DotBoxD.Plugins.Fody` can post-process the compiled assembly and replace those helper calls with direct
+  display-class `ldfld`/`stfld` access when the closure type is provable. If the compiler shape does not
+  expose the expected field, the reflection fallback remains and the caller can switch to the bag.
 - **Lowerer reuse is partial, stated honestly.** `DotBoxDRpcJsonLowerer.LowerBody` lowers the body
   **statements** unchanged. Phase 2 builds either a zero-argument IR function or an IR function whose
   parameters are the implicit captured locals/parameters by source symbol name. Phase 3 adds the capture-bag
@@ -319,6 +322,7 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 | `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode arguments → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits reflection helpers for implicit captures and a null-interception diagnostic when location is null. |
 | `src/CodeGeneration/.../PluginPackageGenerator.cs` | **Modify.** Add the fourth `CreateSyntaxProvider` pipeline; register the package output (reuse `AddSource(package.HintName, package.Source)`); wire the combined attribute-dedup provider; register the interceptor output. |
 | `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs` | **Modify.** Add `Metadata.KernelInvocationSurfaceType` constant (FQN of `RemoteKernelControl`). |
+| `src/CodeGeneration/DotBoxD.Plugins.Fody/**` | **Create.** Fody add-in that discovers generated `InvokeAsync_*` call sites, maps each interceptor to its compiler display class, rewrites safe reflection helper calls to static closure-field IL, and leaves reflection fallback calls untouched otherwise. |
 | `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
 
 ### Generator / runtime / wire pieces that change
@@ -352,6 +356,7 @@ Runtime/round-trip tests (the anonymous package validated + executed via `Plugin
   host-binding set; install fails when a grant is missing.
 - `No_capture_invoke_uses_empty_argument_frame` — exercises the zero-argument `BuildRpcInput` path.
 - `Implicit_capture_reflection_round_trips_sync_in_and_sync_out`.
+- `Implicit_capture_fody_weaver_rewrites_safe_display_class_to_direct_field_access`.
 - `Concurrent_first_invokes_install_once` — `EnsureAnonymousKernelAsync` does not double-install.
 
 ### Exit criteria (Phase 2)
@@ -488,11 +493,12 @@ unchanged.
 
 ## Risks and limits
 
-- **[HIGH→resolved with two paths] Interceptor closure-local capture marshalling is infeasible.** Generated
-  interceptor methods cannot read or write caller locals by name, and closure-`Target` reflection remains
-  compiler-shape-dependent. The implemented stable path is an explicit mutable capture-bag overload on
-  `InvokeAsync`; the lambda-only overload also supports an opt-in convenience path that uses reflection and
-  throws clearly if the closure field cannot be found.
+- **[HIGH→resolved with two paths plus IL rewrite] Interceptor closure-local capture marshalling is
+  infeasible in source.** Generated interceptor methods cannot read or write caller locals by name. The
+  implemented stable path is an explicit mutable capture-bag overload on `InvokeAsync`; the lambda-only
+  overload also supports a reflection fallback. `DotBoxD.Plugins.Fody` opportunistically rewrites safe
+  compiler-generated display-class shapes to static field access after compilation and keeps the fallback
+  when it cannot prove the shape.
 - **[HIGH→resolved] `InterceptsLocationAttribute` hint-name collision.** A compilation with both a hook
   chain and an `InvokeAsync` would crash the generator on a duplicate `AddSource`. Resolved by the shared
   one-shot emitter (Phase 2 prerequisite).
@@ -530,6 +536,7 @@ unchanged.
   `src/CodeGeneration/.../HookChains/InterceptsLocationAttributeEmitter.cs` (new),
   `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` (new),
   `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` (new),
+  `src/CodeGeneration/DotBoxD.Plugins.Fody/**` (new),
   `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs`,
   `samples/.../Examples.GameServer.Plugin/Client/RemotePluginServer.cs` (`RemoteKernelControl`).
 - **Phase 3:** `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs`,
