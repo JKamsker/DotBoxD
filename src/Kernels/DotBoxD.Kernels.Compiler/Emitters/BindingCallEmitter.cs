@@ -55,13 +55,27 @@ internal static class BindingCallEmitter
         ILGenerator il,
         Action<Expression> emitExpression)
     {
+        // Evaluate the arguments before the synthetic ChargeValueArray charge. An argument may itself
+        // be a side-effecting binding call (now compilable for descriptor-governed stubs), and the
+        // interpreter evaluates every argument expression before charging the binding call. Charging
+        // the array first would let a tight fuel/allocation budget throw QuotaExceeded before a
+        // side-effecting argument runs, so the compiled run would skip an effect the interpreter
+        // performs. Materializing the arguments into locals first preserves that ordering.
+        var arg0 = il.DeclareLocal(typeof(SandboxValue));
+        emitExpression(call.Arguments[0]);
+        il.Emit(OpCodes.Stloc, arg0);
+        var arg1 = il.DeclareLocal(typeof(SandboxValue));
+        emitExpression(call.Arguments[1]);
+        il.Emit(OpCodes.Stloc, arg1);
+
         il.Emit(OpCodes.Ldarg_0);
         EmitInt32(il, call.Arguments.Count);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeValueArray)));
+
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldstr, call.Name);
-        emitExpression(call.Arguments[0]);
-        emitExpression(call.Arguments[1]);
+        il.Emit(OpCodes.Ldloc, arg0);
+        il.Emit(OpCodes.Ldloc, arg1);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CallBinding2)));
     }
 

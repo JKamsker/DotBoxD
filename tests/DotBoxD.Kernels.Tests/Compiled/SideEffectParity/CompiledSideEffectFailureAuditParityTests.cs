@@ -293,8 +293,7 @@ public sealed class CompiledSideEffectFailureAuditParityTests
 
         // The interpreted sink: first message must have been delivered before quota hit
         // (the quota is enforced at the second call); second must NOT be present.
-        Assert.Equal(1, sinkI.Messages.Count);
-        Assert.Equal("msg1", sinkI.Messages[0].Message);
+        Assert.Equal("msg1", Assert.Single(sinkI.Messages).Message);
 
         AssertFailedRunSummary(interpreted, SandboxErrorCode.QuotaExceeded);
         AssertFailedRunSummary(compiled, SandboxErrorCode.PolicyDenied);
