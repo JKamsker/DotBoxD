@@ -200,7 +200,7 @@ Binding a kernel **class** is no longer a hook-chain terminal — it moved to
 `server.Kernels.Register<TService, TKernel>()`. That call resolves the kernel package, installs it
 through the owning session under the resolved per-plugin policy, and wires it **generically** —
 resolving the adapter by the manifest's event name instead of the old hardcoded `WireHook` switch
-([GamePluginControlService.cs:59-77](../../../examples/GameServer/DotBoxD.Kernels.Game.Server/Ipc/GamePluginControlService.cs)
+([GamePluginControlService.cs](../../../samples/Kernels/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)
 is deleted). See [kernel-binding-model.md](kernel-binding-model.md) §4.
 
 `server.Events` is the fire-and-forget mirror of `server.Hooks` (same chain surface; isolates handler

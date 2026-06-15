@@ -22,5 +22,7 @@ and the full spec under [`docs/Specs/`](../Specs/).
 > **Important:** the kernel sandbox is the real boundary. It is **not** the same as loading a .NET
 > plugin assembly — see [security/sandbox-caveats.md](../security/sandbox-caveats.md).
 
-Diagnostics use the `DBXK###` prefix. **See also:** [`samples/Kernels`](../../samples/Kernels),
-[plugins authoring](../../samples/Kernels/PluginAuthoring), and [runtime](runtime.md).
+Diagnostics use the `DBXK###` prefix. **See also:** the GameServer sample under
+[`samples/Kernels/GameServer`](../../samples/Kernels/GameServer), [runtime](runtime.md), and
+[`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for kernel scenarios no longer shown
+by maintained samples.

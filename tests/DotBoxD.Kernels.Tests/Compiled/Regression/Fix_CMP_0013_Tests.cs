@@ -8,10 +8,10 @@ using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
 namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
-// Regression guard for CMP-0013: the maintained HTTP transport example must keep proving the
-// consumer-facing safe setup (AddNetworkBindings + GrantHttpGet) through the public package
-// surface, with one allowed request and one denied out-of-allowlist request. This mirrors what
-// samples/Kernels/HttpTransport runs, so behavior drift in the documented setup is caught here too.
+// Regression guard for CMP-0013: the HTTP transport setup (AddNetworkBindings + GrantHttpGet) must
+// keep proving the consumer-facing safe setup through the public package surface, with one allowed
+// request and one denied out-of-allowlist request. The standalone HTTP transport sample is no longer
+// maintained, so this behavior is covered directly here.
 public sealed class Fix_CMP_0013_Tests
 {
     private const string AllowedHost = "api.example.com";

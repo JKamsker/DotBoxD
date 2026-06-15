@@ -10,10 +10,10 @@ namespace DotBoxD.Kernels.Tests.Plugins;
 public sealed class PluginAddendumTests
 {
     [Fact]
-    public void Fire_damage_contracts_live_in_server_abstractions_and_kernel_lives_in_local_plugin()
+    public void Fire_damage_contracts_live_in_test_fixture_abstractions_and_kernel_lives_in_local_fixture()
     {
-        Assert.Equal("DotBoxD.Kernels.PluginIpc.Server.Abstractions", typeof(DamageEvent).Assembly.GetName().Name);
-        Assert.Equal("DotBoxD.Kernels.PluginLocal", typeof(FireDamageKernel).Assembly.GetName().Name);
+        Assert.Equal("DotBoxD.Kernels.TestFixtures.PluginAbstractions", typeof(DamageEvent).Assembly.GetName().Name);
+        Assert.Equal("DotBoxD.Kernels.TestFixtures.PluginLocal", typeof(FireDamageKernel).Assembly.GetName().Name);
         Assert.Same(typeof(FireDamageKernel).Assembly, typeof(FireDamagePluginPackage).Assembly);
     }
 

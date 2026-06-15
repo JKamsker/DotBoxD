@@ -1,561 +1,154 @@
 # Addendum Implementation Examples
 
-This branch implements the addendum as a hosting-layer plugin model:
+The addendum is now demonstrated through one maintained runnable example:
 
-- `DotBoxD.Plugins` exposes live values, typed live contexts, kernel state, hook pipelines, plugin manifests, and safe message bindings.
-- `DotBoxD.Plugins.Analyzer` provides local SDK diagnostics for forbidden File IO in kernels and unsupported live setting types.
-- `DotBoxD.Kernels.PluginIpc.Server.Abstractions` owns the server-side event contracts that plugin clients implement against.
-- Plugin packages carry JSON Safe IR plus manifest metadata. The server validates manifest identity, declared effects, and the Safe IR module with the existing Safe IR validator before installation.
-- Hook handlers run through `SandboxHost.ExecuteAsync`. The local examples reference a generated package factory for trusted development-time convenience; production upload accepts serialized JSON package data and does not load arbitrary plugin DLLs.
+- `samples/Kernels/GameServer/Examples.GameServer.Server.Abstractions` defines the server-owned event
+  contracts, plugin control-plane service contract, MessagePack DTOs, and host binding facade.
+- `samples/Kernels/GameServer/Examples.GameServer.Plugin` is the plugin child process. It authors
+  kernels in C#, resolves the analyzer-generated packages, ships verified IR over IPC, tunes live
+  settings, and invokes a kernel RPC service.
+- `samples/Kernels/GameServer/Examples.GameServer.Server` is the parent process. It hosts the world
+  simulation, installs packages into `DotBoxD.Plugins`, grants least-privilege policies, binds
+  host-world capabilities, and unloads kernels when the plugin connection ends.
 
-## Recommended Documentation Walkthrough
+The old topic-specific examples were removed to keep one high-quality sample. Their historical source
+is preserved by the `examples-before-prune-2026-06-15` tag, and the feature gaps left by removing them
+are tracked in [`docs/examples/coverage-gaps.md`](../../examples/coverage-gaps.md).
 
-The public documentation should lead with the kernel-class authoring model, then show how the server installs and runs the lowered Safe IR package. The snippets below follow the addendum's recommended order.
+## Recommended Walkthrough
 
-### 1. Implement A Simple Filter
+The public docs should lead with the kernel-class authoring model, then show how the server installs
+and runs the lowered package without loading arbitrary plugin code.
 
-Use simple filters for pure read-only decisions.
+### 1. Implement An Event Kernel
+
+Use event kernels when a plugin needs a server-side filter and an approved action path. The GameServer
+sample starts with named service contracts that extend `IEventKernel<TEvent>`:
 
 ```csharp
-public interface IItemFilter
+public interface IMonsterAggroService : IEventKernel<MonsterAggroEvent>
 {
-    bool Accept(ItemView item, PlayerView player);
 }
 
-public sealed record ItemView(string Id, Rarity Rarity);
-
-public sealed record PlayerView(string Id, int Level);
-
-public enum Rarity
+public interface IAttackService : IEventKernel<AttackEvent>
 {
-    Common,
-    Rare,
-    Epic,
-    Legendary
-}
-
-public sealed partial class EpicItemsOnly : IItemFilter
-{
-    public bool Accept(ItemView item, PlayerView player)
-    {
-        return item.Rarity >= Rarity.Epic;
-    }
 }
 ```
 
-Simple filters request CPU-only execution. They do not mutate server state and do not receive raw host services.
-This simple contract is host-side C# guidance today; the current DotBoxD.Kernels source generator only
-lowers `IEventKernel<TEvent>` kernels into plugin packages.
-
-### 2. Implement A Kernel
-
-Use kernels when the plugin needs both a server-side filter and an approved action path. The current sample kernel lives at `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\FireDamageKernel.cs`.
-
-The authoring contracts (`[Plugin]`, `IEventKernel<TEvent>`, `HookContext`, `IPluginMessageSink`,
-`IPluginEventAdapter<TEvent>`, `LiveSettingAttribute`) live in the purpose-agnostic
-`DotBoxD.Abstractions` package; add `using DotBoxD.Abstractions;` to kernel sources.
+The plugin implements those contracts as ordinary C# classes. The analyzer lowers the supported subset
+into package-backed verified IR.
 
 ```csharp
-using DotBoxD.Abstractions;
-
-[Plugin("fire-damage")]
-public sealed partial class FireDamageKernel : IEventKernel<DamageEvent>
+[Plugin("retaliation")]
+public sealed partial class RetaliationKernel : IAttackService
 {
-    public bool ShouldHandle(DamageEvent e, HookContext ctx)
-    {
-        return e.DamageType == "fire" && e.Amount >= 100;
-    }
-
-    public void Handle(DamageEvent e, HookContext ctx)
-    {
-        ctx.Messages.Send(e.TargetId, "Ouch, fire.");
-    }
-}
-```
-
-`ShouldHandle` is the server-side filter. `Handle` can only perform actions exposed by the approved context facade.
-
-### 3. Add Live Settings
-
-Kernel properties become live settings when the generated package manifest exposes them as live state metadata. The authoring-side C# uses `[LiveSetting]`; the source generator mirrors the same settings into the manifest.
-
-```csharp
-[Plugin("fire-damage")]
-public sealed partial class FireDamageKernel : IEventKernel<DamageEvent>
-{
-    [LiveSetting]
-    public string DamageType { get; set; } = "fire";
-
     [LiveSetting]
     [Range(0, 10_000)]
-    public int MinDamage { get; set; } = 100;
+    public int MinDamage { get; set; } = 5;
 
-    public bool ShouldHandle(DamageEvent e, HookContext ctx)
+    [LiveSetting]
+    [Range(0, 100)]
+    public int MinAttackerLevel { get; set; } = 5;
+
+    public bool ShouldHandle(AttackEvent e, HookContext ctx)
+        => e.Damage >= MinDamage &&
+           e.AttackerLevel >= MinAttackerLevel;
+
+    public void Handle(AttackEvent e, HookContext ctx)
+        => ctx.Messages.Send(e.AttackerId, "taunt:" + e.TargetId);
+}
+```
+
+`ShouldHandle` is the server-side filter. `Handle` can only perform actions exposed by the approved
+context facade. In GameServer, `ctx.Messages.Send(...)` writes an example-defined command DSL that the
+host validates before mutating the world.
+
+### 2. Ship Verified IR Over IPC
+
+The plugin process connects to the server's `IGamePluginControlService` over MessagePack IPC. Its
+example-local `RemotePluginServer` gives plugin authors a server-shaped API while forwarding every
+operation over the control-plane contract:
+
+```csharp
+var guardianId = await server.Kernels.Register<IMonsterAggroService, GuardianKernel>();
+var retaliationId = await server.Kernels.Register<IAttackService, RetaliationKernel>();
+```
+
+`Register<TService, TKernel>()` resolves the analyzer-generated package with
+`KernelPackageRegistry.Resolve<TKernel>()`, exports it with `PluginPackageJsonSerializer.Export(...)`,
+and sends the JSON package to `InstallPluginAsync`. The parent process imports that package, validates
+the manifest and IR, applies the server policy, and wires the hook for the declared event
+subscription. The server never compiles or loads the plugin assembly.
+
+### 3. Update Live Settings
+
+Kernel properties annotated with `[LiveSetting]` become live manifest state. The GameServer plugin
+tunes those values after install:
+
+```csharp
+await server.Kernels.Get<GuardianKernel>()
+    .SetValuesAsync(k => { k.CalmStrength = "35"; k.AggroRange = 6; }, atomic: true);
+```
+
+The example helper reflects the live-setting properties on a local draft object, converts the values
+to the control-plane DTO, and calls `UpdateSettingsAsync(..., atomic: true)`. The parent process
+validates and commits the batch before future hook executions observe it.
+
+### 4. Gate Host Bindings With Capabilities
+
+`GuardianKernel` reads world state through an approved host facade:
+
+```csharp
+ctx.Host<IGameWorldAccess>().GetHealth(e.MonsterId)
+```
+
+The server backs that method with a binding such as `host.world.getHealth`, declares a capability such
+as `game.world.monster.read.health`, and grants only the wildcard needed by kernels whose generated
+manifest actually requested a matching capability. `RetaliationKernel` does not read world state, so
+it does not receive the world-read grant.
+
+The GameServer host also emits per-resource audit events from those bindings, uses deterministic cost
+models, and sets fuel and host-call budgets in `ServerPolicy`.
+
+### 5. Use Kernel RPC For Pushdown
+
+GameServer also shows the pushdown shape: the plugin supplies a batch operation that runs on the
+server next to fine-grained host bindings.
+
+```csharp
+[KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+public sealed partial class MonsterKillerKernel
+{
+    private readonly IGameWorldAccess _world;
+
+    public MonsterKillerKernel(IGameWorldAccess world) => _world = world;
+
+    [KernelRpcClientMethod(typeof(RemoteMonsterControl), "KillMonstersAsync")]
+    public List<MonsterKillResult> KillMonsters(List<string> monsterIds, HookContext ctx)
     {
-        return e.DamageType == DamageType &&
-               e.Amount >= MinDamage;
+        var results = new List<MonsterKillResult>();
+        foreach (var id in monsterIds)
+        {
+            var wasMonster = _world.IsMonster(id);
+            var killed = wasMonster && _world.KillMonster(id);
+            results.Add(new MonsterKillResult(id, wasMonster, _world.GetLevel(id), _world.GetPosition(id), 0, killed));
+        }
+
+        return results;
     }
-
-    public void Handle(DamageEvent e, HookContext ctx)
-    {
-        ctx.Messages.Send(e.TargetId, "Ouch, fire.");
-    }
 }
 ```
 
-The generated sample manifest includes the matching metadata:
-
-```csharp
-new LiveSettingDefinition("DamageType", "string", "fire");
-new LiveSettingDefinition("MinDamage", "int", 100, 0, 10_000);
-```
-
-The runtime enforces supported live setting types and numeric ranges during install and live updates.
-
-### 4. Register A Hook
-
-The server registers hooks against event adapters. Event adapters convert trusted host event snapshots into `SandboxValue` inputs for the verified IR entrypoints.
-
-```csharp
-var messages = new InMemoryPluginMessageSink();
-var server = PluginServer.Create(messages, defaultPolicy: PluginMessagePolicy());
-server.RegisterEventAdapter(DamageEventAdapter.Instance);
-await server.InstallAsync(FireDamagePluginPackage.Create());
-
-server.Hooks.On<DamageEvent>()
-    .UseKernel<FireDamageKernel>();
-```
-
-Production servers should register reviewed event adapters before installing packages or wiring
-hooks. Convention/discovery adapters are a development convenience; the production posture is an
-explicit server-owned whitelist of event shapes and fields.
-
-The pipeline flow is:
-
-```text
-DamageEvent
-  -> server-side hook filters
-  -> kernel.ShouldHandle
-  -> kernel.Handle
-```
-
-### 5. Update Settings At Runtime
-
-Live setting changes are applied to future hook executions without reinstalling the plugin or rebuilding the hook pipeline. Use `ModifyAsync` when multiple settings should become visible as one validated batch.
-
-```csharp
-var kernel = server.Kernels.Get<FireDamageKernel>("fire-damage");
-
-await kernel.ModifyAsync(state => {
-    state.MinDamage = 250;
-    state.DamageType = "ice";
-});
-
-await server.Hooks.PublishAsync(new DamageEvent("ice", 300, "player-2"));
-```
-
-Pass `atomic: true` when the update must also wait for any in-flight kernel execution and prevent a new execution from crossing the commit boundary:
-
-```csharp
-await kernel.ModifyAsync(
-    state => {
-        state.MinDamage = 250;
-        state.DamageType = "ice";
-    },
-    atomic: true);
-```
-
-Direct `kernel.Value` assignments use synchronous synchronization by default. If a caller wants fire-and-forget direct assignments, set `UpdateMode = LiveUpdateMode.AsyncSet`. In `AsyncSet`, the typed object changes immediately, but the committed sandbox input is not synchronized until the update queue is drained. A hook execution that observes the assignment before a flush may enqueue the update and still run with the previously committed settings.
-
-```csharp
-kernel.UpdateMode = LiveUpdateMode.AsyncSet;
-kernel.Value.MinDamage = 250;
-
-// Await this before publishing when the next hook run must see the new value.
-await kernel.FlushUpdatesAsync();
-```
-
-Use `ModifyAsync` instead of `AsyncSet` when multiple settings must commit together or when the caller needs validation and acknowledgement before continuing. `ModifyAsync` ignores `UpdateMode`, validates the batch, and commits it before returning.
-
-For small scripts, the same live-update behavior is available through value bindings:
-
-```csharp
-var minDamage = server.BindValue("minDamage", 100);
-
-server.Hooks.On<DamageEvent>()
-    .Where((e, _) => e.Amount >= minDamage.Value)
-    .InvokeHostHandler((e, ctx) => ctx.Messages.Send(e.TargetId, "matched"));
-
-minDamage.Value = 250;
-```
-
-For grouped settings, use a typed live context:
-
-```csharp
-var settings = server.BindContext<IFireDamageSettings>(
-    "operatorDefaults",
-    value => {
-        value.DamageType = "fire";
-        value.MinDamage = 100;
-    });
-
-settings.Value.MinDamage = 250;
-```
-
-Over IPC, send the same update as one request:
-
-```csharp
-await service.ModifySettingsAsync(
-    [
-        new LiveSettingUpdate("MinDamage", "250"),
-        new LiveSettingUpdate("DamageType", "ice")
-    ],
-    atomic: true);
-```
-
-### 6. Inspect Plugin Permissions
-
-The plugin package manifest exposes the permissions and subscriptions that an admin UI or server owner can inspect before enabling the plugin.
-
-```csharp
-var package = FireDamagePluginPackage.Create();
-
-foreach (var effect in package.Manifest.Effects) {
-    Console.WriteLine(effect);
-}
-
-foreach (var setting in package.Manifest.LiveSettings) {
-    Console.WriteLine($"{setting.Name}: {setting.Type} = {setting.DefaultValue}");
-}
-```
-
-The sample package requests:
-
-```text
-Effects:
-  Cpu
-  Alloc
-  HostStateWrite
-  Audit
-
-Capability request:
-  host.message.write
-
-Subscription:
-  DamageEvent -> FireDamageKernel
-```
-
-This is the data a server owner needs to show settings, defaults, ranges, requested effects, and hook subscriptions before install.
-
-### 7. Upload Or Install Package
-
-The production server installs a plugin package from serialized JSON package data. The JSON envelope contains a manifest, entrypoint names if needed, and the Safe IR module. It does not contain an assembly path or plugin DLL reference.
-
-Reference the `DotBoxD.Plugins` package for `PluginPackageJsonSerializer` and the
-`InstallJsonAsync` extension. The helper types are plugin-facing APIs used from the
-`DotBoxD.Plugins` namespace (the package references `DotBoxD.Kernels.Serialization.Json` for the module-IR
-round trip):
-
-```csharp
-using DotBoxD.Plugins;
-```
-
-```csharp
-var package = FireDamagePluginPackage.Create();
-var uploadJson = PluginPackageJsonSerializer.Export(package);
-```
-
-```csharp
-var kernel = await server.InstallJsonAsync(uploadJson);
-```
-
-The local generated factory is still useful for SDK examples and tests, but direct in-process install is not the production upload boundary:
-
-```csharp
-var package = FireDamagePluginPackage.Create();
-var kernel = await server.InstallAsync(package);
-```
-
-The default plugin server policy does not grant message-write capability. Message-sending plugins
-must install with an explicit policy grant:
-
-```csharp
-static SandboxPolicy PluginMessagePolicy()
-    => SandboxPolicyBuilder.Create()
-        .GrantLogging()
-        .GrantHostMessageWrite()
-        .WithFuel(100_000)
-        .WithMaxHostCalls(1_000)
-        .Build();
-```
-
-If the policy does not grant `host.message.write`, package preparation fails closed with a policy diagnostic. The server still re-validates uploaded JSON packages; local analyzer diagnostics are developer-experience feedback, not the trust boundary.
-
-### 8. Observe Runtime Execution
-
-Installed kernels expose the most recent execution and a snapshot of per-entrypoint observations. These are host/admin status values, not plugin-controlled permissions:
-
-```csharp
-await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1"));
-
-var last = kernel.LastExecution;
-foreach (var observation in kernel.ExecutionObservations) {
-    Console.WriteLine(
-        $"{observation.Entrypoint}: requested={observation.RequestedMode}, actual={observation.ActualMode}");
-}
-```
-
-Each observation includes the entrypoint name, requested mode, actual mode, success flag, safe fallback reason when present, cache/materialization status, and compiled runtime envelope fields when compiled execution was used.
-
-## Custom Host Binding Example
-
-Host-owned bindings are the main extensibility point for exposing product-specific data and
-services to verified Safe IR. The runnable example lives in
-`samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\CustomBindingExample.cs` and is exercised by
-the capabilities example run and the docs smoke script.
-
-The example authors a `tenant.lookup` binding and shows every field a binding author must decide:
-
-```csharp
-new BindingDescriptor(
-    "tenant.lookup",
-    SemVersion.One,
-    [SandboxType.I32],
-    SandboxType.I32,
-    // Read-only external access still emits audit, so include the Audit effect.
-    SandboxEffect.Cpu | SandboxEffect.HostStateRead | SandboxEffect.Audit,
-    "tenant.read",                       // required capability (custom, so a grant validator is mandatory)
-    BindingCostModel.Fixed(8),           // deterministic cost: one host call, flat fuel
-    AuditLevel.PerCall,                  // external bindings must be audited
-    BindingSafety.ReadOnlyExternal,      // safety classification
-    InvokeTenantLookup,                  // BindingInvoker
-    CompiledBinding.RuntimeStub(         // compiled-mode dispatch stub
-        typeof(CompiledRuntime).FullName!,
-        nameof(CompiledRuntime.CallBinding)),
-    ValidateTenantReadGrant);            // CapabilityGrantValidator
-```
-
-Register it, grant the capability, import JSON IR that calls it, and inspect the value and audit:
-
-```csharp
-using var host = SandboxHost.Create(builder =>
-{
-    builder.AddBinding(TenantLookupBinding());
-    builder.UseInterpreter();
-    builder.UseCompilerIfAvailable();
-});
-
-var module = await host.ImportJsonAsync(tenantLookupJsonIr);
-var policy = SandboxPolicyBuilder.Create()
-    .Grant("tenant.read", new { maxTenantId = 100 },
-        SandboxEffect.Cpu | SandboxEffect.HostStateRead | SandboxEffect.Audit)
-    .WithFuel(10_000)
-    .WithMaxHostCalls(16)
-    .Build();
-
-var plan = await host.PrepareAsync(module, policy);
-var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
-
-var value = ((I32Value)result.Value!).Value;
-var audit = result.AuditEvents.Single(e => e.BindingId == "tenant.lookup");
-```
-
-Safe defaults a binding author should follow:
-
-- **Required capability**: any binding that reaches outside pure CPU must declare a capability;
-  a custom (non-built-in) capability also requires a `CapabilityGrantValidator` that fails closed
-  on unsupported or invalid grant parameters.
-- **Deterministic cost model**: prefer `BindingCostModel.Fixed(...)` or `PerByte(...)` so fuel and
-  host-call accounting are predictable.
-- **Audit level**: external bindings must use at least `AuditLevel.PerCall` and emit a `BindingCall`
-  audit event populated with `context.BindingAuditFields(...)`.
-- **Safety classification**: pick the narrowest `BindingSafety` that fits; `ReadOnlyExternal` for
-  reads, `SideEffectingExternal` for writes.
-- **Resource charging**: the host charges the declared cost and one host call per invocation, visible
-  through `result.ResourceUsage.HostCalls`.
-- **Compiled runtime stub**: custom bindings dispatch through
-  `CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))`.
-
-## Audit Observer Example
-
-`SandboxHostBuilder.ForwardAuditEventsTo(...)` is the public host integration point for operational
-audit streaming (telemetry, billing, incident review, compliance export). The runnable example lives
-in `samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\AuditObserverExample.cs` and is exercised by
-the capabilities example run and the docs smoke script.
-
-The example registers two observers and runs a minimal module:
-
-```csharp
-var observed = new List<SandboxAuditEvent>();
-
-using var host = SandboxHost.Create(builder =>
-{
-    builder.AddDefaultPureBindings();
-    builder.UseInterpreter();
-    // A failing telemetry sink must not change sandbox results or starve later observers.
-    builder.ForwardAuditEventsTo(_ => throw new InvalidOperationException("telemetry sink offline"));
-    builder.ForwardAuditEventsTo(observed.Add);
-});
-
-var plan = await host.PrepareAsync(module, policy);
-var result = await host.ExecuteAsync(plan, "main", input,
-    new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
-
-// Observed events equal the returned result's audit events, in sequence order, even though the
-// first observer threw on every event.
-var matchesResult = observed.SequenceEqual(result.AuditEvents);
-```
-
-The example prints that the throwing observer did not change `result.Succeeded`, that the surviving
-observer received exactly `result.AuditEvents`, and that the events arrive in `SequenceNumber` order.
-This is the contract documented in `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md`:
-observer failures are isolated and do not change the returned `SandboxExecutionResult` or prevent
-later observers from receiving the same sequenced audit events.
-
-## Resource Limits Example
-
-`WithFuel(...)` is only one of the public quota knobs. `SandboxPolicyBuilder` also exposes
-`WithMaxLoopIterations`, `WithMaxHostCalls`, `WithWallTime`, `WithMaxCallDepth`, `WithMaxAllocatedBytes`,
-the collection-shape limits (`WithMaxListLength`, `WithMaxMapEntries`, `WithMaxCollectionDepth`,
-`WithMaxTotalCollectionElements`), the log limits (`WithMaxLogEvents`, `WithMaxLogMessageLength`), and the
-string limits (`WithMaxStringLength`, `WithMaxTotalStringBytes`). The runnable proof lives in
-`samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\Examples\ResourceLimitsExample.cs` and is
-exercised by the capabilities example run and the docs smoke script.
-
-The example runs small JSON IR modules under intentionally tight non-fuel limits and prints the public
-result code plus the matching `SandboxResourceUsage` counter for each case:
-
-```csharp
-var policy = SandboxPolicyBuilder.Create()
-    .WithFuel(10_000)
-    .WithMaxLoopIterations(3)
-    .Build();
-
-var plan = await host.PrepareAsync(module, policy);
-var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
-
-// result.Error?.Code is SandboxErrorCode.QuotaExceeded and
-// result.ResourceUsage.LoopIterations reports the metered iterations.
-```
-
-The walkthrough covers loop-iteration exhaustion, host-call exhaustion, wall-time timeout
-(`SandboxErrorCode.Timeout`, not `QuotaExceeded`), list-shape rejection, and string-shape rejection.
-Each case asserts the documented `SandboxErrorCode` and the corresponding `SandboxResourceUsage` field so
-integrators can recognize a denied run and read back what the runtime metered, matching the resource-usage
-contract in `docs/Specs/Initial/dotboxd-sandbox-spec/spec/16-public-api.md`.
-
-## Flagship Fire Damage Example
-
-The flagship example is implemented in:
-
-- `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\FireDamageKernel.cs`
-- `samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server.Abstractions\DamageEvent.cs`
-- `DotBoxD.Plugins.Analyzer` generated `FireDamagePluginPackage.g.cs`
-- `samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\Program.cs`
-
-Mental model:
-
-```text
-Kernel properties are live settings.
-ShouldHandle filters events.
-Handle performs approved actions.
-The server executes verified Safe IR, not arbitrary plugin DLLs.
-```
-
-## Local Kernel Example
-
-Run the complete addendum example set, split across three topic projects:
+The plugin invokes the generated client once; the server executes the generated verified IR and returns
+the result list. The server still exposes only reviewed fine-grained bindings, and the kernel RPC
+package receives write capability only because its manifest declares the kill binding.
+
+### 6. Run The Example
 
 ```powershell
-dotnet run --project samples\Kernels\Capabilities\DotBoxD.Kernels.Example.Capabilities\DotBoxD.Kernels.Example.Capabilities.csproj
-dotnet run --project samples\Kernels\Hosting\DotBoxD.Kernels.Example.Hosting\DotBoxD.Kernels.Example.Hosting.csproj
-dotnet run --project samples\Kernels\PluginAuthoring\DotBoxD.Kernels.Example.PluginAuthoring\DotBoxD.Kernels.Example.PluginAuthoring.csproj
+dotnet run --project samples\Kernels\GameServer\Examples.GameServer.Server\Examples.GameServer.Server.csproj
 ```
 
-Run:
-
-```powershell
-dotnet run --project samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\DotBoxD.Kernels.PluginLocal.csproj
-```
-
-The example installs the `fire-damage` kernel, publishes events, updates `MinDamage` and `DamageType` at runtime, and shows that future hook executions observe the latest live settings.
-
-It also demonstrates:
-
-- Level 1: host-authored `BindValue<T>`
-- Level 2: host-authored `BindContext<TSettings>`
-- Level 3: package/generator-backed IR kernel classes with manifest live settings
-
-## Named-Pipe IPC Example
-
-The IPC sample uses `DotBoxD.Pushdown.Services`, which wraps DotBoxD named pipes with MessagePack serialization. The pipe name is a trusted local control-plane endpoint: pass an explicit high-entropy or otherwise deployment-scoped name, and do not expose it across tenant boundaries. The shared contract project still references `DotBoxD` and `MessagePack` because service attributes and payload attributes live with the contract types.
-
-Run the server in one terminal:
-
-```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server\DotBoxD.Kernels.PluginIpc.Server.csproj -- dotboxd-plugin-ipc-local-demo
-```
-
-Run the client in another:
-
-```powershell
-dotnet run --project samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Client\DotBoxD.Kernels.PluginIpc.Client.csproj -- dotboxd-plugin-ipc-local-demo
-```
-
-The client reads settings, publishes a matching event, changes live settings over IPC, and publishes again to prove the server-side hook pipeline uses the updated state.
-
-## Game Server Golden Example
-
-The golden example combines every layer of the plugin model into one runnable scenario. It lives in:
-
-- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server.Abstractions` — the shared contract: the
-  `MonsterAggroEvent` and `AttackEvent` records with their `IPluginEventAdapter<T>` adapters, the
-  `[DotBoxDService] IGamePluginControlService` IPC contract with MessagePack DTOs, and the
-  plugin -> server command DSL helpers in `GameCommands`.
-- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Plugin` — the child process that authors two kernels
-  (`GuardianKernel`, `RetaliationKernel`) and ships them over IPC.
-- `samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server` — the parent process: a deterministic 1D simulation, the
-  example-defined command sink, the IPC service, and the orchestration entrypoint.
-
-### Filter + projection + invoke
-
-Each kernel's `ShouldHandle` is the server-side filter and `Handle` is the approved action. The
-generator lowers arithmetic and comparisons in `ShouldHandle` and a single string-concat
-`ctx.Messages.Send(...)` in `Handle`:
-
-```csharp
-[Plugin("guardian")]
-public sealed partial class GuardianKernel : IEventKernel<MonsterAggroEvent>
-{
-    public bool ShouldHandle(MonsterAggroEvent e, HookContext ctx)
-        => e.MonsterLevel - e.PlayerLevel >= LevelGap &&
-           e.Distance <= AggroRange &&
-           e.PlayerLevel <= ProtectMaxLevel;
-
-    public void Handle(MonsterAggroEvent e, HookContext ctx)
-        => ctx.Messages.Send(e.MonsterId, "calm:" + e.PlayerId + ":" + CalmStrength);
-}
-```
-
-The plugin host runs the same filter/projection/invoke pipeline in-process first (a local preview)
-so the author sees which events match and which command payloads the kernels emit before shipping
-anything. The server then runs the identical lowered IR — never the kernel source.
-
-### Settings binding, IPC, and the example-defined capability
-
-The host ships each kernel as opaque verified IR with `PluginPackageJsonSerializer.Export(...)` plus
-`InstallPluginAsync(json)`, then tunes live settings over IPC with one atomic
-`UpdateSettingsAsync("guardian", [...], atomic: true)` batch. The server installs the IR with
-`server.InstallJsonAsync(...)` and wires the hook for whichever event the kernel's manifest
-subscription declares.
-
-The plugin's only sandbox capability is `host.message.write`. The *meaning* of those messages is
-defined by the example, not by DotBoxD.Kernels core: `Simulation\GameCommandSink.cs` implements
-`IPluginMessageSink`, parses the `calm:`/`taunt:` DSL, validates it (known verb, known/opaque entity
-ids, clamped strength), and applies it to the world. Invalid or unknown commands are ignored safely
-and never throw back into the sandbox. The server contrasts a baseline phase (no plugins) with a
-with-plugin phase to show the untrusted kernels measurably changing game behavior.
-
-```powershell
-dotnet run --project samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server\DotBoxD.Kernels.Game.Server.csproj
-```
+The server prints a baseline phase, launches the plugin child process, installs event kernels and the
+kernel RPC service, runs a with-plugin phase, then disconnects the plugin and shows that its kernels
+were unloaded with the connection.

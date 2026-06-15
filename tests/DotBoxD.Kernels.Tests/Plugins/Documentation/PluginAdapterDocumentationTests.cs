@@ -3,60 +3,34 @@ namespace DotBoxD.Kernels.Tests.Plugins.Documentation;
 public sealed class PluginAdapterDocumentationTests
 {
     [Fact]
-    public void Flagship_plugin_docs_and_examples_register_the_damage_event_adapter()
+    public void Addendum_examples_point_to_the_maintained_game_server_sample()
     {
-        var root = RepositoryRoot();
-        Assert.Contains(
-            "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
-            File.ReadAllText(Path.Combine(root, "docs", "Specs", "Addendum", "Addendum.md")));
-        Assert.Contains(
-            "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
-            File.ReadAllText(Path.Combine(root, "docs", "Specs", "Addendum", "Examples.md")));
-        Assert.Contains(
-            "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
-            File.ReadAllText(Path.Combine(root, "samples", "Kernels", "LocalPlugin", "DotBoxD.Kernels.PluginLocal", "Program.cs")));
-        Assert.Contains(
-            "server.RegisterEventAdapter(DamageEventAdapter.Instance);",
-            File.ReadAllText(Path.Combine(
-                root,
-                "samples", "Pushdown", "PluginIpc",
-                "DotBoxD.Kernels.PluginIpc.Server",
-                "PluginControlService.cs")));
+        var examples = ReadRepositoryText("docs/Specs/Addendum/Examples.md");
+
+        Assert.Contains("samples/Kernels/GameServer/Examples.GameServer.Server", examples);
+        Assert.Contains("Examples.GameServer.Plugin", examples);
+        Assert.Contains("server never compiles or loads the plugin assembly", examples);
     }
 
     [Fact]
-    public void Addendum_examples_call_out_convention_adapters_as_development_convenience()
+    public void Game_server_sample_uses_explicit_event_contracts_and_message_policy()
     {
-        var examples = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "docs",
-            "Specs",
-            "Addendum",
-            "Examples.md"));
+        var contracts = ReadRepositoryText(
+            "samples/Kernels/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs");
+        var policy = ReadRepositoryText(
+            "samples/Kernels/GameServer/Examples.GameServer.Server/ServerPolicy.cs");
 
-        Assert.Contains("Convention/discovery adapters are a development convenience", examples);
-        Assert.Contains("explicit server-owned whitelist", examples);
+        Assert.Contains("IEventKernel<MonsterAggroEvent>", contracts);
+        Assert.Contains("IEventKernel<AttackEvent>", contracts);
+        Assert.Contains("GrantHostMessageWrite", policy);
+        Assert.Contains("game.world.monster.read.*", policy);
     }
 
-    [Fact]
-    public void Message_writing_examples_use_explicit_message_policy()
+    private static string ReadRepositoryText(string relativePath)
     {
-        var root = RepositoryRoot();
-        Assert.Contains(
-            "defaultPolicy: PluginMessagePolicy()",
-            File.ReadAllText(Path.Combine(root, "docs", "Specs", "Addendum", "Examples.md")));
-        Assert.Contains(
-            "defaultPolicy: PluginPolicy()",
-            File.ReadAllText(Path.Combine(root, "samples", "Kernels", "LocalPlugin", "DotBoxD.Kernels.PluginLocal", "Program.cs")));
-        Assert.Contains(
-            "defaultPolicy: PluginExamplePolicies.MessageWrite()",
-            File.ReadAllText(Path.Combine(
-                root,
-                "samples", "Kernels",
-                "PluginAuthoring",
-                "DotBoxD.Kernels.Example.PluginAuthoring",
-                "Examples",
-                "KernelClassExample.cs")));
+        var path = Path.Combine(RepositoryRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(path), $"Missing repository file: {path}");
+        return File.ReadAllText(path);
     }
 
     private static string RepositoryRoot()

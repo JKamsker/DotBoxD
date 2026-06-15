@@ -19,7 +19,9 @@ The Services + channel + codec libraries target **netstandard2.1**, so they run 
 Diagnostics from the generator use the `DBXS###` prefix — see
 [reference/diagnostics.md](../reference/diagnostics.md).
 
-**See also:** [`samples/Services/GameService`](../../samples/Services/GameService),
-[`samples/Services/Inventory`](../../samples/Services/Inventory), the legacy RPC docs under
+**See also:** the GameServer sample under
+[`samples/Kernels/GameServer`](../../samples/Kernels/GameServer), the legacy RPC docs under
 [`docs/channels/`](../channels/) (quick-start, API reference, Unity integration, transports,
-performance), and [pushdown](pushdown.md) for composing services server-side.
+performance), [pushdown](pushdown.md) for composing services server-side, and
+[`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for service scenarios no longer shown
+by maintained samples.

@@ -24,9 +24,9 @@ Or reference individual packages — see the table in the root [README](../../RE
 2. Implement it on the host and `Provide…` it on each accepted peer.
 3. Connect from the client and call the generated typed proxy.
 
-The complete, compiling pattern is in [`samples/Services/GameService`](../../samples/Services/GameService)
-(TCP) and in the [end-to-end sample](../../samples/Pushdown/DotBoxD.EndToEnd) (named pipes). See
-[concepts/services.md](../concepts/services.md).
+The maintained runnable sample uses the same generated service pattern for its plugin control plane:
+[`samples/Kernels/GameServer/Examples.GameServer.Server`](../../samples/Kernels/GameServer/Examples.GameServer.Server).
+See [concepts/services.md](../concepts/services.md).
 
 ## First Kernel (sandbox)
 
@@ -34,18 +34,20 @@ The complete, compiling pattern is in [`samples/Services/GameService`](../../sam
 2. Build a `SandboxPolicy` (fuel, loop, list, capability budgets).
 3. Import the kernel JSON IR, `PrepareAsync`, then `ExecuteAsync`.
 
-See [`samples/Kernels`](../../samples/Kernels) and [concepts/kernels.md](../concepts/kernels.md).
+See the GameServer sample and [concepts/kernels.md](../concepts/kernels.md).
 
 ## Pushdown quickstart
 
 Expose a contract method that composes host data and runs a validated kernel server-side, so the client
-submits work in one round-trip instead of N. See [`samples/Pushdown`](../../samples/Pushdown) and
-[concepts/pushdown.md](../concepts/pushdown.md).
+submits work in one round-trip instead of N. The GameServer sample demonstrates this with the
+`MonsterKillerKernel` kernel RPC service. See [concepts/pushdown.md](../concepts/pushdown.md).
 
-## Run the acceptance sample
+## Run the maintained example
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
+dotnet run -c Release --project samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
-It demonstrates all three modes and prints the round-trip win.
+It demonstrates service IPC, event kernels, live settings, host bindings, policy-gated execution,
+kernel RPC, and unload-on-disconnect. Features no longer covered by maintained samples are listed in
+[`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md).

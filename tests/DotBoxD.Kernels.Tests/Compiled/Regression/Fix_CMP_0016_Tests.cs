@@ -12,17 +12,17 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 public sealed class Fix_CMP_0016_Tests
 {
     [Fact]
-    public void Filter_and_formula_contracts_are_labeled_host_side_guidance_only()
+    public void Filter_and_formula_fixture_contracts_are_labeled_host_side_guidance_only()
     {
         var itemContracts = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "samples", "Pushdown", "PluginIpc",
-            "DotBoxD.Kernels.PluginIpc.Server.Abstractions",
+            "tests",
+            "DotBoxD.Kernels.TestFixtures.PluginAbstractions",
             "ItemContracts.cs"));
         var formulaContracts = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "samples", "Pushdown", "PluginIpc",
-            "DotBoxD.Kernels.PluginIpc.Server.Abstractions",
+            "tests",
+            "DotBoxD.Kernels.TestFixtures.PluginAbstractions",
             "FormulaContracts.cs"));
 
         foreach (var source in new[] { itemContracts, formulaContracts })
@@ -31,27 +31,6 @@ public sealed class Fix_CMP_0016_Tests
             Assert.Contains("NOT a package-backed DotBoxD.Kernels", source);
             Assert.Contains("IEventKernel", source);
         }
-    }
-
-    [Fact]
-    public void Simple_contract_example_is_host_side_only_and_avoids_package_backed_surface()
-    {
-        var example = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "samples", "Kernels",
-            "PluginAuthoring",
-            "DotBoxD.Kernels.Example.PluginAuthoring",
-            "Examples",
-            "SimpleContractExamples.cs"));
-
-        // It must self-document as host-side guidance, not a DotBoxD.Kernels plugin package.
-        Assert.Contains("host-side contract design guidance only", example);
-
-        // It must not pretend to ship filters/formulas through the DotBoxD.Kernels package boundary.
-        Assert.DoesNotContain("InstallAsync", example);
-        Assert.DoesNotContain("InstallJsonAsync", example);
-        Assert.DoesNotContain("PluginPackageJsonSerializer", example);
-        Assert.DoesNotContain("SandboxHost", example);
     }
 
     [Fact]

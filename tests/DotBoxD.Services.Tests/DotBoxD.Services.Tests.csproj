@@ -31,7 +31,7 @@
     <ProjectReference Include="..\..\src\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
     <ProjectReference Include="..\..\src\Channels\DotBoxD.Transports.Tcp\DotBoxD.Transports.Tcp.csproj" />
     <ProjectReference Include="..\..\src\Channels\DotBoxD.Codecs.MessagePack\DotBoxD.Codecs.MessagePack.csproj" />
-    <ProjectReference Include="..\..\samples\Services\GameService\Shared\Shared.csproj" />
+    <ProjectReference Include="..\DotBoxD.Services.TestContracts\DotBoxD.Services.TestContracts.csproj" />
     <ProjectReference Include="..\DotBoxD.Services.Tests.GeneratedFixtures\DotBoxD.Services.Tests.GeneratedFixtures.csproj" />
     <ProjectReference Include="..\..\src\Channels\DotBoxD.Transports.NamedPipes\DotBoxD.Transports.NamedPipes.csproj" />
   </ItemGroup>
