@@ -2,6 +2,7 @@ using Inventory.Shared;
 using DotBoxD.Services;
 using DotBoxD.Services.Generated;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Peer;
 using DotBoxD.Transports.Tcp;
 
 const string Host = "localhost";

@@ -1,7 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Hosting.Http;
+using DotBoxD.Hosting.Http.Bindings;
+using DotBoxD.Hosting.Http.Hosting;
+using DotBoxD.Hosting.Http.Policy;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.ApiSurface;
 
 public sealed class HttpApiSurfaceTests
 {

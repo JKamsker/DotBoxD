@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
-using DotBoxD.Services.SourceGenerator;
-using Xunit;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 // Smoke test: confirms InternalsVisibleTo exposes the generator's internal utilities to this
 // assembly so the round-2 coverage tests can unit-test them directly.

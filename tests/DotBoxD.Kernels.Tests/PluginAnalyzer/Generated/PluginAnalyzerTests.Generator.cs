@@ -1,12 +1,9 @@
-using System.Collections.Immutable;
+using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using DotBoxD.Kernels;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using DiagnosticSeverity = DotBoxD.Kernels.Model.DiagnosticSeverity;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class PluginAnalyzerTests
 {
@@ -57,7 +54,7 @@ public sealed partial class PluginAnalyzerTests
         Assert.Contains("new global::DotBoxD.Plugins.LiveSettingDefinition(\"DamageType\", \"string\", \"fire\")", generated);
         Assert.Contains("new global::DotBoxD.Plugins.LiveSettingDefinition(\"MinDamage\", \"int\", 100, 0, 10000)", generated);
         Assert.Contains("new global::DotBoxD.Kernels.IfStatement(StringEquals(Var(\"e_DamageType\"), Var(\"DamageType\"))", generated);
-        Assert.Contains("global::DotBoxD.Plugins.PluginMessageBindings.SendBindingId", generated);
+        Assert.Contains("global::DotBoxD.Plugins.Runtime.PluginMessageBindings.SendBindingId", generated);
         Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
     }
 

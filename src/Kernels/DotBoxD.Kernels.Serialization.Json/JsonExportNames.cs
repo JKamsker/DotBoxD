@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Serialization.Json;
 
 internal static class JsonExportNames
 {

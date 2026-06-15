@@ -1,8 +1,11 @@
 using System.Text;
-using DotBoxD.Hosting;
 using DotBoxD.Kernels.Interpreter;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 
 // Regression coverage for PAL-0043: interpreted runs rebuild the module-wide
 // function lookup dictionary on every ExecuteAsync call. The function set of a

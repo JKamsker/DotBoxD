@@ -1,8 +1,9 @@
-using Shared;
-using DotBoxD.Services;
-using DotBoxD.Services.Generated;
+using Client;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Generated;
+using DotBoxD.Services.Peer;
 using DotBoxD.Transports.Tcp;
+using Shared;
 
 const string Host = "localhost";
 const int Port = 5050;
@@ -90,14 +91,17 @@ finally
     Console.WriteLine("\nClient disconnected.");
 }
 
-/// <summary>Caller-side callback the server peer can push notifications to.</summary>
-internal sealed class ConsoleNotifications : IPlayerNotifications
+namespace Client
 {
-    public Task NotifyAsync(string message, CancellationToken ct = default)
+    /// <summary>Caller-side callback the server peer can push notifications to.</summary>
+    internal sealed class ConsoleNotifications : IPlayerNotifications
     {
-        Console.WriteLine($"  [server push] {message}");
-        return Task.CompletedTask;
-    }
+        public Task NotifyAsync(string message, CancellationToken ct = default)
+        {
+            Console.WriteLine($"  [server push] {message}");
+            return Task.CompletedTask;
+        }
 
-    public Task<string> WhoAmIAsync(CancellationToken ct = default) => Task.FromResult("TestPlayer");
+        public Task<string> WhoAmIAsync(CancellationToken ct = default) => Task.FromResult("TestPlayer");
+    }
 }

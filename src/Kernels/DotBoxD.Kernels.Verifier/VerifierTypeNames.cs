@@ -9,10 +9,10 @@ internal static class VerifierTypeNames
     public const string Int64Name = "System.Int64";
     public const string DoubleName = "System.Double";
     public const string StringName = "System.String";
-    public const string SandboxContextName = "DotBoxD.Kernels.SandboxContext";
-    public const string SandboxValueName = "DotBoxD.Kernels.SandboxValue";
+    public const string SandboxContextName = "DotBoxD.Kernels.Sandbox.SandboxContext";
+    public const string SandboxValueName = "DotBoxD.Kernels.Sandbox.SandboxValue";
     public const string SandboxValueArrayName = SandboxValueName + "[]";
-    public const string SandboxTypeName = "DotBoxD.Kernels.SandboxType";
+    public const string SandboxTypeName = "DotBoxD.Kernels.Sandbox.SandboxType";
     public const string SandboxTypeArrayName = SandboxTypeName + "[]";
     public const string CompiledRuntimeName = "DotBoxD.Kernels.Runtime.CompiledRuntime";
 }

@@ -1,8 +1,9 @@
-namespace DotBoxD.Kernels.Example.Capabilities;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Serialization.Json;
+namespace DotBoxD.Kernels.Example.Capabilities.Examples;
 
 /// <summary>
 /// Standalone runtime proof for the safe logging capability. It deliberately uses the bare

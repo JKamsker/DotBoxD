@@ -1,7 +1,12 @@
-namespace DotBoxD.Kernels.Tests;
-
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0008: read-only collection helpers
@@ -57,9 +62,9 @@ public sealed class Fix_ALG_0008_Tests
 
         var map = SandboxValue.FromMap(entries, SandboxType.I32, SandboxType.I32);
 
-        var contains = CompiledRuntime.MapContainsKey(context, map, SandboxValue.FromInt32(128));
-        var missing = CompiledRuntime.MapContainsKey(context, map, SandboxValue.FromInt32(999));
-        var value = CompiledRuntime.MapGet(context, map, SandboxValue.FromInt32(128));
+        var contains = Kernels.Runtime.CompiledRuntime.MapContainsKey(context, map, SandboxValue.FromInt32(128));
+        var missing = Kernels.Runtime.CompiledRuntime.MapContainsKey(context, map, SandboxValue.FromInt32(999));
+        var value = Kernels.Runtime.CompiledRuntime.MapGet(context, map, SandboxValue.FromInt32(128));
 
         Assert.True(((BoolValue)contains).Value);
         Assert.False(((BoolValue)missing).Value);
@@ -87,9 +92,9 @@ public sealed class Fix_ALG_0008_Tests
         var notAMap = SandboxValue.FromInt32(7);
 
         var contains = Assert.Throws<SandboxRuntimeException>(
-            () => CompiledRuntime.MapContainsKey(context, notAMap, SandboxValue.FromInt32(0)));
+            () => Kernels.Runtime.CompiledRuntime.MapContainsKey(context, notAMap, SandboxValue.FromInt32(0)));
         var get = Assert.Throws<SandboxRuntimeException>(
-            () => CompiledRuntime.MapGet(context, notAMap, SandboxValue.FromInt32(0)));
+            () => Kernels.Runtime.CompiledRuntime.MapGet(context, notAMap, SandboxValue.FromInt32(0)));
 
         Assert.Equal(SandboxErrorCode.InvalidInput, contains.Error.Code);
         Assert.Equal(SandboxErrorCode.InvalidInput, get.Error.Code);

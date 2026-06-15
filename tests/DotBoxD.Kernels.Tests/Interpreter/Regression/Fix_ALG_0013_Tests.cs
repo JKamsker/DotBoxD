@@ -1,7 +1,9 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0013: <see cref="SandboxHost.ExecuteAsync"/> calls

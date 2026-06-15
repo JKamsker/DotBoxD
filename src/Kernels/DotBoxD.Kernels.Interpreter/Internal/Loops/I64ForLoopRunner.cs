@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Interpreter.Internal.Expressions;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 
 // Fast path for `forRange { <i64 assigns> }` (i32 loop var, i64 assignment targets). Evaluates the body with
 // unboxed i64 plans, avoiding the boxed evaluator's per-op I64Value allocation. Bulk-charges loop fuel per

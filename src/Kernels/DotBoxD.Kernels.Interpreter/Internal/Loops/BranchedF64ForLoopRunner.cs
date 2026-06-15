@@ -1,6 +1,9 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Interpreter.Internal.Expressions;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 
 // Fast path for `forRange { if (<i32 comparison>) { <f64 assigns> } else { <f64 assigns> } }` — an i32 loop
 // variable with an f64 (binding-free) branched body. Evaluates the condition and both branches with unboxed

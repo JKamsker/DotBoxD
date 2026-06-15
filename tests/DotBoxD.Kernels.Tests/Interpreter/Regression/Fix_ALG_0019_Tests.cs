@@ -1,7 +1,8 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0019: live-setting updates coerce and range-validate

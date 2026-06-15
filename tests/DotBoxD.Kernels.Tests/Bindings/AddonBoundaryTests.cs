@@ -1,7 +1,7 @@
-using System.Xml.Linq;
 using System.Text.Json;
+using System.Xml.Linq;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class AddonBoundaryTests
 {

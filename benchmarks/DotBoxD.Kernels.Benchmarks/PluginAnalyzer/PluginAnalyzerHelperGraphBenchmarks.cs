@@ -25,7 +25,7 @@ public class PluginAnalyzerHelperGraphBenchmarks
     public void Setup()
     {
         _compilation = CreateCompilation(BuildSource(HelperCount));
-        _analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new PluginAnalyzer());
+        _analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
     }
 
     [Benchmark]

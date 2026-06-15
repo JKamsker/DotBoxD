@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Verifier;
+namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
 /// <summary>
 /// Compact, allocation-free container for the control-flow successors of a single

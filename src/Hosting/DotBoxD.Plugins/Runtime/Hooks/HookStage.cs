@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Runtime.Hooks;
 
 /// <summary>
 /// A re-typed stage in a hook chain after a <c>HookPipeline&lt;TEvent&gt;.Select</c>. It

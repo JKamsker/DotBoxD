@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using DotBoxD.Kernels.Model;
 
 namespace DotBoxD.Kernels.Serialization.Json.Internal;
 

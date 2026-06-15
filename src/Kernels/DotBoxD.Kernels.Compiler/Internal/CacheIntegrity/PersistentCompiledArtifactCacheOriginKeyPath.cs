@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Compiler.Internal;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 
 internal static class PersistentCompiledArtifactCacheOriginKeyPath
 {

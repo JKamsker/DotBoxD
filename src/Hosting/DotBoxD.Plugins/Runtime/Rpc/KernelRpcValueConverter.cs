@@ -1,6 +1,7 @@
 namespace DotBoxD.Plugins;
 
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Converts between the compact kernel RPC wire IR and the sandbox values consumed by installed verified

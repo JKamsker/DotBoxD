@@ -1,8 +1,13 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledFallbackAuditTests
 {

@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Sandbox;
 
 // Deterministic and non-deterministic source primitives for the sandbox:
 // the logical clock (UtcNow / AuditTimestamp) and the random number source

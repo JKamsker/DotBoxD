@@ -1,4 +1,7 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 
 /// <summary>
 /// Regression coverage for PAL-0045: the plugin input builder reuses a single <see cref="ListValue"/>

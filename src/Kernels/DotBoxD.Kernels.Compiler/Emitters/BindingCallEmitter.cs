@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;
@@ -30,7 +33,7 @@ internal static class BindingCallEmitter
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldstr, call.Name);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCall)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeBindingCall)));
             foreach (var local in locals)
             {
                 il.Emit(OpCodes.Ldloc, local);
@@ -70,13 +73,13 @@ internal static class BindingCallEmitter
 
         il.Emit(OpCodes.Ldarg_0);
         EmitInt32(il, call.Arguments.Count);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeValueArray)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeValueArray)));
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldstr, call.Name);
         il.Emit(OpCodes.Ldloc, arg0);
         il.Emit(OpCodes.Ldloc, arg1);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CallBinding2)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CallBinding2)));
     }
 
     private static void EmitArrayBackedGenericCall(
@@ -87,7 +90,7 @@ internal static class BindingCallEmitter
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldstr, call.Name);
         ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CallBinding)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
     }
 
     private static bool CanEmitCompiledBinding(BindingSignature binding)
@@ -107,13 +110,13 @@ internal static class BindingCallEmitter
     // methods. See PR #27 and #32 (binding-registration safety note).
     private static bool CanEmitGenericRuntimeStub(BindingSignature binding)
         => binding.Compiled.Kind == "RuntimeStub" &&
-           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == nameof(CompiledRuntime.CallBinding);
+           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
+           binding.Compiled.Method == nameof(Kernels.Runtime.CompiledRuntime.CallBinding);
 
     private static bool CanEmitDirectRuntimeMethod(BindingSignature binding)
         => binding.Compiled.Kind == "RuntimeStub" &&
-           binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method != nameof(CompiledRuntime.CallBinding) &&
+           binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
+           binding.Compiled.Method != nameof(Kernels.Runtime.CompiledRuntime.CallBinding) &&
            binding.RequiredCapability is null &&
            binding.Safety == BindingSafety.PureIntrinsic &&
            (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None &&

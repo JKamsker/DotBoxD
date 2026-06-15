@@ -1,10 +1,11 @@
 using System.Reflection;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using DiagnosticSeverity = DotBoxD.Kernels.Model.DiagnosticSeverity;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 internal static class PluginAnalyzerGeneratedPackageFactory
 {

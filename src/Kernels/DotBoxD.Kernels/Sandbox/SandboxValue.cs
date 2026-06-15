@@ -1,4 +1,7 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox.Values;
+
+namespace DotBoxD.Kernels.Sandbox;
 
 public abstract record SandboxValue
 {

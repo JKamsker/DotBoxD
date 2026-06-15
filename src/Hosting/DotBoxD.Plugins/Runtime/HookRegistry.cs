@@ -1,6 +1,8 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Hooks;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Runtime;
 
 public sealed class HookRegistry
 {

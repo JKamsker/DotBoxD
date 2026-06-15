@@ -1,8 +1,9 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
-using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
+
+using static Verifier.VerifierTypeNames;
 
 internal sealed class MethodSignatureNameProvider : ISignatureTypeProvider<string, object?>
 {

@@ -1,7 +1,8 @@
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0007: plugin package validation must resolve the two fixed kernel
@@ -17,7 +18,7 @@ public sealed class Fix_ALG_0007_Tests
     [Fact]
     public async Task Install_succeeds_with_many_non_entrypoint_helper_functions()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var crowded = package with
         {
@@ -37,7 +38,7 @@ public sealed class Fix_ALG_0007_Tests
     [Fact]
     public async Task Install_rejects_entrypoint_id_that_is_only_a_non_entrypoint_function()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
 
         // Demote ShouldHandle to a non-entrypoint (non-public) function while keeping its id. The

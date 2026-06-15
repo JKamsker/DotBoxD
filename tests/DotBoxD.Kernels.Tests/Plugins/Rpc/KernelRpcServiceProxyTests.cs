@@ -1,8 +1,11 @@
 using System.Reflection;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Rpc;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 /// <summary>The client-facing contract for the batch kernel; its return type drives result marshaling.</summary>
 public interface IMonsterKillerService
@@ -34,7 +37,9 @@ public sealed class KernelRpcServiceProxyTests
     private const string MonsterKillerSource = """
         using System.Collections.Generic;
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -64,7 +69,9 @@ public sealed class KernelRpcServiceProxyTests
         using System.Collections.Generic;
         using System.Threading.Tasks;
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -99,7 +106,7 @@ public sealed class KernelRpcServiceProxyTests
     public async Task A_typed_proxy_over_a_generated_kernel_returns_dtos_as_real_objects()
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(MonsterKillerSource, "Sample.MonsterKillerPluginPackage");
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
         var kernel = await server.InstallRpcAsync(package);
 
         var service = KernelRpcServiceProxy.Create<IMonsterKillerService>(kernel);
@@ -114,7 +121,7 @@ public sealed class KernelRpcServiceProxyTests
     [Fact]
     public async Task RegisterRpcService_then_RpcService_invokes_the_batch_kernel_by_contract()
     {
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
         await server.RegisterRpcServiceAsync<IMonsterKillerService, BatchKillerKernel>();
 
         var results = server.RpcService<IMonsterKillerService>().KillMonsters([1, 2]);

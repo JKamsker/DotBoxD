@@ -1,13 +1,16 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// CMP-0015 regression: proves the documented, user-facing compiled-cache happy path end to end
 /// through the public package surface only (no internal test helpers). A host consumer configures
-/// <see cref="SandboxHostBuilder.UseCompilerCache(string)"/> against a fresh cache root, imports a
+/// <see cref="SandboxHostBuilder.UseCompilerCache"/> against a fresh cache root, imports a
 /// minimal JSON module, prepares a plan, and runs compiled execution twice. The first run is a
 /// recompiled miss; the second is a verified cache hit. Cache status is observed exactly the way a
 /// consumer observes it: via the <c>RunSummary</c> audit event (forwarded live and on the result).

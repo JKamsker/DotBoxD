@@ -2,9 +2,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Generated;
 
 public sealed class VerifierTests
 {

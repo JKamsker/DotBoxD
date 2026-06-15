@@ -1,8 +1,7 @@
-namespace DotBoxD.Hosting;
-
-using DotBoxD.Kernels;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Compiler.Emitters;
+
+namespace DotBoxD.Hosting.Execution.Compiled;
 
 internal sealed class CompiledExecutionProvider(ISandboxCompiler? compiler) : IDisposable
 {

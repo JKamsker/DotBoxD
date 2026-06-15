@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Game.Server.Abstractions;
-
 using DotBoxD.Services.Attributes;
+
+namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 
 /// <summary>
 /// Control plane the plugin host calls over IPC. The host ships opaque verified IR

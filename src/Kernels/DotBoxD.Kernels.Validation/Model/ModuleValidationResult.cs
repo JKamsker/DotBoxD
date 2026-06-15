@@ -1,8 +1,9 @@
-namespace DotBoxD.Kernels.Validation;
-
 using System.Collections.Frozen;
 using System.Collections.ObjectModel;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Validation.Model;
 
 public sealed record ModuleValidationResult(
     bool Succeeded,

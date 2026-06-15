@@ -1,10 +1,13 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledBindingCallTests
 {
@@ -180,7 +183,7 @@ public sealed class CompiledBindingCallTests
                 var value = ((I32Value)args[0]).Value;
                 return ValueTask.FromResult(SandboxValue.FromInt32(value * 2));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor ThrowingBinding()
         => new(
@@ -194,7 +197,7 @@ public sealed class CompiledBindingCallTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => throw new InvalidOperationException("secret host detail"),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor RogueBinding()
         => new(
@@ -208,7 +211,7 @@ public sealed class CompiledBindingCallTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(999)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string CallBindingJson(string bindingId)
         => $$"""

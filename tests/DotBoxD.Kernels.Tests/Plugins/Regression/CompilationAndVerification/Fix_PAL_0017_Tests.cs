@@ -1,9 +1,11 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 /// <summary>
 /// Regression coverage for PAL-0017: member signatures are now decoded once per
@@ -30,7 +32,7 @@ public sealed class Fix_PAL_0017_Tests
             }
         };
 
-        var i32 = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!;
+        var i32 = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!;
         var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
             var execute = type.DefineMethod(
@@ -70,11 +72,11 @@ public sealed class Fix_PAL_0017_Tests
     {
         // Repeated calls to an allowed helper share one cached signature; the cache
         // must not corrupt the allowlist decision for any of the repeated tokens.
-        var i32 = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!;
-        var enterCall = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!;
-        var exitCall = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!;
-        var chargeFuel = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!;
-        var validate = typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!;
+        var i32 = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!;
+        var enterCall = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!;
+        var exitCall = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!;
+        var chargeFuel = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!;
+        var validate = typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!;
 
         var bytes = VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {

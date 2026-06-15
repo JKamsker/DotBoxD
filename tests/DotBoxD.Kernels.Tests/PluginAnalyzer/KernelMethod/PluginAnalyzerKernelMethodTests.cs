@@ -1,12 +1,17 @@
 using System.Reflection;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Policies;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod;
 
 /// <summary>An event a generated kernel-method hook chain subscribes to (referenced from chain source).</summary>
 public sealed record KernelMethodAggroEvent(string MonsterId, int Distance, int MonsterLevel, int PlayerLevel);
@@ -23,6 +28,7 @@ public sealed class PluginAnalyzerKernelMethodTests
 {
     private const string InlinedGateSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -51,21 +57,23 @@ public sealed class PluginAnalyzerKernelMethodTests
     public async Task KernelMethod_inlined_into_ShouldHandle_gates_like_the_inline_expression()
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(InlinedGateSource, "Sample.InlinedGatePluginPackage");
-        using var server = PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: SandboxedPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: SandboxedPolicy());
         var kernel = await server.InstallAsync(package);
         var adapter = new AggroAdapter();
 
         // 10-5=5 >= 3 (bullying) AND 3 <= 5 (close) → handled.
-        Assert.True(await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 10, 5, 3)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 10, 5, 3)));
         // 6-5=1 >= 3 is false → not handled (first inlined method short-circuits).
-        Assert.False(await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 6, 5, 3)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 6, 5, 3)));
         // bullying but 9 <= 5 is false → not handled (second inlined method).
-        Assert.False(await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 10, 5, 9)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, new AggroSample("m", "calm", 10, 5, 9)));
     }
 
     private const string InlinedHostBindingSource = """
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -109,7 +117,7 @@ public sealed class PluginAnalyzerKernelMethodTests
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(
             InlinedHostBindingSource, "Sample.InlinedHostBindingPluginPackage");
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             new InMemoryPluginMessageSink(),
             configureHost: AddProbeBindings,
             defaultPolicy: ProbeReadPolicy());
@@ -118,12 +126,13 @@ public sealed class PluginAnalyzerKernelMethodTests
         var adapter = new ProbeAdapter();
 
         // host.probe.getValue returns 42.
-        Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeSample("p", "hi", 10)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, new ProbeSample("p", "hi", 50)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, new ProbeSample("p", "hi", 10)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, new ProbeSample("p", "hi", 50)));
     }
 
     private const string ChainSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace ChainSample;
@@ -131,7 +140,7 @@ public sealed class PluginAnalyzerKernelMethodTests
         public static class Usage
         {
             public static void Configure(HookRegistry hooks)
-                => hooks.On<global::DotBoxD.Kernels.Tests.KernelMethodAggroEvent>()
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
                     .Where((e, ctx) => IsBullyingAndClose(e.MonsterLevel, e.PlayerLevel, e.Distance))
                     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
 
@@ -148,7 +157,7 @@ public sealed class PluginAnalyzerKernelMethodTests
         var package = HookChainPackage(assembly);
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages, defaultPolicy: SandboxedPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: SandboxedPolicy());
         server.Hooks.On<KernelMethodAggroEvent>().UseGeneratedChain(package);
 
         // bullying (10-5>=3) AND close (3<=5) → fires.
@@ -165,6 +174,7 @@ public sealed class PluginAnalyzerKernelMethodTests
 
     private const string MultiStatementSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace ChainSample;
@@ -172,7 +182,7 @@ public sealed class PluginAnalyzerKernelMethodTests
         public static class Usage
         {
             public static void Configure(HookRegistry hooks)
-                => hooks.On<global::DotBoxD.Kernels.Tests.KernelMethodAggroEvent>()
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
                     .Where((e, ctx) => Unsupported(e.Distance))
                     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
 

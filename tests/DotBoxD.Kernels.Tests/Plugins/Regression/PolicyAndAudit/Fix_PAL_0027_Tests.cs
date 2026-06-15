@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
 
 /// <summary>
 /// Regression coverage for PAL-0027: the audit sanitizer clones and regex-scans

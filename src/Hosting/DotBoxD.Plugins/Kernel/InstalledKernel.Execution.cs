@@ -1,7 +1,10 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Hosting.Execution.Prepared;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-using DotBoxD.Hosting;
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Kernel;
 
 public sealed partial class InstalledKernel
 {
@@ -23,7 +26,7 @@ public sealed partial class InstalledKernel
                 executionCancellation.Token,
                 ReusableNoAuditState(entrypoint))
             .ConfigureAwait(false);
-        _executionObserver.Record(entrypoint, _executionMode, result);
+        _executionObserver.Record(entrypoint, _executionMode, (PreparedExecutionResult)result);
         if (IsRevoked)
         {
             PluginKernelRevocation.ThrowIfRevoked(true);

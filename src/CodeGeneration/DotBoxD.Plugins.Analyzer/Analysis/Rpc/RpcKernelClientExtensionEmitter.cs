@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 using System.Collections.Generic;
 using System.Text;

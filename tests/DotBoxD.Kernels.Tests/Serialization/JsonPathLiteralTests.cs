@@ -1,7 +1,7 @@
 using System.Text.Json;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Serialization;
 
 public sealed class JsonPathLiteralTests
 {

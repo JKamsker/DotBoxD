@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 using DotBoxD.Kernels;
@@ -120,8 +124,8 @@ internal static class StringLengthForLoopRunner
     {
         if (bindings.TryGet("string.length", out var binding) &&
             binding.Compiled is { Kind: "RuntimeStub" } &&
-            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-            binding.Compiled.Method == nameof(CompiledRuntime.StringLength) &&
+            binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
+            binding.Compiled.Method == nameof(Runtime.CompiledRuntime.StringLength) &&
             binding.Parameters.Count == 1 &&
             binding.Parameters[0].Equals(SandboxType.String) &&
             binding.ReturnType.Equals(SandboxType.I32) &&

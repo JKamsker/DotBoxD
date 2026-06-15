@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Sandbox;
 
 public sealed record SandboxResourceUsage(
     long FuelUsed,

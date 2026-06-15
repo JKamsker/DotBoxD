@@ -1,8 +1,13 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
 using System.Diagnostics;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class GenericBindingBoundaryTests
 {
@@ -90,7 +95,7 @@ public sealed class GenericBindingBoundaryTests
                 await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
                 return SandboxValue.FromInt32(1);
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor SpuriousCanceledBinding()
         => new(
@@ -104,7 +109,7 @@ public sealed class GenericBindingBoundaryTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => throw new OperationCanceledException(),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string ReturnExpressionModule(string expression, string returnType)
         => $$"""

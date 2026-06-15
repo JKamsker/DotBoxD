@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
-using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Diagnostics;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0019: the <c>DotBoxD.Plugins</c> package emits stable runtime

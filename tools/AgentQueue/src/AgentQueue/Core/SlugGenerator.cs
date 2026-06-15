@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace AgentQueue;
+namespace AgentQueue.Core;
 
 internal static class SlugGenerator
 {

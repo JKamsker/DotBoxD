@@ -1,10 +1,9 @@
-namespace DotBoxD.Kernels;
-
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Linq.Expressions;
 using System.Reflection;
+
+namespace DotBoxD.Kernels.Policies;
 
 // Disambiguate from DotBoxD.Kernels.Expression (the IR model record) which otherwise wins
 // name resolution inside the DotBoxD.Kernels namespace and shadows the expression-tree type.

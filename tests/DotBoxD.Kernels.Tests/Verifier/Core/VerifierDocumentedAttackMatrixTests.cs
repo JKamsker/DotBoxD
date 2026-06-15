@@ -1,10 +1,11 @@
-using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierDocumentedAttackMatrixTests
 {
@@ -58,9 +59,9 @@ public sealed class VerifierDocumentedAttackMatrixTests
 
             public static class Module_0123456789abcdef
             {
-                public static DotBoxD.Kernels.SandboxValue Execute(
-                    DotBoxD.Kernels.SandboxContext context,
-                    DotBoxD.Kernels.SandboxValue input) => input;
+                public static DotBoxD.Kernels.Sandbox.SandboxValue Execute(
+                    DotBoxD.Kernels.Sandbox.SandboxContext context,
+                    DotBoxD.Kernels.Sandbox.SandboxValue input) => input;
             }
             """;
         using var output = new MemoryStream();
@@ -121,12 +122,12 @@ public sealed class VerifierDocumentedAttackMatrixTests
 
             public static unsafe class Module_0123456789abcdef
             {
-                public static DotBoxD.Kernels.SandboxValue Execute(
-                    DotBoxD.Kernels.SandboxContext context,
-                    DotBoxD.Kernels.SandboxValue input) => input;
+                public static DotBoxD.Kernels.Sandbox.SandboxValue Execute(
+                    DotBoxD.Kernels.Sandbox.SandboxContext context,
+                    DotBoxD.Kernels.Sandbox.SandboxValue input) => input;
 
-                private static DotBoxD.Kernels.SandboxValue Fn_0(
-                    DotBoxD.Kernels.SandboxContext context,
+                private static DotBoxD.Kernels.Sandbox.SandboxValue Fn_0(
+                    DotBoxD.Kernels.Sandbox.SandboxContext context,
                     delegate* unmanaged[Cdecl]<void> callback) => null!;
             }
             """;

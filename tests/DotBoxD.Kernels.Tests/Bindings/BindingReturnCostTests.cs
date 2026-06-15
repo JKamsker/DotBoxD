@@ -1,7 +1,14 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxContext = DotBoxD.Kernels.Sandbox.SandboxContext;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class BindingReturnCostTests
 {
@@ -161,7 +168,7 @@ public sealed class BindingReturnCostTests
                 AuditLevel.None,
                 BindingSafety.PureHostFacade,
                 (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(1)),
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding))),
             SandboxPolicyBuilder.Create().WithFuel(1_000).Build(),
             ExecutionMode.Interpreted,
             compiler: false);
@@ -215,7 +222,7 @@ public sealed class BindingReturnCostTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromString(value)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor PerByteStringBinding(string id, string value, long perByteFuel)
         => new(
@@ -229,7 +236,7 @@ public sealed class BindingReturnCostTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromString(value)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor PrechargedStringBinding(string id, string value)
         => new(
@@ -247,7 +254,7 @@ public sealed class BindingReturnCostTests
                 context.ChargeString(value);
                 return ValueTask.FromResult(SandboxValue.FromString(value));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor BadListBinding()
         => new(
@@ -262,7 +269,7 @@ public sealed class BindingReturnCostTests
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult<SandboxValue>(
                 new ListValue([SandboxValue.FromString("wrong")], SandboxType.I32)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor ListBinding(int count)
         => new(
@@ -277,7 +284,7 @@ public sealed class BindingReturnCostTests
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult<SandboxValue>(
                 SandboxValue.FromList(Enumerable.Range(0, count).Select(SandboxValue.FromInt32).ToArray())),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string ReturnBindingJson(string bindingId, string returnType)
         => $$"""

@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 // Recognition for fused i32 plan kinds whose operands may be supplied through inline-call substitutions.
 internal sealed partial class I32ExpressionPlan

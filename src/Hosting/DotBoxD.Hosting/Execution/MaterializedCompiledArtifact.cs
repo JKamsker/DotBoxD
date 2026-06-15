@@ -1,7 +1,7 @@
-namespace DotBoxD.Hosting;
-
 using System.Runtime.Loader;
 using DotBoxD.Kernels.Compiler;
+
+namespace DotBoxD.Hosting.Execution;
 
 internal sealed class MaterializedCompiledArtifact(CompiledArtifact artifact, AssemblyLoadContext? loadContext) : IDisposable
 {

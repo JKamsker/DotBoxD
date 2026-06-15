@@ -1,4 +1,9 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class FileWritePolicyTests
 {
@@ -7,11 +12,11 @@ public sealed class FileWritePolicyTests
     {
         using var temp = TempDirectory.Create();
         var target = Path.Combine(temp.Path, "existing.txt");
-        await File.WriteAllTextAsync(target, "old");
+        await System.IO.File.WriteAllTextAsync(target, "old");
         var result = await ExecuteWriteAsync(temp.Path, "existing.txt", "new", allowCreate: false, allowOverwrite: true);
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal("new", await File.ReadAllTextAsync(target));
+        Assert.Equal("new", await System.IO.File.ReadAllTextAsync(target));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
     }
 
@@ -23,7 +28,7 @@ public sealed class FileWritePolicyTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "missing.txt")));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
     }
 
@@ -32,7 +37,7 @@ public sealed class FileWritePolicyTests
     {
         using var temp = TempDirectory.Create();
         var target = Path.Combine(temp.Path, "existing.txt");
-        await File.WriteAllTextAsync(target, "old");
+        await System.IO.File.WriteAllTextAsync(target, "old");
 
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("existing.txt", new string('x', 1_000)));
@@ -47,7 +52,7 @@ public sealed class FileWritePolicyTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.Equal("old", await File.ReadAllTextAsync(target));
+        Assert.Equal("old", await System.IO.File.ReadAllTextAsync(target));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
     }
 

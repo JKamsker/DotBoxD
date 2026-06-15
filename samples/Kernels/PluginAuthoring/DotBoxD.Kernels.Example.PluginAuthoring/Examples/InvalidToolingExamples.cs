@@ -1,7 +1,4 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
-
-using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 internal static class InvalidToolingExamples
 {

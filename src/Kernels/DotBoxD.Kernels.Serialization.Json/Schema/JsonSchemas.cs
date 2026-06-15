@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Serialization.Json;
+namespace DotBoxD.Kernels.Serialization.Json.Schema;
 
 /// <summary>
 /// Exposes the versioned, machine-readable JSON Schema artifact that describes the public

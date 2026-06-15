@@ -1,8 +1,14 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled;
 
 public sealed class CompilerTests
 {

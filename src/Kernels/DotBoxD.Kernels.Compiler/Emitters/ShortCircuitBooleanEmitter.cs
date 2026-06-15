@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;
@@ -19,7 +22,7 @@ internal static class ShortCircuitBooleanEmitter
         var endLabel = il.DefineLabel();
 
         emitExpression(order.First);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsBool)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AsBool)));
         il.Emit(binary.Operator == "&&" ? OpCodes.Brfalse : OpCodes.Brtrue, shortcutLabel);
 
         emitExpression(order.Second);
@@ -27,7 +30,7 @@ internal static class ShortCircuitBooleanEmitter
 
         il.MarkLabel(shortcutLabel);
         EmitInt32(il, binary.Operator == "&&" ? 0 : 1);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
 
         il.MarkLabel(endLabel);
     }

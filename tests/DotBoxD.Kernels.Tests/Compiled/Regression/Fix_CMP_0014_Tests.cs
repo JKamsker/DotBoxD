@@ -1,16 +1,16 @@
-using DotBoxD.Kernels.Transport.Ipc;
+using System.Threading.Channels;
+using DotBoxD.Pushdown.Services;
 using DotBoxD.Services.Attributes;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Transport;
-using System.Threading.Channels;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// CMP-0014: the DotBoxD MessagePack IPC addon advertises a transport-agnostic public surface,
 /// but the maintained example only demonstrated the named-pipe convenience helpers. These tests
-/// drive the generic <see cref="RpcMessagePackIpc.Listen(IServerTransport, System.Action{DotBoxD.Services.RpcPeer}, DotBoxD.Services.RpcPeerOptions?)"/>
-/// and <see cref="RpcMessagePackIpc.ConnectAsync(ITransport, DotBoxD.Services.RpcPeerOptions?, System.Threading.CancellationToken)"/>
+/// drive the generic <see cref="RpcMessagePackIpc.Listen"/>
+/// and <see cref="RpcMessagePackIpc.ConnectAsync(DotBoxD.Services.Transport.ITransport,DotBoxD.Services.Peer.RpcPeerOptions?,System.Threading.CancellationToken)"/>
 /// entry points over a deterministic in-memory (non-named-pipe) transport and exercise a
 /// plugin-control-style RPC round trip. Being part of the xUnit suite, this generic-transport path
 /// is now continuously checked on every supported CI operating system (Windows, Linux, macOS),

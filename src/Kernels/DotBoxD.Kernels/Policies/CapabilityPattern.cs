@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Policies;
 
 /// <summary>
 /// Hierarchical capability matching for dotted capability ids (e.g. <c>game.world.monster.health.get</c>).

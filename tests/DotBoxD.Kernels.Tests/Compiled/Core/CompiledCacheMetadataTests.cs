@@ -1,11 +1,17 @@
-using DotBoxD.Kernels.Compiler;
-using DotBoxD.Kernels.Compiler.Emitters;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Verifier;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
+using PersistentCompiledArtifactCache = DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledCacheMetadataTests
 {

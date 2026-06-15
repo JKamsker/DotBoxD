@@ -2,13 +2,13 @@ namespace DotBoxD.Kernels.Serialization.Json.Internal;
 
 using DotBoxD.Hosting;
 
-public static class SandboxHostJsonExtensions
+internal static class SandboxHostJsonExtensions
 {
     public static ValueTask<SandboxModule> ImportJsonAsync(
-        this SandboxHost host,
+        this DotBoxD.Hosting.Execution.SandboxHost host,
         string jsonIr,
         CancellationToken cancellationToken = default)
-        => DotBoxD.Kernels.Serialization.Json.SandboxHostJsonExtensions.ImportJsonAsync(
+        => Hosting.SandboxHostJsonExtensions.ImportJsonAsync(
             host,
             jsonIr,
             cancellationToken);

@@ -1,8 +1,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Generated;
 
 public sealed class VerifierStackTypeTests
 {
@@ -28,7 +29,7 @@ public sealed class VerifierStackTypeTests
         Assert.Contains(result.Diagnostics, d =>
             d.Code == "V-STACK-TYPE" &&
             d.Message.Contains("System.Int32", StringComparison.Ordinal) &&
-            d.Message.Contains("DotBoxD.Kernels.SandboxValue", StringComparison.Ordinal));
+            d.Message.Contains("DotBoxD.Kernels.Sandbox.SandboxValue", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -40,7 +41,7 @@ public sealed class VerifierStackTypeTests
         Assert.Contains(result.Diagnostics, d =>
             d.Code == "V-STACK-TYPE" &&
             d.Message.Contains("System.Int32", StringComparison.Ordinal) &&
-            d.Message.Contains("DotBoxD.Kernels.SandboxValue", StringComparison.Ordinal));
+            d.Message.Contains("DotBoxD.Kernels.Sandbox.SandboxValue", StringComparison.Ordinal));
     }
 
     private static byte[] OperandOutOfRangeAssembly(string opcode)
@@ -79,7 +80,7 @@ public sealed class VerifierStackTypeTests
         {
             var il = DefineExecute(type).GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             il.Emit(OpCodes.Ret);
         });
 

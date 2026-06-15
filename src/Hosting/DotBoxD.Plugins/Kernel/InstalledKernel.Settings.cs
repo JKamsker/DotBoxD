@@ -1,4 +1,6 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
+
+namespace DotBoxD.Plugins.Kernel;
 
 /// <summary>
 /// Live-settings mutation for <see cref="InstalledKernel"/>. Split out to keep the execution core

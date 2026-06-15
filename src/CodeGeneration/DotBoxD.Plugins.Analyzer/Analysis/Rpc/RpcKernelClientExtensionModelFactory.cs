@@ -1,5 +1,6 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 

@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Frame;
 
 internal sealed partial class InterpreterFrame
 {

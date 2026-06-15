@@ -1,7 +1,7 @@
-namespace DotBoxD.Kernels.Example.Hosting;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Policies;
 
-using DotBoxD.Kernels;
-using DotBoxD.Plugins;
+namespace DotBoxD.Kernels.Example.Hosting.Examples;
 
 internal static class PluginExamplePolicies
 {

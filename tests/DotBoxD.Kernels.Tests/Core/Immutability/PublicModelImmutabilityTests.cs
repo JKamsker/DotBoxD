@@ -1,6 +1,12 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Immutability;
 
 public sealed class PublicModelImmutabilityTests
 {
@@ -119,8 +125,8 @@ public sealed class PublicModelImmutabilityTests
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(0)),
             CompiledBinding.RuntimeStub(
-                typeof(Runtime.CompiledRuntime).FullName!,
-                nameof(Runtime.CompiledRuntime.CallBinding)));
+                typeof(CompiledRuntime).FullName!,
+                nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
         var registry = new BindingRegistry([descriptor]);
         var manifestHash = registry.ManifestHash;
         parameters[0] = SandboxType.String;

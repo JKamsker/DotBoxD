@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Tests.Serialization;
 
 public sealed class JsonImporterStrictShapeTests
 {

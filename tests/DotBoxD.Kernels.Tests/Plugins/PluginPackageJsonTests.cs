@@ -1,7 +1,9 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Json;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginPackageJsonTests
 {
@@ -9,7 +11,7 @@ public sealed class PluginPackageJsonTests
     public async Task InstallJsonAsync_installs_serialized_package_data()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: PluginAddendumTestPolicies.LongWall());
 
         var kernel = await server.InstallJsonAsync(JsonDamagePackage());
         server.Hooks.On(DamageEventAdapter.Instance).UseKernel(kernel);
@@ -24,7 +26,7 @@ public sealed class PluginPackageJsonTests
     [Fact]
     public async Task InstallJsonAsync_default_policy_denies_game_message_write()
     {
-        var server = PluginServer.Create(new InMemoryPluginMessageSink());
+        var server = DotBoxD.Plugins.PluginServer.Create(new InMemoryPluginMessageSink());
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await server.InstallJsonAsync(JsonDamagePackage()).AsTask());
@@ -92,7 +94,7 @@ public sealed class PluginPackageJsonTests
     [InlineData("MetadataToken=06000001")]
     public async Task InstallJsonAsync_rejects_manifest_loader_descriptors(string contract)
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         var json = JsonDamagePackage().Replace(
             "\"contract\": \"IEventKernel<DamageEvent>\"",
             $"\"contract\": \"{contract}\"",
@@ -107,7 +109,7 @@ public sealed class PluginPackageJsonTests
     [Fact]
     public async Task InstallJsonAsync_rejects_module_metadata_loader_descriptors()
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         var json = JsonDamagePackage().Replace(
             "\"metadata\": { \"pluginId\": \"json-fire-damage\", \"kernel\": \"JsonDamageKernel\" }",
             "\"metadata\": { \"pluginId\": \"json-fire-damage\", \"kernel\": \"JsonDamageKernel\", \"rawIlBase64\": \"AAAA\" }",
@@ -125,7 +127,7 @@ public sealed class PluginPackageJsonTests
     [InlineData("plugin.dll", "loader")]
     public async Task InstallJsonAsync_rejects_module_metadata_dll_loader_hints(string key, string value)
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         var json = JsonDamagePackage().Replace(
             "\"metadata\": { \"pluginId\": \"json-fire-damage\", \"kernel\": \"JsonDamageKernel\" }",
             $"\"metadata\": {{ \"pluginId\": \"json-fire-damage\", \"kernel\": \"JsonDamageKernel\", \"{key}\": \"{value}\" }}",

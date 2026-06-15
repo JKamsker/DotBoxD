@@ -1,8 +1,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierFieldTests
 {

@@ -1,7 +1,12 @@
-using DotBoxD.Kernels;
-using DotBoxD.Plugins;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Regression;
 
 /// <summary>
 /// Regression coverage for COR-0057: the <c>host.message.write</c> grant must be
@@ -197,8 +202,8 @@ public sealed class Fix_COR_0057_Tests
             new[] { " ", null! }
         };
 
-    private static Hosting.SandboxHost CreateHost(IPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CreateHost(IPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);

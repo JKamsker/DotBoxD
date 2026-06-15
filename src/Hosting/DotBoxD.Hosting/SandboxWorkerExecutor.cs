@@ -1,3 +1,9 @@
+using DotBoxD.Hosting.Worker;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Hosting;
 
 using DotBoxD.Kernels;
@@ -13,7 +19,7 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
     {
         if (worker is null || !worker.Profile.SatisfiesWorkerProcess)
         {
-            return SandboxHost.WorkerIsolationUnavailableResult(plan, options, worker?.Profile);
+            return Execution.SandboxHost.WorkerIsolationUnavailableResult(plan, options, worker?.Profile);
         }
 
         // SuppressSuccessfulRunSummaryAudit is an in-process allocation optimization only.
@@ -43,28 +49,28 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
                     AuditEvents = result.AuditEvents.ToSequencedArray(),
                     ExecutionDispatched = true
                 }
-                : SandboxHost.WorkerIsolationFailedResult(
+                : Execution.SandboxHost.WorkerIsolationFailedResult(
                     plan,
                     options,
                     error);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return SandboxHost.WorkerIsolationFailedResult(
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
                 new SandboxError(SandboxErrorCode.Cancelled, "worker process execution was cancelled"));
         }
         catch (OperationCanceledException)
         {
-            return SandboxHost.WorkerIsolationFailedResult(
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
                 new SandboxError(SandboxErrorCode.Timeout, "worker process execution timed out"));
         }
         catch (Exception)
         {
-            return SandboxHost.WorkerIsolationFailedResult(
+            return Execution.SandboxHost.WorkerIsolationFailedResult(
                 plan,
                 options,
                 new SandboxError(SandboxErrorCode.HostFailure, "worker process execution failed"));

@@ -1,8 +1,12 @@
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Verifier.Generated;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledArtifactGuardTests
 {

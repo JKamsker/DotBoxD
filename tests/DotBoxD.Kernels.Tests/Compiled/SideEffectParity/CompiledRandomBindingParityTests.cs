@@ -1,7 +1,10 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Differential / parity tests for <c>random.nextI32</c> on the compiled side-effecting binding path.

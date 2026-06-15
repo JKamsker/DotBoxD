@@ -1,4 +1,7 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
 
 /// <summary>
 /// Regression coverage for PAL-0020: <see cref="SandboxPolicy.Hash"/> recomputed the full

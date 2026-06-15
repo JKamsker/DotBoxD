@@ -1,11 +1,11 @@
-using DotBoxD.Kernels.Transport.Ipc;
-using DotBoxD.Services;
+using System.Threading.Channels;
+using DotBoxD.Pushdown.Services;
 using DotBoxD.Services.Attributes;
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Peer;
 using DotBoxD.Services.Transport;
-using System.Threading.Channels;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Wave9Fixes;
 
 // Regression test for PAL-0014: IPC convenience defaults bypass the low-allocation profile.
 //

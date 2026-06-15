@@ -1,9 +1,6 @@
-using System.Linq;
 using Microsoft.CodeAnalysis;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round 7 regression (deferred R6 finding #7). An explicitly configured empty wire name was accepted with

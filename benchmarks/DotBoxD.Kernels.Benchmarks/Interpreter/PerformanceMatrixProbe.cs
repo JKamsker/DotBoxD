@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
 using System.Diagnostics;
@@ -9,7 +13,7 @@ internal static class PerformanceMatrixProbe
 {
     public static async Task RunAsync()
     {
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
@@ -32,7 +36,7 @@ internal static class PerformanceMatrixProbe
         }
     }
 
-    private static async Task RunCase(SandboxHost host, SandboxPolicy policy, PerformanceMatrixCase probe)
+    private static async Task RunCase(Hosting.Execution.SandboxHost host, SandboxPolicy policy, PerformanceMatrixCase probe)
     {
         var module = await host.ImportJsonAsync(probe.ModuleJson);
         var plan = await host.PrepareAsync(module, policy);
@@ -49,7 +53,7 @@ internal static class PerformanceMatrixProbe
             $"{probe.Name,-28} {handwrittenMs,8:N1} ms {compiledMs,8:N1} ms {compiledMs / handwrittenMs,5:N1} {interpretedMs,10:N1} ms {interpretedMs / handwrittenMs,6:N1}");
     }
 
-    private static async Task<SandboxValue?> RunSandbox(SandboxHost host, ExecutionPlan plan, int iterations, ExecutionMode mode)
+    private static async Task<SandboxValue?> RunSandbox(Hosting.Execution.SandboxHost host, ExecutionPlan plan, int iterations, ExecutionMode mode)
     {
         var result = await host.ExecuteAsync(
             plan,

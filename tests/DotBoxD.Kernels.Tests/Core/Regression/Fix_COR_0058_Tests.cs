@@ -1,10 +1,11 @@
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.Compiler.Internal;
+using DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Regression;
 
 /// <summary>
 /// COR-0058: the compiled-cache HMAC origin key is a host secret. Its directory

@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using Microsoft.CodeAnalysis;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDTypeNameReader
 {

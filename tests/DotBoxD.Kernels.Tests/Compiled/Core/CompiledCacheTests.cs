@@ -1,11 +1,17 @@
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Verifier;
 using System.Text.Json;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledCacheTests
 {
@@ -200,7 +206,7 @@ public sealed class CompiledCacheTests
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteCompiled(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         SandboxValue input)
         => await host.ExecuteAsync(
@@ -239,7 +245,7 @@ public sealed class CompiledCacheTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static async Task ReplaceManifestAssemblyHashAsync(string entryPath, string assemblyHash)
         => await ReplaceManifestAsync(entryPath, manifest => manifest with { AssemblyHash = assemblyHash });

@@ -1,8 +1,13 @@
+using System.Collections;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginHookSignatureTests
 {
@@ -62,7 +67,7 @@ public sealed class PluginHookSignatureTests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK031");
         Assert.Empty(messages.Messages);
-        Assert.Empty(kernel.ExecutionObservations);
+        Assert.Empty((IEnumerable)kernel.ExecutionObservations);
     }
 
     [Fact]
@@ -77,7 +82,7 @@ public sealed class PluginHookSignatureTests
                 new DamageEvent("fire", 120, "player-1")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK033");
-        Assert.Empty(kernel.ExecutionObservations);
+        Assert.Empty((IEnumerable)kernel.ExecutionObservations);
     }
 
     [Fact]
@@ -92,7 +97,7 @@ public sealed class PluginHookSignatureTests
     [Fact]
     public void On_rejects_different_adapter_after_pipeline_exists()
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         _ = server.Hooks.On(DamageEventAdapter.Instance);
 
         var ex = Assert.Throws<SandboxValidationException>(

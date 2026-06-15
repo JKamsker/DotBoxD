@@ -1,7 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 // Regression coverage for CMP-0022: DotBoxD.Kernels exposes custom host binding authoring as public API
 // (SandboxHostBuilder.AddBinding + BindingDescriptor + CapabilityGrantValidator), but there was no
@@ -131,7 +136,7 @@ public sealed class Fix_CMP_0022_Tests
 
                 return ValueTask.FromResult(SandboxValue.FromInt32(tenantId * 10));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             ValidateTenantReadGrant);
 
     private static void ValidateTenantReadGrant(

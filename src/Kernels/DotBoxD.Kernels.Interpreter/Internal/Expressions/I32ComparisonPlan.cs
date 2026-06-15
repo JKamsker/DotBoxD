@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 // Unboxed i32 comparison (two i32 expression plans -> bool), used as the condition of a branched i32 loop body
 // so the comparison avoids boxing its operands and result. FuelCost counts nodes identically to the compiler's

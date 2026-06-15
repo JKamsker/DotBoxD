@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels.Game.Server;
+using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
+
+namespace DotBoxD.Kernels.Game.Server.Simulation;
 
 internal enum EntityKind
 {

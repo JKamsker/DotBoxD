@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Bindings;
 
 public static class BindingAuditFields
 {

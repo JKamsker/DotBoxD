@@ -1,7 +1,8 @@
 using System.Reflection;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 public sealed class KernelRpcClientExtensionTests
 {
@@ -9,7 +10,9 @@ public sealed class KernelRpcClientExtensionTests
         using System.Collections.Generic;
         using System.Threading.Tasks;
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -119,7 +122,9 @@ public sealed class KernelRpcClientExtensionTests
             using System.Collections.Generic;
             using System.Threading.Tasks;
             using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;

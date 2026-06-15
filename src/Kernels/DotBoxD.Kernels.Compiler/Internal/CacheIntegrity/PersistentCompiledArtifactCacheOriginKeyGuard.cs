@@ -1,9 +1,10 @@
-namespace DotBoxD.Kernels.Compiler.Internal;
-
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 
 /// <summary>
 /// Hardens and validates the on-disk HMAC origin-key directory and file so the

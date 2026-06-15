@@ -1,4 +1,4 @@
-namespace AgentQueue;
+namespace AgentQueue.Core;
 
 internal static class FindingSort
 {

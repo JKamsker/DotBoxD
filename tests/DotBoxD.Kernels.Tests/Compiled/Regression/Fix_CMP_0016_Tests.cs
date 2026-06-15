@@ -1,9 +1,7 @@
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// Regression coverage for CMP-0016: the simple filter/formula contracts have no package-backed
@@ -61,7 +59,7 @@ public sealed class Fix_CMP_0016_Tests
     {
         // The filter/formula slots are not a package-backed DotBoxD.Kernels surface; the validator must
         // reject any uploaded package whose manifest claims a non-event filter contract.
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { Contract = "IItemFilter" } };
 

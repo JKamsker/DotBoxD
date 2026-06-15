@@ -153,10 +153,17 @@ Set-Content -LiteralPath (Join-Path $resolvedWorkRoot "DotBoxD.Kernels.PackageCo
 $program = @"
 using DotBoxD.Kernels;
 using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json;
 using DotBoxD.Hosting.Http;
-using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Hosting.Http.Hosting;
+using DotBoxD.Hosting.Http.Policy;
+using DotBoxD.Pushdown.Services;
 using DotBoxD.Kernels.PackageConsumerSmoke;
 using System.IO;
 

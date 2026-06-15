@@ -1,9 +1,8 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 /// <summary>
 /// Lowers a <c>[KernelRpcService]</c> batch method body to DotBoxD.Kernels JSON IR (statements + expressions),

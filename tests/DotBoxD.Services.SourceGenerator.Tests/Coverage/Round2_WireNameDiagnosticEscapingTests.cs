@@ -1,16 +1,14 @@
-using System.Linq;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
+using DotBoxD.Services.SourceGenerator.Models;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round2 regression test for DEFECT #12: wire-name / service-name collision diagnostics
 /// display the C#-escaped form of the name instead of the actual runtime name.
 ///
 /// <para>
-/// <see cref="DotBoxD.Services.SourceGenerator.MethodModel"/>.<c>RpcName</c> and
-/// <see cref="DotBoxD.Services.SourceGenerator.ServiceModel"/>.<c>ServiceName</c> store the value
+/// <see cref="MethodModel"/>.<c>RpcName</c> and
+/// <see cref="ServiceModel"/>.<c>ServiceName</c> store the value
 /// already run through <c>LiteralHelpers.EscapeStringLiteral(...)</c> (MethodModelFactory
 /// line ~153, ServiceModelFactory line ~187) because that value is later emitted inside a
 /// generated string literal. The duplicate-wire-name (DBXS002) and duplicate-service-name

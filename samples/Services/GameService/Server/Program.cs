@@ -3,6 +3,8 @@ using Shared;
 using DotBoxD.Services;
 using DotBoxD.Services.Generated;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Peer;
+using DotBoxD.Services.Server;
 using DotBoxD.Transports.Tcp;
 
 const int Port = 5050;

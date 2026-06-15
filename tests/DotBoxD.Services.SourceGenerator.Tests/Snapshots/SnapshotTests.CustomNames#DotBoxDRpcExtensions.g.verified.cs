@@ -13,13 +13,13 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IHello implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideHello(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Renamed.IHello implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideHello(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Renamed.IHello implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Renamed.HelloDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IHello on the other peer.
         /// </summary>
-        public static global::Snap.Renamed.IHello GetHello(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Renamed.IHello GetHello(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Renamed.HelloProxy(peer);
     }
 }

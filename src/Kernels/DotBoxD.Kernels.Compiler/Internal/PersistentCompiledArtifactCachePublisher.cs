@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
+
 namespace DotBoxD.Kernels.Compiler.Internal;
 
 internal static class PersistentCompiledArtifactCachePublisher

@@ -1,8 +1,14 @@
 using System.Globalization;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
+using PersistentCompiledArtifactCache = DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 public sealed class Fix_ALG_0020_Tests
 {
@@ -92,7 +98,7 @@ public sealed class Fix_ALG_0020_Tests
 
         var cache = new PersistentCompiledArtifactCache(root);
         var cacheKey = CacheKeyBuilder.Build(plan, "main", VerificationPolicy.BoxedValueDefaults(), optimize: false);
-        Assert.True(cache.EntryExists(cacheKey));
+        Assert.True((bool)cache.EntryExists(cacheKey));
         return (cache, plan, cacheKey);
     }
 

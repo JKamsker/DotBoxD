@@ -1,8 +1,6 @@
-namespace DotBoxD.Kernels.Example.Hosting;
-
-using DotBoxD.Kernels;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+
+namespace DotBoxD.Kernels.Example.Hosting.Examples;
 
 internal static class ExecutionModeExample
 {
@@ -10,7 +8,7 @@ internal static class ExecutionModeExample
     {
         foreach (var mode in new[] { ExecutionMode.Interpreted, ExecutionMode.Compiled, ExecutionMode.Auto }) {
             var messages = new InMemoryPluginMessageSink();
-            var server = PluginServer.Create(
+            var server = Plugins.PluginServer.Create(
                 messages,
                 defaultPolicy: PluginExamplePolicies.MessageWrite(),
                 executionMode: mode);

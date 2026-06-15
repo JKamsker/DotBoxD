@@ -1,9 +1,12 @@
 using System.Collections.Concurrent;
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Compiled.Core;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 /// <summary>
 /// Regression coverage for PAL-0031: the host-local compiled executable cache must not retain

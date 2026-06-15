@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 using DotBoxD.Kernels;
@@ -65,12 +69,12 @@ internal static class UnaryPureIntrinsicDispatcher
         InterpreterTrace.WriteBindingCall(context, options, moduleHash, functionId, descriptor);
         context.ChargeBindingCall(descriptor);
         return method switch {
-            nameof(CompiledRuntime.AbsI32) => CompiledRuntime.AbsI32(operand),
-            nameof(CompiledRuntime.StringLength) => CompiledRuntime.StringLength(operand),
-            nameof(CompiledRuntime.SqrtF64) => CompiledRuntime.SqrtF64(operand),
-            nameof(CompiledRuntime.FloorF64) => CompiledRuntime.FloorF64(operand),
-            nameof(CompiledRuntime.CeilF64) => CompiledRuntime.CeilF64(operand),
-            nameof(CompiledRuntime.RoundF64) => CompiledRuntime.RoundF64(operand),
+            nameof(Runtime.CompiledRuntime.AbsI32) => Runtime.CompiledRuntime.AbsI32(operand),
+            nameof(Runtime.CompiledRuntime.StringLength) => Runtime.CompiledRuntime.StringLength(operand),
+            nameof(Runtime.CompiledRuntime.SqrtF64) => Runtime.CompiledRuntime.SqrtF64(operand),
+            nameof(Runtime.CompiledRuntime.FloorF64) => Runtime.CompiledRuntime.FloorF64(operand),
+            nameof(Runtime.CompiledRuntime.CeilF64) => Runtime.CompiledRuntime.CeilF64(operand),
+            nameof(Runtime.CompiledRuntime.RoundF64) => Runtime.CompiledRuntime.RoundF64(operand),
             _ => throw new InvalidOperationException("unsupported unary math intrinsic")
         };
     }
@@ -79,7 +83,7 @@ internal static class UnaryPureIntrinsicDispatcher
     {
         var (parameterType, returnType) = Shape(method);
         return binding.Compiled is { Kind: "RuntimeStub" } &&
-               binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
+               binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
                binding.Compiled.Method == method &&
                binding.Parameters.Count == 1 &&
                binding.Parameters[0].Equals(parameterType) &&
@@ -93,12 +97,12 @@ internal static class UnaryPureIntrinsicDispatcher
     private static bool TryGetMethod(string id, out string method)
     {
         method = id switch {
-            "math.abs" => nameof(CompiledRuntime.AbsI32),
-            "string.length" => nameof(CompiledRuntime.StringLength),
-            "math.sqrt" => nameof(CompiledRuntime.SqrtF64),
-            "math.floor" => nameof(CompiledRuntime.FloorF64),
-            "math.ceil" => nameof(CompiledRuntime.CeilF64),
-            "math.round" => nameof(CompiledRuntime.RoundF64),
+            "math.abs" => nameof(Runtime.CompiledRuntime.AbsI32),
+            "string.length" => nameof(Runtime.CompiledRuntime.StringLength),
+            "math.sqrt" => nameof(Runtime.CompiledRuntime.SqrtF64),
+            "math.floor" => nameof(Runtime.CompiledRuntime.FloorF64),
+            "math.ceil" => nameof(Runtime.CompiledRuntime.CeilF64),
+            "math.round" => nameof(Runtime.CompiledRuntime.RoundF64),
             _ => ""
         };
         return method.Length > 0;
@@ -106,8 +110,8 @@ internal static class UnaryPureIntrinsicDispatcher
 
     private static (SandboxType Parameter, SandboxType Return) Shape(string method)
         => method switch {
-            nameof(CompiledRuntime.AbsI32) => (SandboxType.I32, SandboxType.I32),
-            nameof(CompiledRuntime.StringLength) => (SandboxType.String, SandboxType.I32),
+            nameof(Runtime.CompiledRuntime.AbsI32) => (SandboxType.I32, SandboxType.I32),
+            nameof(Runtime.CompiledRuntime.StringLength) => (SandboxType.String, SandboxType.I32),
             _ => (SandboxType.F64, SandboxType.F64)
         };
 }

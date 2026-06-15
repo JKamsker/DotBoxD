@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler;
 
 using System.Collections.Concurrent;
@@ -55,7 +58,7 @@ internal static class IlEmitterPrimitives
     public static MethodInfo Runtime(string name)
         => RuntimeMethodCache.GetOrAdd(
             name,
-            static key => typeof(CompiledRuntime)
+            static key => typeof(Runtime.CompiledRuntime)
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Single(m => m.Name == key));
 
@@ -63,20 +66,20 @@ internal static class IlEmitterPrimitives
     {
         if (type.Arguments.Count == 0) {
             il.Emit(OpCodes.Ldstr, type.Name);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeScalar)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));
             return;
         }
 
         if (type is { Name: "List", Arguments.Count: 1 }) {
             EmitSandboxType(il, type.Arguments[0]);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeList)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeList)));
             return;
         }
 
         if (type is { Name: "Map", Arguments.Count: 2 }) {
             EmitSandboxType(il, type.Arguments[0]);
             EmitSandboxType(il, type.Arguments[1]);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeMap)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeMap)));
             return;
         }
 
@@ -84,7 +87,7 @@ internal static class IlEmitterPrimitives
             // Build DotBoxD.Kernels.SandboxType[] via the trusted runtime facade (no newarr in verified IL),
             // populate each field type, then fold into a record type — mirrors the value-array path.
             EmitInt32(il, type.Arguments.Count);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CreateTypeArray)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CreateTypeArray)));
             for (var i = 0; i < type.Arguments.Count; i++) {
                 il.Emit(OpCodes.Dup);
                 EmitInt32(il, i);
@@ -92,7 +95,7 @@ internal static class IlEmitterPrimitives
                 il.Emit(OpCodes.Stelem_Ref);
             }
 
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeRecord)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeRecord)));
             return;
         }
 

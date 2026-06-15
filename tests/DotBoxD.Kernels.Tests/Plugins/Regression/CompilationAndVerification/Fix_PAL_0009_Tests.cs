@@ -1,8 +1,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 // Regression coverage for PAL-0009: GeneratedStackTypeVerifier used to start the
 // transfer of every reachable instruction with `input.ToList()`, cloning the whole

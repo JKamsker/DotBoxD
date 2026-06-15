@@ -1,6 +1,11 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class SafeFileSystemTests
 {
@@ -9,7 +14,7 @@ public sealed class SafeFileSystemTests
     {
         using var temp = TempDirectory.Create();
         Directory.CreateDirectory(Path.Combine(temp.Path, "config"));
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "config", "settings.json"), "tenant-settings");
 
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config/settings.json"));
@@ -45,7 +50,7 @@ public sealed class SafeFileSystemTests
     public async Task File_read_charges_actual_streamed_bytes()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = FilePolicyBuilder()
@@ -65,7 +70,7 @@ public sealed class SafeFileSystemTests
     public async Task File_read_respects_byte_quota_while_streaming()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = FilePolicyBuilder()
@@ -84,7 +89,7 @@ public sealed class SafeFileSystemTests
     public async Task File_read_respects_allocation_quota_while_streaming()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = FilePolicyBuilder()
@@ -127,7 +132,7 @@ public sealed class SafeFileSystemTests
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.True(result.Succeeded);
-        Assert.Equal("written", await File.ReadAllTextAsync(Path.Combine(temp.Path, "result.txt")));
+        Assert.Equal("written", await System.IO.File.ReadAllTextAsync(Path.Combine(temp.Path, "result.txt")));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp-*", SearchOption.AllDirectories));
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.writeText" && e.Success);
         Assert.Equal("file", audit.Fields!["resourceKind"]);
@@ -151,7 +156,7 @@ public sealed class SafeFileSystemTests
     public async Task File_write_respects_overwrite_policy()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(FileWriteJson("existing.txt", "new"));
         var policy = FilePolicyBuilder()
@@ -164,14 +169,14 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-        Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
+        Assert.Equal("original", await System.IO.File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
     }
 
     [Fact]
     public async Task File_write_default_builder_grant_denies_create_and_overwrite()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "existing.txt"), "original");
         var host = SandboxTestHost.Create();
         var createModule = await host.ImportJsonAsync(FileWriteJson("missing.txt", "new"));
         var overwriteModule = await host.ImportJsonAsync(FileWriteJson("existing.txt", "new"));
@@ -189,8 +194,8 @@ public sealed class SafeFileSystemTests
         Assert.False(overwrite.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, create.Error!.Code);
         Assert.Equal(SandboxErrorCode.PermissionDenied, overwrite.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
-        Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "missing.txt")));
+        Assert.Equal("original", await System.IO.File.ReadAllTextAsync(Path.Combine(temp.Path, "existing.txt")));
     }
 
     [Fact]
@@ -235,7 +240,7 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "missing.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "missing.txt")));
     }
 
     [Fact]
@@ -254,7 +259,7 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "too-large.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "too-large.txt")));
     }
 
     [Fact]
@@ -274,7 +279,7 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "alloc-too-large.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "alloc-too-large.txt")));
     }
 
     private static string FileWriteJson(string path, string text)

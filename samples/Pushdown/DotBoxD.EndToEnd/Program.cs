@@ -10,7 +10,7 @@
 // round-trip win. Exits non-zero if the equivalence assertion fails, so it doubles as a CI gate.
 
 using DotBoxD.EndToEnd;
-using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Pushdown.Services;
 using DotBoxD.Services.Generated;
 
 // A realistic catalog: item id -> unit price.

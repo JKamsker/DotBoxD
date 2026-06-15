@@ -1,7 +1,11 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Input;
+using DotBoxD.Plugins.Runtime.Lifecycle;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+namespace DotBoxD.Plugins.Kernel;
 
 public sealed partial class InstalledKernel
 {

@@ -1,7 +1,11 @@
 using System.Net;
-using static DotBoxD.Kernels.Tests.NetworkTestFixtures;
+using DotBoxD.Hosting.Http.Policy;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using static DotBoxD.Kernels.Tests._TestSupport.NetworkTestFixtures;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Runtime.Network;
 
 public sealed class NetworkIpClassificationTests
 {

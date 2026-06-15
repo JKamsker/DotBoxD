@@ -1,8 +1,7 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 /// <summary>
 /// Inlines a call to a <c>[KernelMethod]</c>-annotated static helper into the calling kernel/hook IR.

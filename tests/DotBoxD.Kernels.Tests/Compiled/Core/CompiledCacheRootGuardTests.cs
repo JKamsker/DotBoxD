@@ -2,10 +2,17 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
+using PersistentCompiledArtifactCache = DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledCacheRootGuardTests
 {
@@ -16,7 +23,7 @@ public sealed class CompiledCacheRootGuardTests
 
         var cache = new PersistentCompiledArtifactCache(temp.Path);
 
-        Assert.False(cache.EntryExists(new string('0', 64)));
+        Assert.False((bool)cache.EntryExists(new string('0', 64)));
     }
 
     [Fact]
@@ -142,7 +149,7 @@ public sealed class CompiledCacheRootGuardTests
     }
 
     private static async Task<SandboxExecutionResult> ExecuteCompiledAsync(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         SandboxValue input)
         => await host.ExecuteAsync(

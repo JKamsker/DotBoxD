@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 /// <summary>
 /// Regression coverage for PAL-0026: <see cref="GeneratedAssemblyVerifier.VerifyAsync"/>

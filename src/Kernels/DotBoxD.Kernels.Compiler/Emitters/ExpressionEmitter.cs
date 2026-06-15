@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection;
@@ -51,28 +55,28 @@ internal sealed class ExpressionEmitter
         switch (have, want)
         {
             case (StackKind.I32, StackKind.Boxed):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.I32)));
                 break;
             case (StackKind.I64, StackKind.Boxed):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I64)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.I64)));
                 break;
             case (StackKind.F64, StackKind.Boxed):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.F64)));
                 break;
             case (StackKind.Bool, StackKind.Boxed):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
                 break;
             case (StackKind.Boxed, StackKind.I32):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsI32)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AsI32)));
                 break;
             case (StackKind.Boxed, StackKind.I64):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsI64)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AsI64)));
                 break;
             case (StackKind.Boxed, StackKind.F64):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsF64)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AsF64)));
                 break;
             case (StackKind.Boxed, StackKind.Bool):
-                _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AsBool)));
+                _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AsBool)));
                 break;
             default:
                 throw Unsupported($"cannot coerce {have} to {want}");
@@ -131,15 +135,15 @@ internal sealed class ExpressionEmitter
         if (unary.Operator == "-" && _stackPlan.Infer(unary.Operand) is { Name: "I32" })
         {
             EmitAs(unary.Operand, StackKind.I32);
-            _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.NegI32Raw)));
+            _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.NegI32Raw)));
             return StackKind.I32;
         }
 
         EmitAs(unary.Operand, StackKind.Boxed);
         var method = unary.Operator switch
         {
-            "!" => nameof(CompiledRuntime.NotBool),
-            "-" => nameof(CompiledRuntime.Neg),
+            "!" => nameof(Kernels.Runtime.CompiledRuntime.NotBool),
+            "-" => nameof(Kernels.Runtime.CompiledRuntime.Neg),
             _ => throw Unsupported("unary operator not supported by compiler")
         };
         _il.Emit(OpCodes.Call, Runtime(method));
@@ -160,11 +164,11 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.I32);
             var raw = binary.Operator switch
             {
-                "+" => nameof(CompiledRuntime.AddI32Raw),
-                "-" => nameof(CompiledRuntime.SubI32Raw),
-                "*" => nameof(CompiledRuntime.MulI32Raw),
-                "/" => nameof(CompiledRuntime.DivI32Raw),
-                "%" => nameof(CompiledRuntime.RemI32Raw),
+                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddI32Raw),
+                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubI32Raw),
+                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulI32Raw),
+                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivI32Raw),
+                "%" => nameof(Kernels.Runtime.CompiledRuntime.RemI32Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -179,11 +183,11 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.I64);
             var raw = binary.Operator switch
             {
-                "+" => nameof(CompiledRuntime.AddI64Raw),
-                "-" => nameof(CompiledRuntime.SubI64Raw),
-                "*" => nameof(CompiledRuntime.MulI64Raw),
-                "/" => nameof(CompiledRuntime.DivI64Raw),
-                "%" => nameof(CompiledRuntime.RemI64Raw),
+                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddI64Raw),
+                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubI64Raw),
+                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulI64Raw),
+                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivI64Raw),
+                "%" => nameof(Kernels.Runtime.CompiledRuntime.RemI64Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -198,10 +202,10 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.F64);
             var raw = binary.Operator switch
             {
-                "+" => nameof(CompiledRuntime.AddF64Raw),
-                "-" => nameof(CompiledRuntime.SubF64Raw),
-                "*" => nameof(CompiledRuntime.MulF64Raw),
-                "/" => nameof(CompiledRuntime.DivF64Raw),
+                "+" => nameof(Kernels.Runtime.CompiledRuntime.AddF64Raw),
+                "-" => nameof(Kernels.Runtime.CompiledRuntime.SubF64Raw),
+                "*" => nameof(Kernels.Runtime.CompiledRuntime.MulF64Raw),
+                "/" => nameof(Kernels.Runtime.CompiledRuntime.DivF64Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -216,12 +220,12 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.I32);
             var raw = binary.Operator switch
             {
-                "<" => nameof(CompiledRuntime.LtI32Raw),
-                "<=" => nameof(CompiledRuntime.LteI32Raw),
-                ">" => nameof(CompiledRuntime.GtI32Raw),
-                ">=" => nameof(CompiledRuntime.GteI32Raw),
-                "==" => nameof(CompiledRuntime.EqI32Raw),
-                "!=" => nameof(CompiledRuntime.NeI32Raw),
+                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtI32Raw),
+                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteI32Raw),
+                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtI32Raw),
+                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteI32Raw),
+                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqI32Raw),
+                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeI32Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -236,12 +240,12 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.I64);
             var raw = binary.Operator switch
             {
-                "<" => nameof(CompiledRuntime.LtI64Raw),
-                "<=" => nameof(CompiledRuntime.LteI64Raw),
-                ">" => nameof(CompiledRuntime.GtI64Raw),
-                ">=" => nameof(CompiledRuntime.GteI64Raw),
-                "==" => nameof(CompiledRuntime.EqI64Raw),
-                "!=" => nameof(CompiledRuntime.NeI64Raw),
+                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtI64Raw),
+                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteI64Raw),
+                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtI64Raw),
+                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteI64Raw),
+                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqI64Raw),
+                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeI64Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -256,12 +260,12 @@ internal sealed class ExpressionEmitter
             EmitAs(binary.Right, StackKind.F64);
             var raw = binary.Operator switch
             {
-                "<" => nameof(CompiledRuntime.LtF64Raw),
-                "<=" => nameof(CompiledRuntime.LteF64Raw),
-                ">" => nameof(CompiledRuntime.GtF64Raw),
-                ">=" => nameof(CompiledRuntime.GteF64Raw),
-                "==" => nameof(CompiledRuntime.EqF64Raw),
-                "!=" => nameof(CompiledRuntime.NeF64Raw),
+                "<" => nameof(Kernels.Runtime.CompiledRuntime.LtF64Raw),
+                "<=" => nameof(Kernels.Runtime.CompiledRuntime.LteF64Raw),
+                ">" => nameof(Kernels.Runtime.CompiledRuntime.GtF64Raw),
+                ">=" => nameof(Kernels.Runtime.CompiledRuntime.GteF64Raw),
+                "==" => nameof(Kernels.Runtime.CompiledRuntime.EqF64Raw),
+                "!=" => nameof(Kernels.Runtime.CompiledRuntime.NeF64Raw),
                 _ => throw Unsupported("operator not supported by compiler")
             };
             _il.Emit(OpCodes.Call, Runtime(raw));
@@ -272,17 +276,17 @@ internal sealed class ExpressionEmitter
         EmitAs(binary.Right, StackKind.Boxed);
         var method = binary.Operator switch
         {
-            "+" => nameof(CompiledRuntime.Add),
-            "-" => nameof(CompiledRuntime.Sub),
-            "*" => nameof(CompiledRuntime.Mul),
-            "/" => nameof(CompiledRuntime.Div),
-            "%" => nameof(CompiledRuntime.Rem),
-            "==" => nameof(CompiledRuntime.Eq),
-            "!=" => nameof(CompiledRuntime.Ne),
-            "<" => nameof(CompiledRuntime.Lt),
-            "<=" => nameof(CompiledRuntime.Lte),
-            ">" => nameof(CompiledRuntime.Gt),
-            ">=" => nameof(CompiledRuntime.Gte),
+            "+" => nameof(Kernels.Runtime.CompiledRuntime.Add),
+            "-" => nameof(Kernels.Runtime.CompiledRuntime.Sub),
+            "*" => nameof(Kernels.Runtime.CompiledRuntime.Mul),
+            "/" => nameof(Kernels.Runtime.CompiledRuntime.Div),
+            "%" => nameof(Kernels.Runtime.CompiledRuntime.Rem),
+            "==" => nameof(Kernels.Runtime.CompiledRuntime.Eq),
+            "!=" => nameof(Kernels.Runtime.CompiledRuntime.Ne),
+            "<" => nameof(Kernels.Runtime.CompiledRuntime.Lt),
+            "<=" => nameof(Kernels.Runtime.CompiledRuntime.Lte),
+            ">" => nameof(Kernels.Runtime.CompiledRuntime.Gt),
+            ">=" => nameof(Kernels.Runtime.CompiledRuntime.Gte),
             _ => throw Unsupported("operator not supported by compiler")
         };
         _il.Emit(OpCodes.Call, Runtime(method));

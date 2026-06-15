@@ -1,8 +1,8 @@
 using System.Reflection;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Serialization;
 
 public sealed class JsonApiSurfaceTests
 {

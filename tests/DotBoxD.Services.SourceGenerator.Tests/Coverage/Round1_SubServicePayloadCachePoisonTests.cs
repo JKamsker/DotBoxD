@@ -1,9 +1,4 @@
-using System.Linq;
-using Microsoft.CodeAnalysis;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
-
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// RED regression test (bug-hunt ROUND 1, defect #3) for a false-negative poisoned into the

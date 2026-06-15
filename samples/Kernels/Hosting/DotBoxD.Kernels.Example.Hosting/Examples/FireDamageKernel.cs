@@ -1,8 +1,7 @@
-namespace DotBoxD.Kernels.Example.Hosting;
-
 using System.ComponentModel.DataAnnotations;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+
+namespace DotBoxD.Kernels.Example.Hosting.Examples;
 
 [Plugin("fire-damage")]
 public sealed partial class FireDamageKernel : IEventKernel<DamageEvent>

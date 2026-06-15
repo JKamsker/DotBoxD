@@ -1,14 +1,13 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
-
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 internal static class KernelClassExample
 {
     public static async Task RunAsync()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: PluginExamplePolicies.MessageWrite());
+        var server = Plugins.PluginServer.Create(messages, defaultPolicy: PluginExamplePolicies.MessageWrite());
         server.RegisterEventAdapter(DamageEventAdapter.Instance);
 
         await server.InstallAsync(FireDamagePluginPackage.Create());

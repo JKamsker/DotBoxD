@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Diagnostics;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 public sealed class Fix_API_0018_Tests
 {

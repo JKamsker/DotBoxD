@@ -1,7 +1,7 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Net;
 using System.Text;
+
+namespace DotBoxD.Hosting.Http;
 
 public sealed class SafeInMemoryHttpMessageInvoker : HttpMessageInvoker
 {

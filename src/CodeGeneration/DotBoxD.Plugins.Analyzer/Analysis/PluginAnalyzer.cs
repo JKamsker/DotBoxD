@@ -1,10 +1,11 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PluginAnalyzer : DiagnosticAnalyzer
@@ -74,13 +75,19 @@ public sealed class PluginAnalyzer : DiagnosticAnalyzer
 
         var containing = invocation.TargetMethod.ContainingType;
         if (containing is null ||
-            !string.Equals(containing.ContainingNamespace?.ToDisplayString(), "DotBoxD.Plugins", StringComparison.Ordinal) ||
-            containing.Name is not ("HookPipeline" or "HookStage"))
+            !IsHookChainType(containing))
         {
             return;
         }
 
         context.ReportDiagnostic(Diagnostic.Create(InvokeKernelNotLoweredRule, invocation.Syntax.GetLocation()));
+    }
+
+    private static bool IsHookChainType(INamedTypeSymbol type)
+    {
+        var original = type.OriginalDefinition.ToDisplayString();
+        return string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)
@@ -183,8 +190,12 @@ public sealed class PluginAnalyzer : DiagnosticAnalyzer
     }
 
     private static bool IsForbiddenExactType(string typeName)
-        => typeName is "System.Activator" or "System.Environment" or "System.GC"
-            or "System.Delegate" or "System.IServiceProvider" or "System.Type";
+        => typeName is DotBoxDGenerationNames.TypeNames.SystemActivator
+            or DotBoxDGenerationNames.TypeNames.SystemEnvironment
+            or DotBoxDGenerationNames.TypeNames.SystemGc
+            or DotBoxDGenerationNames.TypeNames.SystemDelegate
+            or DotBoxDGenerationNames.TypeNames.SystemServiceProvider
+            or DotBoxDGenerationNames.TypeNames.SystemType;
 
     private static bool IsForbiddenNamespace(string typeName)
     {

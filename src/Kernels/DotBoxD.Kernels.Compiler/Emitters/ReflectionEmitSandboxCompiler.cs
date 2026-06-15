@@ -1,3 +1,8 @@
+using DotBoxD.Kernels.Compiler.Emitters.Cache;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection;
@@ -178,7 +183,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
     {
         il.Emit(OpCodes.Ldarg_1);
         EmitInt32(il, entrypoint.Parameters.Count);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ValidateEntrypointInput)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput)));
 
         il.Emit(OpCodes.Ldarg_0);
         for (var i = 0; i < entrypoint.Parameters.Count; i++)
@@ -187,7 +192,7 @@ public sealed class ReflectionEmitSandboxCompiler : ISandboxCompiler
             EmitInt32(il, i);
             EmitInt32(il, entrypoint.Parameters.Count);
             EmitSandboxType(il, entrypoint.Parameters[i].Type);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GetInputArgument)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.GetInputArgument)));
         }
 
         il.Emit(OpCodes.Call, entrypointMethod);

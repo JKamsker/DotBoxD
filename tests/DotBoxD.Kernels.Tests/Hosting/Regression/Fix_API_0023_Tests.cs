@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0023: the package-backed release smoke

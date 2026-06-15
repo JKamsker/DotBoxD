@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Interpreter.Internal.Expressions;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 using DotBoxD.Kernels;

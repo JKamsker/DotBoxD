@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Bindings;
+
 namespace DotBoxD.Hosting.Http.Internal;
 
 using DotBoxD.Kernels;
@@ -8,7 +10,7 @@ public static class SafeHttpBindingExtensions
         this BindingRegistryBuilder builder,
         SafeInMemoryHttpMessageInvoker? invoker = null,
         SafeDnsResolver? dnsResolver = null)
-        => DotBoxD.Hosting.Http.SafeHttpBindingExtensions.AddNetworkBindings(
+        => Bindings.SafeHttpBindingExtensions.AddNetworkBindings(
             builder,
             invoker,
             dnsResolver);

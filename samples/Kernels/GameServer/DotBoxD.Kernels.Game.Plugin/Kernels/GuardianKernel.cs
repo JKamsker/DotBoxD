@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Game.Plugin;
-
 using System.ComponentModel.DataAnnotations;
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+
+namespace DotBoxD.Kernels.Game.Plugin.Kernels;
 
 /// <summary>
 /// Untrusted plugin kernel. Calms a monster that is about to bully a low-level player. The kernel is

@@ -1,6 +1,7 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 
 /// <summary>
 /// Regression coverage for PAL-0041: the untyped

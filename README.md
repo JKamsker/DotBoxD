@@ -43,7 +43,7 @@ public interface ICatalogService
 ```
 
 ```csharp
-using DotBoxD.Kernels.Transport.Ipc;   // IPC helper (ships in DotBoxD.Pushdown.Services)
+using DotBoxD.Pushdown.Services;       // IPC helper
 using DotBoxD.Services.Generated;       // generated ProvideCatalogService / Get<T>
 
 // Host: turn every accepted connection into a peer that serves the contract.

@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins;
-
 using System.Collections.ObjectModel;
+
+namespace DotBoxD.Plugins.Runtime;
 
 internal static class PluginModelCopy
 {

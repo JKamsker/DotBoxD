@@ -1,9 +1,11 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 // Unboxed i32 expression plan for loop fast paths: builds a small tree from an i32 expression and emits raw IL
 // (via the *I32Raw runtime helpers) with no per-node fuel metering — the loop runner charges the statically
@@ -84,12 +86,12 @@ internal sealed class RawI32ExpressionPlan
                 break;
             case ExpressionKind.InlineCall:
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.EnterInlineCall)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.EnterInlineCall)));
                 _left!.Emit(il, declare);
                 var value = il.DeclareLocal(typeof(int));
                 il.Emit(OpCodes.Stloc, value);
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ExitInlineCall)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ExitInlineCall)));
                 il.Emit(OpCodes.Ldloc, value);
                 break;
             case ExpressionKind.Add:

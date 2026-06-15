@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Runtime.Bindings;
 
 internal static class SafeFileWritePublisher
 {
@@ -64,7 +65,7 @@ internal static class SafeFileWritePublisher
                 throw Error(SandboxErrorCode.PermissionDenied, "file.writeText denied: create is not allowed");
             }
 
-            SafeFileSystem.InvokeBeforeDirectoryCreateForTests(current);
+            FileSystem.SafeFileSystem.InvokeBeforeDirectoryCreateForTests(current);
             if (Directory.Exists(current) || File.Exists(current)) {
                 SafeFileSystem.EnsureNoReparsePoint(rootFull, current);
                 continue;

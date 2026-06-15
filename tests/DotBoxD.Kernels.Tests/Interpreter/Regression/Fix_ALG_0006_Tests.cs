@@ -1,7 +1,7 @@
 using System.Text.Json;
-using DotBoxD.Plugins;
+using DotBoxD.Plugins.Json;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression tests for ALG-0006: plugin package import must read the embedded module

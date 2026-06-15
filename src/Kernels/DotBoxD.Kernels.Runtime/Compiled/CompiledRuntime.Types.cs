@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Runtime;
 
 public static partial class CompiledRuntime
 {

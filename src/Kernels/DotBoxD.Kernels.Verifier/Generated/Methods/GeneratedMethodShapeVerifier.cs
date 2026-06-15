@@ -1,8 +1,8 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
-using static DotBoxD.Kernels.Verifier.GeneratedMethodShapeSignatures;
+
+namespace DotBoxD.Kernels.Verifier.Generated.Methods;
+
+using static GeneratedMethodShapeSignatures;
 
 internal static class GeneratedMethodShapeVerifier
 {

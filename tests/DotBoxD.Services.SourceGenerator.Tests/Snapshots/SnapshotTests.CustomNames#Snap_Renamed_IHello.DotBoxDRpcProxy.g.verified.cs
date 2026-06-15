@@ -9,18 +9,18 @@ namespace Snap.Renamed
     /// </summary>
     public sealed class HelloProxy : global::Snap.Renamed.IHello, global::Snap.Renamed.IHelloAsync
     {
-        private readonly global::DotBoxD.Services.IRpcInvoker _invoker;
+        private readonly global::DotBoxD.Services.Server.IRpcInvoker _invoker;
         /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>
         private readonly string? _instanceId;
 
-        public HelloProxy(global::DotBoxD.Services.IRpcInvoker client)
+        public HelloProxy(global::DotBoxD.Services.Server.IRpcInvoker client)
         {
             this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = null;
         }
 
         /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>
-        public HelloProxy(global::DotBoxD.Services.IRpcInvoker client, string instanceId)
+        public HelloProxy(global::DotBoxD.Services.Server.IRpcInvoker client, string instanceId)
         {
             this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));

@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal sealed record GeneratedPluginPackage(string HintName, string Source);
 

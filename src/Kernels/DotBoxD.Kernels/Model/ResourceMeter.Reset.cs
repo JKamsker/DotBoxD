@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Model;
 
 public sealed partial class ResourceMeter
 {

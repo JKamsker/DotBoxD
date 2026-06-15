@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;
@@ -17,45 +20,45 @@ internal static class PureBindingCallEmitter
             case "list.of":
                 il.Emit(OpCodes.Ldarg_0);
                 ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListOf)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ListOf)));
                 return true;
             case "list.count":
-                EmitContextCall(il, emitExpression, call, nameof(CompiledRuntime.ListCount));
+                EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.ListCount));
                 return true;
             case "list.get":
-                EmitContextCall(il, emitExpression, call, nameof(CompiledRuntime.ListGet));
+                EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.ListGet));
                 return true;
             case "list.add":
                 il.Emit(OpCodes.Ldarg_0);
                 EmitArguments(call, emitExpression);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListAdd)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ListAdd)));
                 return true;
             case "record.new":
                 il.Emit(OpCodes.Ldarg_0);
                 ValueArrayEmitter.Emit(il, call.Arguments, emitExpression);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.RecordNew)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.RecordNew)));
                 return true;
             case "record.get":
-                EmitContextCall(il, emitExpression, call, nameof(CompiledRuntime.RecordGet));
+                EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.RecordGet));
                 return true;
             case "map.empty":
                 EmitMapEmpty(call, il);
                 return true;
             case "map.containsKey":
-                EmitContextCall(il, emitExpression, call, nameof(CompiledRuntime.MapContainsKey));
+                EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.MapContainsKey));
                 return true;
             case "map.get":
-                EmitContextCall(il, emitExpression, call, nameof(CompiledRuntime.MapGet));
+                EmitContextCall(il, emitExpression, call, nameof(Kernels.Runtime.CompiledRuntime.MapGet));
                 return true;
             case "map.set":
                 il.Emit(OpCodes.Ldarg_0);
                 EmitArguments(call, emitExpression);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapSet)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.MapSet)));
                 return true;
             case "map.remove":
                 il.Emit(OpCodes.Ldarg_0);
                 EmitArguments(call, emitExpression);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapRemove)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.MapRemove)));
                 return true;
             default:
                 return false;
@@ -101,7 +104,7 @@ internal static class PureBindingCallEmitter
         il.Emit(OpCodes.Ldarg_0);
         EmitSandboxType(il, mapType.Arguments[0]);
         EmitSandboxType(il, mapType.Arguments[1]);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.MapEmpty)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.MapEmpty)));
     }
 
     private static void EmitListEmpty(CallExpression call, ILGenerator il)
@@ -113,7 +116,7 @@ internal static class PureBindingCallEmitter
 
         il.Emit(OpCodes.Ldarg_0);
         EmitSandboxType(il, itemType);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ListEmpty)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ListEmpty)));
     }
 
     private static Exception Unsupported(string message)

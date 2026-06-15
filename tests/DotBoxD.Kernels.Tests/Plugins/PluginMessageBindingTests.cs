@@ -1,14 +1,20 @@
-using DotBoxD.Plugins;
-using DotBoxD.Kernels.PluginLocal;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginMessageBindingTests
 {
     [Fact]
     public async Task Kernel_handler_capability_is_required_by_policy()
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         var policy = SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
             .Build();
@@ -23,7 +29,7 @@ public sealed class PluginMessageBindingTests
     public async Task Plugin_message_binding_rejects_invalid_target_id_before_sink_send()
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);
@@ -72,7 +78,7 @@ public sealed class PluginMessageBindingTests
     public async Task Plugin_message_binding_redacts_audit_message_without_changing_sink_payload()
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);
@@ -123,7 +129,7 @@ public sealed class PluginMessageBindingTests
     public async Task Plugin_message_binding_redacts_audit_target_without_changing_sink_target()
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);

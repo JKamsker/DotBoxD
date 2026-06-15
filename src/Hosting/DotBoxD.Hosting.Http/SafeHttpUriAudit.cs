@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Runtime;
+namespace DotBoxD.Hosting.Http;
 
 internal static class SafeHttpUriAudit
 {

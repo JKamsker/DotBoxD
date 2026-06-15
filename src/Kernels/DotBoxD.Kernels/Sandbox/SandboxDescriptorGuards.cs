@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Sandbox;
 
 public static class SandboxDescriptorGuards
 {

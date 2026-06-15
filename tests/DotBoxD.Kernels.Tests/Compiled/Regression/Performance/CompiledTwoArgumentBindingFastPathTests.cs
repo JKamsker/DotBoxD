@@ -1,7 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
 public sealed class CompiledTwoArgumentBindingFastPathTests
 {
@@ -63,8 +68,8 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
         var charged = Context();
         var created = Context();
 
-        CompiledRuntime.ChargeValueArray(charged, count);
-        _ = CompiledRuntime.CreateValueArray(created, count);
+        Kernels.Runtime.CompiledRuntime.ChargeValueArray(charged, count);
+        _ = Kernels.Runtime.CompiledRuntime.CreateValueArray(created, count);
 
         Assert.Equal(created.Budget.FuelUsed, charged.Budget.FuelUsed);
         Assert.Equal(created.Budget.AllocatedBytes, charged.Budget.AllocatedBytes);
@@ -120,7 +125,7 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
                 AuditLevel.None,
                 BindingSafety.PureHostFacade,
                 Invoke,
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
         public ValueTask<SandboxValue> Invoke(
             SandboxContext context,
@@ -161,7 +166,7 @@ public sealed class CompiledTwoArgumentBindingFastPathTests
                 AuditLevel.None,
                 BindingSafety.PureHostFacade,
                 Invoke,
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
         private ValueTask<SandboxValue> Invoke(
             SandboxContext context,

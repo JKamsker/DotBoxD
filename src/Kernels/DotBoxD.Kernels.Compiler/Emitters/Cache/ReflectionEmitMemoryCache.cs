@@ -1,6 +1,4 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
-using DotBoxD.Kernels.Compiler;
+namespace DotBoxD.Kernels.Compiler.Emitters.Cache;
 
 internal sealed class ReflectionEmitMemoryCache
 {

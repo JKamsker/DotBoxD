@@ -1,9 +1,10 @@
 using DotBoxD.Services.Buffers;
+using DotBoxD.Services.Peer;
 
 namespace DotBoxD.Services.Transport;
 
 /// <summary>
-/// A duplex, framed, bidirectional channel — the transport unit a <see cref="DotBoxD.Services.RpcPeer"/>
+/// A duplex, framed, bidirectional channel — the transport unit a <see cref="RpcPeer"/>
 /// runs on. Responses flow back over the same channel, so it is always bidirectional even when the
 /// call direction is one-way. Transports return this directly; implement it to add a custom transport.
 /// </summary>

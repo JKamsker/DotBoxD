@@ -1,9 +1,10 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
 /// Phase C lowering of an inline hook chain —
@@ -22,8 +23,6 @@ internal static class HookChainModelFactory
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
-    private const string HookPipelineOriginal = "DotBoxD.Plugins.HookPipeline<TEvent>";
-    private const string HookStageOriginal = "DotBoxD.Plugins.HookStage<TEvent, TCurrent>";
 
     public static HookChainResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
@@ -185,11 +184,13 @@ internal static class HookChainModelFactory
 
         var handlerIsAction = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
             method.Parameters.Length == 1 &&
-            method.Parameters[0].Type.OriginalDefinition.ToDisplayString().StartsWith("System.Action", StringComparison.Ordinal);
+            method.Parameters[0].Type.OriginalDefinition.ToDisplayString().StartsWith(
+                DotBoxDGenerationNames.TypeNames.SystemActionPrefix,
+                StringComparison.Ordinal);
 
         var packageFullName = string.IsNullOrEmpty(chainModel.Namespace)
-            ? "global::" + chainModel.PackageName
-            : "global::" + chainModel.Namespace + "." + chainModel.PackageName;
+            ? DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.PackageName
+            : DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.Namespace + "." + chainModel.PackageName;
 
         return new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
@@ -254,8 +255,8 @@ internal static class HookChainModelFactory
         }
 
         var original = type.OriginalDefinition.ToDisplayString();
-        isPipeline = string.Equals(original, HookPipelineOriginal, StringComparison.Ordinal);
-        return isPipeline || string.Equals(original, HookStageOriginal, StringComparison.Ordinal);
+        isPipeline = string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal);
+        return isPipeline || string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal);
     }
 
     // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),

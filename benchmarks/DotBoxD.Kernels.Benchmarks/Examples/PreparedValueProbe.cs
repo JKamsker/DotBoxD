@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Policies;
+
 namespace DotBoxD.Kernels.Benchmarks.Examples;
 
 using System.Diagnostics;
@@ -23,7 +27,7 @@ internal static class PreparedValueProbe
         int iterations,
         ExampleWorkflowProbe.DamageEvent e)
     {
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             new InMemoryPluginMessageSink(),
             defaultPolicy: MessageWritePolicy(),
             executionMode: ExecutionMode.Compiled);

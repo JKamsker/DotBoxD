@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Documentation;
 
 public sealed class PluginAdapterDocumentationTests
 {

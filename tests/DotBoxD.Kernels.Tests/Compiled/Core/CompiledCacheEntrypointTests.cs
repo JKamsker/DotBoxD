@@ -1,8 +1,12 @@
-using DotBoxD.Kernels;
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledCacheEntrypointTests
 {
@@ -46,7 +50,7 @@ public sealed class CompiledCacheEntrypointTests
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteCompiled(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         string entrypoint)
         => await host.ExecuteAsync(

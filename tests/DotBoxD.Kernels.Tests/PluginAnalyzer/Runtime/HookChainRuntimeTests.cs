@@ -1,11 +1,13 @@
 using System.Reflection;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Kernels;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 /// <summary>An event type a generated hook chain subscribes to (referenced from the chain source).</summary>
 public sealed record ChainAggroEvent(string MonsterId, int Distance);
@@ -21,13 +23,14 @@ public sealed class HookChainRuntimeTests
 {
     private const string ChainSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
 
         namespace ChainSample;
 
         public static class Usage
         {
             public static void Configure(HookRegistry hooks)
-                => hooks.On<global::DotBoxD.Kernels.Tests.ChainAggroEvent>()
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
                     .Where((e, ctx) => e.Distance <= 5)
                     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
         }
@@ -36,13 +39,14 @@ public sealed class HookChainRuntimeTests
     // A one-parameter Where (no context) lowers and runs exactly like the (e, ctx) form.
     private const string OneParamChainSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
 
         namespace ChainSample;
 
         public static class Usage
         {
             public static void Configure(HookRegistry hooks)
-                => hooks.On<global::DotBoxD.Kernels.Tests.ChainAggroEvent>()
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
                     .Where(e => e.Distance <= 5)
                     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
         }
@@ -60,7 +64,7 @@ public sealed class HookChainRuntimeTests
             .Invoke(null, null)!;
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
 
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));   // 3 <= 5 → fires
@@ -74,13 +78,14 @@ public sealed class HookChainRuntimeTests
     // A one-parameter Select projects the element; the projection must flow into the lowered terminal.
     private const string OneParamSelectChainSource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
 
         namespace ChainSample;
 
         public static class Usage
         {
             public static void Configure(HookRegistry hooks)
-                => hooks.On<global::DotBoxD.Kernels.Tests.ChainAggroEvent>()
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
                     .Select(e => e.MonsterId)
                     .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
         }
@@ -98,7 +103,7 @@ public sealed class HookChainRuntimeTests
             .Invoke(null, null)!;
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
 
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-7", 3));
@@ -115,7 +120,7 @@ public sealed class HookChainRuntimeTests
         // The native (non-lowered) path: the new element-only Where / InvokeLocal overloads forward to
         // the (element, context) forms, so a stage need not take the context it doesn't use.
         var collected = new List<string>();
-        using var server = PluginServer.Create(defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>()
             .Where(e => e.Distance <= 5)
             .InvokeLocal(e => collected.Add(e.MonsterId));
@@ -131,7 +136,7 @@ public sealed class HookChainRuntimeTests
     {
         // HookStage element-only Select / Where / InvokeLocal: each stage independently omits the context.
         var collected = new List<int>();
-        using var server = PluginServer.Create(defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>()
             .Select(e => e.Distance)
             .Where(distance => distance <= 5)
@@ -157,7 +162,7 @@ public sealed class HookChainRuntimeTests
             .Invoke(null, null)!;
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>().UseGeneratedChain(package);
 
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));   // 3 <= 5 → fires
@@ -177,7 +182,7 @@ public sealed class HookChainRuntimeTests
         var assembly = Compile(ChainSource, enableInterceptors: true);
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
         var configure = assembly.GetType("ChainSample.Usage")!
             .GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!;
         configure.Invoke(null, [server.Hooks]);

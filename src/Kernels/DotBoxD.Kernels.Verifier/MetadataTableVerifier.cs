@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Verifier.Generated;
+
 namespace DotBoxD.Kernels.Verifier;
 
 using System.Reflection.Metadata;
