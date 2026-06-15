@@ -13,6 +13,8 @@ public IPluginMessageSink Messages { get; }
 public IReadOnlyList<PluginMessage> Messages => _readOnlyMessages
 public SandboxEffect Effects { get; } = effects
 public sealed class CapabilityAttribute(string id) : Attribute
+public sealed class GeneratePluginRegistrationAccumulatorAttribute( string accumulatorName, string methodName) : Attribute
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
 public sealed class HookContext
 public sealed class HostBindingAttribute(string bindingId, string capability, SandboxEffect effects) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
@@ -25,10 +27,12 @@ public sealed class ServerExtensionMethodAttribute(Type receiverType, string? na
 public sealed record PluginMessage(string TargetId, string Message)
 public ServerExtensionAttribute(string id, Type serviceType)
 public ServerExtensionAttribute(string id) => Id = id
+public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; } = bindingId
 public string Capability { get; } = capability
 public string Id { get; }
 public string Id { get; } = id
+public string MethodName { get; } = methodName
 public string? Name { get; } = name
 public THost Host<THost>()
 public Type ReceiverType { get; } = receiverType

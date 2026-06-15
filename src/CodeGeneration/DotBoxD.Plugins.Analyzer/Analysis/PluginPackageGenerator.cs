@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Registration;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -110,6 +111,8 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             invokeAsyncInterceptions,
             static (sourceContext, items) => InvokeAsyncInterceptorEmitter.Emit(sourceContext, items));
+
+        RegistrationAccumulatorGenerator.Register(context);
 
         context.RegisterSourceOutput(packages, static (context, batch) => {
             foreach (var diagnostic in batch.Diagnostics)

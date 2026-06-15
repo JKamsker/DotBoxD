@@ -179,6 +179,7 @@ internal sealed class RemoteServerExtensionControl : IServerExtensionClientRegis
         => _control.InvokeServerExtensionAsync(pluginId, arguments, cancellationToken);
 }
 
+[GeneratePluginRegistrationRootAccumulator("WorldRegistrationAccumulator")]
 internal sealed class RemoteWorldControl
 {
     public RemoteWorldControl(IGamePluginControlService control, RemoteServerExtensionControl serverExtensions)
@@ -192,6 +193,7 @@ internal sealed class RemoteWorldControl
     public RemoteEntityControl Entities { get; }
 }
 
+[GeneratePluginRegistrationAccumulator("RemoteMonsterExtensionAccumulator", "Extend")]
 internal sealed class RemoteMonsterControl
 {
     private readonly IGamePluginControlService _control;

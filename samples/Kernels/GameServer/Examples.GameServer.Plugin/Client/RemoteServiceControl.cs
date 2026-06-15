@@ -13,6 +13,7 @@ internal delegate TReturn RemoteServerInvocation<TCaptures, TReturn>(
     IGameWorldAccess world,
     TCaptures captures);
 
+[GeneratePluginRegistrationAccumulator("ServiceRegistrationAccumulator", "Replace")]
 internal sealed class RemoteServiceControl
 {
     private readonly IGamePluginControlService _control;
