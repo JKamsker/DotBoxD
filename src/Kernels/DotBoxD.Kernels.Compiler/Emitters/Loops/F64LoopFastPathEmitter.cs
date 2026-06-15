@@ -1,9 +1,12 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 internal static class F64LoopFastPathEmitter
 {
@@ -102,7 +105,7 @@ internal static class F64LoopFastPathEmitter
             {
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldstr, expression.BindingId);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCall)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeBindingCall)));
             }
         }
 
@@ -278,10 +281,10 @@ internal static class F64LoopFastPathEmitter
 
         private static string BoxedMethod(ExpressionKind kind)
             => kind switch {
-                ExpressionKind.Sqrt => nameof(CompiledRuntime.SqrtF64),
-                ExpressionKind.Floor => nameof(CompiledRuntime.FloorF64),
-                ExpressionKind.Ceil => nameof(CompiledRuntime.CeilF64),
-                ExpressionKind.Round => nameof(CompiledRuntime.RoundF64),
+                ExpressionKind.Sqrt => nameof(Kernels.Runtime.CompiledRuntime.SqrtF64),
+                ExpressionKind.Floor => nameof(Kernels.Runtime.CompiledRuntime.FloorF64),
+                ExpressionKind.Ceil => nameof(Kernels.Runtime.CompiledRuntime.CeilF64),
+                ExpressionKind.Round => nameof(Kernels.Runtime.CompiledRuntime.RoundF64),
                 _ => ""
             };
 

@@ -1,6 +1,8 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Regression;
 
 /// <summary>
 /// Regression coverage for COR-0060: live-setting numeric validation must reject fractional

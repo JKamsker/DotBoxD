@@ -13,25 +13,25 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IOne implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideOne(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Two.IOne implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideOne(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Two.IOne implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Two.OneDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IOne on the other peer.
         /// </summary>
-        public static global::Snap.Two.IOne GetOne(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Two.IOne GetOne(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Two.OneProxy(peer);
 
         /// <summary>
         /// Provides a ITwo implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideTwo(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Two.ITwo implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideTwo(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Two.ITwo implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Two.TwoDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call ITwo on the other peer.
         /// </summary>
-        public static global::Snap.Two.ITwo GetTwo(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Two.ITwo GetTwo(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Two.TwoProxy(peer);
     }
 }

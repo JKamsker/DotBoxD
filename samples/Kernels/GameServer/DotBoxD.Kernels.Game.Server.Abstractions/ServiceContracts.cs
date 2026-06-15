@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+
 namespace DotBoxD.Kernels.Game.Server.Abstractions;
 
 /// <summary>

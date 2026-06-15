@@ -1,8 +1,14 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Capability enforcement parity tests: a compiled side effect must NEVER happen without the
@@ -340,8 +346,8 @@ public sealed class CompiledSideEffectCapabilityParityTests
     // Private helpers (all prefixed "CapabilityParity_" to avoid name collisions)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static Hosting.SandboxHost CapabilityParity_MessageHost(IPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CapabilityParity_MessageHost(IPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -382,8 +388,8 @@ public sealed class CompiledSideEffectCapabilityParityTests
         }
         """;
 
-    private static Hosting.SandboxHost CapabilityParity_CounterHost(Capability_Counter counter)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CapabilityParity_CounterHost(Capability_Counter counter)
+        => SandboxHost.Create(builder =>
         {
             builder.AddBinding(CapabilityParity_CounterBinding(counter));
             builder.UseInterpreter();
@@ -425,7 +431,7 @@ public sealed class CompiledSideEffectCapabilityParityTests
                     Fields: context.BindingAuditFields("counter", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromInt32(value));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             CapabilityParity_NoParameterGrant);
 
     private static void CapabilityParity_NoParameterGrant(

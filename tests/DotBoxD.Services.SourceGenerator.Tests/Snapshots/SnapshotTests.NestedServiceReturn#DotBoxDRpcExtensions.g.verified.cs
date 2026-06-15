@@ -13,25 +13,25 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IRootSnap implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideRootSnap(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Nested.IRootSnap implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideRootSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Nested.IRootSnap implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.RootSnapDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IRootSnap on the other peer.
         /// </summary>
-        public static global::Snap.Nested.IRootSnap GetRootSnap(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Nested.IRootSnap GetRootSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Nested.RootSnapProxy(peer);
 
         /// <summary>
         /// Provides a ISubSnap implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideSubSnap(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Nested.ISubSnap implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideSubSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Nested.ISubSnap implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Nested.SubSnapDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call ISubSnap on the other peer.
         /// </summary>
-        public static global::Snap.Nested.ISubSnap GetSubSnap(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Nested.ISubSnap GetSubSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Nested.SubSnapProxy(peer);
     }
 }

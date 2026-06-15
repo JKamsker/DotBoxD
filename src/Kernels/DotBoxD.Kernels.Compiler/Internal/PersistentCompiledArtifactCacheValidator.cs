@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
+
 namespace DotBoxD.Kernels.Compiler.Internal;
 
 using DotBoxD.Kernels;

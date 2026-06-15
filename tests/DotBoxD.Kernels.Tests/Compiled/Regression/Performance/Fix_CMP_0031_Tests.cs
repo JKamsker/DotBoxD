@@ -1,6 +1,11 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
 public sealed class Fix_CMP_0031_Tests
 {

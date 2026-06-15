@@ -1,8 +1,13 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Plugins;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Policies;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
 
 /// <summary>
 /// End-to-end coverage of host-binding-call lowering: a kernel reaching a host service through
@@ -15,7 +20,9 @@ public sealed class PluginAnalyzerHostBindingTests
 {
     private const string ProbeSource = """
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -44,7 +51,9 @@ public sealed class PluginAnalyzerHostBindingTests
 
     private const string SecretSource = """
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -70,6 +79,7 @@ public sealed class PluginAnalyzerHostBindingTests
 
     private const string GatedPropertySource = """
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -105,18 +115,18 @@ public sealed class PluginAnalyzerHostBindingTests
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(ProbeSource, "Sample.ProbePluginPackage");
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             configureHost: AddProbeBindings,
             defaultPolicy: ProbeReadPolicy());
 
         var kernel = await server.InstallAsync(package);
-        Assert.Equal("host-binding-probe", kernel.Manifest.PluginId);
+        Assert.Equal((string?)"host-binding-probe", (string?)kernel.Manifest.PluginId);
 
         var adapter = new ProbeEventAdapter();
         // The host.probe.getValue binding returns 42.
-        Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 10)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 50)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 10)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, new ProbeEvent("player-1", "hi", 50)));
     }
 
     [Fact]
@@ -128,7 +138,7 @@ public sealed class PluginAnalyzerHostBindingTests
         var json = PluginPackageJsonSerializer.Export(package, indented: true);
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             configureHost: AddProbeBindings,
             defaultPolicy: ProbeReadPolicy());
@@ -142,7 +152,7 @@ public sealed class PluginAnalyzerHostBindingTests
     public async Task Host_binding_kernel_is_denied_when_its_capability_is_not_granted()
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(ProbeSource, "Sample.ProbePluginPackage");
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: AddProbeBindings,
             defaultPolicy: MessageWriteOnlyPolicy());
 
@@ -155,7 +165,7 @@ public sealed class PluginAnalyzerHostBindingTests
     public async Task Wildcard_grant_does_not_cross_capability_subtrees()
     {
         var package = PluginAnalyzerGeneratedPackageFactory.Create(SecretSource, "Sample.SecretPluginPackage");
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: AddProbeBindings,
             defaultPolicy: ProbeReadPolicy());
 
@@ -166,7 +176,9 @@ public sealed class PluginAnalyzerHostBindingTests
 
     private const string GuardianReplicaSource = """
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
         using System.ComponentModel.DataAnnotations;
 
@@ -208,7 +220,7 @@ public sealed class PluginAnalyzerHostBindingTests
         var json = PluginPackageJsonSerializer.Export(package, indented: true);
 
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             configureHost: AddProbeBindings,
             defaultPolicy: ProbeReadPolicy());

@@ -1,8 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Bindings;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
 
 /// <summary>
 /// Regression coverage for PAL-0024: the module/policy overload of
-/// <see cref="BindingAuditFields.Create(string, System.DateTimeOffset, string, string, bool, long?, long?)"/>
+/// <see cref="BindingAuditFields.Create(string,System.DateTimeOffset,string,string,bool,long?,long?)"/>
 /// builds the final dictionary once instead of copying the base overload's result via LINQ.
 /// These tests pin the observable output so the allocation fix cannot silently change behavior.
 /// </summary>

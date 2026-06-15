@@ -1,9 +1,11 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 // Unboxed i64 expression plan for the i64 loop fast path: literals, i64 locals, and checked i64 arithmetic,
 // emitted as raw IL (the *I64Raw helpers) with no per-node metering — the loop runner bulk-charges FuelCost.

@@ -1,6 +1,7 @@
 using System.Text;
+using DotBoxD.Kernels.Model;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Serialization;
 
 public sealed class JsonImporterBudgetTests
 {

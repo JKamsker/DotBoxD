@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Model;
 
 public enum DiagnosticSeverity
 {

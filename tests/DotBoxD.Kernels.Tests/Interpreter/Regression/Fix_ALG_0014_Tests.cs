@@ -1,15 +1,16 @@
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0014. Plugin execution telemetry used to rescan every
 /// result's audit-event list twice per recorded execution: once with
 /// <c>LastOrDefault(e =&gt; e.Kind == "RunSummary")</c> for the run-summary fields and again
 /// with <c>FirstOrDefault(e =&gt; e.Kind == "ExecutionFallback")</c> for the fallback reason.
-/// <see cref="PluginExecutionObserver.Record(string, ExecutionMode, SandboxExecutionResult)"/>
+/// <see cref="PluginExecutionObserver.Record(string,DotBoxD.Kernels.ExecutionMode,DotBoxD.Kernels.SandboxExecutionResult)"/>
 /// now walks the audit list a single time and
 /// captures both markers in one pass. These tests pin the observable telemetry mapping that
 /// the single-pass rewrite must preserve byte-for-byte: a successful interpreted run derives
@@ -26,29 +27,29 @@ public sealed class Fix_ALG_0014_Tests
         var adapter = new DamageEventAdapter();
         var e = new DamageEvent("fire", 120, "player-1");
 
-        Assert.True(await kernel.ShouldHandleAsync(adapter, e));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, e));
         await kernel.HandleAsync(adapter, e);
 
         // ShouldHandle then Handle each record one observation.
         Assert.Equal(2, kernel.ExecutionObservations.Count);
 
         var shouldHandle = kernel.ExecutionObservations[0];
-        Assert.Equal("ShouldHandle", shouldHandle.Entrypoint);
+        Assert.Equal((string?)"ShouldHandle", (string?)shouldHandle.Entrypoint);
         // Fields recovered from the last RunSummary audit event (single-pass extraction).
-        Assert.Equal("None", shouldHandle.CacheStatus);
+        Assert.Equal((string?)"None", (string?)shouldHandle.CacheStatus);
         Assert.Null(shouldHandle.RuntimeForm);
         Assert.Null(shouldHandle.CacheKey);
         Assert.Null(shouldHandle.MaterializationStatus);
         // No ExecutionFallback marker on the interpreted happy path.
-        Assert.Null(shouldHandle.FallbackReason);
+        Assert.Null<SandboxErrorCode>(shouldHandle.FallbackReason);
 
         var handle = kernel.LastExecution;
         Assert.NotNull(handle);
-        Assert.Equal("Handle", handle.Entrypoint);
-        Assert.True(handle.Succeeded);
+        Assert.Equal((string?)"Handle", (string?)handle.Entrypoint);
+        Assert.True((bool)handle.Succeeded);
         Assert.Equal(ExecutionMode.Interpreted, handle.ActualMode);
-        Assert.Equal("None", handle.CacheStatus);
-        Assert.Null(handle.FallbackReason);
+        Assert.Equal((string?)"None", (string?)handle.CacheStatus);
+        Assert.Null<SandboxErrorCode>(handle.FallbackReason);
         Assert.Null(handle.MaterializationStatus);
     }
 
@@ -70,8 +71,8 @@ public sealed class Fix_ALG_0014_Tests
         {
             Assert.Equal(ExecutionMode.Interpreted, observation.RequestedMode);
             Assert.Equal(ExecutionMode.Interpreted, observation.ActualMode);
-            Assert.Equal("None", observation.CacheStatus);
-            Assert.Null(observation.FallbackReason);
+            Assert.Equal((string?)"None", (string?)observation.CacheStatus);
+            Assert.Null<SandboxErrorCode>(observation.FallbackReason);
         });
     }
 

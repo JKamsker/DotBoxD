@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 
 internal static class MapGetI32ForLoopRunner
 {

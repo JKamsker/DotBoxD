@@ -1,13 +1,16 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0044: installed kernels execute plans prepared by their owning
-/// <see cref="SandboxHost"/>, so the dispatch hot path can skip the public per-run prepared-plan
+/// <see cref="DotBoxD.Hosting.Execution.SandboxHost"/>, so the dispatch hot path can skip the public per-run prepared-plan
 /// integrity guard. The internal prepared path must still enforce host-owned runtime boundaries
 /// such as capability revocation before any entrypoint can run.
 /// </summary>

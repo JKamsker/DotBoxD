@@ -1,8 +1,10 @@
-namespace DotBoxD.Plugins.Analyzer;
-
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDConditionBodyModelFactory
 {
@@ -186,7 +188,7 @@ internal static class DotBoxDConditionBodyModelFactory
         bool conditionAllocates)
     {
         var source =
-            $"new global::DotBoxD.Kernels.Statement[] {{ new {DotBoxDGenerationNames.IrTypes.IfStatement}(" +
+            $"new {StatementArrayType()} {{ new {TypeNames.GlobalIfStatement}(" +
             $"{condition}, {whenTrue.Source}, {whenFalse.Source}, Span) }}";
         return new DotBoxDStatementBodyModel(
             source,
@@ -200,13 +202,13 @@ internal static class DotBoxDConditionBodyModelFactory
 
     private static DotBoxDStatementBodyModel ReturnExpression(string expression, bool allocates)
         => new(
-            $"new global::DotBoxD.Kernels.Statement[] {{ new {DotBoxDGenerationNames.IrTypes.ReturnStatement}({expression}, Span) }}",
+            $"new {StatementArrayType()} {{ new {TypeNames.GlobalReturnStatement}({expression}, Span) }}",
             allocates);
 
     private static DotBoxDStatementBodyModel AssignBool(string name, bool value)
     {
         var source =
-            "new global::DotBoxD.Kernels.Statement[] { new global::DotBoxD.Kernels.AssignmentStatement(" +
+            $"new {StatementArrayType()} {{ new {TypeNames.GlobalAssignmentStatement}(" +
             $"{LiteralReader.StringLiteral(name)}, " +
             $"{DotBoxDGenerationNames.Helpers.Bool}({BoolLiteral(value)}), Span) }}";
         return new DotBoxDStatementBodyModel(source, false);
@@ -216,10 +218,12 @@ internal static class DotBoxDConditionBodyModelFactory
         DotBoxDStatementBodyModel first,
         DotBoxDStatementBodyModel second)
         => new(
-            "global::System.Linq.Enumerable.ToArray(" +
-            "global::System.Linq.Enumerable.Concat<global::DotBoxD.Kernels.Statement>(" +
+            TypeNames.GlobalEnumerable + ".ToArray(" +
+            TypeNames.GlobalEnumerable + ".Concat<" + TypeNames.GlobalStatement + ">(" +
             $"{first.Source}, {second.Source}))",
             first.Allocates || second.Allocates);
+
+    private static string StatementArrayType() => TypeNames.GlobalStatement + "[]";
 
     private static string Var(string name)
         => $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(name)})";

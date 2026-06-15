@@ -1,9 +1,15 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginRevocationTests
 {
@@ -11,7 +17,7 @@ public sealed class PluginRevocationTests
     public async Task Uninstall_revokes_existing_hook_pipeline_kernel_reference()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
+        var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
 
@@ -19,8 +25,8 @@ public sealed class PluginRevocationTests
         var removed = server.Uninstall("fire-damage");
         await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-2"));
 
-        Assert.True(removed);
-        Assert.True(kernel.IsRevoked);
+        Assert.True((bool)removed);
+        Assert.True((bool)kernel.IsRevoked);
         var message = Assert.Single(messages.Messages);
         Assert.Equal("player-1", message.TargetId);
     }
@@ -29,7 +35,7 @@ public sealed class PluginRevocationTests
     public async Task Reinstall_revokes_previous_kernel_captured_by_hook_pipeline()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
+        var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: LongWallPluginPolicy());
         var first = await server.InstallAsync(FireDamagePluginPackage.Create());
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
 
@@ -41,18 +47,18 @@ public sealed class PluginRevocationTests
         var removed = server.Uninstall("fire-damage");
         await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-4"));
 
-        Assert.True(first.IsRevoked);
-        Assert.True(removed);
-        Assert.True(replacement.IsRevoked);
+        Assert.True((bool)first.IsRevoked);
+        Assert.True((bool)removed);
+        Assert.True((bool)replacement.IsRevoked);
         Assert.Equal(["player-1", "player-3"], messages.Messages.Select(m => m.TargetId));
     }
 
     [Fact]
     public async Task Revoked_kernel_handle_rejects_direct_execution()
     {
-        var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
-        Assert.True(server.Uninstall("fire-damage"));
+        Assert.True((bool)server.Uninstall("fire-damage"));
 
         var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(
             async () => await kernel.HandleAsync(
@@ -67,7 +73,7 @@ public sealed class PluginRevocationTests
     {
         var messages = new InMemoryPluginMessageSink();
         var blocking = new BlockingShouldHandleBinding();
-        var server = PluginServer.Create(
+        var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             builder => builder.AddBinding(blocking.Descriptor()),
             LongWallPluginPolicy());
@@ -76,7 +82,7 @@ public sealed class PluginRevocationTests
 
         var publish = server.Hooks.PublishAsync(new BlockingEvent("player-1")).AsTask();
         await blocking.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(server.Uninstall("revocation-blocking"));
+        Assert.True((bool)server.Uninstall("revocation-blocking"));
         blocking.Release.SetResult();
         var error = await Record.ExceptionAsync(
             async () => await publish.WaitAsync(TimeSpan.FromSeconds(5)));
@@ -110,7 +116,7 @@ public sealed class PluginRevocationTests
                     await Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                     return SandboxValue.FromBool(true);
                 },
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
     }
 
     private sealed record BlockingEvent(string TargetId);

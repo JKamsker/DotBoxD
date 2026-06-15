@@ -1,8 +1,11 @@
+using System.Collections;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// ALG-0018: direct plugin kernel dispatch revalidated the adapter/entrypoint shape
@@ -30,7 +33,7 @@ public sealed class Fix_ALG_0018_Tests
         await kernel.HandleAsync(adapter, e);
         await kernel.ShouldHandleAsync(adapter, e);
 
-        Assert.True(first);
+        Assert.True((bool)first);
         // First call performs full validation (reads the adapter parameter shape once).
         Assert.Equal(1, validationsAfterFirst);
         // Subsequent calls reuse full validation, but still re-read shape to catch mutation.
@@ -70,7 +73,7 @@ public sealed class Fix_ALG_0018_Tests
         var second = await Assert.ThrowsAsync<SandboxValidationException>(
             async () => await kernel.HandleAsync(adapter, e));
         Assert.Contains(second.Diagnostics, d => d.Code == "DBXK031");
-        Assert.Empty(kernel.ExecutionObservations);
+        Assert.Empty((IEnumerable)kernel.ExecutionObservations);
     }
 
     [Fact]
@@ -81,7 +84,7 @@ public sealed class Fix_ALG_0018_Tests
         var adapter = new MutableDamageEventAdapter();
         var e = new DamageEvent("fire", 120, "player-1");
 
-        Assert.True(await kernel.ShouldHandleAsync(adapter, e));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, e));
         adapter.DropTargetParameter = true;
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
@@ -104,7 +107,7 @@ public sealed class Fix_ALG_0018_Tests
             async () => await server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK033");
-        Assert.Empty(kernel.ExecutionObservations);
+        Assert.Empty((IEnumerable)kernel.ExecutionObservations);
     }
 
     private sealed class CountingDamageEventAdapter : IPluginEventAdapter<DamageEvent>

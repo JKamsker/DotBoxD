@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels;
-
 using System.Collections.Immutable;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Sandbox.Values;
 
 public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue, IReadOnlyList<SandboxValue>
 {

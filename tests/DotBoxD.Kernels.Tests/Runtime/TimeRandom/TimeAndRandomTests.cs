@@ -1,6 +1,11 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Runtime.TimeRandom;
 
 public sealed class TimeAndRandomTests
 {
@@ -90,7 +95,7 @@ public sealed class TimeAndRandomTests
             CancellationToken.None);
 
         var values = Enumerable.Range(0, 5)
-            .Select(_ => context.NextRandomInt32(0, 1000))
+            .Select<int, int>(_ => context.NextRandomInt32(0, 1000))
             .ToArray();
 
         Assert.Equal([692, 665, 201, 396, 300], values);

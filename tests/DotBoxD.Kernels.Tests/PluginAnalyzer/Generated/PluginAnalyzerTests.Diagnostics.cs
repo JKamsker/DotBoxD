@@ -2,11 +2,8 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using DotBoxD.Kernels;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class PluginAnalyzerTests
 {
@@ -152,7 +149,7 @@ public sealed partial class PluginAnalyzerTests
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
         var compilation = CreateCompilation(source);
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new PluginAnalyzer());
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 

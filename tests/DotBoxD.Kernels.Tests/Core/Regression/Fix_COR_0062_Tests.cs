@@ -1,6 +1,4 @@
-using DotBoxD.Plugins;
-
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Regression;
 
 /// <summary>
 /// Regression coverage for COR-0062: <see cref="InMemoryPluginMessageSink.Messages"/>

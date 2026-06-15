@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
 
-using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
+namespace DotBoxD.Kernels.Verifier.Generated;
+
+using static Verifier.VerifierTypeNames;
 
 internal static class GeneratedStackTypeOperations
 {

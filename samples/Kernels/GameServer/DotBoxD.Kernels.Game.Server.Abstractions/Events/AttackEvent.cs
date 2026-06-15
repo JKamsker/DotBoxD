@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Game.Server.Abstractions;
+namespace DotBoxD.Kernels.Game.Server.Abstractions.Events;
 
 /// <summary>
 /// Published when a monster attacks an adjacent player. Plugins subscribe to taunt strong attackers

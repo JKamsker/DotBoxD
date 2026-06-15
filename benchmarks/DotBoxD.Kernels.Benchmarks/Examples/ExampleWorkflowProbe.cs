@@ -1,3 +1,9 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+
 namespace DotBoxD.Kernels.Benchmarks.Examples;
 
 using System.Diagnostics;
@@ -72,7 +78,7 @@ internal static class ExampleWorkflowProbe
         int iterations)
     {
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages);
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages);
         server.Hooks.On(DamageEventAdapter.Instance)
             .Where((e, _) => e.DamageType == "fire")
             .Where((e, _) => e.Amount >= 100)
@@ -90,7 +96,7 @@ internal static class ExampleWorkflowProbe
         ExecutionMode mode)
     {
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             defaultPolicy: MessageWritePolicy(),
             executionMode: mode);
@@ -103,7 +109,7 @@ internal static class ExampleWorkflowProbe
     }
 
     private static async Task PublishLoopAsync(
-        PluginServer server,
+        DotBoxD.Plugins.PluginServer server,
         DamageEvent primary,
         DamageEvent? secondary,
         int iterations)

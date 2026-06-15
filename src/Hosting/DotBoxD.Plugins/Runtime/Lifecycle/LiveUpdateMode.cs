@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins;
+namespace DotBoxD.Plugins.Runtime.Lifecycle;
 
 [Flags]
 public enum LiveUpdateMode

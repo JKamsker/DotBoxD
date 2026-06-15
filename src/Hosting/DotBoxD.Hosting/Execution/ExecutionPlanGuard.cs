@@ -1,7 +1,8 @@
-namespace DotBoxD.Hosting;
-
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Validation;
+
+namespace DotBoxD.Hosting.Execution;
 
 internal static class ExecutionPlanGuard
 {

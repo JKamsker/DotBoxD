@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
+
 namespace DotBoxD.Kernels.Verifier;
 
 using System.Collections.Frozen;
@@ -207,7 +210,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-7");
+            "dotboxd-verifier-8");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 
@@ -253,7 +256,7 @@ public sealed record VerificationPolicy(
     private static IReadOnlySet<string> RuntimeFacadeIdentityDefaults()
         => new HashSet<string>(StringComparer.Ordinal) {
             AssemblyModuleIdentity(typeof(SandboxValue).Assembly),
-            AssemblyModuleIdentity(typeof(CompiledRuntime).Assembly)
+            AssemblyModuleIdentity(typeof(Runtime.CompiledRuntime).Assembly)
         };
 
     private static string AssemblyModuleIdentity(System.Reflection.Assembly assembly)

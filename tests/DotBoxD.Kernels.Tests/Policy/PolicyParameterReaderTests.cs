@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+
+namespace DotBoxD.Kernels.Tests.Policy;
 
 public sealed class PolicyParameterReaderTests
 {

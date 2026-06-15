@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Game.Plugin;
-
 using System.ComponentModel.DataAnnotations;
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+
+namespace DotBoxD.Kernels.Game.Plugin.Kernels;
 
 /// <summary>
 /// Untrusted plugin kernel. Taunts a strong attacker so it switches away from the player it is

@@ -1,13 +1,9 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
-using DotBoxD.Services.SourceGenerator;
-using Xunit;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
+using DotBoxD.Services.SourceGenerator.Models;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 // Round-2 coverage: direct unit tests over the generator's internal value-model utilities.
 // Targets the previously-uncovered lines in EquatableArray<T>, ServiceModelOrdering.Sort,

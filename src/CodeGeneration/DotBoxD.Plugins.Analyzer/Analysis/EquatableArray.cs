@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using System.Collections;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal readonly struct EquatableArray<T> : IReadOnlyList<T>, IEquatable<EquatableArray<T>>
 {

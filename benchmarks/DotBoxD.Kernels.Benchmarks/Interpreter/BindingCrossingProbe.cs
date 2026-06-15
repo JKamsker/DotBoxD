@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
 using System.Diagnostics;
@@ -17,7 +21,7 @@ internal static class BindingCrossingProbe
         const int iterations = 2_000_000;
         const int warmup = 100_000;
 
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
@@ -59,7 +63,7 @@ internal static class BindingCrossingProbe
     }
 
     private static async Task<SandboxValue?> RunSandbox(
-        SandboxHost host,
+        Hosting.Execution.SandboxHost host,
         ExecutionPlan plan,
         int iterations,
         ExecutionMode mode)

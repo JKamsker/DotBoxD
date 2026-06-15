@@ -1,4 +1,7 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Lifecycle;
+
+namespace DotBoxD.Plugins.Runtime;
 
 public sealed class TypedInstalledKernel<TSettings> where TSettings : class
 {

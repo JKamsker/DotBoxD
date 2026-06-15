@@ -1,18 +1,15 @@
-using System;
-using System.IO;
-using System.Linq;
+using DotBoxD.Services.SourceGenerator.EntryPoint;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Services.SourceGenerator.Tests;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Behavioral coverage for the source generator's internal utility types. None of these
 /// types are visible to the test assembly (there is no InternalsVisibleTo on
 /// DotBoxD.Services.SourceGenerator), so every assertion drives them through the public
-/// <see cref="DotBoxD.Services.SourceGenerator.DotBoxDRpcGenerator"/> via <see cref="GeneratorTestHelper"/>
+/// <see cref="DotBoxDRpcGenerator"/> via <see cref="GeneratorTestHelper"/>
 /// and inspects the observable result: generated source text, reported diagnostics, and
 /// incremental step caching reasons.
 ///

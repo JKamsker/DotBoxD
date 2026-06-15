@@ -13,13 +13,13 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IKwSnap implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideKwSnap(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Kw.IKwSnap implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideKwSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Kw.IKwSnap implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Kw.KwSnapDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IKwSnap on the other peer.
         /// </summary>
-        public static global::Snap.Kw.IKwSnap GetKwSnap(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Kw.IKwSnap GetKwSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Kw.KwSnapProxy(peer);
     }
 }

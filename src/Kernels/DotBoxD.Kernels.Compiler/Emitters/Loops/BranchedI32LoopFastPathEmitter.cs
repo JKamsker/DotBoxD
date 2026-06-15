@@ -1,9 +1,9 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 // Compiled fast path for `forRange { if (<i32 comparison>) { <i32 assigns> } else { <i32 assigns> } }`.
 // Emits the condition and both branches as unboxed raw i32 (via RawI32ExpressionPlan + the *I32Raw helpers) and

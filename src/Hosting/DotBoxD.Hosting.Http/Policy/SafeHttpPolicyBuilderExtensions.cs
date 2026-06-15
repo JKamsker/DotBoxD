@@ -1,7 +1,8 @@
-namespace DotBoxD.Hosting.Http;
-
 using System.Globalization;
-using DotBoxD.Hosting.Http.Internal;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Hosting.Http.Policy;
 
 public static class SafeHttpPolicyBuilderExtensions
 {

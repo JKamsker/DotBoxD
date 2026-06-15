@@ -1,7 +1,10 @@
-using DotBoxD.Kernels;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 /// <summary>
 /// Runtime proof of the kernel RPC service path (Followup #2): a hand-built batch kernel loops over a
@@ -15,7 +18,7 @@ public sealed class RpcKernelRuntimeTests
     [Fact]
     public async Task A_batch_kernel_loops_server_side_and_returns_a_list_of_records()
     {
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
         var kernel = await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller());
 
         var ids = SandboxValue.FromList(
@@ -39,7 +42,7 @@ public sealed class RpcKernelRuntimeTests
         // Compiled execution runs the IL compiler + verifier over the batch IR (forRange, list.empty
         // <Record>, list.add, record.new, the host binding). A passing run proves the emitted IL is valid
         // and fast — the result matches the interpreted batch kernel.
-        using var server = PluginServer.Create(
+        using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: RpcKernelTestPackages.AddKillBinding,
             defaultPolicy: RpcKernelTestPackages.KillPolicy(),
             executionMode: ExecutionMode.Compiled);
@@ -64,7 +67,7 @@ public sealed class RpcKernelRuntimeTests
         var imported = PluginPackageJsonSerializer.Import(json);
         Assert.Equal("KillMonsters", imported.Manifest.RpcEntrypoint);
 
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
         var kernel = await server.InstallRpcAsync(imported);
 
         var result = await kernel.InvokeRpcAsync([SandboxValue.FromList([SandboxValue.FromInt32(2)], SandboxType.I32)]);
@@ -76,7 +79,7 @@ public sealed class RpcKernelRuntimeTests
     [Fact]
     public async Task A_batch_kernel_is_denied_when_its_capability_is_not_granted()
     {
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.NoKillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.NoKillPolicy());
 
         await Assert.ThrowsAnyAsync<Exception>(async () => await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller()).AsTask());
     }
@@ -84,7 +87,7 @@ public sealed class RpcKernelRuntimeTests
     [Fact]
     public async Task Invoking_with_the_wrong_argument_count_throws()
     {
-        using var server = PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.KillPolicy());
         var kernel = await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller());
 
         await Assert.ThrowsAsync<SandboxRuntimeException>(async () => await kernel.InvokeRpcAsync([]).AsTask());

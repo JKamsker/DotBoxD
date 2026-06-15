@@ -1,7 +1,7 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal sealed record PluginKernelDiagnostic(string Message, PluginDiagnosticLocation? Location)
 {

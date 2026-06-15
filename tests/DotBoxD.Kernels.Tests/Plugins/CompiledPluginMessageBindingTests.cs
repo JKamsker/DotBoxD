@@ -1,6 +1,11 @@
-using DotBoxD.Plugins;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 /// <summary>
 /// Compiled-mode coverage for host.message.send. Under #27 the SideEffectingExternal binding compiles
@@ -14,7 +19,7 @@ public sealed class CompiledPluginMessageBindingTests
     public async Task Plugin_message_binding_compiles_without_interpreter_fallback()
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);
@@ -71,7 +76,7 @@ public sealed class CompiledPluginMessageBindingTests
     public async Task Compiled_mode_plugin_message_send_preserves_audit_and_sink_through_refactored_invoker()
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);
@@ -223,7 +228,7 @@ public sealed class CompiledPluginMessageBindingTests
         }
         """;
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);
@@ -254,7 +259,7 @@ public sealed class CompiledPluginMessageBindingTests
         ExecutionMode mode)
     {
         var messages = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(messages);

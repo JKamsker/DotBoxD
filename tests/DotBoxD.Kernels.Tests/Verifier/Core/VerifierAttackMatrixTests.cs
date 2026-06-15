@@ -1,11 +1,11 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierAttackMatrixTests
 {

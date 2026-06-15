@@ -1,7 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Differential parity tests for compiled side-effecting bindings under multi-call,

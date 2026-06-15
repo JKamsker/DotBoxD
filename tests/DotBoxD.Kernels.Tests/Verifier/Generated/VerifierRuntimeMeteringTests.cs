@@ -1,8 +1,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Generated;
 
 public sealed class VerifierRuntimeMeteringTests
 {
@@ -37,7 +38,7 @@ public sealed class VerifierRuntimeMeteringTests
             var fn = DefineFunction(type);
             var il = fn.GetILGenerator();
             il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             il.Emit(OpCodes.Pop);
             EmitEnterCall(il);
             EmitChargeFuel(il);
@@ -62,7 +63,7 @@ public sealed class VerifierRuntimeMeteringTests
             EmitChargeFuel(il);
             EmitExitCall(il);
             il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             il.Emit(OpCodes.Ret);
             EmitExecuteCalling(type, fn);
         }));
@@ -110,14 +111,14 @@ public sealed class VerifierRuntimeMeteringTests
     {
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldc_I4_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
     }
 
     private static void EmitI32ReturnAfterExit(ILGenerator il, int value)
     {
         var local = il.DeclareLocal(typeof(SandboxValue));
         il.Emit(OpCodes.Ldc_I4, value);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
         il.Emit(OpCodes.Stloc, local);
         EmitExitCall(il);
         il.Emit(OpCodes.Ldloc, local);
@@ -127,19 +128,19 @@ public sealed class VerifierRuntimeMeteringTests
     private static void EmitEnterCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
     }
 
     private static void EmitChargeFuel(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
     }
 
     private static void EmitExitCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
 }

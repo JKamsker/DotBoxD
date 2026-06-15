@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Model;
+
 namespace DotBoxD.Hosting.Http.Internal;
 
 using System.Globalization;

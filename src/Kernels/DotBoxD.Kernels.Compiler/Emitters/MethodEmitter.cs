@@ -1,3 +1,9 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Compiler.Emitters.Loops;
+using DotBoxD.Kernels.Compiler.Emitters.Returns;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection;
@@ -274,7 +280,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, value);
         _il.Emit(OpCodes.Ldloc, value);
         CompiledTypeEmitter.EmitMetered(_il, _function.ReturnType);
-        _il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.RequireValueType)));
+        _il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.RequireValueType)));
         _il.Emit(OpCodes.Stloc, value);
         CompiledMeterEmitter.ExitCall(_il);
         _il.Emit(OpCodes.Ldloc, value);

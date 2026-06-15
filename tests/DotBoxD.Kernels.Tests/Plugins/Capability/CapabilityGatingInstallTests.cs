@@ -1,8 +1,7 @@
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Capability;
 
 /// <summary>
 /// End-to-end capability gating at install: a kernel that needs a concrete capability
@@ -14,19 +13,19 @@ public sealed class CapabilityGatingInstallTests
     [Fact]
     public async Task Wildcard_grant_authorizes_a_kernel_needing_a_concrete_capability()
     {
-        using var server = PluginServer.Create(defaultPolicy: WildcardHostPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: WildcardHostPolicy());
 
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create());
 
         // Installed only because the wildcard host.* grant authorized host.message.write — GrantLogging
         // alone never grants it.
-        Assert.Equal("fire-damage", kernel.Manifest.PluginId);
+        Assert.Equal((string?)"fire-damage", (string?)kernel.Manifest.PluginId);
     }
 
     [Fact]
     public async Task Missing_capability_denies_install_fail_closed()
     {
-        using var server = PluginServer.Create(defaultPolicy: LoggingOnlyPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LoggingOnlyPolicy());
 
         await Assert.ThrowsAnyAsync<Exception>(
             async () => await server.InstallAsync(FireDamagePluginPackage.Create()).AsTask());

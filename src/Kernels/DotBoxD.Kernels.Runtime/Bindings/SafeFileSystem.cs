@@ -1,7 +1,8 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Text;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Runtime.Bindings;
 
 public static partial class SafeFileSystem
 {
@@ -82,12 +83,12 @@ public static partial class SafeFileSystem
             var bytes = Encoding.UTF8.GetBytes(text);
 
             EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
-            EnsureDirectWritePath(resolved.RootFull, resolved.FullPath);
+            FileSystem.SafeFileSystem.EnsureDirectWritePath(resolved.RootFull, resolved.FullPath);
             SafeFileWritePublisher.EnsureParentDirectory(resolved.RootFull, resolved.FullPath, permission);
-            var tempPath = resolved.FullPath + ".tmp-" + CreateTempSuffix();
+            var tempPath = resolved.FullPath + ".tmp-" + FileSystem.SafeFileSystem.CreateTempSuffix();
             try
             {
-                BeforeTempCreateForTests.Value?.Invoke();
+                FileSystem.SafeFileSystem.BeforeTempCreateForTests.Value?.Invoke();
                 EnsureNoReparsePoint(resolved.RootFull, tempPath);
                 await using (var temp = SafeFileNoFollow.CreateNewWrite(tempPath))
                 {
@@ -283,7 +284,7 @@ public static partial class SafeFileSystem
         return timeout;
     }
 
-    private static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
+    internal static SandboxRuntimeException Error(SandboxErrorCode code, string message) => new(new SandboxError(code, message));
 
     private sealed record ResolvedPath(CapabilityGrant Grant, string RootFull, string FullPath, string SanitizedPath);
 }

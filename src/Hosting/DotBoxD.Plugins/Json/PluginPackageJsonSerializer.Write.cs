@@ -1,8 +1,9 @@
-namespace DotBoxD.Plugins;
-
 using System.Text.Json;
 using DotBoxD.Kernels.Serialization.Json;
-using static DotBoxD.Kernels.JsonImport;
+
+namespace DotBoxD.Plugins.Json;
+
+using static JsonImport;
 
 /// <summary>
 /// The write (export) half of <see cref="PluginPackageJsonSerializer"/>. The read half (with the strict

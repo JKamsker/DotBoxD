@@ -112,14 +112,14 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Creates the generated proxy for <typeparamref name="TService" /> over an invoker.
         /// </summary>
-        public static TService CreateProxy<TService>(global::DotBoxD.Services.IRpcInvoker invoker)
+        public static TService CreateProxy<TService>(global::DotBoxD.Services.Server.IRpcInvoker invoker)
             where TService : class
             => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateProxy<TService>(invoker);
 
         /// <summary>
         /// Creates the generated proxy for <paramref name="serviceInterface" /> over an invoker.
         /// </summary>
-        public static object CreateProxy(global::System.Type serviceInterface, global::DotBoxD.Services.IRpcInvoker invoker)
+        public static object CreateProxy(global::System.Type serviceInterface, global::DotBoxD.Services.Server.IRpcInvoker invoker)
             => global::DotBoxD.Services.Generated.GeneratedServiceRegistry.CreateProxy(serviceInterface, invoker);
 
         /// <summary>

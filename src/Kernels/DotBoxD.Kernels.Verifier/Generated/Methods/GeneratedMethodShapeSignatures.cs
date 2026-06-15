@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Verifier;
+namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
-using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
+using static Verifier.VerifierTypeNames;
 
 internal static class GeneratedMethodShapeSignatures
 {

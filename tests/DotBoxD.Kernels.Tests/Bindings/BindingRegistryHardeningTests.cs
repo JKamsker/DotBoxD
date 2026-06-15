@@ -1,7 +1,9 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class BindingRegistryHardeningTests
 {
@@ -181,7 +183,7 @@ public sealed class BindingRegistryHardeningTests
             auditLevel,
             safety,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             grantValidator);
 
     private static void NoParameters(CapabilityGrant grant, ICollection<SandboxDiagnostic> diagnostics)

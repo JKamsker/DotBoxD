@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Interpreter.Internal.Expressions;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 
 // Fast path for `forRange { if (<i32 comparison>) { <i32 assignments> } else { <i32 assignments> } }`.
 // Evaluates the condition and both branches with unboxed i32 plans, avoiding the per-op boxing the general

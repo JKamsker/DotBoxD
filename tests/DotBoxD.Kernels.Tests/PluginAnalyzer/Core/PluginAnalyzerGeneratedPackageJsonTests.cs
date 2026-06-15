@@ -1,6 +1,8 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Json;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerGeneratedPackageJsonTests
 {

@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels;
 
 public sealed record CapabilityRequest(string Id, string? Reason);

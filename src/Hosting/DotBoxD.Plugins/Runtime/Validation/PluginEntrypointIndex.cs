@@ -1,6 +1,4 @@
-namespace DotBoxD.Plugins;
-
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Runtime.Validation;
 
 /// <summary>
 /// Indexes a module's public entrypoint functions by id once so package validation can resolve the

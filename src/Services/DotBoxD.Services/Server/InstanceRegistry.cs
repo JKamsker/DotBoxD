@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using DotBoxD.Services.Diagnostics;
 
 namespace DotBoxD.Services.Server;
 
@@ -129,7 +130,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
         catch (Exception ex)
         {
-            DotBoxD.Services.RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
         }
     }
 
@@ -152,7 +153,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
         }
         catch (Exception ex)
         {
-            DotBoxD.Services.RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
+            RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
         }
     }
 }

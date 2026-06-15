@@ -1,7 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Parity tests for the async-sink dimension: verifies that modules exercising
@@ -395,8 +399,8 @@ public sealed class CompiledSideEffectAsyncSinkParityTests
     // Helpers
     // -----------------------------------------------------------------------
 
-    private static Hosting.SandboxHost CreateHost(IPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CreateHost(IPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -404,8 +408,8 @@ public sealed class CompiledSideEffectAsyncSinkParityTests
             builder.UseInterpreter();
         });
 
-    private static Hosting.SandboxHost CreateCompiledHost(IPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CreateCompiledHost(IPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);

@@ -1,6 +1,7 @@
 using System.Text;
+using DotBoxD.Kernels.Model;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Sandbox;
 
 public sealed record SandboxType(string Name, IReadOnlyList<SandboxType> Arguments)
 {

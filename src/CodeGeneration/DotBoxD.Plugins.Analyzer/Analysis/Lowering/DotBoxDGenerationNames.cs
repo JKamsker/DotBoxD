@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDGenerationNames
 {
@@ -15,8 +15,10 @@ internal static class DotBoxDGenerationNames
         public const int ContextIndex = 1;
     }
 
-    public static class Metadata
+    public static class TypeNames
     {
+        public const string GlobalPrefix = "global::";
+
         public const string PluginAttribute = "DotBoxD.Abstractions.PluginAttribute";
         public const string LiveSettingAttribute = "DotBoxD.Abstractions.LiveSettingAttribute";
         public const string EventKernelInterface = "DotBoxD.Abstractions.IEventKernel<TEvent>";
@@ -25,7 +27,76 @@ internal static class DotBoxDGenerationNames
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
         public const string KernelRpcServiceAttribute = "DotBoxD.Abstractions.KernelRpcServiceAttribute";
-        public const string HookContextType = "DotBoxD.Abstractions.HookContext";
+        public const string HookContext = "DotBoxD.Abstractions.HookContext";
+        public const string HookPipelineOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent>";
+        public const string HookStageOriginal = "DotBoxD.Plugins.Runtime.Hooks.HookStage<TEvent, TCurrent>";
+
+        public const string ListOriginal = "System.Collections.Generic.List<T>";
+        public const string ReadOnlyListOriginal = "System.Collections.Generic.IReadOnlyList<T>";
+        public const string ListInterfaceOriginal = "System.Collections.Generic.IList<T>";
+        public const string EnumerableOriginal = "System.Collections.Generic.IEnumerable<T>";
+        public const string ReadOnlyCollectionOriginal = "System.Collections.Generic.IReadOnlyCollection<T>";
+        public const string SystemActionPrefix = "System.Action";
+        public const string SystemActivator = "System.Activator";
+        public const string SystemEnvironment = "System.Environment";
+        public const string SystemGc = "System.GC";
+        public const string SystemDelegate = "System.Delegate";
+        public const string SystemServiceProvider = "System.IServiceProvider";
+        public const string SystemType = "System.Type";
+
+        public const string GlobalArray = GlobalPrefix + "System.Array";
+        public const string GlobalAttribute = GlobalPrefix + "System.Attribute";
+        public const string GlobalAttributeTargets = GlobalPrefix + "System.AttributeTargets";
+        public const string GlobalAttributeUsage = GlobalPrefix + "System.AttributeUsage";
+        public const string GlobalAction = GlobalPrefix + "System.Action";
+        public const string GlobalDictionary = GlobalPrefix + "System.Collections.Generic.Dictionary";
+        public const string GlobalEnumerable = GlobalPrefix + "System.Linq.Enumerable";
+        public const string GlobalFunc = GlobalPrefix + "System.Func";
+        public const string GlobalInvalidOperationException = GlobalPrefix + "System.InvalidOperationException";
+        public const string GlobalReadOnlyList = GlobalPrefix + "System.Collections.Generic.IReadOnlyList";
+        public const string GlobalValueTask = GlobalPrefix + "System.Threading.Tasks.ValueTask";
+
+        public const string GlobalHookContext = GlobalPrefix + HookContext;
+        public const string GlobalPluginPackage = GlobalPrefix + "DotBoxD.Plugins.PluginPackage";
+        public const string GlobalPluginManifest = GlobalPrefix + "DotBoxD.Plugins.PluginManifest";
+        public const string GlobalHookSubscriptionManifest = GlobalPrefix + "DotBoxD.Plugins.HookSubscriptionManifest";
+        public const string GlobalLiveSettingDefinition = GlobalPrefix + "DotBoxD.Plugins.LiveSettingDefinition";
+        public const string GlobalPluginPackageJsonSerializer = GlobalPrefix + "DotBoxD.Plugins.Json.PluginPackageJsonSerializer";
+        public const string GlobalPluginMessageBindings = GlobalPrefix + "DotBoxD.Plugins.Runtime.PluginMessageBindings";
+        public const string GlobalHookPipeline = GlobalPrefix + "DotBoxD.Plugins.Runtime.HookPipeline";
+
+        public const string GlobalSandboxModule = GlobalPrefix + "DotBoxD.Kernels.SandboxModule";
+        public const string GlobalSandboxFunction = GlobalPrefix + "DotBoxD.Kernels.SandboxFunction";
+        public const string GlobalExecutionMode = GlobalPrefix + "DotBoxD.Kernels.ExecutionMode";
+        public const string GlobalCapabilityRequest = GlobalPrefix + "DotBoxD.Kernels.CapabilityRequest";
+        public const string GlobalParameter = GlobalPrefix + "DotBoxD.Kernels.Parameter";
+        public const string GlobalExpression = GlobalPrefix + "DotBoxD.Kernels.Expression";
+        public const string GlobalStatement = GlobalPrefix + "DotBoxD.Kernels.Statement";
+        public const string GlobalIfStatement = GlobalPrefix + "DotBoxD.Kernels.IfStatement";
+        public const string GlobalReturnStatement = GlobalPrefix + "DotBoxD.Kernels.ReturnStatement";
+        public const string GlobalAssignmentStatement = GlobalPrefix + "DotBoxD.Kernels.AssignmentStatement";
+        public const string GlobalVariableExpression = GlobalPrefix + "DotBoxD.Kernels.VariableExpression";
+        public const string GlobalLiteralExpression = GlobalPrefix + "DotBoxD.Kernels.LiteralExpression";
+        public const string GlobalCallExpression = GlobalPrefix + "DotBoxD.Kernels.CallExpression";
+        public const string GlobalUnaryExpression = GlobalPrefix + "DotBoxD.Kernels.UnaryExpression";
+        public const string GlobalBinaryExpression = GlobalPrefix + "DotBoxD.Kernels.BinaryExpression";
+        public const string GlobalSourceSpan = GlobalPrefix + "DotBoxD.Kernels.Model.SourceSpan";
+        public const string GlobalSemVersion = GlobalPrefix + "DotBoxD.Kernels.Model.SemVersion";
+        public const string GlobalSandboxType = GlobalPrefix + "DotBoxD.Kernels.Sandbox.SandboxType";
+        public const string GlobalSandboxValue = GlobalPrefix + "DotBoxD.Kernels.Sandbox.SandboxValue";
+    }
+
+    public static class Metadata
+    {
+        public const string PluginAttribute = TypeNames.PluginAttribute;
+        public const string LiveSettingAttribute = TypeNames.LiveSettingAttribute;
+        public const string EventKernelInterface = TypeNames.EventKernelInterface;
+        public const string RangeAttribute = TypeNames.RangeAttribute;
+        public const string HostBindingAttribute = TypeNames.HostBindingAttribute;
+        public const string CapabilityAttribute = TypeNames.CapabilityAttribute;
+        public const string KernelMethodAttribute = TypeNames.KernelMethodAttribute;
+        public const string KernelRpcServiceAttribute = TypeNames.KernelRpcServiceAttribute;
+        public const string HookContextType = TypeNames.HookContext;
     }
 
     public static class Contracts
@@ -102,7 +173,7 @@ internal static class DotBoxDGenerationNames
         public const string MessageWriteReason = "send host messages";
 
         /// <summary>The capability a <c>ctx.Messages.Send</c> requires — kept in step with
-        /// <c>DotBoxD.Plugins.PluginMessageBindings.CapabilityId</c>.</summary>
+        /// <c>DotBoxD.Plugins.Runtime.PluginMessageBindings.CapabilityId</c>.</summary>
         public const string MessageWrite = "host.message.write";
     }
 
@@ -153,8 +224,8 @@ internal static class DotBoxDGenerationNames
 
     public static class IrTypes
     {
-        public const string IfStatement = "global::DotBoxD.Kernels.IfStatement";
-        public const string ReturnStatement = "global::DotBoxD.Kernels.ReturnStatement";
+        public const string IfStatement = TypeNames.GlobalIfStatement;
+        public const string ReturnStatement = TypeNames.GlobalReturnStatement;
     }
 
     public static class BindingIds

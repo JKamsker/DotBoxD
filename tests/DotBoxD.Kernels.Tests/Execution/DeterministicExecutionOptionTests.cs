@@ -1,7 +1,11 @@
-using DotBoxD.Kernels;
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Execution;
 
 public sealed class DeterministicExecutionOptionTests
 {
@@ -71,8 +75,8 @@ public sealed class DeterministicExecutionOptionTests
         Assert.Equal("Compiled", summary.Fields!["mode"]);
     }
 
-    private static Hosting.SandboxHost SandboxHostForCompiler(ISandboxCompiler compiler)
-        => Hosting.SandboxHost.Create(builder => {
+    private static SandboxHost SandboxHostForCompiler(ISandboxCompiler compiler)
+        => SandboxHost.Create(builder => {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable(compiler);

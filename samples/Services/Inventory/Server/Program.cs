@@ -1,8 +1,8 @@
-using Inventory.Server;
-using DotBoxD.Services;
-using DotBoxD.Services.Generated;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Generated;
+using DotBoxD.Services.Server;
 using DotBoxD.Transports.Tcp;
+using Inventory.Server;
 
 const int Port = 5051;
 
@@ -47,21 +47,24 @@ await host.StopAsync();
 await host.DisposeAsync();
 Console.WriteLine("Server stopped.");
 
-/// <summary>
-/// A no-op IPlayerInventory used only to satisfy the singleton-dispatcher registration
-/// (every [DotBoxDService] generates a top-level dispatcher; for sub-services that
-/// nothing ever calls as a singleton, you can provide any throwing placeholder).
-/// The real per-instance work happens through DispatchOnInstanceAsync on the same
-/// generated dispatcher class.
-/// </summary>
-internal sealed class NullPlayerInventoryPlaceholder : Inventory.Shared.IPlayerInventory
+namespace Inventory.Server
 {
-    public Task<IReadOnlyList<Inventory.Shared.Item>> ListItemsAsync(CancellationToken ct = default) =>
-        throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
-    public Task<int> AddItemAsync(string itemId, int quantity, CancellationToken ct = default) =>
-        throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
-    public Task<int> RemoveItemAsync(string itemId, int quantity, CancellationToken ct = default) =>
-        throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
-    public Task<int> GetTotalValueAsync(CancellationToken ct = default) =>
-        throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
+    /// <summary>
+    /// A no-op IPlayerInventory used only to satisfy the singleton-dispatcher registration
+    /// (every [DotBoxDService] generates a top-level dispatcher; for sub-services that
+    /// nothing ever calls as a singleton, you can provide any throwing placeholder).
+    /// The real per-instance work happens through DispatchOnInstanceAsync on the same
+    /// generated dispatcher class.
+    /// </summary>
+    internal sealed class NullPlayerInventoryPlaceholder : Inventory.Shared.IPlayerInventory
+    {
+        public Task<IReadOnlyList<Inventory.Shared.Item>> ListItemsAsync(CancellationToken ct = default) =>
+            throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
+        public Task<int> AddItemAsync(string itemId, int quantity, CancellationToken ct = default) =>
+            throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
+        public Task<int> RemoveItemAsync(string itemId, int quantity, CancellationToken ct = default) =>
+            throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
+        public Task<int> GetTotalValueAsync(CancellationToken ct = default) =>
+            throw new InvalidOperationException("IPlayerInventory is a sub-service; obtain one via IInventoryService.OpenInventoryAsync.");
+    }
 }

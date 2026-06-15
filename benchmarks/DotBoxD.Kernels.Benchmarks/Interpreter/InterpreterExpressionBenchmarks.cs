@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
 using BenchmarkDotNet.Attributes;
@@ -7,7 +11,7 @@ using DotBoxD.Kernels.Serialization.Json;
 [MemoryDiagnoser]
 public class InterpreterExpressionBenchmarks
 {
-    private SandboxHost _host = null!;
+    private Hosting.Execution.SandboxHost _host = null!;
     private ExecutionPlan _plan = null!;
 
     [Params(100, 10_000)]
@@ -16,7 +20,7 @@ public class InterpreterExpressionBenchmarks
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        _host = SandboxHost.Create(builder =>
+        _host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();

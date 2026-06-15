@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
 using System.Diagnostics;
@@ -20,7 +24,7 @@ internal static class CompiledSpeedProbe
         const int iterations = 20_000_000;
         const int warmup = 1_000_000;
 
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
@@ -60,7 +64,7 @@ internal static class CompiledSpeedProbe
         return total;
     }
 
-    private static async Task<SandboxValue?> RunSandbox(SandboxHost host, ExecutionPlan plan, int iterations, ExecutionMode mode)
+    private static async Task<SandboxValue?> RunSandbox(Hosting.Execution.SandboxHost host, ExecutionPlan plan, int iterations, ExecutionMode mode)
     {
         var result = await host.ExecuteAsync(
             plan,

@@ -1,7 +1,7 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Collections.Immutable;
 using System.Reflection.PortableExecutable;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 internal static class PeStructureVerifier
 {

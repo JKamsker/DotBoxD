@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels;
-
 using System.Runtime.CompilerServices;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Sandbox;
 
 /// <summary>
 /// Checked 64-bit integer arithmetic with sandbox error semantics. Overflow is detected with branchless

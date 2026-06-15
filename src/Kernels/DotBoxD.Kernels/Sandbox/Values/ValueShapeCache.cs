@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels;
-
 using System.Runtime.CompilerServices;
+
+namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Memoizes the measured <see cref="ValueShape"/> (and metering-walk frame count) of immutable collection
@@ -54,7 +54,7 @@ internal static class ValueShapeCache
     /// identical to <c>context.ChargeValue(appended)</c>.
     /// </summary>
     public static void ChargeListAppend(
-        SandboxContext context,
+        Sandbox.SandboxContext context,
         ListValue source,
         SandboxValue item,
         SandboxValue appended,
@@ -82,7 +82,7 @@ internal static class ValueShapeCache
     /// <c>context.ChargeValue(updated)</c>.
     /// </summary>
     public static void ChargeMapInsert(
-        SandboxContext context,
+        Sandbox.SandboxContext context,
         MapValue source,
         SandboxValue key,
         SandboxValue value,

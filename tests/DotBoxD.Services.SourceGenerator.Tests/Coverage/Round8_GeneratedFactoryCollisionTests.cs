@@ -1,8 +1,4 @@
-using System.Linq;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
-
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round 8 regression for the generated-type collision guard. The generator emits two assembly-level types

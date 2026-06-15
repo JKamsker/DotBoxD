@@ -1,7 +1,10 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 
 /// <summary>
 /// Regression coverage for PAL-0038: the interpreted call dispatcher allocated a fresh

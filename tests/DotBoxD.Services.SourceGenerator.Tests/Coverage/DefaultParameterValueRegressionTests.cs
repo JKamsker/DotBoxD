@@ -1,11 +1,7 @@
-using System.IO;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Regression test for the bug-hunt finding that non-cancellation-token explicit default parameter

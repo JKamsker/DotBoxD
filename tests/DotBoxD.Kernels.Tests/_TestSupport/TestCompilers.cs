@@ -1,8 +1,10 @@
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Kernels.Compiler.Emitters;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Compiled.Core;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests._TestSupport;
 
 internal sealed class FailingCompiler : ISandboxCompiler
 {

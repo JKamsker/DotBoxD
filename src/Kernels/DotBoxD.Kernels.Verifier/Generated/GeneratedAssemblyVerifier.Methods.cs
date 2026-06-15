@@ -1,8 +1,10 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
+using static DotBoxD.Kernels.Verifier.VerifierTypeNames;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 public sealed partial class GeneratedAssemblyVerifier
 {
@@ -158,10 +160,10 @@ public sealed partial class GeneratedAssemblyVerifier
         List<VerificationDiagnostic> diagnostics)
     {
         var signature = method.DecodeSignature(MethodSignatureNameProvider.Instance, genericContext: null);
-        if (signature.ReturnType != "DotBoxD.Kernels.SandboxValue" ||
+        if (signature.ReturnType != SandboxValueName ||
             signature.ParameterTypes.Length != 2 ||
-            signature.ParameterTypes[0] != "DotBoxD.Kernels.SandboxContext" ||
-            signature.ParameterTypes[1] != "DotBoxD.Kernels.SandboxValue")
+            signature.ParameterTypes[0] != SandboxContextName ||
+            signature.ParameterTypes[1] != SandboxValueName)
         {
             diagnostics.Add(new VerificationDiagnostic(
                 "V-EXECUTE-SIGNATURE",
@@ -176,10 +178,10 @@ public sealed partial class GeneratedAssemblyVerifier
         List<VerificationDiagnostic> diagnostics)
     {
         var signature = method.DecodeSignature(MethodSignatureNameProvider.Instance, genericContext: null);
-        if (signature.ReturnType != "DotBoxD.Kernels.SandboxValue" ||
+        if (signature.ReturnType != SandboxValueName ||
             signature.ParameterTypes.Length == 0 ||
-            signature.ParameterTypes[0] != "DotBoxD.Kernels.SandboxContext" ||
-            signature.ParameterTypes.Skip(1).Any(t => t != "DotBoxD.Kernels.SandboxValue"))
+            signature.ParameterTypes[0] != SandboxContextName ||
+            signature.ParameterTypes.Skip(1).Any(t => t != SandboxValueName))
         {
             diagnostics.Add(new VerificationDiagnostic(
                 "V-FUNCTION-SIGNATURE",

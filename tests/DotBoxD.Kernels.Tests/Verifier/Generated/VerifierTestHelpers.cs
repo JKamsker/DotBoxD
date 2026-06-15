@@ -1,9 +1,11 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Generated;
 
 internal static class VerifierTestHelpers
 {
@@ -67,7 +69,7 @@ internal static class VerifierTestHelpers
         EmitEnterCall(fnIl);
         EmitChargeFuel(fnIl);
         fnIl.Emit(OpCodes.Ldc_I4_0);
-        fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+        fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
         fnIl.Emit(OpCodes.Stloc, value);
         EmitExitCall(fnIl);
         fnIl.Emit(OpCodes.Ldloc, value);
@@ -81,7 +83,7 @@ internal static class VerifierTestHelpers
         var il = method.GetILGenerator();
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldc_I4_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, fn);
         il.Emit(OpCodes.Ret);
@@ -91,19 +93,19 @@ internal static class VerifierTestHelpers
     private static void EmitEnterCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
     }
 
     private static void EmitChargeFuel(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
     }
 
     private static void EmitExitCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
 }

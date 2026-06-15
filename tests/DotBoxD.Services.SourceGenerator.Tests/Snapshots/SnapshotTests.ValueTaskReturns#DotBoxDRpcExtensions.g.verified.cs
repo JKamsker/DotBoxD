@@ -13,13 +13,13 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IVtSnap implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideVtSnap(this global::DotBoxD.Services.RpcPeer peer, global::Snap.Vt.IVtSnap implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideVtSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.Vt.IVtSnap implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.Vt.VtSnapDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IVtSnap on the other peer.
         /// </summary>
-        public static global::Snap.Vt.IVtSnap GetVtSnap(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.Vt.IVtSnap GetVtSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.Vt.VtSnapProxy(peer);
     }
 }

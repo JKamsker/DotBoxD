@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Model;
 
 public sealed record ResourceLimits(
     long MaxFuel = 100_000,

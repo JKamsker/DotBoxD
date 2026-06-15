@@ -1,6 +1,8 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginAnalyzerNegativeLiteralTests
 {
@@ -34,10 +36,10 @@ public sealed class PluginAnalyzerNegativeLiteralTests
         var kernel = await server.InstallAsync(package);
         var adapter = new NegativeLiteralEventAdapter();
 
-        Assert.True(await kernel.ShouldHandleAsync(adapter, Event(-5L, -1.5D, 0)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, Event(5L, -1.5D, 0)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, Event(-5L, 1.5D, 0)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, Event(-5L, -1.5D, -1)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, Event(-5L, -1.5D, 0)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, Event(5L, -1.5D, 0)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, Event(-5L, 1.5D, 0)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, Event(-5L, -1.5D, -1)));
     }
 
     private static NegativeLiteralEvent Event(long sequence, double ratio, int amount)

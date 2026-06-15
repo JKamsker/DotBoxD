@@ -1,9 +1,4 @@
-using System;
-using System.Linq;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
-
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round 6 regression for <c>ProxyGenerator.GenerateProxyMethod</c>. The runtime

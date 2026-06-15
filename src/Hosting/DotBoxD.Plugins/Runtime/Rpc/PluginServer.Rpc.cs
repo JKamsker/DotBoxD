@@ -1,6 +1,8 @@
-namespace DotBoxD.Plugins;
-
 using System.Collections.Concurrent;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Rpc;
+
+namespace DotBoxD.Plugins;
 
 /// <summary>
 /// In-process kernel RPC service convenience surface: register a batch kernel under a service contract,

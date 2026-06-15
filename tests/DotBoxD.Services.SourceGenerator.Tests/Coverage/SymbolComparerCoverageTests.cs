@@ -1,13 +1,8 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
+using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Services.SourceGenerator;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 // Round-2 coverage: DiagnosticLocationFactory.FromSymbol fallback (lines 15,17) and
 // TupleElementNameComparer.HasSameElementNames tuple/generic walking (lines 66-67, 83, 94-95,

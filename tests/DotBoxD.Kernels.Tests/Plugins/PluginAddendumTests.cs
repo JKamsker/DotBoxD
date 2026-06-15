@@ -1,8 +1,11 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginAddendumTests
 {
@@ -54,7 +57,7 @@ public sealed class PluginAddendumTests
         Assert.All(settings.Keys, key => Assert.Contains(key, declared));
         await installed.ModifySettingsAsync(settings);
 
-        Assert.Equal("ice", installed.Value.Get<string>("DamageType"));
+        Assert.Equal((string?)"ice", (string?)installed.Value.Get<string>("DamageType"));
         Assert.Equal(250, installed.Value.Get<int>("MinDamage"));
     }
 
@@ -149,7 +152,7 @@ public sealed class PluginAddendumTests
         await server.Hooks.PublishAsync(new DamageEvent("ice", 200, "player-2"));
         await server.Hooks.PublishAsync(new DamageEvent("ice", 300, "player-3"));
 
-        Assert.Equal("ice", kernel.Value.DamageType);
+        Assert.Equal((string?)"ice", (string?)kernel.Value.DamageType);
         Assert.Equal(250, kernel.Value.MinDamage);
         var message = Assert.Single(messages.Messages);
         Assert.Equal("player-3", message.TargetId);
@@ -170,9 +173,9 @@ public sealed class PluginAddendumTests
             }).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK023");
-        Assert.Equal("fire", kernel.Value.DamageType);
+        Assert.Equal((string?)"fire", (string?)kernel.Value.DamageType);
         Assert.Equal(100, kernel.Value.MinDamage);
-        Assert.Equal("fire", kernel.Kernel.Value.Get<string>("DamageType"));
+        Assert.Equal((string?)"fire", (string?)kernel.Kernel.Value.Get<string>("DamageType"));
         Assert.Equal(100, kernel.Kernel.Value.Get<int>("MinDamage"));
     }
 
@@ -189,9 +192,9 @@ public sealed class PluginAddendumTests
             state.MinDamage = 250;
         });
 
-        Assert.Equal("ice", settings.Value.DamageType);
+        Assert.Equal((string?)"ice", (string?)settings.Value.DamageType);
         Assert.Equal(250, settings.Value.MinDamage);
-        Assert.Equal("ice", settings.Kernel.Value.Get<string>("DamageType"));
+        Assert.Equal((string?)"ice", (string?)settings.Kernel.Value.Get<string>("DamageType"));
         Assert.Equal(250, settings.Kernel.Value.Get<int>("MinDamage"));
     }
 
@@ -249,7 +252,7 @@ public sealed class PluginAddendumTests
         settings.Value.MinDamage = 250;
         settings.Value.DamageType = "ice";
 
-        Assert.Equal("ice", settings.Settings.Get<string>("DamageType"));
+        Assert.Equal((string?)"ice", (string?)settings.Settings.Get<string>("DamageType"));
         Assert.Equal(250, settings.Settings.Get<int>("MinDamage"));
     }
 

@@ -1,6 +1,9 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// ALG-0011: required audit enforcement must inspect only events written after the
@@ -152,5 +155,5 @@ public sealed class Fix_ALG_0011_Tests
             AuditLevel.PerCall,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(0)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 }

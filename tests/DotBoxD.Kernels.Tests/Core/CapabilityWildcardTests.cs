@@ -1,6 +1,7 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core;
 
 /// <summary>
 /// Hierarchical/wildcard capability matching: a wildcard <em>grant</em> authorizes concrete required

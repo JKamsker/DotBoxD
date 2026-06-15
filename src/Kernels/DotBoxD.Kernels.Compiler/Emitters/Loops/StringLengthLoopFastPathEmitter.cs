@@ -1,9 +1,12 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 internal static class StringLengthLoopFastPathEmitter
 {
@@ -111,7 +114,7 @@ internal static class StringLengthLoopFastPathEmitter
             il.Emit(OpCodes.Ldloc, length);
             il.Emit(OpCodes.Ldloc, iterations);
             EmitInt32(il, plan.FuelPerIteration);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AccumulateLinearI32)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AccumulateLinearI32)));
             il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
             il.Emit(OpCodes.Br, finish);
         }
@@ -146,7 +149,7 @@ internal static class StringLengthLoopFastPathEmitter
         {
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldstr, "string.length");
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeBindingCall)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeBindingCall)));
         }
 
         il.Emit(OpCodes.Ldloc, index);
@@ -232,7 +235,7 @@ internal static class StringLengthLoopFastPathEmitter
         => bindings.TryGet("string.length", out var binding) &&
            binding.Compiled is { Kind: "RuntimeStub" } &&
            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
-           binding.Compiled.Method == nameof(CompiledRuntime.StringLength) &&
+           binding.Compiled.Method == nameof(Kernels.Runtime.CompiledRuntime.StringLength) &&
            binding.Parameters.Count == 1 &&
            binding.Parameters[0].Equals(SandboxType.String) &&
            binding.ReturnType.Equals(SandboxType.I32) &&

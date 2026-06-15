@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Policies;
+
 namespace DotBoxD.Hosting.Http.Internal;
 
 public static class SafeHttpPolicyBuilderExtensions
@@ -11,7 +13,7 @@ public static class SafeHttpPolicyBuilderExtensions
         bool allowIpLiterals = false,
         bool allowPrivateNetwork = false,
         long? maxRequestBytes = null)
-        => DotBoxD.Hosting.Http.SafeHttpPolicyBuilderExtensions.GrantHttpGet(
+        => Policy.SafeHttpPolicyBuilderExtensions.GrantHttpGet(
             builder,
             allowedHosts,
             maxResponseBytes,

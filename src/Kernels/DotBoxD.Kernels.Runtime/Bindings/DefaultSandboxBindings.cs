@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Bindings;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Runtime.Bindings;
 
 public static class DefaultSandboxBindings
 {

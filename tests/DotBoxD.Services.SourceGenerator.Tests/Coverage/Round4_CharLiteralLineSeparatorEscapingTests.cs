@@ -1,11 +1,7 @@
-using System.IO;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round 4 regression for <c>MethodModelFactory.EscapeCharLiteral</c>. The char-literal escaper emitted

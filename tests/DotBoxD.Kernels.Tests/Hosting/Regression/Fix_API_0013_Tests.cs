@@ -1,7 +1,11 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0013: the shipped <see cref="SandboxPolicyBuilder.GrantTimeNow"/> and

@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0021: <see cref="JsonExporter"/> is a public module

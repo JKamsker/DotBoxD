@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0022: the public API compatibility baseline gate

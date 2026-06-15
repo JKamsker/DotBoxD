@@ -1,10 +1,16 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Hosting;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginAnalyzerStringInterpolationTests
 {

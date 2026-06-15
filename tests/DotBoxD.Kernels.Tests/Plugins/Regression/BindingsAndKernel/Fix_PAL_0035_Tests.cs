@@ -1,7 +1,7 @@
-using DotBoxD.Kernels;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using PluginServer = DotBoxD.Plugins.PluginServer;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0035: plugin hook dispatch snapshots the filter and
@@ -44,7 +44,7 @@ public sealed class Fix_PAL_0035_Tests
     public async Task SteadyStatePublish_doesNotAllocatePerPublishHandlerSnapshots()
     {
         // A wide, stable pipeline: many no-op filters that pass plus many no-op handlers.
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         var pipeline = server.Hooks.On(new PingEventAdapter());
         for (var i = 0; i < WidePipelineSize; i++)
         {
@@ -69,11 +69,11 @@ public sealed class Fix_PAL_0035_Tests
     [Fact]
     public async Task PerPublishAllocation_doesNotScaleWithPipelineSize()
     {
-        var tinyServer = PluginServer.Create();
+        var tinyServer = DotBoxD.Plugins.PluginServer.Create();
         var tinyPipeline = tinyServer.Hooks.On(new PingEventAdapter());
         tinyPipeline.InvokeHostHandler((PingEvent _, HookContext _) => { });
 
-        var wideServer = PluginServer.Create();
+        var wideServer = DotBoxD.Plugins.PluginServer.Create();
         var widePipeline = wideServer.Hooks.On(new PingEventAdapter());
         for (var i = 0; i < WidePipelineSize; i++)
         {
@@ -100,7 +100,7 @@ public sealed class Fix_PAL_0035_Tests
     [Fact]
     public async Task DefaultPublish_doesNotAllocateHookContextPerPublish()
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
         server.Hooks.On(new PingEventAdapter())
             .InvokeHostHandler((PingEvent _, HookContext context) =>
             {

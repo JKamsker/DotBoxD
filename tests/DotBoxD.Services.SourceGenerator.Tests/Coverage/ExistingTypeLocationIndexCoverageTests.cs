@@ -1,9 +1,8 @@
 using System.Collections.Immutable;
-using System.Threading;
-using DotBoxD.Services.SourceGenerator;
-using Xunit;
+using DotBoxD.Services.SourceGenerator.Infrastructure;
+using DotBoxD.Services.SourceGenerator.Models;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 // Round-2 coverage: ExistingTypeLocationIndex.Find (binary search miss path, line 63) and
 // CompareLocations (lines 66-101) tie-breaking across every field. We feed declarations sharing

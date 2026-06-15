@@ -1,7 +1,14 @@
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
+using PersistentCompiledArtifactCache = DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledCacheConcurrencyTests
 {
@@ -119,7 +126,7 @@ public sealed class CompiledCacheConcurrencyTests
     }
 
     private static async Task<SandboxExecutionResult> ExecuteCompiled(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         SandboxValue input)
         => await host.ExecuteAsync(

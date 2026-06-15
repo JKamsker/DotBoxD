@@ -1,4 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Audit;
 
 public sealed class AuditSummaryTests
 {

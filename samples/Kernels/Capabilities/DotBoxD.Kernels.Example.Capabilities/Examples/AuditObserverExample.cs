@@ -1,8 +1,11 @@
-namespace DotBoxD.Kernels.Example.Capabilities;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Serialization.Json;
+namespace DotBoxD.Kernels.Example.Capabilities.Examples;
 
 /// <summary>
 /// Runnable proof for the public <see cref="SandboxHostBuilder.ForwardAuditEventsTo"/> observer

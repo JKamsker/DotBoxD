@@ -1,4 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Execution;
 
 public sealed class DifferentialFeatureCoverageTests
 {
@@ -34,7 +40,7 @@ public sealed class DifferentialFeatureCoverageTests
     }
 
     private static ValueTask<SandboxExecutionResult> ExecuteAsync(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         SandboxValue input,
         ExecutionMode mode)

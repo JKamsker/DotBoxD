@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
-
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 public sealed partial class EpicItemsOnly : IItemFilter
 {

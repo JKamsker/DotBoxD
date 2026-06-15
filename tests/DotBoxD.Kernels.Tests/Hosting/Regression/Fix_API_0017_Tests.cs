@@ -1,13 +1,13 @@
 using System.Reflection;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Tests._TestSupport;
+using PluginServer = DotBoxD.Plugins.PluginServer;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
-/// Regression coverage for API-0017: <see cref="DotBoxD.Plugins.PluginServer"/> constructs and owns an
-/// internal <see cref="DotBoxD.Hosting.SandboxHost"/> (via <c>PluginServer.Create</c>), yet exposes no
+/// Regression coverage for API-0017: <see cref="PluginServer"/> constructs and owns an
+/// internal <see cref="SandboxHost"/> (via <c>PluginServer.Create</c>), yet exposes no
 /// disposal surface. The lower-level host makes ownership explicit with <see cref="System.IDisposable"/>
 /// (it disposes the compiled executable cache and other host-owned execution state), but the
 /// higher-level plugin convenience type hides that owned host and gives callers no equivalent release
@@ -45,7 +45,7 @@ public sealed class Fix_API_0017_Tests
         // Build a real plugin server over the default compiled-capable host configuration and install
         // a package, mirroring a host that wires plugins through the public convenience surface. This
         // confirms the disposal-surface assertion below is the only thing red, not test setup.
-        var server = PluginServer.Create(
+        var server = DotBoxD.Plugins.PluginServer.Create(
             defaultPolicy: PluginAddendumTestPolicies.LongWall());
         await server.InstallAsync(FireDamagePluginPackage.Create());
 

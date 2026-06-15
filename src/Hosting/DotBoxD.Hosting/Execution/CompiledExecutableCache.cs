@@ -1,7 +1,6 @@
-namespace DotBoxD.Hosting;
-
-using DotBoxD.Kernels;
 using DotBoxD.Kernels.Compiler;
+
+namespace DotBoxD.Hosting.Execution;
 
 internal sealed class CompiledExecutableCache : IDisposable
 {

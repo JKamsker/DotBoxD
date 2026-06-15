@@ -3,9 +3,12 @@ using System.Reflection.Emit;
 using System.Security.Cryptography;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 internal static class CompiledArtifactTestFactory
 {
@@ -65,14 +68,14 @@ internal static class CompiledArtifactTestFactory
         => BuildExecuteAssembly(parameterCount, il =>
         {
             il.Emit(OpCodes.Ldc_I4, value);
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.I32)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.I32)));
         });
 
     public static byte[] BuildBoolAssembly(int parameterCount, bool value)
         => BuildExecuteAssembly(parameterCount, il =>
         {
             il.Emit(value ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.Bool)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
         });
 
     public static byte[] BuildBindingCallAssembly(int parameterCount, string bindingId)
@@ -82,8 +85,8 @@ internal static class CompiledArtifactTestFactory
             il.Emit(OpCodes.Ldstr, bindingId);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.CreateValueArray)));
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.CallBinding)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.CreateValueArray)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
         });
 
     private static byte[] BuildExecuteAssembly(int parameterCount, Action<ILGenerator> emitBody)
@@ -99,15 +102,15 @@ internal static class CompiledArtifactTestFactory
                 parameterTypes);
             var fnIl = function.GetILGenerator();
             fnIl.Emit(OpCodes.Ldarg_0);
-            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.EnterCall)));
+            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall)));
             fnIl.Emit(OpCodes.Ldarg_0);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.ChargeFuel)));
+            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel)));
             emitBody(fnIl);
             var value = fnIl.DeclareLocal(typeof(SandboxValue));
             fnIl.Emit(OpCodes.Stloc, value);
             fnIl.Emit(OpCodes.Ldarg_0);
-            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.ExitCall)));
+            fnIl.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall)));
             fnIl.Emit(OpCodes.Ldloc, value);
             fnIl.Emit(OpCodes.Ret);
 
@@ -119,7 +122,7 @@ internal static class CompiledArtifactTestFactory
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4, parameterCount);
-            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.ValidateEntrypointInput)));
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput)));
             il.Emit(OpCodes.Ldarg_0);
             for (var i = 0; i < parameterCount; i++)
             {
@@ -128,7 +131,7 @@ internal static class CompiledArtifactTestFactory
                 il.Emit(OpCodes.Ldc_I4, parameterCount);
                 il.Emit(OpCodes.Ldstr, "I32");
                 il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.TypeScalar)));
-                il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.GetInputArgument)));
+                il.Emit(OpCodes.Call, RuntimeMethod(nameof(Kernels.Runtime.CompiledRuntime.GetInputArgument)));
             }
 
             il.Emit(OpCodes.Call, function);

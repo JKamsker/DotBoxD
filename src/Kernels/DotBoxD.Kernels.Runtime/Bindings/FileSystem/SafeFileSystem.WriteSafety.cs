@@ -1,11 +1,11 @@
-namespace DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Runtime.Bindings.FileSystem;
 
 public static partial class SafeFileSystem
 {
     private static readonly AsyncLocal<Func<string>?> TempSuffixFactory = new();
-    private static readonly AsyncLocal<Action?> BeforeTempCreateForTests = new();
+    internal static readonly AsyncLocal<Action?> BeforeTempCreateForTests = new();
     private static readonly AsyncLocal<Action<string>?> BeforeDirectoryCreateForTests = new();
 
     internal static IDisposable UseTempSuffixForTests(string suffix)
@@ -32,19 +32,19 @@ public static partial class SafeFileSystem
     internal static void InvokeBeforeDirectoryCreateForTests(string path)
         => BeforeDirectoryCreateForTests.Value?.Invoke(path);
 
-    private static void EnsureDirectWritePath(string rootFull, string fullPath)
+    internal static void EnsureDirectWritePath(string rootFull, string fullPath)
     {
         var root = rootFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var directory = Path.GetDirectoryName(fullPath);
         if (!PathsEqual(root, directory ?? ""))
         {
-            throw Error(
+            throw Bindings.SafeFileSystem.Error(
                 SandboxErrorCode.PermissionDenied,
                 "file.writeText denied: nested write paths are not supported");
         }
     }
 
-    private static string CreateTempSuffix()
+    internal static string CreateTempSuffix()
         => TempSuffixFactory.Value?.Invoke() ?? Guid.NewGuid().ToString("N");
 
     private static bool PathsEqual(string left, string right)

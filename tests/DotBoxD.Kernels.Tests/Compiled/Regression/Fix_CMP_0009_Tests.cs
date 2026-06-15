@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// Regression coverage for CMP-0009: the release-readiness checklist marks the

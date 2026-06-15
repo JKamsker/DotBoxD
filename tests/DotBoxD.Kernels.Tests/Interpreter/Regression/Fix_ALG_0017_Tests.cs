@@ -1,7 +1,12 @@
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Compiled.Core;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 // ALG-0017: the compiled executable cache memoizes the expected boxed/optimized cache keys per
 // (plan, entrypoint) so steady-state dispatches no longer rebuild and re-hash both cache-key

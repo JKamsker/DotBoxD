@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Serialization.Json;
+
 namespace DotBoxD.Kernels.Benchmarks.Json;
 
 using System.Text;

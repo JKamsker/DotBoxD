@@ -1,6 +1,10 @@
-using DotBoxD.Kernels;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class EntrypointBindingTests
 {
@@ -59,7 +63,7 @@ public sealed class EntrypointBindingTests
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteAsync(
-        DotBoxD.Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         SandboxValue input,
         ExecutionMode mode)

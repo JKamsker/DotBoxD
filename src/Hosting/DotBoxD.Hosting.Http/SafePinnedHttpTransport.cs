@@ -1,7 +1,7 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Net;
 using System.Net.Sockets;
+
+namespace DotBoxD.Hosting.Http;
 
 internal static class SafePinnedHttpTransport
 {

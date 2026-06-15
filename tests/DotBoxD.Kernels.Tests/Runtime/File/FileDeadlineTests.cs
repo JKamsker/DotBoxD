@@ -1,4 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
+
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class FileDeadlineTests
 {
@@ -6,7 +12,7 @@ public sealed class FileDeadlineTests
     public async Task File_read_fails_when_wall_time_is_exhausted()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.txt"), "value");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.txt"), "value");
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("settings.txt"));
         var policy = SandboxPolicyBuilder.Create()
@@ -39,7 +45,7 @@ public sealed class FileDeadlineTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.Timeout, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(temp.Path, "result.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "result.txt")));
     }
 
     private static string FileWriteJson(string path, string text)

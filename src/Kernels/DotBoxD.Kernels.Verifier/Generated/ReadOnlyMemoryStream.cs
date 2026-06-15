@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Verifier;
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 /// <summary>
 /// A read-only, seekable <see cref="Stream"/> view over an immutable

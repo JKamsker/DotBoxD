@@ -1,7 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginAnalyzerShortCircuitOrderTests
 {

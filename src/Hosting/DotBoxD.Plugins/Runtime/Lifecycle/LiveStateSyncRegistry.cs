@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins;
+namespace DotBoxD.Plugins.Runtime.Lifecycle;
 
 internal sealed class LiveStateSyncRegistry(Func<Type, LiveUpdateMode> getUpdateMode)
 {

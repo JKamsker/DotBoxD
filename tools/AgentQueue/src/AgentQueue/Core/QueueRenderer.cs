@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace AgentQueue;
+namespace AgentQueue.Core;
 
 internal sealed class QueueRenderer
 {

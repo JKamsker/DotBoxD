@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
+
+namespace DotBoxD.Kernels.Verifier.Diagnostics;
 
 /// <summary>
 /// Classifies what a verifier diagnostic most likely indicates, so operators can

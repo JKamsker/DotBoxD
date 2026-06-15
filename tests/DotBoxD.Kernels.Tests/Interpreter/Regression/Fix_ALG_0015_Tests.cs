@@ -1,7 +1,9 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0015: a single policy validation pass must probe capability

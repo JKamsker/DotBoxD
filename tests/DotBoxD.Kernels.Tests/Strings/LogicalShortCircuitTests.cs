@@ -1,7 +1,13 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Strings;
 
 public sealed partial class LogicalShortCircuitTests
 {
@@ -219,7 +225,7 @@ public sealed partial class LogicalShortCircuitTests
             AuditLevel.None,
             safety,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromBool(invoke())),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static BindingDescriptor EffectfulBoolBinding(Action invoke)
         => new(
@@ -248,7 +254,7 @@ public sealed partial class LogicalShortCircuitTests
                     Fields: context.BindingAuditFields("game", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromBool(true));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             NoParameterGrant);
 
     private static SandboxPolicy GameReadPolicy()

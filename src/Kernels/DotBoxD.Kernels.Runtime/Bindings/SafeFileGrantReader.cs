@@ -1,8 +1,9 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Runtime.Bindings;
 
 // File capability grants are stable for the lifetime of a CapabilityGrant instance,
 // so the byte limit, create/overwrite flags, and allowed-extension set are decoded

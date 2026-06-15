@@ -1,4 +1,6 @@
-namespace DotBoxD.Plugins.Analyzer;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDManifestEffectModel
 {

@@ -113,7 +113,7 @@ methods on `Program`.
 ```csharp
 namespace DotBoxD.Kernels.Game.Server;
 
-using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Pushdown.Services;
 
 internal static class Program
 {

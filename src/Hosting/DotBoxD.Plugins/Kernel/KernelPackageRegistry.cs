@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins;
-
 using System.Reflection;
+
+namespace DotBoxD.Plugins.Kernel;
 
 /// <summary>
 /// Resolves a kernel CLR type to its analyzer-generated <see cref="PluginPackage"/>, so a host or a

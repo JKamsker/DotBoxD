@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Model;
 
 public sealed record SemVersion(int Major, int Minor, int Patch)
     : IComparable<SemVersion>

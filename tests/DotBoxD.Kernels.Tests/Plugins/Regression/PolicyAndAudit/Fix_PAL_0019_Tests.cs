@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
 
 /// <summary>
 /// Regression tests for PAL-0019. The canonical module hasher was refactored to

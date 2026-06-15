@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Collections.ObjectModel;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 public sealed record ArtifactManifest(
     int ArtifactVersion,

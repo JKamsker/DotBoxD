@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection.Metadata;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 internal static class GeneratedStackVerifier
 {

@@ -13,13 +13,13 @@ namespace DotBoxD.Services.Generated
         /// <summary>
         /// Provides a IRefOutSnap implementation for the other peer to call.
         /// </summary>
-        public static global::DotBoxD.Services.RpcPeer ProvideRefOutSnap(this global::DotBoxD.Services.RpcPeer peer, global::Snap.RefOut.IRefOutSnap implementation)
+        public static global::DotBoxD.Services.Peer.RpcPeer ProvideRefOutSnap(this global::DotBoxD.Services.Peer.RpcPeer peer, global::Snap.RefOut.IRefOutSnap implementation)
             => peer.Provide((global::DotBoxD.Services.Server.IServiceDispatcher)new global::Snap.RefOut.RefOutSnapDispatcher(implementation));
 
         /// <summary>
         /// Gets a proxy to call IRefOutSnap on the other peer.
         /// </summary>
-        public static global::Snap.RefOut.IRefOutSnap GetRefOutSnap(this global::DotBoxD.Services.RpcPeer peer)
+        public static global::Snap.RefOut.IRefOutSnap GetRefOutSnap(this global::DotBoxD.Services.Peer.RpcPeer peer)
             => new global::Snap.RefOut.RefOutSnapProxy(peer);
     }
 }

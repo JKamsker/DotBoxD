@@ -1,3 +1,5 @@
+using AgentQueue.Core;
+
 namespace AgentQueue;
 
 internal sealed class Finding

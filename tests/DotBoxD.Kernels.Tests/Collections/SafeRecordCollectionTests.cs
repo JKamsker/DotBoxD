@@ -1,6 +1,12 @@
-using DotBoxD.Kernels;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Collections;
 
 /// <summary>
 /// Coverage of the sandbox record/object type (Followup #2 foundation): the <c>record.new</c> and
@@ -143,7 +149,7 @@ public sealed class SafeRecordCollectionTests
         Assert.Equal(interpreted, compiled);
     }
 
-    private static async Task<SandboxValue?> RunListOfRecords(DotBoxD.Hosting.SandboxHost host, ExecutionMode mode)
+    private static async Task<SandboxValue?> RunListOfRecords(SandboxHost host, ExecutionMode mode)
     {
         var module = await host.ImportJsonAsync(ListOfRecordsModule);
         var plan = await host.PrepareAsync(module, RecordPolicy());

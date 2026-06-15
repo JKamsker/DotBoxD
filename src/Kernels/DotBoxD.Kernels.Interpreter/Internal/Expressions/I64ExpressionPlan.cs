@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 // Unboxed i64 expression plan: i64 literals, raw i64 locals, and checked i64 arithmetic (via SandboxInt64Math,
 // identical overflow semantics to the boxed path). Narrow by design — anything else (boxed i64 locals, calls,

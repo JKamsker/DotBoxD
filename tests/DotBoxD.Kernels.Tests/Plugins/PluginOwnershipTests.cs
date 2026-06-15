@@ -1,7 +1,8 @@
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Policies;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 /// <summary>
 /// Covers the session-ownership model: a kernel is owned by the session that installed it, cannot be
@@ -13,7 +14,7 @@ public sealed class PluginOwnershipTests
     [Fact]
     public async Task Cross_owner_id_reuse_is_rejected_fail_closed()
     {
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var ownerA = server.CreateSession();
         var ownerB = server.CreateSession();
         var kernelA = await ownerA.InstallAsync(FireDamagePluginPackage.Create());
@@ -22,43 +23,43 @@ public sealed class PluginOwnershipTests
             async () => await ownerB.InstallAsync(FireDamagePluginPackage.Create()).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK060");
-        Assert.False(kernelA.IsRevoked);
-        Assert.True(server.Kernels.TryGet("fire-damage", out var current));
+        Assert.False((bool)kernelA.IsRevoked);
+        Assert.True((bool)server.Kernels.TryGet("fire-damage", out var current));
         Assert.Same(kernelA, current);
     }
 
     [Fact]
     public async Task Session_dispose_revokes_and_unregisters_owned_kernels()
     {
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var session = server.CreateSession();
         var kernel = await session.InstallAsync(FireDamagePluginPackage.Create());
-        Assert.True(server.Kernels.TryGet("fire-damage", out _));
+        Assert.True((bool)server.Kernels.TryGet("fire-damage", out _));
 
         session.Dispose();
 
-        Assert.True(kernel.IsRevoked);
-        Assert.False(server.Kernels.TryGet("fire-damage", out _));
+        Assert.True((bool)kernel.IsRevoked);
+        Assert.False((bool)server.Kernels.TryGet("fire-damage", out _));
     }
 
     [Fact]
     public async Task Same_owner_reinstall_replaces_and_revokes_prior()
     {
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var session = server.CreateSession();
         var first = await session.InstallAsync(FireDamagePluginPackage.Create());
         var second = await session.InstallAsync(FireDamagePluginPackage.Create());
 
-        Assert.True(first.IsRevoked);
-        Assert.False(second.IsRevoked);
-        Assert.True(server.Kernels.TryGet("fire-damage", out var current));
+        Assert.True((bool)first.IsRevoked);
+        Assert.False((bool)second.IsRevoked);
+        Assert.True((bool)server.Kernels.TryGet("fire-damage", out var current));
         Assert.Same(second, current);
     }
 
     [Fact]
     public async Task UpdateSettings_rejects_a_plugin_id_the_session_does_not_own()
     {
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var owner = server.CreateSession();
         await owner.InstallAsync(FireDamagePluginPackage.Create());
         var intruder = server.CreateSession();
@@ -74,7 +75,7 @@ public sealed class PluginOwnershipTests
     [Fact]
     public async Task Disposed_session_rejects_further_installs()
     {
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var session = server.CreateSession();
         session.Dispose();
 
@@ -86,12 +87,12 @@ public sealed class PluginOwnershipTests
     public async Task Owner_with_null_id_keeps_legacy_replace_semantics()
     {
         // Direct (sessionless) installs have no owner; reusing an id replaces + revokes, as before.
-        using var server = PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
         var first = await server.InstallAsync(FireDamagePluginPackage.Create());
         var second = await server.InstallAsync(FireDamagePluginPackage.Create());
 
-        Assert.True(first.IsRevoked);
-        Assert.False(second.IsRevoked);
+        Assert.True((bool)first.IsRevoked);
+        Assert.False((bool)second.IsRevoked);
     }
 
     private static SandboxPolicy LongWallPluginPolicy()

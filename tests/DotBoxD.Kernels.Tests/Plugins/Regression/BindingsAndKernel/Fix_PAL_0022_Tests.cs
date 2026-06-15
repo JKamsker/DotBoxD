@@ -1,6 +1,8 @@
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Runtime.Bindings;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression tests for PAL-0022. File capability grant parameters

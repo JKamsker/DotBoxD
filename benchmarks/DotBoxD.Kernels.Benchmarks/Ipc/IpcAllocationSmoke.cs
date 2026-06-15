@@ -1,7 +1,8 @@
+using DotBoxD.Pushdown.Services;
+
 namespace DotBoxD.Kernels.Benchmarks.Ipc;
 
 using System.Globalization;
-using DotBoxD.Kernels.Transport.Ipc;
 
 internal static class IpcAllocationSmoke
 {

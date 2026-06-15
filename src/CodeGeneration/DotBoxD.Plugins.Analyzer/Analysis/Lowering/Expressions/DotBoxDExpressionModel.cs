@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal sealed record DotBoxDExpressionModel(string Source, string Type, bool Allocates);
 

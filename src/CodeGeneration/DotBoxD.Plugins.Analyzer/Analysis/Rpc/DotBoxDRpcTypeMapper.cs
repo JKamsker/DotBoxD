@@ -1,7 +1,7 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 /// <summary>
 /// Maps C# types used by a <c>[KernelRpcService]</c> batch method onto DotBoxD.Kernels JSON IR types: scalars to
@@ -60,11 +60,11 @@ internal static class DotBoxDRpcTypeMapper
         if (type is INamedTypeSymbol { IsGenericType: true } named)
         {
             var definition = named.ConstructedFrom.ToDisplayString();
-            if (definition is "System.Collections.Generic.List<T>"
-                or "System.Collections.Generic.IReadOnlyList<T>"
-                or "System.Collections.Generic.IList<T>"
-                or "System.Collections.Generic.IEnumerable<T>"
-                or "System.Collections.Generic.IReadOnlyCollection<T>")
+            if (definition is TypeNames.ListOriginal
+                or TypeNames.ReadOnlyListOriginal
+                or TypeNames.ListInterfaceOriginal
+                or TypeNames.EnumerableOriginal
+                or TypeNames.ReadOnlyCollectionOriginal)
             {
                 return named.TypeArguments[0];
             }

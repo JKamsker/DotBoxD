@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Reflection;
-using DotBoxD.Kernels.PluginLocal;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// Regression coverage for CMP-0021: <see cref="DotBoxD.Plugins.KernelRegistry"/> exposes only the
@@ -46,7 +47,7 @@ public sealed class Fix_CMP_0021_Tests
         Assert.NotNull(beforeUninstall);
         Assert.Contains(beforeUninstall!, k => k.Manifest.PluginId == InstalledPluginId);
 
-        Assert.True(server.Uninstall(InstalledPluginId));
+        Assert.True((bool)server.Uninstall(InstalledPluginId));
 
         var afterUninstall = EnumerateInstalledKernels(server.Kernels);
         Assert.NotNull(afterUninstall);

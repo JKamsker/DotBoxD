@@ -1,6 +1,10 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core;
 
 public sealed class HashIdentityTests
 {
@@ -99,5 +103,5 @@ public sealed class HashIdentityTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 }

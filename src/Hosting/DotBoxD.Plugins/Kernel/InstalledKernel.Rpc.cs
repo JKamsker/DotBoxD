@@ -1,6 +1,8 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Runtime;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Kernel;
 
 /// <summary>
 /// Request/response invocation for a <b>kernel RPC service</b> kernel — the path that runs a verified

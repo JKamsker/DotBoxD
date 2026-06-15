@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 internal static class ManifestInspectionExample
 {

@@ -4,9 +4,11 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierMemberSignatureTests
 {
@@ -26,7 +28,7 @@ public sealed class VerifierMemberSignatureTests
                 [typeof(SandboxContext), typeof(SandboxValue)]);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             il.Emit(OpCodes.Ret);
         });
 
@@ -47,12 +49,12 @@ public sealed class VerifierMemberSignatureTests
                 [typeof(SandboxContext)]);
             var fnIl = fn.GetILGenerator();
             var value = fnIl.DeclareLocal(typeof(SandboxValue));
-            EmitRuntimeCall(fnIl, nameof(CompiledRuntime.EnterCall));
+            EmitRuntimeCall(fnIl, nameof(Kernels.Runtime.CompiledRuntime.EnterCall));
             EmitFuel(fnIl);
             fnIl.Emit(OpCodes.Ldc_I8, 5L);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I64))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I64))!);
             fnIl.Emit(OpCodes.Stloc, value);
-            EmitRuntimeCall(fnIl, nameof(CompiledRuntime.ExitCall));
+            EmitRuntimeCall(fnIl, nameof(Kernels.Runtime.CompiledRuntime.ExitCall));
             fnIl.Emit(OpCodes.Ldloc, value);
             fnIl.Emit(OpCodes.Ret);
 
@@ -64,7 +66,7 @@ public sealed class VerifierMemberSignatureTests
             var il = execute.GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Call, fn);
             il.Emit(OpCodes.Ret);
@@ -86,13 +88,13 @@ public sealed class VerifierMemberSignatureTests
                 typeof(SandboxValue),
                 [typeof(SandboxContext)]);
             var fnIl = fn.GetILGenerator();
-            EmitRuntimeCall(fnIl, nameof(CompiledRuntime.EnterCall));
+            EmitRuntimeCall(fnIl, nameof(Kernels.Runtime.CompiledRuntime.EnterCall));
             EmitFuel(fnIl);
             fnIl.Emit(OpCodes.Ldc_I4_1);
             fnIl.Emit(OpCodes.Call, fakeRuntimeI32);
             var value = fnIl.DeclareLocal(typeof(SandboxValue));
             fnIl.Emit(OpCodes.Stloc, value);
-            EmitRuntimeCall(fnIl, nameof(CompiledRuntime.ExitCall));
+            EmitRuntimeCall(fnIl, nameof(Kernels.Runtime.CompiledRuntime.ExitCall));
             fnIl.Emit(OpCodes.Ldloc, value);
             fnIl.Emit(OpCodes.Ret);
 
@@ -104,7 +106,7 @@ public sealed class VerifierMemberSignatureTests
             var il = execute.GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Call, fn);
             il.Emit(OpCodes.Ret);
@@ -257,6 +259,6 @@ public sealed class VerifierMemberSignatureTests
     {
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
     }
 }

@@ -1,3 +1,8 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Interpreter.Internal;
 
 using DotBoxD.Kernels;
@@ -153,7 +158,7 @@ internal sealed class F64ExpressionPlan
         if (bindings is BindingRegistry registry &&
             registry.TryGet(id, out var binding) &&
             binding.Compiled is { Kind: "RuntimeStub" } &&
-            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
+            binding.Compiled.Type == typeof(Runtime.CompiledRuntime).FullName &&
             binding.Compiled.Method == RuntimeMethod(kind) &&
             binding.Parameters.Count == 1 &&
             binding.Parameters[0].Equals(SandboxType.F64) &&
@@ -186,10 +191,10 @@ internal sealed class F64ExpressionPlan
 
     private static string RuntimeMethod(ExpressionKind kind)
         => kind switch {
-            ExpressionKind.Sqrt => nameof(CompiledRuntime.SqrtF64),
-            ExpressionKind.Floor => nameof(CompiledRuntime.FloorF64),
-            ExpressionKind.Ceil => nameof(CompiledRuntime.CeilF64),
-            ExpressionKind.Round => nameof(CompiledRuntime.RoundF64),
+            ExpressionKind.Sqrt => nameof(Runtime.CompiledRuntime.SqrtF64),
+            ExpressionKind.Floor => nameof(Runtime.CompiledRuntime.FloorF64),
+            ExpressionKind.Ceil => nameof(Runtime.CompiledRuntime.CeilF64),
+            ExpressionKind.Round => nameof(Runtime.CompiledRuntime.RoundF64),
             _ => ""
         };
 
