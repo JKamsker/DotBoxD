@@ -35,6 +35,12 @@ internal static class BoolReturnFastPathEmitter
         var falseLabel = il.DefineLabel();
         var endLabel = il.DefineLabel();
 
+        // Fuel: 4 for the string-equals branch and a further 3 for the i32-gte branch (7 on a true
+        // hit, 4 on a short-circuit miss). The general node-by-node emitter charges ~4 for the same
+        // `(str == str) && (i32 >= i32)` shape, so this fast path intentionally over-charges by ~3 on
+        // a hit. Over-charging is the safe direction: the sandbox fuel budget is a cap, not an exact
+        // contract, and a fast path may charge >= the slow path but must never charge less (which could
+        // let a guest under-pay). It can never under-fuel, so it cannot widen the compute a guest gets.
         CompiledMeterEmitter.Fuel(il, 4);
         il.Emit(OpCodes.Ldloc, declare(leftString).Local);
         il.Emit(OpCodes.Ldloc, declare(rightString).Local);

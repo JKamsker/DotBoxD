@@ -142,6 +142,16 @@ internal sealed class PluginExecutionObserver
     {
         summary = null;
         fallbackReason = null;
+
+        // A run requested as Interpreted that actually ran Interpreted never attempts compilation,
+        // so it has no fallback (fallbackReason stays null) and no compiled-artifact telemetry —
+        // cacheStatus/runtimeForm/cacheKey/artifactHash/materializationStatus all describe a compiled
+        // artifact that interpreted execution does not produce, so they are correctly None/null.
+        // Skipping the scan here is therefore an equivalence, not a data loss, and it holds whether or
+        // not SuppressSuccessfulRunSummaryAudit dropped the (artifact-free) interpreted RunSummary.
+        // The hot suppressed-success path with zero events is already handled by RecordNoAuditSuccess
+        // before this method runs; compiled and compiled->interpreted fallback runs fall through and are
+        // scanned below so their fallbackReason and artifact markers are still recovered.
         if (requestedMode == ExecutionMode.Interpreted && result.ActualMode == ExecutionMode.Interpreted)
         {
             return;

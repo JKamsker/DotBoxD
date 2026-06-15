@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType ItemType) : SandboxValue, IReadOnlyList<SandboxValue>
 {
     private IReadOnlyList<SandboxValue> _values = Snapshot(Values);
+    private readonly bool _ownsValues;
 
     public IReadOnlyList<SandboxValue> Values { get => this; init => _values = Snapshot(value); }
 
@@ -16,9 +17,22 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
     internal static ListValue FromOwnedValues(SandboxValue[] values, SandboxType itemType)
         => new(values, itemType, ownsValues: true);
 
+    /// <summary>
+    /// Rebinds the backing array in place to reuse this instance's allocation across dispatches.
+    /// Only valid on a list built via <see cref="FromOwnedValues"/>: such a list is private to the
+    /// builder that owns its buffer and is never handed out for sharing. Resetting a normally
+    /// constructed (defensively copied, potentially externally visible) list would let a retained
+    /// reference observe a later dispatch's input, so that is rejected.
+    /// </summary>
     internal void ResetOwnedValues(SandboxValue[] values)
     {
         ArgumentNullException.ThrowIfNull(values);
+        if (!_ownsValues)
+        {
+            throw new InvalidOperationException(
+                "ResetOwnedValues is only valid on a list constructed via FromOwnedValues.");
+        }
+
         _values = values;
     }
 
@@ -27,6 +41,7 @@ public sealed record ListValue(IReadOnlyList<SandboxValue> Values, SandboxType I
     {
         ArgumentNullException.ThrowIfNull(values);
         _values = ownsValues ? values : values.ToArray();
+        _ownsValues = ownsValues;
     }
 
     private static IReadOnlyList<SandboxValue> Snapshot(IReadOnlyList<SandboxValue> values)
