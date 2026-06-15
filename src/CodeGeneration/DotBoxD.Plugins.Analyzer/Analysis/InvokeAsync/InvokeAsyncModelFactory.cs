@@ -134,8 +134,10 @@ internal static class InvokeAsyncModelFactory
         for (var i = 0; i < shape.SyncOuts.Count; i++)
         {
             var syncOut = shape.SyncOuts[i];
-            syncOutAssignments[i] = "captures." + syncOut.PropertyName + " = " +
-                                    reader.ReadExpression(syncOut.Type, "__fields[" + (i + 1) + "]");
+            var value = reader.ReadExpression(syncOut.Type, "__fields[" + (i + 1) + "]");
+            syncOutAssignments[i] = shape.UsesReflectionCaptures
+                ? "__WriteCapture(lambda, " + Str(syncOut.TargetName) + ", " + value + ")"
+                : "captures." + syncOut.TargetName + " = " + value;
         }
 
         var packageFullName = string.IsNullOrEmpty(ns)
@@ -158,6 +160,7 @@ internal static class InvokeAsyncModelFactory
             shape.ArgumentsExpression,
             resultExpression,
             new EquatableArray<string>(syncOutAssignments),
+            shape.UsesReflectionCaptures,
             reader.Helpers);
     }
 

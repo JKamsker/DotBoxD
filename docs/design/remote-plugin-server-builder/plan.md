@@ -19,9 +19,9 @@ The user wants two additions, **without removing the imperative APIs**:
    `RemoteKernelControl.Register` / `RemoteKernelRpcControl.Register`.
 2. **A new `server.Kernels.InvokeAsync(lambda)`** that lowers an anonymous block-body lambda to verified
    sandboxed IR at compile time (like the existing `InvokeKernel(lambda)` interceptor path), ships it over
-   async IPC, and runs it server-side. No-capture lambdas use the lambda-only overload. Capture sync-in/out
-   uses the implemented explicit mutable capture-bag overload because generated C# interceptor bodies cannot
-   directly read or write caller locals by name.
+   async IPC, and runs it server-side. No-capture lambdas and reflection-backed implicit local/parameter
+   captures use the lambda-only overload. Capture sync-in/out also has the implemented explicit mutable
+   capture-bag overload for compiler-stable marshalling.
 
 ### The DotBoxD invariant (preserved throughout)
 
@@ -257,12 +257,13 @@ the imperative and `--use-builder` paths with identical output; existing
 
 ---
 
-## Phase 2 — `InvokeAsync`: detection and no-capture lambda lowering
+## Phase 2 — `InvokeAsync`: detection, lambda lowering, and implicit capture convenience
 
 **Goal.** Detect `server.Kernels.InvokeAsync(lambda)` at compile time, lower the **block-body** lambda to
 verified IR via the existing RPC lowerer, ship it as an anonymous RPC kernel, run it server-side, and
-return the typed result. Lambda-only calls are no-capture. Capture sync-in/out is provided by the explicit
-mutable capture-bag overload because generated C# interceptors cannot directly access caller locals.
+return the typed result. Lambda-only calls support no-capture lowering and a reflection-backed implicit
+local/parameter capture convenience path. Capture sync-in/out is also provided by the explicit mutable
+capture-bag overload because generated C# interceptors cannot directly access caller locals.
 
 ### Decisions folded in from review
 
@@ -273,20 +274,21 @@ mutable capture-bag overload because generated C# interceptors cannot directly a
   is not sufficient.
 - **Lambda shape.** Exactly one explicitly-typed parameter whose type is the host-access interface
   (`IGameWorldAccess`), **block body** (expression-body lambdas are out of scope; use `InvokeKernel`).
-- **Capture analysis via `SemanticModel.AnalyzeDataFlow(block)`.** Lambda-only calls reject ambient
-  `DataFlowsIn` / `DataFlowsOut` symbols other than the lambda parameter. Captured locals produce no package;
-  explicit capture-bag sync-in/out is Phase 3.
-- **Capture marshalling is explicit, NOT closure reflection.** Reading captured fields from
-  `delegate.Target` via `GetField("name")` relies on Roslyn closure name-mangling, which is **not
-  spec-guaranteed** (the design even mis-guessed `"<lastMonsterName>i__Field"`). Reflection-on-closure
-  **must not ship.** A compiler probe showed generated interceptor method bodies cannot directly reference
-  caller locals by name either. Resolution: lambda-only `InvokeAsync` accepts no ambient captures; sync-in/out
-  is provided by an explicit mutable capture-bag overload. The bag is encoded as a record argument, and
-  assigned bag properties are decoded from a response record and written back after the await.
+- **Capture analysis via `SemanticModel.AnalyzeDataFlow(block)`.** Lambda-only calls use zero arguments when
+  there are no ambient captures. Captured locals/parameters become IR parameters and are read from
+  `lambda.Target` by source symbol name; written captured locals/parameters are returned in the response
+  record and reflected back into the closure object.
+- **Capture marshalling has two modes.** A compiler probe showed generated interceptor method bodies cannot
+  directly reference caller locals by name. The stable mode is the explicit mutable capture-bag overload: the
+  bag is encoded as a record argument, and assigned bag properties are decoded from a response record and
+  written back after the await. The convenience mode is lambda-only implicit capture: the generated
+  interceptor uses `lambda.Target` reflection and source symbol names to read/write compiler closure fields.
+  If the compiler shape does not expose the expected field, it throws and the caller can switch to the bag.
 - **Lowerer reuse is partial, stated honestly.** `DotBoxDRpcJsonLowerer.LowerBody` lowers the body
-  **statements** unchanged. Phase 2 builds a zero-argument IR function for no-capture lambdas. Phase 3 adds
-  the capture-bag record parameter, generated sync-out locals, and the assignment override for bag-property
-  writes. No identifier-rename pass is invented.
+  **statements** unchanged. Phase 2 builds either a zero-argument IR function or an IR function whose
+  parameters are the implicit captured locals/parameters by source symbol name. Phase 3 adds the capture-bag
+  record parameter, generated sync-out locals, and the assignment override for bag-property writes. No
+  identifier-rename pass is invented.
 - **Anonymous kernel identity.** `pluginId = "$anon:" + HookChainIdentity.Compute(invocation)` (FNV-1a of
   file path + span start). Verified to pass `ValidateText` / descriptor guards. The generator emits
   `module.id == pluginId` and `module.metadata.pluginId == pluginId` identically (the existing RPC factory
@@ -313,8 +315,8 @@ mutable capture-bag overload because generated C# interceptors cannot directly a
 | File | Action |
 |---|---|
 | `src/CodeGeneration/.../HookChains/InterceptsLocationAttributeEmitter.cs` | **Create.** Shared one-shot emitter for `DotBoxDInterceptsLocationAttribute.g.cs`. Refactor `DotBoxDHookChainInterceptorEmitter.Emit` to call it instead of emitting the attribute itself. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Create.** Detection (receiver-type guard), lambda-shape validation, ambient-capture rejection, `DotBoxDRpcJsonLowerer.LowerBody` invocation, zero-argument IR function construction, manifest + package JSON (mirrors `RpcKernelModelFactory.EmitPackage`: `mode=Auto`, `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=function id, `requiredCapabilities` from the host-binding sink). Returns `InvokeAsyncResult(Package, Interception)`. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode zero arguments → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits a null-interception diagnostic when location is null. |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Create.** Detection (receiver-type guard), lambda-shape validation, implicit-capture analysis, `DotBoxDRpcJsonLowerer.LowerBody` invocation, IR function construction, manifest + package JSON (mirrors `RpcKernelModelFactory.EmitPackage`: `mode=Auto`, `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=function id, `requiredCapabilities` from the host-binding sink). Returns `InvokeAsyncResult(Package, Interception)`. |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode arguments → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits reflection helpers for implicit captures and a null-interception diagnostic when location is null. |
 | `src/CodeGeneration/.../PluginPackageGenerator.cs` | **Modify.** Add the fourth `CreateSyntaxProvider` pipeline; register the package output (reuse `AddSource(package.HintName, package.Source)`); wire the combined attribute-dedup provider; register the interceptor output. |
 | `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs` | **Modify.** Add `Metadata.KernelInvocationSurfaceType` constant (FQN of `RemoteKernelControl`). |
 | `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
@@ -323,10 +325,11 @@ mutable capture-bag overload because generated C# interceptors cannot directly a
 
 - **Generator:** new pipeline + two new emitters + shared attribute emitter. Reuses `DotBoxDRpcJsonLowerer`,
   `DotBoxDHostBindingExpressionLowerer` (capability sink), `DotBoxDRpcTypeMapper`, `HookChainIdentity`.
-- **Runtime:** new `RemoteKernelControl` members only. **No new IPC method this phase** — no-capture calls use
-  the existing `InstallKernelRpcAsync` + `InvokeKernelRpcAsync(pluginId, byte[]) → byte[]` path.
-- **Wire:** unchanged. `EncodeArguments(Array.Empty<KernelRpcValue>())` → existing `InvokeKernelRpcAsync` →
-  `DecodeValue(returnValue)`.
+- **Runtime:** new `RemoteKernelControl` members only. **No new IPC method this phase** — no-capture and
+  implicit-capture calls use the existing `InstallKernelRpcAsync` + `InvokeKernelRpcAsync(pluginId, byte[]) →
+  byte[]` path.
+- **Wire:** unchanged. `EncodeArguments(captures-or-empty)` → existing `InvokeKernelRpcAsync` →
+  `DecodeValue(returnValue-or-response-record)`.
 
 ### Tests (Phase 2)
 
@@ -335,7 +338,7 @@ self-contained string fixtures with inline stub `RemoteKernelControl`/`IGameWorl
 
 - `InvokeAsync_block_body_lambda_generates_interceptor_and_package`.
 - `InvokeAsync_no_capture_block_body_generates_zero_argument_package`.
-- `Captured_lambda_is_ignored_until_capture_marshalling_strategy_is_corrected` — fails safe for ambient captures.
+- `Implicit_capture_generates_reflection_arguments_and_sync_out`.
 - `InvokeAsync_expression_body_lambda_is_ignored` (use `InvokeKernel` instead).
 - `InvokeAsync_null_interceptable_location_emits_diagnostic`.
 - `InterceptsLocationAttribute_emitted_once_when_both_hookchain_and_invokeasync_present` — the dedup guard.
@@ -348,13 +351,14 @@ Runtime/round-trip tests (the anonymous package validated + executed via `Plugin
 - `Anonymous_kernel_capability_gating_derived_from_lambda_body` — required capabilities equal exactly the
   host-binding set; install fails when a grant is missing.
 - `No_capture_invoke_uses_empty_argument_frame` — exercises the zero-argument `BuildRpcInput` path.
+- `Implicit_capture_reflection_round_trips_sync_in_and_sync_out`.
 - `Concurrent_first_invokes_install_once` — `EnsureAnonymousKernelAsync` does not double-install.
 
 ### Exit criteria (Phase 2)
 
-Build green; a GameServer sample `InvokeAsync` call that uses a no-capture `world.GetMonster("monster-2")`
-lambda compiles, lowers, installs, runs sandboxed, and returns the correct value end-to-end; capability gating
-denies a lambda that touches an ungranted binding.
+Build green; GameServer sample `InvokeAsync` calls for no-capture and implicit-capture lambdas compile, lower,
+install, run sandboxed, and return the correct values end-to-end; capability gating denies a lambda that
+touches an ungranted binding.
 
 ---
 
@@ -374,7 +378,8 @@ await server.Kernels.InvokeAsync(capture, (IGameWorldAccess world, MonsterProbeC
 
 ### Implemented decisions
 
-- Ambient closure captures are rejected for both lambda-only and capture-bag calls.
+- Capture-bag calls reject ambient closure captures; lambda-only implicit captures are handled by the
+  reflection-backed convenience path.
 - The capture bag is encoded as one `KernelRpcValue.Record` argument.
 - Reads like `bag.MonsterId` lower to `record.get(Var("bag"), index)`.
 - Simple assignments to settable bag properties lower to generated sync-out locals.
@@ -483,10 +488,11 @@ unchanged.
 
 ## Risks and limits
 
-- **[HIGH→resolved with fallback] Interceptor closure-local capture marshalling is infeasible.** Generated
+- **[HIGH→resolved with two paths] Interceptor closure-local capture marshalling is infeasible.** Generated
   interceptor methods cannot read or write caller locals by name, and closure-`Target` reflection remains
-  rejected because compiler name-mangling is not a contract. The implemented fallback is an explicit mutable
-  capture-bag overload on `InvokeAsync`, which is more verbose but reflection-free and compiler-stable.
+  compiler-shape-dependent. The implemented stable path is an explicit mutable capture-bag overload on
+  `InvokeAsync`; the lambda-only overload also supports an opt-in convenience path that uses reflection and
+  throws clearly if the closure field cannot be found.
 - **[HIGH→resolved] `InterceptsLocationAttribute` hint-name collision.** A compilation with both a hook
   chain and an `InvokeAsync` would crash the generator on a duplicate `AddSource`. Resolved by the shared
   one-shot emitter (Phase 2 prerequisite).

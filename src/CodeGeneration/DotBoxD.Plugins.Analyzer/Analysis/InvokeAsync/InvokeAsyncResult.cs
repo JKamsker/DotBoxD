@@ -18,4 +18,5 @@ internal sealed record InvokeAsyncInterception(
     string ArgumentsExpression,
     string ResultExpression,
     EquatableArray<string> SyncOutAssignments,
+    bool UsesReflectionCaptures,
     string Helpers);

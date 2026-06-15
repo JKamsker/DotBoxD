@@ -33,6 +33,11 @@ internal static class InvokeAsyncInterceptorEmitter
             AppendInterceptor(builder, interceptions[i], i);
         }
 
+        if (interceptions.Any(static interception => interception.UsesReflectionCaptures))
+        {
+            AppendReflectionCaptureHelpers(builder);
+        }
+
         builder.AppendLine("    }");
         builder.AppendLine("}");
         return builder.ToString();
@@ -106,6 +111,37 @@ internal static class InvokeAsyncInterceptorEmitter
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.Append(interception.Helpers);
+    }
+
+    private static void AppendReflectionCaptureHelpers(StringBuilder builder)
+    {
+        builder.AppendLine("        private static T __ReadCapture<T>(global::System.Delegate lambda, string fieldName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            var target = lambda.Target ?? throw new global::System.NotSupportedException(\"InvokeAsync implicit captures require a compiler-generated closure target.\");");
+        builder.AppendLine("            var value = __FindCaptureField(target.GetType(), fieldName).GetValue(target);");
+        builder.AppendLine("            return value is null ? default! : (T)value;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static void __WriteCapture<T>(global::System.Delegate lambda, string fieldName, T value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            var target = lambda.Target ?? throw new global::System.NotSupportedException(\"InvokeAsync implicit captures require a compiler-generated closure target.\");");
+        builder.AppendLine("            __FindCaptureField(target.GetType(), fieldName).SetValue(target, value);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static global::System.Reflection.FieldInfo __FindCaptureField(global::System.Type type, string fieldName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            for (var current = type; current is not null; current = current.BaseType)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                var field = current.GetField(fieldName, global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic);");
+        builder.AppendLine("                if (field is not null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return field;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            throw new global::System.NotSupportedException(\"InvokeAsync could not find compiler capture field '\" + fieldName + \"'. Use the explicit capture-bag overload for stable capture marshalling.\");");
+        builder.AppendLine("        }");
+        builder.AppendLine();
     }
 
     private static string Literal(string value)

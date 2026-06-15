@@ -28,7 +28,7 @@ internal sealed partial class InvokeAsyncCallShape
                     $"InvokeAsync capture property '{property.Name}' must be assigned with a public set accessor.");
             }
 
-            if (syncOuts.Any(item => string.Equals(item.PropertyName, property.Name, StringComparison.Ordinal)))
+            if (syncOuts.Any(item => string.Equals(item.TargetName, property.Name, StringComparison.Ordinal)))
             {
                 continue;
             }
@@ -65,7 +65,10 @@ internal sealed partial class InvokeAsyncCallShape
 
     private static IReadOnlyList<(string Name, ExpressionSyntax Value)> CreateLeadingLocals(
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
-        => syncOuts.Select(syncOut => (syncOut.LocalName, (ExpressionSyntax)syncOut.Initializer)).ToArray();
+        => syncOuts
+            .Where(static syncOut => syncOut.Initializer is not null)
+            .Select(syncOut => (syncOut.LocalName, syncOut.Initializer!))
+            .ToArray();
 
     private static string? LowerCaptureAssignment(
         AssignmentExpressionSyntax assignment,
@@ -78,7 +81,7 @@ internal sealed partial class InvokeAsyncCallShape
             return null;
         }
 
-        var syncOut = syncOuts.Single(item => string.Equals(item.PropertyName, propertyName, StringComparison.Ordinal));
+        var syncOut = syncOuts.Single(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
         return DotBoxDRpcJsonLowerer.SetGeneratedLocal(syncOut.LocalName, lower(assignment.Right));
     }
 

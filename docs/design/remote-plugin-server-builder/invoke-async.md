@@ -1,9 +1,9 @@
 # InvokeAsync — inline-kernel and explicit capture bag (deep dive)
 
 This document specifies how `server.Kernels.InvokeAsync(lambda)` is detected, lowered to verified sandboxed
-IR at compile time, shipped over async IPC, and executed server-side. It also documents the implemented
-capture sync-in/out fallback: an explicit mutable capture bag. The server never compiles plugin source; only
-verified IR crosses the boundary.
+IR at compile time, shipped over async IPC, and executed server-side. It also documents both capture paths:
+an explicit mutable capture bag, and a reflection-backed implicit-capture convenience path. The server never
+compiles plugin source; only verified IR crosses the boundary.
 
 It corrects the reviewed designs where they were unsound and states every deferral explicitly.
 
@@ -40,6 +40,22 @@ The lambda body is lowered to the same verified IR a `[KernelRpcService]` method
 is encoded as one record argument, and assigned bag properties are returned in a response record and written
 back to the same object after the await.
 
+Implicit capture convenience:
+
+```csharp
+var monsterId = "monster-2";
+var lastHealth = 0;
+var monsterName = await server.Kernels.InvokeAsync((IGameWorldAccess world) =>
+{
+    var monster = world.GetMonster(monsterId);
+    lastHealth = monster.Health;
+    return monster.Name;
+});
+```
+
+Implicit captures use `lambda.Target` reflection in the generated interceptor. This is intentionally a
+convenience path; the explicit capture-bag overload remains the compiler-stable path.
+
 ### Object snapshot surface
 
 The implemented object surface is the flat host binding `world.GetMonster(id)`, returning
@@ -73,7 +89,8 @@ receiver's type and returns `null` unless it is the kernel-invocation surface**
 ### Lambda shape validation
 
 Accept only:
-- either a single explicitly-typed `IGameWorldAccess` lambda parameter, or
+- either a single explicitly-typed `IGameWorldAccess` lambda parameter, with no captures or supported
+  reflection-backed local/parameter captures, or
 - a mutable capture object argument plus a two-parameter lambda
   `(IGameWorldAccess world, TCaptures captures)`, where `TCaptures` is a supported record-shaped DTO, and
 - a **block body** (expression-body lambdas are out of scope — use `InvokeKernel` for those).
@@ -82,7 +99,7 @@ Anything else returns `null` (fail-safe, no output).
 
 ---
 
-## 3. Capture-bag analysis
+## 3. Capture analysis
 
 Use Roslyn data-flow:
 
@@ -90,12 +107,17 @@ Use Roslyn data-flow:
 var flow = semanticModel.AnalyzeDataFlow(lambdaBlock);
 ```
 
-- Lambda-only calls reject `DataFlowsIn` / `DataFlowsOut` symbols other than the lambda parameter. This keeps
-  no-capture lowering honest.
+- Lambda-only calls with no ambient captures lower to a zero-argument anonymous kernel.
+- Lambda-only calls with ambient local/parameter captures lower those captured symbols to IR parameters named
+  after the source symbols. The generated interceptor reads and writes the compiler closure fields by source
+  symbol name via `lambda.Target` reflection.
 - Capture-bag calls also reject ambient `DataFlowsIn` / `DataFlowsOut`; only the explicit bag parameter can
   carry values across the boundary.
-- **Sync-in** = the capture-bag object encoded as a `KernelRpcValue.Record`.
-- **Sync-out** = simple assignments to supported settable bag properties, e.g. `bag.LastHealth = ...`.
+- **Capture-bag sync-in** = the capture-bag object encoded as a `KernelRpcValue.Record`.
+- **Capture-bag sync-out** = simple assignments to supported settable bag properties, e.g. `bag.LastHealth = ...`.
+- **Implicit sync-in** = captured local/parameter values encoded as individual `KernelRpcValue` arguments.
+- **Implicit sync-out** = captured locals/parameters written inside the lambda and returned in the response
+  record, then reflected back into the closure object.
 
 Each assigned bag property gets an initialized IR local (`__syncOut_<Property>`), and returns read those
 locals back through the response envelope.
@@ -111,6 +133,7 @@ or accept null-to-empty-string behavior.
 
 ```
 function "$anon:<hex>" () -> <return>
+function "$anon:<hex>" (<implicit captures>) -> <return or Record([returnValue, syncOut0, ...])>
 function "$anon:<hex>" (captures: Record([...])) -> Record([returnValue, syncOut0, ...])
 ```
 
@@ -118,6 +141,9 @@ function "$anon:<hex>" (captures: Record([...])) -> Record([returnValue, syncOut
   (`world.GetMonster(id)`) lower to a host-binding call via the existing host-binding lowerer.
 - For capture-bag calls, the bag lambda parameter is the single IR parameter. Reads like `bag.MonsterId`
   lower to `record.get(Var("bag"), 0)`.
+- For implicit captures, captured locals/parameters are IR parameters using the original source symbol names.
+  Reads like `monsterId` lower to `Var("monsterId")`, and assignments like `lastHealth = ...` lower to
+  `set lastHealth`.
 
 ### Return type
 
@@ -150,7 +176,8 @@ package. No runtime package resolution.
 2. Declaring leading IR locals for assigned bag properties, initialized from the inbound bag.
 3. Overriding simple assignments to bag properties so `bag.LastHealth = expr` lowers to
    `set __syncOut_LastHealth`.
-4. For sync-out: synthesizing `return record.new([userReturnExpr, syncOut0, …])`. This is done structurally
+4. Building reflection-backed implicit capture parameters when lambda-only calls capture locals/parameters.
+5. For sync-out: synthesizing `return record.new([userReturnExpr, syncOut0, …])`. This is done structurally
    for each lowered return path; the implementation does not scan or post-process JSON text.
 
 ---
@@ -161,15 +188,13 @@ A C# interceptor's non-receiver parameters must match the intercepted method's a
 it **cannot** add `out`/`ref` parameters or change the return type (confirmed by the existing
 `DotBoxDHookChainInterceptorEmitter`, whose interceptor returns `HookPipeline<TEvent>` and forwards the
 identical handler). Therefore captures cannot be threaded as extra interceptor parameters, and
-**closure-`Target` reflection is rejected** (`GetField("name")` depends on Roslyn name-mangling, which is
-not spec-guaranteed; the reviewed design even mis-guessed `"<lastMonsterName>i__Field"`).
+direct caller-local access is impossible.
 
 Implementation finding: the call-site-local mechanism above is not valid C#. A generated interceptor method
 body is compiled as a normal generated method body; it cannot reference locals from the intercepted caller's
-lexical scope by name. The generator therefore rejects lambda-only calls that capture caller locals. That
-keeps the lambda-only overload correct for no-capture inline kernels and avoids closure-field reflection.
+lexical scope by name.
 
-The implemented capture path is an explicit mutable capture bag:
+The stable capture path is an explicit mutable capture bag:
 
 ```csharp
 var bag = new MonsterProbeCapture { MonsterId = "monster-2" };
@@ -188,6 +213,12 @@ generated IR locals. If any bag property is assigned, the anonymous kernel retur
 `Record([returnValue, syncOut0, …])`; the interceptor decodes the response and writes each sync-out value
 back onto the same bag object after the await. This is more explicit than closure-local capture, but it is
 reflection-free, compiler-stable, and works with the interceptor parameter-shape rules.
+
+The convenience capture path uses closure-`Target` reflection. The generator uses Roslyn data-flow to find
+captured locals/parameters, emits IR parameters with their source symbol names, and emits interceptor helpers
+that read/write fields with those names from `lambda.Target`. If the compiler does not expose a matching
+closure field, the interceptor throws a clear `NotSupportedException` and the caller should switch to the
+explicit capture bag.
 
 ### Generated interceptor (no-capture)
 
@@ -215,6 +246,12 @@ internal static async ValueTask<int> InvokeAsync_0(
 
 The response is a `Record([returnValue, syncOut0, …])`. The interceptor splits it, assigns each sync-out
 field back to the caller-provided bag object, then returns the decoded return value.
+
+### Implicit-capture sync-out addition
+
+The response shape is the same `Record([returnValue, syncOut0, …])`. The interceptor splits it, writes each
+sync-out field back through the generated `__WriteCapture(lambda, "<symbol>", value)` helper, then returns the
+decoded return value.
 
 ---
 
@@ -330,6 +367,7 @@ refactored to call it.
 
 - **Phase 2:** detection + receiver guard + lambda-shape validation + no-capture body lowering + anonymous
   package + interceptor + concurrency-safe install + attribute dedup.
+- **Phase 2b:** reflection-backed implicit local/parameter captures on the lambda-only overload.
 - **Phase 3:** explicit mutable capture-bag sync-in/out via record argument plus response record envelope.
 - **Phase 4:** object-returning host binding via flat `world.GetMonster(id)`, Record-typed
   `BindingDescriptor`, and member access through `record.get`.
@@ -347,4 +385,5 @@ refactored to call it.
 `DotBoxDGenerationNames.Metadata.KernelInvocationSurfaceType`,
 `DotBoxDGenerationNames.Metadata.KernelInvocationDelegateType`, `RemoteKernelControl` members
 (`InvokeAsync<TReturn>` stub, capture-bag `InvokeAsync<TCaptures,TReturn>` stub, `WireClient`,
-`EnsureAnonymousKernelAsync`), and the sample `world.GetMonster(id)` snapshot binding.
+`EnsureAnonymousKernelAsync`), reflection capture helpers in generated interceptors, and the sample
+`world.GetMonster(id)` snapshot binding.

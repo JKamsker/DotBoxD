@@ -48,22 +48,27 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
-    public void Captured_lambda_is_ignored_until_capture_marshalling_strategy_is_corrected()
+    public void Implicit_capture_generates_reflection_arguments_and_sync_out()
     {
         var result = RunGenerator(UsageSource("""
             public static ValueTask<int> Run(RemoteKernelControl kernels)
             {
                 var monsterId = "monster-1";
+                var lastHealth = 0;
                 return kernels.InvokeAsync((IGameWorldAccess world) =>
                 {
-                    return world.GetHealth(monsterId);
+                    lastHealth = world.GetHealth(monsterId);
+                    return lastHealth;
                 });
             }
             """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
 
-        Assert.DoesNotContain(
-            result.GeneratedTrees,
-            tree => tree.ToString().Contains("InvokeAsync_", StringComparison.Ordinal));
+        Assert.Contains("InvokeAsync_", source, StringComparison.Ordinal);
+        Assert.Contains("__ReadCapture<", source, StringComparison.Ordinal);
+        Assert.Contains("__WriteCapture(lambda, \"lastHealth\"", source, StringComparison.Ordinal);
+        Assert.Contains("\\\"name\\\":\\\"monsterId\\\"", source, StringComparison.Ordinal);
+        Assert.Contains("\\\"name\\\":\\\"lastHealth\\\"", source, StringComparison.Ordinal);
     }
 
     [Fact]

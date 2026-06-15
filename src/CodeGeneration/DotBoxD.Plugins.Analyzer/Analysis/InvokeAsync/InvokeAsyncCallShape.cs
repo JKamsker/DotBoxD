@@ -12,6 +12,7 @@ internal sealed partial class InvokeAsyncCallShape
         BlockSyntax block,
         ITypeSymbol returnType,
         ITypeSymbol? captureType,
+        bool usesReflectionCaptures,
         string parametersJson,
         string returnTypeJson,
         string argumentsExpression,
@@ -22,6 +23,7 @@ internal sealed partial class InvokeAsyncCallShape
         Block = block;
         ReturnType = returnType;
         CaptureType = captureType;
+        UsesReflectionCaptures = usesReflectionCaptures;
         ParametersJson = parametersJson;
         ReturnTypeJson = returnTypeJson;
         ArgumentsExpression = argumentsExpression;
@@ -35,6 +37,8 @@ internal sealed partial class InvokeAsyncCallShape
     public ITypeSymbol ReturnType { get; }
 
     public ITypeSymbol? CaptureType { get; }
+
+    public bool UsesReflectionCaptures { get; }
 
     public string ParametersJson { get; }
 
@@ -58,10 +62,9 @@ internal sealed partial class InvokeAsyncCallShape
         if (arguments.Count == 1 && method.TypeArguments.Length == 1 &&
             TryLambda(arguments[0].Expression, out var lambda) &&
             lambda.Body is BlockSyntax block &&
-            HasWorldParameter(lambda, model, cancellationToken) &&
-            !HasExternalCaptures(lambda, model))
+            HasWorldParameter(lambda, model, cancellationToken))
         {
-            return NoCapture(block, method.TypeArguments[0]);
+            return LambdaOnly(lambda, block, method.TypeArguments[0], model);
         }
 
         if (arguments.Count == 2 && method.TypeArguments.Length == 2 &&
@@ -84,6 +87,7 @@ internal sealed partial class InvokeAsyncCallShape
             block,
             returnType,
             captureType: null,
+            usesReflectionCaptures: false,
             parametersJson: "[]",
             returnTypeJson: DotBoxDRpcTypeMapper.JsonType(returnType),
             argumentsExpression: "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
@@ -103,6 +107,7 @@ internal sealed partial class InvokeAsyncCallShape
             block,
             returnType,
             captureParameter.Type,
+            usesReflectionCaptures: false,
             CaptureParametersJson(captureParameter),
             returnTypeJson,
             CaptureArgumentsExpression(captureParameter.Type),
@@ -184,32 +189,7 @@ internal sealed partial class InvokeAsyncCallShape
                StringComparison.Ordinal);
 
     private static bool HasExternalCaptures(LambdaExpressionSyntax lambda, SemanticModel model)
-    {
-        if (lambda.Body is not BlockSyntax block ||
-            lambda is not ParenthesizedLambdaExpressionSyntax parenthesized)
-        {
-            return true;
-        }
-
-        var allowed = parenthesized.ParameterList.Parameters
-            .Select(parameter => model.GetDeclaredSymbol(parameter))
-            .Where(static symbol => symbol is not null)
-            .ToArray();
-        if (model.AnalyzeDataFlow(block) is not { Succeeded: true } flow)
-        {
-            return true;
-        }
-
-        foreach (var symbol in flow.DataFlowsIn.Concat(flow.DataFlowsOut))
-        {
-            if (!allowed.Any(allowedSymbol => SymbolEqualityComparer.Default.Equals(allowedSymbol, symbol)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        => ImplicitCaptureSet.Create(lambda, model) is { HasExternalCaptures: true };
 
     private static string BuildReturnTypeJson(ITypeSymbol returnType, IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
     {
@@ -232,7 +212,7 @@ internal sealed partial class InvokeAsyncCallShape
 internal sealed record InvokeAsyncCaptureParameter(string Name, INamedTypeSymbol Type);
 
 internal sealed record InvokeAsyncSyncOut(
-    string PropertyName,
+    string TargetName,
     ITypeSymbol Type,
     string LocalName,
-    MemberAccessExpressionSyntax Initializer);
+    ExpressionSyntax? Initializer);

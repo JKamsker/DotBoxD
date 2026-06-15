@@ -112,6 +112,17 @@ internal static class Program
             }).ConfigureAwait(false);
         Console.WriteLine($"[plugin] invoke async capture bag {capture.MonsterId} => {monsterName} hp={capture.LastHealth}.");
 
+        var implicitMonsterId = "monster-2";
+        var implicitLastHealth = 0;
+        var implicitMonsterName = await server.Kernels.InvokeAsync((IGameWorldAccess world) =>
+        {
+            var monster = world.GetMonster(implicitMonsterId);
+            implicitLastHealth = monster.Health;
+            return monster.Name;
+        }).ConfigureAwait(false);
+        Console.WriteLine(
+            $"[plugin] invoke async implicit capture {implicitMonsterId} => {implicitMonsterName} hp={implicitLastHealth}.");
+
         // Hold the connection open so the kernels stay owned and live while the server runs its
         // with-plugin phase. When the server signals shutdown this returns and we disconnect, at which
         // point the server unloads our kernels (ownership = connection lifetime).
