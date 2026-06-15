@@ -93,6 +93,18 @@ internal static class BindingCallEmitter
     private static bool CanEmitCompiledBinding(BindingSignature binding)
         => CanEmitGenericRuntimeStub(binding) || CanEmitDirectRuntimeMethod(binding);
 
+    // SECURITY-SENSITIVE GATE. This admits ANY binding whose compiled descriptor is a CompiledRuntime
+    // "RuntimeStub" pointing at CallBinding — regardless of its RequiredCapability, Safety, Effects, or
+    // AuditLevel. There is deliberately NO compile-time capability/effects/audit check here: a binding
+    // routed through CallBinding is dispatched at runtime by CompiledBindingDispatcher.CallBinding /
+    // CallBinding2, which perform the SAME capability check (ChargeBindingCall), quota and return
+    // charging, and success/failure audit as the interpreter. That runtime dispatch is therefore the
+    // SOLE gate for compiled side-effecting bindings (verified by the differential parity suite under
+    // tests/.../Compiled/SideEffectParity). Consequence: binding REGISTRATION is security-sensitive —
+    // giving a descriptor a CallBinding stub makes it compilable with no compile-time fence, so the
+    // descriptor's capability/effects/audit metadata must be correct and is what gets enforced. The
+    // pure direct-runtime path below stays restricted to capability-free PureIntrinsic Cpu/Alloc
+    // methods. See PR #27 and #32 (binding-registration safety note).
     private static bool CanEmitGenericRuntimeStub(BindingSignature binding)
         => binding.Compiled.Kind == "RuntimeStub" &&
            binding.Compiled.Type == typeof(CompiledRuntime).FullName &&
