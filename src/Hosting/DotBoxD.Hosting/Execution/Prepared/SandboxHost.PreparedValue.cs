@@ -69,13 +69,12 @@ public sealed partial class SandboxHost
                     options,
                     out var allowedBindings))
             {
-                var fullResult = await CompiledExecutionRunner.ExecuteAsync(
-                        executable,
-                        plan,
-                        entrypoint,
-                        input,
-                        options,
-                        cancellationToken)
+                var execution = ShouldUseCompiledAsyncWorker(plan, entrypoint)
+                    ? CompiledExecutionRunner.ExecuteOnWorkerAsync(
+                        executable, plan, entrypoint, input, options, cancellationToken)
+                    : CompiledExecutionRunner.ExecuteAsync(
+                        executable, plan, entrypoint, input, options, cancellationToken);
+                var fullResult = await execution
                     .ConfigureAwait(false);
                 return PreparedExecutionResult.FromResult(Publish(fullResult));
             }

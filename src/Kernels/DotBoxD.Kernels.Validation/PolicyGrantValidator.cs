@@ -121,8 +121,14 @@ internal static class PolicyGrantValidator
             case "file.write":
                 ValidateFileGrant(grant, diagnostics, allowWriteFlags: true);
                 break;
-            case "time.now" or "random" or "log.write":
+            case "time.now" or "random" or "log.write" or RuntimeCapabilityIds.Async:
                 RequireAllowedKeys(grant, diagnostics, NoAllowedParameterKeys);
+                break;
+            case RuntimeCapabilityIds.Reentrant:
+                RequireAllowedKeys(grant, diagnostics, NoAllowedParameterKeys);
+                diagnostics.Add(new SandboxDiagnostic(
+                    "E-POLICY-GRANT",
+                    $"grant '{RuntimeCapabilityIds.Reentrant}' is not supported until intra-kernel reentrancy ships"));
                 break;
             default:
                 if (bindings.TryGetCapabilityGrantValidator(grant.Id, out var validator))

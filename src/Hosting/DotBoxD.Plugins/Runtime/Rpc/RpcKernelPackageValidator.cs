@@ -71,6 +71,14 @@ internal static class RpcKernelPackageValidator
                     $"Plugin manifest effects '{manifestEffects}' do not match verified entrypoint effects '{analysis.Effects}'."));
             }
 
+            if ((analysis.Effects & SandboxEffect.Concurrency) != 0 &&
+                !plan.Policy.GrantsCapability(RuntimeCapabilityIds.Async))
+            {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK043",
+                    $"Plugin requires async but policy does not grant '{RuntimeCapabilityIds.Async}'."));
+            }
+
             if (!analysis.ReturnType.IsKnown() || analysis.ReturnType.IsForbidden())
             {
                 diagnostics.Add(new SandboxDiagnostic("DBXK072", $"Kernel RPC return type '{analysis.ReturnType}' is not supported."));

@@ -175,7 +175,7 @@ public sealed class PluginPackageJsonTests
             "pluginId": "json-fire-damage",
             "contract": "IEventKernel<DamageEvent>",
             "mode": "Interpreted",
-            "effects": ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+            "effects": ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
             "liveSettings": [{{liveSettings}}],
             "subscriptions": [
               { "event": "DamageEvent", "kernel": "JsonDamageKernel" }

@@ -117,7 +117,7 @@ public sealed class PluginInputAllocationTests
                 "input-build",
                 "IEventKernel<IndexOnlyEvent>",
                 ExecutionMode.Interpreted,
-                ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+                ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
                 [new LiveSettingDefinition("Enabled", "bool", true)],
                 [new HookSubscriptionManifest(nameof(IndexOnlyEvent), "InputBuildKernel")]),
             new SandboxModule(

@@ -1,4 +1,5 @@
 using System.Globalization;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -61,6 +62,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             foreach (var effect in binding.Effects)
             {
                 _effects.Add(effect);
+            }
+
+            if (binding.Effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+            {
+                _capabilities.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
             }
 
             var args = new List<string>();

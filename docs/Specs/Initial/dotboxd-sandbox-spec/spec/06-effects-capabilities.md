@@ -161,8 +161,9 @@ Examples:
 | `math.sqrt` | `Cpu` |
 | `clock.now` | `Cpu | Time` |
 | `random.next` | `Cpu | Random` |
-| `file.readText` | `Cpu | Alloc | FileRead` |
+| `file.readText` | `Cpu | Alloc | FileRead | Concurrency` |
 | `log.info` / `log.warn` | `Cpu | Audit` |
+| `host.message.send` | `Cpu | Alloc | HostStateWrite | Concurrency | Audit` |
 | `game.inventory.grant` | `Cpu | HostStateWrite | Audit` |
 
 Function effects are the union of all reachable operation effects.

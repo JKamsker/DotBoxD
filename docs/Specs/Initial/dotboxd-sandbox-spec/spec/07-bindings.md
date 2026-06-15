@@ -87,7 +87,8 @@ Example:
   "version": "1.0.0",
   "parameters": ["SandboxPath"],
   "returnType": "String",
-  "effects": ["Cpu", "Alloc", "FileRead"],
+  "effects": ["Cpu", "Alloc", "FileRead", "Concurrency"],
+  "isAsync": true,
   "requiredCapability": "file.read",
   "costModel": {
     "baseFuel": 50,

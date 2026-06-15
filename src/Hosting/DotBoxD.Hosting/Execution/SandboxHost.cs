@@ -265,7 +265,10 @@ public sealed partial class SandboxHost : IDisposable
         try
         {
             var executable = await _compiled.GetAsync(plan, entrypoint, cancellationToken).ConfigureAwait(false);
-            var result = await CompiledExecutionRunner.ExecuteAsync(executable, plan, entrypoint, input, options, cancellationToken)
+            var execution = ShouldUseCompiledAsyncWorker(plan, entrypoint)
+                ? CompiledExecutionRunner.ExecuteOnWorkerAsync(executable, plan, entrypoint, input, options, cancellationToken)
+                : CompiledExecutionRunner.ExecuteAsync(executable, plan, entrypoint, input, options, cancellationToken);
+            var result = await execution
                 .ConfigureAwait(false);
             return new CompiledAttempt(result, null);
         }

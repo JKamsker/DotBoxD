@@ -1,3 +1,4 @@
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -225,8 +226,9 @@ public sealed class SafeFileSystemTests
         var module = await host.ImportJsonAsync(FileWriteJson("missing.txt", "new"));
         var policy = new SandboxPolicy(
             "direct-file-write",
-            SandboxEffects.Pure | SandboxEffect.FileWrite | SandboxEffect.Audit,
+            SandboxEffects.Pure | SandboxEffect.FileWrite | SandboxEffect.Concurrency | SandboxEffect.Audit,
             [
+                new CapabilityGrant(RuntimeCapabilityIds.Async, new Dictionary<string, string>()),
                 new CapabilityGrant("file.write", new Dictionary<string, string>
                 {
                     ["root"] = temp.Path,

@@ -49,6 +49,12 @@ internal static class PolicyResolver
         }
 
         if (policy.Deterministic) {
+            if (policy.GrantsCapability(RuntimeCapabilityIds.Async, now)) {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "E-POLICY-DETERMINISM",
+                    "deterministic policy cannot grant runtime async until serialized async limits are configurable"));
+            }
+
             if ((requiredEffects & SandboxEffect.Time) != 0 && policy.LogicalNow is null) {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-DETERMINISM", "deterministic policy requires logical time for Time effects"));
             }

@@ -137,7 +137,7 @@ public sealed class PluginRevocationTests
                 "revocation-blocking",
                 "IEventKernel<BlockingEvent>",
                 ExecutionMode.Interpreted,
-                ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+                ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
                 [],
                 [new HookSubscriptionManifest(nameof(BlockingEvent), "BlockingKernel")]),
             new SandboxModule(

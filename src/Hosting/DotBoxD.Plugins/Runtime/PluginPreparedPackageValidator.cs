@@ -27,6 +27,7 @@ internal static class PluginPreparedPackageValidator
                 $"Plugin manifest effects '{manifestEffects}' do not match verified entrypoint effects '{planEffects}'."));
         }
 
+        ValidateAsyncCapability(package, plan, diagnostics);
         var contractEvent = ValidateContract(package, diagnostics);
         ValidatePreparedEntrypoints(package, plan, events, contractEvent, diagnostics);
         ThrowIfErrors(diagnostics);
@@ -47,6 +48,31 @@ internal static class PluginPreparedPackageValidator
 
         return effects;
     }
+
+    private static void ValidateAsyncCapability(
+        PluginPackage package,
+        ExecutionPlan plan,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (!EntrypointRequiresAsync(package.Entrypoints.ShouldHandle, plan) &&
+            !EntrypointRequiresAsync(package.Entrypoints.Handle, plan))
+        {
+            return;
+        }
+
+        if (plan.Policy.GrantsCapability(RuntimeCapabilityIds.Async))
+        {
+            return;
+        }
+
+        diagnostics.Add(new SandboxDiagnostic(
+            "DBXK043",
+            $"Plugin requires async but policy does not grant '{RuntimeCapabilityIds.Async}'."));
+    }
+
+    private static bool EntrypointRequiresAsync(string entrypoint, ExecutionPlan plan)
+        => plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis) &&
+           (analysis.Effects & SandboxEffect.Concurrency) != 0;
 
     private static string? ValidateContract(PluginPackage package, List<SandboxDiagnostic> diagnostics)
     {

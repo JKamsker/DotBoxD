@@ -363,10 +363,20 @@ internal sealed class FunctionAnalyzer
         {
             CheckArguments(call, binding.Parameters, scope, ref effects, ref canReorder, recordCapabilities);
             effects |= binding.Effects;
+            if (binding.IsAsync)
+            {
+                effects |= SandboxEffect.Concurrency;
+            }
+
             canReorder &= CanReorderBinding(binding);
             if (recordCapabilities && binding.RequiredCapability is not null)
             {
                 RequiredCapabilities.Add(binding.RequiredCapability);
+            }
+
+            if (recordCapabilities && binding.IsAsync)
+            {
+                RequiredCapabilities.Add(RuntimeCapabilityIds.Async);
             }
 
             return binding.ReturnType;

@@ -1,6 +1,7 @@
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -155,7 +156,7 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         PluginPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
+        var plan = await PreparePluginPlanAsync(package, policy ?? _defaultPolicy, cancellationToken)
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
@@ -171,7 +172,7 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         RpcKernelPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
+        var plan = await PreparePluginPlanAsync(package, policy ?? _defaultPolicy, cancellationToken)
             .ConfigureAwait(false);
         RpcKernelPackageValidator.ValidatePrepared(package, plan);
         // RPC kernels honor the server's execution mode like event kernels — their record/list IR
@@ -179,6 +180,53 @@ public sealed partial class PluginServer : IDisposable
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
         Kernels.Add(kernel);
         return kernel;
+    }
+
+    private async ValueTask<ExecutionPlan> PreparePluginPlanAsync(
+        PluginPackage package,
+        SandboxPolicy policy,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _host.PrepareAsync(package.Module, policy, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (SandboxValidationException ex) when (HasAsyncPolicyDenial(ex.Diagnostics))
+        {
+            throw new SandboxValidationException(AppendAsyncPolicyDiagnostic(ex.Diagnostics));
+        }
+    }
+
+    private static bool HasAsyncPolicyDenial(IReadOnlyList<SandboxDiagnostic> diagnostics)
+    {
+        for (var i = 0; i < diagnostics.Count; i++)
+        {
+            var diagnostic = diagnostics[i];
+            if (diagnostic.Code is "E-POLICY-CAP" or "E-POLICY-EFFECT" &&
+                (diagnostic.Message.Contains(RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
+                 diagnostic.Message.Contains(nameof(SandboxEffect.Concurrency), StringComparison.Ordinal)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IReadOnlyList<SandboxDiagnostic> AppendAsyncPolicyDiagnostic(
+        IReadOnlyList<SandboxDiagnostic> diagnostics)
+    {
+        var copy = new SandboxDiagnostic[diagnostics.Count + 1];
+        for (var i = 0; i < diagnostics.Count; i++)
+        {
+            copy[i] = diagnostics[i];
+        }
+
+        copy[^1] = new SandboxDiagnostic(
+            "DBXK043",
+            $"Plugin requires async but policy does not grant '{RuntimeCapabilityIds.Async}'.");
+        return copy;
     }
 
     /// <summary>

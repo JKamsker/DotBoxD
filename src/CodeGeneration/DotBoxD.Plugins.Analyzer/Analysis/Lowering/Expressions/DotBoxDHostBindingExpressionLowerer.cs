@@ -73,6 +73,11 @@ internal static class DotBoxDHostBindingExpressionLowerer
             }
         }
 
+        if (effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+        {
+            context.Capabilities?.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
+        }
+
         var source =
             $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(bindingId)}, " +
             $"[{string.Join(", ", loweredSources)}], null, Span)";

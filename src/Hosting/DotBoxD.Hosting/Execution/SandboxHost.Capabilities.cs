@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Runtime;
 
 namespace DotBoxD.Hosting.Execution;
@@ -53,15 +54,46 @@ public sealed partial class SandboxHost
 
         foreach (var bindingId in bindingReferences)
         {
-            if (plan.Bindings.TryGet(bindingId, out var binding) &&
-                binding.RequiredCapability is not null)
+            if (!plan.Bindings.TryGet(bindingId, out var binding))
+            {
+                continue;
+            }
+
+            if (binding.RequiredCapability is not null)
             {
                 required.Add(binding.RequiredCapability);
+            }
+
+            if (binding.IsAsync)
+            {
+                required.Add(RuntimeCapabilityIds.Async);
             }
         }
 
         return required;
     }
+
+    private static bool EntrypointHasAsyncBinding(ExecutionPlan plan, string entrypoint)
+    {
+        if (!plan.BindingReferences.TryGetValue(entrypoint, out var bindingReferences))
+        {
+            return false;
+        }
+
+        foreach (var bindingId in bindingReferences)
+        {
+            if (plan.Bindings.TryGet(bindingId, out var binding) && binding.IsAsync)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ShouldUseCompiledAsyncWorker(ExecutionPlan plan, string entrypoint)
+        => plan.Policy.GrantsCapability(RuntimeCapabilityIds.Async) &&
+           EntrypointHasAsyncBinding(plan, entrypoint);
 
     private static void ValidateCapabilityId(string capabilityId)
     {

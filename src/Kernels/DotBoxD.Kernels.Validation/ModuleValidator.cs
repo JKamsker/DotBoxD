@@ -84,10 +84,19 @@ public sealed class ModuleValidator
 
             foreach (var bindingId in references)
             {
-                if (bindings.TryGet(bindingId, out var binding) &&
-                    binding.RequiredCapability is not null)
+                if (!bindings.TryGet(bindingId, out var binding))
+                {
+                    continue;
+                }
+
+                if (binding.RequiredCapability is not null)
                 {
                     required.Add(binding.RequiredCapability);
+                }
+
+                if (binding.IsAsync)
+                {
+                    required.Add(RuntimeCapabilityIds.Async);
                 }
             }
         }

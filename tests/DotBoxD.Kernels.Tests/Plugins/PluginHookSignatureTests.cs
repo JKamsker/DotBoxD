@@ -177,7 +177,7 @@ public sealed class PluginHookSignatureTests
                 "convention-record-adapter",
                 "IEventKernel<ConventionRecordEvent>",
                 ExecutionMode.Interpreted,
-                ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+                ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
                 [],
                 [new HookSubscriptionManifest(nameof(ConventionRecordEvent), "ConventionRecordKernel")]),
             new SandboxModule(
@@ -239,7 +239,7 @@ public sealed class PluginHookSignatureTests
                 "convention-adapter",
                 "IEventKernel<ConventionDamageEvent>",
                 ExecutionMode.Interpreted,
-                ["Cpu", "Alloc", "HostStateWrite", "Audit"],
+                ["Cpu", "Alloc", "HostStateWrite", "Concurrency", "Audit"],
                 [],
                 [new HookSubscriptionManifest(nameof(ConventionDamageEvent), "ConventionKernel")]),
             new SandboxModule(

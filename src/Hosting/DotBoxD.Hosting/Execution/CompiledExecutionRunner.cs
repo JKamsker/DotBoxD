@@ -28,6 +28,28 @@ internal static class CompiledExecutionRunner
                 cancellationToken);
         }
 
+        return ValueTask.FromResult(ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
+    }
+
+    public static ValueTask<SandboxExecutionResult> ExecuteOnWorkerAsync(
+        CompiledExecutable executable,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+        => CompiledAsyncWorker.RunAsync(
+            () => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
+
+    private static SandboxExecutionResult ExecuteCore(
+        CompiledExecutable executable,
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxValue input,
+        SandboxExecutionOptions options,
+        CancellationToken cancellationToken)
+    {
+        var artifact = executable.Artifact;
         var runId = options.RunId ?? SandboxRunId.New();
         var audit = new InMemoryAuditSink();
         var budget = new ResourceMeter(plan.Budget);
@@ -56,24 +78,24 @@ internal static class CompiledExecutionRunner
                 WriteSummary(audit, runId, startedAt, plan, executable, budget, true, null);
             }
 
-            return ValueTask.FromResult(Result(plan, artifact, budget, audit, true, value, null));
+            return Result(plan, artifact, budget, audit, true, value, null);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "execution cancelled");
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
-            return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, error));
+            return Result(plan, artifact, budget, audit, false, null, error);
         }
         catch (SandboxRuntimeException ex)
         {
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, ex.Error);
-            return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, ex.Error));
+            return Result(plan, artifact, budget, audit, false, null, ex.Error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "compiled sandbox execution failed");
             WriteSummary(audit, runId, startedAt, plan, executable, budget, false, error);
-            return ValueTask.FromResult(Result(plan, artifact, budget, audit, false, null, error));
+            return Result(plan, artifact, budget, audit, false, null, error);
         }
     }
 

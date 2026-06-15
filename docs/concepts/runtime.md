@@ -20,8 +20,8 @@ Every run is bounded by a `SandboxPolicy`:
 - **list/collection cardinality** and **output-byte** budgets,
 - **capability grants** (e.g. `file.read`, `net.http.get`) with parameters, expiry, and per-capability
   quotas,
-- **effect** controls (Pure / Read / Write / ExternalCall / Time / Random / NonDeterministic), with a
-  deterministic mode (logical clock + seeded random) available.
+- **effect** controls (`Cpu`, `Alloc`, file/network/host effects, `Time`, `Random`, `Concurrency`,
+  `Audit`), with a deterministic mode (logical clock + seeded random) available.
 
 ## Effects & capabilities
 
@@ -30,3 +30,8 @@ pure computation, and only when the policy grants the matching capability. This 
 author-supplied logic safe to run in-process. See
 [security/sandbox-caveats.md](../security/sandbox-caveats.md) and the full specification under
 [`docs/Specs/`](../Specs/).
+
+Async-capable bindings are opt-in. A binding marked `BindingDescriptor.IsAsync` adds the
+`Concurrency` effect and requires the `dotboxd.runtime.async` runtime capability. Hosts grant it with
+`SandboxPolicyBuilder.AllowRuntimeAsync()`; without that grant, preparation fails closed and the
+runtime backstop rejects genuinely pending `ValueTask` results.
