@@ -1,7 +1,7 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Policies;
 
-using DotBoxD.Kernels;
-using DotBoxD.Plugins;
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 internal static class PluginExamplePolicies
 {

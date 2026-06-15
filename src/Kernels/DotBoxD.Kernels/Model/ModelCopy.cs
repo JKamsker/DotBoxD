@@ -1,6 +1,7 @@
-namespace DotBoxD.Kernels;
-
 using System.Collections.ObjectModel;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Model;
 
 internal static class ModelCopy
 {

@@ -1,7 +1,7 @@
 using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 /// <summary>
 /// KernelPackageRegistry resolves a kernel CLR type to its analyzer-generated package — by an

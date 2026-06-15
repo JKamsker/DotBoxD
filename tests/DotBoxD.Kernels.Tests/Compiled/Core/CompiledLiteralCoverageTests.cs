@@ -1,4 +1,11 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledLiteralCoverageTests
 {

@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Example.Hosting.Examples;
+
 Console.WriteLine("Safe IR hosting examples");
 
 await ValueBindingExample.RunAsync();

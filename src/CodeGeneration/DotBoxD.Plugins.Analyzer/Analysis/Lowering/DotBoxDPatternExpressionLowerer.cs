@@ -1,7 +1,8 @@
-namespace DotBoxD.Plugins.Analyzer;
-
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDPatternExpressionLowerer
 {

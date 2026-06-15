@@ -1,8 +1,9 @@
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Interpreter;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Execution;
 
 public sealed class BackendIsolationTests
 {

@@ -1,6 +1,10 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 // Regression coverage for CMP-0020: DotBoxD.Kernels ships sandbox-visible logging bindings and log
 // quotas, but there was no standalone runtime proof that a host registers log.info/log.warn,

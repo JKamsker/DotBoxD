@@ -1,8 +1,8 @@
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0032: class-shaped live kernel state caches its
@@ -37,9 +37,9 @@ public sealed class Fix_PAL_0032_Tests
             });
 
             Assert.Equal(expected, kernel.Value.MinDamage);
-            Assert.Equal(expectedType, kernel.Value.DamageType);
+            Assert.Equal(expectedType, (string?)kernel.Value.DamageType);
             Assert.Equal(expected, kernel.Kernel.Value.Get<int>("MinDamage"));
-            Assert.Equal(expectedType, kernel.Kernel.Value.Get<string>("DamageType"));
+            Assert.Equal(expectedType, (string?)kernel.Kernel.Value.Get<string>("DamageType"));
         }
     }
 
@@ -59,7 +59,7 @@ public sealed class Fix_PAL_0032_Tests
             ["MinDamage"] = 250
         });
 
-        Assert.Equal("ice", kernel.Value.DamageType);
+        Assert.Equal((string?)"ice", (string?)kernel.Value.DamageType);
         Assert.Equal(250, kernel.Value.MinDamage);
     }
 
@@ -83,7 +83,7 @@ public sealed class Fix_PAL_0032_Tests
 
         var message = Assert.Single(messages.Messages);
         Assert.Equal("player-3", message.TargetId);
-        Assert.Equal("ice", kernel.Kernel.Value.Get<string>("DamageType"));
+        Assert.Equal((string?)"ice", (string?)kernel.Kernel.Value.Get<string>("DamageType"));
         Assert.Equal(200, kernel.Kernel.Value.Get<int>("MinDamage"));
     }
 }

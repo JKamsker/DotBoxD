@@ -1,4 +1,5 @@
 using AgentQueue;
+using AgentQueue.Core;
 
 namespace AgentQueue.Tests;
 

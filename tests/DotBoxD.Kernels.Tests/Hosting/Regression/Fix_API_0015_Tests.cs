@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using DotBoxD.Kernels.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 // Regression coverage for API-0015: the generated-runtime facade ships without a
 // public support boundary. CompiledRuntime is a verifier/compiler-owned ABI for

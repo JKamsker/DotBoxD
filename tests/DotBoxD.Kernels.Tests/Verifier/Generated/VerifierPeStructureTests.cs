@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Generated;
 
 public sealed class VerifierPeStructureTests
 {

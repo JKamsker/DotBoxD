@@ -1,9 +1,12 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierMethodShapeTests
 {
@@ -128,14 +131,14 @@ public sealed class VerifierMethodShapeTests
             fnIl.Emit(OpCodes.Call, function);
             fnIl.Emit(OpCodes.Pop);
             fnIl.Emit(OpCodes.Ldarg_0);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
             fnIl.Emit(OpCodes.Ldarg_0);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
             fnIl.Emit(OpCodes.Ldarg_0);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
             fnIl.Emit(OpCodes.Ldc_I4_0);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Ret);
 
             var execute = type.DefineMethod(
@@ -146,7 +149,7 @@ public sealed class VerifierMethodShapeTests
             var il = execute.GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Call, function);
             il.Emit(OpCodes.Ret);

@@ -1,7 +1,12 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Wave9Fixes;
 
 /// <summary>
 /// Regression coverage for PAL-0034: forwarding audit events to host observers must not

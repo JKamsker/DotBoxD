@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// A wall-time <see cref="CancellationTokenSource"/> that is reused for the
@@ -11,7 +13,7 @@ namespace DotBoxD.Kernels;
 /// <remarks>
 /// Dispatchers dispose the source they receive in their <c>finally</c> block.
 /// This type makes <see cref="Dispose(bool)"/> a no-op so the shared instance
-/// survives those calls and stays reusable. The owning <see cref="SandboxContext"/>
+/// survives those calls and stays reusable. The owning <see cref="Sandbox.SandboxContext"/>
 /// arms the deadline timer via <see cref="ArmDeadline"/> before each dispatch,
 /// which reuses the internal timer (no per-call allocation) instead of creating
 /// a new source. Once the deadline fires, the enforcing <c>Timeout</c> error

@@ -1,8 +1,8 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 // Compiled fast path for `forRange { <i64 assigns> }` (i32 loop variable, i64 assignment targets). Emits the
 // body as unboxed raw i64 (RawI64ExpressionPlan) with one bulk loop-iteration meter, matching the general

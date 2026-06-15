@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.EndToEnd;
 
 using DotBoxD.Hosting;
@@ -55,15 +59,15 @@ public sealed class CartTotalKernel : IDisposable
     }
     """;
 
-    private readonly SandboxHost _host;
+    private readonly Hosting.Execution.SandboxHost _host;
     private ExecutionPlan? _plan;
 
-    private CartTotalKernel(SandboxHost host) => _host = host;
+    private CartTotalKernel(Hosting.Execution.SandboxHost host) => _host = host;
 
     /// <summary>Builds the host with the default pure bindings and the interpreter execution engine.</summary>
     public static CartTotalKernel Create()
     {
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();

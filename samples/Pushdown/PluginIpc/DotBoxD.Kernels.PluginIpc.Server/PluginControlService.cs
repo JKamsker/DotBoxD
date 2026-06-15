@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Policies;
+
 namespace DotBoxD.Kernels.PluginIpc.Server;
 
 using System.Globalization;
@@ -9,12 +13,12 @@ using DotBoxD.Plugins;
 public sealed class PluginControlService : IPluginControlService
 {
     private readonly InMemoryPluginMessageSink _messages;
-    private readonly PluginServer _server;
+    private readonly Plugins.PluginServer _server;
     private readonly InstalledKernel _kernel;
 
     private PluginControlService(
         InMemoryPluginMessageSink messages,
-        PluginServer server,
+        Plugins.PluginServer server,
         InstalledKernel kernel)
     {
         _messages = messages;
@@ -25,7 +29,7 @@ public sealed class PluginControlService : IPluginControlService
     public static async ValueTask<PluginControlService> CreateAsync()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: PluginPolicy());
+        var server = Plugins.PluginServer.Create(messages, defaultPolicy: PluginPolicy());
         server.RegisterEventAdapter(DamageEventAdapter.Instance);
         var kernel = await server.InstallAsync(FireDamagePluginPackage.Create()).ConfigureAwait(false);
         server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();

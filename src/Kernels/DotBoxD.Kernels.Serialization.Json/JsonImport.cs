@@ -1,6 +1,8 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Serialization.Json;
 
 internal static class JsonImport
 {

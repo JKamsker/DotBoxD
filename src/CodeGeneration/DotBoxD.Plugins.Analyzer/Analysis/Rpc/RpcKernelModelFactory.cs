@@ -1,8 +1,10 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+
 using static DotBoxDRpcJsonLowerer;
 
 /// <summary>
@@ -153,8 +155,8 @@ internal static class RpcKernelModelFactory
 
         builder.Append("public static class ").AppendLine(PackageName(type.Name));
         builder.AppendLine("{");
-        builder.AppendLine("    public static global::DotBoxD.Plugins.PluginPackage Create()");
-        builder.Append("        => global::DotBoxD.Plugins.PluginPackageJsonSerializer.Import(\"")
+        builder.Append("    public static ").Append(TypeNames.GlobalPluginPackage).AppendLine(" Create()");
+        builder.Append("        => ").Append(TypeNames.GlobalPluginPackageJsonSerializer).Append(".Import(\"")
             .Append(json.Replace("\\", "\\\\").Replace("\"", "\\\""))
             .AppendLine("\");");
         builder.AppendLine("}");

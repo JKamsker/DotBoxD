@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Example.Capabilities.Examples;
+
 Console.WriteLine("Safe IR capabilities examples");
 
 await CustomBindingExample.RunAsync();

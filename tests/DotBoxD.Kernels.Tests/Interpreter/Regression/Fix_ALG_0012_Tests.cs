@@ -1,4 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 // Regression coverage for ALG-0012: the function analyzer now uses a parent-linked,
 // copy-on-write scope instead of cloning the full local dictionary per control-flow

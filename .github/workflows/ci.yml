@@ -155,6 +155,10 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/check-csharp-file-lines.ps1
 
+      - name: C# folder layout limits
+        shell: pwsh
+        run: ./eng/scripts/check-csharp-folder-layout.ps1
+
       - name: Spec manifest integrity
         shell: pwsh
         run: ./eng/scripts/check-spec-manifest.ps1

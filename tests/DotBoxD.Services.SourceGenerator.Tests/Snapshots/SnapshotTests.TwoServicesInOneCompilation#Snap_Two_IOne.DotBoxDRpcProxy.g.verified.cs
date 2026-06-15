@@ -9,18 +9,18 @@ namespace Snap.Two
     /// </summary>
     public sealed class OneProxy : global::Snap.Two.IOne, global::Snap.Two.IOneAsync
     {
-        private readonly global::DotBoxD.Services.IRpcInvoker _invoker;
+        private readonly global::DotBoxD.Services.Server.IRpcInvoker _invoker;
         /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>
         private readonly string? _instanceId;
 
-        public OneProxy(global::DotBoxD.Services.IRpcInvoker client)
+        public OneProxy(global::DotBoxD.Services.Server.IRpcInvoker client)
         {
             this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = null;
         }
 
         /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>
-        public OneProxy(global::DotBoxD.Services.IRpcInvoker client, string instanceId)
+        public OneProxy(global::DotBoxD.Services.Server.IRpcInvoker client, string instanceId)
         {
             this._invoker = client ?? throw new global::System.ArgumentNullException(nameof(client));
             this._instanceId = instanceId ?? throw new global::System.ArgumentNullException(nameof(instanceId));

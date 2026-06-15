@@ -1,17 +1,10 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using DotBoxD.Services.Serialization;
 using DotBoxD.Services.Server;
-using DotBoxD.Services.SourceGenerator.Tests;
-using Xunit;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Cov;
+namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
 /// <summary>
 /// Round1 regression test for DEFECT #2: the generated sub-service dispatch case has no

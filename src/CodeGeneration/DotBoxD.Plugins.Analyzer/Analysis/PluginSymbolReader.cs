@@ -1,8 +1,9 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using System.Globalization;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class PluginSymbolReader
 {

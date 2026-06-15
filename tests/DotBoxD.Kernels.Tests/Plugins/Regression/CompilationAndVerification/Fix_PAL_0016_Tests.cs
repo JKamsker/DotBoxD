@@ -1,8 +1,8 @@
-namespace DotBoxD.Kernels.Tests;
-
 using System.Reflection;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Runtime;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 /// <summary>
 /// Regression coverage for PAL-0016: compiler IL emission resolved every
@@ -20,15 +20,15 @@ using DotBoxD.Kernels.Runtime;
 public sealed class Fix_PAL_0016_Tests
 {
     [Theory]
-    [InlineData(nameof(CompiledRuntime.ChargeFuel))]
-    [InlineData(nameof(CompiledRuntime.ChargeLoopIteration))]
-    [InlineData(nameof(CompiledRuntime.EnterCall))]
-    [InlineData(nameof(CompiledRuntime.ExitCall))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.ChargeLoopIteration))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))]
     [InlineData(nameof(CompiledRuntime.TypeScalar))]
-    [InlineData(nameof(CompiledRuntime.AddI32))]
-    [InlineData(nameof(CompiledRuntime.CallBinding2))]
-    [InlineData(nameof(CompiledRuntime.ChargeValueArray))]
-    [InlineData(nameof(CompiledRuntime.CreateValueArray))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.AddI32))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.CallBinding2))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.ChargeValueArray))]
+    [InlineData(nameof(Kernels.Runtime.CompiledRuntime.CreateValueArray))]
     [InlineData(nameof(CompiledRuntime.ListOf))]
     public void Runtime_resolves_the_expected_runtime_helper(string name)
     {
@@ -50,9 +50,9 @@ public sealed class Fix_PAL_0016_Tests
     {
         // The whole point of the fix: emitting the same helper across many call sites must
         // reuse one cached MethodInfo rather than re-enumerating reflection metadata each time.
-        var first = IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.ChargeFuel));
-        var second = IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.ChargeFuel));
-        var third = IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.ChargeFuel));
+        var first = IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel));
+        var second = IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel));
+        var third = IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel));
 
         Assert.Same(first, second);
         Assert.Same(second, third);
@@ -61,12 +61,12 @@ public sealed class Fix_PAL_0016_Tests
     [Fact]
     public void Runtime_caches_each_helper_independently()
     {
-        var fuel = IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.ChargeFuel));
-        var enter = IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.EnterCall));
+        var fuel = IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel));
+        var enter = IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.EnterCall));
 
         Assert.NotSame(fuel, enter);
-        Assert.Same(fuel, IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.ChargeFuel)));
-        Assert.Same(enter, IlEmitterPrimitives.Runtime(nameof(CompiledRuntime.EnterCall)));
+        Assert.Same(fuel, IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel)));
+        Assert.Same(enter, IlEmitterPrimitives.Runtime(nameof(Kernels.Runtime.CompiledRuntime.EnterCall)));
     }
 
     [Fact]

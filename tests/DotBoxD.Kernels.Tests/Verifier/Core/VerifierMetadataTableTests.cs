@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierMetadataTableTests
 {

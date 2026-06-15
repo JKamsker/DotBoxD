@@ -1,6 +1,6 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
 /// <summary>
 /// The fluent hook-chain surface: Where/Select re-type and compose, InvokeLocal is the native host
@@ -15,7 +15,7 @@ public sealed class HookPipelineFluentTests
     public async Task Select_then_InvokeLocal_runs_the_native_terminal_with_the_projected_value()
     {
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages);
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages);
         server.Hooks.On<Ping>()
             .Select((p, ctx) => p.Value * 2)
             .InvokeLocal((doubled, ctx) => ctx.Messages.Send("monster-1", "v:" + doubled));
@@ -30,7 +30,7 @@ public sealed class HookPipelineFluentTests
     public async Task Staged_Where_short_circuits_the_terminal()
     {
         var messages = new InMemoryPluginMessageSink();
-        using var server = PluginServer.Create(messages);
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages);
         server.Hooks.On<Ping>()
             .Select((p, ctx) => p.Value)
             .Where((value, ctx) => value >= 100)
@@ -44,7 +44,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public async Task Publish_with_cancellable_token_exposes_that_token_to_handlers()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
         using var cts = new CancellationTokenSource();
         CancellationToken observed = default;
         server.Hooks.On<Ping>()
@@ -58,7 +58,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public async Task Async_filters_and_handlers_resume_in_order()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
         var observed = new List<string>();
         server.Hooks.On<Ping>()
             .Where(async (_, _) => {
@@ -84,7 +84,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public async Task Async_filter_false_still_short_circuits_handlers()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
         var handled = false;
         server.Hooks.On<Ping>()
             .Where(async (_, _) => {
@@ -101,7 +101,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public void InvokeKernel_lambda_throws_until_lowered()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
 
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.Hooks.On<Ping>().InvokeKernel((p, ctx) => ValueTask.CompletedTask));
@@ -112,7 +112,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public void Staged_InvokeKernel_lambda_throws_until_lowered()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
 
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.Hooks.On<Ping>()
@@ -125,7 +125,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public void Element_only_InvokeKernel_func_throws_until_lowered()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
 
         // The element-only Func<TEvent, ValueTask> terminal must throw just like the (e, ctx) form: it
         // can never run as host code (a verified terminal is reached only through the lowered IR).
@@ -138,7 +138,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public void Element_only_InvokeKernel_action_throws_until_lowered()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
 
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.Hooks.On<Ping>().InvokeKernel(p => { }));
@@ -149,7 +149,7 @@ public sealed class HookPipelineFluentTests
     [Fact]
     public void Staged_element_only_InvokeKernel_throws_until_lowered()
     {
-        using var server = PluginServer.Create();
+        using var server = DotBoxD.Plugins.PluginServer.Create();
 
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.Hooks.On<Ping>()

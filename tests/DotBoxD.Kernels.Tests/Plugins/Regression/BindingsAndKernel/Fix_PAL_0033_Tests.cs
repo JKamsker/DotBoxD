@@ -1,8 +1,9 @@
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0033: an installed plugin kernel must not retain
@@ -28,7 +29,7 @@ public sealed class Fix_PAL_0033_Tests
     public async Task ExecutionObservations_stay_bounded_across_many_runs()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(
+        var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
             executionMode: ExecutionMode.Interpreted);
@@ -47,7 +48,7 @@ public sealed class Fix_PAL_0033_Tests
 
         // Always-on last-execution diagnostic must still reflect the final run.
         Assert.NotNull(kernel.LastExecution);
-        Assert.Equal("Handle", kernel.LastExecution!.Entrypoint);
+        Assert.Equal((string?)"Handle", (string?)kernel.LastExecution!.Entrypoint);
 
         // Retained history must be bounded rather than scaling with event volume.
         Assert.True(
@@ -75,7 +76,7 @@ public sealed class Fix_PAL_0033_Tests
     private static async Task<int> RetainedObservationCountAsync(int eventCount)
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(
+        var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             defaultPolicy: PluginAddendumTestPolicies.LongWall(),
             executionMode: ExecutionMode.Interpreted);

@@ -1,9 +1,14 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests.Compiled.Core;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class BindingResolutionTests
 {
@@ -89,7 +94,7 @@ public sealed class BindingResolutionTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(999)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string DeadFunctionBindingJson()
         => """

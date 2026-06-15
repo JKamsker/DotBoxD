@@ -22,7 +22,7 @@ internal static class ValueArrayEmitter
         // the way a grouped store loop after a single charge would (which the verifier rejects for
         // calls with more than a handful of arguments).
         EmitInt32(il, arguments.Count);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CreateLiteralValueArray)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CreateLiteralValueArray)));
         for (var i = 0; i < arguments.Count; i++)
         {
             il.Emit(OpCodes.Dup);
@@ -33,6 +33,6 @@ internal static class ValueArrayEmitter
 
         il.Emit(OpCodes.Ldarg_0);
         EmitInt32(il, arguments.Count);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeValueArray)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeValueArray)));
     }
 }

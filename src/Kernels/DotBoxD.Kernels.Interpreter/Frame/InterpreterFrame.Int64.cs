@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Interpreter;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Frame;
 
 // Unboxed i64 slot access, mirroring the i32/f64 raw-slot accessors. Used by I64ExpressionPlan / I64ForLoopRunner.
 internal sealed partial class InterpreterFrame

@@ -1,10 +1,10 @@
-using DotBoxD.Kernels.Transport.Ipc;
+using System.Threading.Channels;
+using DotBoxD.Pushdown.Services;
 using DotBoxD.Services.Attributes;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Transport;
-using System.Threading.Channels;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class RpcIpcAddonTests
 {

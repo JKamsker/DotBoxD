@@ -1,7 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Audit;
 
 public sealed class BindingAuditConsistencyTests
 {
@@ -143,7 +148,7 @@ public sealed class BindingAuditConsistencyTests
                 WriteAudit(context, success: true, SandboxErrorCode.PermissionDenied);
                 return ValueTask.FromResult(SandboxValue.FromInt32(7));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static void WriteAudit(SandboxContext context, bool success, SandboxErrorCode? errorCode)
     {

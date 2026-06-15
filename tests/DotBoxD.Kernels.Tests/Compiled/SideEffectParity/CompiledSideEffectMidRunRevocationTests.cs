@@ -1,8 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Closes the "compiled artifact must not cache a stale capability grant" concern at the finest
@@ -130,6 +134,6 @@ public sealed class CompiledSideEffectMidRunRevocationTests
                     Fields: context.BindingAuditFields("revoke", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromString("player-1"));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             static (_, _) => { });
 }

@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins;
+namespace DotBoxD.Plugins.Runtime.Lifecycle;
 
 /// <summary>
 /// Resolves the effective cancellation token for a single kernel entrypoint

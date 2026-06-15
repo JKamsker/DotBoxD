@@ -1,8 +1,4 @@
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Plugins;
-
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// Regression coverage for CMP-0010: the runnable manifest/admin inspection example

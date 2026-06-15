@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Serialization.Json;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-using DotBoxD.Hosting;
+namespace DotBoxD.Kernels.Serialization.Json.Hosting;
 
 public static class SandboxHostJsonExtensions
 {

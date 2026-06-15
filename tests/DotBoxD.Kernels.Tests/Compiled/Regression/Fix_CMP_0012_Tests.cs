@@ -1,14 +1,14 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DotBoxD.Plugins;
-using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Kernels.Serialization.Json.Schema;
+using DotBoxD.Plugins.Json;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 /// <summary>
 /// Regression coverage for CMP-0012: the public JSON ingestion boundary (the module envelope
 /// accepted by <see cref="JsonImporter.Import(string)"/> and the plugin package envelope
-/// accepted by <see cref="DotBoxD.Plugins.PluginPackageJsonSerializer.Import(string)"/>) is the
+/// accepted by <see cref="PluginPackageJsonSerializer.Import"/>) is the
 /// documented text-ingestion path, yet the strict shape lived only in importer C# code. Consumers
 /// (plugin authors, admin UIs, upload validators, package tooling) had to infer the accepted JSON
 /// envelope from examples, tests, or importer source.

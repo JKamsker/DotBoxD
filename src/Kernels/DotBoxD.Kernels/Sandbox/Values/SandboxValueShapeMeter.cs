@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Kernels.Sandbox.Values;
 
 internal static class SandboxValueShapeMeter
 {

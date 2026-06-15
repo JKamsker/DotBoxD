@@ -1,6 +1,6 @@
-using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0036: plugin kernel execution created a linked

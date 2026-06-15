@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Compiler.Internal;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.CompilationAndVerification;
 
 /// <summary>
 /// Regression test for PAL-0010: the persistent compiled artifact cache opens a cross-process

@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using DotBoxD.Plugins.Analyzer;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0008: the DotBoxD.Plugins.Analyzer package ships stable
@@ -15,7 +13,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Forbidden_host_api_rule_links_to_shipped_reference()
     {
-        var rule = PluginAnalyzer.ForbiddenHostApiRule;
+        var rule = DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer.ForbiddenHostApiRule;
 
         Assert.Equal("DBXK001", rule.Id);
         AssertHelpLink(rule, "AnalyzerReleases.Shipped.md", "DBXK001");
@@ -24,7 +22,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Live_setting_type_rule_links_to_shipped_reference()
     {
-        var rule = PluginAnalyzer.LiveSettingTypeRule;
+        var rule = DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer.LiveSettingTypeRule;
 
         Assert.Equal("DBXK020", rule.Id);
         AssertHelpLink(rule, "AnalyzerReleases.Shipped.md", "DBXK020");
@@ -33,7 +31,7 @@ public sealed class Fix_API_0008_Tests
     [Fact]
     public void Every_supported_diagnostic_exposes_a_help_link_for_its_id()
     {
-        var analyzer = new PluginAnalyzer();
+        var analyzer = new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer();
 
         Assert.NotEmpty(analyzer.SupportedDiagnostics);
         foreach (var rule in analyzer.SupportedDiagnostics)

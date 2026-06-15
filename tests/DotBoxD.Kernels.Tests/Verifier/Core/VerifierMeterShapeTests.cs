@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierMeterShapeTests
 {
@@ -21,9 +23,9 @@ public sealed class VerifierMeterShapeTests
             fnIl.Emit(OpCodes.Br_S, meter);
             fnIl.Emit(OpCodes.Ldc_I4_1);
             fnIl.MarkLabel(meter);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -54,16 +56,16 @@ public sealed class VerifierMeterShapeTests
             EmitChargeFuel(fnIl);
             EmitChargeFuel(fnIl);
             fnIl.Emit(OpCodes.Ldc_I4_3);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             fnIl.Emit(OpCodes.Br_S, end);
             fnIl.MarkLabel(workPath);
             // Two metered work calls (Neg) on this branch, whose fuel was charged only on the other branch
             // -> rejected. I32 boxing is non-metered O(1), used only to produce the operand.
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.Neg))!);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.Neg))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.Neg))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.Neg))!);
             fnIl.Emit(OpCodes.Stloc, value);
             fnIl.MarkLabel(end);
             EmitExitCall(fnIl);
@@ -91,7 +93,7 @@ public sealed class VerifierMeterShapeTests
             EmitEnterCall(fnIl);
             EmitChargeFuel(fnIl);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -120,7 +122,7 @@ public sealed class VerifierMeterShapeTests
             EmitTypeScalar(fnIl);
             fnIl.Emit(OpCodes.Pop);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -149,7 +151,7 @@ public sealed class VerifierMeterShapeTests
             EmitTypeScalar(fnIl);
             fnIl.Emit(OpCodes.Pop);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -176,7 +178,7 @@ public sealed class VerifierMeterShapeTests
             [typeof(SandboxContext), typeof(SandboxValue)]).GetILGenerator();
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldc_I4_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Call, function);
@@ -186,7 +188,7 @@ public sealed class VerifierMeterShapeTests
     private static void EmitEnterCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
     }
 
     private static void EmitChargeFuel(ILGenerator il)
@@ -196,13 +198,13 @@ public sealed class VerifierMeterShapeTests
     {
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldc_I4, amount);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
     }
 
     private static void EmitExitCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
 
     private static void EmitTypeScalar(ILGenerator il)

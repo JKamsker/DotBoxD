@@ -1,9 +1,10 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Returns;
+
+using static Compiler.IlEmitterPrimitives;
 
 internal static class BoolReturnFastPathEmitter
 {
@@ -51,12 +52,12 @@ internal static class BoolReturnFastPathEmitter
         il.Emit(OpCodes.Ldloc, declare(leftI32).Local);
         il.Emit(OpCodes.Ldloc, declare(rightI32).Local);
         il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.GteI32Raw)));
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
         il.Emit(OpCodes.Br, endLabel);
 
         il.MarkLabel(falseLabel);
         EmitInt32(il, 0);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
         il.MarkLabel(endLabel);
     }
 

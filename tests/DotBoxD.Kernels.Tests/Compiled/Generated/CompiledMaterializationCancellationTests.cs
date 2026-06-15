@@ -1,6 +1,10 @@
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Compiled.Core;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Generated;
 
 public sealed class CompiledMaterializationCancellationTests
 {

@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels;
-
 using System.Collections.ObjectModel;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Bindings;
 
 public sealed record SandboxRunId(Guid Value)
 {

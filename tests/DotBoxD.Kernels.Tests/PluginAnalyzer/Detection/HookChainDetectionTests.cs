@@ -2,11 +2,9 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using DotBoxD.Kernels;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using PluginServer = DotBoxD.Plugins.PluginServer;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Detection;
 
 /// <summary>
 /// Phase C-0 (detection only): the analyzer flags an inline InvokeKernel(lambda) hook-chain terminal
@@ -23,6 +21,7 @@ public sealed class HookChainDetectionTests
     {
         var diagnostics = await AnalyzeAsync("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample
@@ -45,6 +44,7 @@ public sealed class HookChainDetectionTests
     {
         var diagnostics = await AnalyzeAsync("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample
@@ -72,7 +72,7 @@ public sealed class HookChainDetectionTests
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginServer).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new PluginAnalyzer());
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 

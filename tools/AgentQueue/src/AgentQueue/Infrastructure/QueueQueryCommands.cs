@@ -1,3 +1,5 @@
+using AgentQueue.Core;
+
 namespace AgentQueue.Infrastructure;
 
 internal sealed class QueueQueryCommands

@@ -1,8 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Parity tests for resource/quota behaviour across interpreted and compiled execution modes
@@ -250,16 +253,16 @@ public sealed class CompiledSideEffectQuotaParityTests
     // Private helpers
     // ----------------------------------------------------------------
 
-    private static Hosting.SandboxHost QuotaParityPureHost()
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost QuotaParityPureHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
             builder.UseCompilerIfAvailable();
         });
 
-    private static Hosting.SandboxHost QuotaParityLogHost()
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost QuotaParityLogHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();
@@ -267,8 +270,8 @@ public sealed class CompiledSideEffectQuotaParityTests
             builder.UseCompilerIfAvailable();
         });
 
-    private static Hosting.SandboxHost QuotaParityMessageHost(InMemoryPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost QuotaParityMessageHost(InMemoryPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -290,7 +293,7 @@ public sealed class CompiledSideEffectQuotaParityTests
             .Build();
 
     private static ValueTask<SandboxExecutionResult> RunAsync(
-        Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         ExecutionMode mode)
         => host.ExecuteAsync(

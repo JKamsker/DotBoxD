@@ -1,6 +1,10 @@
-using DotBoxD.Kernels;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Core;
 
 public sealed class CompiledFuelAccountingTests
 {
@@ -56,7 +60,7 @@ public sealed class CompiledFuelAccountingTests
     }
 
     private static async ValueTask<SandboxExecutionResult> ExecuteAsync(
-        DotBoxD.Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         ExecutionMode mode)
         => await host.ExecuteAsync(
@@ -66,7 +70,7 @@ public sealed class CompiledFuelAccountingTests
             new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
 
     private static async ValueTask<SandboxExecutionResult> ExecuteAsync(
-        DotBoxD.Hosting.SandboxHost host,
+        SandboxHost host,
         ExecutionPlan plan,
         ExecutionMode mode,
         SandboxValue input)

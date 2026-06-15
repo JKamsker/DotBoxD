@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Expressions;
 
 internal sealed partial class I32ExpressionPlan
 {

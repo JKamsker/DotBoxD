@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Example.PluginAuthoring.Examples;
+
 Console.WriteLine("Safe IR plugin authoring examples");
 
 SimpleContractExamples.Run();

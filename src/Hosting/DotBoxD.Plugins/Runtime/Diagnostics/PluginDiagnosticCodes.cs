@@ -1,6 +1,7 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Runtime.Diagnostics;
 
 /// <summary>
 /// The runtime phase that emits a plugin <c>DBXK*</c> diagnostic, so a host can tell a

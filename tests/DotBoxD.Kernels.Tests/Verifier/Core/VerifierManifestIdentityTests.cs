@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierManifestIdentityTests
 {

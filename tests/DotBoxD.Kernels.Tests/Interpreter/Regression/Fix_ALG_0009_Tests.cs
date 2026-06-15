@@ -1,4 +1,7 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// Regression coverage for ALG-0009: capability lookups must resolve through a single

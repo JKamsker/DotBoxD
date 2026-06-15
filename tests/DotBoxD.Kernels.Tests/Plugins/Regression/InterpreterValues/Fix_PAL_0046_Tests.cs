@@ -1,6 +1,8 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Plugins.Kernel;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues;
 
 /// <summary>
 /// Regression coverage for PAL-0046: when a reusing <c>ShouldHandle</c> hands its input to a separate

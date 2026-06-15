@@ -1,6 +1,6 @@
-namespace DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Hosting.Worker;
 
 internal static class WorkerRunSummaryValidator
 {

@@ -1,8 +1,14 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Verifier-negative dimension: asserts that the system's gates prevent side-effecting bindings
@@ -207,8 +213,8 @@ public sealed class CompiledSideEffectVerifierGuardTests
     // are combined in the same test assembly).
     // =========================================================================
 
-    private static Hosting.SandboxHost VerifierGuard_CreatePluginHost(InMemoryPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost VerifierGuard_CreatePluginHost(InMemoryPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -294,7 +300,7 @@ public sealed class CompiledSideEffectVerifierGuardTests
             (_, args, _) => ValueTask.FromResult(args[0]),
             // Using a direct method ("AbsI32") instead of the generic "CallBinding".
             // This is the configuration that must be rejected.
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.AbsI32)),
             (grant, diagnostics) => { });
 
     /// <summary>
@@ -315,6 +321,6 @@ public sealed class CompiledSideEffectVerifierGuardTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(0)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             (grant, diagnostics) => { });
 }

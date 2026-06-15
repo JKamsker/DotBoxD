@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
 
 using System.Diagnostics;
@@ -18,7 +22,7 @@ internal static class RogueScalingProbe
 
     public static async Task RunAsync()
     {
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.UseInterpreter();
@@ -40,7 +44,7 @@ internal static class RogueScalingProbe
         await RunPattern(host, policy, "map.set build", MapBuildJson(), MapSizes);
     }
 
-    private static async Task RunPattern(SandboxHost host, SandboxPolicy policy, string name, string moduleJson, int[] sizes)
+    private static async Task RunPattern(Hosting.Execution.SandboxHost host, SandboxPolicy policy, string name, string moduleJson, int[] sizes)
     {
         var module = await host.ImportJsonAsync(moduleJson);
         var plan = await host.PrepareAsync(module, policy);
@@ -67,7 +71,7 @@ internal static class RogueScalingProbe
         Console.WriteLine();
     }
 
-    private static async Task<SandboxValue?> RunSandbox(SandboxHost host, ExecutionPlan plan, int n, ExecutionMode mode)
+    private static async Task<SandboxValue?> RunSandbox(Hosting.Execution.SandboxHost host, ExecutionPlan plan, int n, ExecutionMode mode)
     {
         var result = await host.ExecuteAsync(
             plan,

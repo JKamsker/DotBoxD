@@ -1,8 +1,8 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 /// <summary>
 /// Lowers a host-service call the kernel reaches through <c>ctx.Host&lt;T&gt;()</c> — e.g.
@@ -74,7 +74,7 @@ internal static class DotBoxDHostBindingExpressionLowerer
         }
 
         var source =
-            $"new global::DotBoxD.Kernels.CallExpression({LiteralReader.StringLiteral(bindingId)}, " +
+            $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(bindingId)}, " +
             $"[{string.Join(", ", loweredSources)}], null, Span)";
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }

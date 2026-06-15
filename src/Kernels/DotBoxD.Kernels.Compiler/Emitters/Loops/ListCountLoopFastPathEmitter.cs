@@ -1,9 +1,11 @@
-namespace DotBoxD.Kernels.Compiler.Emitters;
-
 using System.Reflection.Emit;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using static DotBoxD.Kernels.Compiler.IlEmitterPrimitives;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
+
+using static Compiler.IlEmitterPrimitives;
 
 internal static class ListCountLoopFastPathEmitter
 {
@@ -111,7 +113,7 @@ internal static class ListCountLoopFastPathEmitter
             il.Emit(OpCodes.Ldloc, count);
             il.Emit(OpCodes.Ldloc, iterations);
             EmitInt32(il, plan.LoopFuelPerIteration);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.AccumulateLinearI32)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.AccumulateLinearI32)));
             il.Emit(OpCodes.Stloc, declare(plan.Target).Local);
             il.Emit(OpCodes.Br, finish);
         }

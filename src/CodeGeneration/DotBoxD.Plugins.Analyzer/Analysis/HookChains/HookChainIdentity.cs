@@ -1,8 +1,8 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
 /// Stable identity for a lowered hook chain: a deterministic id from the chain's source file + span

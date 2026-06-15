@@ -1,4 +1,8 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Tests.Core.Regression;
 
 /// <summary>
 /// Regression coverage for COR-0061: capability denial audits bypass the
@@ -6,7 +10,7 @@ namespace DotBoxD.Kernels.Tests;
 /// emits a <c>PolicyDenied</c> audit event when policy denies a capability,
 /// but it stamps that event with <see cref="System.DateTimeOffset.UtcNow"/>
 /// instead of routing through the context's deterministic audit clock
-/// (<see cref="SandboxContext.AuditTimestamp"/>). Under a deterministic policy
+/// (<see cref="Sandbox.SandboxContext.AuditTimestamp"/>). Under a deterministic policy
 /// with a logical clock, every emitted audit timestamp must be the logical
 /// clock value so replays and deterministic audit comparisons stay stable.
 /// </summary>

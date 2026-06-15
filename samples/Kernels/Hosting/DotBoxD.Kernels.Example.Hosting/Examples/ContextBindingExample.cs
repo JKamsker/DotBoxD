@@ -1,14 +1,13 @@
-namespace DotBoxD.Kernels.Example.Hosting;
-
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+
+namespace DotBoxD.Kernels.Example.Hosting.Examples;
 
 internal static class ContextBindingExample
 {
     public static async Task RunAsync()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages);
+        var server = Plugins.PluginServer.Create(messages);
         server.RegisterEventAdapter(DamageEventAdapter.Instance);
         var settings = server.BindContext<DamageSettings>(
             "damage",

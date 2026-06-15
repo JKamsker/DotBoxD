@@ -1,14 +1,18 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Plugins;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 /// <summary>
 /// End-to-end proof of the kernel RPC service authoring path (Followup #2.3): a plain-C# batch class
 /// with <c>[KernelRpcService]</c> — locals, a <c>foreach</c> over a list, a host binding per element, and
 /// a <c>List&lt;KillResult&gt;</c> of DTOs built and returned — is lowered by the generator to verified
-/// IR, installed via <see cref="PluginServer.InstallRpcAsync"/>, and invoked request/response returning
+/// IR, installed via <see cref="DotBoxD.Plugins.PluginServer.InstallRpcAsync"/>, and invoked request/response returning
 /// the list of objects in one roundtrip.
 /// </summary>
 public sealed class RpcKernelGenerationTests
@@ -16,7 +20,9 @@ public sealed class RpcKernelGenerationTests
     private const string MonsterKillerSource = """
         using System.Collections.Generic;
         using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
         using DotBoxD.Abstractions;
 
         namespace Sample;
@@ -53,7 +59,7 @@ public sealed class RpcKernelGenerationTests
         Assert.Equal("KillMonsters", package.Manifest.RpcEntrypoint);
         Assert.Contains("game.world.monster.write.kill", package.Manifest.RequiredCapabilities);
 
-        using var server = PluginServer.Create(configureHost: AddKillBinding, defaultPolicy: KillPolicy());
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: AddKillBinding, defaultPolicy: KillPolicy());
         var kernel = await server.InstallRpcAsync(package);
 
         var ids = SandboxValue.FromList(

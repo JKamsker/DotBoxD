@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Game.Server.Abstractions;
-
 using MessagePack;
+
+namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 
 [MessagePackObject]
 public readonly struct LiveSettingUpdate

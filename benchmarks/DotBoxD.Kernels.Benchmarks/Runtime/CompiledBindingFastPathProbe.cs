@@ -1,3 +1,10 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+
 namespace DotBoxD.Kernels.Benchmarks.Runtime;
 
 using System.Diagnostics;
@@ -42,10 +49,10 @@ internal static class CompiledBindingFastPathProbe
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
         {
-            var args = CompiledRuntime.CreateValueArray(run.Context, 2);
+            var args = Kernels.Runtime.CompiledRuntime.CreateValueArray(run.Context, 2);
             args[0] = target;
             args[1] = message;
-            _ = CompiledRuntime.CallBinding(run.Context, PluginMessageBindings.SendBindingId, args);
+            _ = Kernels.Runtime.CompiledRuntime.CallBinding(run.Context, PluginMessageBindings.SendBindingId, args);
         }
 
         sw.Stop();
@@ -67,8 +74,8 @@ internal static class CompiledBindingFastPathProbe
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
         {
-            CompiledRuntime.ChargeValueArray(run.Context, 2);
-            _ = CompiledRuntime.CallBinding2(
+            Kernels.Runtime.CompiledRuntime.ChargeValueArray(run.Context, 2);
+            _ = Kernels.Runtime.CompiledRuntime.CallBinding2(
                 run.Context,
                 PluginMessageBindings.SendBindingId,
                 target,

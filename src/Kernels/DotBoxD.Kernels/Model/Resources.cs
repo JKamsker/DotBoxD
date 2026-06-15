@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Model;
 
 public sealed partial class ResourceMeter
 {

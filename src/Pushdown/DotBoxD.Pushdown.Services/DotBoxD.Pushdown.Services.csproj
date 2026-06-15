@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
     <ProjectReference Include="..\..\Services\DotBoxD.Services\DotBoxD.Services.csproj" />
     <ProjectReference Include="..\..\CodeGeneration\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\Channels\DotBoxD.Codecs.MessagePack\DotBoxD.Codecs.MessagePack.csproj" />

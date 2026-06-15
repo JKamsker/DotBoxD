@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Game.Server;
+namespace DotBoxD.Kernels.Game.Server.Simulation;
 
 /// <summary>
 /// The extended capability defined by this example. The plugin's only sandbox grant is

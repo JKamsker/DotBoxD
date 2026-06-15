@@ -1,6 +1,8 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Policies;
+using PluginServer = DotBoxD.Plugins.PluginServer;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests._TestSupport;
 
 internal sealed class BlockingPluginMessageSink : IPluginMessageSink
 {
@@ -19,7 +21,7 @@ internal static class PluginAddendumTestPolicies
     public static PluginServer CreateServer(
         IPluginMessageSink? messages = null,
         ExecutionMode executionMode = ExecutionMode.Auto)
-        => PluginServer.Create(messages, defaultPolicy: LongWall(), executionMode: executionMode);
+        => DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: LongWall(), executionMode: executionMode);
 
     public static SandboxPolicy LongWall()
         => SandboxPolicyBuilder.Create().GrantLogging().GrantHostMessageWrite()

@@ -1,14 +1,13 @@
-namespace DotBoxD.Kernels.Example.PluginAuthoring;
-
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
-using DotBoxD.Plugins;
+
+namespace DotBoxD.Kernels.Example.PluginAuthoring.Examples;
 
 internal static class DesignGuidanceExample
 {
     public static async Task RunAsync()
     {
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(messages, defaultPolicy: PluginExamplePolicies.MessageWrite());
+        var server = Plugins.PluginServer.Create(messages, defaultPolicy: PluginExamplePolicies.MessageWrite());
         server.RegisterEventAdapter(MyEventAdapter.Instance);
 
         await server.InstallAsync(MyPluginPackage.Create());

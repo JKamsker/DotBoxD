@@ -1,6 +1,6 @@
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerGenericEventTests
 {

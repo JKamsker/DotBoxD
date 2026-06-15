@@ -1,9 +1,11 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Buffers;
 using System.Net;
 using System.Text;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Hosting.Http;
 
 public delegate ValueTask<IReadOnlyList<IPAddress>> SafeDnsResolver(string host, CancellationToken cancellationToken);
 

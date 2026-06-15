@@ -1,4 +1,4 @@
-namespace AgentQueue;
+namespace AgentQueue.Core;
 
 internal sealed record AgentArea(string Name, string Prefix, string QueueFile, string DisplayName);
 

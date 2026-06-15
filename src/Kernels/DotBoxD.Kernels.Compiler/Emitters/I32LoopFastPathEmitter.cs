@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Compiler.Emitters.Loops;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;

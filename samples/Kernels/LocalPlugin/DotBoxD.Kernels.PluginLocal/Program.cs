@@ -1,7 +1,10 @@
 using DotBoxD.Kernels;
 using DotBoxD.Kernels.PluginLocal;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Policies;
+using PluginServer = DotBoxD.Plugins.PluginServer;
 
 var messages = new InMemoryPluginMessageSink();
 var server = PluginServer.Create(messages, defaultPolicy: PluginPolicy());

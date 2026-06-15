@@ -1,7 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerGeneratedPackageTests
 {
@@ -74,8 +79,8 @@ public sealed class PluginAnalyzerGeneratedPackageTests
         var matching = new GeneratedDamageEvent("player-1", "matched", "fire", 150, 7L, 1.5D);
         var rejected = matching with { Amount = 99 };
 
-        Assert.False(await kernel.ShouldHandleAsync(adapter, rejected));
-        Assert.True(await kernel.ShouldHandleAsync(adapter, matching));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, rejected));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, matching));
 
         await kernel.HandleAsync(adapter, matching);
 
@@ -129,10 +134,10 @@ public sealed class PluginAnalyzerGeneratedPackageTests
         var kernel = await server.InstallAsync(package);
         var adapter = new GeneratedDamageEventAdapter();
 
-        Assert.True(await kernel.ShouldHandleAsync(adapter, EventWithAmount(0)));
-        Assert.True(await kernel.ShouldHandleAsync(adapter, EventWithAmount(10)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, EventWithAmount(-1)));
-        Assert.False(await kernel.ShouldHandleAsync(adapter, EventWithAmount(11)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, EventWithAmount(0)));
+        Assert.True((bool)await kernel.ShouldHandleAsync(adapter, EventWithAmount(10)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, EventWithAmount(-1)));
+        Assert.False((bool)await kernel.ShouldHandleAsync(adapter, EventWithAmount(11)));
     }
 
     [Fact]

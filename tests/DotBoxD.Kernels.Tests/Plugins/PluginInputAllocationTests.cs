@@ -1,6 +1,11 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginInputAllocationTests
 {
@@ -49,7 +54,7 @@ public sealed class PluginInputAllocationTests
     [Fact]
     public void Register_event_adapter_rejects_writer_value_count_mismatch()
     {
-        var server = PluginServer.Create();
+        var server = DotBoxD.Plugins.PluginServer.Create();
 
         var ex = Assert.Throws<SandboxValidationException>(
             () => server.RegisterEventAdapter(new MismatchedWriterEventAdapter()));

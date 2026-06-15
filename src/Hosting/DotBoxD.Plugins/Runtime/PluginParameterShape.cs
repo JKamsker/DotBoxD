@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Runtime;
 
 internal static class PluginParameterShape
 {

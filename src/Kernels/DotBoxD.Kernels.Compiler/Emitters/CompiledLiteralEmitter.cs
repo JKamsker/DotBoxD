@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;
@@ -18,33 +22,33 @@ internal static class CompiledLiteralEmitter
         switch (value)
         {
             case UnitValue:
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Unit)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Unit)));
                 break;
             case I32Value i32:
                 EmitInt32(il, i32.Value);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I32)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.I32)));
                 break;
             case I64Value i64:
                 il.Emit(OpCodes.Ldc_I8, i64.Value);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.I64)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.I64)));
                 break;
             case BoolValue boolean:
                 EmitInt32(il, boolean.Value ? 1 : 0);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Bool)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Bool)));
                 break;
             case F64Value f64:
                 il.Emit(OpCodes.Ldc_R8, f64.Value);
-                il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.F64)));
+                il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.F64)));
                 break;
             case StringValue text:
                 if (chargeLiteral)
                 {
-                    EmitContextStringCall(il, text.Value, nameof(CompiledRuntime.StringConst));
+                    EmitContextStringCall(il, text.Value, nameof(Kernels.Runtime.CompiledRuntime.StringConst));
                 }
                 else
                 {
                     il.Emit(OpCodes.Ldstr, text.Value);
-                    il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.StringLiteralValue)));
+                    il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.StringLiteralValue)));
                 }
 
                 break;
@@ -57,24 +61,24 @@ internal static class CompiledLiteralEmitter
                 il.Emit(OpCodes.Ldstr, id.TypeName);
                 il.Emit(OpCodes.Ldstr, id.Value);
                 il.Emit(OpCodes.Call, chargeLiteral
-                    ? Runtime(nameof(CompiledRuntime.OpaqueIdConst))
-                    : Runtime(nameof(CompiledRuntime.OpaqueIdLiteralValue)));
+                    ? Runtime(nameof(Kernels.Runtime.CompiledRuntime.OpaqueIdConst))
+                    : Runtime(nameof(Kernels.Runtime.CompiledRuntime.OpaqueIdLiteralValue)));
                 break;
             case SandboxPathValue path:
                 EmitStringBackedValue(
                     il,
                     path.Value.RelativePath,
                     chargeLiteral,
-                    nameof(CompiledRuntime.PathConst),
-                    nameof(CompiledRuntime.PathLiteralValue));
+                    nameof(Kernels.Runtime.CompiledRuntime.PathConst),
+                    nameof(Kernels.Runtime.CompiledRuntime.PathLiteralValue));
                 break;
             case SandboxUriValue uri:
                 EmitStringBackedValue(
                     il,
                     uri.Value.Value,
                     chargeLiteral,
-                    nameof(CompiledRuntime.UriConst),
-                    nameof(CompiledRuntime.UriLiteralValue));
+                    nameof(Kernels.Runtime.CompiledRuntime.UriConst),
+                    nameof(Kernels.Runtime.CompiledRuntime.UriLiteralValue));
                 break;
             case ListValue list:
                 EmitListLiteral(il, list, chargeLiteral);
@@ -121,8 +125,8 @@ internal static class CompiledLiteralEmitter
         EmitSandboxType(il, list.ItemType);
         EmitValueArray(il, list.Values);
         il.Emit(OpCodes.Call, Runtime(chargeLiteral
-            ? nameof(CompiledRuntime.ListLiteral)
-            : nameof(CompiledRuntime.ListLiteralValue)));
+            ? nameof(Kernels.Runtime.CompiledRuntime.ListLiteral)
+            : nameof(Kernels.Runtime.CompiledRuntime.ListLiteralValue)));
     }
 
     private static void EmitMapLiteral(ILGenerator il, MapValue map, bool chargeLiteral)
@@ -137,14 +141,14 @@ internal static class CompiledLiteralEmitter
         EmitValueArray(il, map.Values.Keys.ToArray());
         EmitValueArray(il, map.Values.Values.ToArray());
         il.Emit(OpCodes.Call, Runtime(chargeLiteral
-            ? nameof(CompiledRuntime.MapLiteral)
-            : nameof(CompiledRuntime.MapLiteralValue)));
+            ? nameof(Kernels.Runtime.CompiledRuntime.MapLiteral)
+            : nameof(Kernels.Runtime.CompiledRuntime.MapLiteralValue)));
     }
 
     private static void EmitValueArray(ILGenerator il, IReadOnlyList<SandboxValue> values)
     {
         EmitInt32(il, values.Count);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.CreateLiteralValueArray)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CreateLiteralValueArray)));
         for (var i = 0; i < values.Count; i++)
         {
             il.Emit(OpCodes.Dup);

@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Sandbox;
+
+namespace DotBoxD.Kernels.Tests.Core;
 
 public sealed class SandboxValueFactoryTests
 {

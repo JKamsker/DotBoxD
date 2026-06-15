@@ -1,4 +1,4 @@
-namespace DotBoxD.Hosting;
+namespace DotBoxD.Hosting.Execution.Compiled;
 
 internal sealed class CompiledExecutableExecutionCache
 {

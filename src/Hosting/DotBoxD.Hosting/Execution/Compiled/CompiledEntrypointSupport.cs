@@ -1,6 +1,4 @@
-namespace DotBoxD.Hosting;
-
-using DotBoxD.Kernels;
+namespace DotBoxD.Hosting.Execution.Compiled;
 
 internal static class CompiledEntrypointSupport
 {

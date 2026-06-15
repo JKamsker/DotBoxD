@@ -1,8 +1,11 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Differential / parity tests for audit-success on the compiled side-effecting binding path.
@@ -495,7 +498,7 @@ public sealed class CompiledSideEffectAuditParityTests
         ExecutionMode mode)
     {
         var sink = new InMemoryPluginMessageSink();
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -520,7 +523,7 @@ public sealed class CompiledSideEffectAuditParityTests
         ExecutionMode mode,
         int? maxLogEvents = null)
     {
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();
@@ -549,7 +552,7 @@ public sealed class CompiledSideEffectAuditParityTests
         string moduleJson,
         ExecutionMode mode)
     {
-        var host = Hosting.SandboxHost.Create(builder =>
+        var host = SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddFileBindings();

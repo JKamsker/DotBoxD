@@ -1,7 +1,6 @@
 using System.Reflection;
-using DotBoxD.Kernels.Runtime;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Runtime.Network;
 
 public sealed class SafeNetworkBodyBufferTests
 {

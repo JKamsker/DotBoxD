@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Runtime;
-
 using System.Net;
+
+namespace DotBoxD.Hosting.Http;
 
 internal static class SafeIpAddressClassifier
 {

@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Benchmarks.Core;
 
 using BenchmarkDotNet.Attributes;
@@ -8,7 +12,7 @@ public class BindingReferencePlanBenchmarks
 {
     private static readonly SourceSpan Span = new(0, 0);
 
-    private SandboxHost _host = null!;
+    private Hosting.Execution.SandboxHost _host = null!;
     private SandboxModule _module = null!;
     private SandboxPolicy _policy = null!;
 
@@ -18,7 +22,7 @@ public class BindingReferencePlanBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _host = SandboxHost.Create(builder =>
+        _host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();

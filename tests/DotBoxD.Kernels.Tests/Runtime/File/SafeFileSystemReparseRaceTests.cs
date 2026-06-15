@@ -1,4 +1,9 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class SafeFileSystemReparseRaceTests
 {
@@ -11,7 +16,7 @@ public sealed class SafeFileSystemReparseRaceTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-        Assert.False(File.Exists(Path.Combine(outside.Path, "out.txt")));
+        Assert.False(System.IO.File.Exists(Path.Combine(outside.Path, "out.txt")));
     }
 
     [Fact]

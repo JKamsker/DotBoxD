@@ -1,6 +1,12 @@
 using System.Diagnostics;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
+using SafeFileSystem = DotBoxD.Kernels.Runtime.Bindings.FileSystem.SafeFileSystem;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class SafeFileSystemReparsePointTests
 {
@@ -10,7 +16,7 @@ public sealed class SafeFileSystemReparsePointTests
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         Directory.CreateDirectory(Path.Combine(outside.Path, "sub"));
-        await File.WriteAllTextAsync(Path.Combine(outside.Path, "sub", "secret.txt"), "secret");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(outside.Path, "sub", "secret.txt"), "secret");
         var link = Path.Combine(root.Path, "link");
         Assert.True(
             TryCreateDirectoryLink(link, outside.Path),
@@ -33,7 +39,7 @@ public sealed class SafeFileSystemReparsePointTests
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         var secret = Path.Combine(outside.Path, "secret.txt");
-        await File.WriteAllTextAsync(secret, "secret");
+        await System.IO.File.WriteAllTextAsync(secret, "secret");
         var link = Path.Combine(root.Path, "secret.txt");
         var directoryLink = false;
         if (!TryCreateFileLink(link, secret)) {
@@ -65,7 +71,7 @@ public sealed class SafeFileSystemReparsePointTests
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         var outsideFile = Path.Combine(outside.Path, "secret.txt");
-        await File.WriteAllTextAsync(outsideFile, "original");
+        await System.IO.File.WriteAllTextAsync(outsideFile, "original");
         var link = Path.Combine(root.Path, "link");
         Assert.True(
             TryCreateDirectoryLink(link, outside.Path),
@@ -76,7 +82,7 @@ public sealed class SafeFileSystemReparsePointTests
 
             Assert.False(result.Succeeded);
             Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-            Assert.Equal("original", await File.ReadAllTextAsync(outsideFile));
+            Assert.Equal("original", await System.IO.File.ReadAllTextAsync(outsideFile));
         }
         finally {
             TryDeleteDirectoryLink(link);
@@ -89,7 +95,7 @@ public sealed class SafeFileSystemReparsePointTests
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         var outsideFile = Path.Combine(outside.Path, "secret.txt");
-        await File.WriteAllTextAsync(outsideFile, "original");
+        await System.IO.File.WriteAllTextAsync(outsideFile, "original");
         var link = Path.Combine(root.Path, "secret.txt");
         var directoryLink = false;
         if (!TryCreateFileLink(link, outsideFile)) {
@@ -104,7 +110,7 @@ public sealed class SafeFileSystemReparsePointTests
 
             Assert.False(result.Succeeded);
             Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-            Assert.Equal("original", await File.ReadAllTextAsync(outsideFile));
+            Assert.Equal("original", await System.IO.File.ReadAllTextAsync(outsideFile));
         }
         finally {
             if (directoryLink) {
@@ -122,7 +128,7 @@ public sealed class SafeFileSystemReparsePointTests
         using var root = TempDirectory.Create();
         using var outside = TempDirectory.Create();
         var outsideFile = Path.Combine(outside.Path, "secret.txt");
-        await File.WriteAllTextAsync(outsideFile, "original");
+        await System.IO.File.WriteAllTextAsync(outsideFile, "original");
         var tempLink = Path.Combine(root.Path, "target.txt.tmp-known");
         var directoryLink = false;
         if (!TryCreateFileLink(tempLink, outsideFile)) {
@@ -133,13 +139,13 @@ public sealed class SafeFileSystemReparsePointTests
         }
 
         try {
-            using var _ = Runtime.SafeFileSystem.UseTempSuffixForTests("known");
+            using var _ = SafeFileSystem.UseTempSuffixForTests("known");
             var result = await ExecuteWriteAsync(root.Path, "target.txt", "new");
 
             Assert.False(result.Succeeded);
             Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
-            Assert.Equal("original", await File.ReadAllTextAsync(outsideFile));
-            Assert.False(File.Exists(Path.Combine(root.Path, "target.txt")));
+            Assert.Equal("original", await System.IO.File.ReadAllTextAsync(outsideFile));
+            Assert.False(System.IO.File.Exists(Path.Combine(root.Path, "target.txt")));
         }
         finally {
             if (directoryLink) {
@@ -229,7 +235,7 @@ public sealed class SafeFileSystemReparsePointTests
     private static bool TryCreateFileLink(string link, string target)
     {
         try {
-            File.CreateSymbolicLink(link, target);
+            System.IO.File.CreateSymbolicLink(link, target);
             return true;
         }
         catch (IOException) {
@@ -278,8 +284,8 @@ public sealed class SafeFileSystemReparsePointTests
     private static void TryDeleteFileLink(string link)
     {
         try {
-            if (File.Exists(link)) {
-                File.Delete(link);
+            if (System.IO.File.Exists(link)) {
+                System.IO.File.Delete(link);
             }
         }
         catch (IOException) {

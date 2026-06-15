@@ -1,10 +1,9 @@
+using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Kernels;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using PluginServer = DotBoxD.Plugins.PluginServer;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 /// <summary>
 /// Phase C lowering: the generator lowers an inline On&lt;TEvent&gt;().Where(lambda).InvokeKernel(lambda)
@@ -21,6 +20,7 @@ public sealed class PluginAnalyzerHookChainTests
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -47,6 +47,7 @@ public sealed class PluginAnalyzerHookChainTests
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -72,6 +73,7 @@ public sealed class PluginAnalyzerHookChainTests
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -100,6 +102,7 @@ public sealed class PluginAnalyzerHookChainTests
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -127,6 +130,7 @@ public sealed class PluginAnalyzerHookChainTests
         // Where(e => ...) — element only, simple lambda (no parens), no context — lowers like (e, ctx) =>.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -154,6 +158,7 @@ public sealed class PluginAnalyzerHookChainTests
         // Where((e) => ...) — parenthesized single parameter.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -181,6 +186,7 @@ public sealed class PluginAnalyzerHookChainTests
         // Select(e => ...) and Where(gap => ...) — both element-only — lower with the projection.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -209,6 +215,7 @@ public sealed class PluginAnalyzerHookChainTests
         // Each stage independently chooses its arity: 1-param Where, 2-param Where, 1-param Select.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
@@ -239,6 +246,7 @@ public sealed class PluginAnalyzerHookChainTests
         // terminal effect. It must fail safe: no HookChain_ package, leaving the runtime terminal to throw.
         var result = RunGenerator("""
             using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;

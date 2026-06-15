@@ -1,6 +1,9 @@
-namespace DotBoxD.Plugins.Analyzer;
-
 using System.Text;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class DotBoxDPackageSourceEmitter
 {
@@ -31,25 +34,25 @@ internal static class DotBoxDPackageSourceEmitter
 
     private static void EmitBody(StringBuilder builder, PluginKernelModel model)
     {
-        builder.Append("    private static readonly global::DotBoxD.Kernels.SourceSpan Span = new(")
+        builder.Append("    private static readonly ").Append(TypeNames.GlobalSourceSpan).Append(" Span = new(")
             .Append(DotBoxDGenerationNames.GeneratedSpanLine)
             .Append(", ")
             .Append(DotBoxDGenerationNames.GeneratedSpanColumn)
             .AppendLine(");");
         builder.AppendLine();
-        builder.AppendLine("    public static global::DotBoxD.Plugins.PluginPackage Create()");
+        builder.Append("    public static ").Append(TypeNames.GlobalPluginPackage).AppendLine(" Create()");
         builder.AppendLine("    {");
         EmitSettings(builder, model);
-        builder.AppendLine("        var manifest = new global::DotBoxD.Plugins.PluginManifest(");
+        builder.Append("        var manifest = new ").Append(TypeNames.GlobalPluginManifest).AppendLine("(");
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
         builder.AppendLine(
             $"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Contracts.EventKernel(model.EventName))},");
-        builder.AppendLine("            global::DotBoxD.Kernels.ExecutionMode.Auto,");
+        builder.AppendLine($"            {TypeNames.GlobalExecutionMode}.Auto,");
         EmitEffects(builder, model.ManifestEffects);
         builder.AppendLine("            settings,");
-        builder.AppendLine($"            [new global::DotBoxD.Plugins.HookSubscriptionManifest({LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})])");
+        builder.AppendLine($"            [new {TypeNames.GlobalHookSubscriptionManifest}({LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})])");
         EmitRequiredCapabilities(builder, model.RequiredCapabilities);
-        builder.AppendLine("        return global::DotBoxD.Plugins.PluginPackage.Create(manifest, CreateModule(settings));");
+        builder.Append("        return ").Append(TypeNames.GlobalPluginPackage).AppendLine(".Create(manifest, CreateModule(settings));");
         builder.AppendLine("    }");
         builder.AppendLine();
         EmitModule(builder, model);
@@ -60,13 +63,13 @@ internal static class DotBoxDPackageSourceEmitter
     private static void EmitSettings(StringBuilder builder, PluginKernelModel model)
     {
         if (model.LiveSettings.Count == 0) {
-            builder.AppendLine("        var settings = global::System.Array.Empty<global::DotBoxD.Plugins.LiveSettingDefinition>();");
+            builder.Append("        var settings = ").Append(EmptyArray(TypeNames.GlobalLiveSettingDefinition)).AppendLine(";");
             return;
         }
 
-        builder.AppendLine("        var settings = new global::DotBoxD.Plugins.LiveSettingDefinition[] {");
+        builder.Append("        var settings = new ").Append(ArrayOf(TypeNames.GlobalLiveSettingDefinition)).AppendLine(" {");
         foreach (var setting in model.LiveSettings) {
-            builder.Append("            new global::DotBoxD.Plugins.LiveSettingDefinition(");
+            builder.Append("            new ").Append(TypeNames.GlobalLiveSettingDefinition).Append('(');
             builder.Append(LiteralReader.StringLiteral(setting.Name)).Append(", ");
             builder.Append(LiteralReader.StringLiteral(setting.Type)).Append(", ");
             builder.Append(setting.DefaultValue);
@@ -115,61 +118,63 @@ internal static class DotBoxDPackageSourceEmitter
 
     private static void EmitModule(StringBuilder builder, PluginKernelModel model)
     {
-        builder.AppendLine("    private static global::DotBoxD.Kernels.SandboxModule CreateModule(global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Plugins.LiveSettingDefinition> settings)");
+        builder.Append("    private static ").Append(TypeNames.GlobalSandboxModule).Append(" CreateModule(")
+            .Append(ReadOnlyListOf(TypeNames.GlobalLiveSettingDefinition)).AppendLine(" settings)");
         builder.AppendLine("    {");
         builder.AppendLine("        var parameters = Parameters(settings);");
-        builder.AppendLine("        return new global::DotBoxD.Kernels.SandboxModule(");
+        builder.Append("        return new ").Append(TypeNames.GlobalSandboxModule).AppendLine("(");
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
-        builder.AppendLine("            global::DotBoxD.Kernels.SemVersion.One,");
-        builder.AppendLine("            global::DotBoxD.Kernels.SemVersion.One,");
+        builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
+        builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
         builder.AppendLine(
-            $"            [new global::DotBoxD.Kernels.CapabilityRequest(global::DotBoxD.Plugins.PluginMessageBindings.CapabilityId, {LiteralReader.StringLiteral(DotBoxDGenerationNames.Capabilities.MessageWriteReason)})],");
+            $"            [new {TypeNames.GlobalCapabilityRequest}({TypeNames.GlobalPluginMessageBindings}.CapabilityId, {LiteralReader.StringLiteral(DotBoxDGenerationNames.Capabilities.MessageWriteReason)})],");
         builder.Append("            [")
             .Append(DotBoxDGenerationNames.Entrypoints.ShouldHandle)
             .Append("(parameters), ")
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
             .AppendLine("(parameters)],");
-        builder.AppendLine($"            new global::System.Collections.Generic.Dictionary<string, string> {{ [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId)}] = {LiteralReader.StringLiteral(model.PluginId)}, [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel)}] = {LiteralReader.StringLiteral(model.KernelName)} }});");
+        builder.AppendLine($"            new {Generic(TypeNames.GlobalDictionary, "string", "string")} {{ [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId)}] = {LiteralReader.StringLiteral(model.PluginId)}, [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel)}] = {LiteralReader.StringLiteral(model.KernelName)} }});");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
 
     private static void EmitFunctions(StringBuilder builder, PluginKernelModel model)
     {
-        builder.Append("    private static global::DotBoxD.Kernels.SandboxFunction ")
+        builder.Append("    private static ").Append(TypeNames.GlobalSandboxFunction).Append(' ')
             .Append(DotBoxDGenerationNames.Entrypoints.ShouldHandle)
-            .AppendLine("(global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Kernels.Parameter> parameters)");
+            .Append('(').Append(ReadOnlyListOf(TypeNames.GlobalParameter)).AppendLine(" parameters)");
         builder.AppendLine("        => new(");
-        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.ShouldHandle)}, true, parameters, global::DotBoxD.Kernels.SandboxType.Bool,");
+        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.ShouldHandle)}, true, parameters, {TypeNames.GlobalSandboxType}.Bool,");
         builder.AppendLine($"            {model.ShouldHandle.Source});");
         builder.AppendLine();
-        builder.Append("    private static global::DotBoxD.Kernels.SandboxFunction ")
+        builder.Append("    private static ").Append(TypeNames.GlobalSandboxFunction).Append(' ')
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
-            .AppendLine("(global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Kernels.Parameter> parameters)");
+            .Append('(').Append(ReadOnlyListOf(TypeNames.GlobalParameter)).AppendLine(" parameters)");
         builder.AppendLine("        => new(");
-        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, global::DotBoxD.Kernels.SandboxType.Unit,");
-        builder.AppendLine($"            [new global::DotBoxD.Kernels.ReturnStatement({HandleExpression(model.Handle)}, Span)]);");
+        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {TypeNames.GlobalSandboxType}.Unit,");
+        builder.AppendLine($"            [new {TypeNames.GlobalReturnStatement}({HandleExpression(model.Handle)}, Span)]);");
         builder.AppendLine();
     }
 
     private static void EmitHelpers(StringBuilder builder, PluginKernelModel model)
     {
-        builder.AppendLine("    private static global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Kernels.Parameter> Parameters(global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Plugins.LiveSettingDefinition> settings)");
+        builder.Append("    private static ").Append(ReadOnlyListOf(TypeNames.GlobalParameter)).Append(" Parameters(")
+            .Append(ReadOnlyListOf(TypeNames.GlobalLiveSettingDefinition)).AppendLine(" settings)");
         builder.AppendLine("    {");
         if (model.EventProperties.Count == 0) {
             builder.AppendLine("        if (settings.Count == 0) {");
-            builder.AppendLine("            return global::System.Array.Empty<global::DotBoxD.Kernels.Parameter>();");
+            builder.Append("            return ").Append(EmptyArray(TypeNames.GlobalParameter)).AppendLine(";");
             builder.AppendLine("        }");
         }
 
-        builder.Append("        var parameters = new global::DotBoxD.Kernels.Parameter[settings.Count + ")
+        builder.Append("        var parameters = new ").Append(TypeNames.GlobalParameter).Append("[settings.Count + ")
             .Append(model.EventProperties.Count)
             .AppendLine("];");
         var parameterIndex = 0;
         foreach (var property in model.EventProperties) {
             builder.Append("        parameters[")
                 .Append(parameterIndex)
-                .Append("] = new global::DotBoxD.Kernels.Parameter(");
+                .Append("] = new ").Append(TypeNames.GlobalParameter).Append('(');
             builder.Append(LiteralReader.StringLiteral(DotBoxDExpressionModelFactory.EventVariable(property.Name)));
             builder.Append(", TypeOf(").Append(LiteralReader.StringLiteral(property.Type)).AppendLine("));");
             parameterIndex++;
@@ -179,33 +184,33 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine("            var setting = settings[i];");
         builder.Append("            parameters[i + ")
             .Append(model.EventProperties.Count)
-            .AppendLine("] = new global::DotBoxD.Kernels.Parameter(setting.Name, TypeOf(setting.Type));");
+            .Append("] = new ").Append(TypeNames.GlobalParameter).AppendLine("(setting.Name, TypeOf(setting.Type));");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        return parameters;");
         builder.AppendLine("    }");
         builder.AppendLine();
-        builder.Append("    private static global::DotBoxD.Kernels.SandboxType TypeOf(")
+        builder.Append("    private static ").Append(TypeNames.GlobalSandboxType).Append(" TypeOf(")
             .Append(Parameter(DotBoxDGenerationNames.CSharpTypes.String, "type"))
             .AppendLine(") => type switch {");
-        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Bool)} => global::DotBoxD.Kernels.SandboxType.Bool,");
-        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Int)} => global::DotBoxD.Kernels.SandboxType.I32,");
-        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Long)} => global::DotBoxD.Kernels.SandboxType.I64,");
-        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Double)} => global::DotBoxD.Kernels.SandboxType.F64,");
-        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.String)} => global::DotBoxD.Kernels.SandboxType.String,");
-        builder.AppendLine("        _ => throw new global::System.InvalidOperationException($\"Unsupported generated setting type '{type}'.\")");
+        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Bool)} => {TypeNames.GlobalSandboxType}.Bool,");
+        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Int)} => {TypeNames.GlobalSandboxType}.I32,");
+        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Long)} => {TypeNames.GlobalSandboxType}.I64,");
+        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.Double)} => {TypeNames.GlobalSandboxType}.F64,");
+        builder.AppendLine($"        {LiteralReader.StringLiteral(DotBoxDGenerationNames.ManifestTypes.String)} => {TypeNames.GlobalSandboxType}.String,");
+        builder.AppendLine($"        _ => throw new {TypeNames.GlobalInvalidOperationException}($\"Unsupported generated setting type '{{type}}'.\")");
         builder.AppendLine("    };");
         builder.AppendLine();
         EmitHelper(
             builder,
             DotBoxDGenerationNames.Helpers.Var,
             Parameter(DotBoxDGenerationNames.CSharpTypes.String, "name"),
-            "new global::DotBoxD.Kernels.VariableExpression(name, Span)");
+            $"new {TypeNames.GlobalVariableExpression}(name, Span)");
         EmitHelper(
             builder,
             DotBoxDGenerationNames.Helpers.Str,
             Parameter(DotBoxDGenerationNames.CSharpTypes.String, "value"),
-            "new global::DotBoxD.Kernels.LiteralExpression(global::DotBoxD.Kernels.SandboxValue.FromString(value), Span)");
+            $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromString(value), Span)");
         EmitStringLengthHelper(builder);
         EmitStringSubstringHelper(builder);
         EmitStringConcatHelper(builder);
@@ -214,22 +219,22 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             DotBoxDGenerationNames.Helpers.I32,
             Parameter(DotBoxDGenerationNames.CSharpTypes.Int, "value"),
-            "new global::DotBoxD.Kernels.LiteralExpression(global::DotBoxD.Kernels.SandboxValue.FromInt32(value), Span)");
+            $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromInt32(value), Span)");
         EmitHelper(
             builder,
             DotBoxDGenerationNames.Helpers.I64,
             Parameter(DotBoxDGenerationNames.CSharpTypes.Long, "value"),
-            "new global::DotBoxD.Kernels.LiteralExpression(global::DotBoxD.Kernels.SandboxValue.FromInt64(value), Span)");
+            $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromInt64(value), Span)");
         EmitHelper(
             builder,
             DotBoxDGenerationNames.Helpers.F64,
             Parameter(DotBoxDGenerationNames.CSharpTypes.Double, "value"),
-            "new global::DotBoxD.Kernels.LiteralExpression(global::DotBoxD.Kernels.SandboxValue.FromDouble(value), Span)");
+            $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromDouble(value), Span)");
         EmitHelper(
             builder,
             DotBoxDGenerationNames.Helpers.Bool,
             Parameter(DotBoxDGenerationNames.CSharpTypes.Bool, "value"),
-            "new global::DotBoxD.Kernels.LiteralExpression(global::DotBoxD.Kernels.SandboxValue.FromBool(value), Span)");
+            $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromBool(value), Span)");
         EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Not, DotBoxDGenerationNames.Operators.LogicalNot);
         EmitUnaryHelper(builder, DotBoxDGenerationNames.Helpers.Neg, DotBoxDGenerationNames.Operators.Minus);
         EmitBinaryHelper(builder, DotBoxDGenerationNames.Helpers.Eq, DotBoxDGenerationNames.Operators.EqualTo);
@@ -248,7 +253,7 @@ internal static class DotBoxDPackageSourceEmitter
     }
 
     private static void EmitHelper(StringBuilder builder, string name, string parameters, string expression)
-        => builder.Append("    private static global::DotBoxD.Kernels.Expression ")
+        => builder.Append("    private static ").Append(TypeNames.GlobalExpression).Append(' ')
             .Append(name)
             .Append('(')
             .Append(parameters)
@@ -261,7 +266,7 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             DotBoxDGenerationNames.Helpers.ConcatString,
             DotBoxDGenerationNames.BindingIds.StringConcatBudgeted,
-            "global::DotBoxD.Kernels.Expression left, global::DotBoxD.Kernels.Expression right",
+            $"{TypeNames.GlobalExpression} left, {TypeNames.GlobalExpression} right",
             "left, right");
 
     private static void EmitStringLengthHelper(StringBuilder builder)
@@ -269,7 +274,7 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             DotBoxDGenerationNames.Helpers.StringLength,
             DotBoxDGenerationNames.BindingIds.StringLength,
-            "global::DotBoxD.Kernels.Expression value",
+            $"{TypeNames.GlobalExpression} value",
             "value");
 
     private static void EmitStringSubstringHelper(StringBuilder builder)
@@ -277,7 +282,7 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             DotBoxDGenerationNames.Helpers.StringSubstring,
             DotBoxDGenerationNames.BindingIds.StringSubstringBudgeted,
-            "global::DotBoxD.Kernels.Expression value, global::DotBoxD.Kernels.Expression startIndex, global::DotBoxD.Kernels.Expression length",
+            $"{TypeNames.GlobalExpression} value, {TypeNames.GlobalExpression} startIndex, {TypeNames.GlobalExpression} length",
             "value, startIndex, length");
 
     private static void EmitStringEqualsHelper(StringBuilder builder)
@@ -285,7 +290,7 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             DotBoxDGenerationNames.Helpers.StringEquals,
             DotBoxDGenerationNames.BindingIds.StringEquals,
-            "global::DotBoxD.Kernels.Expression left, global::DotBoxD.Kernels.Expression right",
+            $"{TypeNames.GlobalExpression} left, {TypeNames.GlobalExpression} right",
             "left, right");
 
     private static void EmitBindingCallHelper(
@@ -298,26 +303,37 @@ internal static class DotBoxDPackageSourceEmitter
             builder,
             helper,
             parameters,
-            "new global::DotBoxD.Kernels.CallExpression(" +
+            "new " + TypeNames.GlobalCallExpression + "(" +
             LiteralReader.StringLiteral(bindingId) +
             ", [" + arguments + "], null, Span)");
 
     private static string Parameter(string type, string name) => type + " " + name;
 
+    private static string ArrayOf(string elementType) => elementType + "[]";
+
+    private static string EmptyArray(string elementType) => TypeNames.GlobalArray + ".Empty<" + elementType + ">()";
+
+    private static string ReadOnlyListOf(string elementType) => Generic(TypeNames.GlobalReadOnlyList, elementType);
+
+    private static string Generic(string typeName, string argument) => typeName + "<" + argument + ">";
+
+    private static string Generic(string typeName, string firstArgument, string secondArgument)
+        => typeName + "<" + firstArgument + ", " + secondArgument + ">";
+
     private static void EmitUnaryHelper(StringBuilder builder, string name, string op)
         => EmitHelper(
             builder,
             name,
-            "global::DotBoxD.Kernels.Expression operand",
-            $"new global::DotBoxD.Kernels.UnaryExpression({LiteralReader.StringLiteral(op)}, operand, Span)");
+            $"{TypeNames.GlobalExpression} operand",
+            $"new {TypeNames.GlobalUnaryExpression}({LiteralReader.StringLiteral(op)}, operand, Span)");
 
     private static void EmitBinaryHelper(StringBuilder builder, string name, string op)
         => EmitHelper(
             builder,
             name,
-            "global::DotBoxD.Kernels.Expression left, global::DotBoxD.Kernels.Expression right",
-            $"new global::DotBoxD.Kernels.BinaryExpression(left, {LiteralReader.StringLiteral(op)}, right, Span)");
+            $"{TypeNames.GlobalExpression} left, {TypeNames.GlobalExpression} right",
+            $"new {TypeNames.GlobalBinaryExpression}(left, {LiteralReader.StringLiteral(op)}, right, Span)");
 
     private static string HandleExpression(DotBoxDHandleModel handle)
-        => $"new global::DotBoxD.Kernels.CallExpression(global::DotBoxD.Plugins.PluginMessageBindings.SendBindingId, [{handle.Target.Source}, {handle.Message.Source}], null, Span)";
+        => $"new {TypeNames.GlobalCallExpression}({TypeNames.GlobalPluginMessageBindings}.SendBindingId, [{handle.Target.Source}, {handle.Message.Source}], null, Span)";
 }

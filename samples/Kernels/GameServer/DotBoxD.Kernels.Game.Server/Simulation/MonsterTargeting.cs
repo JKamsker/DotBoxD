@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Game.Server;
+namespace DotBoxD.Kernels.Game.Server.Simulation;
 
 /// <summary>
 /// Deterministic target selection and movement for monsters. Calm and taunt effects (recorded by

@@ -1,6 +1,10 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Interpreter.Regression;
 
 /// <summary>
 /// ALG-0010: compiled binding dispatch recursively re-validates every argument value on
@@ -9,7 +13,7 @@ namespace DotBoxD.Kernels.Tests;
 /// path and, at most, shallow-check the wrapper kind/declared element metadata instead of
 /// walking the entire collection per call.
 ///
-/// These tests drive <see cref="CompiledRuntime.CallBinding"/> directly with a list
+/// These tests drive <see cref="Kernels.Runtime.CompiledRuntime.CallBinding"/> directly with a list
 /// argument whose declared element type (<c>List&lt;I32&gt;</c>) matches the binding
 /// parameter, so a shallow wrapper-type check passes. Because the per-call dispatcher today
 /// performs a FULL recursive walk via SandboxValueValidator.RequireType, it descends into
@@ -45,7 +49,7 @@ public sealed class Fix_ALG_0010_Tests
         // RED today: the dispatcher recursively revalidates the argument and throws
         // SandboxRuntimeException(ValidationError) before the binding runs. After the fix,
         // the compiled type proof is trusted on the hot path and the binding is invoked.
-        var result = CompiledRuntime.CallBinding(context, BindingId, new[] { listArg });
+        var result = Kernels.Runtime.CompiledRuntime.CallBinding(context, BindingId, new[] { listArg });
 
         Assert.True(invoked, "binding body must run instead of being blocked by a per-call recursive argument re-walk");
         Assert.Equal(SandboxType.I32, result.Type);
@@ -63,7 +67,7 @@ public sealed class Fix_ALG_0010_Tests
         var scalarArg = SandboxValue.FromInt32(42);
 
         var error = Assert.Throws<SandboxRuntimeException>(
-            () => CompiledRuntime.CallBinding(context, BindingId, new[] { scalarArg }));
+            () => Kernels.Runtime.CompiledRuntime.CallBinding(context, BindingId, new[] { scalarArg }));
 
         Assert.Equal(SandboxErrorCode.ValidationError, error.Error.Code);
         Assert.False(invoked, "binding body must not run when the argument wrapper type does not match");
@@ -85,7 +89,7 @@ public sealed class Fix_ALG_0010_Tests
                 onInvoke();
                 return ValueTask.FromResult(SandboxValue.FromInt32(0));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static SandboxContext Context(BindingDescriptor binding)
     {

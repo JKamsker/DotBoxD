@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierCompiledShapeTests
 {
@@ -30,7 +32,7 @@ public sealed class VerifierCompiledShapeTests
             var il = execute.GetILGenerator();
             EmitValidateInput(il);
             il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             il.Emit(OpCodes.Ret);
         }));
 
@@ -56,7 +58,7 @@ public sealed class VerifierCompiledShapeTests
             var il = execute.GetILGenerator();
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Call, fn);
@@ -180,7 +182,7 @@ public sealed class VerifierCompiledShapeTests
             EmitEnterCall(fnIl);
             EmitChargeFuel(fnIl, 0);
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -207,9 +209,9 @@ public sealed class VerifierCompiledShapeTests
             // Two metered runtime work calls (Neg) against a single fuel charge -> rejected. I32 boxing is a
             // non-metered O(1) conversion, so it only materializes the operand and does not count as work.
             fnIl.Emit(OpCodes.Ldc_I4_1);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.Neg))!);
-            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.Neg))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.Neg))!);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.Neg))!);
             fnIl.Emit(OpCodes.Stloc, value);
             EmitExitCall(fnIl);
             fnIl.Emit(OpCodes.Ldloc, value);
@@ -301,7 +303,7 @@ public sealed class VerifierCompiledShapeTests
     {
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldc_I4_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
     }
 
     private static void EmitFunctionMeters(ILGenerator il)
@@ -314,7 +316,7 @@ public sealed class VerifierCompiledShapeTests
     private static void EmitEnterCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
     }
 
     private static void EmitChargeFuel(ILGenerator il)
@@ -324,12 +326,12 @@ public sealed class VerifierCompiledShapeTests
     {
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldc_I4, amount);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
     }
 
     private static void EmitExitCall(ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
 }

@@ -1,9 +1,13 @@
-namespace DotBoxD.Kernels.Example.Capabilities;
-
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
+
+namespace DotBoxD.Kernels.Example.Capabilities.Examples;
 
 /// <summary>
 /// Package-backed walkthrough for authoring a custom host binding.
@@ -94,7 +98,7 @@ internal static class CustomBindingExample
                 return ValueTask.FromResult(SandboxValue.FromInt32(resolved));
             },
             // Compiled mode dispatches custom bindings through the shared runtime stub.
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Runtime.CompiledRuntime.CallBinding)),
             ValidateTenantReadGrant);
 
     // The grant validator runs during preparation and fails closed on unsupported or invalid

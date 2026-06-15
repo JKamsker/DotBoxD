@@ -1,4 +1,6 @@
-namespace DotBoxD.Kernels;
+using DotBoxD.Kernels.Bindings;
+
+namespace DotBoxD.Kernels.Model;
 
 public readonly record struct ShortCircuitOperands(Expression First, Expression Second, bool Reordered);
 

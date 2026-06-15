@@ -1,6 +1,10 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Generated;
 
 public sealed class CompiledRuntimeQuotaTests
 {
@@ -34,7 +38,7 @@ public sealed class CompiledRuntimeQuotaTests
         var context = ContextWithLimits(new ResourceLimits(MaxFuel: 1_000_000_000, MaxAllocatedBytes: 16));
 
         var ex = Assert.Throws<SandboxRuntimeException>(() =>
-            CompiledRuntime.CreateValueArray(context, 536_870_912));
+            Kernels.Runtime.CompiledRuntime.CreateValueArray(context, 536_870_912));
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
         Assert.Equal(536_870_912, context.Budget.FuelUsed);

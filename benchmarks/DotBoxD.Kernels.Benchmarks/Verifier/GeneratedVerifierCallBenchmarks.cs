@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
+
 namespace DotBoxD.Kernels.Benchmarks.Verifier;
 
 using System.Reflection;
@@ -62,15 +65,15 @@ public class GeneratedVerifierCallBenchmarks
         var il = method.GetILGenerator();
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldc_I4_0);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ValidateEntrypointInput)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput)));
         for (var i = 0; i < callCount; i++)
         {
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.ChargeFuel)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel)));
         }
 
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.Unit)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.Unit)));
         il.Emit(OpCodes.Ret);
         type.CreateType();
 
@@ -80,5 +83,5 @@ public class GeneratedVerifierCallBenchmarks
     }
 
     private static MethodInfo Runtime(string name)
-        => typeof(CompiledRuntime).GetMethod(name)!;
+        => typeof(Kernels.Runtime.CompiledRuntime).GetMethod(name)!;
 }

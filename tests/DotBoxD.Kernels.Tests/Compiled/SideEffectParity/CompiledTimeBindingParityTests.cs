@@ -1,7 +1,10 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Differential / parity tests for <c>time.nowUnixMillis</c> under interpreted vs compiled
@@ -11,7 +14,7 @@ namespace DotBoxD.Kernels.Tests;
 ///   <c>time.nowUnixMillis</c> reads a wall-clock value that is inherently nondeterministic.
 ///   To make the returned timestamp value comparable across two separate executions (interpreted
 ///   and compiled), every test that checks the returned I64 uses
-///   <see cref="SandboxPolicyBuilder.Deterministic(DateTimeOffset, ulong)"/> with a fixed
+///   <see cref="SandboxPolicyBuilder.Deterministic"/> with a fixed
 ///   <c>logicalNow</c>.  The policy then seeds <c>SandboxContext.UtcNow()</c> with the pinned
 ///   offset, so both runs observe the same clock value and both the return value and the audit
 ///   event Timestamp can be compared deterministically.
@@ -299,8 +302,8 @@ public sealed class CompiledTimeBindingParityTests
     // Private helpers (all prefixed "TimeParity" to avoid name collisions)
     // ──────────────────────────────────────────────────────────────────────────
 
-    private static DotBoxD.Hosting.SandboxHost TimeParityBuildHost()
-        => DotBoxD.Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost TimeParityBuildHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddTimeBindings();

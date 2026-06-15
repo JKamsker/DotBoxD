@@ -1,11 +1,12 @@
 using System.Net;
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
-using DotBoxD.Kernels.Serialization.Json;
-using DotBoxD.Hosting.Http;
+using DotBoxD.Hosting.Http.Hosting;
+using DotBoxD.Hosting.Http.Policy;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 
 // Regression guard for CMP-0013: the maintained HTTP transport example must keep proving the
 // consumer-facing safe setup (AddNetworkBindings + GrantHttpGet) through the public package

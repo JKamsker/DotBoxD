@@ -1,6 +1,9 @@
-namespace DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using SandboxContext = DotBoxD.Kernels.Sandbox.SandboxContext;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Runtime.Internal;
 
 // Cohesive implementation detail for compiled-mode map operations.
 //

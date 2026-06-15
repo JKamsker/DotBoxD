@@ -1,17 +1,19 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
-using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginPackageValidationTests
 {
     [Fact]
     public async Task Install_rejects_manifest_plugin_id_that_does_not_match_module()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { PluginId = "other-plugin" } };
 
@@ -23,7 +25,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_manifest_effects_that_do_not_match_verified_module()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { Effects = ["Cpu", "HostStateWrite", "Audit"] } };
 
@@ -35,7 +37,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_missing_kernel_entrypoint()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Entrypoints = package.Entrypoints with { Handle = "MissingHandle" } };
 
@@ -47,7 +49,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_subscription_kernel_that_does_not_match_module_metadata()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with
         {
@@ -67,7 +69,7 @@ public sealed class PluginPackageValidationTests
     {
         var compiler = new FailingCompiler();
         var messages = new InMemoryPluginMessageSink();
-        var server = PluginServer.Create(
+        var server = DotBoxD.Plugins.PluginServer.Create(
             messages,
             builder => builder.UseCompilerIfAvailable(compiler),
             PluginAddendumTestPolicies.LongWall());
@@ -85,7 +87,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_unsupported_manifest_execution_mode()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { Mode = (ExecutionMode)123 } };
 
@@ -97,7 +99,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_manifest_contract_that_does_not_match_subscription_event()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { Contract = "IItemFilter" } };
 
@@ -111,7 +113,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_event_kernel_contract_with_different_event_than_subscription()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { Contract = "IEventKernel<OtherEvent>" } };
 
@@ -125,7 +127,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_wrong_should_handle_return_type()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var shouldHandle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.ShouldHandle);
         var span = new SourceSpan(1, 1);
@@ -148,7 +150,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_live_setting_missing_from_entrypoint_parameters()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var handle = package.Module.Functions.Single(f => f.Id == package.Entrypoints.Handle);
         var functions = package.Module.Functions
@@ -166,7 +168,7 @@ public sealed class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_event_and_live_setting_parameters_in_wrong_order()
     {
-        var server = PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         server.RegisterEventAdapter(DamageEventAdapter.Instance);
         var package = FireDamagePluginPackage.Create();
         var functions = package.Module.Functions

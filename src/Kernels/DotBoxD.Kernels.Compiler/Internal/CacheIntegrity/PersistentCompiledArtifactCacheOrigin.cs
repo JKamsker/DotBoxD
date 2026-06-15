@@ -1,11 +1,12 @@
-namespace DotBoxD.Kernels.Compiler.Internal;
-
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DotBoxD.Kernels;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Verifier.Generated;
+
+namespace DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 
 internal static class PersistentCompiledArtifactCacheOrigin
 {

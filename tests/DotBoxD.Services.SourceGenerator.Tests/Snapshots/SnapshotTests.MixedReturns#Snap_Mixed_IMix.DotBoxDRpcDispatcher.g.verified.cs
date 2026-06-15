@@ -19,10 +19,10 @@ namespace Snap.Mixed
         public string ServiceName => "IMix";
 
         public global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>
-            DispatchAsync(method, payload, serializer, registry, output, global::DotBoxD.Services.Streaming.RpcStreamingContext.Disabled, ct);
+            DispatchAsync(method, payload, serializer, registry, output, global::DotBoxD.Services.Streaming.Remote.RpcStreamingContext.Disabled, ct);
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             switch (method)
@@ -64,10 +64,10 @@ namespace Snap.Mixed
         }
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>
-            DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::DotBoxD.Services.Streaming.RpcStreamingContext.Disabled, ct);
+            DispatchOnInstanceAsync(instanceId, method, payload, serializer, registry, output, global::DotBoxD.Services.Streaming.Remote.RpcStreamingContext.Disabled, ct);
 
 #pragma warning disable CS1998
-        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
+        public async global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
             if (!registry.TryGet("IMix", instanceId, out var __obj) || __obj is not global::Snap.Mixed.IMix __inst)

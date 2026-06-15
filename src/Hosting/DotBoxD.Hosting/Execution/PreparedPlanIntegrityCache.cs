@@ -1,8 +1,7 @@
-namespace DotBoxD.Hosting;
-
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using DotBoxD.Kernels;
+
+namespace DotBoxD.Hosting.Execution;
 
 /// <summary>
 /// Remembers the plans a host prepared so repeated execution of an already-prepared plan can be

@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Benchmarks.Runtime;
 
 using System.Diagnostics;
@@ -11,16 +13,16 @@ internal static class RuntimeTypeProbe
         const int warmup = 100_000;
 
         _ = Measure(warmup, static () => SandboxType.Scalar("I32"));
-        _ = Measure(warmup, static () => CompiledRuntime.TypeScalar("I32"));
-        _ = Measure(warmup, static () => CompiledRuntime.TypeScalar("MonsterId"));
+        _ = Measure(warmup, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("I32"));
+        _ = Measure(warmup, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("MonsterId"));
         var i32 = SandboxValue.FromInt32(42);
         var genericI32Type = SandboxType.Scalar("I32");
         _ = Measure(warmup, () => SandboxValueValidator.RequireType(i32, genericI32Type, "probe"));
         _ = Measure(warmup, () => SandboxValueValidator.RequireType(i32, SandboxType.I32, "probe"));
 
         var allocatedScalar = Measure(iterations, static () => SandboxType.Scalar("I32"));
-        var runtimeBuiltIn = Measure(iterations, static () => CompiledRuntime.TypeScalar("I32"));
-        var runtimeOpaque = Measure(iterations, static () => CompiledRuntime.TypeScalar("MonsterId"));
+        var runtimeBuiltIn = Measure(iterations, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("I32"));
+        var runtimeOpaque = Measure(iterations, static () => Kernels.Runtime.CompiledRuntime.TypeScalar("MonsterId"));
         var genericValidation = Measure(
             iterations,
             () => SandboxValueValidator.RequireType(i32, genericI32Type, "probe"));

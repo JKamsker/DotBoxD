@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Model;
 
 internal static class PolicyHash
 {

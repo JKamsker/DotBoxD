@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Verifier.Generated;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
+
 namespace DotBoxD.Kernels.Verifier;
 
 using System.Reflection;
@@ -108,7 +111,7 @@ internal static class OpCodeVerifier
             }
 
             var name = MetadataName.Type(reader, handle);
-            if (!StringComparer.Ordinal.Equals(name, "DotBoxD.Kernels.SandboxValue"))
+            if (!StringComparer.Ordinal.Equals(name, VerifierTypeNames.SandboxValueName))
             {
                 diagnostics.Add(new VerificationDiagnostic("V-ARRAY", $"array element type '{name}' is not allowed"));
             }

@@ -1,8 +1,12 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Validation;
-using DotBoxD.Kernels.Verifier;
+using DotBoxD.Kernels.Validation.Model;
+using DotBoxD.Kernels.Verifier.Generated;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core.Immutability;
 
 public sealed class PublicEvidenceImmutabilityTests
 {

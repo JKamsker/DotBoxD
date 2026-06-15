@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Emitters;
 
 using System.Reflection.Emit;
@@ -13,7 +15,7 @@ internal static class CompiledTypeEmitter
         {
             EmitMetered(il, type.Arguments[0]);
             CompiledMeterEmitter.Fuel(il, 1);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeList)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeList)));
             return;
         }
 
@@ -22,12 +24,12 @@ internal static class CompiledTypeEmitter
             EmitMetered(il, type.Arguments[0]);
             EmitMetered(il, type.Arguments[1]);
             CompiledMeterEmitter.Fuel(il, 1);
-            il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeMap)));
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeMap)));
             return;
         }
 
         CompiledMeterEmitter.Fuel(il, 1);
         il.Emit(OpCodes.Ldstr, type.Name);
-        il.Emit(OpCodes.Call, Runtime(nameof(CompiledRuntime.TypeScalar)));
+        il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));
     }
 }

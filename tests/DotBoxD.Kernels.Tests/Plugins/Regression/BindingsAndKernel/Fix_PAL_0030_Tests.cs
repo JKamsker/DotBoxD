@@ -1,8 +1,10 @@
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
 using DotBoxD.Hosting.Internal;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
 
 /// <summary>
 /// Regression coverage for PAL-0030: <see cref="AutoExecutionHotness"/> must not

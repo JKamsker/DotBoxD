@@ -1,4 +1,10 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
+
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class FileExtensionPolicyTests
 {
@@ -6,7 +12,7 @@ public sealed class FileExtensionPolicyTests
     public async Task File_read_allows_configured_extension()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.json"), "ok");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "settings.json"), "ok");
 
         var result = await ExecuteReadAsync(temp.Path, "settings.json", ".json");
 
@@ -18,7 +24,7 @@ public sealed class FileExtensionPolicyTests
     public async Task File_read_denies_disallowed_extension()
     {
         using var temp = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "secret.txt"), "blocked");
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "secret.txt"), "blocked");
 
         var result = await ExecuteReadAsync(temp.Path, "secret.txt", ".json");
 

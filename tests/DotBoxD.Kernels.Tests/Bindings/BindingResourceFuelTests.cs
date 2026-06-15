@@ -1,6 +1,12 @@
-using static DotBoxD.Kernels.Tests.NetworkTestFixtures;
+using DotBoxD.Hosting.Http.Policy;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.Interpreter;
+using static DotBoxD.Kernels.Tests._TestSupport.NetworkTestFixtures;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class BindingResourceFuelTests
 {

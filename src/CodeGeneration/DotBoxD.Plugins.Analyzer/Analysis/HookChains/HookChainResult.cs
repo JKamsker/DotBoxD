@@ -1,4 +1,4 @@
-namespace DotBoxD.Plugins.Analyzer;
+namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
 /// A lowered hook chain: the package model (emitted like a kernel) plus optional interception metadata

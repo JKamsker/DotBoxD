@@ -1,10 +1,10 @@
-namespace DotBoxD.Plugins.Analyzer;
-
-using System.Collections.Generic;
 using System.Globalization;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 /// <summary>
 /// Expression lowering and JSON emission for <see cref="DotBoxDRpcJsonLowerer"/>: constants, identifiers,

@@ -1,9 +1,8 @@
+using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerGenerationTests
 {

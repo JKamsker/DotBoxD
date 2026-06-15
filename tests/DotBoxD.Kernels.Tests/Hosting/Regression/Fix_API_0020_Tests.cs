@@ -1,7 +1,8 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using DotBoxD.Kernels.Policies;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 /// <summary>
 /// Regression coverage for API-0020: the shipped <see cref="SandboxPolicyBuilder.GrantFileWrite"/>

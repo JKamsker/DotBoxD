@@ -1,7 +1,8 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 internal static class GeneratedIlReader
 {

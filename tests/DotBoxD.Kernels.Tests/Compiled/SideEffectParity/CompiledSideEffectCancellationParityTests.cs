@@ -1,8 +1,14 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Cancellation/timeout parity tests for side-effecting bindings.
@@ -328,8 +334,8 @@ public sealed class CompiledSideEffectCancellationParityTests
     // Private helpers
     // ---------------------------------------------------------------------------
 
-    private static Hosting.SandboxHost CancellationMessageHost(IPluginMessageSink sink)
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CancellationMessageHost(IPluginMessageSink sink)
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddPluginMessageBindings(sink);
@@ -337,8 +343,8 @@ public sealed class CompiledSideEffectCancellationParityTests
             builder.UseCompilerIfAvailable();
         });
 
-    private static Hosting.SandboxHost CancellationLogHost()
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CancellationLogHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();
@@ -346,8 +352,8 @@ public sealed class CompiledSideEffectCancellationParityTests
             builder.UseCompilerIfAvailable();
         });
 
-    private static Hosting.SandboxHost CancellationPureHost()
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CancellationPureHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddBinding(CancellationInstantPureBinding());
@@ -355,8 +361,8 @@ public sealed class CompiledSideEffectCancellationParityTests
             builder.UseCompilerIfAvailable();
         });
 
-    private static Hosting.SandboxHost CancellationSlowPureHost()
-        => Hosting.SandboxHost.Create(builder =>
+    private static SandboxHost CancellationSlowPureHost()
+        => SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddBinding(CancellationSlowPureBinding());
@@ -482,7 +488,7 @@ public sealed class CompiledSideEffectCancellationParityTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.FromInt32(42)),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     /// <summary>
     /// A pure binding that blocks until the wall-time cancellation token fires,
@@ -504,7 +510,7 @@ public sealed class CompiledSideEffectCancellationParityTests
                 await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
                 return SandboxValue.FromInt32(0);
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     // ---------------------------------------------------------------------------
     // Nested helpers (prefixed with "Cancellation" to avoid collisions when test

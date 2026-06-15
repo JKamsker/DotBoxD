@@ -1,7 +1,7 @@
-using DotBoxD.Hosting;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Hosting.Http.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests._TestSupport;
 
 internal static class SandboxTestHost
 {

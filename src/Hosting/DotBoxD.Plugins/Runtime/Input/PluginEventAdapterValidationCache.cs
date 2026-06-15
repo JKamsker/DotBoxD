@@ -1,7 +1,7 @@
-namespace DotBoxD.Plugins;
-
 using System.Runtime.CompilerServices;
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Model;
+
+namespace DotBoxD.Plugins.Runtime.Input;
 
 internal sealed class PluginEventAdapterValidationCache
 {

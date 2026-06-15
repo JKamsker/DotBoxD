@@ -1,6 +1,8 @@
-namespace DotBoxD.Kernels.Interpreter.Internal;
+using DotBoxD.Kernels.Interpreter.Frame;
+using DotBoxD.Kernels.Interpreter.Internal.Expressions;
+using DotBoxD.Kernels.Sandbox;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Interpreter.Internal.Loops;
 
 // Fast path for `while (<i32 comparison>) { <i32 assignments> }`. Evaluates the condition and body with
 // unboxed i32 plans instead of the boxed statement executor (which allocates a value per op).

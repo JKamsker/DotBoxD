@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using DotBoxD.Services.Attributes;
+using DotBoxD.Services.SourceGenerator.EntryPoint;
 
 namespace DotBoxD.Services.SourceGenerator.Tests;
 

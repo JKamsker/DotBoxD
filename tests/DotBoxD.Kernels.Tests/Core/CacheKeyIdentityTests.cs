@@ -1,9 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using DotBoxD.Kernels.Compiler;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Core;
 
 public sealed class CacheKeyIdentityTests
 {
@@ -17,7 +21,7 @@ public sealed class CacheKeyIdentityTests
         var extendedPolicy = policy with
         {
             AllowedMembers = policy.AllowedMembers
-                .Append("DotBoxD.Kernels.Runtime.CompiledRuntime.TestOnly(DotBoxD.Kernels.SandboxContext):System.Void")
+                .Append("DotBoxD.Kernels.Runtime.CompiledRuntime.TestOnly(DotBoxD.Kernels.Sandbox.SandboxContext):System.Void")
                 .ToHashSet(StringComparer.Ordinal)
         };
 
@@ -103,7 +107,7 @@ public sealed class CacheKeyIdentityTests
         var policy = VerificationPolicy.BoxedValueDefaults() with { AllowedMembers = members };
         var allowlistHash = policy.AllowlistHash;
         var runtimeFacadeHash = policy.RuntimeFacadeHash;
-        const string forgedMember = "DotBoxD.Kernels.Runtime.CompiledRuntime.TestOnly(DotBoxD.Kernels.SandboxContext):System.Void";
+        const string forgedMember = "DotBoxD.Kernels.Runtime.CompiledRuntime.TestOnly(DotBoxD.Kernels.Sandbox.SandboxContext):System.Void";
 
         members.Add(forgedMember);
 

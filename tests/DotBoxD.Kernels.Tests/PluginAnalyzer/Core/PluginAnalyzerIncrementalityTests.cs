@@ -1,13 +1,11 @@
 using System.Collections;
 using System.Collections.Immutable;
 using System.Reflection;
+using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 public sealed class PluginAnalyzerIncrementalityTests
 {

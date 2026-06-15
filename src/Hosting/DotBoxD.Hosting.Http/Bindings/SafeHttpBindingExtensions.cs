@@ -1,6 +1,6 @@
-namespace DotBoxD.Hosting.Http;
+using DotBoxD.Kernels.Bindings;
 
-using DotBoxD.Hosting.Http.Internal;
+namespace DotBoxD.Hosting.Http.Bindings;
 
 public static class SafeHttpBindingExtensions
 {

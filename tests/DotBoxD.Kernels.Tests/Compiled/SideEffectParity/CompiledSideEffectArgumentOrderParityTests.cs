@@ -1,8 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
-using DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Plugins.Runtime;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Compiled.SideEffectParity;
 
 /// <summary>
 /// Regression coverage for the Codex P2 finding: a binding argument may itself be a side-effecting
@@ -212,7 +216,7 @@ public sealed class CompiledSideEffectArgumentOrderParityTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             static (_, _) => { });
 
     // A side-effecting, capability-gated binding that takes no arguments, records each invocation, and
@@ -244,7 +248,7 @@ public sealed class CompiledSideEffectArgumentOrderParityTests
                     Fields: context.BindingAuditFields("touch", timestamp)));
                 return ValueTask.FromResult(SandboxValue.FromString("player-1"));
             },
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             static (grant, diagnostics) =>
             {
                 foreach (var key in grant.Parameters.Keys)

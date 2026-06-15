@@ -1,3 +1,10 @@
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Rpc;
+
 namespace DotBoxD.Plugins;
 
 using System.Collections;
@@ -7,13 +14,13 @@ using DotBoxD.Hosting;
 
 public sealed partial class PluginServer : IDisposable
 {
-    private readonly SandboxHost _host;
+    private readonly Hosting.Execution.SandboxHost _host;
     private readonly SandboxPolicy _defaultPolicy;
     private readonly ExecutionMode _executionMode;
     private int _disposed;
 
     private PluginServer(
-        SandboxHost host,
+        Hosting.Execution.SandboxHost host,
         SandboxPolicy defaultPolicy,
         IPluginMessageSink messages,
         ExecutionMode executionMode)
@@ -50,7 +57,7 @@ public sealed partial class PluginServer : IDisposable
         }
 
         messages ??= new InMemoryPluginMessageSink();
-        var host = SandboxHost.Create(builder =>
+        var host = Hosting.Execution.SandboxHost.Create(builder =>
         {
             builder.AddDefaultPureBindings();
             builder.AddLogBindings();
@@ -175,7 +182,7 @@ public sealed partial class PluginServer : IDisposable
     }
 
     /// <summary>
-    /// Releases the owned <see cref="SandboxHost"/> (compiled executable cache, generated load
+    /// Releases the owned <see cref="Hosting.Execution.SandboxHost"/> (compiled executable cache, generated load
     /// contexts, hotness state, and other host-owned execution resources) so a host that retires a
     /// plugin server (per tenant, world, test, or reload) can deterministically reclaim them through
     /// the public plugin API. After disposal the lifecycle entrypoints

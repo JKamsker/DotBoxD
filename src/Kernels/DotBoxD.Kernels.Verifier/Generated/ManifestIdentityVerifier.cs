@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Verifier;
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 internal static class ManifestIdentityVerifier
 {

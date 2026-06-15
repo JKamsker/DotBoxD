@@ -1,7 +1,6 @@
-namespace DotBoxD.Hosting.Http;
+using DotBoxD.Hosting.Execution;
 
-using DotBoxD.Kernels.Runtime;
-using DotBoxD.Hosting.Http.Internal;
+namespace DotBoxD.Hosting.Http.Hosting;
 
 public static class SafeHttpHostBuilderExtensions
 {

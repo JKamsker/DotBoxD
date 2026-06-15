@@ -1,7 +1,13 @@
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Hosting.Http.Bindings;
+using DotBoxD.Hosting.Http.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Runtime.Bindings;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Bindings;
 
 public sealed class BindingRegistryValidationTests
 {
@@ -22,8 +28,8 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() =>
             new BindingRegistryBuilder()
-                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))))
-                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding))))
+                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding))))
+                .Add(TestBinding(CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding))))
                 .Build());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-DUP");
@@ -34,7 +40,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
                 id: "")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
@@ -45,7 +51,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
                 id: "System.IO.File.ReadAllText")));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-ID");
@@ -56,7 +62,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
                 effects: SandboxEffect.FileRead,
                 requiredCapability: "System.IO.File")));
 
@@ -67,7 +73,7 @@ public sealed class BindingRegistryValidationTests
     public void Binding_registry_rejects_unsupported_compiled_target_kind()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
-            TestBinding(new CompiledBinding("DirectMethod", typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)))));
+            TestBinding(new CompiledBinding("DirectMethod", typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)))));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
     }
@@ -113,7 +119,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.AbsI32)),
                 BindingSafety.PureHostFacade)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
@@ -124,7 +130,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.AbsI32)),
                 BindingSafety.PureIntrinsic,
                 auditLevel: AuditLevel.PerCall)));
 
@@ -136,7 +142,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.AbsI32)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.AbsI32)),
                 BindingSafety.PureIntrinsic)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COMPILED");
@@ -146,7 +152,7 @@ public sealed class BindingRegistryValidationTests
     public void Binding_registry_rejects_side_effecting_binding_without_capability()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             effects: SandboxEffect.FileRead)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-CAP");
@@ -156,7 +162,7 @@ public sealed class BindingRegistryValidationTests
     public void Binding_registry_rejects_dangerous_binding()
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(TestBinding(
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             safety: BindingSafety.DangerousRequiresReview)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-DANGER");
@@ -168,7 +174,7 @@ public sealed class BindingRegistryValidationTests
     {
         var ex = Assert.Throws<SandboxValidationException>(() => Build(
             TestBinding(
-                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+                CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
                 costModel: costModel)));
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-COST");

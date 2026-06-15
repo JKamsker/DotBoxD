@@ -1,10 +1,10 @@
-using DotBoxD.Kernels;
+using DotBoxD.Kernels.Policies;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
 
 /// <summary>
 /// Regression coverage for PAL-0029: the generic
-/// <see cref="SandboxPolicyBuilder.Grant(string, object)"/> extensibility overload rediscovered
+/// <see cref="SandboxPolicyBuilder.Grant(string,object)"/> extensibility overload rediscovered
 /// parameter object metadata via <c>GetType().GetProperties(...)</c>, re-filtered public getters
 /// and indexers, and invoked a reflection <c>GetValue</c> for every grant -- even when many grants
 /// reuse the same anonymous/options parameter type. The fix caches the readable property accessors

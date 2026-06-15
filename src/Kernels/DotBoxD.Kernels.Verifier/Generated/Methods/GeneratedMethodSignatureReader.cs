@@ -1,8 +1,7 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection;
 using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
+
+namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
 internal static class GeneratedMethodSignatureReader
 {

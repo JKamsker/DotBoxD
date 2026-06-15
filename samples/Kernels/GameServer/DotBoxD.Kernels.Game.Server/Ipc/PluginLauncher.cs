@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Game.Server;
-
 using System.Diagnostics;
+
+namespace DotBoxD.Kernels.Game.Server.Ipc;
 
 /// <summary>
 /// Launches the plugin child process and forwards its stdout/stderr so the demo shows the plugin's

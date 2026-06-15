@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Model;
+
 namespace DotBoxD.Kernels.Validation.Internal;
 
 using DotBoxD.Kernels;

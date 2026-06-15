@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
+
 namespace DotBoxD.Kernels.Compiler.Internal;
 
 using System.Runtime.Versioning;

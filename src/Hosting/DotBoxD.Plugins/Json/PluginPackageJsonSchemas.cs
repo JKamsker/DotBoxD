@@ -1,6 +1,6 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Serialization.Json.Schema;
 
-using DotBoxD.Kernels.Serialization.Json;
+namespace DotBoxD.Plugins.Json;
 
 /// <summary>
 /// Exposes the versioned, machine-readable JSON Schema artifact that describes the plugin package

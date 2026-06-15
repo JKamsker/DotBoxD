@@ -1,6 +1,6 @@
-namespace DotBoxD.Kernels.Verifier;
-
 using System.Reflection.Metadata;
+
+namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
 internal static class GeneratedMethodMeterAnalyzer
 {

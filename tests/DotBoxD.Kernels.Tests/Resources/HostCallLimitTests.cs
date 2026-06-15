@@ -1,7 +1,12 @@
-using DotBoxD.Hosting;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.Resources;
 
 public sealed class HostCallLimitTests
 {
@@ -47,8 +52,8 @@ public sealed class HostCallLimitTests
             new InMemoryAuditSink(),
             CancellationToken.None);
 
-        _ = CompiledRuntime.CallBinding(context, "test.ping", []);
-        var ex = Assert.Throws<SandboxRuntimeException>(() => CompiledRuntime.CallBinding(context, "test.ping", []));
+        _ = Kernels.Runtime.CompiledRuntime.CallBinding(context, "test.ping", []);
+        var ex = Assert.Throws<SandboxRuntimeException>(() => Kernels.Runtime.CompiledRuntime.CallBinding(context, "test.ping", []));
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
         Assert.Equal(2, context.Budget.HostCalls);
@@ -81,7 +86,7 @@ public sealed class HostCallLimitTests
             AuditLevel.None,
             BindingSafety.PureHostFacade,
             (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)));
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)));
 
     private static string DoubleCallJson(string bindingId)
         => $$"""

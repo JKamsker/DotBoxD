@@ -1,6 +1,8 @@
-namespace DotBoxD.Plugins;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Plugins.Runtime.Input;
 
-using DotBoxD.Kernels;
+namespace DotBoxD.Plugins.Kernel;
 
 public sealed partial class InstalledKernel
 {

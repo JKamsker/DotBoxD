@@ -1,10 +1,13 @@
-namespace DotBoxD.Plugins;
-
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using DotBoxD.Kernels;
-using DotBoxD.Hosting;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using CompiledRuntime = DotBoxD.Kernels.Runtime.CompiledRuntime;
+
+namespace DotBoxD.Plugins.Runtime;
 
 public static class PluginMessageBindings
 {
@@ -38,7 +41,7 @@ public static class PluginMessageBindings
             AuditLevel.PerResource,
             BindingSafety.SideEffectingExternal,
             invoker.Invoke,
-            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(Kernels.Runtime.CompiledRuntime.CallBinding)),
             ValidateGrant);
     }
 

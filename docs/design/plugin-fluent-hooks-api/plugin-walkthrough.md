@@ -122,7 +122,7 @@ automatically. See [kernel-binding-model.md](kernel-binding-model.md).
 namespace DotBoxD.Kernels.Game.Plugin;
 
 using DotBoxD.Kernels.Game.Plugin.Client;
-using DotBoxD.Kernels.Transport.Ipc;
+using DotBoxD.Pushdown.Services;
 
 internal static class Program
 {

@@ -1,4 +1,9 @@
-namespace DotBoxD.Kernels.Tests;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Serialization.Json.Hosting;
+using DotBoxD.Kernels.Tests._TestSupport;
+
+namespace DotBoxD.Kernels.Tests.Runtime.File;
 
 public sealed class SafeFileWriteUnixModeTests
 {
@@ -24,8 +29,8 @@ public sealed class SafeFileWriteUnixModeTests
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
-        Assert.Equal("written", await File.ReadAllTextAsync(target));
-        var mode = File.GetUnixFileMode(target);
+        Assert.Equal("written", await System.IO.File.ReadAllTextAsync(target));
+        var mode = System.IO.File.GetUnixFileMode(target);
         Assert.True((mode & UnixFileMode.UserRead) != 0, $"mode was {mode}");
         Assert.True((mode & UnixFileMode.UserWrite) != 0, $"mode was {mode}");
     }

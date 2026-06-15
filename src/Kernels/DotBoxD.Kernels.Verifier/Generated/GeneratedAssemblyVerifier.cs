@@ -1,10 +1,9 @@
-namespace DotBoxD.Kernels.Verifier;
-
-using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+
+namespace DotBoxD.Kernels.Verifier.Generated;
 
 public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifier
 {

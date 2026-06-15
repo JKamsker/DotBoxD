@@ -1,9 +1,11 @@
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Runtime;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DotBoxD.Plugins.Analyzer;
-using DotBoxD.Plugins;
+using DiagnosticSeverity = DotBoxD.Kernels.Model.DiagnosticSeverity;
 
-namespace DotBoxD.Kernels.Tests;
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed class PluginAnalyzerPropertyShapeTests
 {

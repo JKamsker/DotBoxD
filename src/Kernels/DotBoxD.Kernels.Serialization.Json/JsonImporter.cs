@@ -1,7 +1,8 @@
 using System.Text.Json;
-using static DotBoxD.Kernels.JsonImport;
+using DotBoxD.Kernels.Model;
+using static DotBoxD.Kernels.Serialization.Json.JsonImport;
 
-namespace DotBoxD.Kernels;
+namespace DotBoxD.Kernels.Serialization.Json;
 
 public static class JsonImporter
 {
