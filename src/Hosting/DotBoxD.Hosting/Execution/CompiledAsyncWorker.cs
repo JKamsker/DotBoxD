@@ -83,13 +83,7 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         public override void Post(SendOrPostCallback d, object? state)
         {
             ArgumentNullException.ThrowIfNull(d);
-            lock (_queue)
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                _queue.Enqueue(new WorkItem(d, state));
-            }
-
-            Signal();
+            Enqueue(new WorkItem(d, state, null));
         }
 
         public override void Send(SendOrPostCallback d, object? state)
@@ -101,41 +95,59 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
                 return;
             }
 
-            using var completed = new ManualResetEventSlim();
-            ExceptionDispatchInfo? error = null;
-            Post(s =>
-            {
-                try
-                {
-                    d(s);
-                }
-                catch (Exception ex)
-                {
-                    error = ExceptionDispatchInfo.Capture(ex);
-                }
-                finally
-                {
-                    completed.Set();
-                }
-            }, state);
-            completed.Wait();
-            error?.Throw();
+            using var waitState = new SendWaitState(this);
+            Enqueue(new WorkItem(d, state, waitState));
+            waitState.Wait();
         }
 
         public override SynchronizationContext CreateCopy() => this;
 
         public void Dispose()
         {
+            var pending = new List<WorkItem>();
             lock (_queue)
             {
+                if (_disposed)
+                {
+                    return;
+                }
+
                 _disposed = true;
-                _queue.Clear();
+                while (_queue.Count > 0)
+                {
+                    pending.Add(_queue.Dequeue());
+                }
+            }
+
+            foreach (var item in pending)
+            {
+                item.WaitState?.CancelDisposed();
             }
 
             _signal.Dispose();
         }
 
-        private void Signal() => _signal.Set();
+        private void Signal()
+        {
+            try
+            {
+                _signal.Set();
+            }
+            catch (ObjectDisposedException)
+            {
+                ObjectDisposedException.ThrowIf(!_disposed, this);
+            }
+        }
+
+        private void Enqueue(WorkItem item)
+        {
+            lock (_queue)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                _queue.Enqueue(item);
+                Signal();
+            }
+        }
 
         private bool TryDequeue(out WorkItem item)
         {
@@ -152,8 +164,55 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
             return false;
         }
 
-        private static void Invoke(WorkItem item) => item.Callback(item.State);
+        private static void Invoke(WorkItem item)
+        {
+            if (item.WaitState is null)
+            {
+                item.Callback(item.State);
+                return;
+            }
 
-        private readonly record struct WorkItem(SendOrPostCallback Callback, object? State);
+            ExceptionDispatchInfo? error = null;
+            try
+            {
+                item.Callback(item.State);
+            }
+            catch (Exception ex)
+            {
+                error = ExceptionDispatchInfo.Capture(ex);
+            }
+            finally
+            {
+                item.WaitState.Complete(error);
+            }
+        }
+
+        private sealed class SendWaitState(CompiledAwaitPump owner) : IDisposable
+        {
+            private readonly ManualResetEventSlim _completed = new();
+            private ExceptionDispatchInfo? _error;
+
+            public void Wait()
+            {
+                _completed.Wait();
+                _error?.Throw();
+            }
+
+            public void Complete(ExceptionDispatchInfo? error)
+            {
+                _error = error;
+                _completed.Set();
+            }
+
+            public void CancelDisposed()
+                => Complete(ExceptionDispatchInfo.Capture(new ObjectDisposedException(owner.GetType().FullName)));
+
+            public void Dispose() => _completed.Dispose();
+        }
+
+        private readonly record struct WorkItem(
+            SendOrPostCallback Callback,
+            object? State,
+            SendWaitState? WaitState);
     }
 }

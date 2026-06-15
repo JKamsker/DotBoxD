@@ -171,7 +171,8 @@ internal static class RpcKernelClientExtensionModelFactory
     {
         foreach (var member in receiverType.GetMembers("KernelRpc"))
         {
-            if (member is IPropertySymbol { IsStatic: false } property &&
+            if (member is IPropertySymbol { IsStatic: false, GetMethod: { } getter } property &&
+                IsAccessible(getter) &&
                 IsKernelRpcClientRegistry(property.Type))
             {
                 return true;
@@ -180,6 +181,12 @@ internal static class RpcKernelClientExtensionModelFactory
 
         return false;
     }
+
+    private static bool IsAccessible(IMethodSymbol getter)
+        => getter.DeclaredAccessibility is
+            Accessibility.Public or
+            Accessibility.Internal or
+            Accessibility.ProtectedOrInternal;
 
     private static bool IsKernelRpcClientRegistry(ITypeSymbol type)
     {

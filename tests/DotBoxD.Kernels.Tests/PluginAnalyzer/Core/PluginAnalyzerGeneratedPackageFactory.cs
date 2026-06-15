@@ -3,7 +3,6 @@ using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using DiagnosticSeverity = DotBoxD.Kernels.Model.DiagnosticSeverity;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
@@ -31,8 +30,8 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             out var outputCompilation,
             out var diagnostics);
 
-        Assert.Empty(diagnostics.Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)));
+        Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
 
         using var assembly = new MemoryStream();
         var emit = outputCompilation.Emit(assembly);
@@ -55,7 +54,8 @@ internal static class PluginAnalyzerGeneratedPackageFactory
             out var generatorDiagnostics);
 
         return generatorDiagnostics
-            .Concat(outputCompilation.GetDiagnostics().Where(d => d.Severity.Equals(DiagnosticSeverity.Error)))
+            .Concat(outputCompilation.GetDiagnostics().Where(
+                d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
             .ToArray();
     }
 

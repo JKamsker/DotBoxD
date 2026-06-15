@@ -1,3 +1,4 @@
+using DotBoxD.Kernels;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
@@ -9,6 +10,21 @@ namespace DotBoxD.Kernels.Tests.Policy;
 
 public sealed class PolicyFileGrantValidationTests
 {
+    [Fact]
+    public void File_grants_do_not_implicitly_grant_runtime_async()
+    {
+        var root = Path.GetTempPath();
+        var readPolicy = SandboxPolicyBuilder.Create().GrantFileRead(root, 1024).Build();
+        var writePolicy = SandboxPolicyBuilder.Create()
+            .GrantFileWrite(root, 1024, allowCreate: true, allowOverwrite: true)
+            .Build();
+
+        Assert.DoesNotContain(readPolicy.Grants, grant => grant.Id == RuntimeCapabilityIds.Async);
+        Assert.DoesNotContain(writePolicy.Grants, grant => grant.Id == RuntimeCapabilityIds.Async);
+        Assert.False(readPolicy.AllowedEffects.HasFlag(SandboxEffect.Concurrency));
+        Assert.False(writePolicy.AllowedEffects.HasFlag(SandboxEffect.Concurrency));
+    }
+
     [Fact]
     public void File_grant_builder_rejects_relative_root()
     {

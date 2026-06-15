@@ -316,7 +316,9 @@ public sealed class SafeFileSystemTests
         """;
 
     private static SandboxPolicyBuilder FilePolicyBuilder()
-        => SandboxPolicyBuilder.Create().WithWallTime(TimeSpan.FromSeconds(2));
+        => SandboxPolicyBuilder.Create()
+            .AllowRuntimeAsync()
+            .WithWallTime(TimeSpan.FromSeconds(2));
 
     private sealed class TempDirectory : IDisposable
     {

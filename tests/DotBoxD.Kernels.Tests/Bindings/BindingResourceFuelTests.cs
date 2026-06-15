@@ -19,6 +19,7 @@ public sealed class BindingResourceFuelTests
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("config.txt"));
         var policy = SandboxPolicyBuilder.Create()
+            .AllowRuntimeAsync()
             .GrantFileRead(temp.Path, 1024)
             .WithFuel(5_000)
             .WithWallTime(TimeSpan.FromSeconds(2))

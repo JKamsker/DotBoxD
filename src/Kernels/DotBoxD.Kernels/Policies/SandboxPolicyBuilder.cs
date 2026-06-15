@@ -59,7 +59,6 @@ public sealed class SandboxPolicyBuilder
             ["root"] = normalizedRoot,
             ["maxBytesPerRun"] = maxBytesPerRun.ToString(System.Globalization.CultureInfo.InvariantCulture)
         }));
-        GrantRuntimeAsyncIfMissing();
         _limits = _limits with { MaxFileBytesRead = maxBytesPerRun };
         return this;
     }
@@ -80,7 +79,6 @@ public sealed class SandboxPolicyBuilder
             ["allowCreate"] = allowCreate.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["allowOverwrite"] = allowOverwrite.ToString(System.Globalization.CultureInfo.InvariantCulture)
         }));
-        GrantRuntimeAsyncIfMissing();
         _limits = _limits with { MaxFileBytesWritten = Math.Max(_limits.MaxFileBytesWritten, maxBytesPerRun) };
         return this;
     }

@@ -2,8 +2,24 @@
   "version": 1,
   "files": [
     {
-      "path": "src/DotBoxD.Kernels.Validation/FunctionAnalyzer.cs",
+      "path": "src/Kernels/DotBoxD.Kernels.Validation/FunctionAnalyzer.cs",
       "justification": "Legacy validation analyzer over the soft limit. Do not grow it; split during the next validation refactor."
+    },
+    {
+      "path": "src/Hosting/DotBoxD.Plugins/PluginServer.cs",
+      "justification": "Plugin server orchestration remains centralized for install, async-policy diagnostics, and RPC registration state. Keep scoped changes here until a larger runtime-host split is planned."
+    },
+    {
+      "path": "src/Kernels/DotBoxD.Kernels/Bindings/BindingContracts.cs",
+      "justification": "Public binding contract models are kept together to preserve API discoverability and avoid scattering related descriptor/value records."
+    },
+    {
+      "path": "tests/DotBoxD.Kernels.Tests/Compiled/SideEffectParity/CompiledSideEffectCancellationParityTests.cs",
+      "justification": "Comprehensive cancellation parity coverage shares test fixtures and mode assertions across interpreted and compiled execution paths; split only when adding new scenarios."
+    },
+    {
+      "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/HostBinding/PluginAnalyzerHostBindingTests.cs",
+      "justification": "Host-binding analyzer scenarios share generated source fixtures and package assertions; keep together until the fixture can be extracted cleanly."
     },
     {
       "path": "src/DotBoxD.Kernels.Verifier/Diagnostics/VerifierDiagnosticCodes.cs",

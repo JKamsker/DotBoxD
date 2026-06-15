@@ -223,6 +223,7 @@ public sealed class ValidationHardeningTests
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
             SandboxPolicyBuilder.Create()
+                .AllowRuntimeAsync()
                 .GrantFileRead(Path.GetTempPath(), 1024)
                 .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
                 .Build());
@@ -235,6 +236,7 @@ public sealed class ValidationHardeningTests
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
             SandboxPolicyBuilder.Create()
+                .AllowRuntimeAsync()
                 .GrantFileRead(Path.GetTempPath(), 1024)
                 .Deterministic(DateTimeOffset.UnixEpoch, randomSeed: 1)
                 .Build());

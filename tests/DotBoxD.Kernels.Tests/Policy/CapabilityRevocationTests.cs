@@ -18,6 +18,7 @@ public sealed class CapabilityRevocationTests
         var plan = await host.PrepareAsync(
             module,
             SandboxPolicyBuilder.Create()
+                .AllowRuntimeAsync()
                 .GrantFileRead(temp.Path, maxBytesPerRun: 1024)
                 .WithFuel(1_000)
                 .Build());

@@ -20,6 +20,7 @@ var tenantId = "123";
 var configRoot = Path.GetFullPath(Path.Combine(hostDataRoot, "tenants", tenantId, "config"));
 var policy = SandboxPolicyBuilder.Create()
     .AllowPureComputation()
+    .AllowRuntimeAsync()
     .GrantFileRead(root: configRoot, maxBytesPerRun: 256_000)
     .WithFuel(100_000)
     .WithWallTime(TimeSpan.FromMilliseconds(50))
@@ -234,11 +235,13 @@ runtime fails closed when either flag is absent or `false`.
 ```csharp
 // Create-only grant: new files may be created under the root, but existing files are protected.
 var createOnly = SandboxPolicyBuilder.Create()
+    .AllowRuntimeAsync()
     .GrantFileWrite(root: outputRoot, maxBytesPerRun: 256_000, allowCreate: true, allowOverwrite: false)
     .Build();
 
 // Overwrite-enabled grant: existing files may be replaced (typically alongside allowCreate).
 var overwrite = SandboxPolicyBuilder.Create()
+    .AllowRuntimeAsync()
     .GrantFileWrite(root: outputRoot, maxBytesPerRun: 256_000, allowCreate: true, allowOverwrite: true)
     .Build();
 ```
@@ -261,8 +264,10 @@ host setup stays copyable without source or test spelunking.
 ### Runtime async capability
 
 Bindings marked `BindingDescriptor.IsAsync` require the `dotboxd.runtime.async` capability and add the
-`Concurrency` effect. `AllowRuntimeAsync()` grants that capability and enables the effect. File, HTTP,
-and plugin-message policy helpers call it because those built-in bindings may complete asynchronously.
+`Concurrency` effect. `AllowRuntimeAsync()` grants that capability and enables the effect. File helpers
+do not grant runtime async implicitly; call `AllowRuntimeAsync()` explicitly when a module uses async
+file bindings. HTTP and plugin-message policy helpers call it because those built-in helper grants are
+always async-only operations.
 
 `AllowIntraKernelReentrancy()` is reserved for a future isolated reentrant execution mode and currently
 fails closed when the policy is built.

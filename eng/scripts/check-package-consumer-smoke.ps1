@@ -177,6 +177,7 @@ var host = SandboxHost.Create(builder =>
 });
 
 var policy = SandboxPolicyBuilder.Create()
+    .AllowRuntimeAsync()
     .GrantFileRead(Path.GetTempPath(), 1024)
     .GrantLogging()
     .GrantHttpGet(new[] { "example.com" }, 4096)

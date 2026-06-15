@@ -117,7 +117,27 @@ public sealed class KernelRpcClientExtensionTests
                  d.GetMessage().Contains("method 'KillMonsters'", StringComparison.Ordinal));
     }
 
-    private static string ConflictSource(string receiverMember, string classAttributes, string methodAttributes)
+    [Fact]
+    public void Generated_extension_requires_readable_kernel_rpc_property()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(
+            ConflictSource(
+                "public IKernelRpcClientRegistry KernelRpc { private get; set; } = null!;",
+                "[KernelRpcClientProperty(typeof(RemoteMonsterControl))]",
+                string.Empty,
+                includeReadableRegistry: false));
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("KernelRpc property", StringComparison.Ordinal));
+    }
+
+    private static string ConflictSource(
+        string receiverMember,
+        string classAttributes,
+        string methodAttributes,
+        bool includeReadableRegistry = true)
         => $$"""
             using System.Collections.Generic;
             using System.Threading.Tasks;
@@ -131,7 +151,7 @@ public sealed class KernelRpcClientExtensionTests
 
             public sealed class RemoteMonsterControl
             {
-                public IKernelRpcClientRegistry KernelRpc { get; } = null!;
+                {{(includeReadableRegistry ? "public IKernelRpcClientRegistry KernelRpc { get; } = null!;" : string.Empty)}}
                 {{receiverMember}}
             }
 

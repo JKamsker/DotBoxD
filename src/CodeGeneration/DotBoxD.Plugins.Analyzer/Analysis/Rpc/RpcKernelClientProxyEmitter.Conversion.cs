@@ -235,7 +235,9 @@ internal static partial class RpcKernelClientProxyEmitter
                 var matched = true;
                 foreach (var parameter in constructor.Parameters)
                 {
-                    if (FieldIndex(fields, parameter.Name) < 0)
+                    var fieldIndex = FieldIndex(fields, parameter.Name);
+                    if (fieldIndex < 0 ||
+                        !SymbolEqualityComparer.Default.Equals(parameter.Type, fields[fieldIndex].Type))
                     {
                         matched = false;
                         break;

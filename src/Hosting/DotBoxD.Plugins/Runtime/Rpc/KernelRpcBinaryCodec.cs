@@ -196,7 +196,13 @@ public static class KernelRpcBinaryCodec
             while (shift < 35)
             {
                 var next = ReadByte();
-                result |= (next & 0x7F) << shift;
+                var payload = next & 0x7F;
+                if (shift == 28 && payload > 0x07)
+                {
+                    throw new FormatException("Kernel RPC payload contains an invalid length prefix.");
+                }
+
+                result |= payload << shift;
                 if ((next & 0x80) == 0)
                 {
                     return result;

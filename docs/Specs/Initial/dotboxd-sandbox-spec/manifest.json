@@ -99,8 +99,8 @@
     },
     {
       "path": "spec/06-effects-capabilities.md",
-      "sha256": "0eb19b65eff23fe9fde0a938eaf46b357474029a8e8676209c1fbfbf37085c7a",
-      "bytes": 6371
+      "sha256": "a4ff6a959ab7b2ceba88635d4cb81ab823a0c95dec78c5226d88b922dc2bdb88",
+      "bytes": 6386
     },
     {
       "path": "spec/07-bindings.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "spec/16-public-api.md",
-      "sha256": "d13d7d2a92bad392d0271bff65c9611fce8cdd4bc3da6058d5cab8bd6f203905",
-      "bytes": 25076
+      "sha256": "3024a904dbc3fa1bcc78249c03594578a0db20c9791cfbd028bfab5e87d92e8f",
+      "bytes": 25284
     },
     {
       "path": "spec/17-implementation-plan.md",

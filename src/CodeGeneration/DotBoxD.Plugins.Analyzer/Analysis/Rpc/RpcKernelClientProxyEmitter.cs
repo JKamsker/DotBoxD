@@ -68,10 +68,18 @@ internal static partial class RpcKernelClientProxyEmitter
 
         for (var i = 0; i < kernelParameterCount; i++)
         {
-            if (!SymbolEqualityComparer.Default.Equals(serviceMethod.Parameters[i].Type, kernelMethod.Parameters[i].Type))
+            var serviceParameter = serviceMethod.Parameters[i];
+            var kernelParameter = kernelMethod.Parameters[i];
+            if (!SymbolEqualityComparer.Default.Equals(serviceParameter.Type, kernelParameter.Type))
             {
                 throw new NotSupportedException(
-                    $"Kernel RPC service parameter '{serviceMethod.Parameters[i].Name}' must match kernel parameter '{kernelMethod.Parameters[i].Name}'.");
+                    $"Kernel RPC service parameter '{serviceParameter.Name}' must match kernel parameter '{kernelParameter.Name}'.");
+            }
+
+            if (!ParameterModifiersMatch(serviceParameter, kernelParameter))
+            {
+                throw new NotSupportedException(
+                    $"Kernel RPC service parameter '{serviceParameter.Name}' modifier '{DescribeParameterModifiers(serviceParameter)}' must match kernel parameter '{kernelParameter.Name}' modifier '{DescribeParameterModifiers(kernelParameter)}'.");
             }
         }
 
@@ -86,6 +94,26 @@ internal static partial class RpcKernelClientProxyEmitter
 
     private static ITypeSymbol UnwrapReturn(ITypeSymbol type)
         => IsGenericTask(type, out var inner) || IsGenericValueTask(type, out inner) ? inner : type;
+
+    private static bool ParameterModifiersMatch(IParameterSymbol serviceParameter, IParameterSymbol kernelParameter)
+        => serviceParameter.RefKind == kernelParameter.RefKind &&
+            serviceParameter.IsParams == kernelParameter.IsParams;
+
+    private static string DescribeParameterModifiers(IParameterSymbol parameter)
+    {
+        var modifier = parameter.RefKind switch
+        {
+            RefKind.Ref => "ref",
+            RefKind.In => "in",
+            RefKind.Out => "out",
+            RefKind.None => "none",
+            _ => parameter.RefKind.ToString()
+        };
+
+        return parameter.IsParams
+            ? modifier == "none" ? "params" : "params " + modifier
+            : modifier;
+    }
 
     private static bool IsGenericTask(ITypeSymbol type, out ITypeSymbol inner)
         => TryGenericTaskLike(type, "Task", out inner);
