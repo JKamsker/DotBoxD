@@ -144,14 +144,16 @@ fails on the `.Monsters` access. In the `FromConnection(control)` no-world path 
 **Fix:** `[DebuggerBrowsable(Never)]` + a `[DebuggerDisplay]` that doesn't trip the gate; split the message by
 cause (not-started vs no-world-supplied).
 
-### 2.7 — low — `CalmStrength` is `string "20"` among `int [Range]` siblings **[3×]**
+### 2.7 — RETRACTED — `CalmStrength` is `string "20"` among `int [Range]` siblings **[3×]**
 
-`GuardianKernel.cs:26–27`. The workflow **downgraded** the "accepts garbage" framing — garbage is neutralized
-server-side (`int.TryParse` → ignored no-op), so it's not a safety hole. Real issue: the lone numeric-as-string
-that loses `[Range]` and teaches the wrong default.
-
-**Fix:** make it `int` with `[Range(0,50)]` (server clamps at 50); format at send time. Wire-identical
-(settings stringify regardless of C# type).
+`GuardianKernel.cs`. Originally filed as "make it `int` with `[Range(0,50)]`." **Disproven at build time:** the
+kernel emits `CalmStrength` into the `calm:<player>:<strength>` host message, and the sandbox forbids
+converting an `int` to a string inside kernel IR (`DBXK100` — interpolation holes must already be strings).
+So a numeric live-setting that a kernel *writes into a message* must be a `string` here; and string settings
+can't carry `[Range]` (`DBXK022`). The bound is enforced server-side (`GameCommandSink` clamps to 50). This is
+an inherent sandbox constraint, not a smell — `CalmStrength` stays `string`. (Sibling settings like
+`AggroRange` are `int` precisely because they're only *compared*, never emitted into a message.) A real
+ergonomic fix would be a library enhancement: support an `int→string` lowering for message construction.
 
 ## 3. Too coarse / wrong-grain control
 
@@ -228,7 +230,8 @@ concept-naming-decision.md deliberately deferred that.
    diagnostic. (1.1, 2.5)
 6. **Cleanups (mostly free once #2 lands):** drop the placeholder `IMonsterKillerService` and the redundant
    `[ServerExtensionMethod]` name (the triple collapses to one class marker + one method marker),
-   `ConfigureAwait` noise, the stale test-double methods; `CalmStrength → int`; rename `[Plugin]`.
+   `ConfigureAwait` noise, the stale test-double methods; rename `[Plugin]`. (`CalmStrength → int` was tried
+   and **retracted** — see 2.7: the sandbox forbids `int→string` in a kernel message.)
 
 ---
 

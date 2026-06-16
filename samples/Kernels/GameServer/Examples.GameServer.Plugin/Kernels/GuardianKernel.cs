@@ -23,11 +23,13 @@ public sealed partial class GuardianKernel : IMonsterAggroService
     [Range(0, 100)]
     public int ProtectMaxLevel { get; set; } = 5;
 
-    // Numeric like its siblings, so it keeps the [Range] guard and compile-time typing (the server clamps at
-    // 50). Live settings stringify on the wire regardless of C# type, so this round-trips identically.
+    // A STRING, not an int: the kernel emits it into the `calm:<player>:<strength>` host message, and the
+    // sandbox forbids converting an int to a string inside kernel IR (DBXK100 — interpolation holes must
+    // already be strings). A string live setting also can't carry [Range] (DBXK022), so the bound is enforced
+    // server-side (GameCommandSink clamps to 50). The siblings above stay int because they're only compared,
+    // never emitted into a message.
     [LiveSetting]
-    [Range(0, 50)]
-    public int CalmStrength { get; set; } = 20;
+    public string CalmStrength { get; set; } = "20";
 
     // Event hooks stay synchronous. Async world reads live in server extensions and InvokeAsync; aggro events
     // are only published for live monsters, so this gate can read event data directly.
@@ -41,7 +43,7 @@ public sealed partial class GuardianKernel : IMonsterAggroService
             ProtectMaxLevel);
 
     public void Handle(MonsterAggroEvent e, HookContext ctx)
-        => ctx.Messages.Send(e.MonsterId, $"calm:{e.PlayerId}");
+        => ctx.Messages.Send(e.MonsterId, $"calm:{e.PlayerId}:{CalmStrength}");
 
     /// <summary>
     /// Reusable, unit-testable gate factored out with <c>[KernelMethod]</c>: the generator inlines this body

@@ -48,14 +48,15 @@ internal static class Program
         await server.Monsters.Extend<BlinkKernel>();            // grafts onto IMonster handles (per-instance)
 
         // One direct domain call via a scoped handle — the id is captured by Get(id), so KillAsync omits it.
-        var monster4 = server.Monsters.Get("monster-4");
-        var killed = await monster4.KillAsync();
+        var killed = await server.Monsters.Get("monster-4").KillAsync();
         Console.WriteLine($"[plugin] Monsters.Get(monster-4).KillAsync() => {killed}.");
+
+        await server.Monsters.Get("monster-1").BlinkBehindAsync("playerA");
 
         // Tune a replaced kernel's live settings — strongly typed member setters, one atomic batch. Only
         // [LiveSetting] members are settable; ApplyAsync ships it (a chain without ApplyAsync warns).
         await server.Get<GuardianKernel>()
-            .Set(k => k.CalmStrength, 35)
+            .Set(k => k.CalmStrength, "35")
             .Set(k => k.AggroRange, 6)
             .ApplyAsync(atomic: true);
 

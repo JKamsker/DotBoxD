@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 
 namespace DotBoxD.Kernels.Game.Plugin.Kernels;
