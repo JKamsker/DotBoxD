@@ -43,6 +43,29 @@ public sealed class CompiledBindingCompletionFailureTests
         Assert.DoesNotContain("pending result", result.Error.SafeMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Sync_declared_pending_binding_succeeds_with_runtime_async_in_both_modes()
+    {
+        using var host = CreateHost(PendingSuccessBinding());
+        var module = await host.ImportJsonAsync(CallModuleJson());
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().AllowRuntimeAsync().WithFuel(1_000).Build());
+
+        foreach (var mode in new[] { ExecutionMode.Interpreted, ExecutionMode.Compiled })
+        {
+            var result = await host.ExecuteAsync(
+                plan,
+                "main",
+                SandboxValue.Unit,
+                new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
+
+            Assert.True(result.Succeeded, result.Error?.SafeMessage);
+            Assert.Equal(42, ((I32Value)result.Value!).Value);
+            Assert.Equal(mode, result.ActualMode);
+        }
+    }
+
     private static SandboxHost CreateHost(BindingDescriptor binding)
         => SandboxHost.Create(builder =>
         {
@@ -55,6 +78,13 @@ public sealed class CompiledBindingCompletionFailureTests
         => BaseBinding((_, _, _) => completion == "canceled"
             ? new ValueTask<SandboxValue>(Task.FromCanceled<SandboxValue>(new CancellationToken(canceled: true)))
             : new ValueTask<SandboxValue>(Task.FromException<SandboxValue>(new InvalidOperationException("secret"))));
+
+    private static BindingDescriptor PendingSuccessBinding()
+        => BaseBinding(async (_, _, _) =>
+        {
+            await Task.Yield();
+            return SandboxValue.FromInt32(42);
+        });
 
     private static BindingDescriptor BaseBinding(BindingInvoker invoke)
         => new(
