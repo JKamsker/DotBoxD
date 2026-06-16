@@ -15,6 +15,10 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 /// </summary>
 public class KernelRpcServiceProxy : DispatchProxy
 {
+    private static readonly MethodInfo InvokeTaskAsyncDefinition = typeof(KernelRpcServiceProxy)
+        .GetMethod(nameof(InvokeTaskAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly MethodInfo InvokeValueTaskAsyncDefinition = typeof(KernelRpcServiceProxy)
+        .GetMethod(nameof(InvokeValueTaskAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
     private InstalledKernel _kernel = null!;
 
     public static TService Create<TService>(InstalledKernel kernel) where TService : class
@@ -39,11 +43,10 @@ public class KernelRpcServiceProxy : DispatchProxy
             arguments[i] = KernelRpcMarshaller.ToSandboxValue(args?[i], parameters[i].ParameterType);
         }
 
-        var result = _kernel.InvokeRpcAsync(arguments).AsTask().GetAwaiter().GetResult();
-        return Materialize(targetMethod.ReturnType, result);
+        return InvokeRpc(targetMethod.ReturnType, arguments);
     }
 
-    private static object? Materialize(Type returnType, SandboxValue result)
+    private object? InvokeRpc(Type returnType, SandboxValue[] arguments)
     {
         // Only Task<T>/ValueTask<T> unwrap to an awaitable; every other return type (including
         // List<T>) is marshaled whole.
@@ -53,17 +56,29 @@ public class KernelRpcServiceProxy : DispatchProxy
             if (definition == typeof(Task<>))
             {
                 var inner = returnType.GetGenericArguments()[0];
-                var value = KernelRpcMarshaller.FromSandboxValue(result, inner);
-                return typeof(Task).GetMethod(nameof(Task.FromResult))!.MakeGenericMethod(inner).Invoke(null, [value]);
+                return InvokeTaskAsyncDefinition.MakeGenericMethod(inner).Invoke(this, [arguments]);
             }
 
             if (definition == typeof(ValueTask<>))
             {
                 var inner = returnType.GetGenericArguments()[0];
-                return Activator.CreateInstance(returnType, KernelRpcMarshaller.FromSandboxValue(result, inner));
+                return InvokeValueTaskAsyncDefinition.MakeGenericMethod(inner).Invoke(this, [arguments]);
             }
         }
 
+        var result = _kernel.InvokeRpcAsync(arguments).AsTask().GetAwaiter().GetResult();
         return KernelRpcMarshaller.FromSandboxValue(result, returnType);
+    }
+
+    private async Task<T> InvokeTaskAsync<T>(SandboxValue[] arguments)
+    {
+        var result = await _kernel.InvokeRpcAsync(arguments).ConfigureAwait(false);
+        return (T)KernelRpcMarshaller.FromSandboxValue(result, typeof(T))!;
+    }
+
+    private async ValueTask<T> InvokeValueTaskAsync<T>(SandboxValue[] arguments)
+    {
+        var result = await _kernel.InvokeRpcAsync(arguments).ConfigureAwait(false);
+        return (T)KernelRpcMarshaller.FromSandboxValue(result, typeof(T))!;
     }
 }
