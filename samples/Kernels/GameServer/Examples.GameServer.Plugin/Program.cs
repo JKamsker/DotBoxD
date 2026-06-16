@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
@@ -10,8 +11,12 @@ namespace DotBoxD.Kernels.Game.Plugin;
 ///
 /// <para><b>Which verb when:</b></para>
 /// <list type="bullet">
-///   <item><c>Setup(s =&gt; s.Replace&lt;TService, TKernel&gt;())</c> — record an <c>[EventKernel]</c> that swaps
-///   a whole event service; <c>StartAsync()</c> ships it.</item>
+///   <item><c>Setup(s =&gt; s.Hooks.On&lt;TEvent&gt;().Use&lt;TKernel&gt;())</c> — record an event subscription;
+///   <c>StartAsync()</c> ships and wires the kernel.</item>
+///   <item><c>server.Hooks.On&lt;TEvent&gt;()</c> — install additional subscriptions after <c>StartAsync()</c>
+///   through the generated <c>IGameWorldServer</c>.</item>
+///   <item><c>server.Hooks.On&lt;TEvent&gt;().Where(...).Select(...).Run(...)</c> — install an inline remote
+///   hook chain at runtime; filters, projections, and <c>Run</c> are lowered to verified IR.</item>
 ///   <item><c>Setup(s =&gt; s.Monsters.Extend&lt;TKernel&gt;())</c> — record a <c>[ServerExtension]</c>; grafts a
 ///   method onto the control (batch) or onto each <c>IMonster</c> handle (per-instance).</item>
 ///   <item><c>Monsters.Get(id)</c> — a runtime scoped handle; calls on it omit the id.</item>
@@ -36,18 +41,20 @@ internal static class Program
 
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
 
-        using var server = GamePluginServerBuilder
+        using IGameWorldServer server = GamePluginServerBuilder
             .FromPipeName(pipeName)
             .Setup(s =>
             {
-                // Record plugin-owned kernels. Build() is sync and does no I/O; StartAsync() ships the IR.
-                s.Replace<IMonsterAggroService, GuardianKernel>();
-                s.Replace<IAttackService, RetaliationKernel>();
+                // Record plugin-owned subscriptions. Build() is sync and does no I/O; StartAsync() ships the IR.
+                s.Hooks.On<MonsterAggroEvent>().Use<GuardianKernel>();
+
                 s.Monsters.Extend<MonsterKillerKernel>();   // grafts onto IMonsterControl (batch)
                 s.Monsters.Extend<BlinkKernel>();           // grafts onto IMonster handles (per-instance)
             })
             .Build();
         await server.StartAsync();
+
+        ConfigureRuntimeHooks(server);
 
         // One direct domain call via a scoped handle — the id is captured by Get(id), so KillAsync omits it.
         var killed = await server.Monsters.Get("monster-4").KillAsync();
@@ -67,6 +74,19 @@ internal static class Program
 
         Console.WriteLine("[plugin] kernels live; holding until server completes...");
         await server.HoldUntilShutdownAsync();
+
         return 0;
+    }
+
+    internal static void ConfigureRuntimeHooks(IGameWorldServer server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+
+        // Runtime subscriptions go through the generated IGameWorldServer after StartAsync().
+        server.Hooks.On<AttackEvent>().Use<RetaliationKernel>();
+        server.Hooks.On<MonsterAggroEvent>()
+            .Where(e => e.Distance <= 4)
+            .Select(e => e.MonsterId)
+            .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
     }
 }

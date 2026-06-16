@@ -61,6 +61,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GameWorldMonsterSnapshotType)] = TypeName(typeof(MonsterSnapshot)),
             [nameof(TypeNames.HookPipelineOriginal)] = OriginalTypeName(typeof(HookPipeline<>), "TEvent"),
             [nameof(TypeNames.HookStageOriginal)] = OriginalTypeName(typeof(HookStage<,>), "TEvent", "TCurrent"),
+            [nameof(TypeNames.RemoteHookPipelineOriginal)] = OriginalTypeName(typeof(RemoteHookPipeline<>), "TEvent"),
+            [nameof(TypeNames.RemoteHookStageOriginal)] = OriginalTypeName(typeof(RemoteHookStage<,>), "TEvent", "TCurrent"),
 
             [nameof(TypeNames.ListOriginal)] = OriginalTypeName(typeof(List<>), "T"),
             [nameof(TypeNames.ReadOnlyListOriginal)] = OriginalTypeName(typeof(IReadOnlyList<>), "T"),

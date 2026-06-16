@@ -1,19 +1,18 @@
 using DotBoxD.Kernels.Game.Plugin.Kernels;
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
 /// <summary>
 /// Advanced surface, kept out of the golden Program.cs so the first-run path stays short: entity handles,
-/// server-extension calls, and <c>InvokeAsync</c> probes.
+/// server-extension calls, local hook terminals, and <c>InvokeAsync</c> probes.
 ///
 /// <para><c>InvokeAsync</c> ships a lambda as verified IR that runs sandboxed on the server, reading the same
-/// async world surface (local there). <b>Two overloads, three call shapes:</b></para>
+/// async world surface (local there). <b>Two overloads, two call shapes:</b></para>
 /// <list type="bullet">
 ///   <item><b>plain single-lambda</b> — read-only probe, a value out.</item>
 ///   <item><b>explicit capture-bag (recommended for write-back)</b> — the second overload; the bag's assigned
 ///   fields are written back after the await.</item>
-///   <item><b>implicit local capture</b> — the SAME single-lambda overload as the first, but it closes over an
-///   outer local and writes it back. Convenience only; prefer the capture bag when you need a value back.</item>
 /// </list>
 /// </summary>
 internal static class AdvancedUsage
@@ -59,9 +58,20 @@ internal static class AdvancedUsage
         });
         Console.WriteLine($"[plugin] InvokeAsync capture {probe.MonsterId} => {monsterName} hp={probe.LastHealth}.");
 
-        // ── InvokeAsync (c) implicit local capture — same single-lambda overload as (a), but it closes over an
-        // outer local and writes it back. Prefer the capture bag (b) for write-back; this is shown once for
-        // completeness, not as a parallel-recommended option.
+        await RunLocalHookPreviewAsync();
+    }
+
+    private static async Task RunLocalHookPreviewAsync()
+    {
+        var observed = new List<string>();
+        using var local = PluginServer.Create();
+        local.Hooks.On<AttackEvent>()
+            .Where(e => e.Damage >= 10)
+            .Select(e => e.AttackerId)
+            .RunLocal(attackerId => observed.Add(attackerId));
+
+        await local.Hooks.PublishAsync(new AttackEvent("monster-local", "player-local", 12, 7));
+        Console.WriteLine($"[plugin] local hook RunLocal observed {observed.Count} attack event.");
     }
 }
 

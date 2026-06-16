@@ -115,6 +115,108 @@ public sealed class HookChainRuntimeTests
     }
 
     [Fact]
+    public async Task The_generated_interceptor_installs_a_projected_stage_chain_at_the_Run_call_site()
+    {
+        var assembly = Compile(OneParamSelectChainSource, enableInterceptors: true);
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        var configure = assembly.GetType("ChainSample.Usage")!
+            .GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!;
+        configure.Invoke(null, [server.Hooks]);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-8", 3));
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("monster-8", message.TargetId);
+        Assert.Equal("calm", message.Message);
+    }
+
+    private const string RemoteSelectChainSource = """
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class RemoteUsage
+        {
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 5)
+                    .Select(e => e.MonsterId)
+                    .Run((id, ctx) => ctx.Messages.Send(id, "calm"));
+        }
+        """;
+
+    private const string RemoteServerInterfaceChainSource = """
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public interface IGeneratedWorldServer
+        {
+            RemoteHookRegistry Hooks { get; }
+        }
+
+        public sealed class GeneratedWorldServer : IGeneratedWorldServer
+        {
+            public GeneratedWorldServer(RemoteHookRegistry hooks) => Hooks = hooks;
+
+            public RemoteHookRegistry Hooks { get; }
+        }
+
+        public static class RemoteServerUsage
+        {
+            public static void Configure(IGeneratedWorldServer server)
+            {
+                server.Hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 5)
+                    .Select(e => e.MonsterId)
+                    .Run((id, ctx) => ctx.Messages.Send(id, "calm"));
+            }
+        }
+        """;
+
+    [Fact]
+    public void The_generated_interceptor_installs_a_remote_projected_stage_chain_at_the_Run_call_site()
+    {
+        var assembly = Compile(RemoteSelectChainSource, enableInterceptors: true);
+        var installed = new List<PluginPackage>();
+        var registry = new RemoteHookRegistry(package =>
+        {
+            installed.Add(package);
+            return ValueTask.FromResult(package.Manifest.PluginId);
+        });
+
+        var configure = assembly.GetType("ChainSample.RemoteUsage")!
+            .GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!;
+        configure.Invoke(null, [registry]);
+
+        var package = Assert.Single(installed);
+        Assert.Equal("ChainAggroEvent", Assert.Single(package.Manifest.Subscriptions).Event);
+    }
+
+    [Fact]
+    public void The_generated_interceptor_installs_remote_chains_from_a_server_interface_hook_property()
+    {
+        var assembly = Compile(RemoteServerInterfaceChainSource, enableInterceptors: true);
+        var installed = new List<PluginPackage>();
+        var registry = new RemoteHookRegistry(package =>
+        {
+            installed.Add(package);
+            return ValueTask.FromResult(package.Manifest.PluginId);
+        });
+
+        var serverType = assembly.GetType("ChainSample.GeneratedWorldServer")!;
+        var server = Activator.CreateInstance(serverType, registry)!;
+        var configure = assembly.GetType("ChainSample.RemoteServerUsage")!
+            .GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!;
+        configure.Invoke(null, [server]);
+
+        var package = Assert.Single(installed);
+        Assert.Equal("ChainAggroEvent", Assert.Single(package.Manifest.Subscriptions).Event);
+    }
+
+    [Fact]
     public async Task Element_only_runtime_overloads_filter_and_run_without_a_context_parameter()
     {
         // The native (non-lowered) path: the new element-only Where / RunLocal overloads forward to

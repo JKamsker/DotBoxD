@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Plugins;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
 
@@ -96,6 +97,9 @@ public sealed class HookStage<TEvent, TCurrent>
         ArgumentNullException.ThrowIfNull(handler);
         return RunLocal((value, _) => handler(value));
     }
+
+    public HookPipeline<TEvent> UseGeneratedChain(PluginPackage package)
+        => _root.UseGeneratedChain(package);
 
     /// <summary>The terminal the analyzer lowers to verified IR; un-lowered it throws (never native).</summary>
     public HookPipeline<TEvent> Run(Func<TCurrent, HookContext, ValueTask> handler)

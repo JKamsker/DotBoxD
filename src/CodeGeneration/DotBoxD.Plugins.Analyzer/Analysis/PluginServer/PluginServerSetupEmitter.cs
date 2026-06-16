@@ -53,6 +53,7 @@ internal static class PluginServerSetupEmitter
         builder.Append(model.Accessibility).Append(" interface ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("{");
         builder.Append("    ").Append(model.SetupInterfaceName).AppendLine(" Replace<TService, TKernel>() where TService : class where TKernel : class, TService;");
+        builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks { get; }");
         foreach (var control in model.Controls)
         {
             builder.Append("    ").Append(control.AccumulatorInterfaceName).Append(' ')
@@ -131,6 +132,7 @@ internal static class PluginServerSetupEmitter
         builder.Append("    private sealed class SetupRecorder : ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly global::System.Collections.Generic.List<RecordedInstall> _installs;");
+        builder.AppendLine("        private readonly global::DotBoxD.Plugins.Runtime.RemoteHookRegistry _hooks;");
         foreach (var control in model.Controls)
         {
             builder.Append("        private readonly ").Append(control.AccumulatorInterfaceName).Append(' ')
@@ -140,6 +142,11 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("        public SetupRecorder(global::System.Collections.Generic.List<RecordedInstall> installs)");
         builder.AppendLine("        {");
         builder.AppendLine("            _installs = installs;");
+        builder.AppendLine("            _hooks = new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package =>");
+        builder.AppendLine("            {");
+        builder.AppendLine("                _installs.Add(RecordedInstall.Plugin(package));");
+        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
+        builder.AppendLine("            });");
         foreach (var control in model.Controls)
         {
             builder.Append("            ").Append(FieldName(control.Name)).Append(" = new ")
@@ -157,6 +164,7 @@ internal static class PluginServerSetupEmitter
             builder.Append("        public ").Append(control.AccumulatorInterfaceName).Append(' ')
                 .Append(control.Name).Append(" => ").Append(FieldName(control.Name)).AppendLine(";");
         }
+        builder.AppendLine("        public global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks => _hooks;");
 
         builder.AppendLine("    }");
         builder.AppendLine();
