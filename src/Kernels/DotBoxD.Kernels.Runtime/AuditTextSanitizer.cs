@@ -99,6 +99,6 @@ public static partial class AuditTextSanitizer
     [GeneratedRegex("(?<prefix>\\b[A-Za-z][A-Za-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")]
     private static partial Regex UriCredentialPattern();
 
-    [GeneratedRegex("(?i)(^|[-_.])(authorization|bearer|credential|key|password|passwd|pwd|secret|session|signature|token)([-_.]|$)")]
+    [GeneratedRegex("(?i)(^|[-_.])(authorization|bearer|credential|key|password|passwd|pwd|secret|session|signature|token)([-_.:=]|$)")]
     private static partial Regex SecretPathSegmentPattern();
 }
