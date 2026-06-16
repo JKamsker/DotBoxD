@@ -45,6 +45,50 @@ public sealed class CompiledAsyncCapabilityParityTests
         Assert.Equal(42, ((I32Value)result.Value!).Value);
     }
 
+    [Fact]
+    public async Task Sync_only_binding_under_async_policy_runs_on_caller_thread()
+    {
+        using var host = CreateHost(ThreadIdBinding());
+        var module = await host.ImportJsonAsync(CallModuleJson("sync-binding-no-worker"));
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .AllowRuntimeAsync()
+                .WithFuel(1_000)
+                .WithWallTime(TimeSpan.FromSeconds(2))
+                .Build());
+        var completion = new TaskCompletionSource<(int CallerThreadId, SandboxExecutionResult Result)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            var callerThreadId = Environment.CurrentManagedThreadId;
+            try
+            {
+                var result = host.ExecuteAsync(
+                    plan,
+                    "main",
+                    SandboxValue.Unit,
+                    new SandboxExecutionOptions { Mode = ExecutionMode.Compiled, AllowFallbackToInterpreter = false })
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+                completion.SetResult((callerThreadId, result));
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        thread.Start();
+        var (callerThreadId, result) = await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal(callerThreadId, ((I32Value)result.Value!).Value);
+    }
+
     [Theory]
     [MemberData(nameof(Modes))]
     public async Task Sync_declared_pending_binding_fails_closed_at_runtime(ExecutionMode mode)
@@ -93,6 +137,10 @@ public sealed class CompiledAsyncCapabilityParityTests
             {
                 IsAsync = true
             };
+
+    private static BindingDescriptor ThreadIdBinding()
+        => BaseBinding((_, _, _) =>
+            ValueTask.FromResult(SandboxValue.FromInt32(Environment.CurrentManagedThreadId)));
 
     private static BindingDescriptor PendingSyncDeclaredBinding()
         => BaseBinding((_, _, _) =>

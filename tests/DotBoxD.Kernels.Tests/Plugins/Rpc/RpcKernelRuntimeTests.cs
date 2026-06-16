@@ -1,6 +1,10 @@
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Kernel;
@@ -16,6 +20,30 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 /// </summary>
 public sealed class RpcKernelRuntimeTests
 {
+    private const string ConcurrencyEffectSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IConcurrentWorld
+        {
+            [HostBinding("host.concurrent.value", "host.concurrent.value", SandboxEffect.Cpu | SandboxEffect.Concurrency)]
+            int Value();
+        }
+
+        [KernelRpcService("concurrency-effect")]
+        public sealed partial class ConcurrencyEffectKernel
+        {
+            public int Run(HookContext ctx)
+            {
+                return ctx.Host<IConcurrentWorld>().Value();
+            }
+        }
+        """;
+
     [Fact]
     public async Task A_batch_kernel_loops_server_side_and_returns_a_list_of_records()
     {
@@ -153,6 +181,24 @@ public sealed class RpcKernelRuntimeTests
     }
 
     [Fact]
+    public async Task Install_accepts_manifest_async_capability_for_concurrency_effect_binding()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            ConcurrencyEffectSource,
+            "Sample.ConcurrencyEffectPluginPackage");
+        Assert.Contains(RuntimeCapabilityIds.Async, package.Manifest.RequiredCapabilities);
+
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: AddConcurrencyEffectBinding,
+            defaultPolicy: ConcurrencyEffectPolicy());
+
+        var kernel = await server.InstallRpcAsync(package);
+        var result = await kernel.InvokeRpcAsync([]);
+
+        Assert.Equal(7, Assert.IsType<I32Value>(result).Value);
+    }
+
+    [Fact]
     public async Task Install_rejects_rpc_manifest_required_capabilities_that_self_assert_unverified_capability()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(
@@ -187,4 +233,42 @@ public sealed class RpcKernelRuntimeTests
         var record = Assert.IsType<RecordValue>(value);
         Assert.Equal([SandboxValue.FromInt32(expectedId), SandboxValue.FromBool(expectedSuccess)], record.Fields);
     }
+
+    private static void AddConcurrencyEffectBinding(SandboxHostBuilder builder)
+        => builder.AddBinding(new BindingDescriptor(
+            "host.concurrent.value",
+            SemVersion.One,
+            [],
+            SandboxType.I32,
+            SandboxEffect.Cpu | SandboxEffect.Concurrency,
+            "host.concurrent.value",
+            BindingCostModel.Fixed(1),
+            AuditLevel.PerResource,
+            BindingSafety.PureHostFacade,
+            (context, _, _) =>
+            {
+                var startedAt = DateTimeOffset.UtcNow;
+                context.Audit.Write(new SandboxAuditEvent(
+                    context.RunId,
+                    "BindingCall",
+                    startedAt,
+                    true,
+                    BindingId: "host.concurrent.value",
+                    CapabilityId: "host.concurrent.value",
+                    Effect: SandboxEffect.Concurrency,
+                    ResourceId: "host.concurrent.value",
+                    Fields: context.BindingAuditFields("host", startedAt)));
+                return ValueTask.FromResult(SandboxValue.FromInt32(7));
+            },
+            CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"),
+            GrantValidator: static (_, _) => { }));
+
+    private static SandboxPolicy ConcurrencyEffectPolicy()
+        => SandboxPolicyBuilder.Create()
+            .Grant("host.concurrent.value", new { }, SandboxEffect.Concurrency)
+            .AllowRuntimeAsync()
+            .WithFuel(100_000)
+            .WithMaxHostCalls(10_000)
+            .WithWallTime(TimeSpan.FromSeconds(10))
+            .Build();
 }

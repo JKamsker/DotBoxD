@@ -48,6 +48,7 @@ public sealed class SafeNetworkAuditRedactionTests
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "net.http.get" && e.Success);
         Assert.DoesNotContain("api_key", audit.ResourceId, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("abc123", audit.ResourceId, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("file", audit.ResourceId, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
