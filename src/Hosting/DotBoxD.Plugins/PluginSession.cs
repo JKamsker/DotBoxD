@@ -89,16 +89,16 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            if (!_owned.Contains(pluginId))
+            if (!_owned.Contains(pluginId) ||
+                !_server.Kernels.TryGetOwned(this, pluginId, out kernel))
             {
+                _owned.Remove(pluginId);
                 throw new SandboxValidationException([
                     new SandboxDiagnostic(
                         "DBXK061",
                         $"plugin id '{pluginId}' is not owned by this session.")
                 ]);
             }
-
-            kernel = _server.Kernels.Get(pluginId);
         }
         finally
         {
@@ -115,7 +115,18 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
-            return Volatile.Read(ref _disposed) == 0 && _owned.Contains(pluginId);
+            if (Volatile.Read(ref _disposed) != 0 || !_owned.Contains(pluginId))
+            {
+                return false;
+            }
+
+            if (_server.Kernels.TryGetOwned(this, pluginId, out _))
+            {
+                return true;
+            }
+
+            _owned.Remove(pluginId);
+            return false;
         }
         finally
         {

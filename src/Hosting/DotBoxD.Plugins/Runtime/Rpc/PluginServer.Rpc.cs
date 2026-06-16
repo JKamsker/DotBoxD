@@ -39,12 +39,33 @@ public sealed partial class PluginServer
     /// </summary>
     public TService RpcService<TService>() where TService : class
     {
-        if (!_rpcServices.TryGetValue(typeof(TService), out var pluginId))
+        var serviceType = typeof(TService);
+        if (!_rpcServices.TryGetValue(serviceType, out var pluginId))
         {
-            throw new InvalidOperationException(
-                $"No kernel RPC service is registered for '{typeof(TService)}'. Call RegisterRpcServiceAsync first.");
+            throw NoRpcServiceRegistered(serviceType);
         }
 
-        return KernelRpcServiceProxy.Create<TService>(Kernels.Get(pluginId));
+        if (!Kernels.TryGet(pluginId, out var kernel))
+        {
+            _rpcServices.TryRemove(serviceType, out _);
+            throw NoRpcServiceRegistered(serviceType);
+        }
+
+        return KernelRpcServiceProxy.Create<TService>(kernel);
     }
+
+    private void RemoveRpcServiceRegistrations(string pluginId)
+    {
+        foreach (var registration in _rpcServices)
+        {
+            if (string.Equals(registration.Value, pluginId, StringComparison.Ordinal))
+            {
+                _rpcServices.TryRemove(registration.Key, out _);
+            }
+        }
+    }
+
+    private static InvalidOperationException NoRpcServiceRegistered(Type serviceType)
+        => new(
+            $"No kernel RPC service is registered for '{serviceType}'. Call RegisterRpcServiceAsync first.");
 }

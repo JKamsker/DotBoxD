@@ -119,7 +119,13 @@ public sealed partial class PluginServer : IDisposable
     public bool Uninstall(string pluginId)
     {
         ThrowIfDisposed();
-        return Kernels.Remove(pluginId);
+        var removed = Kernels.Remove(pluginId);
+        if (removed)
+        {
+            RemoveRpcServiceRegistrations(pluginId);
+        }
+
+        return removed;
     }
 
     internal ValueTask<InstalledKernel> InstallOwnedAsync(
@@ -145,7 +151,13 @@ public sealed partial class PluginServer : IDisposable
             return false;
         }
 
-        return Kernels.RemoveOwned(owner, pluginId);
+        var removed = Kernels.RemoveOwned(owner, pluginId);
+        if (removed)
+        {
+            RemoveRpcServiceRegistrations(pluginId);
+        }
+
+        return removed;
     }
 
     private async ValueTask<InstalledKernel> InstallCoreAsync(
@@ -283,6 +295,26 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         lock (_gate)
         {
             return _kernels.TryGetValue(pluginId, out kernel);
+        }
+    }
+
+    internal bool TryGetOwned(
+        PluginSession owner,
+        string pluginId,
+        [MaybeNullWhen(false)] out InstalledKernel kernel)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(pluginId);
+        lock (_gate)
+        {
+            if (!_kernels.TryGetValue(pluginId, out kernel) ||
+                !ReferenceEquals(kernel.OwnerId, owner))
+            {
+                kernel = null;
+                return false;
+            }
+
+            return true;
         }
     }
 
