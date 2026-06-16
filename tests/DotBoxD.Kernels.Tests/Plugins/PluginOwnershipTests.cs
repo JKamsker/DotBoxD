@@ -74,6 +74,26 @@ public sealed class PluginOwnershipTests
     }
 
     [Fact]
+    public async Task Stale_session_owner_cannot_update_reused_plugin_id()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var ownerA = server.CreateSession();
+        await ownerA.InstallAsync(FireDamagePluginPackage.Create());
+        Assert.True(server.Uninstall("fire-damage"));
+
+        var ownerB = server.CreateSession();
+        var replacement = await ownerB.InstallAsync(FireDamagePluginPackage.Create());
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await ownerA
+                .UpdateSettingsAsync("fire-damage", new Dictionary<string, object?> { ["DamageType"] = "ice" })
+                .AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK061");
+        Assert.Equal("fire", replacement.Value.Get<string>("DamageType"));
+    }
+
+    [Fact]
     public async Task Disposed_session_rejects_further_installs()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
