@@ -69,6 +69,69 @@ public sealed class KernelRpcClientProxyValidationTests
     }
 
     [Fact]
+    public void Generated_client_rejects_multidimensional_array_parameters()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IEchoService
+            {
+                ValueTask<int> EchoAsync(int[,] values);
+            }
+
+            [KernelRpcService("echo", typeof(IEchoService))]
+            public sealed partial class EchoKernel
+            {
+                public int Echo(int[,] values, HookContext ctx)
+                {
+                    return 0;
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("multidimensional array", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Generated_client_allows_jagged_array_results()
+    {
+        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly("""
+            using System.Threading.Tasks;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IEchoService
+            {
+                ValueTask<int[][]> EchoAsync(int[][] values);
+            }
+
+            [KernelRpcService("echo", typeof(IEchoService))]
+            public sealed partial class EchoKernel
+            {
+                public int[][] Echo(int[][] values, HookContext ctx)
+                {
+                    return values;
+                }
+            }
+            """);
+
+        Assert.NotNull(assembly.GetType("Sample.EchoKernelRpcClient", throwOnError: true));
+    }
+
+    [Fact]
     public void Kernel_rpc_service_rejects_ref_parameters_without_service_interface()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
