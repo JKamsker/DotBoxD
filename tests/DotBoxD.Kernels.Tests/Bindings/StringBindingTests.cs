@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
+using System.Globalization;
 
 namespace DotBoxD.Kernels.Tests.Bindings;
 
@@ -118,6 +119,44 @@ public sealed class StringBindingTests
 
         AssertSucceeded(result, mode);
         Assert.Equal(expected, ((I32Value)result.Value!).Value);
+    }
+
+    [Theory]
+    [InlineData(ExecutionMode.Interpreted, false)]
+    [InlineData(ExecutionMode.Compiled, true)]
+    public async Task Int32_to_string_invariant_ignores_current_culture(
+        ExecutionMode mode,
+        bool compiler)
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NegativeSign = "~";
+
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+            var positive = await ExecuteReturnAsync(
+                """{ "call": "int32.toStringInvariant", "args": [{ "i32": 1234 }] }""",
+                "String",
+                SandboxPolicyBuilder.Create().Build(),
+                Options(mode),
+                compiler);
+            var negative = await ExecuteReturnAsync(
+                """{ "call": "int32.toStringInvariant", "args": [{ "i32": -1234 }] }""",
+                "String",
+                SandboxPolicyBuilder.Create().Build(),
+                Options(mode),
+                compiler);
+
+            AssertSucceeded(positive, mode);
+            AssertSucceeded(negative, mode);
+            Assert.Equal("1234", ((StringValue)positive.Value!).Value);
+            Assert.Equal("-1234", ((StringValue)negative.Value!).Value);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     [Theory]

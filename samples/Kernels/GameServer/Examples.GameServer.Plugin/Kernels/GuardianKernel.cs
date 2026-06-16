@@ -23,13 +23,11 @@ public sealed partial class GuardianKernel : IMonsterAggroService
     [Range(0, 100)]
     public int ProtectMaxLevel { get; set; } = 5;
 
-    // A STRING, not an int: the kernel emits it into the `calm:<player>:<strength>` host message, and the
-    // sandbox forbids converting an int to a string inside kernel IR (DBXK100 — interpolation holes must
-    // already be strings). A string live setting also can't carry [Range] (DBXK022), so the bound is enforced
-    // server-side (GameCommandSink clamps to 50). The siblings above stay int because they're only compared,
-    // never emitted into a message.
+    // The kernel emits this into the `calm:<player>:<strength>` host message. Kernel IR supports
+    // deterministic invariant int-to-string conversion for interpolation, so the setting can remain numeric.
     [LiveSetting]
-    public string CalmStrength { get; set; } = "20";
+    [Range(0, 50)]
+    public int CalmStrength { get; set; } = 20;
 
     // Event hooks stay synchronous. Async world reads live in server extensions and InvokeAsync; aggro events
     // are only published for live monsters, so this gate can read event data directly.

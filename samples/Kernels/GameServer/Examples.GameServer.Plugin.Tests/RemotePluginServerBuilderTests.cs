@@ -73,7 +73,7 @@ public sealed class RemotePluginServerBuilderTests
 
         await server.Replace<IMonsterAggroService, GuardianKernel>();
         await server.Get<GuardianKernel>()
-            .Set(k => k.CalmStrength, "35")
+            .Set(k => k.CalmStrength, 35)
             .Set(k => k.AggroRange, 6)
             .ApplyAsync(atomic: true);
 

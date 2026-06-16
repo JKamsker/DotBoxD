@@ -56,7 +56,7 @@ internal static class Program
         // Tune a replaced kernel's live settings — strongly typed member setters, one atomic batch. Only
         // [LiveSetting] members are settable; ApplyAsync ships it (a chain without ApplyAsync warns).
         await server.Get<GuardianKernel>()
-            .Set(k => k.CalmStrength, "35")
+            .Set(k => k.CalmStrength, 35)
             .Set(k => k.AggroRange, 6)
             .ApplyAsync(atomic: true);
 

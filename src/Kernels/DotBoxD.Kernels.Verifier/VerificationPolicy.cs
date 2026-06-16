@@ -156,6 +156,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("Gte", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("And", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("Or", $"{SandboxValueName},{SandboxValueName}", SandboxValueName),
+                RuntimeMember("Int32ToStringInvariant", $"{SandboxContextName},{SandboxValueName}", SandboxValueName),
                 RuntimeMember("StringLength", SandboxValueName, SandboxValueName),
                 RuntimeMember("StringLengthRaw", SandboxValueName, Int32Name),
                 RuntimeMember("ListCountRaw", SandboxValueName, Int32Name),

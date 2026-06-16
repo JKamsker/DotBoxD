@@ -81,7 +81,7 @@ collapse and dissolves 2.4.
 
 No test exercises it and the test double discards the payload, so it is fully unguarded.
 
-**Fix:** an expression setter builder — `Get<GuardianKernel>().Set(k => k.AggroRange, 6).Set(k => k.CalmStrength, "35").ApplyAsync(atomic: true)` —
+**Fix:** an expression setter builder — `Get<GuardianKernel>().Set(k => k.AggroRange, 6).Set(k => k.CalmStrength, 35).ApplyAsync(atomic: true)` —
 so "read k.X" is unrepresentable and only live keys compile.
 
 ### 2.2 — HIGH — Install verbs on the domain contract (the headline; doc tension B) **[3×]**
@@ -144,16 +144,15 @@ fails on the `.Monsters` access. In the `FromConnection(control)` no-world path 
 **Fix:** `[DebuggerBrowsable(Never)]` + a `[DebuggerDisplay]` that doesn't trip the gate; split the message by
 cause (not-started vs no-world-supplied).
 
-### 2.7 — RETRACTED — `CalmStrength` is `string "20"` among `int [Range]` siblings **[3×]**
+### 2.7 — low — `CalmStrength` was `string "20"` among `int [Range]` siblings **[3×]**
 
-`GuardianKernel.cs`. Originally filed as "make it `int` with `[Range(0,50)]`." **Disproven at build time:** the
-kernel emits `CalmStrength` into the `calm:<player>:<strength>` host message, and the sandbox forbids
-converting an `int` to a string inside kernel IR (`DBXK100` — interpolation holes must already be strings).
-So a numeric live-setting that a kernel *writes into a message* must be a `string` here; and string settings
-can't carry `[Range]` (`DBXK022`). The bound is enforced server-side (`GameCommandSink` clamps to 50). This is
-an inherent sandbox constraint, not a smell — `CalmStrength` stays `string`. (Sibling settings like
-`AggroRange` are `int` precisely because they're only *compared*, never emitted into a message.) A real
-ergonomic fix would be a library enhancement: support an `int→string` lowering for message construction.
+`GuardianKernel.cs`. The framework now supports deterministic, culture-invariant `int→string` lowering for
+kernel interpolation, so `CalmStrength` can be a numeric live setting again:
+`[LiveSetting] [Range(0, 50)] public int CalmStrength { get; set; } = 20;`. The kernel still emits it into the
+`calm:<player>:<strength>` host message, but DBXK100 now only rejects unsupported interpolation hole types;
+`int` holes are converted through the invariant IR helper. The server-side clamp can remain a defense-in-depth
+boundary, but the authored sample no longer has to give up range metadata to pass the strength through a
+message.
 
 ## 3. Too coarse / wrong-grain control
 
@@ -230,8 +229,8 @@ concept-naming-decision.md deliberately deferred that.
    diagnostic. (1.1, 2.5)
 6. **Cleanups (mostly free once #2 lands):** drop the placeholder `IMonsterKillerService` and the redundant
    `[ServerExtensionMethod]` name (the triple collapses to one class marker + one method marker),
-   `ConfigureAwait` noise, the stale test-double methods; rename `[Plugin]`. (`CalmStrength → int` was tried
-   and **retracted** — see 2.7: the sandbox forbids `int→string` in a kernel message.)
+   `ConfigureAwait` noise, the stale test-double methods; rename `[Plugin]`. Keep `CalmStrength` as `int`
+   with `[Range(0,50)]`; the kernel IR now supports invariant `int→string` interpolation for the host message.
 
 ---
 

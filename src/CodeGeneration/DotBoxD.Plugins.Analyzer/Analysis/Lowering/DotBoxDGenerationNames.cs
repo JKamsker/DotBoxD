@@ -217,6 +217,7 @@ internal static class DotBoxDGenerationNames
     {
         public const string Var = "Var";
         public const string Str = "Str";
+        public const string Int32ToStr = "Int32ToStr";
         public const string ConcatString = "ConcatString";
         public const string StringLength = "StringLength";
         public const string StringSubstring = "StringSubstring";
@@ -250,6 +251,7 @@ internal static class DotBoxDGenerationNames
 
     public static class BindingIds
     {
+        public const string Int32ToStringInvariant = "int32.toStringInvariant";
         public const string StringLength = "string.length";
         public const string StringSubstringBudgeted = "string.substringBudgeted";
         public const string StringConcatBudgeted = "string.concatBudgeted";
