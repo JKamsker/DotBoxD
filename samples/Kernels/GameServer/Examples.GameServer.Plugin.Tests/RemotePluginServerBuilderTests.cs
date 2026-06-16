@@ -19,7 +19,7 @@ public sealed class RemotePluginServerBuilderTests
     public void FromConnection_build_performs_no_control_plane_io()
     {
         var control = new RecordingGamePluginControlService();
-        using var server = GamePluginServerBuilder
+        using IGameWorldServer server = GamePluginServerBuilder
             .FromConnection(control)
             .Setup(s => s.Replace<IMonsterAggroService, GuardianKernel>())
             .Build();

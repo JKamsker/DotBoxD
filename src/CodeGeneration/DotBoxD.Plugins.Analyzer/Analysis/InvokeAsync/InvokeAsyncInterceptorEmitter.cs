@@ -72,13 +72,21 @@ internal static class InvokeAsyncInterceptorEmitter
         }
 
         builder.AppendLine("        {");
+        var server = "server";
+        if (interception.ServerAccessType is { } serverAccessType)
+        {
+            server = "__server";
+            builder.Append("            var __server = server as ").Append(serverAccessType)
+                .AppendLine(" ?? throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls require a generated plugin server receiver.\");");
+        }
+
         if (interception.CaptureType is not null)
         {
             builder.AppendLine("            global::System.ArgumentNullException.ThrowIfNull(captures);");
         }
 
         builder.AppendLine("            global::System.ArgumentNullException.ThrowIfNull(lambda);");
-        builder.Append("            var __pluginId = await server.Services.EnsureAnonymousKernelAsync(")
+        builder.Append("            var __pluginId = await ").Append(server).Append(".Services.EnsureAnonymousKernelAsync(")
             .Append(Literal(interception.PluginId))
             .Append(", ")
             .Append(interception.PackageFullName)
@@ -86,7 +94,8 @@ internal static class InvokeAsyncInterceptorEmitter
         builder.Append("            var __request = global::DotBoxD.Plugins.KernelRpcBinaryCodec.EncodeArguments(")
             .Append(interception.ArgumentsExpression)
             .AppendLine(");");
-        builder.AppendLine("            var __response = await server.Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request).ConfigureAwait(false);");
+        builder.Append("            var __response = await ").Append(server)
+            .AppendLine(".Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request).ConfigureAwait(false);");
         builder.AppendLine("            var __result = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(__response);");
         if (interception.SyncOutAssignments.Count > 0)
         {

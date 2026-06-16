@@ -38,7 +38,13 @@ internal static class InvokeAsyncModelFactory
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax access ||
             !string.Equals(access.Name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal) ||
-            !TryServerInvocationSurface(model, access.Expression, cancellationToken, out var receiverType, out var worldType))
+            !TryServerInvocationSurface(
+                model,
+                access.Expression,
+                cancellationToken,
+                out var receiverType,
+                out var serverAccessType,
+                out var worldType))
         {
             return null;
         }
@@ -71,6 +77,7 @@ internal static class InvokeAsyncModelFactory
             invocation,
             model,
             receiverType,
+            serverAccessType,
             ns,
             packageName,
             pluginId,
@@ -83,9 +90,16 @@ internal static class InvokeAsyncModelFactory
         SemanticModel model,
         ExpressionSyntax receiver,
         CancellationToken cancellationToken,
-        out INamedTypeSymbol receiverType,
+        out string receiverType,
+        out string? serverAccessType,
         out INamedTypeSymbol worldType)
-        => InvokeAsyncReceiverResolver.TryResolve(model, receiver, cancellationToken, out receiverType, out worldType);
+        => InvokeAsyncReceiverResolver.TryResolve(
+            model,
+            receiver,
+            cancellationToken,
+            out receiverType,
+            out serverAccessType,
+            out worldType);
 
     private static GeneratedPluginPackage EmitPackage(
         string ns,
@@ -124,7 +138,8 @@ internal static class InvokeAsyncModelFactory
     private static InvokeAsyncInterception? Interception(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
-        INamedTypeSymbol receiverType,
+        string receiverType,
+        string? serverAccessType,
         string ns,
         string packageName,
         string pluginId,
@@ -164,7 +179,8 @@ internal static class InvokeAsyncModelFactory
 
         return new InvokeAsyncInterception(
             location.GetInterceptsLocationAttributeSyntax(),
-            receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            receiverType,
+            serverAccessType,
             shape.WorldType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             shape.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             captureType,

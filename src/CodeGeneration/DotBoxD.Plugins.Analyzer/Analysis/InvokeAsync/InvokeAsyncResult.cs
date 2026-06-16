@@ -9,6 +9,7 @@ internal sealed record InvokeAsyncResult(
 internal sealed record InvokeAsyncInterception(
     string AttributeSyntax,
     string ReceiverType,
+    string? ServerAccessType,
     string HostAccessType,
     string ReturnType,
     string? CaptureType,

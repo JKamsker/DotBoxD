@@ -18,7 +18,7 @@ namespace DotBoxD.Kernels.Game.Plugin;
 /// </summary>
 internal static class AdvancedUsage
 {
-    public static async Task RunAsync(GamePluginServer server)
+    public static async Task RunAsync(IGameWorldServer server)
     {
         // ── Generated server-extension graft (MonsterKillerKernel grafted onto the IMonsterControl collection).
         var killResults = await server.Monsters.KillMonstersAsync(["monster-3", "monster-4", "player-1"]);

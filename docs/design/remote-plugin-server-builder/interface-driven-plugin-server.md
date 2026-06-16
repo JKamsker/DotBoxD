@@ -53,7 +53,7 @@ on the contract.
 |---|---|---|---|
 | **Framework contracts** | `DotBoxD.Abstractions` (markers) + `DotBoxD.Plugins.Client` (runtime) | framework | `IPluginServer<TWorld>`, `ILiveSettingsHandle<>`, `RemoteServerInvocation<,,>`, `[GeneratePluginServer]`, extension-client registry/accessor contracts |
 | **Game domain surface** | game `*.Server.Abstractions` | game-SDK owner | pure `IGameWorldAccess`, `IMonsterControl`/`IEntityControl`, `MonsterSnapshot` |
-| **Generated plugin facade** | plugin assembly (generated) | source generator | `GamePluginServer : IGameWorldAccess, IPluginServer<IGameWorldAccess>` + `GamePluginServerBuilder.Setup(...)` + `IGamePluginSetup`/control accumulators + control RPC wrappers |
+| **Generated plugin facade** | plugin assembly (generated) | source generator | `GamePluginServer : IGameWorldServer`, `IGameWorldServer : IGameWorldAccess` + `GamePluginServerBuilder.Setup(...)` + `IGamePluginSetup`/control accumulators + control RPC wrappers |
 | **Reusable runtime library** | `DotBoxD.Plugins.Client` (hand-written once) | framework | lifecycle helpers, live-settings contracts, extension registry/accessor contracts, anonymous-`InvokeAsync` plumbing |
 | **Server implementation** | game server | server author | `GameWorldAccess : IGameWorldAccess` over the live world; `[HostCapability]` per method |
 
@@ -153,7 +153,7 @@ The dev writes a shell; the generator fills it in and emits a builder:
 
 ```csharp
 [GeneratePluginServer]
-public partial class GamePluginServer : IGameWorldAccess   // generator adds : IPluginServer<IGameWorldAccess>
+public partial class GamePluginServer : IGameWorldAccess   // generator adds : IGameWorldServer
 {
     partial void OnConfigured() => Console.WriteLine("[plugin] custom wiring ran.");   // optional hook
 }
@@ -162,7 +162,8 @@ public partial class GamePluginServer : IGameWorldAccess   // generator adds : I
 Lifecycle honors the locked decisions: `Build()` is synchronous and does no I/O; setup actions only resolve
 kernel packages and record install intent. `StartAsync()` connects, ships the recorded verified IR,
 registers extension ids, then runs `OnConfigured()`; `RunAsync() = StartAsync + HoldUntilShutdownAsync`.
-`Program.cs` reads:
+`Build()` returns the generated interface (`IGameWorldServer` here), not the concrete facade, so the authored
+runtime surface remains domain-first while lifecycle/settings members stay available. `Program.cs` reads:
 
 ```csharp
 using var server = GamePluginServerBuilder

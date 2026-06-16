@@ -12,23 +12,38 @@ internal static class InvokeAsyncReceiverResolver
         SemanticModel model,
         ExpressionSyntax receiver,
         CancellationToken cancellationToken,
-        out INamedTypeSymbol receiverType,
+        out string receiverType,
+        out string? serverAccessType,
         out INamedTypeSymbol worldType)
     {
-        receiverType = null!;
+        receiverType = string.Empty;
+        serverAccessType = null;
         worldType = null!;
 
         if (model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol semanticType &&
             TryResolveWorld(semanticType, out worldType))
         {
-            receiverType = semanticType;
+            receiverType = TypeName(semanticType);
+            return true;
+        }
+
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol generatedInterfaceType &&
+            TryResolveGeneratedServerInterface(
+                model.Compilation,
+                generatedInterfaceType,
+                cancellationToken,
+                out receiverType,
+                out serverAccessType,
+                out worldType))
+        {
             return true;
         }
 
         if (TryResolveGeneratedBuilderLocal(model, receiver, cancellationToken, out var generatedType) &&
             TryResolveWorld(generatedType, out worldType))
         {
-            receiverType = generatedType;
+            receiverType = PluginServerInterfaceTypeName(worldType);
+            serverAccessType = ServerInterfaceTypeName(generatedType, worldType);
             return true;
         }
 
@@ -85,13 +100,21 @@ internal static class InvokeAsyncReceiverResolver
         out string facadeName)
     {
         facadeName = string.Empty;
-        return buildReceiver is InvocationExpressionSyntax
+        var current = buildReceiver;
+        while (current is InvocationExpressionSyntax
+               {
+                   Expression: MemberAccessExpressionSyntax { Expression: { } next }
+               })
         {
-            Expression: MemberAccessExpressionSyntax
+            if (TryFacadeNameFromBuilderType(next, out facadeName))
             {
-                Expression: { } builderType
+                return true;
             }
-        } && TryFacadeNameFromBuilderType(builderType, out facadeName);
+
+            current = next;
+        }
+
+        return TryFacadeNameFromBuilderType(current, out facadeName);
     }
 
     private static bool TryFacadeNameFromBuilderType(
@@ -163,6 +186,57 @@ internal static class InvokeAsyncReceiverResolver
         return false;
     }
 
+    private static bool TryResolveGeneratedServerInterface(
+        Compilation compilation,
+        INamedTypeSymbol type,
+        CancellationToken cancellationToken,
+        out string receiverType,
+        out string? serverAccessType,
+        out INamedTypeSymbol worldType)
+    {
+        receiverType = string.Empty;
+        serverAccessType = null;
+        worldType = null!;
+        var candidates = new List<(INamedTypeSymbol Facade, INamedTypeSymbol World)>();
+        var expectedNamespace = type.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : type.ContainingNamespace.ToDisplayString();
+        foreach (var symbol in compilation.GetSymbolsWithName(_ => true, SymbolFilter.Type, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (symbol is not INamedTypeSymbol candidate ||
+                !TryResolveWorld(candidate, out var candidateWorld) ||
+                !string.Equals(type.Name, ServerInterfaceName(candidateWorld), StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var candidateNamespace = candidate.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : candidate.ContainingNamespace.ToDisplayString();
+            if (!string.IsNullOrEmpty(expectedNamespace) &&
+                string.Equals(expectedNamespace, candidateNamespace, StringComparison.Ordinal))
+            {
+                receiverType = PluginServerInterfaceTypeName(candidateWorld);
+                serverAccessType = ServerInterfaceTypeName(candidate, candidateWorld);
+                worldType = candidateWorld;
+                return true;
+            }
+
+            candidates.Add((candidate, candidateWorld));
+        }
+
+        if (candidates.Count != 1)
+        {
+            return false;
+        }
+
+        receiverType = PluginServerInterfaceTypeName(candidates[0].World);
+        serverAccessType = ServerInterfaceTypeName(candidates[0].Facade, candidates[0].World);
+        worldType = candidates[0].World;
+        return true;
+    }
+
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDGenerationNames.Metadata.GeneratePluginServerAttribute);
 
@@ -184,4 +258,34 @@ internal static class InvokeAsyncReceiverResolver
 
         return false;
     }
+
+    private static string ServerInterfaceTypeName(INamedTypeSymbol facadeType, INamedTypeSymbol worldType)
+    {
+        var ns = facadeType.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : facadeType.ContainingNamespace.ToDisplayString() + ".";
+        return "global::" + ns + ServerInterfaceName(worldType);
+    }
+
+    private static string PluginServerInterfaceTypeName(INamedTypeSymbol worldType)
+        => "global::DotBoxD.Abstractions.IPluginServer<" + TypeName(worldType) + ">";
+
+    private static string ServerInterfaceName(INamedTypeSymbol worldType)
+    {
+        var name = worldType.Name;
+        if (name.StartsWith("I", StringComparison.Ordinal) && name.Length > 1 && char.IsUpper(name[1]))
+        {
+            name = name.Substring(1);
+        }
+
+        if (name.EndsWith("Access", StringComparison.Ordinal) && name.Length > "Access".Length)
+        {
+            name = name.Substring(0, name.Length - "Access".Length);
+        }
+
+        return "I" + name + "Server";
+    }
+
+    private static string TypeName(INamedTypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 }

@@ -42,7 +42,7 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("        _setup += configure;");
         builder.AppendLine("        return this;");
         builder.AppendLine("    }");
-        builder.AppendLine("    public " + model.ClassName + " Build()");
+        builder.AppendLine("    public " + model.ServerInterfaceName + " Build()");
         builder.AppendLine("        => _connectionFactory is not null ? new " + model.ClassName + "(_connectionFactory, _setup) : new " + model.ClassName + "(_control!, _world, _setup);");
         builder.AppendLine("}");
     }

@@ -20,6 +20,8 @@ internal static class PluginServerFacadeEmitter
 
         AppendFacade(builder, model);
         builder.AppendLine();
+        AppendServerInterface(builder, model);
+        builder.AppendLine();
         PluginServerSetupEmitter.AppendBuilder(builder, model);
         PluginServerSetupEmitter.AppendSetupInterfaces(builder, model);
         return new GeneratedPluginPackage(HintName(model), builder.ToString());
@@ -28,9 +30,7 @@ internal static class PluginServerFacadeEmitter
     private static void AppendFacade(StringBuilder builder, PluginServerFacadeModel model)
     {
         builder.Append(model.Accessibility).Append(" partial class ").Append(model.ClassName)
-            .Append(" : global::DotBoxD.Abstractions.IPluginServer<").Append(model.WorldType)
-            .Append(">, global::DotBoxD.Abstractions.IServerExtensionClientRegistry, ")
-            .AppendLine("global::System.IDisposable, global::System.IAsyncDisposable");
+            .Append(" : ").AppendLine(model.ServerInterfaceName);
         builder.AppendLine("{");
         builder.AppendLine("    private const string NotStartedMessage = \"Call StartAsync() before using the server.\";");
         builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
@@ -97,7 +97,7 @@ internal static class PluginServerFacadeEmitter
     private static void AppendProperties(StringBuilder builder, PluginServerFacadeModel model)
     {
         builder.AppendLine();
-        builder.Append("    public ").Append(model.ClassName).AppendLine(" Services => this;");
+        builder.Append("    public ").Append(model.ServerInterfaceName).AppendLine(" Services => this;");
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => this;");
         foreach (var control in model.Controls)
         {
@@ -106,6 +106,22 @@ internal static class PluginServerFacadeEmitter
                 .AppendLine(" is not null ? _" + FieldName(control.Name) + " : throw new global::System.InvalidOperationException(NotStartedMessage);");
         }
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient => this;");
+    }
+
+    private static void AppendServerInterface(StringBuilder builder, PluginServerFacadeModel model)
+    {
+        builder.Append(model.Accessibility).Append(" interface ").Append(model.ServerInterfaceName)
+            .Append(" : ").Append(model.WorldType)
+            .Append(", global::DotBoxD.Abstractions.IPluginServer<").Append(model.WorldType)
+            .Append(">, global::DotBoxD.Abstractions.IServerExtensionClientRegistry, ")
+            .AppendLine("global::System.IDisposable, global::System.IAsyncDisposable");
+        builder.AppendLine("{");
+        builder.Append("    ").Append(model.ServerInterfaceName).AppendLine(" Services { get; }");
+        builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }");
+        builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient { get; }");
+        builder.AppendLine("    global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new();");
+        builder.AppendLine("    global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory);");
+        builder.AppendLine("}");
     }
 
     private static void AppendLifecycle(StringBuilder builder, PluginServerFacadeModel model)
