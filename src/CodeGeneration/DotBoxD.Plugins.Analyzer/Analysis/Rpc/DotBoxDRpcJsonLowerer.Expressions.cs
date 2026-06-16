@@ -155,9 +155,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 argumentList.Arguments,
                 constructor.Parameters,
                 $"Kernel RPC service constructor for '{named.Name}'");
-            for (var i = 0; i < fields.Count; i++)
+            var assigned = new bool[fields.Count];
+            for (var i = 0; i < constructor.Parameters.Length; i++)
             {
-                args[i] = lowered[i];
+                var fieldIndex = ConstructorFieldIndex(fields, constructor.Parameters[i], named);
+                if (assigned[fieldIndex])
+                {
+                    throw new NotSupportedException(
+                        $"Kernel RPC service constructor for '{named.Name}' must map one argument per field.");
+                }
+
+                args[fieldIndex] = lowered[i];
+                assigned[fieldIndex] = true;
             }
         }
         else if (creation.Initializer is { } initializer)
@@ -211,6 +220,24 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         throw new NotSupportedException($"Kernel RPC service '{named.Name}' has no field '{name}'.");
+    }
+
+    private static int ConstructorFieldIndex(
+        IReadOnlyList<IPropertySymbol> fields,
+        IParameterSymbol parameter,
+        INamedTypeSymbol named)
+    {
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (string.Equals(fields[i].Name, parameter.Name, StringComparison.OrdinalIgnoreCase) &&
+                SymbolEqualityComparer.Default.Equals(fields[i].Type, parameter.Type))
+            {
+                return i;
+            }
+        }
+
+        throw new NotSupportedException(
+            $"Kernel RPC DTO '{named.Name}' must expose a constructor matching its public fields.");
     }
 
     private ITypeSymbol TypeOf(ExpressionSyntax expression)
