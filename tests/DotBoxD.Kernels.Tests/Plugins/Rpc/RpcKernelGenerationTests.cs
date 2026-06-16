@@ -122,6 +122,22 @@ public sealed class RpcKernelGenerationTests
         }
         """;
 
+    private const string ControlStringSource = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [KernelRpcService("control-string")]
+        public sealed partial class ControlStringKernel
+        {
+            public string Text(HookContext ctx)
+            {
+                return "\b\f";
+            }
+        }
+        """;
+
     [Fact]
     public async Task A_generated_batch_kernel_installs_and_returns_a_list_of_dtos_in_one_roundtrip()
     {
@@ -178,6 +194,22 @@ public sealed class RpcKernelGenerationTests
         Assert.Contains("game.world.monster.read.level", package.Manifest.RequiredCapabilities);
         Assert.Contains(RuntimeCapabilityIds.Async, package.Manifest.RequiredCapabilities);
         Assert.Contains("Concurrency", package.Manifest.Effects);
+    }
+
+    [Fact]
+    public async Task String_literals_escape_json_control_characters()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            ControlStringSource,
+            "Sample.ControlStringPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: KillPolicy());
+        var kernel = await server.InstallRpcAsync(package);
+
+        var result = await kernel.InvokeRpcAsync([]);
+
+        var text = Assert.IsType<StringValue>(result);
+        Assert.Equal("\b\f", text.Value);
     }
 
     private static void AssertKill(SandboxValue value, int expectedId, bool expectedSuccess)
