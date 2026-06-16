@@ -151,6 +151,12 @@ public static class KernelRpcMarshaller
     {
         if (type.IsArray)
         {
+            if (type.GetArrayRank() != 1)
+            {
+                throw new NotSupportedException(
+                    $"Kernel RPC service cannot marshal multidimensional array type '{type}'.");
+            }
+
             return type.GetElementType();
         }
 
