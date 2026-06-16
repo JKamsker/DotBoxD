@@ -203,7 +203,7 @@ public sealed class RpcKernelGenerationTests
             ControlStringSource,
             "Sample.ControlStringPluginPackage");
 
-        using var server = PluginServer.Create(defaultPolicy: KillPolicy());
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
         var kernel = await server.InstallRpcAsync(package);
 
         var result = await kernel.InvokeRpcAsync([]);
@@ -252,6 +252,14 @@ public sealed class RpcKernelGenerationTests
         => SandboxPolicyBuilder.Create()
             .GrantLogging()
             .Grant("game.world.monster.write.*", new { }, SandboxEffect.HostStateWrite)
+            .WithFuel(100_000)
+            .WithMaxHostCalls(10_000)
+            .WithWallTime(TimeSpan.FromSeconds(10))
+            .Build();
+
+    private static SandboxPolicy PurePolicy()
+        => SandboxPolicyBuilder.Create()
+            .GrantLogging()
             .WithFuel(100_000)
             .WithMaxHostCalls(10_000)
             .WithWallTime(TimeSpan.FromSeconds(10))

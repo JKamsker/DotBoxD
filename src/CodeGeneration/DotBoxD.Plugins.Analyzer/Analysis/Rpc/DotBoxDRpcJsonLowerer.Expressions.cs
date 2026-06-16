@@ -18,6 +18,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _cancellationToken.ThrowIfCancellationRequested();
         if (_model.GetConstantValue(expression, _cancellationToken) is { HasValue: true } constant)
         {
+            if (constant.Value is string)
+            {
+                Allocates = true;
+            }
+
             return LiteralJson(constant.Value);
         }
 
