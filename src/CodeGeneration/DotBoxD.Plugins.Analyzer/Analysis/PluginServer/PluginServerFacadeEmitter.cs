@@ -21,6 +21,7 @@ internal static class PluginServerFacadeEmitter
         AppendFacade(builder, model);
         builder.AppendLine();
         AppendBuilder(builder, model);
+        AppendClientInterfaces(builder, model);
         return new GeneratedPluginPackage(HintName(model), builder.ToString());
     }
 
@@ -79,7 +80,11 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => this;");
         foreach (var control in model.Controls)
         {
-            builder.Append("    public ").Append(control.WrapperName).Append(' ').Append(control.Name)
+            // The public property is typed as the generated client interface (which inherits the domain
+            // control), so "Go to Definition" on e.g. server.Monsters lands on a one-line interface whose base
+            // is the hand-written IMonsterControl — instead of the generated wrapper class. The runtime value
+            // is still the wrapper (it carries the registry), so grafted extension methods route as before.
+            builder.Append("    public ").Append(ClientInterfaceRef(model, control)).Append(' ').Append(control.Name)
                 .Append(" => _started && _").Append(FieldName(control.Name))
                 .AppendLine(" is not null ? _" + FieldName(control.Name) + " : throw new global::System.InvalidOperationException(NotStartedMessage);");
             builder.Append("    ").Append(control.Type).Append(' ').Append(model.WorldType).Append('.').Append(control.Name)
@@ -240,6 +245,28 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        => _connectionFactory is not null ? new " + model.ClassName + "(_connectionFactory) : new " + model.ClassName + "(_control!, _world);");
         builder.AppendLine("}");
     }
+
+    private static void AppendClientInterfaces(StringBuilder builder, PluginServerFacadeModel model)
+    {
+        foreach (var control in model.Controls)
+        {
+            builder.AppendLine();
+            builder.AppendLine("/// <summary>Plugin-side client view of the domain control: its base interface (navigate there for");
+            builder.AppendLine("/// the domain API) plus the install verbs the generated facade routes.</summary>");
+            builder.Append(model.Accessibility).Append(" interface ").Append(control.ClientInterfaceName)
+                .Append(" : ").Append(control.Type).AppendLine();
+            builder.AppendLine("{");
+            builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }");
+            builder.AppendLine("    global::System.Threading.Tasks.ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class;");
+            builder.AppendLine("    global::System.Threading.Tasks.ValueTask<string> Extend<TKernel>() where TKernel : class;");
+            builder.AppendLine("}");
+        }
+    }
+
+    internal static string ClientInterfaceRef(PluginServerFacadeModel model, PluginServerControlProperty control)
+        => string.IsNullOrEmpty(model.Namespace)
+            ? control.ClientInterfaceName
+            : "global::" + model.Namespace + "." + control.ClientInterfaceName;
 
     private static string ParameterList(PluginServerForwardedMethod method)
         => string.Join(", ", method.Parameters.Select(p => p.Type + " @" + p.Name));

@@ -102,6 +102,7 @@ internal static class PluginServerFacadeModelFactory
                 property.Name,
                 TypeName(propertyType),
                 property.Name + "PluginControl",
+                propertyType.Name + "Client",   // e.g. IMonsterControl -> IMonsterControlClient (navigable: base is the domain interface)
                 new EquatableArray<PluginServerForwardedMethod>(
                     ResolveMethods(propertyType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
                 new EquatableArray<PluginServerServiceWrapper>(ResolveServiceWrappers(propertyType, cancellationToken))));

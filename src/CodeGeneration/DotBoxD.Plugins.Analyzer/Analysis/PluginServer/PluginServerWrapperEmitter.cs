@@ -9,7 +9,7 @@ internal static class PluginServerWrapperEmitter
         PluginServerFacadeModel model,
         PluginServerControlProperty control)
     {
-        builder.AppendLine("    public sealed class " + control.WrapperName + " : " + control.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
+        builder.AppendLine("    public sealed class " + control.WrapperName + " : " + PluginServerFacadeEmitter.ClientInterfaceRef(model, control) + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
         builder.AppendLine("        private readonly " + control.Type + " _inner;");

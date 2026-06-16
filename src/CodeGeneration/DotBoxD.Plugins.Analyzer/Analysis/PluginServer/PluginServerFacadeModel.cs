@@ -16,6 +16,7 @@ internal sealed record PluginServerControlProperty(
     string Name,
     string Type,
     string WrapperName,
+    string ClientInterfaceName,
     EquatableArray<PluginServerForwardedMethod> Methods,
     EquatableArray<PluginServerServiceWrapper> ServiceWrappers);
 
