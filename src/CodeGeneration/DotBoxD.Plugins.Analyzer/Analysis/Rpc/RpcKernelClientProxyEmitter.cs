@@ -70,6 +70,8 @@ internal static partial class RpcKernelClientProxyEmitter
         {
             var serviceParameter = serviceMethod.Parameters[i];
             var kernelParameter = kernelMethod.Parameters[i];
+            RejectRefLikeParameter(serviceParameter, "service");
+            RejectRefLikeParameter(kernelParameter, "kernel");
             if (!SymbolEqualityComparer.Default.Equals(serviceParameter.Type, kernelParameter.Type))
             {
                 throw new NotSupportedException(
@@ -90,6 +92,17 @@ internal static partial class RpcKernelClientProxyEmitter
         }
 
         return serviceMethod;
+    }
+
+    private static void RejectRefLikeParameter(IParameterSymbol parameter, string owner)
+    {
+        if (parameter.RefKind == RefKind.None)
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Kernel RPC {owner} parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
     }
 
     private static ITypeSymbol UnwrapReturn(ITypeSymbol type)

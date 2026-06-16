@@ -162,9 +162,9 @@ internal static class CompiledBindingDispatcher
     {
         // Synchronous bindings (the common case) complete inline, so read the
         // result directly and avoid allocating a Task<SandboxValue> wrapper.
-        if (pending.IsCompletedSuccessfully)
+        if (pending.IsCompleted)
         {
-            return pending.Result;
+            return pending.GetAwaiter().GetResult();
         }
 
         if (!context.AsyncEnabled)

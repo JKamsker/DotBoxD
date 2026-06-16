@@ -10,6 +10,8 @@ using System.Text;
 /// </summary>
 public static class KernelRpcBinaryCodec
 {
+    private const int MaxDecodeDepth = 64;
+
     public static byte[] EncodeArguments(IReadOnlyList<KernelRpcValue> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -30,7 +32,7 @@ public static class KernelRpcBinaryCodec
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader);
+            values[i] = ReadValue(ref reader, depth: 0);
         }
 
         reader.EnsureConsumed();
@@ -47,7 +49,7 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var value = ReadValue(ref reader);
+        var value = ReadValue(ref reader, depth: 0);
         reader.EnsureConsumed();
         return value;
     }
@@ -83,7 +85,7 @@ public static class KernelRpcBinaryCodec
         }
     }
 
-    private static KernelRpcValue ReadValue(ref Reader reader)
+    private static KernelRpcValue ReadValue(ref Reader reader, int depth)
     {
         var kind = (KernelRpcValueKind)reader.ReadByte();
         return kind switch
@@ -94,8 +96,8 @@ public static class KernelRpcBinaryCodec
             KernelRpcValueKind.I64 => KernelRpcValue.Int64(reader.ReadInt64()),
             KernelRpcValueKind.F64 => KernelRpcValue.Double(BitConverter.Int64BitsToDouble(reader.ReadInt64())),
             KernelRpcValueKind.String => KernelRpcValue.String(reader.ReadString()),
-            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader)),
-            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader)),
+            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader, depth)),
+            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader, depth)),
             _ => throw new FormatException($"Kernel RPC payload contains unknown value kind '{kind}'.")
         };
     }
@@ -109,13 +111,18 @@ public static class KernelRpcBinaryCodec
         }
     }
 
-    private static KernelRpcValue[] ReadItems(ref Reader reader)
+    private static KernelRpcValue[] ReadItems(ref Reader reader, int depth)
     {
+        if (depth >= MaxDecodeDepth)
+        {
+            throw new FormatException("Kernel RPC payload exceeds maximum nesting depth.");
+        }
+
         var count = reader.ReadLength();
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader);
+            values[i] = ReadValue(ref reader, depth + 1);
         }
 
         return values;

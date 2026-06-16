@@ -201,8 +201,7 @@ public sealed class KernelRpcServiceProxyTests
         Assert.Contains(
             diagnostics,
             d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("modifier 'none'", StringComparison.Ordinal) &&
-                 d.GetMessage().Contains("modifier 'ref'", StringComparison.Ordinal));
+                 d.GetMessage().Contains("cannot use ref, in, or out", StringComparison.Ordinal));
     }
 
     [Fact]

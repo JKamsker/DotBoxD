@@ -27,7 +27,7 @@ internal static class DotBoxDHostBindingExpressionLowerer
             return null;
         }
 
-        var (bindingId, capability, effects) = binding;
+        var (bindingId, capability, effects, isAsync) = binding;
         var returnType = DotBoxDTypeNameReader.SandboxTypeName(method.ReturnType);
         if (string.Equals(returnType, DotBoxDGenerationNames.ManifestTypes.Unsupported, StringComparison.Ordinal))
         {
@@ -71,9 +71,14 @@ internal static class DotBoxDHostBindingExpressionLowerer
             {
                 effectSink.Add(effect);
             }
+
+            if (isAsync)
+            {
+                effectSink.Add(DotBoxDGenerationNames.Effects.Concurrency);
+            }
         }
 
-        if (effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+        if (isAsync || effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
         {
             context.Capabilities?.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
         }
@@ -84,7 +89,8 @@ internal static class DotBoxDHostBindingExpressionLowerer
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }
 
-    internal static (string BindingId, string Capability, IReadOnlyList<string> Effects)? HostBinding(IMethodSymbol method)
+    internal static (string BindingId, string Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
+        IMethodSymbol method)
     {
         foreach (var attribute in method.GetAttributes())
         {
@@ -102,11 +108,25 @@ internal static class DotBoxDHostBindingExpressionLowerer
                 !string.IsNullOrEmpty(bindingId) &&
                 !string.IsNullOrEmpty(capability))
             {
-                return (bindingId, capability, EffectNames(attribute.ConstructorArguments[2]));
+                return (bindingId, capability, EffectNames(attribute.ConstructorArguments[2]), IsAsync(attribute));
             }
         }
 
         return null;
+    }
+
+    private static bool IsAsync(AttributeData attribute)
+    {
+        foreach (var argument in attribute.NamedArguments)
+        {
+            if (string.Equals(argument.Key, "IsAsync", StringComparison.Ordinal) &&
+                argument.Value.Value is bool isAsync)
+            {
+                return isAsync;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

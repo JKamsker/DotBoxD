@@ -35,3 +35,8 @@ Async-capable bindings are opt-in. A binding marked `BindingDescriptor.IsAsync` 
 `Concurrency` effect and requires the `dotboxd.runtime.async` runtime capability. Hosts grant it with
 `SandboxPolicyBuilder.AllowRuntimeAsync()`; without that grant, preparation fails closed and the
 runtime backstop rejects genuinely pending `ValueTask` results.
+
+When a plugin authoring interface uses `[HostBinding]`, set the additive
+`HostBindingAttribute.IsAsync` named property to mirror the registered descriptor's `IsAsync` value.
+The property defaults to `false`, so existing source remains compatible while async host bindings can
+derive `dotboxd.runtime.async` into generated manifests.

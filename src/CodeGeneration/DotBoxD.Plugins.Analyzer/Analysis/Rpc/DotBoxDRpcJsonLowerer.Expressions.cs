@@ -64,7 +64,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 _effects.Add(effect);
             }
 
-            if (binding.Effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+            if (binding.IsAsync)
+            {
+                _effects.Add(DotBoxDGenerationNames.Effects.Concurrency);
+            }
+
+            if (binding.IsAsync || binding.Effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
             {
                 _capabilities.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
             }

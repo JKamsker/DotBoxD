@@ -49,8 +49,8 @@ internal static class InterpreterBindingCaller
             timeout = context.CreateWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope();
             var pending = descriptor.Invoke(context, args, timeout.Token);
-            var value = pending.IsCompletedSuccessfully
-                ? pending.Result
+            var value = pending.IsCompleted
+                ? pending.GetAwaiter().GetResult()
                 : await AwaitPendingAsync(context, pending).ConfigureAwait(false);
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);

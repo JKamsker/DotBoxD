@@ -56,7 +56,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        var policy = ServerPolicy.ForKernel(package.Manifest.RequiredCapabilities);
+        var policy = ServerPolicy.ForRpcKernel(package.Manifest.RequiredCapabilities);
         var kernel = await _session.InstallRpcAsync(package, policy, ct).ConfigureAwait(false);
         return kernel.Manifest.PluginId;
     }

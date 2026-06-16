@@ -91,6 +91,37 @@ public sealed class RpcKernelGenerationTests
         }
         """;
 
+    private const string AsyncHostBindingSource = """
+        using System.Collections.Generic;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IGameWorld
+        {
+            [HostBinding("host.world.getLevel", "game.world.monster.read.level", SandboxEffect.Cpu | SandboxEffect.HostStateRead, IsAsync = true)]
+            int GetLevel(int id);
+        }
+
+        [KernelRpcService("async-level")]
+        public sealed partial class AsyncLevelKernel
+        {
+            public int SumLevels(List<int> monsterIds, HookContext ctx)
+            {
+                var total = 0;
+                foreach (var id in monsterIds)
+                {
+                    total += ctx.Host<IGameWorld>().GetLevel(id);
+                }
+
+                return total;
+            }
+        }
+        """;
+
     [Fact]
     public async Task A_generated_batch_kernel_installs_and_returns_a_list_of_dtos_in_one_roundtrip()
     {
@@ -135,6 +166,18 @@ public sealed class RpcKernelGenerationTests
         Assert.Equal(2, list.Values.Count);
         AssertKill(list.Values[0], 20, true);
         AssertKill(list.Values[1], 21, false);
+    }
+
+    [Fact]
+    public void Async_host_binding_metadata_derives_runtime_async_manifest_requirements()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            AsyncHostBindingSource,
+            "Sample.AsyncLevelPluginPackage");
+
+        Assert.Contains("game.world.monster.read.level", package.Manifest.RequiredCapabilities);
+        Assert.Contains(RuntimeCapabilityIds.Async, package.Manifest.RequiredCapabilities);
+        Assert.Contains("Concurrency", package.Manifest.Effects);
     }
 
     private static void AssertKill(SandboxValue value, int expectedId, bool expectedSuccess)

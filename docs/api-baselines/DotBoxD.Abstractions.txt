@@ -2,6 +2,7 @@
 # Package: DotBoxD.Abstractions
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
+public bool IsAsync { get; set; }
 public CancellationToken CancellationToken { get; }
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
 public InMemoryPluginMessageSink()
