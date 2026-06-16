@@ -181,24 +181,6 @@ public static class KernelRpcMarshaller
             }
         }
 
-        // For positional records/structs the primary constructor parameter order is the canonical field
-        // order the analyzer lowered against; align to it when a matching constructor exists.
-        foreach (var constructor in type.GetConstructors())
-        {
-            var parameters = constructor.GetParameters();
-            if (parameters.Length == properties.Count && parameters.Length > 0 &&
-                Array.TrueForAll(parameters, p => properties.Exists(pr => NameMatches(pr.Name, p.Name))))
-            {
-                var ordered = new List<PropertyInfo>(parameters.Length);
-                foreach (var parameter in parameters)
-                {
-                    ordered.Add(properties.Find(pr => NameMatches(pr.Name, parameter.Name))!);
-                }
-
-                return ordered;
-            }
-        }
-
         return properties;
     }
 
