@@ -49,7 +49,7 @@ internal static class HookChainModelFactory
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             !string.Equals(terminalAccess.Name.Identifier.ValueText, InvokeKernelMethod, StringComparison.Ordinal) ||
-            !IsHookChainType(model, terminalAccess.Expression, cancellationToken, out var receiverIsPipeline))
+            !IsHookChainType(model, terminalAccess.Expression, cancellationToken, out var receiverType, out var receiverIsPipeline))
         {
             return null;
         }
@@ -158,24 +158,25 @@ internal static class HookChainModelFactory
             ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects),
             RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]));
 
-        return new HookChainResult(modelResult, Interception(invocation, model, eventType, modelResult, receiverIsPipeline, cancellationToken));
+        return new HookChainResult(modelResult, Interception(
+            invocation,
+            model,
+            receiverType,
+            eventType,
+            modelResult,
+            receiverIsPipeline,
+            cancellationToken));
     }
 
     private static HookChainInterception? Interception(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
+        INamedTypeSymbol receiverType,
         INamedTypeSymbol eventType,
         PluginKernelModel chainModel,
         bool receiverIsPipeline,
         CancellationToken cancellationToken)
     {
-        // Only HookPipeline<TEvent> terminals get an interceptor in the MVP (a HookStage after a Select
-        // has a second type parameter the non-generic interceptor cannot name).
-        if (!receiverIsPipeline)
-        {
-            return null;
-        }
-
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
         if (location is null)
         {
@@ -194,10 +195,18 @@ internal static class HookChainModelFactory
 
         return new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
+            receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            HandlerElementType(receiverType, eventType, receiverIsPipeline).ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             packageFullName,
             handlerIsAction);
     }
+
+    private static ITypeSymbol HandlerElementType(
+        INamedTypeSymbol receiverType,
+        INamedTypeSymbol eventType,
+        bool receiverIsPipeline)
+        => receiverIsPipeline ? eventType : receiverType.TypeArguments[1];
 
     private static DotBoxDExpressionLoweringContext Context(
         string elementParam,
@@ -246,15 +255,18 @@ internal static class HookChainModelFactory
         SemanticModel model,
         ExpressionSyntax receiver,
         CancellationToken cancellationToken,
+        out INamedTypeSymbol type,
         out bool isPipeline)
     {
+        type = null!;
         isPipeline = false;
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol type)
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol resolved)
         {
             return false;
         }
 
-        var original = type.OriginalDefinition.ToDisplayString();
+        type = resolved;
+        var original = resolved.OriginalDefinition.ToDisplayString();
         isPipeline = string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal);
         return isPipeline || string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal);
     }

@@ -51,8 +51,8 @@ internal static class DotBoxDHookChainInterceptorEmitter
         {
             var interception = interceptions[i];
             var handlerType = interception.HandlerIsAction
-                ? $"{TypeNames.GlobalAction}<{interception.EventTypeFullName}, {TypeNames.GlobalHookContext}>"
-                : $"{TypeNames.GlobalFunc}<{interception.EventTypeFullName}, {TypeNames.GlobalHookContext}, {TypeNames.GlobalValueTask}>";
+                ? $"{TypeNames.GlobalAction}<{interception.HandlerElementTypeFullName}, {TypeNames.GlobalHookContext}>"
+                : $"{TypeNames.GlobalFunc}<{interception.HandlerElementTypeFullName}, {TypeNames.GlobalHookContext}, {TypeNames.GlobalValueTask}>";
 
             builder.Append("        ").AppendLine(interception.AttributeSyntax);
             builder.Append("        public static ").Append(TypeNames.GlobalHookPipeline).Append('<')
@@ -60,9 +60,7 @@ internal static class DotBoxDHookChainInterceptorEmitter
                 .Append("> Intercept_")
                 .Append(i.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .AppendLine("(");
-            builder.Append("            this ").Append(TypeNames.GlobalHookPipeline).Append('<')
-                .Append(interception.EventTypeFullName)
-                .AppendLine("> pipeline,");
+            builder.Append("            this ").Append(interception.ReceiverTypeFullName).AppendLine(" pipeline,");
             builder.Append("            ").Append(handlerType).AppendLine(" handler)");
             builder.Append("            => pipeline.UseGeneratedChain(")
                 .Append(interception.PackageFullName)

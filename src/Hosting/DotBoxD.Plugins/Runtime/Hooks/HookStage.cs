@@ -97,6 +97,9 @@ public sealed class HookStage<TEvent, TCurrent>
         return InvokeLocal((value, _) => handler(value));
     }
 
+    public HookPipeline<TEvent> UseGeneratedChain(PluginPackage package)
+        => _root.UseGeneratedChain(package);
+
     /// <summary>The terminal the analyzer lowers to verified IR; un-lowered it throws (never native).</summary>
     public HookPipeline<TEvent> InvokeKernel(Func<TCurrent, HookContext, ValueTask> handler)
         => throw HookLowering.NotLowered();
