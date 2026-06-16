@@ -54,6 +54,12 @@ internal static class DotBoxDRpcTypeMapper
     {
         if (type is IArrayTypeSymbol array)
         {
+            if (array.Rank != 1)
+            {
+                throw new NotSupportedException(
+                    $"Kernel RPC service multidimensional array type '{type.ToDisplayString()}' is not supported.");
+            }
+
             return array.ElementType;
         }
 
