@@ -39,7 +39,7 @@ public sealed class InvokeAsyncGenerationTests
     {
         var result = RunGenerator(UsageSource("""
             public static ValueTask<int> Run(RemotePluginServer kernels)
-                => kernels.InvokeAsync((IGameWorldAccess world) => world.GetHealth("monster-1"));
+                => kernels.InvokeAsync((IGameWorldAccess world) => new ValueTask<int>(world.GetHealth("monster-1")));
             """));
 
         Assert.DoesNotContain(
@@ -55,7 +55,7 @@ public sealed class InvokeAsyncGenerationTests
             {
                 var monsterId = "monster-1";
                 var lastHealth = 0;
-                return kernels.InvokeAsync((IGameWorldAccess world) =>
+                return kernels.InvokeAsync(async (IGameWorldAccess world) =>
                 {
                     lastHealth = world.GetHealth(monsterId);
                     return lastHealth;
@@ -85,15 +85,18 @@ public sealed class InvokeAsyncGenerationTests
 
     private const string NoCaptureSource = """
         using System;
+        using System.Threading;
         using System.Threading.Tasks;
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Kernels.Game.Plugin.Client;
         using DotBoxD.Kernels.Game.Server.Abstractions;
 
         namespace DotBoxD.Kernels.Game.Server.Abstractions
         {
+            [DotBoxDService]
             public interface IGameWorldAccess
             {
                 [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
@@ -101,12 +104,27 @@ public sealed class InvokeAsyncGenerationTests
             }
         }
 
+        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
-            public sealed class RemotePluginServer
-            {
-                public ValueTask<T> InvokeAsync<T>(Func<IGameWorldAccess, T> lambda) => throw new InvalidOperationException();
-            }
+            [GeneratePluginServer]
+            public partial class RemotePluginServer : IGameWorldAccess;
         }
 
         namespace Sample
@@ -114,7 +132,7 @@ public sealed class InvokeAsyncGenerationTests
             public static class Usage
             {
                 public static ValueTask<int> Run(RemotePluginServer kernels)
-                    => kernels.InvokeAsync((IGameWorldAccess world) =>
+                    => kernels.InvokeAsync(async (IGameWorldAccess world) =>
                     {
                         var hp = world.GetHealth("monster-1");
                         return hp;
@@ -125,10 +143,12 @@ public sealed class InvokeAsyncGenerationTests
 
     private const string CaptureBagSource = """
         using System;
+        using System.Threading;
         using System.Threading.Tasks;
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Kernels.Game.Plugin.Client;
         using DotBoxD.Kernels.Game.Server.Abstractions;
 
@@ -136,6 +156,7 @@ public sealed class InvokeAsyncGenerationTests
         {
             public sealed record MonsterSnapshot(string Id, string Name, int Health, int Level, int Position);
 
+            [DotBoxDService]
             public interface IGameWorldAccess
             {
                 [HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead)]
@@ -143,20 +164,27 @@ public sealed class InvokeAsyncGenerationTests
             }
         }
 
+        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
-            public delegate TReturn RemoteServerInvocation<TCaptures, TReturn>(
-                IGameWorldAccess world,
-                TCaptures captures);
-
-            public sealed class RemotePluginServer
-            {
-                public ValueTask<T> InvokeAsync<TCaptures, T>(
-                    TCaptures captures,
-                    RemoteServerInvocation<TCaptures, T> lambda)
-                    where TCaptures : class
-                    => throw new InvalidOperationException();
-            }
+            [GeneratePluginServer]
+            public partial class RemotePluginServer : IGameWorldAccess;
         }
 
         namespace Sample
@@ -170,7 +198,7 @@ public sealed class InvokeAsyncGenerationTests
             public static class Usage
             {
                 public static ValueTask<string> Run(RemotePluginServer kernels, MonsterCapture captures)
-                    => kernels.InvokeAsync(captures, (IGameWorldAccess world, MonsterCapture bag) =>
+                    => kernels.InvokeAsync(captures, async (IGameWorldAccess world, MonsterCapture bag) =>
                     {
                         var monster = world.GetMonster(bag.MonsterId);
                         bag.LastHealth = monster.Health;
@@ -182,10 +210,12 @@ public sealed class InvokeAsyncGenerationTests
 
     private const string ObjectSurfaceSource = """
         using System;
+        using System.Threading;
         using System.Threading.Tasks;
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Kernels.Game.Plugin.Client;
         using DotBoxD.Kernels.Game.Server.Abstractions;
 
@@ -193,6 +223,7 @@ public sealed class InvokeAsyncGenerationTests
         {
             public sealed record MonsterSnapshot(string Id, string Name, int Health, int Level, int Position);
 
+            [DotBoxDService]
             public interface IGameWorldAccess
             {
                 [HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead)]
@@ -200,12 +231,27 @@ public sealed class InvokeAsyncGenerationTests
             }
         }
 
+        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
-            public sealed class RemotePluginServer
-            {
-                public ValueTask<T> InvokeAsync<T>(Func<IGameWorldAccess, T> lambda) => throw new InvalidOperationException();
-            }
+            [GeneratePluginServer]
+            public partial class RemotePluginServer : IGameWorldAccess;
         }
 
         namespace Sample
@@ -213,7 +259,7 @@ public sealed class InvokeAsyncGenerationTests
             public static class Usage
             {
                 public static ValueTask<int> Run(RemotePluginServer kernels)
-                    => kernels.InvokeAsync((IGameWorldAccess world) =>
+                    => kernels.InvokeAsync(async (IGameWorldAccess world) =>
                     {
                         var monster = world.GetMonster("monster-2");
                         return monster.Health;
@@ -225,15 +271,18 @@ public sealed class InvokeAsyncGenerationTests
     private static string UsageSource(string usage)
         => """
         using System;
+        using System.Threading;
         using System.Threading.Tasks;
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Kernels.Game.Plugin.Client;
         using DotBoxD.Kernels.Game.Server.Abstractions;
 
         namespace DotBoxD.Kernels.Game.Server.Abstractions
         {
+            [DotBoxDService]
             public interface IGameWorldAccess
             {
                 [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
@@ -241,12 +290,27 @@ public sealed class InvokeAsyncGenerationTests
             }
         }
 
+        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
-            public sealed class RemotePluginServer
-            {
-                public ValueTask<T> InvokeAsync<T>(Func<IGameWorldAccess, T> lambda) => throw new InvalidOperationException();
-            }
+            [GeneratePluginServer]
+            public partial class RemotePluginServer : IGameWorldAccess;
         }
 
         namespace Sample
@@ -266,7 +330,8 @@ public sealed class InvokeAsyncGenerationTests
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(

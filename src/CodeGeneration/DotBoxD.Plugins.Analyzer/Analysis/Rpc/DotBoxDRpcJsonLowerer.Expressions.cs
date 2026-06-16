@@ -25,6 +25,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             case ParenthesizedExpressionSyntax parenthesized:
                 return LowerExpression(parenthesized.Expression);
+            case AwaitExpressionSyntax awaited:
+                return LowerExpression(awaited.Expression);
             case IdentifierNameSyntax identifier:
                 return Var(identifier.Identifier.ValueText);
             case PrefixUnaryExpressionSyntax unary:
@@ -57,7 +59,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is IMethodSymbol method &&
             DotBoxDHostBindingExpressionLowerer.HostBinding(method) is { } binding)
         {
-            _capabilities.Add(binding.Capability);
+            if (binding.Capability is { Length: > 0 } capability)
+            {
+                _capabilities.Add(capability);
+            }
+
             foreach (var effect in binding.Effects)
             {
                 _effects.Add(effect);

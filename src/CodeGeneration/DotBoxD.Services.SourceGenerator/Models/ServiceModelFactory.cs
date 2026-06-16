@@ -11,6 +11,12 @@ internal static class ServiceModelFactory
 {
     private const string CancellationTokenFullName = ServicesGeneratorTypeNames.CancellationTokenMetadata;
 
+    private static readonly SymbolDisplayFormat s_qualifiedFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     public static ServiceResult GetServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
         try
@@ -77,7 +83,12 @@ internal static class ServiceModelFactory
         }
 
         var interfaceMethods = new List<IMethodSymbol>();
-        var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMethods(interfaceSymbol, interfaceMethods, ct);
+        var interfaceProperties = new List<IPropertySymbol>();
+        var unsupportedMemberDiagnostic = ServiceShapeValidator.CollectMembers(
+            interfaceSymbol,
+            interfaceMethods,
+            interfaceProperties,
+            ct);
         if (unsupportedMemberDiagnostic is not null)
         {
             return RejectedService(
@@ -103,6 +114,7 @@ internal static class ServiceModelFactory
 
         var cancellationTokenSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(CancellationTokenFullName);
         var methods = new List<MethodModel>();
+        var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
         var methodDiagnostics = new List<MethodDiagnostic>();
         var seenSignatures = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
@@ -192,6 +204,22 @@ internal static class ServiceModelFactory
             methodLocations.Add(methodLocation);
         }
 
+        foreach (var propertySymbol in interfaceProperties)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (propertySymbol.Type is not INamedTypeSymbol propertyType)
+            {
+                continue;
+            }
+
+            var propertyNamespace = GetNamespace(propertyType.ContainingNamespace);
+            var proxyName = NamingHelpers.StripInterfacePrefix(propertyType.Name) + "Proxy";
+            properties.Add(new ServicePropertyModel(
+                IdentifierHelpers.EscapeIdentifier(propertySymbol.Name),
+                propertyType.ToDisplayString(s_qualifiedFormat),
+                IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName)));
+        }
+
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
 
         return new ServiceResult(
@@ -200,6 +228,7 @@ internal static class ServiceModelFactory
                 InterfaceName: interfaceSymbol.Name,
                 ServiceName: LiteralHelpers.EscapeStringLiteral(serviceName),
                 Methods: methods.ToEquatableArray(),
+                Properties: properties.ToEquatableArray(),
                 RawServiceName: serviceName),
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),

@@ -41,13 +41,12 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     {
         ArgumentNullException.ThrowIfNull(packageJson);
 
-        // Grant each kernel exactly what its analyzer-derived manifest declares it needs (least
-        // privilege). The plugin cannot widen this: RequiredCapabilities reflects what the verified IR
-        // actually touches, not what the plugin asserts.
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        var policy = ServerPolicy.ForKernel(package.Manifest.RequiredCapabilities);
+        Console.WriteLine($"[server] installing plugin kernel '{package.Manifest.PluginId}'...");
+        var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
         var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
         WireHook(kernel);
+        Console.WriteLine($"[server] installed plugin kernel '{kernel.Manifest.PluginId}'.");
         return kernel.Manifest.PluginId;
     }
 
@@ -56,8 +55,10 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        var policy = ServerPolicy.ForKernel(package.Manifest.RequiredCapabilities);
+        Console.WriteLine($"[server] installing server extension '{package.Manifest.PluginId}'...");
+        var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
         var kernel = await _session.InstallServerExtensionAsync(package, policy, ct).ConfigureAwait(false);
+        Console.WriteLine($"[server] installed server extension '{kernel.Manifest.PluginId}'.");
         return kernel.Manifest.PluginId;
     }
 

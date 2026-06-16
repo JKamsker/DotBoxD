@@ -14,9 +14,9 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
     public async Task Generated_interceptor_round_trips_explicit_capture_bag_sync_out()
     {
         var assembly = Compile(Source);
-        var wire = Activator.CreateInstance(assembly.GetType("Sample.RecordingWireClient", throwOnError: true)!)!;
+        var wire = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
         var controlType = assembly.GetType("DotBoxD.Kernels.Game.Plugin.Client.RemotePluginServer", throwOnError: true)!;
-        var control = Activator.CreateInstance(controlType, [wire])!;
+        var control = Activator.CreateInstance(controlType, [wire, null])!;
         var captureType = assembly.GetType("Sample.MonsterCapture", throwOnError: true)!;
         var captures = Activator.CreateInstance(captureType)!;
         captureType.GetProperty("MonsterId")!.SetValue(captures, "monster-2");
@@ -30,7 +30,7 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
         Assert.Equal("monster-2", wire.GetType().GetProperty("CapturedMonsterId")!.GetValue(wire));
         Assert.Equal(0, wire.GetType().GetProperty("CapturedLastHealth")!.GetValue(wire));
 
-        var package = Assert.IsType<PluginPackage>(controlType.GetProperty("LastPackage")!.GetValue(control));
+        var package = Assert.IsType<PluginPackage>(wire.GetType().GetProperty("LastPackage")!.GetValue(wire));
         Assert.Contains("game.world.monster.read.snapshot", package.Manifest.RequiredCapabilities);
         var function = Assert.Single(package.Module.Functions);
         Assert.Single(function.Parameters);
@@ -45,13 +45,16 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Kernels.Game.Plugin.Client;
         using DotBoxD.Kernels.Game.Server.Abstractions;
+        using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 
         namespace DotBoxD.Kernels.Game.Server.Abstractions
         {
             public sealed record MonsterSnapshot(string Id, string Name, int Health, int Level, int Position);
 
+            [DotBoxDService]
             public interface IGameWorldAccess
             {
                 [HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead)]
@@ -59,42 +62,36 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
             }
         }
 
+        namespace DotBoxD.Services.Generated
+        {
+            public static class DotBoxDGeneratedExtensions
+            {
+                public static IGameWorldAccess GetGameWorldAccess(DotBoxD.Services.Peer.RpcPeer peer)
+                    => throw new InvalidOperationException("not used");
+            }
+        }
+
+        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Plugin.Client
         {
-            public delegate TReturn RemoteServerInvocation<TCaptures, TReturn>(
-                IGameWorldAccess world,
-                TCaptures captures);
-
-            public sealed class RemotePluginServer
-            {
-                public RemotePluginServer(IServerExtensionWireClient wireClient)
-                    => Services = new RemoteServiceControl(wireClient);
-
-                public RemoteServiceControl Services { get; }
-
-                public PluginPackage? LastPackage => Services.LastPackage;
-
-                public ValueTask<T> InvokeAsync<TCaptures, T>(
-                    TCaptures captures,
-                    RemoteServerInvocation<TCaptures, T> lambda)
-                    where TCaptures : class
-                    => throw new InvalidOperationException("not intercepted");
-            }
-
-            public sealed class RemoteServiceControl
-            {
-                public RemoteServiceControl(IServerExtensionWireClient wireClient) => WireClient = wireClient;
-
-                public IServerExtensionWireClient WireClient { get; }
-
-                public PluginPackage? LastPackage { get; private set; }
-
-                public Task<string> EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> packageFactory)
-                {
-                    LastPackage = packageFactory();
-                    return Task.FromResult(pluginId);
-                }
-            }
+            [GeneratePluginServer]
+            public partial class RemotePluginServer : IGameWorldAccess;
         }
 
         namespace Sample
@@ -110,7 +107,7 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
                 public static async ValueTask<string> Run(
                     RemotePluginServer kernels,
                     MonsterCapture captures)
-                    => await kernels.InvokeAsync(captures, (IGameWorldAccess world, MonsterCapture bag) =>
+                    => await kernels.InvokeAsync(captures, async (IGameWorldAccess world, MonsterCapture bag) =>
                     {
                         var monster = world.GetMonster(bag.MonsterId);
                         bag.LastHealth = monster.Health;
@@ -118,10 +115,27 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
                     });
             }
 
-            public sealed class RecordingWireClient : IServerExtensionWireClient
+            public sealed class RecordingControlService : IGamePluginControlService
             {
                 public string CapturedMonsterId { get; private set; } = "";
                 public int CapturedLastHealth { get; private set; }
+                public PluginPackage? LastPackage { get; private set; }
+
+                public ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default)
+                    => InstallPackageAsync(packageJson);
+
+                public ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
+                    => InstallPackageAsync(packageJson);
+
+                public ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default)
+                    => default;
+
+                public ValueTask HoldUntilShutdownAsync(CancellationToken ct = default)
+                    => default;
 
                 public ValueTask<byte[]> InvokeServerExtensionAsync(
                     string pluginId,
@@ -137,6 +151,12 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
                         KernelRpcValue.String("monster-2"),
                         KernelRpcValue.Int32(80)
                     ])));
+                }
+
+                private ValueTask<string> InstallPackageAsync(string packageJson)
+                {
+                    LastPackage = DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Import(packageJson);
+                    return ValueTask.FromResult(LastPackage.Manifest.PluginId);
                 }
             }
         }
@@ -158,7 +178,10 @@ public sealed class InvokeAsyncCaptureBagRuntimeTests
             TrustedPlatformReferences()
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location)),
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeerSession).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Pushdown.Services.RpcMessagePackIpc).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],

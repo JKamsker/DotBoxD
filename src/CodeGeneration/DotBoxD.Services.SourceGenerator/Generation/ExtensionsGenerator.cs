@@ -9,7 +9,7 @@ namespace DotBoxD.Services.SourceGenerator.Generation;
 
 internal static class ExtensionsGenerator
 {
-    public static string Generate(EquatableArray<ServiceIdentity> services, CancellationToken ct = default)
+    public static string Generate(EquatableArray<ServiceExtensionModel> services, CancellationToken ct = default)
     {
         var sb = new StringBuilder();
         var extensionSuffixes = BuildExtensionSuffixes(services, ct);
@@ -41,7 +41,25 @@ internal static class ExtensionsGenerator
             sb.AppendLine($"        /// Provides a {service.InterfaceName} implementation for the other peer to call.");
             sb.AppendLine("        /// </summary>");
             sb.AppendLine($"        public static {ServicesGeneratorTypeNames.GlobalRpcPeer} Provide{extensionSuffix}(this {ServicesGeneratorTypeNames.GlobalRpcPeer} peer, {fullInterfaceName} implementation)");
-            sb.AppendLine($"            => peer.Provide(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+            if (service.Properties.IsEmpty)
+            {
+                sb.AppendLine($"            => peer.Provide(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+            }
+            else
+            {
+                sb.AppendLine("        {");
+                sb.AppendLine($"            peer.Provide(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {fullDispatcherName}(implementation));");
+                foreach (var property in service.Properties.Array)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var propertyDispatcher = property.ProxyType.EndsWith("Proxy", StringComparison.Ordinal)
+                        ? property.ProxyType.Substring(0, property.ProxyType.Length - "Proxy".Length) + "Dispatcher"
+                        : property.ProxyType + "Dispatcher";
+                    sb.AppendLine($"            peer.Provide(({ServicesGeneratorTypeNames.GlobalServiceDispatcher})new {propertyDispatcher}(implementation.{property.Name}));");
+                }
+                sb.AppendLine("            return peer;");
+                sb.AppendLine("        }");
+            }
 
             sb.AppendLine();
             sb.AppendLine("        /// <summary>");
@@ -58,7 +76,7 @@ internal static class ExtensionsGenerator
     }
 
     private static Dictionary<string, string> BuildExtensionSuffixes(
-        EquatableArray<ServiceIdentity> services,
+        EquatableArray<ServiceExtensionModel> services,
         CancellationToken ct)
     {
         var shortNameCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -97,11 +115,11 @@ internal static class ExtensionsGenerator
         return suffixes;
     }
 
-    private static string QualifiedSuffix(ServiceIdentity service, string serviceName) =>
+    private static string QualifiedSuffix(ServiceExtensionModel service, string serviceName) =>
         string.IsNullOrEmpty(service.Namespace)
             ? serviceName
             : HintNameBuilder.NamespaceIdentifierPrefix(service.Namespace) + "_" + serviceName;
 
-    private static string ServiceKey(ServiceIdentity service) =>
+    private static string ServiceKey(ServiceExtensionModel service) =>
         service.Namespace + "\u001f" + service.InterfaceName + "\u001f" + service.ServiceName;
 }

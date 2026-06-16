@@ -59,19 +59,16 @@ internal static class InvokeAsyncInterceptorEmitter
             interception.CaptureDelegateType is { } captureDelegateType)
         {
             builder.Append("            ").Append(captureType).AppendLine(" captures,");
-            builder.Append("            ").Append(captureDelegateType).Append('<')
-                .Append(captureType)
-                .Append(", ")
-                .Append(interception.ReturnType)
-                .AppendLine("> lambda)");
+            builder.Append("            ").Append(captureDelegateType).AppendLine(" lambda)");
         }
         else
         {
             builder.Append("            global::System.Func<")
                 .Append(interception.HostAccessType)
                 .Append(", ")
+                .Append("global::System.Threading.Tasks.ValueTask<")
                 .Append(interception.ReturnType)
-                .AppendLine("> lambda)");
+                .AppendLine(">> lambda)");
         }
 
         builder.AppendLine("        {");

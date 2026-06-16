@@ -75,7 +75,9 @@ internal static partial class RpcKernelClientProxyEmitter
             }
         }
 
-        if (!SymbolEqualityComparer.Default.Equals(UnwrapReturn(serviceMethod.ReturnType), kernelMethod.ReturnType))
+        if (!SymbolEqualityComparer.Default.Equals(
+                UnwrapReturn(serviceMethod.ReturnType),
+                UnwrapReturn(kernelMethod.ReturnType)))
         {
             throw new NotSupportedException(
                 $"Server extension method '{serviceMethod.Name}' return type must match kernel method '{kernelMethod.Name}'.");
@@ -149,18 +151,18 @@ internal static partial class RpcKernelClientProxyEmitter
             var clientName = _kernelType.Name + "ServerExtensionClient";
             builder.Append("public sealed class ").Append(clientName).Append(" : ").AppendLine(TypeName(_serviceType));
             builder.AppendLine("{");
-            builder.AppendLine("    private readonly global::DotBoxD.Plugins.IServerExtensionWireClient _client;");
+            builder.AppendLine("    private readonly global::DotBoxD.Abstractions.IServerExtensionWireClient _client;");
             builder.AppendLine("    private readonly string _pluginId;");
             builder.AppendLine();
             builder.Append("    public ").Append(clientName)
-                .AppendLine("(global::DotBoxD.Plugins.IServerExtensionWireClient client, string pluginId)");
+                .AppendLine("(global::DotBoxD.Abstractions.IServerExtensionWireClient client, string pluginId)");
             builder.AppendLine("    {");
             builder.AppendLine("        _client = client ?? throw new global::System.ArgumentNullException(nameof(client));");
             builder.AppendLine("        _pluginId = pluginId ?? throw new global::System.ArgumentNullException(nameof(pluginId));");
             builder.AppendLine("    }");
             builder.AppendLine();
             builder.Append("    public static ").Append(TypeName(_serviceType))
-                .AppendLine(" Create(global::DotBoxD.Plugins.IServerExtensionWireClient client, string pluginId)");
+                .AppendLine(" Create(global::DotBoxD.Abstractions.IServerExtensionWireClient client, string pluginId)");
             builder.Append("        => new ").Append(clientName).AppendLine("(client, pluginId);");
             builder.AppendLine();
             AppendServiceMethod(builder);

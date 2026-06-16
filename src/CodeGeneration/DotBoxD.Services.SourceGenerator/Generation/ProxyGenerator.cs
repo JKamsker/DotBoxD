@@ -50,11 +50,21 @@ internal static class ProxyGenerator
         sb.AppendLine($"        private readonly {ServicesGeneratorTypeNames.GlobalRpcInvoker} _invoker;");
         sb.AppendLine("        /// <summary>Non-null when this proxy targets a sub-service instance returned by a parent call.</summary>");
         sb.AppendLine("        private readonly string? _instanceId;");
+        foreach (var property in service.Properties.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            sb.AppendLine($"        private readonly {property.Type} {PropertyFieldName(property)};");
+        }
         sb.AppendLine();
         sb.AppendLine($"        public {proxyName}({ServicesGeneratorTypeNames.GlobalRpcInvoker} client)");
         sb.AppendLine("        {");
         sb.AppendLine($"            this._invoker = client ?? throw new {ServicesGeneratorTypeNames.GlobalArgumentNullException}(nameof(client));");
         sb.AppendLine("            this._instanceId = null;");
+        foreach (var property in service.Properties.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            sb.AppendLine($"            this.{PropertyFieldName(property)} = new {property.ProxyType}(client);");
+        }
         sb.AppendLine("        }");
         sb.AppendLine();
         sb.AppendLine($"        /// <summary>Constructs a proxy bound to a specific server-side instance.</summary>");
@@ -62,7 +72,19 @@ internal static class ProxyGenerator
         sb.AppendLine("        {");
         sb.AppendLine($"            this._invoker = client ?? throw new {ServicesGeneratorTypeNames.GlobalArgumentNullException}(nameof(client));");
         sb.AppendLine($"            this._instanceId = instanceId ?? throw new {ServicesGeneratorTypeNames.GlobalArgumentNullException}(nameof(instanceId));");
+        foreach (var property in service.Properties.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            sb.AppendLine($"            this.{PropertyFieldName(property)} = new {property.ProxyType}(client);");
+        }
         sb.AppendLine("        }");
+
+        foreach (var property in service.Properties.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+            sb.AppendLine();
+            sb.AppendLine($"        public {property.Type} {property.Name} => this.{PropertyFieldName(property)};");
+        }
 
         foreach (var method in service.Methods.Array)
         {
@@ -109,6 +131,9 @@ internal static class ProxyGenerator
     }
     private static string QualifyServiceType(ServiceModel service, string typeName) =>
         IdentifierHelpers.QualifyTypeName(service.Namespace, typeName);
+
+    private static string PropertyFieldName(ServicePropertyModel property) =>
+        "__dotboxd_" + IdentifierHelpers.UnescapeIdentifier(property.Name);
 
     private static void GenerateProxyMethod(
         StringBuilder sb,

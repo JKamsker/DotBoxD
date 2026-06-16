@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
@@ -15,6 +16,7 @@ internal static class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
+        type = DotBoxDTypeNameReader.UnwrapTaskLike(type);
         switch (type.SpecialType)
         {
             case SpecialType.System_Boolean: return Scalar("Bool");

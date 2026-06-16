@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using DotBoxD.Plugins.Analyzer.Analysis.Registration;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
@@ -75,6 +76,20 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             invokeAsyncResults.Select(static (result, _) => result.Package),
             static (sourceContext, package) => sourceContext.AddSource(package.HintName, package.Source));
+
+        var pluginServerResults = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                DotBoxDGenerationNames.Metadata.GeneratePluginServerAttribute,
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, ct) => PluginServerFacadeModelFactory.Create(ctx, ct))
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
+        context.RegisterSourceOutput(
+            pluginServerResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            pluginServerResults.Where(static result => result.Source is not null).Select(static (result, _) => result.Source!),
+            static (sourceContext, source) => sourceContext.AddSource(source.HintName, source.Source));
 
         var packages = models
             .Collect()

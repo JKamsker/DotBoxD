@@ -11,7 +11,7 @@ namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 /// <c>IPluginServer&lt;TWorld&gt;</c> lifecycle — the dev never calls these directly.
 /// </summary>
 [DotBoxDService]
-public interface IGamePluginControlService : IServerExtensionWireClient
+public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
 {
     ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
 

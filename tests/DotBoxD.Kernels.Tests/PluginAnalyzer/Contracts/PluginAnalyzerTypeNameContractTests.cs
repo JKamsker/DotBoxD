@@ -11,17 +11,14 @@ using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Services.Attributes;
 using GameServerAbstractions::DotBoxD.Kernels.Game.Server.Abstractions;
-using GuardianKernel = GameServerPlugin::DotBoxD.Kernels.Game.Plugin.Kernels.GuardianKernel;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts;
 
 public sealed class PluginAnalyzerTypeNameContractTests
 {
-    private const string RemoteServerInvocationMetadataName = "RemoteServerInvocation`2";
-    private const string RemotePluginServerTypeName = "RemotePluginServer";
-
     [Fact]
     public void Type_name_constants_match_referenced_contracts()
     {
@@ -54,10 +51,11 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.ServerExtensionAttribute)] = TypeName(typeof(ServerExtensionAttribute)),
             [nameof(TypeNames.ServerExtensionClientAttribute)] = TypeName(typeof(ServerExtensionClientAttribute)),
             [nameof(TypeNames.ServerExtensionMethodAttribute)] = TypeName(typeof(ServerExtensionMethodAttribute)),
+            [nameof(TypeNames.GeneratePluginServerAttribute)] = TypeName(typeof(GeneratePluginServerAttribute)),
+            [nameof(TypeNames.DotBoxDServiceAttribute)] = TypeName(typeof(DotBoxDServiceAttribute)),
             [nameof(TypeNames.HookContext)] = TypeName(typeof(HookContext)),
             [nameof(TypeNames.ServerInvocationDelegateType)] = RemoteServerInvocationTypeName(),
             [nameof(TypeNames.ServerInvocationDelegateOriginal)] = RemoteServerInvocationOriginalName(),
-            [nameof(TypeNames.ServerInvocationSurfaceType)] = RemotePluginServerFullName(),
             [nameof(TypeNames.GameWorldAccessType)] = TypeName(typeof(IGameWorldAccess)),
             [nameof(TypeNames.GameWorldMonsterSnapshotType)] = TypeName(typeof(MonsterSnapshot)),
             [nameof(TypeNames.HookPipelineOriginal)] = OriginalTypeName(typeof(HookPipeline<>), "TEvent"),
@@ -118,18 +116,11 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GlobalSandboxValue)] = GlobalTypeName(typeof(SandboxValue)),
         };
 
-    private static string RemotePluginServerFullName()
-        => TypeName(SamplePluginType(RemotePluginServerTypeName));
-
     private static string RemoteServerInvocationTypeName()
-        => TypeName(SamplePluginType(RemoteServerInvocationMetadataName));
+        => TypeName(typeof(RemoteServerInvocation<,,>));
 
     private static string RemoteServerInvocationOriginalName()
-        => RemoteServerInvocationTypeName() + "<TCaptures, TReturn>";
-
-    private static Type SamplePluginType(string name)
-        => typeof(GuardianKernel).Assembly.GetTypes().Single(
-            type => string.Equals(type.Name, name, StringComparison.Ordinal));
+        => RemoteServerInvocationTypeName() + "<TWorld, TCaptures, TReturn>";
 
     private static string GlobalTypeName(Type type) => TypeNames.GlobalPrefix + TypeName(type);
 

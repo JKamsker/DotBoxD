@@ -77,6 +77,19 @@ public sealed class RpcKernelRuntimeTests
     }
 
     [Fact]
+    public void Required_capabilities_are_derived_from_registered_host_bindings()
+    {
+        var package = RpcKernelTestPackages.MonsterKiller();
+        package = package with { Manifest = package.Manifest with { RequiredCapabilities = [] } };
+        using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding);
+
+        var capabilities = server.GetRequiredCapabilities(package);
+
+        Assert.Contains(RpcKernelTestPackages.KillCapability, capabilities);
+        Assert.Equal(capabilities.Order(StringComparer.Ordinal), capabilities);
+    }
+
+    [Fact]
     public async Task A_batch_kernel_is_denied_when_its_capability_is_not_granted()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.NoKillPolicy());

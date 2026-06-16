@@ -30,10 +30,11 @@ internal static class DotBoxDGenerationNames
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
         public const string ServerExtensionMethodAttribute = "DotBoxD.Abstractions.ServerExtensionMethodAttribute";
+        public const string GeneratePluginServerAttribute = "DotBoxD.Abstractions.GeneratePluginServerAttribute";
+        public const string DotBoxDServiceAttribute = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
         public const string HookContext = "DotBoxD.Abstractions.HookContext";
-        public const string ServerInvocationDelegateType = "DotBoxD.Kernels.Game.Plugin.Client.RemoteServerInvocation";
-        public const string ServerInvocationDelegateOriginal = ServerInvocationDelegateType + "<TCaptures, TReturn>";
-        public const string ServerInvocationSurfaceType = "DotBoxD.Kernels.Game.Plugin.Client.RemotePluginServer";
+        public const string ServerInvocationDelegateType = "DotBoxD.Abstractions.RemoteServerInvocation";
+        public const string ServerInvocationDelegateOriginal = ServerInvocationDelegateType + "<TWorld, TCaptures, TReturn>";
         public const string GameWorldAccessType = "DotBoxD.Kernels.Game.Server.Abstractions.IGameWorldAccess";
         public const string GameWorldMonsterSnapshotType = "DotBoxD.Kernels.Game.Server.Abstractions.MonsterSnapshot";
         public const string HookPipelineOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent>";
@@ -106,10 +107,11 @@ internal static class DotBoxDGenerationNames
         public const string ServerExtensionAttribute = TypeNames.ServerExtensionAttribute;
         public const string ServerExtensionClientAttribute = TypeNames.ServerExtensionClientAttribute;
         public const string ServerExtensionMethodAttribute = TypeNames.ServerExtensionMethodAttribute;
+        public const string GeneratePluginServerAttribute = TypeNames.GeneratePluginServerAttribute;
+        public const string DotBoxDServiceAttribute = TypeNames.DotBoxDServiceAttribute;
         public const string HookContextType = TypeNames.HookContext;
         public const string ServerInvocationDelegateType = TypeNames.ServerInvocationDelegateType;
         public const string ServerInvocationDelegateOriginal = TypeNames.ServerInvocationDelegateOriginal;
-        public const string ServerInvocationSurfaceType = TypeNames.ServerInvocationSurfaceType;
         public const string GameWorldAccessType = TypeNames.GameWorldAccessType;
         public const string GameWorldMonsterSnapshotType = TypeNames.GameWorldMonsterSnapshotType;
     }
@@ -179,6 +181,7 @@ internal static class DotBoxDGenerationNames
     {
         public const string Cpu = "Cpu";
         public const string Alloc = "Alloc";
+        public const string HostStateRead = "HostStateRead";
         public const string HostStateWrite = "HostStateWrite";
         public const string Audit = "Audit";
     }

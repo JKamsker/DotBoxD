@@ -38,13 +38,16 @@ internal static class InvokeAsyncModelFactory
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax access ||
             !string.Equals(access.Name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal) ||
-            !IsServerInvocationSurface(model, access.Expression, cancellationToken))
+            !TryServerInvocationSurface(model, access.Expression, cancellationToken, out var receiverType, out var worldType))
         {
             return null;
         }
 
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            InvokeAsyncCallShape.Create(invocation, method, model, cancellationToken) is not { } shape)
+        var shape = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method
+            ? InvokeAsyncCallShape.Create(invocation, method, model, cancellationToken)
+            : null;
+        shape ??= InvokeAsyncCallShape.Create(invocation, worldType, model, cancellationToken);
+        if (shape is null)
         {
             return null;
         }
@@ -64,18 +67,25 @@ internal static class InvokeAsyncModelFactory
         var packageName = "InvokeAsync_" + id + DotBoxDGenerationNames.PluginPackageSuffix;
         var ns = HookChainIdentity.Namespace(invocation);
         var package = EmitPackage(ns, packageName, pluginId, shape, bodyJson, effects, capabilities);
-        var interception = Interception(invocation, model, ns, packageName, pluginId, shape, cancellationToken);
+        var interception = Interception(
+            invocation,
+            model,
+            receiverType,
+            ns,
+            packageName,
+            pluginId,
+            shape,
+            cancellationToken);
         return new InvokeAsyncResult(package, interception);
     }
 
-    private static bool IsServerInvocationSurface(
+    private static bool TryServerInvocationSurface(
         SemanticModel model,
         ExpressionSyntax receiver,
-        CancellationToken cancellationToken)
-        => string.Equals(
-            model.GetTypeInfo(receiver, cancellationToken).Type?.ToDisplayString(),
-            DotBoxDGenerationNames.Metadata.ServerInvocationSurfaceType,
-            StringComparison.Ordinal);
+        CancellationToken cancellationToken,
+        out INamedTypeSymbol receiverType,
+        out INamedTypeSymbol worldType)
+        => InvokeAsyncReceiverResolver.TryResolve(model, receiver, cancellationToken, out receiverType, out worldType);
 
     private static GeneratedPluginPackage EmitPackage(
         string ns,
@@ -114,6 +124,7 @@ internal static class InvokeAsyncModelFactory
     private static InvokeAsyncInterception? Interception(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
+        INamedTypeSymbol receiverType,
         string ns,
         string packageName,
         string pluginId,
@@ -146,12 +157,15 @@ internal static class InvokeAsyncModelFactory
         var captureType = shape.CaptureType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var captureDelegateType = shape.CaptureType is null
             ? null
-            : DotBoxDGenerationNames.TypeNames.GlobalPrefix + DotBoxDGenerationNames.Metadata.ServerInvocationDelegateType;
+            : DotBoxDGenerationNames.TypeNames.GlobalPrefix + DotBoxDGenerationNames.Metadata.ServerInvocationDelegateType +
+              "<" + shape.WorldType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+              ", " + captureType +
+              ", " + shape.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">";
 
         return new InvokeAsyncInterception(
             location.GetInterceptsLocationAttributeSyntax(),
-            DotBoxDGenerationNames.TypeNames.GlobalPrefix + DotBoxDGenerationNames.Metadata.ServerInvocationSurfaceType,
-            DotBoxDGenerationNames.TypeNames.GlobalPrefix + DotBoxDGenerationNames.Metadata.GameWorldAccessType,
+            receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            shape.WorldType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             shape.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             captureType,
             captureDelegateType,

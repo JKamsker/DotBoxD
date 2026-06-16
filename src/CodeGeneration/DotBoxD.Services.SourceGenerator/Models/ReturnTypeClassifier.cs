@@ -242,7 +242,7 @@ internal static class ReturnTypeClassifier
         return false;
     }
 
-    private static bool TryGetSubServiceInfo(ITypeSymbol type, CancellationToken ct, out SubServiceInfo info)
+    internal static bool TryGetSubServiceInfo(ITypeSymbol type, CancellationToken ct, out SubServiceInfo info)
     {
         ct.ThrowIfCancellationRequested();
 

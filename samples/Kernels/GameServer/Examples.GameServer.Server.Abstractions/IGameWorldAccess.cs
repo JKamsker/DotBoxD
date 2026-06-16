@@ -25,6 +25,7 @@ public interface IGameWorldAccess : IServiceControl
     IEntityControl Entities { get; }
 }
 
+[DotBoxDService]
 public interface IMonsterControl : IExtensibleControl
 {
     /// <summary>Immutable monster snapshot. Unknown or non-monster ids return an empty snapshot.</summary>
@@ -40,6 +41,7 @@ public interface IMonsterControl : IExtensibleControl
     ValueTask<int> GetThreatAsync(string entityId);
 }
 
+[DotBoxDService]
 public interface IEntityControl : IExtensibleControl
 {
     /// <summary>The entity's current hit points (0 if unknown or defeated).</summary>

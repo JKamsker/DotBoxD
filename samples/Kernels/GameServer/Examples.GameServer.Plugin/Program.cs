@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Game.Plugin.Kernels;
+using DotBoxD.Kernels.Game.Server.Abstractions;
 
 namespace DotBoxD.Kernels.Game.Plugin;
 
@@ -30,8 +31,11 @@ internal static class Program
 
         // Install plugin-owned kernels — ships verified IR. `server` IS the world surface, so the install
         // verbs sit right on it (Replace) and on each control (Monsters.Extend).
+        Console.WriteLine("[plugin] installing GuardianKernel...");
         await server.Replace<IMonsterAggroService, GuardianKernel>().ConfigureAwait(false);
+        Console.WriteLine("[plugin] installing RetaliationKernel...");
         await server.Replace<IAttackService, RetaliationKernel>().ConfigureAwait(false);
+        Console.WriteLine("[plugin] installing MonsterKillerKernel...");
         await server.Monsters.Extend<IMonsterKillerService, MonsterKillerKernel>().ConfigureAwait(false);
 
         // Tune a replaced service's live settings — strongly typed, one atomic IPC batch.
@@ -55,18 +59,29 @@ internal static class Program
 
         // Anonymous server-side invoke — the lambda is lowered to verified IR and runs sandboxed. It reads
         // the same async world surface (local on the server).
-        var monsterHealth = await server.InvokeAsync(async world =>
+        var monsterHealth = await server.InvokeAsync(async (IGameWorldAccess world) =>
         {
             var monster = await world.Monsters.GetAsync("monster-2");
             return monster.Health;
         }).ConfigureAwait(false);
         Console.WriteLine($"[plugin] InvokeAsync Monsters.GetAsync(monster-2).Health => {monsterHealth}.");
 
+        var implicitMonsterId = "monster-2";
+        var implicitLastHealth = 0;
+        var implicitMonsterName = await server.InvokeAsync(async (IGameWorldAccess world) =>
+        {
+            var monster = await world.Monsters.GetAsync(implicitMonsterId);
+            implicitLastHealth = monster.Health;
+            return monster.Name;
+        }).ConfigureAwait(false);
+        Console.WriteLine(
+            $"[plugin] InvokeAsync implicit capture {implicitMonsterId} => {implicitMonsterName} hp={implicitLastHealth}.");
+
         // Explicit capture-bag invoke — sync values in and out across the sandbox boundary.
         var capture = new MonsterProbeCapture { MonsterId = "monster-2" };
         var monsterName = await server.InvokeAsync(
             capture,
-            async (world, bag) =>
+            async (IGameWorldAccess world, MonsterProbeCapture bag) =>
             {
                 var monster = await world.Monsters.GetAsync(bag.MonsterId);
                 bag.LastHealth = monster.Health;

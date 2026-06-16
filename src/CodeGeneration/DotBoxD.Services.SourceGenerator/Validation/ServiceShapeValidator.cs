@@ -1,12 +1,16 @@
 using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
+using DotBoxD.Services.SourceGenerator.Models;
 using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
 
 internal static class ServiceShapeValidator
 {
+    private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
+    private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
+
     public static UnsupportedMemberDiagnostic? GetUnsupportedMemberDiagnostic(
         INamedTypeSymbol interfaceSymbol,
         CancellationToken ct)
@@ -24,9 +28,10 @@ internal static class ServiceShapeValidator
         return null;
     }
 
-    public static UnsupportedMemberDiagnostic? CollectMethods(
+    public static UnsupportedMemberDiagnostic? CollectMembers(
         INamedTypeSymbol interfaceSymbol,
         List<IMethodSymbol> methods,
+        List<IPropertySymbol> properties,
         CancellationToken ct)
     {
         foreach (var member in EnumerateInterfaceMembers(interfaceSymbol, ct))
@@ -40,7 +45,21 @@ internal static class ServiceShapeValidator
 
             if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
             {
+                if (IsControlPlaneMethod(method))
+                {
+                    continue;
+                }
+
                 methods.Add(method);
+            }
+            else if (member is IPropertySymbol property)
+            {
+                if (IsControlPlaneProperty(property))
+                {
+                    continue;
+                }
+
+                properties.Add(property);
             }
         }
 
@@ -51,9 +70,12 @@ internal static class ServiceShapeValidator
     {
         if (member is IPropertySymbol property)
         {
-            return CreateDiagnostic(
-                property,
-                $"interface property '{property.Name}' is not supported; DotBoxD services may declare methods only");
+            if (IsControlPlaneProperty(property))
+            {
+                return null;
+            }
+
+            return GetUnsupportedPropertyDiagnostic(property);
         }
 
         if (member is IEventSymbol eventSymbol)
@@ -65,6 +87,11 @@ internal static class ServiceShapeValidator
 
         if (member is IMethodSymbol method)
         {
+            if (IsControlPlaneMethod(method))
+            {
+                return null;
+            }
+
             if (method.MethodKind == MethodKind.Ordinary &&
                 method.DeclaredAccessibility != Accessibility.Public)
             {
@@ -90,6 +117,40 @@ internal static class ServiceShapeValidator
         }
 
         return null;
+    }
+
+    private static UnsupportedMemberDiagnostic? GetUnsupportedPropertyDiagnostic(IPropertySymbol property)
+    {
+        if (property.GetMethod is null ||
+            property.GetMethod.DeclaredAccessibility != Accessibility.Public ||
+            property.GetMethod.IsStatic ||
+            property.SetMethod is not null)
+        {
+            return CreateDiagnostic(
+                property,
+                $"interface property '{property.Name}' is not supported; DotBoxD service properties must be public get-only sub-service controls");
+        }
+
+        if (!ReturnTypeClassifier.TryGetSubServiceInfo(property.Type, CancellationToken.None, out _))
+        {
+            return CreateDiagnostic(
+                property,
+                $"interface property '{property.Name}' is not supported; DotBoxD service properties must return a [DotBoxDService] interface");
+        }
+
+        return null;
+    }
+
+    private static bool IsControlPlaneMethod(IMethodSymbol method)
+    {
+        var containingType = method.ContainingType.ToDisplayString();
+        return containingType == ExtensibleControlType || containingType == ServiceControlType;
+    }
+
+    private static bool IsControlPlaneProperty(IPropertySymbol property)
+    {
+        var containingType = property.ContainingType.ToDisplayString();
+        return containingType == ExtensibleControlType || containingType == ServiceControlType;
     }
 
     private static IEnumerable<ISymbol> EnumerateInterfaceMembers(

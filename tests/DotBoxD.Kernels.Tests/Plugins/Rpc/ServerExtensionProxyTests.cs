@@ -196,7 +196,7 @@ public sealed class ServerExtensionProxyTests
         Assert.Equal(success, type.GetProperty("Success")!.GetValue(result));
     }
 
-    private sealed class RecordingServerExtensionWireClient : IServerExtensionWireClient
+    private sealed class RecordingServerExtensionWireClient : DotBoxD.Plugins.IServerExtensionWireClient
     {
         private readonly byte[] _response;
 

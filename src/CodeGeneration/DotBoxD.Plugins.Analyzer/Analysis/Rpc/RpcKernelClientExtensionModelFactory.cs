@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 internal static class RpcKernelClientExtensionModelFactory
 {
-    private const string RegistryType = "DotBoxD.Plugins.IServerExtensionClientRegistry";
+    private const string RegistryType = "DotBoxD.Abstractions.IServerExtensionClientRegistry";
 
     public static RpcKernelClientExtensions Resolve(INamedTypeSymbol kernelType, IMethodSymbol kernelMethod)
     {

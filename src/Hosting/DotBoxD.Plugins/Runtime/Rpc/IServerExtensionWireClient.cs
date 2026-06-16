@@ -5,19 +5,15 @@ namespace DotBoxD.Plugins;
 /// server extension value IR encoded by <see cref="KernelRpcBinaryCodec"/>, so transports can carry it as an
 /// ordinary binary IPC argument without knowing the plugin-owned service contract.
 /// </summary>
-public interface IServerExtensionWireClient
+public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtensionWireClient
 {
-    ValueTask<byte[]> InvokeServerExtensionAsync(
-        string pluginId,
-        byte[] arguments,
-        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Adds service-contract lookup for generated domain-style server extension client extensions.
 /// </summary>
-public interface IServerExtensionClientRegistry : IServerExtensionWireClient
+public interface IServerExtensionClientRegistry :
+    IServerExtensionWireClient,
+    DotBoxD.Abstractions.IServerExtensionClientRegistry
 {
-    string PluginId<TService>()
-        where TService : class;
 }

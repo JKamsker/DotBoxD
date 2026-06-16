@@ -24,8 +24,8 @@ internal sealed class GameWorldHost
     public void Bind(GameWorld world) => _world = world;
 
     public void AddBindings(SandboxHostBuilder builder)
-        // VIBE: the framework reflects [HostCapability] off the IGameWorldAccess impl and registers one
-        // gated binding per method. Routing + effects are derived; only the capability is read from the
-        // annotation. (Speculative API name — the point is "derive from the impl", not hand-write a registry.)
-        => builder.AddBindingsFrom<IGameWorldAccess>(new GameWorldAccess(_world!));
+        => builder.AddBindingsFrom<IGameWorldAccess>(new GameWorldAccess(RequireWorld));
+
+    private GameWorld RequireWorld()
+        => _world ?? throw new InvalidOperationException("Game world has not been bound.");
 }

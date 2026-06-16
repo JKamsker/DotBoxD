@@ -19,8 +19,8 @@ public sealed class ServerExtensionClientExtensionTests
 
         public sealed class RemoteMonsterControl
         {
-            public RemoteMonsterControl(IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public IServerExtensionClientRegistry ServerExtensions { get; }
+            public RemoteMonsterControl(DotBoxD.Plugins.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
+            public DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
         public interface IMonsterKillerService
@@ -131,7 +131,7 @@ public sealed class ServerExtensionClientExtensionTests
 
             public sealed class RemoteMonsterControl
             {
-                public IServerExtensionClientRegistry ServerExtensions { get; } = null!;
+                public DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; } = null!;
                 {{receiverMember}}
             }
 
@@ -185,7 +185,7 @@ public sealed class ServerExtensionClientExtensionTests
         Assert.Equal(success, type.GetProperty("Success")!.GetValue(result));
     }
 
-    private sealed class RecordingServerExtensionsRegistry(byte[] response) : IServerExtensionClientRegistry
+    private sealed class RecordingServerExtensionsRegistry(byte[] response) : DotBoxD.Plugins.IServerExtensionClientRegistry
     {
         public string? LastPluginId { get; private set; }
 

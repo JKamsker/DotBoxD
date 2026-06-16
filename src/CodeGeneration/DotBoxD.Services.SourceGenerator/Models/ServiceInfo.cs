@@ -66,7 +66,32 @@ internal sealed record ServiceModel(
     string InterfaceName,
     string ServiceName,
     EquatableArray<MethodModel> Methods,
+    EquatableArray<ServicePropertyModel> Properties,
     string RawServiceName = "");
+
+/// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
+internal sealed record ServicePropertyModel(
+    string Name,
+    string Type,
+    string ProxyType);
+
+/// <summary>
+/// Method-insensitive shape used by the aggregate extension generator. A method rename should
+/// regenerate the per-service proxy/dispatcher and metadata, but not the peer extension helpers.
+/// </summary>
+internal sealed record ServiceExtensionModel(
+    string Namespace,
+    string InterfaceName,
+    string ServiceName,
+    EquatableArray<ServicePropertyModel> Properties)
+{
+    public static ServiceExtensionModel From(ServiceModel service) =>
+        new(
+            service.Namespace,
+            service.InterfaceName,
+            service.ServiceName,
+            service.Properties);
+}
 
 /// <summary>
 /// Immutable, value-equatable representation of a service method. When

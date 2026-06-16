@@ -9,6 +9,7 @@ internal sealed partial class InvokeAsyncCallShape
     private static InvokeAsyncCallShape? LambdaOnly(
         LambdaExpressionSyntax lambda,
         BlockSyntax block,
+        ITypeSymbol worldType,
         ITypeSymbol returnType,
         SemanticModel model)
     {
@@ -18,12 +19,13 @@ internal sealed partial class InvokeAsyncCallShape
         }
 
         return captures.HasExternalCaptures
-            ? FromImplicitCaptures(block, returnType, captures)
-            : NoCapture(block, returnType);
+            ? FromImplicitCaptures(block, worldType, returnType, captures)
+            : NoCapture(block, worldType, returnType);
     }
 
     private static InvokeAsyncCallShape FromImplicitCaptures(
         BlockSyntax block,
+        ITypeSymbol worldType,
         ITypeSymbol returnType,
         ImplicitCaptureSet captures)
     {
@@ -32,6 +34,7 @@ internal sealed partial class InvokeAsyncCallShape
             .ToArray();
         return new InvokeAsyncCallShape(
             block,
+            worldType,
             returnType,
             captureType: null,
             usesReflectionCaptures: true,
