@@ -229,7 +229,8 @@ public static class KernelRpcMarshaller
             for (var i = 0; i < parameters.Length; i++)
             {
                 var fieldIndex = FieldIndex(fields, parameters[i].Name);
-                if (fieldIndex < 0)
+                if (fieldIndex < 0 ||
+                    parameters[i].ParameterType != fields[fieldIndex].PropertyType)
                 {
                     matched = false;
                     break;
