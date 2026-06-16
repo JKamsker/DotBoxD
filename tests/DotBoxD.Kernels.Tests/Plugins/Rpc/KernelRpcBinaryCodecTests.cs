@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
@@ -67,6 +68,43 @@ public sealed class KernelRpcBinaryCodecTests
         Assert.Contains("too many items", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DecodeValue_rejects_bool_byte_other_than_zero_or_one()
+    {
+        var payload = new byte[] { (byte)KernelRpcValueKind.Bool, 2 };
+
+        var ex = Assert.Throws<FormatException>(() => KernelRpcBinaryCodec.DecodeValue(payload));
+
+        Assert.Contains("bool", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DecodeValue_rejects_invalid_utf8_string()
+    {
+        var payload = new byte[]
+        {
+            (byte)KernelRpcValueKind.String,
+            2,
+            0xC3,
+            0x28
+        };
+
+        var ex = Assert.Throws<FormatException>(() => KernelRpcBinaryCodec.DecodeValue(payload));
+
+        Assert.Contains("UTF-8", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void DecodeValue_rejects_non_finite_f64(double value)
+    {
+        var ex = Assert.Throws<FormatException>(() => KernelRpcBinaryCodec.DecodeValue(F64Payload(value)));
+
+        Assert.Contains("finite", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static byte[] NestedListPayload(int depth)
     {
         var bytes = new List<byte>((depth * 2) + 1);
@@ -92,5 +130,15 @@ public sealed class KernelRpcBinaryCodecTests
 
         bytes.Add((byte)remaining);
         return bytes.ToArray();
+    }
+
+    private static byte[] F64Payload(double value)
+    {
+        var payload = new byte[sizeof(byte) + sizeof(long)];
+        payload[0] = (byte)KernelRpcValueKind.F64;
+        BinaryPrimitives.WriteInt64LittleEndian(
+            payload.AsSpan(1),
+            BitConverter.DoubleToInt64Bits(value));
+        return payload;
     }
 }
