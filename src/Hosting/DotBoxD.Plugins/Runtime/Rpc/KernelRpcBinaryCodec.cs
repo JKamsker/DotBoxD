@@ -11,6 +11,7 @@ using System.Text;
 public static class KernelRpcBinaryCodec
 {
     private const int MaxDecodeDepth = 64;
+    private const int MaxDecodeItems = 10_000;
 
     public static byte[] EncodeArguments(IReadOnlyList<KernelRpcValue> arguments)
     {
@@ -28,7 +29,7 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var count = reader.ReadLength();
+        var count = ReadItemCount(ref reader);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
@@ -118,7 +119,7 @@ public static class KernelRpcBinaryCodec
             throw new FormatException("Kernel RPC payload exceeds maximum nesting depth.");
         }
 
-        var count = reader.ReadLength();
+        var count = ReadItemCount(ref reader);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
@@ -126,6 +127,17 @@ public static class KernelRpcBinaryCodec
         }
 
         return values;
+    }
+
+    private static int ReadItemCount(ref Reader reader)
+    {
+        var count = reader.ReadLength();
+        if (count > MaxDecodeItems)
+        {
+            throw new FormatException("Kernel RPC payload contains too many items.");
+        }
+
+        return count;
     }
 
     private static void WriteString(MemoryStream stream, string value)
