@@ -77,6 +77,40 @@ public sealed class RpcKernelRuntimeTests
     }
 
     [Fact]
+    public async Task InstallJsonAsync_routes_rpc_packages_to_rpc_installer()
+    {
+        var json = PluginPackageJsonSerializer.Export(RpcKernelTestPackages.MonsterKiller(), indented: true);
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+
+        var kernel = await server.InstallJsonAsync(json);
+
+        var result = await kernel.InvokeRpcAsync(
+            [SandboxValue.FromList([SandboxValue.FromInt32(2)], SandboxType.I32)]);
+        var list = Assert.IsType<ListValue>(result);
+        AssertKill(Assert.Single(list.Values), 2, true);
+    }
+
+    [Fact]
+    public async Task SessionInstallJsonAsync_routes_rpc_packages_to_rpc_installer()
+    {
+        var json = PluginPackageJsonSerializer.Export(RpcKernelTestPackages.MonsterKiller(), indented: true);
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var session = server.CreateSession();
+
+        var kernel = await session.InstallJsonAsync(json);
+
+        Assert.True(session.Owns("monster-killer"));
+        var result = await kernel.InvokeRpcAsync(
+            [SandboxValue.FromList([SandboxValue.FromInt32(2)], SandboxType.I32)]);
+        var list = Assert.IsType<ListValue>(result);
+        AssertKill(Assert.Single(list.Values), 2, true);
+    }
+
+    [Fact]
     public async Task A_batch_kernel_is_denied_when_its_capability_is_not_granted()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(configureHost: RpcKernelTestPackages.AddKillBinding, defaultPolicy: RpcKernelTestPackages.NoKillPolicy());
