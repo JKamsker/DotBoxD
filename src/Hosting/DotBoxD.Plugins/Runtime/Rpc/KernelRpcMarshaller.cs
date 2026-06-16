@@ -18,6 +18,9 @@ public static class KernelRpcMarshaller
 {
     public static SandboxValue ToSandboxValue(object? value, Type type)
     {
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(value);
+
         if (TryScalarToSandbox(value, type) is { } scalar)
         {
             return scalar;
@@ -25,13 +28,17 @@ public static class KernelRpcMarshaller
 
         if (ElementType(type) is { } elementType)
         {
-            var items = new List<SandboxValue>();
-            if (value is IEnumerable enumerable)
+            if (value is not IEnumerable enumerable)
             {
-                foreach (var item in enumerable)
-                {
-                    items.Add(ToSandboxValue(item, elementType));
-                }
+                throw new ArgumentException(
+                    $"Kernel RPC service expected '{type}' to be enumerable.",
+                    nameof(value));
+            }
+
+            var items = new List<SandboxValue>();
+            foreach (var item in enumerable)
+            {
+                items.Add(ToSandboxValue(item, elementType));
             }
 
             return SandboxValue.FromList(items, SandboxTypeOf(elementType));

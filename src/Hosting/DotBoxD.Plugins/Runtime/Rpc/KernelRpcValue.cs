@@ -112,13 +112,22 @@ public readonly struct KernelRpcValue
     }
 
     public static KernelRpcValue String(string value)
-        => new(KernelRpcValueKind.String, 0L, 0D, value ?? string.Empty, []);
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new KernelRpcValue(KernelRpcValueKind.String, 0L, 0D, value, []);
+    }
 
     public static KernelRpcValue List(KernelRpcValue[] items)
-        => new(KernelRpcValueKind.List, 0L, 0D, string.Empty, items ?? []);
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        return new KernelRpcValue(KernelRpcValueKind.List, 0L, 0D, string.Empty, items);
+    }
 
     public static KernelRpcValue Record(KernelRpcValue[] fields)
-        => new(KernelRpcValueKind.Record, 0L, 0D, string.Empty, fields ?? []);
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        return new KernelRpcValue(KernelRpcValueKind.Record, 0L, 0D, string.Empty, fields);
+    }
 
     public void RequireKind(KernelRpcValueKind expected)
     {
