@@ -65,15 +65,25 @@ public static partial class AuditTextSanitizer
         {
             var segment = segments[i];
             var isSecret = IsSecretSegment(segment);
+            var hasInlineSecretValue = isSecret && HasInlineSecretValue(segment);
             if (previousWasSecretMarker || isSecret)
             {
                 segments[i] = Redacted;
             }
 
-            previousWasSecretMarker = isSecret;
+            previousWasSecretMarker = isSecret && !hasInlineSecretValue;
         }
 
         return string.Join("/", segments);
+    }
+
+    private static bool HasInlineSecretValue(string segment)
+        => HasValueAfter(segment, ':') || HasValueAfter(segment, '=');
+
+    private static bool HasValueAfter(string segment, char separator)
+    {
+        var index = segment.IndexOf(separator);
+        return index >= 0 && index + 1 < segment.Length;
     }
 
     private static bool IsSecretSegment(string segment)

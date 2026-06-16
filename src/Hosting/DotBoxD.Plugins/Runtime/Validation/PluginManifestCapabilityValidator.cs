@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Runtime.Validation;
 
@@ -47,7 +48,7 @@ internal static class PluginManifestCapabilityValidator
                     required.Add(binding.RequiredCapability);
                 }
 
-                if (binding.IsAsync)
+                if (binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0)
                 {
                     required.Add(RuntimeCapabilityIds.Async);
                 }
