@@ -33,6 +33,16 @@ internal static class RpcKernelPackageValidator
             diagnostics.Add(new SandboxDiagnostic("DBXK012", "Plugin module metadata must bind to the manifest plugin id."));
         }
 
+        if (!package.Module.Metadata.TryGetValue(PluginManifestNames.ModuleMetadata.Kernel, out var metadataKernel) ||
+            string.IsNullOrWhiteSpace(metadataKernel))
+        {
+            diagnostics.Add(new SandboxDiagnostic("DBXK013", "Plugin module metadata must bind to the manifest kernel."));
+        }
+        else
+        {
+            ValidateText(metadataKernel, "kernel metadata", diagnostics);
+        }
+
         if (string.IsNullOrWhiteSpace(package.Manifest.RpcEntrypoint))
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK070", "Kernel RPC service manifest must declare an rpcEntrypoint."));
