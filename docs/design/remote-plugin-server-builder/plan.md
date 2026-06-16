@@ -1,5 +1,11 @@
 # RemotePluginServerBuilder + InvokeAsync inline-kernel — Phased Implementation Plan
 
+> **Note (2026-06-16):** the hand-written-control approach below is partly superseded by
+> [interface-driven-plugin-server.md](interface-driven-plugin-server.md), which declares the surface as
+> interfaces and source-generates the controls/facade/builder, unifying the world-access and remote-control
+> surfaces into one `IGameWorldAccess`. The lifecycle decisions here (sync `Build()`, async `StartAsync()`)
+> and the `InvokeAsync` machinery still hold.
+
 ## Context
 
 The GameServer sample plugin (`samples/Kernels/GameServer/Examples.GameServer.Plugin/Program.cs`) registers

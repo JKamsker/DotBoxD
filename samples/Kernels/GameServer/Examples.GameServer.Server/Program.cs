@@ -91,7 +91,12 @@ internal static class Program
                     session.Dispose();           // revoke + unregister the kernels this connection owned
                     disconnected.TrySetResult();
                 };
+
+                // Two services now: the control-plane (install IR, settings, hold) and the domain world
+                // surface. The server simply implements IGameWorldAccess; the plugin RPC-proxies it as its
+                // GamePluginServer. ProvideGameWorldAccess is generated from [DotBoxDService] on the interface.
                 peer.ProvideGamePluginControlService(service);
+                peer.ProvideGameWorldAccess(new GameWorldAccess(world));
                 connected.TrySetResult(service);
             });
         await host.StartAsync().ConfigureAwait(false);

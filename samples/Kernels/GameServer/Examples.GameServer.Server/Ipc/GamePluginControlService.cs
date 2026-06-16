@@ -130,40 +130,9 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         return ValueTask.FromResult(_sink.DrainEffects());
     }
 
-    public ValueTask<bool> KillMonsterAsync(string monsterId, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(monsterId);
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_world.KillMonster(monsterId));
-    }
-
-    public ValueTask<bool> IsMonsterAsync(string entityId, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(entityId);
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_world.IsMonster(entityId));
-    }
-
-    public ValueTask<int> GetEntityHealthAsync(string entityId, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(entityId);
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_world.GetHealth(entityId));
-    }
-
-    public ValueTask<int> GetEntityLevelAsync(string entityId, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(entityId);
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_world.GetLevel(entityId));
-    }
-
-    public ValueTask<int> GetEntityPositionAsync(string entityId, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(entityId);
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_world.GetPosition(entityId));
-    }
+    // The per-entity domain calls (KillMonster / IsMonster / GetEntity*) moved to GameWorldAccess, which
+    // implements IGameWorldAccess directly. This control service is now control-plane only. (GetWorldAsync
+    // stays because it returns a whole WorldSnapshot for the server's own diagnostics, not a domain read.)
 
     private void WireHook(InstalledKernel kernel)
     {

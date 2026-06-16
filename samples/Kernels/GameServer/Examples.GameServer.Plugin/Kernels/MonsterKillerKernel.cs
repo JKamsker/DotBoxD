@@ -1,5 +1,3 @@
-using DotBoxD.Kernels.Game.Plugin.Client;
-
 namespace DotBoxD.Kernels.Game.Plugin;
 
 public interface IMonsterKillerService
@@ -16,10 +14,12 @@ public readonly record struct MonsterKillResult(
     bool Killed);
 
 /// <summary>
-/// Plugin-owned batch operation. The class and service contract live in the plugin assembly, but the
-/// generated verified IR is installed and executed on the server through the server-extension IPC bridge.
+/// Plugin-owned batch operation. It is injected the SAME <see cref="IGameWorldAccess"/> the plugin uses
+/// remotely — but because this kernel runs on the server, the awaited calls are local (no real IPC hop).
+/// From the dev's seat it reads exactly like the remote plugin code: <c>await _world.Monsters.KillAsync(id)</c>.
+/// The generated verified IR is installed and executed server-side through the server-extension bridge.
 /// </summary>
-[ServerExtensionClient(typeof(RemoteMonsterControl))]
+[ServerExtensionClient(typeof(IMonsterControl))]
 [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
 public sealed partial class MonsterKillerKernel
 {
@@ -27,23 +27,20 @@ public sealed partial class MonsterKillerKernel
 
     public MonsterKillerKernel(IGameWorldAccess world) => _world = world;
 
-    [ServerExtensionMethod(typeof(RemoteMonsterControl), "KillMonstersAsync")]
-    public List<MonsterKillResult> KillMonsters(List<string> monsterIds, HookContext ctx)
+    [ServerExtensionMethod(typeof(IMonsterControl), "KillMonstersAsync")]
+    public async ValueTask<List<MonsterKillResult>> KillMonstersAsync(List<string> monsterIds, HookContext ctx)
     {
         var results = new List<MonsterKillResult>();
         foreach (var id in monsterIds)
         {
-            var healthBefore = _world.GetHealth(id);
-            var wasMonster = _world.IsMonster(id);
-            var level = _world.GetLevel(id);
-            var position = _world.GetPosition(id);
+            var healthBefore = await _world.Entities.GetHealthAsync(id);
+            var wasMonster = await _world.Monsters.IsMonsterAsync(id);
+            var level = await _world.Entities.GetLevelAsync(id);
+            var position = await _world.Entities.GetPositionAsync(id);
             var killed = false;
-            if (wasMonster)
+            if (wasMonster && healthBefore > 0)
             {
-                if (healthBefore > 0)
-                {
-                    killed = _world.KillMonster(id);
-                }
+                killed = await _world.Monsters.KillAsync(id);
             }
 
             results.Add(new MonsterKillResult(id, wasMonster, level, position, healthBefore, killed));

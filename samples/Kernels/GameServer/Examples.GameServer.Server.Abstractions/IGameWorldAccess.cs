@@ -1,49 +1,53 @@
-using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Kernels.Game.Server.Abstractions;
-
-using DotBoxD.Kernels;
 
 public sealed record MonsterSnapshot(string Id, string Name, int Health, int Level, int Position);
 
 /// <summary>
-/// Gated host-world access a kernel reaches through <c>ctx.Host&lt;IGameWorldAccess&gt;()</c>. Each method
-/// is a sandbox binding (<see cref="HostBindingAttribute"/>): the DotBoxD.Kernels generator lowers the call to
-/// the binding id and records its capability in the manifest's required capabilities, so a kernel only
-/// installs under a policy that grants it. The server registers a matching binding (same id + capability)
-/// backed by the live world.
+/// THE single game surface — one PURE interface, three consumers:
+/// <list type="bullet">
+///   <item>the <b>server</b> implements it for real (in-process world);</item>
+///   <item>the <b>plugin</b> gets an RPC proxy generated for it (<c>[DotBoxDService]</c>) — that proxy is
+///   the <c>GamePluginServer</c> facade;</item>
+///   <item>a <b>kernel</b> gets it injected; on the server its calls are local (no real async hop), but the
+///   dev writes them exactly like the remote calls.</item>
+/// </list>
+/// No <c>[HostBinding]</c> here on purpose: <b>routing is automatic</b> — each method's identity is the
+/// binding/RPC route, so nothing extra is annotated. The capability each call requires is declared on the
+/// <b>server implementation</b> (see <c>GameWorldAccess</c>'s <c>[HostCapability]</c>), and the read/write
+/// effect is inferred from the impl. The contract stays a plain async interface.
 /// </summary>
-public interface IGameWorldAccess
+[DotBoxDService]
+public interface IGameWorldAccess : IServiceControl
+{
+    IMonsterControl Monsters { get; }
+    IEntityControl Entities { get; }
+}
+
+public interface IMonsterControl : IExtensibleControl
 {
     /// <summary>Immutable monster snapshot. Unknown or non-monster ids return an empty snapshot.</summary>
-    [HostBinding("host.world.getMonster", "game.world.monster.read.snapshot", SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead)]
-    MonsterSnapshot GetMonster(string entityId);
+    ValueTask<MonsterSnapshot> GetAsync(string entityId);
 
-    /// <summary>The entity's current hit points (0 if unknown or defeated). Monster-read capability.</summary>
-    [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-    int GetHealth(string entityId);
+    /// <summary>Kills a live monster by id and returns whether the world changed.</summary>
+    ValueTask<bool> KillAsync(string entityId);
 
-    /// <summary>Whether the id currently belongs to a monster. Monster-read capability.</summary>
-    [HostBinding("host.world.isMonster", "game.world.monster.read.kind", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-    bool IsMonster(string entityId);
+    /// <summary>Whether the id currently belongs to a monster.</summary>
+    ValueTask<bool> IsMonsterAsync(string entityId);
 
-    /// <summary>The entity's level (0 if unknown). Monster-read capability.</summary>
-    [HostBinding("host.world.getLevel", "game.world.monster.read.level", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-    int GetLevel(string entityId);
+    /// <summary>The entity's combat threat rating (gated under its own capability subtree, server-side).</summary>
+    ValueTask<int> GetThreatAsync(string entityId);
+}
 
-    /// <summary>The entity's 1D world position (0 if unknown). Monster-read capability.</summary>
-    [HostBinding("host.world.getPosition", "game.world.monster.read.position", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-    int GetPosition(string entityId);
+public interface IEntityControl : IExtensibleControl
+{
+    /// <summary>The entity's current hit points (0 if unknown or defeated).</summary>
+    ValueTask<int> GetHealthAsync(string entityId);
 
-    /// <summary>Kills a live monster by id and returns whether the world changed. Monster-write capability.</summary>
-    [HostBinding("host.world.killMonster", "game.world.monster.write.kill", SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
-    bool KillMonster(string entityId);
+    /// <summary>The entity's level (0 if unknown).</summary>
+    ValueTask<int> GetLevelAsync(string entityId);
 
-    /// <summary>
-    /// The entity's combat threat rating. Also a read, but gated under a different capability subtree
-    /// (<c>game.world.combat.*</c>) than the monster-read grant: a kernel that reads it is denied at
-    /// install unless that subtree is granted, which the guardian is not.
-    /// </summary>
-    [HostBinding("host.world.getThreat", "game.world.combat.threat", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-    int GetThreat(string entityId);
+    /// <summary>The entity's 1D world position (0 if unknown).</summary>
+    ValueTask<int> GetPositionAsync(string entityId);
 }

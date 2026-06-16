@@ -26,11 +26,14 @@ public sealed partial class GuardianKernel : IMonsterAggroService
     [LiveSetting]
     public string CalmStrength { get; set; } = "20";
 
+    // OPEN QUESTION (the one real cost of unifying IGameWorldAccess to an async surface): this sync gate
+    // used to read ctx.Host<IGameWorldAccess>().GetHealth(id). The unified IGameWorldAccess is now async +
+    // nested (ctx.Host<IGameWorldAccess>().Entities.GetHealthAsync), which a sync `bool ShouldHandle`
+    // cannot await. In lowered IR the await would be erased to a sync host-binding call (capability model
+    // unchanged) — but the C# author shape needs a decision: make event hooks async, or expose a sync
+    // sandbox view of the world for ShouldHandle/Handle. Left calling the OLD sync GetHealth to mark the gap.
     public bool ShouldHandle(MonsterAggroEvent e, HookContext ctx)
         => IsBullyingLowLevelPlayer(e.MonsterLevel, e.PlayerLevel, e.Distance, LevelGap, AggroRange, ProtectMaxLevel) &&
-           // Gated host-world read: only calm a monster that is still alive. The call lowers to the
-           // host.world.getHealth binding and requires game.world.monster.read.health, which the server
-           // grants via game.world.monster.read.*.
            ctx.Host<IGameWorldAccess>().GetHealth(e.MonsterId) > 0;
 
     public void Handle(MonsterAggroEvent e, HookContext ctx)
