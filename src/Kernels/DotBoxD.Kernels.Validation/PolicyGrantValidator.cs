@@ -4,15 +4,11 @@ using DotBoxD.Kernels.Policies;
 
 namespace DotBoxD.Kernels.Validation;
 
-using System.Globalization;
 using DotBoxD.Kernels;
 
 internal static class PolicyGrantValidator
 {
     private static readonly string[] NoAllowedParameterKeys = [];
-    private static readonly string[] FileReadParameterKeys = ["root", "maxBytesPerRun", "allowedExtensions"];
-    private static readonly string[] FileWriteParameterKeys =
-        ["root", "maxBytesPerRun", "allowCreate", "allowOverwrite", "allowedExtensions"];
 
     public static void Validate(
         SandboxPolicy policy,
@@ -113,81 +109,82 @@ internal static class PolicyGrantValidator
         IReadOnlySet<string> requiredCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
-        switch (grant.Id)
+        if (CapabilityPattern.IsWildcard(grant.Id))
+        {
+            ValidateWildcardGrant(grant, bindings, requiredCapabilities, diagnostics);
+            return;
+        }
+
+        if (ValidateConcreteGrant(grant.Id, grant, bindings, diagnostics))
+        {
+            return;
+        }
+
+        if (!requiredCapabilities.Contains(grant.Id))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT",
+                $"grant '{grant.Id}' is not supported by the prepared module"));
+        }
+    }
+
+    private static void ValidateWildcardGrant(
+        CapabilityGrant grant,
+        IBindingCatalog bindings,
+        IReadOnlySet<string> requiredCapabilities,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var matched = false;
+        foreach (var required in requiredCapabilities)
+        {
+            if (!CapabilityPattern.Matches(grant.Id, required))
+            {
+                continue;
+            }
+
+            matched = true;
+            ValidateConcreteGrant(required, grant, bindings, diagnostics);
+        }
+
+        if (!matched)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-GRANT",
+                $"grant '{grant.Id}' is not supported by the prepared module"));
+        }
+    }
+
+    private static bool ValidateConcreteGrant(
+        string capabilityId,
+        CapabilityGrant grant,
+        IBindingCatalog bindings,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        switch (capabilityId)
         {
             case "file.read":
-                ValidateFileGrant(grant, diagnostics, allowWriteFlags: false);
-                break;
+                FilePolicyGrantValidator.ValidateRead(grant, diagnostics);
+                return true;
             case "file.write":
-                ValidateFileGrant(grant, diagnostics, allowWriteFlags: true);
-                break;
+                FilePolicyGrantValidator.ValidateWrite(grant, diagnostics);
+                return true;
             case "time.now" or "random" or "log.write" or RuntimeCapabilityIds.Async:
                 RequireAllowedKeys(grant, diagnostics, NoAllowedParameterKeys);
-                break;
+                return true;
             case RuntimeCapabilityIds.Reentrant:
                 RequireAllowedKeys(grant, diagnostics, NoAllowedParameterKeys);
                 diagnostics.Add(new SandboxDiagnostic(
                     "E-POLICY-GRANT",
                     $"grant '{RuntimeCapabilityIds.Reentrant}' is not supported until intra-kernel reentrancy ships"));
-                break;
+                return true;
             default:
-                if (bindings.TryGetCapabilityGrantValidator(grant.Id, out var validator))
+                if (bindings.TryGetCapabilityGrantValidator(capabilityId, out var validator))
                 {
                     validator(grant, diagnostics);
-                    return;
+                    return true;
                 }
 
-                if (!SupportsAnyRequired(grant.Id, requiredCapabilities))
-                {
-                    diagnostics.Add(new SandboxDiagnostic(
-                        "E-POLICY-GRANT",
-                        $"grant '{grant.Id}' is not supported by the prepared module"));
-                }
-
-                break;
-        }
-    }
-
-    // A grant supports the module if it is exactly a required capability, or a wildcard pattern
-    // (e.g. "game.world.monster.*") that authorizes at least one concrete required capability.
-    private static bool SupportsAnyRequired(string grantId, IReadOnlySet<string> requiredCapabilities)
-    {
-        if (requiredCapabilities.Contains(grantId))
-        {
-            return true;
-        }
-
-        if (!CapabilityPattern.IsWildcard(grantId))
-        {
-            return false;
-        }
-
-        foreach (var required in requiredCapabilities)
-        {
-            if (CapabilityPattern.Matches(grantId, required))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static void ValidateFileGrant(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        bool allowWriteFlags)
-    {
-        var allowed = allowWriteFlags ? FileWriteParameterKeys : FileReadParameterKeys;
-        RequireAllowedKeys(grant, diagnostics, allowed);
-        RequireNonEmpty(grant, diagnostics, "root");
-        RequireAbsoluteCanonicalRoot(grant, diagnostics);
-        RequireNonNegativeLong(grant, diagnostics, "maxBytesPerRun");
-        RequireAllowedExtensions(grant, diagnostics);
-        if (allowWriteFlags)
-        {
-            RequireOptionalBool(grant, diagnostics, "allowCreate");
-            RequireOptionalBool(grant, diagnostics, "allowOverwrite");
+                return false;
         }
     }
 
@@ -218,98 +215,8 @@ internal static class PolicyGrantValidator
         return false;
     }
 
-    private static void RequireNonEmpty(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        string key)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
-        {
-            Add(diagnostics, grant, $"parameter '{key}' is required");
-        }
-    }
-
-    private static void RequireCsv(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        string key)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value) ||
-            value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
-        {
-            Add(diagnostics, grant, $"parameter '{key}' must contain at least one value");
-        }
-    }
-
-    private static void RequireAbsoluteCanonicalRoot(CapabilityGrant grant, List<SandboxDiagnostic> diagnostics)
-    {
-        if (!grant.Parameters.TryGetValue("root", out var root) || string.IsNullOrWhiteSpace(root))
-        {
-            return;
-        }
-
-        try
-        {
-            var fullPath = Path.GetFullPath(root);
-            if (!Path.IsPathFullyQualified(root) ||
-                !PathsEqual(NormalizeRootForCompare(root), NormalizeRootForCompare(fullPath)))
-            {
-                Add(diagnostics, grant, "parameter 'root' must be an absolute canonical path");
-            }
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            Add(diagnostics, grant, "parameter 'root' must be an absolute canonical path");
-        }
-    }
-
-    private static void RequireAllowedExtensions(CapabilityGrant grant, List<SandboxDiagnostic> diagnostics)
-        => AllowedExtensionParameterValidator.Validate(grant, diagnostics);
-
-    private static void RequireNonNegativeLong(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        string key)
-        => RequireRangeLong(grant, diagnostics, key, min: 0, max: long.MaxValue);
-
-    private static void RequireRangeLong(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        string key,
-        long min,
-        long max)
-    {
-        if (!grant.Parameters.TryGetValue(key, out var value) ||
-            !long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
-            parsed < min ||
-            parsed > max)
-        {
-            Add(diagnostics, grant, $"parameter '{key}' must be between {min} and {max}");
-        }
-    }
-
-    private static void RequireOptionalBool(
-        CapabilityGrant grant,
-        List<SandboxDiagnostic> diagnostics,
-        string key)
-    {
-        if (grant.Parameters.TryGetValue(key, out var value) && !bool.TryParse(value, out _))
-        {
-            Add(diagnostics, grant, $"parameter '{key}' must be a boolean");
-        }
-    }
-
     private static void Add(List<SandboxDiagnostic> diagnostics, CapabilityGrant grant, string message)
         => diagnostics.Add(new SandboxDiagnostic(
             "E-POLICY-GRANT-PARAM",
             $"grant '{grant.Id}' {message}"));
-
-    private static string NormalizeRootForCompare(string path)
-        => Path.TrimEndingDirectorySeparator(path);
-
-    private static bool PathsEqual(string left, string right)
-        => string.Equals(
-            left,
-            right,
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }
