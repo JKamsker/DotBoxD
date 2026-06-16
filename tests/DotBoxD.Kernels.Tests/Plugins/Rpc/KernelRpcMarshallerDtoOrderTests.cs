@@ -7,6 +7,16 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 public sealed class KernelRpcMarshallerDtoOrderTests
 {
     [Fact]
+    public void ToSandboxValue_rejects_null_string()
+        => Assert.Throws<ArgumentNullException>(
+            () => KernelRpcMarshaller.ToSandboxValue(null, typeof(string)));
+
+    [Fact]
+    public void ToSandboxValue_rejects_null_list()
+        => Assert.Throws<ArgumentNullException>(
+            () => KernelRpcMarshaller.ToSandboxValue(null, typeof(List<int>)));
+
+    [Fact]
     public void ToSandboxValue_uses_property_order_when_constructor_order_differs()
     {
         var dto = new ReorderedDto(success: true, monsterId: 7);
