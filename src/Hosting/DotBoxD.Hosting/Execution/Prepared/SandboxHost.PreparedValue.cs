@@ -73,7 +73,8 @@ public sealed partial class SandboxHost
                     ? CompiledExecutionRunner.ExecuteOnWorkerAsync(
                         executable, plan, entrypoint, input, options, cancellationToken)
                     : CompiledExecutionRunner.ExecuteAsync(
-                        executable, plan, entrypoint, input, options, cancellationToken);
+                        executable, plan, entrypoint, input, options, cancellationToken,
+                        ShouldUseCompiledInlineAwaitPump(plan, entrypoint));
                 var fullResult = await execution
                     .ConfigureAwait(false);
                 return PreparedExecutionResult.FromResult(Publish(fullResult));

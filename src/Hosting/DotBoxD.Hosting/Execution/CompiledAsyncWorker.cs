@@ -16,6 +16,22 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
         return new ValueTask<SandboxExecutionResult>(worker._completion.Task);
     }
 
+    public static SandboxExecutionResult RunInline(Func<SandboxExecutionResult> execute)
+    {
+        using var pump = new CompiledAwaitPump();
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(pump);
+        using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
+        try
+        {
+            return execute();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
     private void Start()
     {
         var thread = new Thread(Run)
@@ -28,21 +44,13 @@ internal sealed class CompiledAsyncWorker(Func<SandboxExecutionResult> execute)
 
     private void Run()
     {
-        using var pump = new CompiledAwaitPump();
-        var previous = SynchronizationContext.Current;
-        SynchronizationContext.SetSynchronizationContext(pump);
-        using var scope = CompiledBindingDispatcher.InstallAwaitPump(pump);
         try
         {
-            _completion.SetResult(execute());
+            _completion.SetResult(RunInline(execute));
         }
         catch (Exception ex)
         {
             _completion.SetException(ex);
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(previous);
         }
     }
 

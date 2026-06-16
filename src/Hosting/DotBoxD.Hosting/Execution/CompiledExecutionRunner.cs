@@ -13,7 +13,8 @@ internal static class CompiledExecutionRunner
         string entrypoint,
         SandboxValue input,
         SandboxExecutionOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool useInlineAwaitPump = false)
     {
         var artifact = executable.Artifact;
         if (CanUseNoAuditSuccessPath(plan, entrypoint, artifact, options, out var noAuditBindings))
@@ -28,7 +29,10 @@ internal static class CompiledExecutionRunner
                 cancellationToken);
         }
 
-        return ValueTask.FromResult(ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
+        var result = useInlineAwaitPump
+            ? CompiledAsyncWorker.RunInline(() => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken))
+            : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken);
+        return ValueTask.FromResult(result);
     }
 
     public static ValueTask<SandboxExecutionResult> ExecuteOnWorkerAsync(
