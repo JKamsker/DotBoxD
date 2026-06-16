@@ -5,8 +5,8 @@ namespace DotBoxD.Kernels.Game.Plugin;
 /// post-wire setup (see the commented block below), or leave it out: a bodyless partial compiles away.
 /// <para>Everything else is generated from <c>: IGameWorldAccess</c>: the RPC proxy of the world, the
 /// <c>IPluginServer&lt;IGameWorldAccess&gt;</c> lifecycle (<c>StartAsync</c>/<c>RunAsync</c>/
-/// <c>HoldUntilShutdownAsync</c>/<c>InvokeAsync</c>), the install verbs (<c>Replace</c>/<c>Extend</c>/
-/// <c>Get</c>) on the facade and its control wrappers, and <c>GamePluginServerBuilder</c>. See
+/// <c>HoldUntilShutdownAsync</c>/<c>InvokeAsync</c>), the build-time <c>Setup</c> install accumulator, live
+/// settings (<c>Get</c>), and <c>GamePluginServerBuilder</c>. See
 /// interface-driven-plugin-server.md §7.</para>
 /// </summary>
 [GeneratePluginServer]

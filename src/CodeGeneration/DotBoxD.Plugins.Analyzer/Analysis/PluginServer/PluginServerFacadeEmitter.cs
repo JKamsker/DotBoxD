@@ -20,8 +20,8 @@ internal static class PluginServerFacadeEmitter
 
         AppendFacade(builder, model);
         builder.AppendLine();
-        AppendBuilder(builder, model);
-        AppendClientInterfaces(builder, model);
+        PluginServerSetupEmitter.AppendBuilder(builder, model);
+        PluginServerSetupEmitter.AppendSetupInterfaces(builder, model);
         return new GeneratedPluginPackage(HintName(model), builder.ToString());
     }
 
@@ -36,6 +36,7 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
         builder.AppendLine("    private readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>> _anonymousKernels = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
+        builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
         builder.AppendLine("    private global::DotBoxD.Services.Peer.RpcPeerSession? _session;");
@@ -45,26 +46,46 @@ internal static class PluginServerFacadeEmitter
                 .Append(FieldName(control.Name)).AppendLine(";");
         }
         builder.AppendLine("    private bool _started;");
+        builder.AppendLine("    private bool _setupReplayed;");
+        builder.AppendLine("    private bool _configured;");
         builder.AppendLine("    private bool _disposed;");
         builder.AppendLine();
         builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
             .Append(" control, ").Append(model.WorldType).AppendLine("? world = null)");
+        builder.AppendLine("        : this(control, world, setup: null)");
+        builder.AppendLine("    {");
+        builder.AppendLine("    }");
+        builder.AppendLine();
+        builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
+            .Append(" control, ").Append(model.WorldType).Append("? world, global::System.Action<")
+            .Append(model.SetupInterfaceName).AppendLine(">? setup)");
         builder.AppendLine("    {");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(control);");
+        builder.AppendLine("        _setupInstalls = RecordSetup(setup);");
         builder.AppendLine("        Initialize(control, world);");
         builder.AppendLine("        _started = true;");
-        builder.AppendLine("        OnConfigured();");
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.Append("    internal ").Append(model.ClassName)
             .AppendLine("(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory)");
-        builder.AppendLine("        => _connectionFactory = connectionFactory ?? throw new global::System.ArgumentNullException(nameof(connectionFactory));");
+        builder.AppendLine("        : this(connectionFactory, setup: null)");
+        builder.AppendLine("    {");
+        builder.AppendLine("    }");
+        builder.AppendLine();
+        builder.Append("    internal ").Append(model.ClassName)
+            .Append("(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
+            .Append(model.SetupInterfaceName).AppendLine(">? setup)");
+        builder.AppendLine("    {");
+        builder.AppendLine("        _connectionFactory = connectionFactory ?? throw new global::System.ArgumentNullException(nameof(connectionFactory));");
+        builder.AppendLine("        _setupInstalls = RecordSetup(setup);");
+        builder.AppendLine("    }");
         builder.AppendLine();
         builder.AppendLine("    partial void OnConfigured();");
         AppendProperties(builder, model);
         AppendLifecycle(builder, model);
         AppendWorldForwarders(builder, model);
         AppendInstallSurface(builder, model);
+        PluginServerSetupEmitter.AppendSetupMembers(builder, model);
         AppendLiveSettingsHandle(builder, model);
         foreach (var control in model.Controls)
         {
@@ -80,15 +101,9 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => this;");
         foreach (var control in model.Controls)
         {
-            // The public property is typed as the generated client interface (which inherits the domain
-            // control), so "Go to Definition" on e.g. server.Monsters lands on a one-line interface whose base
-            // is the hand-written IMonsterControl — instead of the generated wrapper class. The runtime value
-            // is still the wrapper (it carries the registry), so grafted extension methods route as before.
-            builder.Append("    public ").Append(ClientInterfaceRef(model, control)).Append(' ').Append(control.Name)
+            builder.Append("    public ").Append(control.Type).Append(' ').Append(control.Name)
                 .Append(" => _started && _").Append(FieldName(control.Name))
                 .AppendLine(" is not null ? _" + FieldName(control.Name) + " : throw new global::System.InvalidOperationException(NotStartedMessage);");
-            builder.Append("    ").Append(control.Type).Append(' ').Append(model.WorldType).Append('.').Append(control.Name)
-                .Append(" => ").Append(control.Name).AppendLine(";");
         }
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient => this;");
     }
@@ -99,19 +114,26 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask StartAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
         builder.AppendLine("        ThrowIfDisposed();");
-        builder.AppendLine("        if (_started) { return; }");
-        builder.AppendLine("        if (_connectionFactory is null) { throw new global::System.InvalidOperationException(NotStartedMessage); }");
-        builder.AppendLine("        _session = await _connectionFactory(cancellationToken).ConfigureAwait(false);");
-        builder.AppendLine("        var control = _session.Get<" + model.ControlServiceType + ">();");
-        builder.AppendLine("        var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + ShortTypeName(model.WorldType) + "(_session.Peer);");
-        builder.AppendLine("        Initialize(control, world);");
-        builder.AppendLine("        _started = true;");
-        builder.AppendLine("        OnConfigured();");
+        builder.AppendLine("        if (!_started)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (_connectionFactory is null) { throw new global::System.InvalidOperationException(NotStartedMessage); }");
+        builder.AppendLine("            _session = await _connectionFactory(cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("            var control = _session.Get<" + model.ControlServiceType + ">();");
+        builder.AppendLine("            var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + ShortTypeName(model.WorldType) + "(_session.Peer);");
+        builder.AppendLine("            Initialize(control, world);");
+        builder.AppendLine("            _started = true;");
+        builder.AppendLine("        }");
+        builder.AppendLine("        await ReplaySetupAsync(cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        if (!_configured)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            OnConfigured();");
+        builder.AppendLine("            _configured = true;");
+        builder.AppendLine("        }");
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask RunAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
-        builder.AppendLine("        if (!_started) { await StartAsync(cancellationToken).ConfigureAwait(false); }");
+        builder.AppendLine("        await StartAsync(cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        await HoldUntilShutdownAsync(cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("    }");
         builder.AppendLine();
@@ -163,20 +185,6 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
         builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(TCaptures captures, global::DotBoxD.Abstractions.RemoteServerInvocation<" + model.WorldType + ", TCaptures, TReturn> lambda) where TCaptures : class");
         builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
-        builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask<string> Replace<TService, TKernel>() where TService : class where TKernel : class, TService");
-        builder.AppendLine("        => await InstallPluginPackageAsync(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>()).ConfigureAwait(false);");
-        builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class");
-        builder.AppendLine("    {");
-        builder.AppendLine("        var pluginId = await InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>()).ConfigureAwait(false);");
-        builder.AppendLine("        _serverExtensions[typeof(TService)] = pluginId;");
-        builder.AppendLine("        return pluginId;");
-        builder.AppendLine("    }");
-        builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask<string> Extend<TKernel>() where TKernel : class");
-        builder.AppendLine("    {");
-        builder.AppendLine("        var pluginId = await InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>()).ConfigureAwait(false);");
-        builder.AppendLine("        _serverExtensions[typeof(TKernel)] = pluginId;");
-        builder.AppendLine("        return pluginId;");
-        builder.AppendLine("    }");
         builder.AppendLine("    public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new()");
         builder.AppendLine("        => new LiveSettingsHandle<TKernel>(this, global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>().Manifest.PluginId);");
         builder.AppendLine("    public string PluginId<TService>() where TService : class");
@@ -185,10 +193,10 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        => RequireControl().InvokeServerExtensionAsync(pluginId, arguments, cancellationToken);");
         builder.AppendLine("    public global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory)");
         builder.AppendLine("        => _anonymousKernels.GetOrAdd(pluginId, id => new global::System.Lazy<global::System.Threading.Tasks.Task<string>>(() => InstallServerExtensionPackageAsync(factory()).AsTask())).Value;");
-        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallPluginPackageAsync(global::DotBoxD.Plugins.PluginPackage package)");
-        builder.AppendLine("        => RequireControl().InstallPluginAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package));");
-        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.PluginPackage package)");
-        builder.AppendLine("        => RequireControl().InstallServerExtensionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package));");
+        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallPluginPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
+        builder.AppendLine("        => RequireControl().InstallPluginAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken);");
+        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
+        builder.AppendLine("        => RequireControl().InstallServerExtensionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken);");
     }
 
     private static void AppendLiveSettingsHandle(StringBuilder builder, PluginServerFacadeModel model)
@@ -227,46 +235,6 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
-
-    private static void AppendBuilder(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        builder.Append("public sealed class ").Append(model.ClassName).AppendLine("Builder");
-        builder.AppendLine("{");
-        builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
-        builder.Append("    private readonly ").Append(model.ControlServiceType).AppendLine("? _control;");
-        builder.Append("    private readonly ").Append(model.WorldType).AppendLine("? _world;");
-        builder.AppendLine("    private " + model.ClassName + "Builder(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory) => _connectionFactory = connectionFactory;");
-        builder.AppendLine("    private " + model.ClassName + "Builder(" + model.ControlServiceType + " control, " + model.WorldType + "? world) { _control = control; _world = world; }");
-        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
-        builder.AppendLine("        => new(ct => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, cancellationToken: ct)));");
-        builder.AppendLine("    public static " + model.ClassName + "Builder FromConnection(" + model.ControlServiceType + " control, " + model.WorldType + "? world = null)");
-        builder.AppendLine("        => new(control, world);");
-        builder.AppendLine("    public " + model.ClassName + " Build()");
-        builder.AppendLine("        => _connectionFactory is not null ? new " + model.ClassName + "(_connectionFactory) : new " + model.ClassName + "(_control!, _world);");
-        builder.AppendLine("}");
-    }
-
-    private static void AppendClientInterfaces(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        foreach (var control in model.Controls)
-        {
-            builder.AppendLine();
-            builder.AppendLine("/// <summary>Plugin-side client view of the domain control: its base interface (navigate there for");
-            builder.AppendLine("/// the domain API) plus the install verbs the generated facade routes.</summary>");
-            builder.Append(model.Accessibility).Append(" interface ").Append(control.ClientInterfaceName)
-                .Append(" : ").Append(control.Type).AppendLine();
-            builder.AppendLine("{");
-            builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }");
-            builder.AppendLine("    global::System.Threading.Tasks.ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class;");
-            builder.AppendLine("    global::System.Threading.Tasks.ValueTask<string> Extend<TKernel>() where TKernel : class;");
-            builder.AppendLine("}");
-        }
-    }
-
-    internal static string ClientInterfaceRef(PluginServerFacadeModel model, PluginServerControlProperty control)
-        => string.IsNullOrEmpty(model.Namespace)
-            ? control.ClientInterfaceName
-            : "global::" + model.Namespace + "." + control.ClientInterfaceName;
 
     private static string ParameterList(PluginServerForwardedMethod method)
         => string.Join(", ", method.Parameters.Select(p => p.Type + " @" + p.Name));

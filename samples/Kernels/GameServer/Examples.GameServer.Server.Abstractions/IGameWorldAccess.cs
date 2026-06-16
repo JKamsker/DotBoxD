@@ -14,9 +14,10 @@ public sealed record MonsterSnapshot(string Id, string Name, int Health, int Lev
 ///   <item>a <b>kernel</b> gets it injected; on the server its calls are local (no real async hop), but the
 ///   dev writes them exactly like the remote calls.</item>
 /// </list>
-/// <para><b>Pure domain on purpose.</b> The install verbs (<c>Replace</c>/<c>Extend</c>/<c>Get</c>) live on
-/// the generated <c>GamePluginServer</c> facade and its control wrappers, NOT here — so a kernel that gets the
-/// world injected sees only domain reads, never an install verb that would throw. <b>Routing is automatic</b>:
+/// <para><b>Pure domain on purpose.</b> Install recording (<c>Replace</c>/<c>Extend</c>) lives on the
+/// generated builder's <c>Setup</c> accumulator, and live tuning (<c>Get</c>) lives on the facade, NOT here —
+/// so a kernel that gets the world injected sees only domain reads, never an install verb that would throw.
+/// <b>Routing is automatic</b>:
 /// each method's identity is the binding/RPC route. The capability each call requires is declared on the
 /// <b>server implementation</b> (see <c>GameWorldAccess</c>'s <c>[HostCapability]</c>); the read/write effect
 /// is inferred from the impl.</para>

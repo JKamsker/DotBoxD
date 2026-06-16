@@ -6,6 +6,8 @@ internal sealed record PluginServerFacadeModel(
     string Namespace,
     string Accessibility,
     string ClassName,
+    string ServerInterfaceName,
+    string SetupInterfaceName,
     string WorldType,
     string ControlServiceType,
     string LiveSettingUpdateType,
@@ -16,7 +18,7 @@ internal sealed record PluginServerControlProperty(
     string Name,
     string Type,
     string WrapperName,
-    string ClientInterfaceName,
+    string AccumulatorInterfaceName,
     EquatableArray<PluginServerForwardedMethod> Methods,
     EquatableArray<PluginServerServiceWrapper> ServiceWrappers);
 

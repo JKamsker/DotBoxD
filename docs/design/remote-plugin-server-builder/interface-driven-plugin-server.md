@@ -51,10 +51,10 @@ on the contract.
 
 | Layer | Lives in | Authored by | Contents |
 |---|---|---|---|
-| **Framework contracts** | `DotBoxD.Abstractions` (markers) + `DotBoxD.Plugins.Client` (runtime) | framework | `IPluginServer<TWorld>`, `IServiceControl`, `IExtensibleControl`, `ILiveSettingsHandle<>`, `RemoteServerInvocation<,,>`, `[GeneratePluginServer]` |
-| **Game domain surface** | game `*.Server.Abstractions` | game-SDK owner | `IGameWorldAccess : IServiceControl`, `IMonsterControl`/`IEntityControl : IExtensibleControl`, `MonsterSnapshot` |
-| **Generated plugin facade** | plugin assembly (generated) | source generator | `GamePluginServer : IGameWorldAccess, IPluginServer<IGameWorldAccess>` + `GamePluginServerBuilder` + the control RPC proxies + the registration accumulators |
-| **Reusable runtime library** | `DotBoxD.Plugins.Client` (hand-written once) | framework | lifecycle, `Replace`/`Extend`/`Get` bodies, the anonymous-`InvokeAsync` plumbing, the started-gate |
+| **Framework contracts** | `DotBoxD.Abstractions` (markers) + `DotBoxD.Plugins.Client` (runtime) | framework | `IPluginServer<TWorld>`, `ILiveSettingsHandle<>`, `RemoteServerInvocation<,,>`, `[GeneratePluginServer]`, extension-client registry/accessor contracts |
+| **Game domain surface** | game `*.Server.Abstractions` | game-SDK owner | pure `IGameWorldAccess`, `IMonsterControl`/`IEntityControl`, `MonsterSnapshot` |
+| **Generated plugin facade** | plugin assembly (generated) | source generator | `GamePluginServer : IGameWorldAccess, IPluginServer<IGameWorldAccess>` + `GamePluginServerBuilder.Setup(...)` + `IGamePluginSetup`/control accumulators + control RPC wrappers |
+| **Reusable runtime library** | `DotBoxD.Plugins.Client` (hand-written once) | framework | lifecycle helpers, live-settings contracts, extension registry/accessor contracts, anonymous-`InvokeAsync` plumbing |
 | **Server implementation** | game server | server author | `GameWorldAccess : IGameWorldAccess` over the live world; `[HostCapability]` per method |
 
 The boundary that matters: **framework-generic behavior is a tested library** (not regenerated per build);
@@ -76,15 +76,6 @@ public interface IPluginServer<TWorld> where TWorld : class
     ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
 }
 
-public interface IExtensibleControl                       // every control + the root
-{ ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class; }
-
-public interface IServiceControl : IExtensibleControl     // the root adds service-level verbs
-{
-    ValueTask<string> Replace<TService, TKernel>() where TService : class where TKernel : class, TService;
-    ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new();
-}
-
 [AttributeUsage(AttributeTargets.Class)] public sealed class GeneratePluginServerAttribute : Attribute;
 ```
 
@@ -92,17 +83,17 @@ public interface IServiceControl : IExtensibleControl     // the root adds servi
 
 ```csharp
 [DotBoxDService]                                          // -> plugin RPC proxy generated "like normally"
-public interface IGameWorldAccess : IServiceControl
+public interface IGameWorldAccess
 { IMonsterControl Monsters { get; } IEntityControl Entities { get; } }
 
-public interface IMonsterControl : IExtensibleControl
+public interface IMonsterControl
 {
     ValueTask<MonsterSnapshot> GetAsync(string entityId);     // pure signatures — no [HostBinding],
     ValueTask<bool> KillAsync(string entityId);               // no [WireCall], no routing id
     ValueTask<bool> IsMonsterAsync(string entityId);
     ValueTask<int> GetThreatAsync(string entityId);
 }
-public interface IEntityControl : IExtensibleControl
+public interface IEntityControl
 { ValueTask<int> GetHealthAsync(string id); ValueTask<int> GetLevelAsync(string id); ValueTask<int> GetPositionAsync(string id); }
 ```
 
@@ -168,17 +159,26 @@ public partial class GamePluginServer : IGameWorldAccess   // generator adds : I
 }
 ```
 
-Lifecycle honors the locked decisions: `Build()` is synchronous and does no I/O; `StartAsync()` connects,
-ships verified IR, registers, then runs `OnConfigured()`; `RunAsync() = StartAsync + HoldUntilShutdownAsync`;
-the typed surface throws `"Call StartAsync() before using the server."` until started. `Program.cs` reads:
+Lifecycle honors the locked decisions: `Build()` is synchronous and does no I/O; setup actions only resolve
+kernel packages and record install intent. `StartAsync()` connects, ships the recorded verified IR,
+registers extension ids, then runs `OnConfigured()`; `RunAsync() = StartAsync + HoldUntilShutdownAsync`.
+`Program.cs` reads:
 
 ```csharp
-using var server = GamePluginServerBuilder.FromPipeName(pipeName).Build();   // sync, no I/O
-await server.StartAsync();
-await server.Replace<IMonsterAggroService, GuardianKernel>();                // root service verb
-await server.Monsters.Extend<IMonsterKillerService, MonsterKillerKernel>();  // per-control verb
-var killed = await server.Monsters.KillAsync("monster-4");                   // domain RPC
-var hp = await server.InvokeAsync(async w => (await w.Monsters.GetAsync("monster-2")).Health);
+using var server = GamePluginServerBuilder
+    .FromPipeName(pipeName)
+    .Setup(s =>
+    {
+        s.Replace<IMonsterAggroService, GuardianKernel>();
+        s.Replace<IAttackService, RetaliationKernel>();
+        s.Monsters.Extend<MonsterKillerKernel>();
+        s.Monsters.Extend<BlinkKernel>();
+    })
+    .Build();                                                                // sync, no I/O
+
+await server.StartAsync();                                                   // connect + ship recorded IR
+var killed = await server.Monsters.Get("monster-4").KillAsync();             // domain RPC
+var hp = await server.InvokeAsync(async w => await w.Monsters.Get("monster-2").GetHealthAsync());
 await server.HoldUntilShutdownAsync();
 ```
 
@@ -199,15 +199,13 @@ These are grounded in the current analyzer; they are the work to make the design
    `DotBoxD.Plugins.Client` library, those two members must be reachable across assemblies — make them
    `public` on the library type (note: `InternalsVisibleTo` cannot target the *generated* interceptor, which
    compiles into the consuming plugin assembly, so `public` is the robust choice).
-3. **`[ServerExtensionClient]` graft accepts an interface receiver.** Verified:
-   `RpcKernelClientExtensionModelFactory.ReceiverType` accepts any `INamedTypeSymbol`, and both
-   `ReceiverHasMember` and `ReceiverHasServerExtensionRegistry` walk `AllInterfaces`. So
-   `[ServerExtensionClient(typeof(IMonsterControl))]` validates when `IMonsterControl : IExtensibleControl`
-   exposes the registry. (Caveat: emitting a C# 14 extension member onto an *interface* receiver needs a
-   real compile test against the pinned Roslyn — it replaces a concrete-class path that has coverage.)
-4. **Registration accumulators** — reuse the existing `Analysis/Registration/*` emitter; the root accumulator
-   must be emitted by the surface generator (a generated control is invisible to a second
-   `ForAttributeWithMetadataName` pass).
+3. **Direct server-extension grafts use a hidden accessor.** Runtime control wrappers still implement the
+   bare domain interface plus `IServerExtensionClientAccessor`; generated extension methods cast the receiver
+   to the accessor at the call site. The public property remains `IMonsterControl`, so navigation lands on
+   the hand-written domain interface while `KillMonstersAsync`/`BlinkBehindAsync` still route.
+4. **Setup accumulators** — the facade generator emits `IGamePluginSetup` and one
+   `I{Control}Accumulator` per domain control. These are build-time surfaces only; `Build()` records install
+   intent and `StartAsync()` replays it.
 5. **Bindings derived from the impl** — generate the sandbox host bindings from `GameWorldAccess` and its
    `[HostCapability]` annotations instead of the hand-written `AddBindings` registry.
 
@@ -233,11 +231,9 @@ from `GameWorldAccess`.
   In lowered IR the `await` is erased to a sync host-binding call (capability model unchanged), but the C#
   author shape needs a decision: **async event hooks**, or a **sync sandbox view** of the world for
   `ShouldHandle`/`Handle`. Marked at the call site in the sample.
-- **[B] Install verbs do not fit the server.** `IExtensibleControl`/`IServiceControl` put
-  `Extend`/`Replace`/`Get` on every control, but the server cannot implement them (they ship plugin IR with
-  generic kernel types) — every server-side control throws via `ServerControlBase`. The throwers are the
-  signal that the install verbs should live on the **plugin facade only**, leaving `IGameWorldAccess` a pure
-  domain contract the server implements with zero throwers. Recommended cleanup.
+- **[B — resolved] Install verbs do not fit the server.** `Replace`/`Extend` now live on the build-time
+  `Setup(...)` accumulator, not on `IGameWorldAccess`, not on `IMonsterControl`, and not on runtime
+  `server.Monsters`. `Get<TKernel>()`, `InvokeAsync`, and lifecycle stay on the facade.
 - **[C] `InvokeAsync` placement.** Kept on the framework `IPluginServer<TWorld>` (and concrete on the
   facade) rather than on `IGameWorldAccess` — the interceptor needs a concrete receiver and the locked
   decision puts `InvokeAsync` top-level. The user's original sketch had it on the game interface; this is the
@@ -266,8 +262,8 @@ from `GameWorldAccess`.
   implements and the plugin proxies (kills the separate wire contract and `[WireCall]`).
 - `[HostBinding]` **removed** from the abstraction; capability annotated on the server impl
   (`[HostCapability]`), routing derived, effects inferred.
-- `IServiceControl` is filled in (`Replace`/`Get`) rather than left empty; all controls are
-  `IExtensibleControl`.
+- Install verbs moved out of domain interfaces entirely: `Setup(...)` records `Replace`/`Extend`, while the
+  runtime control properties are bare domain interfaces.
 
 ## 13. Provenance
 

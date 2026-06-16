@@ -10,11 +10,11 @@ namespace DotBoxD.Kernels.Game.Plugin;
 ///
 /// <para><b>Which verb when:</b></para>
 /// <list type="bullet">
-///   <item><c>Replace&lt;TService, TKernel&gt;()</c> — install an <c>[EventKernel]</c> that swaps a whole
-///   event service (root verb).</item>
-///   <item><c>Monsters.Extend&lt;TKernel&gt;()</c> — install a <c>[ServerExtension]</c>; grafts a method onto
-///   the control (batch) or onto each <c>IMonster</c> handle (per-instance).</item>
-///   <item><c>Monsters.Get(id)</c> — a scoped handle; calls on it omit the id.</item>
+///   <item><c>Setup(s =&gt; s.Replace&lt;TService, TKernel&gt;())</c> — record an <c>[EventKernel]</c> that swaps
+///   a whole event service; <c>StartAsync()</c> ships it.</item>
+///   <item><c>Setup(s =&gt; s.Monsters.Extend&lt;TKernel&gt;())</c> — record a <c>[ServerExtension]</c>; grafts a
+///   method onto the control (batch) or onto each <c>IMonster</c> handle (per-instance).</item>
+///   <item><c>Monsters.Get(id)</c> — a runtime scoped handle; calls on it omit the id.</item>
 ///   <item><c>Get&lt;TKernel&gt;()</c> — tune an installed kernel's live settings.</item>
 ///   <item><c>InvokeAsync(...)</c> — a throwaway server-side probe (see <c>AdvancedUsage</c>).</item>
 /// </list>
@@ -36,22 +36,24 @@ internal static class Program
 
         Console.WriteLine($"[plugin] connecting to server pipe '{pipeName}'...");
 
-        using var server = GamePluginServerBuilder.FromPipeName(pipeName).Build();   // sync, no I/O
+        using var server = GamePluginServerBuilder
+            .FromPipeName(pipeName)
+            .Setup(s =>
+            {
+                // Record plugin-owned kernels. Build() is sync and does no I/O; StartAsync() ships the IR.
+                s.Replace<IMonsterAggroService, GuardianKernel>();
+                s.Replace<IAttackService, RetaliationKernel>();
+                s.Monsters.Extend<MonsterKillerKernel>();   // grafts onto IMonsterControl (batch)
+                s.Monsters.Extend<BlinkKernel>();           // grafts onto IMonster handles (per-instance)
+            })
+            .Build();
         await server.StartAsync();
-
-        // Install plugin-owned kernels — ships verified IR; install ids derive from the kernel type.
-        //   Replace<> installs an [EventKernel] sync reaction (swaps a whole event service).
-        //   Extend<>  grafts a [ServerExtension] async kernel onto a control (batch) or an IMonster handle.
-        await server.Replace<IMonsterAggroService, GuardianKernel>();
-        await server.Replace<IAttackService, RetaliationKernel>();
-        await server.Monsters.Extend<MonsterKillerKernel>();   // grafts onto IMonsterControl (batch)
-        await server.Monsters.Extend<BlinkKernel>();            // grafts onto IMonster handles (per-instance)
 
         // One direct domain call via a scoped handle — the id is captured by Get(id), so KillAsync omits it.
         var killed = await server.Monsters.Get("monster-4").KillAsync();
         Console.WriteLine($"[plugin] Monsters.Get(monster-4).KillAsync() => {killed}.");
 
-        await server.Monsters.Get("monster-1").BlinkBehindAsync("playerA");
+        await server.Monsters.Get("monster-1").BlinkBehindAsync("player-1");
 
         // Tune a replaced kernel's live settings — strongly typed member setters, one atomic batch. Only
         // [LiveSetting] members are settable; ApplyAsync ships it (a chain without ApplyAsync warns).

@@ -96,9 +96,10 @@ implement-and-throw (`GameWorldAccess.cs:35–42,98–107`). Two precisions past
   statically `IGameWorldAccess`, so `_world.Monsters.Extend(…)` autocompletes beside the domain reads and
   throws — and that author is a plugin dev.
 
-**Fix:** make `IGameWorldAccess`/controls pure domain (drop the bases), emit the verbs only on the generated
-`GamePluginServer` facade. Converts a runtime trap into a compile error; `server.Monsters.Extend(…)` in
-`Program.cs` keeps working because `server` is the facade.
+**Fix:** make `IGameWorldAccess`/controls pure domain (drop the bases) and move install verbs to the
+builder's build-time `Setup(...)` accumulator. `Build()` records `Replace`/`Extend` intents synchronously;
+`StartAsync()` ships them. The runtime `server.Monsters` property is exactly `IMonsterControl`, so
+`server.Monsters.Extend(...)` becomes a compile error and `s.Monsters.Extend(...)` is the only install shape.
 
 ### 2.3 — HIGH — `Replace`/`Extend` are less type-safe than they look **[codex, verified]**
 
@@ -217,8 +218,9 @@ concept-naming-decision.md deliberately deferred that.
 
 ## Do-first (priority)
 
-1. **Pure-domain `IGameWorldAccess`** — move install verbs onto the facade only; delete the throwers *and* the
-   DIM throwers so the kernel's injected `_world` shows only domain calls. (2.2)
+1. **Pure-domain `IGameWorldAccess`** — move install verbs to build-time `Setup(...)` accumulators; delete the
+   throwers *and* the DIM throwers so `server.Monsters` and a kernel's injected `_world.Monsters` both show
+   only domain calls. (2.2)
 2. **Derive kernel ids from the type** (Identity note) — kill the hand-typed `"monster-killer"`/`"guardian"`
    strings, key the duplicate detector on the derived id, and validate `Replace`/`Extend` against the manifest.
    This is the keystone: it dissolves 2.4 and unblocks the 1.3 collapse. (1.3, 2.3, 2.4)

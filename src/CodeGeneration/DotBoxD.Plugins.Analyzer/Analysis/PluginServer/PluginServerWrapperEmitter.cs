@@ -9,7 +9,7 @@ internal static class PluginServerWrapperEmitter
         PluginServerFacadeModel model,
         PluginServerControlProperty control)
     {
-        builder.AppendLine("    public sealed class " + control.WrapperName + " : " + PluginServerFacadeEmitter.ClientInterfaceRef(model, control) + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
+        builder.AppendLine("    public sealed class " + control.WrapperName + " : " + control.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
         builder.AppendLine("        private readonly " + control.Type + " _inner;");
@@ -56,8 +56,6 @@ internal static class PluginServerWrapperEmitter
     private static void AppendAccessorSurface(StringBuilder builder, string indent)
     {
         builder.Append(indent).AppendLine("public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => _owner;");
-        builder.Append(indent).AppendLine("public global::System.Threading.Tasks.ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class => _owner.Extend<TService, TKernel>();");
-        builder.Append(indent).AppendLine("public global::System.Threading.Tasks.ValueTask<string> Extend<TKernel>() where TKernel : class => _owner.Extend<TKernel>();");
     }
 
     private static void AppendMethod(StringBuilder builder, PluginServerForwardedMethod method, string indent)
