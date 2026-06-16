@@ -25,7 +25,10 @@ public sealed record MonsterSnapshot(string Id, string Name, int Health, int Lev
 [DotBoxDService]
 public interface IGameWorldAccess
 {
+    /// <summary>Monster-specific commands and scoped monster handles exposed by the game world.</summary>
     IMonsterControl Monsters { get; }
+
+    /// <summary>Entity-wide commands and scoped entity handles exposed by the game world.</summary>
     IEntityControl Entities { get; }
 }
 

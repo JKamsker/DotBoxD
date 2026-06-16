@@ -20,7 +20,7 @@ internal static class PluginServerFacadeEmitter
 
         AppendFacade(builder, model);
         builder.AppendLine();
-        AppendServerInterface(builder, model);
+        PluginServerFacadeSurfaceEmitter.AppendServerInterface(builder, model);
         builder.AppendLine();
         PluginServerSetupEmitter.AppendBuilder(builder, model);
         PluginServerSetupEmitter.AppendSetupInterfaces(builder, model);
@@ -29,6 +29,10 @@ internal static class PluginServerFacadeEmitter
 
     private static void AppendFacade(StringBuilder builder, PluginServerFacadeModel model)
     {
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            string.Empty,
+            "Generated plugin-side client for the remote world domain. Call StartAsync before using runtime domain, hook, subscription, or server extension APIs.");
         builder.Append(model.Accessibility).Append(" partial class ").Append(model.ClassName)
             .Append(" : ").AppendLine(model.ServerInterfaceName);
         builder.AppendLine("{");
@@ -52,12 +56,20 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    private bool _configured;");
         builder.AppendLine("    private bool _disposed;");
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a generated plugin server over an already connected control-plane service.");
         builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
             .Append(" control, ").Append(model.WorldType).AppendLine("? world = null)");
         builder.AppendLine("        : this(control, world, setup: null)");
         builder.AppendLine("    {");
         builder.AppendLine("    }");
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a generated plugin server and records setup actions for replay when the server starts.");
         builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
             .Append(" control, ").Append(model.WorldType).Append("? world, global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
@@ -83,10 +95,10 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.AppendLine("    partial void OnConfigured();");
-        AppendProperties(builder, model);
+        PluginServerFacadeSurfaceEmitter.AppendProperties(builder, model);
         AppendLifecycle(builder, model);
         AppendWorldForwarders(builder, model);
-        AppendInstallSurface(builder, model);
+        PluginServerFacadeSurfaceEmitter.AppendInstallSurface(builder, model);
         PluginServerSetupEmitter.AppendSetupMembers(builder, model);
         AppendLiveSettingsHandle(builder, model);
         foreach (var control in model.Controls)
@@ -96,43 +108,13 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("}");
     }
 
-    private static void AppendProperties(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        builder.AppendLine();
-        builder.Append("    public ").Append(model.ServerInterfaceName).AppendLine(" Services => this;");
-        builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => this;");
-        builder.AppendLine("    public global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks => _started && _hooks is not null ? _hooks : throw new global::System.InvalidOperationException(NotStartedMessage);");
-        builder.AppendLine("    public global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions => _started && _subscriptions is not null ? _subscriptions : throw new global::System.InvalidOperationException(NotStartedMessage);");
-        foreach (var control in model.Controls)
-        {
-            builder.Append("    public ").Append(control.Type).Append(' ').Append(control.Name)
-                .Append(" => _started && _").Append(FieldName(control.Name))
-                .AppendLine(" is not null ? _" + FieldName(control.Name) + " : throw new global::System.InvalidOperationException(NotStartedMessage);");
-        }
-        builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient => this;");
-    }
-
-    private static void AppendServerInterface(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        builder.Append(model.Accessibility).Append(" interface ").Append(model.ServerInterfaceName)
-            .Append(" : ").Append(model.WorldType)
-            .Append(", global::DotBoxD.Abstractions.IPluginServer<").Append(model.WorldType)
-            .Append(">, global::DotBoxD.Abstractions.IServerExtensionClientRegistry, ")
-            .AppendLine("global::System.IDisposable, global::System.IAsyncDisposable");
-        builder.AppendLine("{");
-        builder.Append("    ").Append(model.ServerInterfaceName).AppendLine(" Services { get; }");
-        builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }");
-        builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks { get; }");
-        builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions { get; }");
-        builder.AppendLine("    global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient { get; }");
-        builder.AppendLine("    global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new();");
-        builder.AppendLine("    global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory);");
-        builder.AppendLine("}");
-    }
-
     private static void AppendLifecycle(StringBuilder builder, PluginServerFacadeModel model)
     {
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Connects the generated plugin server, initializes runtime domain, hook, subscription, and extension APIs, and replays setup registrations once.");
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask StartAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
         builder.AppendLine("        ThrowIfDisposed();");
@@ -153,16 +135,32 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        }");
         builder.AppendLine("    }");
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Starts the generated plugin server and then waits until the remote host shuts down or the operation is cancelled.");
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask RunAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
         builder.AppendLine("        await StartAsync(cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("        await HoldUntilShutdownAsync(cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("    }");
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Waits for the remote host to signal shutdown after the generated plugin server has started.");
         builder.AppendLine("    public global::System.Threading.Tasks.ValueTask HoldUntilShutdownAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("        => RequireControl().HoldUntilShutdownAsync(cancellationToken);");
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Synchronously releases the generated plugin server session and any owned connection.");
         builder.AppendLine("    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Asynchronously releases the generated plugin server session and any owned connection.");
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask DisposeAsync()");
         builder.AppendLine("    {");
         builder.AppendLine("        if (_disposed) { return; }");
@@ -191,6 +189,7 @@ internal static class PluginServerFacadeEmitter
     {
         foreach (var method in model.WorldMethods)
         {
+            PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
             builder.Append("    public ").Append(method.ReturnType).Append(' ').Append(method.Name)
                 .Append('(').Append(ParameterList(method)).Append(") => RequireWorld().")
                 .Append(method.Name).Append('(').Append(ArgumentList(method)).AppendLine(");");
@@ -200,29 +199,6 @@ internal static class PluginServerFacadeEmitter
         {
             builder.AppendLine();
         }
-    }
-
-    private static void AppendInstallSurface(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        builder.AppendLine();
-        builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<TReturn> InvokeAsync<TReturn>(global::System.Func<" + model.WorldType + ", global::System.Threading.Tasks.ValueTask<TReturn>> lambda)");
-        builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
-        builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(TCaptures captures, global::DotBoxD.Abstractions.RemoteServerInvocation<" + model.WorldType + ", TCaptures, TReturn> lambda) where TCaptures : class");
-        builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
-        builder.AppendLine("    public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new()");
-        builder.AppendLine("        => new LiveSettingsHandle<TKernel>(this, global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>().Manifest.PluginId);");
-        builder.AppendLine("    public string PluginId<TService>() where TService : class");
-        builder.AppendLine("        => _serverExtensions.TryGetValue(typeof(TService), out var pluginId) ? pluginId : throw new global::System.InvalidOperationException($\"Server extension '{typeof(TService).FullName}' has not been registered.\");");
-        builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<byte[]> InvokeServerExtensionAsync(string pluginId, byte[] arguments, global::System.Threading.CancellationToken cancellationToken = default)");
-        builder.AppendLine("        => RequireControl().InvokeServerExtensionAsync(pluginId, arguments, cancellationToken);");
-        builder.AppendLine("    public global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory)");
-        builder.AppendLine("        => _anonymousKernels.GetOrAdd(pluginId, id => new global::System.Lazy<global::System.Threading.Tasks.Task<string>>(() => InstallServerExtensionPackageAsync(factory()).AsTask())).Value;");
-        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallPluginPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
-        builder.AppendLine("        => RequireControl().InstallPluginAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken);");
-        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallSubscriptionPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
-        builder.AppendLine("        => RequireControl().InstallSubscriptionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken);");
-        builder.AppendLine("    private global::System.Threading.Tasks.ValueTask<string> InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.PluginPackage package, global::System.Threading.CancellationToken cancellationToken = default)");
-        builder.AppendLine("        => RequireControl().InstallServerExtensionAsync(global::DotBoxD.Plugins.Json.PluginPackageJsonSerializer.Export(package), cancellationToken);");
     }
 
     private static void AppendLiveSettingsHandle(StringBuilder builder, PluginServerFacadeModel model)

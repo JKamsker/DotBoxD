@@ -25,6 +25,10 @@ internal static class PluginServerSetupEmitter
 
     public static void AppendBuilder(StringBuilder builder, PluginServerFacadeModel model)
     {
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            string.Empty,
+            "Builder for the generated plugin server. Use Setup to record installs without I/O, then Build to create the runtime facade.");
         builder.Append("public sealed class ").Append(model.ClassName).AppendLine("Builder");
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
@@ -33,16 +37,32 @@ internal static class PluginServerSetupEmitter
         builder.Append("    private global::System.Action<").Append(model.SetupInterfaceName).AppendLine(">? _setup;");
         builder.AppendLine("    private " + model.ClassName + "Builder(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory) => _connectionFactory = connectionFactory;");
         builder.AppendLine("    private " + model.ClassName + "Builder(" + model.ControlServiceType + " control, " + model.WorldType + "? world) { _control = control; _world = world; }");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a builder that connects to a running game server by named pipe when StartAsync is called.");
         builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
         builder.AppendLine("        => new(ct => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, cancellationToken: ct)));");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Creates a builder over an already connected control-plane service and optional world proxy.");
         builder.AppendLine("    public static " + model.ClassName + "Builder FromConnection(" + model.ControlServiceType + " control, " + model.WorldType + "? world = null)");
         builder.AppendLine("        => new(control, world);");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Records setup actions such as hooks, fire-and-forget subscriptions, replacements, and server extensions. Build remains synchronous; StartAsync replays the recorded installs.");
         builder.AppendLine("    public " + model.ClassName + "Builder Setup(global::System.Action<" + model.SetupInterfaceName + "> configure)");
         builder.AppendLine("    {");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(configure);");
         builder.AppendLine("        _setup += configure;");
         builder.AppendLine("        return this;");
         builder.AppendLine("    }");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Builds the generated plugin server facade. For pipe-based builders, call StartAsync before using runtime APIs.");
         builder.AppendLine("    public " + model.ServerInterfaceName + " Build()");
         builder.AppendLine("        => _connectionFactory is not null ? new " + model.ClassName + "(_connectionFactory, _setup) : new " + model.ClassName + "(_control!, _world, _setup);");
         builder.AppendLine("}");
@@ -51,13 +71,30 @@ internal static class PluginServerSetupEmitter
     public static void AppendSetupInterfaces(StringBuilder builder, PluginServerFacadeModel model)
     {
         builder.AppendLine();
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            string.Empty,
+            "Setup-time registration surface. Actions recorded here are replayed when the generated plugin server starts.");
         builder.Append(model.Accessibility).Append(" interface ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("{");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Records a hook kernel package for replay at StartAsync. Hooks are awaited decision logic.");
         builder.Append("    ").Append(model.SetupInterfaceName).AppendLine(" Replace<TService, TKernel>() where TService : class where TKernel : class, TService;");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Setup-time hook registration surface. Recorded hooks plug plugin logic into server decisions and are awaited by the server.");
         builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks { get; }");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "    ",
+            "Setup-time fire-and-forget subscription registration surface. Recorded subscriptions are notifications and the server does not wait for them.");
         builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions { get; }");
         foreach (var control in model.Controls)
         {
+            PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
             builder.Append("    ").Append(control.AccumulatorInterfaceName).Append(' ')
                 .Append(control.Name).AppendLine(" { get; }");
         }
@@ -66,9 +103,21 @@ internal static class PluginServerSetupEmitter
         foreach (var control in model.Controls)
         {
             builder.AppendLine();
+            PluginServerXmlDocumentation.AppendSummary(
+                builder,
+                string.Empty,
+                "Setup-time server-extension accumulator for the " + control.Name + " domain control.");
             builder.Append(model.Accessibility).Append(" interface ").Append(control.AccumulatorInterfaceName).AppendLine();
             builder.AppendLine("{");
+            PluginServerXmlDocumentation.AppendSummary(
+                builder,
+                "    ",
+                "Records a server-extension kernel for replay at StartAsync.");
             builder.Append("    ").Append(control.AccumulatorInterfaceName).AppendLine(" Extend<TKernel>() where TKernel : class;");
+            PluginServerXmlDocumentation.AppendSummary(
+                builder,
+                "    ",
+                "Records a server-extension kernel for the requested service contract and replays it at StartAsync.");
             builder.Append("    ").Append(control.AccumulatorInterfaceName).AppendLine(" Extend<TService, TKernel>() where TService : class where TKernel : class;");
             builder.AppendLine("}");
         }
@@ -175,10 +224,19 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("        }");
         foreach (var control in model.Controls)
         {
+            PluginServerXmlDocumentation.Append(builder, "        ", control.Documentation);
             builder.Append("        public ").Append(control.AccumulatorInterfaceName).Append(' ')
                 .Append(control.Name).Append(" => ").Append(FieldName(control.Name)).AppendLine(";");
         }
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "        ",
+            "Setup-time hook registration surface. Recorded hooks plug plugin logic into server decisions and are awaited by the server.");
         builder.AppendLine("        public global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks => _hooks;");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "        ",
+            "Setup-time fire-and-forget subscription registration surface. Recorded subscriptions are notifications and the server does not wait for them.");
         builder.AppendLine("        public global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions => _subscriptions;");
 
         builder.AppendLine("    }");
@@ -192,11 +250,19 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly global::System.Collections.Generic.List<RecordedInstall> _installs;");
         builder.Append("        public ").Append(control.Name).AppendLine("SetupAccumulator(global::System.Collections.Generic.List<RecordedInstall> installs) => _installs = installs;");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "        ",
+            "Records a server-extension kernel for replay at StartAsync.");
         builder.Append("        public ").Append(control.AccumulatorInterfaceName).AppendLine(" Extend<TKernel>() where TKernel : class");
         builder.AppendLine("        {");
         builder.AppendLine("            Add<TKernel>();");
         builder.AppendLine("            return this;");
         builder.AppendLine("        }");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "        ",
+            "Records a server-extension kernel for the requested service contract and replays it at StartAsync.");
         builder.Append("        public ").Append(control.AccumulatorInterfaceName).AppendLine(" Extend<TService, TKernel>() where TService : class where TKernel : class");
         builder.AppendLine("        {");
         builder.AppendLine("            Add<TKernel>();");

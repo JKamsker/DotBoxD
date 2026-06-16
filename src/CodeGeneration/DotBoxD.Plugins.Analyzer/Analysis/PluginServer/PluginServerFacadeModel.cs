@@ -9,6 +9,7 @@ internal sealed record PluginServerFacadeModel(
     string ServerInterfaceName,
     string SetupInterfaceName,
     string WorldType,
+    string WorldDocumentation,
     string ControlServiceType,
     string LiveSettingUpdateType,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
@@ -17,6 +18,7 @@ internal sealed record PluginServerFacadeModel(
 internal sealed record PluginServerControlProperty(
     string Name,
     string Type,
+    string Documentation,
     string WrapperName,
     string AccumulatorInterfaceName,
     EquatableArray<PluginServerForwardedMethod> Methods,
@@ -25,14 +27,16 @@ internal sealed record PluginServerControlProperty(
 internal sealed record PluginServerForwardedMethod(
     string Name,
     string ReturnType,
+    string Documentation,
     string? ReturnWrapperName,
     EquatableArray<PluginServerParameter> Parameters);
 
-internal sealed record PluginServerForwardedProperty(string Name, string Type);
+internal sealed record PluginServerForwardedProperty(string Name, string Type, string Documentation);
 
 internal sealed record PluginServerServiceWrapper(
     string Type,
     string WrapperName,
+    string Documentation,
     EquatableArray<PluginServerForwardedProperty> Properties,
     EquatableArray<PluginServerForwardedMethod> Methods);
 

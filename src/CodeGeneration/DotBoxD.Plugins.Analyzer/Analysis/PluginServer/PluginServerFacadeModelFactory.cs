@@ -52,6 +52,10 @@ internal static class PluginServerFacadeModelFactory
             ServerInterfaceName(worldType),
             SetupInterfaceName(type.Name),
             TypeName(worldType),
+            PluginServerXmlDocumentation.FromSymbol(
+                worldType,
+                "Generated plugin-side facade for the remote world domain.",
+                cancellationToken),
             TypeName(controlServiceType),
             "global::" + controlNs + ".LiveSettingUpdate",
             new EquatableArray<PluginServerForwardedMethod>(
@@ -103,6 +107,10 @@ internal static class PluginServerFacadeModelFactory
             controls.Add(new PluginServerControlProperty(
                 property.Name,
                 TypeName(propertyType),
+                PluginServerXmlDocumentation.FromSymbol(
+                    property,
+                    "Accesses the server's " + property.Name + " domain control after StartAsync.",
+                    cancellationToken),
                 property.Name + "PluginControl",
                 propertyType.Name + "Accumulator",
                 new EquatableArray<PluginServerForwardedMethod>(
@@ -137,6 +145,10 @@ internal static class PluginServerFacadeModelFactory
                 methods.Add(new PluginServerForwardedMethod(
                     method.Name,
                     TypeName(method.ReturnType),
+                    PluginServerXmlDocumentation.FromSymbol(
+                        method,
+                        "Forwards " + method.Name + " to the remote domain service.",
+                        cancellationToken),
                     returnWrapperName,
                     new EquatableArray<PluginServerParameter>(ResolveParameters(method))));
             }
@@ -155,6 +167,7 @@ internal static class PluginServerFacadeModelFactory
             .Select(static wrapper => new PluginServerServiceWrapper(
                 wrapper.Type,
                 wrapper.WrapperName,
+                wrapper.Documentation,
                 new EquatableArray<PluginServerForwardedProperty>(wrapper.Properties.ToArray()),
                 new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
             .ToArray();
@@ -171,7 +184,13 @@ internal static class PluginServerFacadeModelFactory
             return existing.WrapperName;
         }
 
-        var wrapper = new ServiceWrapperBuilder(typeName, ServiceWrapperName(serviceType));
+        var wrapper = new ServiceWrapperBuilder(
+            typeName,
+            ServiceWrapperName(serviceType),
+            PluginServerXmlDocumentation.FromSymbol(
+                serviceType,
+                "Generated scoped client for the remote " + serviceType.Name + " domain service.",
+                cancellationToken));
         serviceWrappers.Add(typeName, wrapper);
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
@@ -195,7 +214,13 @@ internal static class PluginServerFacadeModelFactory
                 } property &&
                 seenProperties.Add(property.Name))
             {
-                wrapper.Properties.Add(new PluginServerForwardedProperty(property.Name, TypeName(property.Type)));
+                wrapper.Properties.Add(new PluginServerForwardedProperty(
+                    property.Name,
+                    TypeName(property.Type),
+                    PluginServerXmlDocumentation.FromSymbol(
+                        property,
+                        "Forwards the " + property.Name + " property from the remote domain service.",
+                        cancellationToken)));
             }
         }
 
@@ -296,10 +321,11 @@ internal static class PluginServerFacadeModelFactory
             _ => "internal"
         };
 
-    private sealed class ServiceWrapperBuilder(string type, string wrapperName)
+    private sealed class ServiceWrapperBuilder(string type, string wrapperName, string documentation)
     {
         public string Type { get; } = type;
         public string WrapperName { get; } = wrapperName;
+        public string Documentation { get; } = documentation;
         public List<PluginServerForwardedProperty> Properties { get; } = [];
         public List<PluginServerForwardedMethod> Methods { get; } = [];
     }

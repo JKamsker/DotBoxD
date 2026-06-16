@@ -9,10 +9,15 @@ internal static class PluginServerWrapperEmitter
         PluginServerFacadeModel model,
         PluginServerControlProperty control)
     {
+        PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
         builder.AppendLine("    public sealed class " + control.WrapperName + " : " + control.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
         builder.AppendLine("        private readonly " + control.Type + " _inner;");
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            "        ",
+            "Creates a generated wrapper around the remote domain control and the owning plugin server.");
         builder.AppendLine("        public " + control.WrapperName + "(" + model.ClassName + " owner, " + control.Type + " inner) { _owner = owner; _inner = inner; }");
         AppendAccessorSurface(builder, "        ");
         foreach (var method in control.Methods)
@@ -33,6 +38,7 @@ internal static class PluginServerWrapperEmitter
         PluginServerFacadeModel model,
         PluginServerServiceWrapper wrapper)
     {
+        PluginServerXmlDocumentation.Append(builder, "        ", wrapper.Documentation);
         builder.AppendLine("        private sealed class " + wrapper.WrapperName + " : " + wrapper.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("        {");
         builder.AppendLine("            private readonly " + model.ClassName + " _owner;");
@@ -41,6 +47,7 @@ internal static class PluginServerWrapperEmitter
         AppendAccessorSurface(builder, "            ");
         foreach (var property in wrapper.Properties)
         {
+            PluginServerXmlDocumentation.Append(builder, "            ", property.Documentation);
             builder.Append("            public ").Append(property.Type).Append(' ').Append(property.Name)
                 .Append(" => _inner.").Append(property.Name).AppendLine(";");
         }
@@ -55,11 +62,16 @@ internal static class PluginServerWrapperEmitter
 
     private static void AppendAccessorSurface(StringBuilder builder, string indent)
     {
+        PluginServerXmlDocumentation.AppendSummary(
+            builder,
+            indent,
+            "Registry for server extension clients installed through setup, Extend, or EnsureAnonymousKernelAsync.");
         builder.Append(indent).AppendLine("public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => _owner;");
     }
 
     private static void AppendMethod(StringBuilder builder, PluginServerForwardedMethod method, string indent)
     {
+        PluginServerXmlDocumentation.Append(builder, indent, method.Documentation);
         builder.Append(indent).Append("public ").Append(method.ReturnType).Append(' ').Append(method.Name)
             .Append('(').Append(ParameterList(method)).Append(") => ");
         if (method.ReturnWrapperName is null)
