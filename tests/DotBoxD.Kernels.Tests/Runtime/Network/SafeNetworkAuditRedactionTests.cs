@@ -31,6 +31,26 @@ public sealed class SafeNetworkAuditRedactionTests
     }
 
     [Fact]
+    public async Task Http_get_redacts_secret_key_value_path_segments_in_audit()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("remote-config"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/download/api_key=abc123/file"));
+        var policy = SandboxPolicyBuilder.Create()
+            .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024)
+            .WithFuel(5_000)
+            .WithWallTime(TimeSpan.FromSeconds(2))
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded);
+        var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "net.http.get" && e.Success);
+        Assert.DoesNotContain("api_key", audit.ResourceId, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("abc123", audit.ResourceId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Http_get_redacts_secret_shaped_denied_path_segments_in_audit()
     {
         var result = await ExecuteNetworkAsync(
