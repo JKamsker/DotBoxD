@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\samples\Pushdown\PluginIpc\DotBoxD.Kernels.PluginIpc.Server.Abstractions\DotBoxD.Kernels.PluginIpc.Server.Abstractions.csproj" />
     <ProjectReference Include="..\..\samples\Kernels\LocalPlugin\DotBoxD.Kernels.PluginLocal\DotBoxD.Kernels.PluginLocal.csproj" />
+    <ProjectReference Include="..\..\samples\Kernels\GameServer\DotBoxD.Kernels.Game.Server\DotBoxD.Kernels.Game.Server.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\CodeGeneration\DotBoxD.Plugins.Analyzer\DotBoxD.Plugins.Analyzer.csproj" />
     <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
     <ProjectReference Include="..\..\src\Kernels\DotBoxD.Kernels.Validation\DotBoxD.Kernels.Validation.csproj" />
