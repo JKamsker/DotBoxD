@@ -1,0 +1,47 @@
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Plugins.Runtime.Rpc;
+
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+
+public sealed class KernelRpcMarshallerDtoOrderTests
+{
+    [Fact]
+    public void ToSandboxValue_uses_property_order_when_constructor_order_differs()
+    {
+        var dto = new ReorderedDto(success: true, monsterId: 7);
+
+        var sandbox = KernelRpcMarshaller.ToSandboxValue(dto, typeof(ReorderedDto));
+
+        var record = Assert.IsType<RecordValue>(sandbox);
+        Assert.Equal(
+            [SandboxValue.FromInt32(7), SandboxValue.FromBool(true)],
+            record.Fields);
+    }
+
+    [Fact]
+    public void FromSandboxValue_constructs_dto_when_constructor_order_differs()
+    {
+        var sandbox = SandboxValue.FromRecord(
+            [SandboxValue.FromInt32(8), SandboxValue.FromBool(false)]);
+
+        var dto = Assert.IsType<ReorderedDto>(
+            KernelRpcMarshaller.FromSandboxValue(sandbox, typeof(ReorderedDto)));
+
+        Assert.Equal(8, dto.MonsterId);
+        Assert.False(dto.Success);
+    }
+
+    private sealed class ReorderedDto
+    {
+        public ReorderedDto(bool success, int monsterId)
+        {
+            Success = success;
+            MonsterId = monsterId;
+        }
+
+        public int MonsterId { get; }
+
+        public bool Success { get; }
+    }
+}
