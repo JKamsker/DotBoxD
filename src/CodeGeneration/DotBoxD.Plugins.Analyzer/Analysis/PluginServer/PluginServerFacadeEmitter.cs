@@ -67,7 +67,7 @@ internal static class PluginServerFacadeEmitter
         AppendLiveSettingsHandle(builder, model);
         foreach (var control in model.Controls)
         {
-            AppendControlWrapper(builder, model, control);
+            PluginServerWrapperEmitter.AppendControlWrapper(builder, model, control);
         }
         builder.AppendLine("}");
     }
@@ -79,9 +79,11 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => this;");
         foreach (var control in model.Controls)
         {
-            builder.Append("    public ").Append(control.Type).Append(' ').Append(control.Name)
+            builder.Append("    public ").Append(control.WrapperName).Append(' ').Append(control.Name)
                 .Append(" => _started && _").Append(FieldName(control.Name))
                 .AppendLine(" is not null ? _" + FieldName(control.Name) + " : throw new global::System.InvalidOperationException(NotStartedMessage);");
+            builder.Append("    ").Append(control.Type).Append(' ').Append(model.WorldType).Append('.').Append(control.Name)
+                .Append(" => ").Append(control.Name).AppendLine(";");
         }
         builder.AppendLine("    public global::DotBoxD.Abstractions.IServerExtensionWireClient WireClient => this;");
     }
@@ -164,6 +166,12 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        _serverExtensions[typeof(TService)] = pluginId;");
         builder.AppendLine("        return pluginId;");
         builder.AppendLine("    }");
+        builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask<string> Extend<TKernel>() where TKernel : class");
+        builder.AppendLine("    {");
+        builder.AppendLine("        var pluginId = await InstallServerExtensionPackageAsync(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>()).ConfigureAwait(false);");
+        builder.AppendLine("        _serverExtensions[typeof(TKernel)] = pluginId;");
+        builder.AppendLine("        return pluginId;");
+        builder.AppendLine("    }");
         builder.AppendLine("    public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Get<TKernel>() where TKernel : class, new()");
         builder.AppendLine("        => new LiveSettingsHandle<TKernel>(this, global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>().Manifest.PluginId);");
         builder.AppendLine("    public string PluginId<TService>() where TService : class");
@@ -184,10 +192,27 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
         builder.AppendLine("        private readonly string _pluginId;");
+        builder.AppendLine("        private readonly global::System.Collections.Generic.List<" + model.LiveSettingUpdateType + "> _updates = new();");
         builder.AppendLine("        public LiveSettingsHandle(" + model.ClassName + " owner, string pluginId) { _owner = owner; _pluginId = pluginId; }");
+        builder.AppendLine("        public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Set<TValue>(global::System.Linq.Expressions.Expression<global::System.Func<TKernel, TValue>> member, TValue value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            var body = member.Body is global::System.Linq.Expressions.UnaryExpression unary ? unary.Operand : member.Body;");
+        builder.AppendLine("            if (body is not global::System.Linq.Expressions.MemberExpression { Member: global::System.Reflection.PropertyInfo property })");
+        builder.AppendLine("            {");
+        builder.AppendLine("                throw new global::System.ArgumentException(\"Live setting expression must select a property.\", nameof(member));");
+        builder.AppendLine("            }");
+        builder.AppendLine("            if (property.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length == 0)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                throw new global::System.ArgumentException($\"Property '{property.Name}' is not a live setting.\", nameof(member));");
+        builder.AppendLine("            }");
+        builder.AppendLine("            _updates.Add(new " + model.LiveSettingUpdateType + "(property.Name, global::System.Convert.ToString(value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty));");
+        builder.AppendLine("            return this;");
+        builder.AppendLine("        }");
+        builder.AppendLine("        public global::System.Threading.Tasks.ValueTask ApplyAsync(bool atomic = false)");
+        builder.AppendLine("            => _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic);");
         builder.AppendLine("        public global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
-        builder.AppendLine("            var draft = new TKernel();");
+            builder.AppendLine("            var draft = new TKernel();");
         builder.AppendLine("            set(draft);");
         builder.AppendLine("            var updates = typeof(TKernel).GetProperties(global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.Instance)");
         builder.AppendLine("                .Where(p => p.GetMethod is not null && p.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length != 0)");
@@ -195,24 +220,6 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("                .ToArray();");
         builder.AppendLine("            return _owner.RequireControl().UpdateSettingsAsync(_pluginId, updates, atomic);");
         builder.AppendLine("        }");
-        builder.AppendLine("    }");
-    }
-
-    private static void AppendControlWrapper(StringBuilder builder, PluginServerFacadeModel model, PluginServerControlProperty control)
-    {
-        builder.AppendLine("    private sealed class " + control.WrapperName + " : " + control.Type);
-        builder.AppendLine("    {");
-        builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
-        builder.AppendLine("        private readonly " + control.Type + " _inner;");
-        builder.AppendLine("        public " + control.WrapperName + "(" + model.ClassName + " owner, " + control.Type + " inner) { _owner = owner; _inner = inner; }");
-        builder.AppendLine("        public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => _owner;");
-        builder.AppendLine("        public global::System.Threading.Tasks.ValueTask<string> Extend<TService, TKernel>() where TService : class where TKernel : class => _owner.Extend<TService, TKernel>();");
-        foreach (var method in control.Methods)
-        {
-            builder.Append("        public ").Append(method.ReturnType).Append(' ').Append(method.Name)
-                .Append('(').Append(ParameterList(method)).Append(") => _inner.")
-                .Append(method.Name).Append('(').Append(ArgumentList(method)).AppendLine(");");
-        }
         builder.AppendLine("    }");
     }
 

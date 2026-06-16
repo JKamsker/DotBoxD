@@ -15,13 +15,23 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var modelResults = context.SyntaxProvider
+        var pluginAttributeResults = context.SyntaxProvider
             .ForAttributeWithMetadataName(
                 DotBoxDGenerationNames.Metadata.PluginAttribute,
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
             .Where(static result => result is not null)
             .Select(static (result, _) => result!);
+        var eventKernelAttributeResults = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                DotBoxDGenerationNames.Metadata.EventKernelAttribute,
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
+        var modelResults = pluginAttributeResults.Collect()
+            .Combine(eventKernelAttributeResults.Collect())
+            .SelectMany(static (pair, _) => pair.Left.AddRange(pair.Right));
 
         var diagnostics = modelResults
             .Where(static result => result.Diagnostic is not null)

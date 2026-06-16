@@ -4,7 +4,6 @@ using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Fody;
 using GameServerPlugin::DotBoxD.Kernels.Game.Plugin.Kernels;
 using Mono.Cecil;
-using Mono.Cecil.Cil;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Weaving;
 
@@ -24,15 +23,16 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
     }
 
     [Fact]
-    public void GameServer_plugin_implicit_capture_interceptor_uses_weaved_field_access()
+    public void GameServer_plugin_interceptors_do_not_use_capture_helpers()
     {
         using var module = ModuleDefinition.ReadModule(typeof(GuardianKernel).Assembly.Location);
         var generatedType = module.GetType(DotBoxDInvokeAsyncWeaverNames.GeneratedInterceptorsFullName);
         Assert.NotNull(generatedType);
 
         Assert.Contains(generatedType.Methods, method =>
-            method.Name == DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName);
-        Assert.Contains(generatedType.Methods, method =>
+            method.Name.StartsWith(DotBoxDInvokeAsyncWeaverNames.InvokeAsyncMethodPrefix, StringComparison.Ordinal));
+        Assert.DoesNotContain(generatedType.Methods, method =>
+            method.Name == DotBoxDInvokeAsyncWeaverNames.ReadCaptureMethodName ||
             method.Name == DotBoxDInvokeAsyncWeaverNames.WriteCaptureMethodName);
 
         var moveNextMethods = generatedType.NestedTypes
@@ -44,16 +44,6 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
         Assert.NotEmpty(moveNextMethods);
 
         Assert.Empty(moveNextMethods.SelectMany(CaptureHelperCalls));
-        var fieldAccesses = moveNextMethods.SelectMany(CaptureFieldAccesses).ToArray();
-        Assert.Contains(fieldAccesses, access =>
-            access.Code == Code.Ldfld && access.Field.Name == "implicitMonsterId");
-        Assert.Contains(fieldAccesses, access =>
-            access.Code == Code.Stfld && access.Field.Name == "implicitLastHealth");
-
-        var closureType = module.GetType("DotBoxD.Kernels.Game.Plugin.Program")!
-            .NestedTypes
-            .Single(type => type.Fields.Any(field => field.Name == "implicitMonsterId"));
-        Assert.True(closureType.IsNestedAssembly);
     }
 
     private static IEnumerable<MethodReference> CaptureHelperCalls(MethodDefinition method)
@@ -64,18 +54,6 @@ public sealed class InvokeAsyncImplicitCaptureWeaverTests
                 IsCaptureHelper(candidate))
             {
                 yield return candidate;
-            }
-        }
-    }
-
-    private static IEnumerable<(Code Code, FieldReference Field)> CaptureFieldAccesses(MethodDefinition method)
-    {
-        foreach (var instruction in method.Body.Instructions)
-        {
-            if (instruction is { Operand: FieldReference field } &&
-                field.DeclaringType.FullName.Contains("<>c__DisplayClass", StringComparison.Ordinal))
-            {
-                yield return (instruction.OpCode.Code, field);
             }
         }
     }

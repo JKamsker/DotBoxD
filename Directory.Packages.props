@@ -14,6 +14,7 @@
 
     <!-- Serialization (aligned across both families) -->
     <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="MessagePackAnalyzer" Version="3.1.7" />
 
     <!-- Roslyn. Central = 4.8.0 so the shipped generators load in the widest range of
          consumer SDKs. Test/host projects that need newer APIs use VersionOverride

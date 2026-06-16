@@ -11,7 +11,6 @@ public sealed class PluginAnalyzerPluginIdTests
 
     [Theory]
     [InlineData("\"\"")]
-    [InlineData("null")]
     public void Generator_reports_empty_game_plugin_id(string pluginId)
     {
         var result = RunGenerator($$"""
@@ -34,6 +33,32 @@ public sealed class PluginAnalyzerPluginIdTests
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Fact]
+    public void Generator_derives_missing_game_plugin_id_from_kernel_name()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            [Plugin(null)]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, "message");
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains(result.GeneratedTrees, tree =>
+            tree.GetText().ToString().Contains("\"damage\"", StringComparison.Ordinal));
     }
 
     private static GeneratorDriverRunResult RunGenerator(string source)

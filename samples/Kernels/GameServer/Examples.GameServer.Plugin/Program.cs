@@ -48,7 +48,8 @@ internal static class Program
         await server.Monsters.Extend<BlinkKernel>();            // grafts onto IMonster handles (per-instance)
 
         // One direct domain call via a scoped handle — the id is captured by Get(id), so KillAsync omits it.
-        var killed = await server.Monsters.Get("monster-4").KillAsync();
+        var monster4 = server.Monsters.Get("monster-4");
+        var killed = await monster4.KillAsync();
         Console.WriteLine($"[plugin] Monsters.Get(monster-4).KillAsync() => {killed}.");
 
         // Tune a replaced kernel's live settings — strongly typed member setters, one atomic batch. Only

@@ -41,7 +41,8 @@ internal static class AdvancedUsage
         // ── InvokeAsync (a) plain probe — read-only, returns a value.
         var monsterHealth = await server.InvokeAsync(async (IGameWorldAccess world) =>
         {
-            var snapshot = await world.Monsters.Get("monster-2").SnapshotAsync();
+            var monster = world.Monsters.Get("monster-2");
+            var snapshot = await monster.SnapshotAsync();
             return snapshot.Health;
         });
         Console.WriteLine($"[plugin] InvokeAsync Get(monster-2).Snapshot.Health => {monsterHealth}.");
@@ -51,7 +52,8 @@ internal static class AdvancedUsage
         var probe = new MonsterProbeCapture { MonsterId = "monster-2" };
         var monsterName = await server.InvokeAsync(probe, async (IGameWorldAccess world, MonsterProbeCapture bag) =>
         {
-            var snapshot = await world.Monsters.Get(bag.MonsterId).SnapshotAsync();
+            var monster = world.Monsters.Get(bag.MonsterId);
+            var snapshot = await monster.SnapshotAsync();
             bag.LastHealth = snapshot.Health;
             return snapshot.Name;
         });

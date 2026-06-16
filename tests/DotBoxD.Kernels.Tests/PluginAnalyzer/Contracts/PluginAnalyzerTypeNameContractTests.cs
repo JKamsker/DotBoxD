@@ -42,6 +42,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GeneratedInterceptorsNamespace)] = "DotBoxD.Plugins.Generated",
 
             [nameof(TypeNames.PluginAttribute)] = TypeName(typeof(PluginAttribute)),
+            [nameof(TypeNames.EventKernelAttribute)] = TypeName(typeof(EventKernelAttribute)),
             [nameof(TypeNames.LiveSettingAttribute)] = TypeName(typeof(LiveSettingAttribute)),
             [nameof(TypeNames.EventKernelInterface)] = OriginalTypeName(typeof(IEventKernel<>), "TEvent"),
             [nameof(TypeNames.RangeAttribute)] = TypeName(typeof(RangeAttribute)),

@@ -1,9 +1,6 @@
 using System.Reflection;
 using DotBoxD.Abstractions;
 using DotBoxD.Kernels.Bindings;
-using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Sandbox;
-using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Hosting.Execution;
 
@@ -11,6 +8,7 @@ public static class HostServiceBindingExtensions
 {
     private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
+    private const string DotBoxDServiceAttributeType = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
 
     public static SandboxHostBuilder AddBindingsFrom<TService>(
         this SandboxHostBuilder builder,
@@ -21,7 +19,8 @@ public static class HostServiceBindingExtensions
         ArgumentNullException.ThrowIfNull(implementation);
 
         var visited = new HashSet<Type>();
-        AddServiceBindings(builder, typeof(TService), implementation, visited);
+        var registeredBindings = new HashSet<string>(StringComparer.Ordinal);
+        AddServiceBindings(builder, typeof(TService), implementation, visited, registeredBindings);
         return builder;
     }
 
@@ -29,7 +28,8 @@ public static class HostServiceBindingExtensions
         SandboxHostBuilder builder,
         Type serviceType,
         object implementation,
-        HashSet<Type> visited)
+        HashSet<Type> visited,
+        HashSet<string> registeredBindings)
     {
         if (!visited.Add(serviceType))
         {
@@ -43,6 +43,11 @@ public static class HostServiceBindingExtensions
                 continue;
             }
 
+            if (TryAddHandleServiceBindings(builder, serviceType, implementation, method, registeredBindings))
+            {
+                continue;
+            }
+
             var target = ResolveTargetMethod(serviceType, implementation.GetType(), method);
             var capability = target.GetCustomAttribute<HostCapabilityAttribute>();
             if (capability is null)
@@ -51,7 +56,10 @@ public static class HostServiceBindingExtensions
                     $"Host service method '{serviceType.FullName}.{method.Name}' must declare [HostCapability] on its implementation.");
             }
 
-            builder.AddBinding(CreateBinding(method, target, implementation, capability.Capability));
+            AddBinding(
+                builder,
+                registeredBindings,
+                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability.Capability));
         }
 
         foreach (var property in serviceType.GetProperties())
@@ -68,132 +76,61 @@ public static class HostServiceBindingExtensions
                     $"Host service property '{serviceType.FullName}.{property.Name}' returned null.");
             }
 
-            AddServiceBindings(builder, property.PropertyType, child, visited);
+            AddServiceBindings(builder, property.PropertyType, child, visited, registeredBindings);
         }
     }
 
-    private static BindingDescriptor CreateBinding(
-        MethodInfo interfaceMethod,
-        MethodInfo targetMethod,
-        object target,
-        string capability)
+    private static bool TryAddHandleServiceBindings(
+        SandboxHostBuilder builder,
+        Type parentServiceType,
+        object parentImplementation,
+        MethodInfo factoryMethod,
+        HashSet<string> registeredBindings)
     {
-        var payloadType = UnwrapReturnType(interfaceMethod.ReturnType);
-        var parameters = interfaceMethod.GetParameters()
-            .Select(parameter => KernelRpcMarshaller.SandboxTypeOf(parameter.ParameterType))
-            .ToArray();
-        var returnType = payloadType is null ? SandboxType.Unit : KernelRpcMarshaller.SandboxTypeOf(payloadType);
-        var effects = InferEffects(interfaceMethod, returnType);
-        var id = HostBindingRoute(interfaceMethod.DeclaringType!, interfaceMethod);
-        var safety = (effects & SandboxEffect.HostStateWrite) != SandboxEffect.None
-            ? BindingSafety.SideEffectingExternal
-            : BindingSafety.ReadOnlyExternal;
+        if (HostServiceBindingFactory.UnwrapReturnType(factoryMethod.ReturnType) is not { } handleServiceType ||
+            !HasDotBoxDServiceAttribute(handleServiceType))
+        {
+            return false;
+        }
 
-        return new BindingDescriptor(
-            id,
-            SemVersion.One,
-            parameters,
-            returnType,
-            effects,
-            capability,
-            BindingCostModel.Fixed(BaseFuel(returnType)),
-            AuditLevel.PerResource,
-            safety,
-            (context, args, cancellationToken) =>
-                InvokeAsync(context, args, cancellationToken, id, capability, effects, targetMethod, target, payloadType),
-            CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"),
-            GrantValidator: static (_, _) => { });
+        var targetFactory = ResolveTargetMethod(parentServiceType, parentImplementation.GetType(), factoryMethod);
+        foreach (var handleMethod in handleServiceType.GetMethods())
+        {
+            if (ShouldSkipMethod(handleMethod))
+            {
+                continue;
+            }
+
+            var capability = handleMethod.GetCustomAttribute<HostCapabilityAttribute>();
+            if (capability is null)
+            {
+                throw new InvalidOperationException(
+                    $"Host service handle method '{handleServiceType.FullName}.{handleMethod.Name}' must declare [HostCapability].");
+            }
+
+            AddBinding(
+                builder,
+                registeredBindings,
+                HostServiceBindingFactory.CreateHandleBinding(
+                    factoryMethod,
+                    targetFactory,
+                    parentImplementation,
+                    handleMethod,
+                    capability.Capability));
+        }
+
+        return true;
     }
 
-    private static async ValueTask<SandboxValue> InvokeAsync(
-        SandboxContext context,
-        IReadOnlyList<SandboxValue> args,
-        CancellationToken cancellationToken,
-        string bindingId,
-        string capability,
-        SandboxEffect effects,
-        MethodInfo targetMethod,
-        object target,
-        Type? payloadType)
+    private static void AddBinding(
+        SandboxHostBuilder builder,
+        HashSet<string> registeredBindings,
+        BindingDescriptor descriptor)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var startedAt = DateTimeOffset.UtcNow;
-        var values = ConvertArguments(targetMethod, args);
-        var result = targetMethod.Invoke(target, values);
-        var payload = await AwaitReturnAsync(result, targetMethod.ReturnType).ConfigureAwait(false);
-        WriteAudit(context, bindingId, capability, effects, startedAt, values);
-        return payloadType is null
-            ? SandboxValue.Unit
-            : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
-    }
-
-    private static object?[] ConvertArguments(MethodInfo targetMethod, IReadOnlyList<SandboxValue> args)
-    {
-        var parameters = targetMethod.GetParameters();
-        var values = new object?[parameters.Length];
-        for (var i = 0; i < parameters.Length; i++)
+        if (registeredBindings.Add(descriptor.Id))
         {
-            values[i] = KernelRpcMarshaller.FromSandboxValue(args[i], parameters[i].ParameterType);
+            builder.AddBinding(descriptor);
         }
-
-        return values;
-    }
-
-    private static async ValueTask<object?> AwaitReturnAsync(object? result, Type returnType)
-    {
-        if (returnType == typeof(void) || result is null)
-        {
-            return null;
-        }
-
-        if (returnType == typeof(ValueTask))
-        {
-            await ((ValueTask)result).ConfigureAwait(false);
-            return null;
-        }
-
-        if (returnType == typeof(Task))
-        {
-            await ((Task)result).ConfigureAwait(false);
-            return null;
-        }
-
-        if (IsGenericValueTask(returnType))
-        {
-            var task = (Task)returnType.GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(result, null)!;
-            await task.ConfigureAwait(false);
-            return task.GetType().GetProperty(nameof(Task<int>.Result))!.GetValue(task);
-        }
-
-        if (IsGenericTask(returnType))
-        {
-            var task = (Task)result;
-            await task.ConfigureAwait(false);
-            return task.GetType().GetProperty(nameof(Task<int>.Result))!.GetValue(task);
-        }
-
-        return result;
-    }
-
-    private static void WriteAudit(
-        SandboxContext context,
-        string bindingId,
-        string capability,
-        SandboxEffect effects,
-        DateTimeOffset startedAt,
-        IReadOnlyList<object?> values)
-    {
-        var resourceId = values.Count > 0 && values[0] is string id ? $"entity:{id}" : bindingId;
-        context.Audit.Write(new SandboxAuditEvent(
-            context.RunId,
-            "BindingCall",
-            startedAt,
-            true,
-            BindingId: bindingId,
-            CapabilityId: capability,
-            Effect: effects & (SandboxEffect.HostStateRead | SandboxEffect.HostStateWrite),
-            ResourceId: resourceId,
-            Fields: context.BindingAuditFields("host-service", startedAt)));
     }
 
     private static MethodInfo ResolveTargetMethod(Type interfaceType, Type implementationType, MethodInfo method)
@@ -235,57 +172,11 @@ public static class HostServiceBindingExtensions
            (string.Equals(t.FullName, ExtensibleControlType, StringComparison.Ordinal) ||
             string.Equals(t.FullName, ServiceControlType, StringComparison.Ordinal));
 
-    private static Type? UnwrapReturnType(Type type)
-    {
-        if (type == typeof(void) || type == typeof(Task) || type == typeof(ValueTask))
-        {
-            return null;
-        }
+    private static bool HasDotBoxDServiceAttribute(Type type)
+        => type.GetCustomAttributes(inherit: false)
+            .Any(attribute => string.Equals(
+                attribute.GetType().FullName,
+                DotBoxDServiceAttributeType,
+                StringComparison.Ordinal));
 
-        if ((IsGenericTask(type) || IsGenericValueTask(type)) && type.GetGenericArguments() is [var payload])
-        {
-            return payload;
-        }
-
-        return type;
-    }
-
-    private static bool IsGenericTask(Type type)
-        => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>);
-
-    private static bool IsGenericValueTask(Type type)
-        => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTask<>);
-
-    private static SandboxEffect InferEffects(MethodInfo method, SandboxType returnType)
-    {
-        var effects = SandboxEffect.Cpu;
-        if (ReturnAllocates(returnType))
-        {
-            effects |= SandboxEffect.Alloc;
-        }
-
-        return IsWriteMethod(method)
-            ? effects | SandboxEffect.HostStateWrite
-            : effects | SandboxEffect.HostStateRead;
-    }
-
-    private static bool IsWriteMethod(MethodInfo method)
-        => method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Set", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Update", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Add", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Remove", StringComparison.Ordinal);
-
-    private static bool ReturnAllocates(SandboxType type)
-        => type != SandboxType.Unit &&
-           type != SandboxType.Bool &&
-           type != SandboxType.I32 &&
-           type != SandboxType.I64 &&
-           type != SandboxType.F64;
-
-    private static long BaseFuel(SandboxType returnType) => ReturnAllocates(returnType) ? 3 : 2;
-
-    private static string HostBindingRoute(Type type, MethodInfo method)
-        => "host." + (type.Namespace is null ? type.Name : type.Namespace + "." + type.Name) + "." + method.Name;
 }

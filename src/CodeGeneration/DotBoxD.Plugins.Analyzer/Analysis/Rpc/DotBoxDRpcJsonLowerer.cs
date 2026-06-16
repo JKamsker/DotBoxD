@@ -20,6 +20,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly ICollection<string> _capabilities;
     private readonly ICollection<string> _effects;
     private readonly CancellationToken _cancellationToken;
+    private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? _assignmentOverride;
     private IReadOnlyList<string> _returnRecordFields = [];
     private string? _returnRecordType;
@@ -41,6 +42,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
 
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
+
+    internal void AddServiceHandleLocal(string name, string handleIdJson)
+        => _serviceHandleLocals[name] = handleIdJson;
 
     internal string LowerBody(
         BlockSyntax block,
@@ -122,8 +126,30 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException("Server extension locals must be initialized.");
             }
 
-            output.Add(SetStatement(declarator.Identifier.ValueText, LowerExpression(initializer.Value)));
+            var localName = declarator.Identifier.ValueText;
+            if (TryLowerServiceHandleLocal(localName, initializer.Value, output))
+            {
+                continue;
+            }
+
+            output.Add(SetStatement(localName, LowerExpression(initializer.Value)));
         }
+    }
+
+    private bool TryLowerServiceHandleLocal(string localName, ExpressionSyntax value, List<string> output)
+    {
+        if (value is not InvocationExpressionSyntax invocation ||
+            _model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
+            !HasDotBoxDServiceAttribute(method.ReturnType) ||
+            invocation.ArgumentList.Arguments.Count == 0)
+        {
+            return false;
+        }
+
+        var handleId = LowerExpression(invocation.ArgumentList.Arguments[0].Expression);
+        _serviceHandleLocals[localName] = handleId;
+        output.Add(SetStatement(localName, handleId));
+        return true;
     }
 
     private string LowerExpressionStatement(ExpressionSyntax expression)
@@ -144,6 +170,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 return SetStatement(inc.Identifier.ValueText, BinaryJson(op, Var(inc.Identifier.ValueText), I32(1)));
             case InvocationExpressionSyntax invocation when TryLowerListAdd(invocation) is { } listAdd:
                 return listAdd;
+            case InvocationExpressionSyntax invocation:
+                return SetStatement("__sir_discard" + _tempCounter++, LowerExpression(invocation));
+            case AwaitExpressionSyntax { Expression: InvocationExpressionSyntax invocation }:
+                return SetStatement("__sir_discard" + _tempCounter++, LowerExpression(invocation));
             default:
                 throw new NotSupportedException($"Server extension statement expression '{expression}' is not supported.");
         }

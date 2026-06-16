@@ -1,6 +1,10 @@
 using DotBoxD.Kernels.Game.Plugin;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
 using DotBoxD.Kernels.Game.Server.Abstractions;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Hosting.Execution;
+using DotBoxD.Abstractions;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Kernel;
 
@@ -104,6 +108,39 @@ public sealed class RemotePluginServerBuilderTests
     }
 
     [Fact]
+    public async Task Generated_handle_extensions_send_receiver_id()
+    {
+        var control = new RecordingGamePluginControlService
+        {
+            RpcResponse = KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.Int32(11))
+        };
+        using var server = GamePluginServerBuilder.FromConnection(control, new FakeWorld()).Build();
+
+        await server.Monsters.Extend<BlinkKernel>();
+        var target = await server.Monsters.Get("monster-4").BlinkBehindAsync("player-1");
+
+        Assert.Equal(11, target);
+        Assert.Equal("blink", control.LastRpcPluginId);
+        Assert.Equal(["monster-4", "player-1"], DecodeRequestedStrings(control.LastRpcArguments));
+    }
+
+    [Fact]
+    public async Task Real_server_installs_handle_grafted_extension_package()
+    {
+        using var pluginServer = PluginServer.Create(
+            configureHost: host => host.AddBindingsFrom<IGameWorldAccess>(new FakeWorld()));
+        using var session = pluginServer.CreateSession();
+        var package = KernelPackageRegistry.Resolve<BlinkKernel>();
+        var policy = GrantRequiredCapabilities(pluginServer.GetRequiredCapabilities(package));
+
+        var kernel = await session.InstallServerExtensionAsync(package, policy)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("blink", kernel.Manifest.PluginId);
+    }
+
+    [Fact]
     public async Task FromPipeName_defers_pipe_validation_until_StartAsync()
     {
         await using var server = GamePluginServerBuilder.FromPipeName("unsafe").Build();
@@ -148,7 +185,7 @@ public sealed class RemotePluginServerBuilderTests
         using var server = new GamePluginServer(control, new FakeWorld());
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => server.InvokeAsync(async world => await world.Entities.GetHealthAsync("monster-1")));
+            () => server.InvokeAsync(async world => await world.Entities.Get("monster-1").GetHealthAsync()));
 
         Assert.Contains("must be intercepted", ex.Message, StringComparison.Ordinal);
     }
@@ -185,6 +222,25 @@ public sealed class RemotePluginServerBuilderTests
     private static string[] DecodeRequestedMonsterIds(byte[] arguments)
         => KernelRpcBinaryCodec.DecodeArguments(arguments)[0].Items.Select(item => item.TextValue).ToArray();
 
+    private static string[] DecodeRequestedStrings(byte[] arguments)
+        => KernelRpcBinaryCodec.DecodeArguments(arguments).Select(item => item.TextValue).ToArray();
+
+    private static SandboxPolicy GrantRequiredCapabilities(IReadOnlyList<string> capabilities)
+    {
+        var builder = SandboxPolicyBuilder.Create()
+            .WithFuel(100_000)
+            .WithMaxHostCalls(1_000);
+        foreach (var capability in capabilities)
+        {
+            var effect = capability.Contains(".write.", StringComparison.Ordinal)
+                ? SandboxEffect.HostStateWrite
+                : SandboxEffect.HostStateRead;
+            builder.Grant(capability, new { }, effect);
+        }
+
+        return builder.Build();
+    }
+
     private sealed class FakeWorld : IGameWorldAccess
     {
         public FakeWorld()
@@ -202,6 +258,7 @@ public sealed class RemotePluginServerBuilderTests
     {
         public IMonster Get(string entityId) => new FakeMonster(entityId);
 
+        [HostCapability("game.world.monster.read.kind")]
         public ValueTask<bool> IsMonsterAsync(string entityId)
             => ValueTask.FromResult(true);
     }

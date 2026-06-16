@@ -1,5 +1,3 @@
-using DotBoxD.Kernels.Game.Plugin.Authoring;
-
 namespace DotBoxD.Kernels.Game.Plugin.Kernels;
 
 /// <summary>
@@ -34,9 +32,15 @@ public sealed partial class BlinkKernel
     public async ValueTask<int> BlinkBehindAsync(string playerId, HookContext ctx)
     {
         // Root-world read (the player) + scoped-instance read/write (this monster) — no monster id passed.
-        var playerPosition = await _world.Entities.Get(playerId).GetPositionAsync();
+        var player = _world.Entities.Get(playerId);
+        var playerPosition = await player.GetPositionAsync();
         var threat = await _monster.GetThreatAsync();
-        var target = playerPosition - 1 - (threat > 7 ? 1 : 0);
+        var target = playerPosition - 1;
+        if (threat > 7)
+        {
+            target -= 1;
+        }
+
         await _monster.TeleportToAsync(target);
         return target;
     }

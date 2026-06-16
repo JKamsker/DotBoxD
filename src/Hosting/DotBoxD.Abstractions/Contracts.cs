@@ -5,9 +5,17 @@ namespace DotBoxD.Abstractions;
 using DotBoxD.Kernels;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class PluginAttribute(string id) : Attribute
+public sealed class PluginAttribute : Attribute
 {
-    public string Id { get; } = id;
+    public PluginAttribute(string id) => Id = id;
+
+    public string Id { get; }
+}
+
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class EventKernelAttribute(string? id = null) : Attribute
+{
+    public string? Id { get; } = id;
 }
 
 [AttributeUsage(AttributeTargets.Property)]
@@ -117,9 +125,17 @@ public sealed class ServerExtensionAttribute : Attribute
         ServiceType = serviceType;
     }
 
-    public string Id { get; }
+    public ServerExtensionAttribute(Type grafts, string? id = null)
+    {
+        Grafts = grafts;
+        Id = id;
+    }
+
+    public string? Id { get; }
 
     public Type? ServiceType { get; }
+
+    public Type? Grafts { get; }
 }
 
 /// <summary>
@@ -142,9 +158,9 @@ public sealed class ServerExtensionClientAttribute(Type receiverType, string? na
 /// is used; supply a custom name to make the receiver's domain API read naturally or avoid conflicts.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-public sealed class ServerExtensionMethodAttribute(Type receiverType, string? name = null) : Attribute
+public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
 {
-    public Type ReceiverType { get; } = receiverType;
+    public Type? ReceiverType { get; } = receiverType;
 
     public string? Name { get; } = name;
 }

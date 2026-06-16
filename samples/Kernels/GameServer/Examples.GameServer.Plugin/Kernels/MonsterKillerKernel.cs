@@ -1,5 +1,3 @@
-using DotBoxD.Kernels.Game.Plugin.Authoring;
-
 namespace DotBoxD.Kernels.Game.Plugin.Kernels;
 
 public readonly record struct MonsterKillResult(

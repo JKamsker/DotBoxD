@@ -7,19 +7,18 @@ namespace DotBoxD.Kernels.Game.Server;
 /// <summary>
 /// Per-kernel least-privilege policies. Every kernel gets logging, the example-defined
 /// <c>host.message.write</c> capability, and deterministic fuel/host-call budgets. A kernel whose server-side
-/// package analysis finds a <c>game.world.monster.read.*</c> / <c>game.world.entity.read.*</c> capability
-/// additionally receives the matching wildcard grant; a kernel that does not (the retaliation kernel) is not
-/// over-granted. The read grants cover <c>game.world.monster.read.kind</c> and
-/// <c>game.world.entity.read.health</c> but not <c>game.world.combat.threat</c> (<c>GetThreat</c>), so a
-/// kernel that reads threat is denied at install. Without the message-write grant, package preparation fails
-/// closed too. Server extensions get the same least-privilege treatment; the monster-killer batch kernel
-/// receives <c>game.world.monster.write.*</c> only because its verified IR declares the kill binding.
+/// package analysis finds a <c>game.world.monster.read.*</c>, <c>game.world.entity.read.*</c>, or combat-read
+/// capability additionally receives the matching grant; a kernel that does not (the retaliation kernel) is not
+/// over-granted. Without the message-write grant, package preparation fails closed too. Server extensions get the
+/// same least-privilege treatment; the monster-killer batch kernel receives <c>game.world.monster.write.*</c> only
+/// because its verified IR declares the kill binding.
 /// </summary>
 internal static class ServerPolicy
 {
     private const string MonsterReadPrefix = "game.world.monster.read.";
     private const string MonsterWritePrefix = "game.world.monster.write.";
     private const string EntityReadPrefix = "game.world.entity.read.";
+    private const string CombatThreat = "game.world.combat.threat";
 
     /// <summary>The base ceiling applied to a kernel with no extra capability needs.</summary>
     public static SandboxPolicy Create() => ForKernel([]);
@@ -48,6 +47,11 @@ internal static class ServerPolicy
         if (RequiresPrefix(requiredCapabilities, MonsterWritePrefix))
         {
             builder.Grant("game.world.monster.write.*", new { }, SandboxEffect.HostStateWrite);
+        }
+
+        if (requiredCapabilities.Contains(CombatThreat, StringComparer.Ordinal))
+        {
+            builder.Grant(CombatThreat, new { }, SandboxEffect.HostStateRead);
         }
 
         return builder.Build();

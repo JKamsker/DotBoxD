@@ -665,7 +665,7 @@ public class CodegenRegressionTests
     }
 
     [Fact]
-    public void SynchronousSubServiceReturn_ProducesDBXS002_AndDoesNotSerializeLiveInstance()
+    public void SynchronousSubServiceReturn_RegistersNestedServiceHandle()
     {
         const string source = """
             using DotBoxD.Services.Attributes;
@@ -690,22 +690,25 @@ public class CodegenRegressionTests
         var (final, runResult) = Run(source);
         AssertCompiles(final);
 
-        runResult.Diagnostics.Should().Contain(d => d.Id == "DBXS002" &&
-            d.GetMessage().Contains("synchronous sub-service returns are not supported"));
+        runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS002");
 
         var generated = runResult.Results.Single().GeneratedSources;
         var proxy = generated
             .Single(g => g.HintName == GeneratorTestHelper.HintName(
                 "Regress.SyncSubService", "IRoot", GeneratorTestHelper.GeneratedKind.Proxy))
             .SourceText.ToString();
-        proxy.Should().Contain("throw new global::System.NotSupportedException");
+        proxy.Should().Contain("return new global::Regress.SyncSubService.SubProxy(this._invoker, __dotboxd_handle.InstanceId);");
 
         var dispatcher = generated
             .Single(g => g.HintName == GeneratorTestHelper.HintName(
                 "Regress.SyncSubService", "IRoot", GeneratorTestHelper.GeneratedKind.Dispatcher))
             .SourceText.ToString();
-        dispatcher.Should().NotContain("case \"GetSub\":");
-        dispatcher.Should().NotContain("SerializeToPayload");
+        dispatcher.Should().Contain("case \"GetSub\":");
+        dispatcher.Should().Contain("__subId = registry.Register(\"ISub\", __sub);");
+        dispatcher.Should().Contain("serializer.Serialize(output, new global::DotBoxD.Services.Protocol.ServiceHandle");
+
+        generated.Select(g => g.SourceText.ToString())
+            .Should().Contain(source => source.Contains("GeneratedReturnKind.SyncNestedService", StringComparison.Ordinal));
     }
 
     [Fact]

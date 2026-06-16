@@ -207,6 +207,16 @@ internal static class ServiceModelFactory
         foreach (var propertySymbol in interfaceProperties)
         {
             ct.ThrowIfCancellationRequested();
+            if (ServiceShapeValidator.IsInstanceIdProperty(propertySymbol))
+            {
+                properties.Add(new ServicePropertyModel(
+                    IdentifierHelpers.EscapeIdentifier(propertySymbol.Name),
+                    propertySymbol.Type.ToDisplayString(s_qualifiedFormat),
+                    ProxyType: null,
+                    IsInstanceId: true));
+                continue;
+            }
+
             if (propertySymbol.Type is not INamedTypeSymbol propertyType)
             {
                 continue;
@@ -217,7 +227,8 @@ internal static class ServiceModelFactory
             properties.Add(new ServicePropertyModel(
                 IdentifierHelpers.EscapeIdentifier(propertySymbol.Name),
                 propertyType.ToDisplayString(s_qualifiedFormat),
-                IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName)));
+                IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
+                IsInstanceId: false));
         }
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);

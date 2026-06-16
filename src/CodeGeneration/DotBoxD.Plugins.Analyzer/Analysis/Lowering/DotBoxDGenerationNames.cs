@@ -21,6 +21,7 @@ internal static class DotBoxDGenerationNames
         public const string GeneratedInterceptorsNamespace = "DotBoxD.Plugins.Generated";
 
         public const string PluginAttribute = "DotBoxD.Abstractions.PluginAttribute";
+        public const string EventKernelAttribute = "DotBoxD.Abstractions.EventKernelAttribute";
         public const string LiveSettingAttribute = "DotBoxD.Abstractions.LiveSettingAttribute";
         public const string EventKernelInterface = "DotBoxD.Abstractions.IEventKernel<TEvent>";
         public const string RangeAttribute = "System.ComponentModel.DataAnnotations.RangeAttribute";
@@ -98,6 +99,7 @@ internal static class DotBoxDGenerationNames
     public static class Metadata
     {
         public const string PluginAttribute = TypeNames.PluginAttribute;
+        public const string EventKernelAttribute = TypeNames.EventKernelAttribute;
         public const string LiveSettingAttribute = TypeNames.LiveSettingAttribute;
         public const string EventKernelInterface = TypeNames.EventKernelInterface;
         public const string RangeAttribute = TypeNames.RangeAttribute;

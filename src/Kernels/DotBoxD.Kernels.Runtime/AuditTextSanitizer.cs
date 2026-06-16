@@ -5,6 +5,28 @@ using System.Text.RegularExpressions;
 public static partial class AuditTextSanitizer
 {
     private const string Redacted = "[redacted]";
+    private const RegexOptions RedactionOptions =
+        RegexOptions.Compiled | RegexOptions.CultureInvariant;
+
+    private static readonly Regex AuthorizationHeaderRegex = new(
+        "(?i)(?<key>\\bauthorization\\s*[:=]\\s*)(?:(?<scheme>bearer|basic)\\s+)?(?<value>[^\\s,;]+)",
+        RedactionOptions);
+
+    private static readonly Regex SecretRegex = new(
+        "(?i)(?<key>\\b(?:password|passwd|pwd|secret|token|access[_-]?token|refresh[_-]?token|session[_-]?token|api[_-]?key|account[_-]?key|client[_-]?secret|private[_-]?key)\\s*[:=]\\s*)(?<value>[^\\s,;]+)",
+        RedactionOptions);
+
+    private static readonly Regex AuthSchemeRegex = new(
+        "(?i)\\b(?<scheme>bearer|basic)\\s+[A-Za-z0-9._~+/=-]+",
+        RedactionOptions);
+
+    private static readonly Regex UriCredentialRegex = new(
+        "(?<prefix>\\b[A-Za-z][A-Za-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@",
+        RedactionOptions);
+
+    private static readonly Regex SecretPathSegmentRegex = new(
+        "(?i)(^|[-_.])(authorization|bearer|credential|key|password|passwd|pwd|secret|session|signature|token)([-_.]|$)",
+        RedactionOptions);
 
     public static string SanitizeAndRedact(string message)
     {
@@ -23,14 +45,14 @@ public static partial class AuditTextSanitizer
         }
 
         var sanitized = new string(chars);
-        sanitized = UriCredentialPattern().Replace(sanitized, "${prefix}[redacted]@");
-        sanitized = AuthorizationHeaderPattern().Replace(
+        sanitized = UriCredentialRegex.Replace(sanitized, "${prefix}[redacted]@");
+        sanitized = AuthorizationHeaderRegex.Replace(
             sanitized,
             match => match.Groups["key"].Value +
                      (match.Groups["scheme"].Success ? match.Groups["scheme"].Value + " " : "") +
                      "[redacted]");
-        sanitized = SecretPattern().Replace(sanitized, match => match.Groups["key"].Value + "[redacted]");
-        return AuthSchemePattern().Replace(
+        sanitized = SecretRegex.Replace(sanitized, match => match.Groups["key"].Value + "[redacted]");
+        return AuthSchemeRegex.Replace(
             sanitized,
             match => match.Groups["scheme"].Value + " " + Redacted);
     }
@@ -84,21 +106,6 @@ public static partial class AuditTextSanitizer
             return false;
         }
 
-        return SecretPathSegmentPattern().IsMatch(normalized);
+        return SecretPathSegmentRegex.IsMatch(normalized);
     }
-
-    [GeneratedRegex("(?i)(?<key>\\bauthorization\\s*[:=]\\s*)(?:(?<scheme>bearer|basic)\\s+)?(?<value>[^\\s,;]+)")]
-    private static partial Regex AuthorizationHeaderPattern();
-
-    [GeneratedRegex("(?i)(?<key>\\b(?:password|passwd|pwd|secret|token|access[_-]?token|refresh[_-]?token|session[_-]?token|api[_-]?key|account[_-]?key|client[_-]?secret|private[_-]?key)\\s*[:=]\\s*)(?<value>[^\\s,;]+)")]
-    private static partial Regex SecretPattern();
-
-    [GeneratedRegex("(?i)\\b(?<scheme>bearer|basic)\\s+[A-Za-z0-9._~+/=-]+")]
-    private static partial Regex AuthSchemePattern();
-
-    [GeneratedRegex("(?<prefix>\\b[A-Za-z][A-Za-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")]
-    private static partial Regex UriCredentialPattern();
-
-    [GeneratedRegex("(?i)(^|[-_.])(authorization|bearer|credential|key|password|passwd|pwd|secret|session|signature|token)([-_.]|$)")]
-    private static partial Regex SecretPathSegmentPattern();
 }

@@ -52,7 +52,8 @@ internal static class PluginServerFacadeModelFactory
             TypeName(worldType),
             TypeName(controlServiceType),
             "global::" + controlNs + ".LiveSettingUpdate",
-            new EquatableArray<PluginServerForwardedMethod>(ResolveMethods(worldType, cancellationToken)),
+            new EquatableArray<PluginServerForwardedMethod>(
+                ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
             new EquatableArray<PluginServerControlProperty>(controls));
     }
 
@@ -101,7 +102,9 @@ internal static class PluginServerFacadeModelFactory
                 property.Name,
                 TypeName(propertyType),
                 property.Name + "PluginControl",
-                new EquatableArray<PluginServerForwardedMethod>(ResolveMethods(propertyType, cancellationToken))));
+                new EquatableArray<PluginServerForwardedMethod>(
+                    ResolveMethods(propertyType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
+                new EquatableArray<PluginServerServiceWrapper>(ResolveServiceWrappers(propertyType, cancellationToken))));
         }
 
         return controls.ToArray();
@@ -109,10 +112,11 @@ internal static class PluginServerFacadeModelFactory
 
     private static PluginServerForwardedMethod[] ResolveMethods(
         INamedTypeSymbol controlType,
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
         CancellationToken cancellationToken)
     {
         var methods = new List<PluginServerForwardedMethod>();
-        foreach (var member in controlType.GetMembers())
+        foreach (var member in MembersIncludingInherited(controlType))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (member is IMethodSymbol
@@ -123,14 +127,76 @@ internal static class PluginServerFacadeModelFactory
                 } method &&
                 !IsControlPlaneMember(method.ContainingType))
             {
+                var returnWrapperName = method.ReturnType is INamedTypeSymbol returnType &&
+                    HasAttribute(returnType, DotBoxDGenerationNames.Metadata.DotBoxDServiceAttribute)
+                        ? EnsureServiceWrapper(returnType, serviceWrappers, cancellationToken)
+                        : null;
                 methods.Add(new PluginServerForwardedMethod(
                     method.Name,
                     TypeName(method.ReturnType),
+                    returnWrapperName,
                     new EquatableArray<PluginServerParameter>(ResolveParameters(method))));
             }
         }
 
         return methods.ToArray();
+    }
+
+    private static PluginServerServiceWrapper[] ResolveServiceWrappers(
+        INamedTypeSymbol controlType,
+        CancellationToken cancellationToken)
+    {
+        var serviceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
+        ResolveMethods(controlType, serviceWrappers, cancellationToken);
+        return serviceWrappers.Values
+            .Select(static wrapper => new PluginServerServiceWrapper(
+                wrapper.Type,
+                wrapper.WrapperName,
+                new EquatableArray<PluginServerForwardedProperty>(wrapper.Properties.ToArray()),
+                new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
+            .ToArray();
+    }
+
+    private static string EnsureServiceWrapper(
+        INamedTypeSymbol serviceType,
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
+        CancellationToken cancellationToken)
+    {
+        var typeName = TypeName(serviceType);
+        if (serviceWrappers.TryGetValue(typeName, out var existing))
+        {
+            return existing.WrapperName;
+        }
+
+        var wrapper = new ServiceWrapperBuilder(typeName, ServiceWrapperName(serviceType));
+        serviceWrappers.Add(typeName, wrapper);
+        PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
+        return wrapper.WrapperName;
+    }
+
+    private static void PopulateServiceWrapper(
+        INamedTypeSymbol serviceType,
+        ServiceWrapperBuilder wrapper,
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
+        CancellationToken cancellationToken)
+    {
+        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var member in MembersIncludingInherited(serviceType))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (member is IPropertySymbol
+                {
+                    IsStatic: false,
+                    GetMethod: not null,
+                    SetMethod: null
+                } property &&
+                seenProperties.Add(property.Name))
+            {
+                wrapper.Properties.Add(new PluginServerForwardedProperty(property.Name, TypeName(property.Type)));
+            }
+        }
+
+        wrapper.Methods.AddRange(ResolveMethods(serviceType, serviceWrappers, cancellationToken));
     }
 
     private static PluginServerParameter[] ResolveParameters(IMethodSymbol method)
@@ -165,6 +231,33 @@ internal static class PluginServerFacadeModelFactory
                string.Equals(name, ExtensibleControlType, StringComparison.Ordinal);
     }
 
+    private static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
+    {
+        foreach (var inherited in type.AllInterfaces.Reverse())
+        {
+            foreach (var member in inherited.GetMembers())
+            {
+                yield return member;
+            }
+        }
+
+        foreach (var member in type.GetMembers())
+        {
+            yield return member;
+        }
+    }
+
+    private static string ServiceWrapperName(INamedTypeSymbol serviceType)
+    {
+        var name = serviceType.Name;
+        if (name.StartsWith("I", StringComparison.Ordinal) && name.Length > 1 && char.IsUpper(name[1]))
+        {
+            name = name.Substring(1);
+        }
+
+        return name + "PluginService";
+    }
+
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
@@ -175,4 +268,12 @@ internal static class PluginServerFacadeModelFactory
             Microsoft.CodeAnalysis.Accessibility.Internal => "internal",
             _ => "internal"
         };
+
+    private sealed class ServiceWrapperBuilder(string type, string wrapperName)
+    {
+        public string Type { get; } = type;
+        public string WrapperName { get; } = wrapperName;
+        public List<PluginServerForwardedProperty> Properties { get; } = [];
+        public List<PluginServerForwardedMethod> Methods { get; } = [];
+    }
 }

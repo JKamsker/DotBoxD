@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <PackageReference Include="MessagePack" />
+    <PackageReference Include="MessagePack" ExcludeAssets="analyzers" />
+    <PackageReference Include="MessagePackAnalyzer" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

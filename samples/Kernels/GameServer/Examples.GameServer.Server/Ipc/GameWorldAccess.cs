@@ -38,6 +38,7 @@ internal sealed class GameMonsterControl : IMonsterControl
     public GameMonsterControl(Func<GameWorld> world)
         => _world = world ?? throw new ArgumentNullException(nameof(world));
 
+    [HostCapability("game.world.monster.read.handle")]
     public IMonster Get(string entityId) => new GameMonster(_world, entityId);
 
     [HostCapability("game.world.monster.read.kind")]
@@ -96,6 +97,7 @@ internal sealed class GameEntityControl : IEntityControl
     public GameEntityControl(Func<GameWorld> world)
         => _world = world ?? throw new ArgumentNullException(nameof(world));
 
+    [HostCapability("game.world.entity.read.handle")]
     public IEntity Get(string entityId) => new GameEntity(_world, entityId);
 }
 

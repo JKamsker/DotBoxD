@@ -27,11 +27,6 @@ internal static class ReturnTypeClassifier
     {
         ct.ThrowIfCancellationRequested();
 
-        if (IsDotBoxDServiceInterface(returnType, ct))
-        {
-            return "synchronous sub-service returns are not supported; return Task<TService> or ValueTask<TService>";
-        }
-
         if (!TryGetAsyncPayloadType(returnType, out var payloadType) ||
             !IsDotBoxDServiceInterface(payloadType, ct))
         {
@@ -172,6 +167,12 @@ internal static class ReturnTypeClassifier
         }
 
         unwrappedReturnType = returnType.ToDisplayString(s_qualifiedFormat);
+        if (TryGetSubServiceInfo(returnType, ct, out var syncSubService))
+        {
+            subService = syncSubService;
+            return MethodReturnKind.SyncSubService;
+        }
+
         return MethodReturnKind.Sync;
     }
 

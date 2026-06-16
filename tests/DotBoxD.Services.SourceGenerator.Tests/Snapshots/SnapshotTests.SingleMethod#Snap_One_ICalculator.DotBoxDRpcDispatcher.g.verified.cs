@@ -9,7 +9,11 @@ namespace Snap.One
     /// </summary>
     public sealed class CalculatorDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.One.ICalculator _service;
+        private readonly global::Snap.One.ICalculator? _service;
+
+        internal CalculatorDispatcher()
+        {
+        }
 
         public CalculatorDispatcher(global::Snap.One.ICalculator service)
         {
@@ -25,12 +29,17 @@ namespace Snap.One
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'ICalculator' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "AddAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
-                    var __dotboxd_task = _service.AddAsync(args.Item1, args.Item2);
+                    var __dotboxd_task = __service.AddAsync(args.Item1, args.Item2);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;

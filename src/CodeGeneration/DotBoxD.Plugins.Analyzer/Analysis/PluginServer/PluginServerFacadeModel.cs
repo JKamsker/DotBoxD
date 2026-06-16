@@ -16,12 +16,22 @@ internal sealed record PluginServerControlProperty(
     string Name,
     string Type,
     string WrapperName,
-    EquatableArray<PluginServerForwardedMethod> Methods);
+    EquatableArray<PluginServerForwardedMethod> Methods,
+    EquatableArray<PluginServerServiceWrapper> ServiceWrappers);
 
 internal sealed record PluginServerForwardedMethod(
     string Name,
     string ReturnType,
+    string? ReturnWrapperName,
     EquatableArray<PluginServerParameter> Parameters);
+
+internal sealed record PluginServerForwardedProperty(string Name, string Type);
+
+internal sealed record PluginServerServiceWrapper(
+    string Type,
+    string WrapperName,
+    EquatableArray<PluginServerForwardedProperty> Properties,
+    EquatableArray<PluginServerForwardedMethod> Methods);
 
 internal sealed record PluginServerParameter(string Name, string Type);
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
@@ -131,15 +132,24 @@ internal static class ServiceShapeValidator
                 $"interface property '{property.Name}' is not supported; DotBoxD service properties must be public get-only sub-service controls");
         }
 
+        if (IsInstanceIdProperty(property))
+        {
+            return null;
+        }
+
         if (!ReturnTypeClassifier.TryGetSubServiceInfo(property.Type, CancellationToken.None, out _))
         {
             return CreateDiagnostic(
                 property,
-                $"interface property '{property.Name}' is not supported; DotBoxD service properties must return a [DotBoxDService] interface");
+                $"interface property '{property.Name}' is not supported; DotBoxD service properties must return a [DotBoxDService] interface or be the string Id of an instance handle");
         }
 
         return null;
     }
+
+    internal static bool IsInstanceIdProperty(IPropertySymbol property) =>
+        string.Equals(property.Name, "Id", StringComparison.Ordinal) &&
+        property.Type.SpecialType == SpecialType.System_String;
 
     private static bool IsControlPlaneMethod(IMethodSymbol method)
     {

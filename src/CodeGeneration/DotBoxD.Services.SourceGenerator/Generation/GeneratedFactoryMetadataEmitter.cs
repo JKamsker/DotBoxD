@@ -113,6 +113,7 @@ internal static class GeneratedFactoryMetadataEmitter
     {
         MethodReturnKind.Void => "Void",
         MethodReturnKind.Sync => "Sync",
+        MethodReturnKind.SyncSubService => "SyncNestedService",
         MethodReturnKind.Task => "Task",
         MethodReturnKind.TaskOf => "TaskOfT",
         MethodReturnKind.ValueTask => "ValueTask",

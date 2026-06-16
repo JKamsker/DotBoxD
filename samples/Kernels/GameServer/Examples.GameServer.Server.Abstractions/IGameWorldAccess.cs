@@ -1,3 +1,4 @@
+using DotBoxD.Abstractions;
 using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Kernels.Game.Server.Abstractions;
@@ -59,12 +60,15 @@ public interface IEntity
     string Id { get; }
 
     /// <summary>The entity's current hit points (0 if unknown or defeated).</summary>
+    [HostCapability("game.world.entity.read.health")]
     ValueTask<int> GetHealthAsync();
 
     /// <summary>The entity's level (0 if unknown).</summary>
+    [HostCapability("game.world.entity.read.level")]
     ValueTask<int> GetLevelAsync();
 
     /// <summary>The entity's 1D world position (0 if unknown).</summary>
+    [HostCapability("game.world.entity.read.position")]
     ValueTask<int> GetPositionAsync();
 }
 
@@ -77,14 +81,18 @@ public interface IEntity
 public interface IMonster : IEntity
 {
     /// <summary>Immutable snapshot of this monster. An unknown/non-monster id yields an empty snapshot.</summary>
+    [HostCapability("game.world.monster.read.snapshot")]
     ValueTask<MonsterSnapshot> SnapshotAsync();
 
     /// <summary>Kills this monster and returns whether the world changed.</summary>
+    [HostCapability("game.world.monster.write.kill")]
     ValueTask<bool> KillAsync();
 
     /// <summary>This monster's combat threat rating (gated under its own capability subtree, server-side).</summary>
+    [HostCapability("game.world.combat.threat")]
     ValueTask<int> GetThreatAsync();
 
     /// <summary>Moves this monster to a 1D world position.</summary>
+    [HostCapability("game.world.monster.write.position")]
     ValueTask TeleportToAsync(int position);
 }

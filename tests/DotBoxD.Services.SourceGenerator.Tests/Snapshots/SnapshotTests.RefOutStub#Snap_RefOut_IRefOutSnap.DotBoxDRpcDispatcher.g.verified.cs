@@ -9,7 +9,11 @@ namespace Snap.RefOut
     /// </summary>
     public sealed class RefOutSnapDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.RefOut.IRefOutSnap _service;
+        private readonly global::Snap.RefOut.IRefOutSnap? _service;
+
+        internal RefOutSnapDispatcher()
+        {
+        }
 
         public RefOutSnapDispatcher(global::Snap.RefOut.IRefOutSnap service)
         {
@@ -25,12 +29,17 @@ namespace Snap.RefOut
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IRefOutSnap' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "GoodAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
-                    var __dotboxd_task = _service.GoodAsync(arg);
+                    var __dotboxd_task = __service.GoodAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;

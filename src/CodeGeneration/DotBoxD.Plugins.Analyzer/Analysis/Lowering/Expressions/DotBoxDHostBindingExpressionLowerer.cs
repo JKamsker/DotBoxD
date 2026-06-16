@@ -15,6 +15,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// </summary>
 internal static class DotBoxDHostBindingExpressionLowerer
 {
+    private const string HostCapabilityAttribute = "DotBoxD.Abstractions.HostCapabilityAttribute";
+
     public static DotBoxDExpressionModel? TryLower(
         InvocationExpressionSyntax invocation,
         DotBoxDExpressionLoweringContext context,
@@ -119,10 +121,11 @@ internal static class DotBoxDHostBindingExpressionLowerer
             return null;
         }
 
+        var capability = HostCapability(method);
         return (
             HostBindingRoute(method.ContainingType, method),
-            null,
-            AutoEffectNames(method));
+            capability,
+            AutoEffectNames(method, capability));
     }
 
     private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
@@ -149,7 +152,23 @@ internal static class DotBoxDHostBindingExpressionLowerer
         return "host." + ns + type.MetadataName + "." + method.Name;
     }
 
-    private static IReadOnlyList<string> AutoEffectNames(IMethodSymbol method)
+    private static string? HostCapability(IMethodSymbol method)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), HostCapabilityAttribute, StringComparison.Ordinal) &&
+                attribute.ConstructorArguments.Length == 1 &&
+                attribute.ConstructorArguments[0].Value is string capability &&
+                !string.IsNullOrWhiteSpace(capability))
+            {
+                return capability;
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<string> AutoEffectNames(IMethodSymbol method, string? capability)
     {
         var effects = new List<string> { DotBoxDGenerationNames.Effects.Cpu };
         var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
@@ -158,25 +177,38 @@ internal static class DotBoxDHostBindingExpressionLowerer
             effects.Add(DotBoxDGenerationNames.Effects.Alloc);
         }
 
-        effects.Add(IsWriteMethod(method)
+        effects.Add(IsWriteMethod(method, capability)
             ? DotBoxDGenerationNames.Effects.HostStateWrite
             : DotBoxDGenerationNames.Effects.HostStateRead);
         return effects;
     }
 
-    private static bool IsWriteMethod(IMethodSymbol method)
-        => method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
+    private static bool IsWriteMethod(IMethodSymbol method, string? capability)
+        => capability?.Contains(".write.", StringComparison.Ordinal) == true ||
+           method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
            method.Name.StartsWith("Set", StringComparison.Ordinal) ||
            method.Name.StartsWith("Update", StringComparison.Ordinal) ||
            method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
            method.Name.StartsWith("Add", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Remove", StringComparison.Ordinal);
+           method.Name.StartsWith("Remove", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Move", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Teleport", StringComparison.Ordinal);
 
     private static bool ReturnAllocates(ITypeSymbol type)
-        => type.SpecialType == SpecialType.System_String ||
+        => !IsUnitTaskLike(type) &&
+           (type.SpecialType == SpecialType.System_String ||
            DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcTypeMapper.ListElementType(type) is not null ||
            type is INamedTypeSymbol named &&
-           DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcTypeMapper.IsRecordDto(named);
+           DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcTypeMapper.IsRecordDto(named));
+
+    private static bool IsUnitTaskLike(ITypeSymbol type)
+        => type is INamedTypeSymbol
+        {
+            IsGenericType: false,
+            Name: "Task" or "ValueTask",
+            ContainingNamespace: { } ns
+        } &&
+        string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
 
     /// <summary>
     /// The single-bit flag names set in a <c>SandboxEffect</c> attribute argument (e.g. "Cpu",

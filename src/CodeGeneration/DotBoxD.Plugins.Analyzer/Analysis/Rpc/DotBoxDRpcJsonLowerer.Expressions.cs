@@ -56,18 +56,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LowerInvocation(InvocationExpressionSyntax invocation)
     {
+        if (TryLowerServiceHandleInvocation(invocation) is { } serviceHandleCall)
+        {
+            return serviceHandleCall;
+        }
+
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is IMethodSymbol method &&
             DotBoxDHostBindingExpressionLowerer.HostBinding(method) is { } binding)
         {
-            if (binding.Capability is { Length: > 0 } capability)
-            {
-                _capabilities.Add(capability);
-            }
-
-            foreach (var effect in binding.Effects)
-            {
-                _effects.Add(effect);
-            }
+            AddBindingMetadata(binding);
 
             var args = new List<string>();
             foreach (var argument in invocation.ArgumentList.Arguments)
@@ -79,6 +76,42 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         throw new NotSupportedException($"Server extension call '{invocation}' is not a host binding.");
+    }
+
+    private string? TryLowerServiceHandleInvocation(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is not MemberAccessExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax receiver
+            } ||
+            !_serviceHandleLocals.TryGetValue(receiver.Identifier.ValueText, out var handleId) ||
+            _model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
+            DotBoxDHostBindingExpressionLowerer.HostBinding(method) is not { } binding)
+        {
+            return null;
+        }
+
+        AddBindingMetadata(binding);
+        var args = new List<string> { handleId };
+        foreach (var argument in invocation.ArgumentList.Arguments)
+        {
+            args.Add(LowerExpression(argument.Expression));
+        }
+
+        return Call(binding.BindingId, null, args.ToArray());
+    }
+
+    private void AddBindingMetadata((string BindingId, string? Capability, IReadOnlyList<string> Effects) binding)
+    {
+        if (binding.Capability is { Length: > 0 } capability)
+        {
+            _capabilities.Add(capability);
+        }
+
+        foreach (var effect in binding.Effects)
+        {
+            _effects.Add(effect);
+        }
     }
 
     private string LowerMemberAccess(MemberAccessExpressionSyntax member)
@@ -205,6 +238,22 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => _model.GetTypeInfo(expression, _cancellationToken).Type
            ?? throw new NotSupportedException($"Server extension could not resolve the type of '{expression}'.");
 
+    private static bool HasDotBoxDServiceAttribute(ITypeSymbol type)
+    {
+        foreach (var attribute in type.GetAttributes())
+        {
+            if (string.Equals(
+                attribute.AttributeClass?.ToDisplayString(),
+                "DotBoxD.Services.Attributes.DotBoxDServiceAttribute",
+                StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private string JsonBinaryOperator(BinaryExpressionSyntax binary)
         => binary.Kind() switch
         {
@@ -235,7 +284,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _ => throw new NotSupportedException($"Server extension literal '{value}' is not supported.")
         };
 
-    private static string Var(string name) => Obj(("var", Str(name)));
+    internal static string Var(string name) => Obj(("var", Str(name)));
 
     private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
 

@@ -53,6 +53,11 @@ internal static class ProxyGenerator
         foreach (var property in service.Properties.Array)
         {
             ct.ThrowIfCancellationRequested();
+            if (property.IsInstanceId)
+            {
+                continue;
+            }
+
             sb.AppendLine($"        private readonly {property.Type} {PropertyFieldName(property)};");
         }
         sb.AppendLine();
@@ -63,6 +68,11 @@ internal static class ProxyGenerator
         foreach (var property in service.Properties.Array)
         {
             ct.ThrowIfCancellationRequested();
+            if (property.IsInstanceId)
+            {
+                continue;
+            }
+
             sb.AppendLine($"            this.{PropertyFieldName(property)} = new {property.ProxyType}(client);");
         }
         sb.AppendLine("        }");
@@ -75,6 +85,11 @@ internal static class ProxyGenerator
         foreach (var property in service.Properties.Array)
         {
             ct.ThrowIfCancellationRequested();
+            if (property.IsInstanceId)
+            {
+                continue;
+            }
+
             sb.AppendLine($"            this.{PropertyFieldName(property)} = new {property.ProxyType}(client);");
         }
         sb.AppendLine("        }");
@@ -83,7 +98,14 @@ internal static class ProxyGenerator
         {
             ct.ThrowIfCancellationRequested();
             sb.AppendLine();
-            sb.AppendLine($"        public {property.Type} {property.Name} => this.{PropertyFieldName(property)};");
+            if (property.IsInstanceId)
+            {
+                sb.AppendLine($"        public {property.Type} {property.Name} => this._instanceId ?? string.Empty;");
+            }
+            else
+            {
+                sb.AppendLine($"        public {property.Type} {property.Name} => this.{PropertyFieldName(property)};");
+            }
         }
 
         foreach (var method in service.Methods.Array)

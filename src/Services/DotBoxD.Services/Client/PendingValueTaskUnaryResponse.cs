@@ -26,8 +26,9 @@ internal sealed class PendingValueTaskUnaryResponse<TResponse> :
 
     private PendingValueTaskUnaryResponse()
     {
-        // The no-timeout ValueTask fast path avoids the Task allocation by completing inline.
-        _source.RunContinuationsAsynchronously = false;
+        // Do not resume user code on the transport read loop. A continuation can make a synchronous
+        // RPC-facing call, and inline completion would block the same loop needed to deliver its response.
+        _source.RunContinuationsAsynchronously = true;
     }
 
     public int MessageId => _messageId;

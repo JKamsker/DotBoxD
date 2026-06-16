@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using DotBoxD.Kernels.Game.Plugin.Authoring;
 using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 
 namespace DotBoxD.Kernels.Game.Plugin.Kernels;
@@ -33,19 +32,30 @@ public sealed partial class GuardianKernel : IMonsterAggroService
     // Event hooks stay synchronous. Async world reads live in server extensions and InvokeAsync; aggro events
     // are only published for live monsters, so this gate can read event data directly.
     public bool ShouldHandle(MonsterAggroEvent e, HookContext ctx)
-        => IsBullyingLowLevelPlayer(e.MonsterLevel, e.PlayerLevel, e.Distance);
+        => IsBullyingLowLevelPlayer(
+            e.MonsterLevel,
+            e.PlayerLevel,
+            e.Distance,
+            LevelGap,
+            AggroRange,
+            ProtectMaxLevel);
 
     public void Handle(MonsterAggroEvent e, HookContext ctx)
-        => ctx.Messages.Send(e.MonsterId, $"calm:{e.PlayerId}:{CalmStrength}");
+        => ctx.Messages.Send(e.MonsterId, $"calm:{e.PlayerId}");
 
     /// <summary>
     /// Reusable, unit-testable gate factored out with <c>[KernelMethod]</c>: the generator inlines this body
-    /// into <see cref="ShouldHandle"/> and resolves the <c>[LiveSetting]</c> reads (<c>LevelGap</c> etc.)
-    /// directly, so the author passes only event data — no need to thread every live setting as an argument.
+    /// into <see cref="ShouldHandle"/> after the live-setting reads have been lowered at the call site.
     /// </summary>
     [KernelMethod]
-    public bool IsBullyingLowLevelPlayer(int monsterLevel, int playerLevel, int distance)
-        => monsterLevel - playerLevel >= LevelGap &&
-           distance <= AggroRange &&
-           playerLevel <= ProtectMaxLevel;
+    public static bool IsBullyingLowLevelPlayer(
+        int monsterLevel,
+        int playerLevel,
+        int distance,
+        int levelGap,
+        int aggroRange,
+        int protectMaxLevel)
+        => monsterLevel - playerLevel >= levelGap &&
+           distance <= aggroRange &&
+           playerLevel <= protectMaxLevel;
 }

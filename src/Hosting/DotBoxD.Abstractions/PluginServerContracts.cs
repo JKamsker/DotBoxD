@@ -59,6 +59,12 @@ public interface IServiceControl : IExtensibleControl
 public interface ILiveSettingsHandle<TKernel>
     where TKernel : class, new()
 {
+    ILiveSettingsHandle<TKernel> Set<TValue>(
+        System.Linq.Expressions.Expression<Func<TKernel, TValue>> member,
+        TValue value);
+
+    ValueTask ApplyAsync(bool atomic = false);
+
     ValueTask SetValuesAsync(Action<TKernel> set, bool atomic = false);
 }
 
@@ -91,4 +97,9 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 {
     string PluginId<TService>()
         where TService : class;
+}
+
+public interface IServerExtensionClientAccessor
+{
+    IServerExtensionClientRegistry ServerExtensions { get; }
 }
