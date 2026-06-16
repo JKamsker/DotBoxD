@@ -85,6 +85,7 @@ internal static class RpcKernelPackageValidator
             }
         }
 
+        PluginManifestCapabilityValidator.Validate(package.Manifest, plan, [entrypointId], diagnostics);
         ValidateLiveSettingSuffix(package.Manifest.LiveSettings, entrypoint, diagnostics);
         ThrowIfErrors(diagnostics);
     }

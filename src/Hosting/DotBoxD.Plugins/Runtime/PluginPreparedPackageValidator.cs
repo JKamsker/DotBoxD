@@ -28,6 +28,11 @@ internal static class PluginPreparedPackageValidator
         }
 
         ValidateAsyncCapability(package, plan, diagnostics);
+        PluginManifestCapabilityValidator.Validate(
+            package.Manifest,
+            plan,
+            [package.Entrypoints.ShouldHandle, package.Entrypoints.Handle],
+            diagnostics);
         var contractEvent = ValidateContract(package, diagnostics);
         ValidatePreparedEntrypoints(package, plan, events, contractEvent, diagnostics);
         ThrowIfErrors(diagnostics);
