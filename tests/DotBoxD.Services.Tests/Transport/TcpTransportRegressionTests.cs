@@ -181,6 +181,26 @@ public sealed class TcpTransportRegressionTests
     }
 
     [Fact]
+    public async Task StopAsync_PreCancelledToken_DoesNotStopListener()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
+        await server.StartAsync();
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => server.StopAsync(cts.Token));
+
+        using var client = new TcpClient();
+        var acceptTask = server.AcceptAsync();
+        await client.ConnectAsync(IPAddress.Loopback, port);
+        await using var accepted = await acceptTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(accepted.IsConnected);
+    }
+
+    [Fact]
     public async Task SendAsync_RejectsMismatchedFrameLength()
     {
         await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
