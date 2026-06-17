@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DotBoxD.Kernels.Serialization.Json.Schema;
+using DotBoxD.Kernels.Tests.Compiled.Regression.SchemaDrift;
 using DotBoxD.Plugins.Json;
 
 namespace DotBoxD.Kernels.Tests.Compiled.Regression;
@@ -19,8 +20,8 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 /// <list type="bullet">
 ///   <item>the artifacts exist on disk, are valid versioned JSON Schema, and are exposed via the
 ///   public API;</item>
-///   <item>the schema's allowed-property lists stay synchronized with the importer's strict
-///   <c>RequireAllowedProperties</c> lists (the drift guard from the finding's release-gate idea).</item>
+///   <item>the schema's strict object shapes stay synchronized with the importer's
+///   <c>RequireAllowedProperties</c> lists and required/discriminator constraints.</item>
 /// </list>
 /// </summary>
 public sealed class Fix_CMP_0012_Tests
@@ -96,10 +97,13 @@ public sealed class Fix_CMP_0012_Tests
     [InlineData(ModuleSchemaRelative, ImporterRelative, "function", new[] { "id", "visibility", "parameters", "returnType", "body" })]
     [InlineData(ModuleSchemaRelative, ImporterRelative, "parameter", new[] { "name", "type" })]
     [InlineData(ModuleSchemaRelative, ImporterRelative, "set statement", new[] { "op", "name", "value" })]
+    [InlineData(ModuleSchemaRelative, ImporterRelative, "return statement", new[] { "op", "value" })]
+    [InlineData(ModuleSchemaRelative, ImporterRelative, "expression statement", new[] { "op", "value" })]
     [InlineData(ModuleSchemaRelative, ImporterRelative, "if statement", new[] { "op", "condition", "then", "else" })]
     [InlineData(ModuleSchemaRelative, ImporterRelative, "while statement", new[] { "op", "condition", "body" })]
     [InlineData(ModuleSchemaRelative, ImporterRelative, "forRange statement", new[] { "op", "local", "start", "end", "body" })]
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "type", new[] { "name", "arguments" })]
+    [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "variable expression", new[] { "var" })]
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "call expression", new[] { "call", "args", "genericType" })]
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "unary expression", new[] { "unary", "operand" })]
     [InlineData(ModuleSchemaRelative, ExpressionReaderRelative, "binary expression", new[] { "op", "left", "right" })]
@@ -124,13 +128,15 @@ public sealed class Fix_CMP_0012_Tests
             $"Importer allowed-property list for '{requirementName}' ({sourceRelative}) drifted from the " +
             $"schema contract. Importer: [{string.Join(", ", importerAllowed)}]. Schema/test: [{string.Join(", ", expectedAllowed)}].");
 
-        // 2. The schema must declare exactly the same property set for this object, so a consumer
-        //    validating against the artifact accepts and rejects the same envelope as the importer.
-        var schemaProperties = SchemaPropertyNamesFor(schemaRelative, expectedAllowed);
+        // 2. The schema must declare the same strict object contract, so a consumer validating
+        //    against the artifact accepts and rejects the same envelope as the importer.
+        var schemaFailures = JsonSchemaDriftGuard.SemanticDriftMessages(
+            File.ReadAllText(RepositoryPath(schemaRelative)),
+            JsonSchemaContractCatalog.ForImporterShape(requirementName, expectedAllowed));
         Assert.True(
-            SameSet(schemaProperties, expectedAllowed),
-            $"JSON schema '{schemaRelative}' allowed properties for '{requirementName}' drifted from the " +
-            $"importer. Schema: [{string.Join(", ", schemaProperties)}]. Importer: [{string.Join(", ", expectedAllowed)}].");
+            schemaFailures.Count == 0,
+            $"JSON schema '{schemaRelative}' strict shape for '{requirementName}' drifted from the importer. " +
+            string.Join(" ", schemaFailures));
     }
 
     /// <summary>
@@ -151,67 +157,6 @@ public sealed class Fix_CMP_0012_Tests
         return Regex.Matches(match.Groups["props"].Value, "\"(?<name>[^\"]+)\"")
             .Select(m => m.Groups["name"].Value)
             .ToList();
-    }
-
-    /// <summary>
-    /// Finds, anywhere in the schema document, the object whose <c>properties</c> map exactly covers
-    /// the expected property names and returns that property set. Anchoring on the expected set keeps
-    /// the lookup independent of where the object is declared in the schema ($defs vs inline).
-    /// </summary>
-    private static IReadOnlyList<string> SchemaPropertyNamesFor(string schemaRelative, string[] expectedAllowed)
-    {
-        var json = File.ReadAllText(RepositoryPath(schemaRelative));
-        using var document = JsonDocument.Parse(json);
-        var expected = expectedAllowed.OrderBy(name => name, StringComparer.Ordinal).ToArray();
-
-        var best = FindMatchingPropertySet(document.RootElement, expected);
-        Assert.True(
-            best is not null,
-            $"No object in {schemaRelative} declares a 'properties' map matching [{string.Join(", ", expectedAllowed)}].");
-        return best!;
-    }
-
-    private static IReadOnlyList<string>? FindMatchingPropertySet(JsonElement element, string[] expected)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                if (element.TryGetProperty("properties", out var properties) &&
-                    properties.ValueKind == JsonValueKind.Object)
-                {
-                    var names = properties.EnumerateObject().Select(p => p.Name).ToArray();
-                    if (SameSet(names, expected))
-                    {
-                        return names;
-                    }
-                }
-
-                foreach (var child in element.EnumerateObject())
-                {
-                    var found = FindMatchingPropertySet(child.Value, expected);
-                    if (found is not null)
-                    {
-                        return found;
-                    }
-                }
-
-                return null;
-
-            case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray())
-                {
-                    var found = FindMatchingPropertySet(item, expected);
-                    if (found is not null)
-                    {
-                        return found;
-                    }
-                }
-
-                return null;
-
-            default:
-                return null;
-        }
     }
 
     private static bool SameSet(IEnumerable<string> left, IEnumerable<string> right)

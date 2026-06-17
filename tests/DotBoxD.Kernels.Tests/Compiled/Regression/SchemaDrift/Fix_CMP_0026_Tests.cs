@@ -8,8 +8,7 @@ public sealed class Fix_CMP_0026_Tests
         var contract = new JsonSchemaObjectContract(
             "plugin manifest",
             ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions", "requiredCapabilities", "rpcEntrypoint"],
-            ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions"],
-            new Dictionary<string, string>());
+            ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions"]);
 
         var failures = JsonSchemaDriftGuard.SemanticDriftMessages(
             """
@@ -40,8 +39,10 @@ public sealed class Fix_CMP_0026_Tests
         var contract = new JsonSchemaObjectContract(
             "expression statement",
             ["op", "value"],
-            ["op", "value"],
-            new Dictionary<string, string> { ["op"] = "expr" });
+            ["op", "value"])
+        {
+            ConstProperties = new Dictionary<string, string> { ["op"] = "expr" }
+        };
 
         var failures = JsonSchemaDriftGuard.SemanticDriftMessages(
             """
