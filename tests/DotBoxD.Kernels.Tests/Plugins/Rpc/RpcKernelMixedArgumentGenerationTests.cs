@@ -114,6 +114,54 @@ public sealed class RpcKernelMixedArgumentGenerationTests
         AssertFight(list.Values[1], 10, true);
     }
 
+    [Theory]
+    [InlineData("ref int value", "ref mutable")]
+    [InlineData("in int value", "in mutable")]
+    [InlineData("out int value", "out mutable")]
+    public void Host_binding_ref_kind_arguments_are_rejected(string parameter, string argument)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics($$"""
+            using System.Collections.Generic;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IGameWorld
+            {
+                [HostBinding("host.world.canFight", "game.world.monster.read.threshold", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+                bool CanFight({{parameter}});
+            }
+
+            [KernelRpcService("ref-host-binding")]
+            public sealed partial class RefHostBindingKernel
+            {
+                public List<int> Check(List<int> monsterIds, HookContext ctx)
+                {
+                    var results = new List<int>();
+                    foreach (var id in monsterIds)
+                    {
+                        var mutable = id;
+                        var ok = ctx.Host<IGameWorld>().CanFight({{argument}});
+                        if (ok)
+                        {
+                            results.Add(mutable);
+                        }
+                    }
+
+                    return results;
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("cannot use ref, in, or out", StringComparison.Ordinal));
+    }
+
     private static void AssertFight(SandboxValue value, int expectedId, bool expectedSuccess)
     {
         var record = Assert.IsType<RecordValue>(value);
