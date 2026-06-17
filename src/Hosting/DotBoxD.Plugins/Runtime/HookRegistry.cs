@@ -57,6 +57,24 @@ public sealed class HookRegistry
         }
     }
 
+    internal void RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
+    {
+        lock (_gate)
+        {
+            if (_pipelines.TryGetValue(typeof(TEvent), out var existing) &&
+                !((HookPipeline<TEvent>)existing).UsesAdapter(adapter))
+            {
+                throw new SandboxValidationException([
+                    new SandboxDiagnostic(
+                        "DBXK034",
+                        $"Hook pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
+                ]);
+            }
+
+            _events.Register(adapter);
+        }
+    }
+
     public async ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
         object? pipeline;
