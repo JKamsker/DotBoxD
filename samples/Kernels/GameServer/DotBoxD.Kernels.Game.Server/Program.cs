@@ -160,8 +160,18 @@ internal static class Program
 
         // (g) Release the plugin; it disconnects, and ownership unloads its kernels.
         control.SignalShutdown();
-        await pluginExit.ConfigureAwait(false);
-        await disconnected.Task.ConfigureAwait(false);
+        var shutdown = Task.WhenAll(pluginExit, disconnected.Task);
+        var shutdownCompleted = await Task.WhenAny(shutdown, Task.Delay(readinessTimeout)).ConfigureAwait(false);
+        if (shutdownCompleted != shutdown)
+        {
+            return await FailAsync(
+                    host,
+                    pluginProcess,
+                    $"plugin did not shut down within {FormatDuration(readinessTimeout)}.")
+                .ConfigureAwait(false);
+        }
+
+        await shutdown.ConfigureAwait(false);
         if (pluginProcess.ExitCode != 0)
         {
             return await FailAsync(host, pluginProcess, $"plugin exited with code {pluginProcess.ExitCode}.")
