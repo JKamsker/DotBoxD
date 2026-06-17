@@ -216,6 +216,14 @@ public sealed class NamedPipeServerTransportCoverageTests
     }
 
     [Fact]
+    public void Constructor_Throws_WhenMaxAllowedInstancesExceedsPlatformLimit()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new NamedPipeServerTransport(CreatePipeName(), maxAllowedServerInstances: 255));
+        Assert.Equal("value", ex.ParamName);
+    }
+
+    [Fact]
     public void Constructor_Throws_WhenMaxMessageSizeBelowHeader()
     {
         var ex = Assert.Throws<ArgumentOutOfRangeException>(
