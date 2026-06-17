@@ -147,7 +147,9 @@ public sealed class Fix_CMP_0012_Tests
         var defs = document.RootElement.GetProperty("$defs");
         var manifestProperties = defs.GetProperty("manifest").GetProperty("properties");
 
-        AssertEnum(manifestProperties.GetProperty("mode"), ["Auto", "Interpreted", "Compiled"]);
+        AssertPattern(
+            manifestProperties.GetProperty("mode"),
+            "^(?:[Aa][Uu][Tt][Oo]|[Ii][Nn][Tt][Ee][Rr][Pp][Rr][Ee][Tt][Ee][Dd]|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Dd])$");
         AssertEnum(
             manifestProperties.GetProperty("effects").GetProperty("items"),
             Enum.GetNames<SandboxEffect>().Where(name => name != nameof(SandboxEffect.None)));
@@ -204,6 +206,12 @@ public sealed class Fix_CMP_0012_Tests
         Assert.True(
             SameSet(actualValues, expected),
             $"Schema enum drifted. Schema: [{string.Join(", ", actualValues)}]. Expected: [{string.Join(", ", expected)}].");
+    }
+
+    private static void AssertPattern(JsonElement schema, string expected)
+    {
+        Assert.True(schema.TryGetProperty("pattern", out var actual), "schema is missing pattern.");
+        Assert.Equal(expected, actual.GetString());
     }
 
     private static string SchemaVersionOf(string schemaJson)
