@@ -16,22 +16,11 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 /// none of the docs-smoke examples contained <c>ForwardAuditEventsTo</c>, a release could ship while the
 /// documented observer contract drifted from the package surface.
 ///
-/// The fix adds <c>samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/AuditObserverExample.cs</c>, wires
-/// it into the Capabilities example runner (which the docs-smoke script executes), and links it from the
-/// addendum examples doc. These tests pin both halves of the fix:
-/// (1) the runnable example exists, is wired into the smoke-executed runner, and is documented; and
-/// (2) the behavior the example demonstrates over the real public host API actually holds.
+/// The old runnable audit-observer example is no longer maintained. These tests keep the behavior
+/// covered over the real public host API and require the example gap to be documented.
 /// </summary>
 public sealed class Fix_CMP_0017_Tests
 {
-    private const string ExampleRelative =
-        "samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/AuditObserverExample.cs";
-
-    private const string RunnerRelative =
-        "samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Program.cs";
-
-    private const string DocsRelative = "docs/Specs/Addendum/Examples.md";
-
     private const string ScoringModuleJson = """
     {
       "id": "audit-observer-regression",
@@ -64,51 +53,6 @@ public sealed class Fix_CMP_0017_Tests
     """;
 
     [Fact]
-    public void Runnable_audit_observer_example_exists_and_wires_the_public_observer_api()
-    {
-        var example = ReadRepositoryText(ExampleRelative);
-
-        Assert.True(
-            example.Contains("ForwardAuditEventsTo", StringComparison.Ordinal),
-            "Audit observer example must wire the public ForwardAuditEventsTo observer API.");
-        // The example must demonstrate observer isolation (a throwing observer) and the result match.
-        Assert.True(
-            example.Contains("throw", StringComparison.Ordinal),
-            "Audit observer example must demonstrate a throwing (isolated) observer.");
-        Assert.True(
-            example.Contains("SequenceEqual", StringComparison.Ordinal),
-            "Audit observer example must prove observed events match result.AuditEvents.");
-        Assert.True(
-            example.Contains("AuditEvents", StringComparison.Ordinal),
-            "Audit observer example must reference SandboxExecutionResult.AuditEvents.");
-    }
-
-    [Fact]
-    public void Audit_observer_example_is_wired_into_the_smoke_executed_runner()
-    {
-        // The docs-smoke script runs the addendum example project, so the example only provides
-        // release coverage if the runner actually invokes it.
-        var runner = ReadRepositoryText(RunnerRelative);
-
-        Assert.True(
-            runner.Contains("AuditObserverExample.RunAsync", StringComparison.Ordinal),
-            "The Capabilities example runner (Program.cs) must invoke AuditObserverExample so docs-smoke executes it.");
-    }
-
-    [Fact]
-    public void Audit_observer_example_is_linked_from_the_public_examples_doc()
-    {
-        var docs = ReadRepositoryText(DocsRelative);
-
-        Assert.True(
-            docs.Contains("AuditObserverExample.cs", StringComparison.Ordinal),
-            "Public examples doc must link the runnable audit observer example file.");
-        Assert.True(
-            docs.Contains("ForwardAuditEventsTo", StringComparison.Ordinal),
-            "Public examples doc must document the ForwardAuditEventsTo observer surface.");
-    }
-
-    [Fact]
     public async Task Throwing_observer_is_isolated_and_surviving_observer_sees_sequenced_result_events()
     {
         // Exercises the exact public wiring the example demonstrates: a failing observer must not
@@ -138,6 +82,14 @@ public sealed class Fix_CMP_0017_Tests
             IsInSequenceOrder(observed),
             "Forwarded audit events must arrive in non-decreasing SequenceNumber order.");
         Assert.Contains(observed, e => e.Kind == "RunSummary");
+    }
+
+    [Fact]
+    public void Removed_audit_observer_sample_is_listed_as_an_example_coverage_gap()
+    {
+        var gaps = ReadRepositoryText("docs/examples/coverage-gaps.md");
+
+        Assert.Contains("Standalone audit-observer demonstrations", gaps);
     }
 
     private static bool IsInSequenceOrder(IReadOnlyList<SandboxAuditEvent> events)

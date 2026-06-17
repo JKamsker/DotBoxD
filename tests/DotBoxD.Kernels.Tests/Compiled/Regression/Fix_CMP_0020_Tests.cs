@@ -9,10 +9,8 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 // Regression coverage for CMP-0020: DotBoxD.Kernels ships sandbox-visible logging bindings and log
 // quotas, but there was no standalone runtime proof that a host registers log.info/log.warn,
 // grants log.write, applies a log quota, and inspects the sanitized audit + ResourceUsage.LogEvents
-// output. The runnable walkthrough now lives in
-// samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/SafeLoggingExample.cs (exercised by the docs
-// smoke). These tests lock the public capability boundary that walkthrough demonstrates so the
-// example cannot silently drift from the bindings/policy contract it documents.
+// output. The old runnable logging walkthrough is no longer maintained as a sample, so these tests
+// lock the public capability boundary directly.
 public sealed class Fix_CMP_0020_Tests
 {
     private const string WalkthroughModuleJson = """

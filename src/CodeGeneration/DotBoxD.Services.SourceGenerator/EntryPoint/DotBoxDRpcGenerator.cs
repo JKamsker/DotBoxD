@@ -210,10 +210,13 @@ public sealed class DotBoxDRpcGenerator : IIncrementalGenerator
             }
         });
 
-        var allServices = models
-            .Select(static (model, _) => ServiceIdentity.From(model))
+        var serviceExtensions = models
+            .Select(static (model, _) => ServiceExtensionModel.From(model))
+            .WithTrackingName("ServiceExtensions");
+
+        var allServices = serviceExtensions
             .Collect()
-            .Select(static (arr, ct) => ServiceModelOrdering.SortIdentities(arr, ct))
+            .Select(static (arr, ct) => ServiceModelOrdering.SortExtensions(arr, ct))
             .WithTrackingName("AllServices");
 
         var allServiceMetadata = models

@@ -65,13 +65,25 @@ internal static class DotBoxDInterpolatedStringExpressionLowerer
         }
 
         var expression = lowerExpression(interpolation.Expression);
-        if (!string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.String, StringComparison.Ordinal))
+        if (string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.String, StringComparison.Ordinal))
         {
-            throw new NotSupportedException("String interpolation holes must lower to string expressions.");
+            return expression;
         }
 
-        return expression;
+        if (string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal))
+        {
+            return Int32ToString(expression);
+        }
+
+        throw new NotSupportedException(
+            "String interpolation holes must lower to string or supported invariant string-convertible expressions.");
     }
+
+    private static DotBoxDExpressionModel Int32ToString(DotBoxDExpressionModel expression)
+        => new(
+            $"{DotBoxDGenerationNames.Helpers.Int32ToStr}({expression.Source})",
+            DotBoxDGenerationNames.ManifestTypes.String,
+            true);
 
     private static DotBoxDExpressionModel Text(string value)
         => new(

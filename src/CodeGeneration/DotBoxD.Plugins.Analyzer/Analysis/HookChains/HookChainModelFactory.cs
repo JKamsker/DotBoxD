@@ -8,18 +8,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
 /// Phase C lowering of an inline hook chain —
-/// <c>On&lt;TEvent&gt;().Where*(lambda).Select*(lambda).InvokeKernel(lambda)</c> — into the same
+/// <c>On&lt;TEvent&gt;().Where*(lambda).Select*(lambda).Run(lambda)</c> — into the same
 /// <see cref="PluginKernelModel"/> a kernel class produces, so the existing emitter + verifier path
 /// applies unchanged. The <c>Where</c>s AND-compose into <c>ShouldHandle</c>; a <c>Select</c> projects
 /// the flowing element and downstream lambdas substitute that projection at compile time (via the
-/// lowering context's projected-element binding); the <c>InvokeKernel</c> terminal's single
+/// lowering context's projected-element binding); the <c>Run</c> terminal's single
 /// <c>ctx.Messages.Send(targetId, message)</c> becomes <c>Handle</c>. Supported subset: expression-body
 /// lambdas and a single Send terminal. Any other shape fails safe (returns <c>null</c>, no package),
 /// leaving the runtime terminal to throw DBXK062 / the analyzer to flag DBXK110.
 /// </summary>
 internal static class HookChainModelFactory
 {
-    private const string InvokeKernelMethod = "InvokeKernel";
+    private const string RunMethod = "Run";
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
@@ -48,8 +48,21 @@ internal static class HookChainModelFactory
         CancellationToken cancellationToken)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            !string.Equals(terminalAccess.Name.Identifier.ValueText, InvokeKernelMethod, StringComparison.Ordinal) ||
-            !IsHookChainType(model, terminalAccess.Expression, cancellationToken, out var receiverIsPipeline))
+            !string.Equals(terminalAccess.Name.Identifier.ValueText, RunMethod, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var stages = new List<HookChainStage>();
+        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        if (seed is null)
+        {
+            return null;
+        }
+
+        var receiverIsKnownHookChain = IsHookChainType(model, terminalAccess.Expression, cancellationToken);
+        var generatedRemoteKind = GeneratedRemoteHookChainFallback.CandidateKind(seed);
+        if (!receiverIsKnownHookChain && generatedRemoteKind is null)
         {
             return null;
         }
@@ -67,18 +80,9 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        var stages = new List<Stage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages);
-        if (seed is null)
-        {
-            return null;
-        }
-
         stages.Reverse(); // seed-to-terminal order
 
-        if (model.GetTypeInfo(seed, cancellationToken).Type is not INamedTypeSymbol pipelineType ||
-            pipelineType.TypeArguments.Length != 1 ||
-            pipelineType.TypeArguments[0] is not INamedTypeSymbol eventType)
+        if (!GeneratedRemoteHookChainFallback.TryEventType(model, seed, cancellationToken, out var eventType))
         {
             return null;
         }
@@ -100,6 +104,7 @@ internal static class HookChainModelFactory
         var whereStages = new List<(ExpressionSyntax Body, DotBoxDExpressionLoweringContext Context)>();
         DotBoxDExpressionModel? projected = null;
         var shouldHandleEventParam = DotBoxDGenerationNames.DefaultEventParameterName;
+        var terminalElementTypeFullName = eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         foreach (var stage in stages)
         {
@@ -113,6 +118,11 @@ internal static class HookChainModelFactory
             if (stage.IsSelect)
             {
                 projected = DotBoxDExpressionModelFactory.Create(body, context);
+                terminalElementTypeFullName = GeneratedRemoteHookChainFallback.TypeFullName(
+                    body,
+                    model,
+                    cancellationToken,
+                    projected.Type);
             }
             else
             {
@@ -158,45 +168,66 @@ internal static class HookChainModelFactory
             ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects),
             RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]));
 
-        return new HookChainResult(modelResult, Interception(invocation, model, eventType, modelResult, receiverIsPipeline, cancellationToken));
+        return new HookChainResult(
+            modelResult,
+            Interception(
+                invocation,
+                model,
+                modelResult,
+                terminalAccess.Expression,
+                eventType,
+                stages,
+                terminalElementTypeFullName,
+                generatedRemoteKind,
+                cancellationToken));
     }
 
     private static HookChainInterception? Interception(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
-        INamedTypeSymbol eventType,
         PluginKernelModel chainModel,
-        bool receiverIsPipeline,
+        ExpressionSyntax receiver,
+        INamedTypeSymbol eventType,
+        IReadOnlyList<HookChainStage> stages,
+        string terminalElementTypeFullName,
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
         CancellationToken cancellationToken)
     {
-        // Only HookPipeline<TEvent> terminals get an interceptor in the MVP (a HookStage after a Select
-        // has a second type parameter the non-generic interceptor cannot name).
-        if (!receiverIsPipeline)
-        {
-            return null;
-        }
-
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
         if (location is null)
         {
             return null;
         }
 
-        var handlerIsAction = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.Parameters.Length == 1 &&
-            method.Parameters[0].Type.OriginalDefinition.ToDisplayString().StartsWith(
-                DotBoxDGenerationNames.TypeNames.SystemActionPrefix,
-                StringComparison.Ordinal);
-
         var packageFullName = string.IsNullOrEmpty(chainModel.Namespace)
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.PackageName
             : DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.Namespace + "." + chainModel.PackageName;
 
-        return new HookChainInterception(
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
+            method.Parameters.Length == 1 &&
+            model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
+            IsSupportedHookChainType(receiverType))
+        {
+            return new HookChainInterception(
+                location.GetInterceptsLocationAttributeSyntax(),
+                receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                packageFullName);
+        }
+
+        if (generatedRemoteKind is null)
+        {
+            return null;
+        }
+
+        return GeneratedRemoteHookChainFallback.CreateInterception(
             location.GetInterceptsLocationAttributeSyntax(),
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            stages.Any(stage => stage.IsSelect),
+            terminalElementTypeFullName,
             packageFullName,
-            handlerIsAction);
+            generatedRemoteKind.Value);
     }
 
     private static DotBoxDExpressionLoweringContext Context(
@@ -215,7 +246,7 @@ internal static class HookChainModelFactory
                 elementParam, eventProperties, default, model, cancellationToken, elementParam, projected,
                 capabilities, effects);
 
-    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<Stage> stages)
+    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<HookChainStage> stages)
     {
         var current = receiver;
         while (current is InvocationExpressionSyntax invocation &&
@@ -231,7 +262,7 @@ internal static class HookChainModelFactory
             if ((isSelect || string.Equals(name, WhereMethod, StringComparison.Ordinal)) &&
                 TryLambda(invocation, out var lambda))
             {
-                stages.Add(new Stage(isSelect, lambda));
+                stages.Add(new HookChainStage(isSelect, lambda));
                 current = access.Expression;
                 continue;
             }
@@ -245,18 +276,27 @@ internal static class HookChainModelFactory
     private static bool IsHookChainType(
         SemanticModel model,
         ExpressionSyntax receiver,
-        CancellationToken cancellationToken,
-        out bool isPipeline)
+        CancellationToken cancellationToken)
     {
-        isPipeline = false;
         if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol type)
         {
             return false;
         }
 
+        return IsSupportedHookChainType(type);
+    }
+
+    private static bool IsSupportedHookChainType(INamedTypeSymbol type)
+    {
         var original = type.OriginalDefinition.ToDisplayString();
-        isPipeline = string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal);
-        return isPipeline || string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal);
+        return string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
+               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal);
     }
 
     // Accepts both lambda forms a fluent stage can take: a parenthesized lambda (e), (e, ctx) or (),
@@ -297,18 +337,5 @@ internal static class HookChainModelFactory
             default:
                 return (null, null);
         }
-    }
-
-    private readonly struct Stage
-    {
-        public Stage(bool isSelect, LambdaExpressionSyntax lambda)
-        {
-            IsSelect = isSelect;
-            Lambda = lambda;
-        }
-
-        public bool IsSelect { get; }
-
-        public LambdaExpressionSyntax Lambda { get; }
     }
 }

@@ -1,10 +1,11 @@
 using Microsoft.CodeAnalysis;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 /// <summary>
-/// Maps C# types used by a <c>[KernelRpcService]</c> batch method onto DotBoxD.Kernels JSON IR types: scalars to
+/// Maps C# types used by a <c>[ServerExtension]</c> batch method onto DotBoxD.Kernels JSON IR types: scalars to
 /// their sandbox names, <c>List&lt;T&gt;</c>/<c>IEnumerable&lt;T&gt;</c>/<c>T[]</c> to <c>List</c>, and a
 /// DTO (record/struct/class of supported fields) to a positional <c>Record</c>. A DTO's fields are its
 /// public instance properties in declaration order, which is also the order <c>record.new</c> arguments
@@ -15,6 +16,7 @@ internal static class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
+        type = DotBoxDTypeNameReader.UnwrapTaskLike(type);
         switch (type.SpecialType)
         {
             case SpecialType.System_Boolean: return Scalar("Bool");
@@ -41,7 +43,7 @@ internal static class DotBoxDRpcTypeMapper
             return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
         }
 
-        throw new NotSupportedException($"Kernel RPC service type '{type.ToDisplayString()}' is not supported.");
+        throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
     }
 
     public static bool IsScalar(ITypeSymbol type)

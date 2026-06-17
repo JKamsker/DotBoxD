@@ -33,7 +33,9 @@ internal static class RpcTypeValidator
         CancellationToken ct,
         RpcTypeValidationCache? cache = null)
     {
-        if (returnKind is MethodReturnKind.TaskOfSubService or MethodReturnKind.ValueTaskOfSubService)
+        if (returnKind is MethodReturnKind.SyncSubService or
+            MethodReturnKind.TaskOfSubService or
+            MethodReturnKind.ValueTaskOfSubService)
         {
             return null;
         }
@@ -47,7 +49,7 @@ internal static class RpcTypeValidator
         CancellationToken ct,
         RpcTypeValidationCache? cache = null) =>
         ContainsDotBoxDServiceInterface(type, ct, cache)
-            ? $"{role} contains a sub-service type; sub-services are only supported as direct Task<TService> or ValueTask<TService> return values"
+            ? $"{role} contains a sub-service type; sub-services are only supported as direct TService, Task<TService>, or ValueTask<TService> return values"
             : null;
 
     public static bool RequiresUnsafeContext(ITypeSymbol type, CancellationToken ct) =>

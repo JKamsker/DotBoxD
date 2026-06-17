@@ -5,9 +5,17 @@ namespace DotBoxD.Abstractions;
 using DotBoxD.Kernels;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class PluginAttribute(string id) : Attribute
+public sealed class PluginAttribute : Attribute
 {
-    public string Id { get; } = id;
+    public PluginAttribute(string id) => Id = id;
+
+    public string Id { get; }
+}
+
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class EventKernelAttribute(string? id = null) : Attribute
+{
+    public string? Id { get; } = id;
 }
 
 [AttributeUsage(AttributeTargets.Property)]
@@ -15,8 +23,8 @@ public sealed class LiveSettingAttribute : Attribute;
 
 /// <summary>
 /// Marks a host-service method as a sandbox binding the DotBoxD.Kernels generator may call from verified kernel
-/// IR. A kernel reaches the service through <see cref="HookContext.Host{THost}"/> (e.g.
-/// <c>ctx.Host&lt;IGameWorldAccess&gt;().GetHealth(id)</c>); the generator lowers that call to a
+/// IR. A kernel reaches the service through <see cref="HookContext.Host{THost}"/> or through a
+/// constructor-injected service field (e.g. <c>_world.GetHealth(id)</c>); the generator lowers that call to a
 /// <c>CallExpression(<paramref name="bindingId"/>, …)</c>, records <paramref name="capability"/> in the
 /// manifest's required capabilities, and adds <paramref name="effects"/> to the manifest's effects. The
 /// host registers a matching binding (same id, capability, and effects) so install-time policy and
@@ -53,12 +61,12 @@ public sealed class CapabilityAttribute(string id) : Attribute
 /// <summary>
 /// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR
 /// at every call site, so plugin authors can factor shared gate/handler logic out of a
-/// <c>Where</c>/<c>Select</c>/<c>InvokeKernel</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
+/// <c>Where</c>/<c>Select</c>/<c>Run</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
 /// without leaving the sandbox. For example:
 /// <code>
 /// server.Hooks.On&lt;MonsterAggroEvent&gt;()
 ///     .Where((e, ctx) => IsBullying(e.MonsterLevel, e.PlayerLevel))
-///     .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+///     .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
 ///
 /// [KernelMethod]
 /// public static bool IsBullying(int monsterLevel, int playerLevel) =&gt; monsterLevel - playerLevel &gt;= 3;
@@ -77,21 +85,24 @@ public sealed class CapabilityAttribute(string id) : Attribute
 public sealed class KernelMethodAttribute : Attribute;
 
 /// <summary>
-/// Marks a class as a <b>kernel RPC service</b>: a batch operation the plugin ships as verified IR and
+/// Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and
 /// the server runs request/response in a single roundtrip, so a loop over many entities executes
 /// server-side (calling the host's existing bindings) instead of one network call per entity. The
 /// generator lowers the class's single public batch method — its body may use locals, a <c>foreach</c>
-/// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c>, and may build and return complex
-/// objects (records/DTOs) and lists of them. For example:
+/// over a list parameter, host bindings via <c>ctx.Host&lt;T&gt;()</c> or constructor-injected service
+/// fields, and may build and return complex objects (records/DTOs) and lists of them. For example:
 /// <code>
-/// [KernelRpcService("monster-killer")]
+/// [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
 /// public sealed partial class MonsterKillerKernel
 /// {
+///     private readonly IGameWorld _world;
+///     public MonsterKillerKernel(IGameWorld world) =&gt; _world = world;
+///
 ///     public List&lt;KillResult&gt; KillMonsters(List&lt;int&gt; monsterIds, HookContext ctx)
 ///     {
 ///         var results = new List&lt;KillResult&gt;();
 ///         foreach (var id in monsterIds)
-///             results.Add(new KillResult(id, ctx.Host&lt;IGameWorld&gt;().Kill(id)));
+///             results.Add(new KillResult(id, _world.Kill(id)));
 ///         return results;
 ///     }
 /// }
@@ -99,12 +110,83 @@ public sealed class KernelMethodAttribute : Attribute;
 /// </code>
 /// The trailing <see cref="HookContext"/> parameter is the lowering marker for host bindings (as in a
 /// kernel's <c>Handle</c>) and is not part of the wire signature. Parameters, return type, and DTO
-/// fields must use the supported scalar types, lists, or nested DTOs.
+/// fields must use the supported scalar types, lists, or nested DTOs. Supplying the optional service
+/// interface type lets the analyzer emit a source-generated plugin-side client that marshals directly to
+/// compact server-extension value bytes instead of using a reflection proxy.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class KernelRpcServiceAttribute(string id) : Attribute
+public sealed class ServerExtensionAttribute : Attribute
 {
-    public string Id { get; } = id;
+    public ServerExtensionAttribute(string id) => Id = id;
+
+    public ServerExtensionAttribute(string id, Type serviceType)
+    {
+        Id = id;
+        ServiceType = serviceType;
+    }
+
+    public ServerExtensionAttribute(Type grafts, string? id = null)
+    {
+        Grafts = grafts;
+        Id = id;
+    }
+
+    public string? Id { get; }
+
+    public Type? ServiceType { get; }
+
+    public Type? Grafts { get; }
+}
+
+/// <summary>
+/// Requests a generated C# 14 extension property on <paramref name="receiverType"/> that resolves the
+/// source-generated server extension client for this service. The receiver type must expose a
+/// <c>ServerExtensions</c> property whose value can invoke server extensions and resolve the installed
+/// service id.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
+{
+    public Type ReceiverType { get; } = receiverType;
+
+    public string? Name { get; } = name;
+}
+
+/// <summary>
+/// Requests a generated C# 14 extension method on <paramref name="receiverType"/> that forwards to the
+/// source-generated server extension client. When <paramref name="name"/> is omitted, the kernel method name
+/// is used; supply a custom name to make the receiver's domain API read naturally or avoid conflicts.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
+{
+    public Type? ReceiverType { get; } = receiverType;
+
+    public string? Name { get; } = name;
+}
+
+/// <summary>
+/// Requests a generated client-side registration accumulator for a control type. The generated accumulator
+/// queues calls to <paramref name="methodName"/> and flushes them in order when the plugin builder starts.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class GeneratePluginRegistrationAccumulatorAttribute(
+    string accumulatorName,
+    string methodName) : Attribute
+{
+    public string AccumulatorName { get; } = accumulatorName;
+
+    public string MethodName { get; } = methodName;
+}
+
+/// <summary>
+/// Requests a generated root registration accumulator that exposes child accumulators for annotated child
+/// control properties.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
+{
+    public string AccumulatorName { get; } = accumulatorName;
 }
 
 public interface IEventKernel<TEvent>

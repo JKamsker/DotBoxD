@@ -8,6 +8,14 @@ public static class StringBindings
 {
     public static IReadOnlyList<BindingDescriptor> All { get; } = [
         Pure(
+            "int32.toStringInvariant",
+            [SandboxType.I32],
+            SandboxType.String,
+            SandboxEffect.Cpu | SandboxEffect.Alloc,
+            BindingCostModel.Fixed(2),
+            (ctx, args, _) => ValueTask.FromResult(CompiledRuntime.Int32ToStringInvariant(ctx, args[0])),
+            nameof(CompiledRuntime.Int32ToStringInvariant)),
+        Pure(
             "string.length",
             [SandboxType.String],
             SandboxType.I32,

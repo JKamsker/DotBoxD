@@ -5,7 +5,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 internal static class DotBoxDTypeNameReader
 {
     public static string SandboxTypeName(ITypeSymbol type)
-        => type.SpecialType switch {
+        => UnwrapTaskLike(type).SpecialType switch {
             SpecialType.System_Boolean => DotBoxDGenerationNames.ManifestTypes.Bool,
             SpecialType.System_Int32 => DotBoxDGenerationNames.ManifestTypes.Int,
             SpecialType.System_Int64 => DotBoxDGenerationNames.ManifestTypes.Long,
@@ -19,4 +19,26 @@ internal static class DotBoxDTypeNameReader
             SandboxTypeName(type),
             DotBoxDGenerationNames.ManifestTypes.Unsupported,
             StringComparison.Ordinal);
+
+    public static ITypeSymbol UnwrapTaskLike(ITypeSymbol type)
+        => TryUnwrapTaskLike(type, out var inner) ? inner : type;
+
+    public static bool TryUnwrapTaskLike(ITypeSymbol type, out ITypeSymbol inner)
+    {
+        if (type is INamedTypeSymbol
+            {
+                IsGenericType: true,
+                TypeArguments.Length: 1,
+                Name: "Task" or "ValueTask",
+                ContainingNamespace: { } ns
+            } named &&
+            string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal))
+        {
+            inner = named.TypeArguments[0];
+            return true;
+        }
+
+        inner = type;
+        return false;
+    }
 }

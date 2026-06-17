@@ -20,10 +20,10 @@ dotnet build   DotBoxD.slnx -c Release --no-restore
 dotnet test    DotBoxD.slnx -c Release --no-build
 ```
 
-Run the end-to-end acceptance sample (it exercises all three modes and must print `RESULT: PASS`):
+Run the maintained GameServer example:
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 > Warnings are treated as errors in CI (`TreatWarningsAsErrors` is on when `GITHUB_ACTIONS=true`).
@@ -46,8 +46,7 @@ the .NET 8/9/10 SDKs.
 | Spec manifest integrity | `check-spec-manifest.ps1` | The sandbox spec manifest is consistent |
 | Public API baseline | `check-api-compat-baseline.ps1` | Public package API matches `docs/api-baselines/*.txt` |
 | Security-boundary tests | `run-required-tests.ps1` | A required allowlist of sandbox/security tests passes |
-| Docs & examples smoke | `check-docs-smoke.ps1` | Doc commands point at real paths; kernel samples run |
-| End-to-end acceptance | `dotnet run … DotBoxD.EndToEnd` | All three modes produce the expected result |
+| Docs & examples smoke | `check-docs-smoke.ps1` | Doc commands point at real paths; the GameServer sample runs on Windows |
 
 **Package validation** — after build/test and gates pass, CI packs every product package, runs
 `check-package-metadata.ps1`, runs the package consumer smoke test, and uploads the package artifact.

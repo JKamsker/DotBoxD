@@ -70,6 +70,26 @@ public sealed partial class SandboxHost : IDisposable
         return ValueTask.FromResult(plan);
     }
 
+    internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ThrowIfDisposed();
+
+        var validation = new ModuleValidator().Validate(module, _bindings);
+        if (!validation.Succeeded)
+        {
+            throw new SandboxValidationException(validation.Diagnostics);
+        }
+
+        var required = new SortedSet<string>(validation.RequiredCapabilities, StringComparer.Ordinal);
+        foreach (var request in module.CapabilityRequests)
+        {
+            required.Add(request.Id);
+        }
+
+        return required.ToArray();
+    }
+
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(
         ExecutionPlan plan,
         string entrypoint,

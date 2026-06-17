@@ -17,6 +17,6 @@ internal static class PluginAnalyzerDiagnostics
         "DotBoxD.Kernels.Generation",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Plugin package generation supports a restricted kernel expression subset.",
+        description: "Plugin package generation supports a restricted kernel expression subset; interpolation holes may be strings or supported invariant string-convertible numeric types.",
         helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK100");
 }

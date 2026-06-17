@@ -69,6 +69,9 @@ internal static class ProxyInvocationEmitter
             case MethodReturnKind.ValueTaskOfSubService:
                 EmitSubServiceReturn(sb, method, invocation, locals, ct, indent);
                 break;
+            case MethodReturnKind.SyncSubService:
+                EmitSyncSubServiceReturn(sb, method, invocation, locals, ct, indent);
+                break;
         }
     }
 
@@ -119,6 +122,28 @@ internal static class ProxyInvocationEmitter
         {
             // ServiceHandle is a struct, so the nullable wire type is Nullable<ServiceHandle>;
             // unwrap via .Value before reading InstanceId.
+            sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.InstanceId);");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}return new {subProxyType}(this._invoker, {handleName}.InstanceId);");
+        }
+    }
+
+    private static void EmitSyncSubServiceReturn(
+        StringBuilder sb,
+        MethodModel method,
+        string invocation,
+        GeneratedLocalNames locals,
+        CancellationToken ct,
+        string indent)
+    {
+        var info = method.SubService!;
+        var subProxyType = ProxyGenerationHelpers.BuildSubProxyTypeName(info.QualifiedInterfaceName);
+        var handleName = locals.Reserve("__dotboxd_handle", ct);
+        sb.AppendLine($"{indent}var {handleName} = {invocation}.GetAwaiter().GetResult();");
+        if (info.AllowsNull)
+        {
             sb.AppendLine($"{indent}return {handleName} is null ? null : new {subProxyType}(this._invoker, {handleName}.Value.InstanceId);");
         }
         else

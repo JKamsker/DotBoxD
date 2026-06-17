@@ -15,6 +15,7 @@ internal static class BindingRegistryValidator
 
     private static readonly HashSet<string> ApprovedCompiledRuntimeMethods = new(StringComparer.Ordinal) {
         GenericBindingStub,
+        "Int32ToStringInvariant",
         "StringLength",
         "ConcatString",
         "AbsI32",
@@ -338,6 +339,7 @@ internal static class BindingRegistryValidator
 
     private static (SandboxType Return, SandboxType[] Parameters) DirectCompiledSignature(string method)
         => method switch {
+            "Int32ToStringInvariant" => (SandboxType.String, [SandboxType.I32]),
             "StringLength" => (SandboxType.I32, [SandboxType.String]),
             "ConcatString" => (SandboxType.String, [SandboxType.String, SandboxType.String]),
             "AbsI32" => (SandboxType.I32, [SandboxType.I32]),

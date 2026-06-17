@@ -178,6 +178,13 @@ public static partial class CompiledRuntime
 
     public static SandboxValue Or(SandboxValue left, SandboxValue right) => Bool(AsBool(left) || AsBool(right));
 
+    public static SandboxValue Int32ToStringInvariant(SandboxContext context, SandboxValue value)
+    {
+        var text = AsI32(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        context.ChargeString(text);
+        return SandboxValue.FromString(text);
+    }
+
     public static SandboxValue StringLength(SandboxValue value) => I32(StringLengthRaw(value));
 
     public static SandboxValue ConcatString(SandboxContext context, SandboxValue left, SandboxValue right)

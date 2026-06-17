@@ -8,7 +8,7 @@ inventory items that must be configured by the product operator.
 
 Before publishing or enabling DotBoxD.Kernels for a tenant:
 
-- Run `dotnet test DotBoxD.Kernels.slnx --configuration Release`.
+- Run `dotnet test DotBoxD.slnx --configuration Release`.
 - Run `scripts/check-release-readiness.ps1 -RequireComplete`.
 - Run `scripts/check-spec-manifest.ps1`.
 - Run `scripts/check-docs-smoke.ps1`.

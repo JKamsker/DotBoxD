@@ -57,7 +57,27 @@ public sealed class PluginAnalyzerStringInterpolationTests
     }
 
     [Fact]
-    public void Generator_rejects_non_string_interpolation_holes()
+    public void Generated_package_lowers_int_interpolation_hole_to_invariant_conversion()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(IntInterpolationSource());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            IntInterpolationSource(),
+            "Sample.IntInterpolationPluginPackage");
+        var handle = package.Module.Functions.Single(function => function.Id == "Handle");
+        var send = Assert.IsType<CallExpression>(
+            Assert.IsType<ReturnStatement>(Assert.Single(handle.Body)).Value);
+        var concat = Assert.IsType<CallExpression>(send.Arguments[1]);
+        var conversion = Assert.IsType<CallExpression>(concat.Arguments[1]);
+
+        Assert.Equal("string.concatBudgeted", concat.Name);
+        Assert.Equal("int32.toStringInvariant", conversion.Name);
+        Assert.IsType<VariableExpression>(Assert.Single(conversion.Arguments));
+    }
+
+    [Fact]
+    public void Generator_rejects_unsupported_interpolation_holes()
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
@@ -65,7 +85,7 @@ public sealed class PluginAnalyzerStringInterpolationTests
 
             namespace Sample;
 
-            public sealed record DamageEvent(string TargetId, int Amount);
+            public sealed record DamageEvent(string TargetId, double Amount);
 
             [Plugin("bad-string-interpolation")]
             public sealed partial class DamageKernel : IEventKernel<DamageEvent>
@@ -136,6 +156,25 @@ public sealed class PluginAnalyzerStringInterpolationTests
     private static string ExecutionFailure(SandboxExecutionResult result)
         => result.Error?.SafeMessage + Environment.NewLine +
            string.Join(Environment.NewLine, result.AuditEvents.Select(e => $"{e.Kind}: {e.ErrorCode} {e.Message}"));
+
+    private static string IntInterpolationSource()
+        => """
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record IntInterpolationEvent(string TargetId, int Amount);
+
+            [Plugin("generated-int-interpolation")]
+            public sealed partial class IntInterpolationKernel : IEventKernel<IntInterpolationEvent>
+            {
+                public bool ShouldHandle(IntInterpolationEvent e, HookContext ctx) => true;
+
+                public void Handle(IntInterpolationEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, $"x:{e.Amount}");
+            }
+            """;
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

@@ -7,6 +7,7 @@ public enum GeneratedReturnKind
 {
     Void,
     Sync,
+    SyncNestedService,
     Task,
     TaskOfT,
     ValueTask,

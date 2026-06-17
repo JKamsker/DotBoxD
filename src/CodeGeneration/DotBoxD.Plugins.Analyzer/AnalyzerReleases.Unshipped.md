@@ -5,5 +5,5 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-DBXK100 | DotBoxD.Kernels.Generation | Error | Plugin kernel shape is not supported
+DBXK100 | DotBoxD.Kernels.Generation | Error | Plugin kernel shape is not supported; string interpolation holes may be strings or supported invariant string-convertible numeric types
 DBXK110 | DotBoxD.Kernels.Generation | Info | InvokeKernel(lambda) chain is not yet lowered to verified IR

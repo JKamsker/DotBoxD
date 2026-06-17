@@ -217,7 +217,12 @@ public sealed class EquatableArrayCoverageTests
 public sealed class ServiceModelOrderingCoverageTests
 {
     private static ServiceModel Model(string @namespace, string interfaceName, string serviceName) =>
-        new(@namespace, interfaceName, serviceName, EquatableArray<MethodModel>.Empty);
+        new(
+            @namespace,
+            interfaceName,
+            serviceName,
+            EquatableArray<MethodModel>.Empty,
+            EquatableArray<ServicePropertyModel>.Empty);
 
     [Fact]
     public void Sort_OrdersByNamespaceThenInterfaceThenService_Ordinal()

@@ -9,7 +9,11 @@ namespace Snap.Mixed
     /// </summary>
     public sealed class MixDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.Mixed.IMix _service;
+        private readonly global::Snap.Mixed.IMix? _service;
+
+        internal MixDispatcher()
+        {
+        }
 
         public MixDispatcher(global::Snap.Mixed.IMix service)
         {
@@ -25,11 +29,16 @@ namespace Snap.Mixed
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IMix' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "GetNameAsync":
                 {
-                    var __dotboxd_task = _service.GetNameAsync();
+                    var __dotboxd_task = __service.GetNameAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
@@ -39,7 +48,7 @@ namespace Snap.Mixed
                 case "SaveAsync":
                 {
                     var arg = serializer.Deserialize<string>(payload);
-                    var __dotboxd_task = _service.SaveAsync(arg);
+                    var __dotboxd_task = __service.SaveAsync(arg);
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
                         await __dotboxd_task;
@@ -49,13 +58,13 @@ namespace Snap.Mixed
                 case "SyncAdd":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
-                    var result = _service.SyncAdd(args.Item1, args.Item2);
+                    var result = __service.SyncAdd(args.Item1, args.Item2);
                     serializer.Serialize(output, result);
                     return;
                 }
                 case "SyncPing":
                 {
-                    _service.SyncPing();
+                    __service.SyncPing();
                     return;
                 }
                 default:

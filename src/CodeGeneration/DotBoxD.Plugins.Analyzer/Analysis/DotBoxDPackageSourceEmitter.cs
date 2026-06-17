@@ -211,6 +211,7 @@ internal static class DotBoxDPackageSourceEmitter
             DotBoxDGenerationNames.Helpers.Str,
             Parameter(DotBoxDGenerationNames.CSharpTypes.String, "value"),
             $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromString(value), Span)");
+        EmitInt32ToStringHelper(builder);
         EmitStringLengthHelper(builder);
         EmitStringSubstringHelper(builder);
         EmitStringConcatHelper(builder);
@@ -268,6 +269,14 @@ internal static class DotBoxDPackageSourceEmitter
             DotBoxDGenerationNames.BindingIds.StringConcatBudgeted,
             $"{TypeNames.GlobalExpression} left, {TypeNames.GlobalExpression} right",
             "left, right");
+
+    private static void EmitInt32ToStringHelper(StringBuilder builder)
+        => EmitBindingCallHelper(
+            builder,
+            DotBoxDGenerationNames.Helpers.Int32ToStr,
+            DotBoxDGenerationNames.BindingIds.Int32ToStringInvariant,
+            $"{TypeNames.GlobalExpression} value",
+            "value");
 
     private static void EmitStringLengthHelper(StringBuilder builder)
         => EmitBindingCallHelper(

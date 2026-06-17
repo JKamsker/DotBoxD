@@ -13,14 +13,15 @@ Services, Kernels, and Pushdown.
   diagnostics). The wire format is unchanged.
 - **Central Package Management (CPM):** versions are managed centrally via
   `Directory.Packages.props`; the solution uses the `DotBoxD.slnx` format.
-- **New CI / release pipelines:** cross-platform build/test (net8/9/10 on Windows, Ubuntu, macOS),
+- **New CI / release pipelines:** cross-platform build/test (net8/9/10 on Windows and Ubuntu),
   security & quality gates (rebrand completeness, file-length, spec manifest, API baseline,
-  security-boundary tests, docs smoke, end-to-end acceptance), CodeQL, benchmarks, and a tag-driven
+  security-boundary tests, docs smoke, GameServer example smoke), CodeQL, benchmarks, and a tag-driven
   release pipeline with provenance attestation.
 - **Meta-packages:** `DotBoxD` (net10.0, full stack) and `DotBoxD.Services.All` (netstandard2.1,
   Unity/IL2CPP service bundle).
-- **End-to-end acceptance sample:** `samples/Pushdown/DotBoxD.EndToEnd` demonstrates all three modes
-  (Services, Kernels, Pushdown) in one runnable program and is enforced as a CI gate.
+- **GameServer example:** `samples/GameServer/Examples.GameServer.Server` is the maintained
+  runnable example for service IPC, event kernels, live settings, host bindings, policies, and
+  kernel RPC. Removed sample coverage is tracked in `docs/examples/coverage-gaps.md`.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

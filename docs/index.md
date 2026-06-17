@@ -38,11 +38,11 @@ flowchart LR
 - **Channels (legacy RPC docs)** — [`channels/`](channels/): quick-start, API reference, Unity
   integration, named-pipe/websocket transports, performance, design notes.
 
-## Runnable example
+## Runnable Example
 
-The acceptance sample [`samples/Pushdown/DotBoxD.EndToEnd`](../samples/Pushdown/DotBoxD.EndToEnd)
-demonstrates all three modes end to end:
+The maintained GameServer sample demonstrates service IPC, event kernels, live settings, host
+bindings, policy-gated execution, kernel RPC, and unload-on-disconnect:
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```

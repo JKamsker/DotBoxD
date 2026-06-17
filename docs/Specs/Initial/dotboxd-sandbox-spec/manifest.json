@@ -9,8 +9,8 @@
     },
     {
       "path": "../Addendum/Examples.md",
-      "sha256": "06ce1222956d04285d26ffb397c1b05d3bcb1b2bf26e8f794e66c2e4f176227c",
-      "bytes": 23191
+      "sha256": "f1554c60b9e99cd96b23627ea82ad9beda49fe151d3f8fe2a7b4cc984538b809",
+      "bytes": 6438
     },
     {
       "path": "adr/0001-restricted-ir-not-csharp.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "operations/runbook.md",
-      "sha256": "ac6dc8a442fdb6a5695989ebddc1b68d156c8e8d918599eda33a8b5798ccdb9c",
-      "bytes": 4523
+      "sha256": "9f0ff21c927bc57a5fd25faa121936e967bb75ff94ff098598921b74d59f63a0",
+      "bytes": 4515
     },
     {
       "path": "README.md",

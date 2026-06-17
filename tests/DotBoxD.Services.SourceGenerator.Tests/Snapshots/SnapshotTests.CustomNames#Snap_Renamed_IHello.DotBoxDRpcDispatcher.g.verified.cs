@@ -9,7 +9,11 @@ namespace Snap.Renamed
     /// </summary>
     public sealed class HelloDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.Renamed.IHello _service;
+        private readonly global::Snap.Renamed.IHello? _service;
+
+        internal HelloDispatcher()
+        {
+        }
 
         public HelloDispatcher(global::Snap.Renamed.IHello service)
         {
@@ -25,12 +29,17 @@ namespace Snap.Renamed
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'Greeter' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "Greet":
                 {
                     var arg = serializer.Deserialize<string>(payload);
-                    var __dotboxd_task = _service.HelloAsync(arg);
+                    var __dotboxd_task = __service.HelloAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;

@@ -6,7 +6,8 @@
     <PackageTags>dotboxd;sandbox;ipc;transport;pushdown;preview</PackageTags>
   </PropertyGroup>
 <ItemGroup>
-    <PackageReference Include="MessagePack" />
+    <PackageReference Include="MessagePack" ExcludeAssets="analyzers" />
+    <PackageReference Include="MessagePackAnalyzer" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

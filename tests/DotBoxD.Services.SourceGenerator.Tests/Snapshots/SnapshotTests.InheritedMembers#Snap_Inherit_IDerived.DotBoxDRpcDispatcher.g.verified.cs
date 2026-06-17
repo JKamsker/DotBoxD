@@ -9,7 +9,11 @@ namespace Snap.Inherit
     /// </summary>
     public sealed class DerivedDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.Inherit.IDerived _service;
+        private readonly global::Snap.Inherit.IDerived? _service;
+
+        internal DerivedDispatcher()
+        {
+        }
 
         public DerivedDispatcher(global::Snap.Inherit.IDerived service)
         {
@@ -25,11 +29,16 @@ namespace Snap.Inherit
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IDerived' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "DerivedAsync":
                 {
-                    var __dotboxd_task = _service.DerivedAsync();
+                    var __dotboxd_task = __service.DerivedAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
@@ -39,7 +48,7 @@ namespace Snap.Inherit
                 case "BaseAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
-                    var __dotboxd_task = _service.BaseAsync(arg);
+                    var __dotboxd_task = __service.BaseAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
