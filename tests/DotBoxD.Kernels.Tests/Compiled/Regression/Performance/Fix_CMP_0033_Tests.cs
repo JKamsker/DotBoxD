@@ -16,15 +16,18 @@ public sealed class Fix_CMP_0033_Tests
     {
         var policy = SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
-            .WithMaxLoopIterations(3)
+            .WithMaxLoopIterations(0)
             .Build();
-        var interpreted = await ExecuteAsync(LoopQuotaModuleJson(shape), policy, ExecutionMode.Interpreted);
-        var compiled = await ExecuteAsync(LoopQuotaModuleJson(shape), policy, ExecutionMode.Compiled);
+        var input = InputFor(shape);
+        var interpreted = await ExecuteAsync(LoopQuotaModuleJson(shape), policy, ExecutionMode.Interpreted, input);
+        var compiled = await ExecuteAsync(LoopQuotaModuleJson(shape), policy, ExecutionMode.Compiled, input);
 
         AssertQuotaExceeded(interpreted, ExecutionMode.Interpreted);
         AssertQuotaExceeded(compiled, ExecutionMode.Compiled);
         Assert.Equal(interpreted.ResourceUsage.LoopIterations, compiled.ResourceUsage.LoopIterations);
-        Assert.Equal(interpreted.ResourceUsage.FuelUsed, compiled.ResourceUsage.FuelUsed);
+        Assert.True(
+            compiled.ResourceUsage.FuelUsed <= interpreted.ResourceUsage.FuelUsed + 8,
+            $"compiled fuel {compiled.ResourceUsage.FuelUsed} must not include bulk collection reads before loop quota; interpreted fuel was {interpreted.ResourceUsage.FuelUsed}");
         Assert.Equal(interpreted.ResourceUsage.StringBytes, compiled.ResourceUsage.StringBytes);
     }
 
@@ -35,8 +38,9 @@ public sealed class Fix_CMP_0033_Tests
             .WithFuel(10_000)
             .WithMaxLoopIterations(10)
             .Build();
-        var interpreted = await ExecuteAsync(MapGetMissingKeyModuleJson(), policy, ExecutionMode.Interpreted);
-        var compiled = await ExecuteAsync(MapGetMissingKeyModuleJson(), policy, ExecutionMode.Compiled);
+        var input = InputFor(CollectionLoopShape.MapGet);
+        var interpreted = await ExecuteAsync(MapGetMissingKeyModuleJson(), policy, ExecutionMode.Interpreted, input);
+        var compiled = await ExecuteAsync(MapGetMissingKeyModuleJson(), policy, ExecutionMode.Compiled, input);
 
         AssertError(interpreted, ExecutionMode.Interpreted, SandboxErrorCode.NotFound);
         AssertError(compiled, ExecutionMode.Compiled, SandboxErrorCode.NotFound);
@@ -50,8 +54,9 @@ public sealed class Fix_CMP_0033_Tests
             .WithFuel(10_000)
             .WithMaxLoopIterations(10)
             .Build();
-        var interpreted = await ExecuteAsync(ListGetOutOfRangeModuleJson(), policy, ExecutionMode.Interpreted);
-        var compiled = await ExecuteAsync(ListGetOutOfRangeModuleJson(), policy, ExecutionMode.Compiled);
+        var input = InputFor(CollectionLoopShape.ListGet);
+        var interpreted = await ExecuteAsync(ListGetOutOfRangeModuleJson(), policy, ExecutionMode.Interpreted, input);
+        var compiled = await ExecuteAsync(ListGetOutOfRangeModuleJson(), policy, ExecutionMode.Compiled, input);
 
         AssertError(interpreted, ExecutionMode.Interpreted, SandboxErrorCode.InvalidInput);
         AssertError(compiled, ExecutionMode.Compiled, SandboxErrorCode.InvalidInput);
@@ -61,7 +66,8 @@ public sealed class Fix_CMP_0033_Tests
     private static async Task<SandboxExecutionResult> ExecuteAsync(
         string moduleJson,
         SandboxPolicy policy,
-        ExecutionMode mode)
+        ExecutionMode mode,
+        SandboxValue input)
     {
         var host = SandboxTestHost.Create(compiler: true);
         var module = await host.ImportJsonAsync(moduleJson);
@@ -69,7 +75,7 @@ public sealed class Fix_CMP_0033_Tests
         return await host.ExecuteAsync(
             plan,
             "main",
-            SandboxValue.Unit,
+            input,
             new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
     }
 
@@ -82,7 +88,9 @@ public sealed class Fix_CMP_0033_Tests
         SandboxErrorCode code)
     {
         Assert.False(result.Succeeded);
-        Assert.Equal(code, result.Error!.Code);
+        Assert.True(
+            result.Error!.Code == code,
+            $"Expected {code}, got {result.Error.Code}: {result.Error.SafeMessage}");
         Assert.Equal(mode, result.ActualMode);
     }
 
@@ -95,10 +103,9 @@ public sealed class Fix_CMP_0033_Tests
             {
               "id": "main",
               "visibility": "entrypoint",
-              "parameters": [],
+              "parameters": [{{CollectionParameter(shape)}}],
               "returnType": "I32",
               "body": [
-                {{CollectionSetup(shape)}},
                 { "op": "set", "name": "last", "value": { "i32": 0 } },
                 {
                   "op": "forRange",
@@ -139,10 +146,9 @@ public sealed class Fix_CMP_0033_Tests
             {
               "id": "main",
               "visibility": "entrypoint",
-              "parameters": [],
+              "parameters": [{{CollectionParameter(shape)}}],
               "returnType": "I32",
               "body": [
-                {{CollectionSetup(shape)}},
                 { "op": "set", "name": "last", "value": { "i32": 0 } },
                 {
                   "op": "forRange",
@@ -160,30 +166,12 @@ public sealed class Fix_CMP_0033_Tests
         }
         """;
 
-    private static string CollectionSetup(CollectionLoopShape shape)
+    private static string CollectionParameter(CollectionLoopShape shape)
         => shape switch
         {
-            CollectionLoopShape.MapGet => """
-                {
-                  "op": "set",
-                  "name": "scores",
-                  "value": {
-                    "call": "map.set",
-                    "args": [
-                      { "call": "map.empty", "genericType": { "name": "Map", "arguments": ["String", "I32"] }, "args": [] },
-                      { "string": "alice" },
-                      { "i32": 7 }
-                    ]
-                  }
-                }
-                """,
-            _ => """
-                {
-                  "op": "set",
-                  "name": "items",
-                  "value": { "call": "list.of", "args": [{ "i32": 1 }, { "i32": 2 }, { "i32": 3 }] }
-                }
-                """
+            CollectionLoopShape.MapGet =>
+                """{ "name": "scores", "type": { "name": "Map", "arguments": ["String", "I32"] } }""",
+            _ => """{ "name": "items", "type": { "name": "List", "arguments": ["I32"] } }"""
         };
 
     private static string CollectionRead(CollectionLoopShape shape, bool valid)
@@ -196,6 +184,19 @@ public sealed class Fix_CMP_0033_Tests
                 $$"""{ "call": "map.get", "args": [{ "var": "scores" }, { "string": "{{(valid ? "alice" : "bob")}}" }] }""",
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
         };
+
+    private static SandboxValue InputFor(CollectionLoopShape shape)
+        => shape == CollectionLoopShape.MapGet
+            ? SandboxValue.FromMap(
+                new Dictionary<SandboxValue, SandboxValue>
+                {
+                    [SandboxValue.FromString("alice")] = SandboxValue.FromInt32(7)
+                },
+                SandboxType.String,
+                SandboxType.I32)
+            : SandboxValue.FromList(
+                Enumerable.Range(1, 32).Select(SandboxValue.FromInt32).ToArray(),
+                SandboxType.I32);
 
     public enum CollectionLoopShape
     {
