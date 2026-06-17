@@ -52,6 +52,7 @@ internal static class InterpreterBindingCaller
             var value = pending.IsCompleted
                 ? pending.GetAwaiter().GetResult()
                 : await AwaitPendingAsync(context, pending).ConfigureAwait(false);
+            context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
             return value;

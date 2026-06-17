@@ -40,6 +40,7 @@ internal static class CompiledBindingDispatcher
             timeout = context.CreateWallTimeToken();
             using var returnCredits = context.BeginBindingReturnCreditScope();
             var value = AwaitBinding(context, descriptor.Invoke(context, args, timeout.Token));
+            context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
             return value;
@@ -108,6 +109,7 @@ internal static class CompiledBindingDispatcher
                 ? fastInvoker.Invoke(context, arg0, arg1, timeout.Token)
                 : descriptor.Invoke(context, [arg0, arg1], timeout.Token);
             var value = AwaitBinding(context, pending);
+            context.Checkpoint();
             value = context.ChargeBindingReturn(descriptor, value);
             context.EnsureRequiredBindingSuccessAudit(descriptor, auditCheckpoint);
             return value;
