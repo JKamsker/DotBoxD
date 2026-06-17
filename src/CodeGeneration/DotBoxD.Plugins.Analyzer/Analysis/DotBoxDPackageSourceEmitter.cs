@@ -21,7 +21,11 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine("{");
         EmitBody(builder, model);
         builder.AppendLine("}");
-        return new GeneratedPluginPackage(HintName(model), builder.ToString());
+        return new GeneratedPluginPackage(
+            HintName(model),
+            builder.ToString(),
+            model.Namespace,
+            model.PackageName);
     }
 
     private static string HintName(PluginKernelModel model)

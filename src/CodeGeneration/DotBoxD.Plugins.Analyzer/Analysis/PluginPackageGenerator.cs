@@ -57,14 +57,16 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             rpcResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
-        context.RegisterSourceOutput(
-            rpcResults.Where(static result => result.Package is not null).Select(static (result, _) => result.Package!),
-            static (sourceContext, package) => sourceContext.AddSource(package.HintName, package.Source));
+
+        var rpcPackages = rpcResults
+            .Where(static result => result.Package is not null)
+            .Select(static (result, _) => result.Package!);
 
         var packages = models
             .Collect()
             .Combine(chainResults.Select(static (result, _) => result.Model).Collect())
-            .Select(static (pair, _) => CreatePackageBatch(pair.Left.AddRange(pair.Right)))
+            .Combine(rpcPackages.Collect())
+            .Select(static (pair, _) => CreatePackageBatch(pair.Left.Left, pair.Left.Right, pair.Right))
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
 
         // Emit a C# interceptor per lowered chain so the InvokeKernel call site installs + wires its
@@ -93,26 +95,30 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         });
     }
 
-    private static GeneratedPluginPackageBatch CreatePackageBatch(ImmutableArray<PluginKernelModel> models)
+    private static GeneratedPluginPackageBatch CreatePackageBatch(
+        ImmutableArray<PluginKernelModel> models,
+        ImmutableArray<PluginKernelModel> chainModels,
+        ImmutableArray<GeneratedPluginPackage> rpcPackages)
     {
-        var duplicateIdentities = DuplicateIdentities(models, out var duplicateModelCount);
+        var sourcePackages = BuildSourcePackageArray(models, chainModels, rpcPackages);
+        var duplicateIdentities = DuplicateIdentities(sourcePackages, out var duplicatePackageCount);
         var diagnostics = new GeneratedPluginPackageDiagnostic[duplicateIdentities.Count];
         var diagnosticIndex = 0;
         foreach (var duplicate in duplicateIdentities.Values)
         {
-            var model = duplicate.FirstModel;
+            var package = duplicate.FirstPackage;
             diagnostics[diagnosticIndex] = new GeneratedPluginPackageDiagnostic(
-                $"Plugin package name '{model.PackageName}' is generated more than once in namespace '{NamespaceDisplay(model)}'.");
+                $"Plugin package name '{package.PackageName}' is generated more than once in namespace '{NamespaceDisplay(package)}'.");
             diagnosticIndex++;
         }
 
-        var packages = new GeneratedPluginPackage[models.Length - duplicateModelCount];
+        var packages = new GeneratedPluginPackage[sourcePackages.Length - duplicatePackageCount];
         var packageIndex = 0;
-        foreach (var model in models)
+        foreach (var package in sourcePackages)
         {
-            if (!duplicateIdentities.ContainsKey(PackageIdentity(model)))
+            if (!duplicateIdentities.ContainsKey(PackageIdentity(package)))
             {
-                packages[packageIndex] = DotBoxDPackageSourceEmitter.Emit(model);
+                packages[packageIndex] = package;
                 packageIndex++;
             }
         }
@@ -122,31 +128,59 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             EquatableArray<GeneratedPluginPackageDiagnostic>.FromOwned(diagnostics));
     }
 
-    private static Dictionary<PackageIdentityKey, DuplicatePackageIdentity> DuplicateIdentities(
+    private static GeneratedPluginPackage[] BuildSourcePackageArray(
         ImmutableArray<PluginKernelModel> models,
-        out int duplicateModelCount)
+        ImmutableArray<PluginKernelModel> chainModels,
+        ImmutableArray<GeneratedPluginPackage> rpcPackages)
     {
-        var counts = new Dictionary<PackageIdentityKey, DuplicatePackageIdentity>();
+        var packages = new GeneratedPluginPackage[models.Length + chainModels.Length + rpcPackages.Length];
+        var index = 0;
         foreach (var model in models)
         {
-            var identity = PackageIdentity(model);
+            packages[index] = DotBoxDPackageSourceEmitter.Emit(model);
+            index++;
+        }
+
+        foreach (var model in chainModels)
+        {
+            packages[index] = DotBoxDPackageSourceEmitter.Emit(model);
+            index++;
+        }
+
+        foreach (var package in rpcPackages)
+        {
+            packages[index] = package;
+            index++;
+        }
+
+        return packages;
+    }
+
+    private static Dictionary<PackageIdentityKey, DuplicatePackageIdentity> DuplicateIdentities(
+        IReadOnlyList<GeneratedPluginPackage> packages,
+        out int duplicatePackageCount)
+    {
+        var counts = new Dictionary<PackageIdentityKey, DuplicatePackageIdentity>();
+        foreach (var package in packages)
+        {
+            var identity = PackageIdentity(package);
             if (counts.TryGetValue(identity, out var duplicate))
             {
                 counts[identity] = duplicate.Increment();
             }
             else
             {
-                counts.Add(identity, new DuplicatePackageIdentity(model));
+                counts.Add(identity, new DuplicatePackageIdentity(package));
             }
         }
 
-        duplicateModelCount = 0;
+        duplicatePackageCount = 0;
         var duplicates = new Dictionary<PackageIdentityKey, DuplicatePackageIdentity>();
         foreach (var pair in counts)
         {
             if (pair.Value.Count > 1)
             {
-                duplicateModelCount += pair.Value.Count;
+                duplicatePackageCount += pair.Value.Count;
                 duplicates.Add(pair.Key, pair.Value);
             }
         }
@@ -154,11 +188,11 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         return duplicates;
     }
 
-    private static PackageIdentityKey PackageIdentity(PluginKernelModel model)
-        => new(model.Namespace, model.PackageName);
+    private static PackageIdentityKey PackageIdentity(GeneratedPluginPackage package)
+        => new(package.Namespace, package.PackageName);
 
-    private static string NamespaceDisplay(PluginKernelModel model)
-        => string.IsNullOrWhiteSpace(model.Namespace) ? "<global>" : model.Namespace;
+    private static string NamespaceDisplay(GeneratedPluginPackage package)
+        => string.IsNullOrWhiteSpace(package.Namespace) ? "<global>" : package.Namespace;
 
     private readonly struct PackageIdentityKey : IEquatable<PackageIdentityKey>
     {
@@ -189,23 +223,23 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
     private readonly struct DuplicatePackageIdentity
     {
-        public DuplicatePackageIdentity(PluginKernelModel firstModel)
+        public DuplicatePackageIdentity(GeneratedPluginPackage firstPackage)
         {
-            FirstModel = firstModel;
+            FirstPackage = firstPackage;
             Count = 1;
         }
 
-        private DuplicatePackageIdentity(PluginKernelModel firstModel, int count)
+        private DuplicatePackageIdentity(GeneratedPluginPackage firstPackage, int count)
         {
-            FirstModel = firstModel;
+            FirstPackage = firstPackage;
             Count = count;
         }
 
-        public PluginKernelModel FirstModel { get; }
+        public GeneratedPluginPackage FirstPackage { get; }
 
         public int Count { get; }
 
         public DuplicatePackageIdentity Increment()
-            => new(FirstModel, Count + 1);
+            => new(FirstPackage, Count + 1);
     }
 }
