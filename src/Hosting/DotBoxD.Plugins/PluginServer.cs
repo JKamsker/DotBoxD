@@ -120,12 +120,14 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         var removed = Kernels.Remove(pluginId);
-        if (removed)
+        if (removed is not null)
         {
+            Hooks.RemoveKernel(removed);
             RemoveRpcServiceRegistrations(pluginId);
+            return true;
         }
 
-        return removed;
+        return false;
     }
 
     internal ValueTask<InstalledKernel> InstallOwnedAsync(
@@ -152,12 +154,14 @@ public sealed partial class PluginServer : IDisposable
         }
 
         var removed = Kernels.RemoveOwned(owner, pluginId);
-        if (removed)
+        if (removed is not null)
         {
+            Hooks.RemoveKernel(removed);
             RemoveRpcServiceRegistrations(pluginId);
+            return true;
         }
 
-        return removed;
+        return false;
     }
 
     private async ValueTask<InstalledKernel> InstallCoreAsync(
@@ -172,7 +176,12 @@ public sealed partial class PluginServer : IDisposable
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        Kernels.Add(kernel);
+        var replaced = Kernels.Add(kernel);
+        if (replaced is not null)
+        {
+            Hooks.RemoveKernel(replaced);
+        }
+
         return kernel;
     }
 
@@ -190,7 +199,12 @@ public sealed partial class PluginServer : IDisposable
         // RPC kernels honor the server's execution mode like event kernels — their record/list IR
         // compiles to verified IL (record.new/record.get) so Auto/Compiled produces fast code.
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        Kernels.Add(kernel);
+        var replaced = Kernels.Add(kernel);
+        if (replaced is not null)
+        {
+            Hooks.RemoveKernel(replaced);
+        }
+
         return kernel;
     }
 
@@ -347,7 +361,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         return Get(pluginId);
     }
 
-    internal void Add(InstalledKernel kernel)
+    internal InstalledKernel? Add(InstalledKernel kernel)
     {
         InstalledKernel? revoke = null;
         lock (_gate)
@@ -374,51 +388,52 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         }
 
         revoke?.Revoke();
+        return revoke;
     }
 
     /// <summary>
     /// Removes and revokes a kernel only if it is owned by <paramref name="owner"/>, so a session
     /// disposal never tears down a server-owned or different-session kernel with the same id.
     /// </summary>
-    internal bool RemoveOwned(PluginSession owner, string pluginId)
+    internal InstalledKernel? RemoveOwned(PluginSession owner, string pluginId)
     {
         InstalledKernel? kernel;
         lock (_gate)
         {
             if (!_kernels.TryGetValue(pluginId, out kernel))
             {
-                return false;
+                return null;
             }
 
             if (!ReferenceEquals(kernel.OwnerId, owner))
             {
-                return false;
+                return null;
             }
 
             _kernels.Remove(pluginId);
         }
 
         kernel.Revoke();
-        return true;
+        return kernel;
     }
 
-    internal bool Remove(string pluginId)
+    internal InstalledKernel? Remove(string pluginId)
     {
         InstalledKernel? kernel;
         lock (_gate)
         {
             if (!_kernels.Remove(pluginId, out kernel))
             {
-                return false;
+                return null;
             }
         }
 
         if (kernel is null)
         {
-            return false;
+            return null;
         }
 
         kernel.Revoke();
-        return true;
+        return kernel;
     }
 }
