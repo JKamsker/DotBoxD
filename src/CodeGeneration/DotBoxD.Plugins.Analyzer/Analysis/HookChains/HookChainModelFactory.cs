@@ -84,6 +84,10 @@ internal static class HookChainModelFactory
         }
 
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
+        if (ContainsUnsupported(eventProperties))
+        {
+            return null;
+        }
 
         // Collectors for the whole chain: every Where/Select/terminal-Send deposits the capabilities its
         // IR needs (Send, [HostBinding] calls, gated event-property reads) and every extra sandbox effect
@@ -318,5 +322,18 @@ internal static class HookChainModelFactory
         public bool IsSelect { get; }
 
         public LambdaExpressionSyntax Lambda { get; }
+    }
+
+    private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)
+    {
+        for (var i = 0; i < eventProperties.Count; i++)
+        {
+            if (eventProperties[i].Type == DotBoxDGenerationNames.ManifestTypes.Unsupported)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
