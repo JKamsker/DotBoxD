@@ -136,6 +136,7 @@ internal static class LiveKernelValueFactory
         }
 
         kernel.Value.SetMany(values);
+        kernel.RefreshTypedValuesFromStore();
     }
 
     private static bool HasSetting(IReadOnlyList<LiveSettingDefinition> settings, string name)

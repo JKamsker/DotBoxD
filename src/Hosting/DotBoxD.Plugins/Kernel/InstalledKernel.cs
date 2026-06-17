@@ -253,7 +253,7 @@ public sealed partial class InstalledKernel
     internal void ValidateFor<TEvent>(IPluginEventAdapter<TEvent> adapter)
         => _adapterValidation.Validate(Manifest, _plan, _entrypoints, adapter);
 
-    private void RefreshTypedValuesFromStore()
+    internal void RefreshTypedValuesFromStore()
     {
         lock (_typedValueGate)
         {
