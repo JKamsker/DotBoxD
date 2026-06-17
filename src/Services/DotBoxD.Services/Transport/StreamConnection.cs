@@ -17,6 +17,7 @@ public sealed class StreamConnection : IRpcChannel
     private readonly int _maxMessageSize;
     private readonly TimeSpan _frameReadIdleTimeout;
     private readonly byte[] _lengthBuffer = new byte[4];
+    private int _activeReceives;
     private int _disposed;
 
     /// <summary>
@@ -101,37 +102,46 @@ public sealed class StreamConnection : IRpcChannel
 
     public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
-        ThrowIfDisposed();
-
-        var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false).ConfigureAwait(false);
-        if (read < 4)
-        {
-            return Payload.Empty;
-        }
-
-        var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer.AsSpan(0, 4));
-        ValidateIncomingLength(totalLength);
-
-        var frame = Payload.Rent(totalLength);
-        BinaryPrimitives.WriteInt32LittleEndian(frame.Memory.Span.Slice(0, 4), totalLength);
-
+        Interlocked.Increment(ref _activeReceives);
         try
         {
-            read = await ReadExactAsync(frame.Memory.Slice(4), ct, timeFirstRead: true).ConfigureAwait(false);
-            if (read < totalLength - 4)
+            ThrowIfDisposed();
+
+            var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false)
+                .ConfigureAwait(false);
+            if (read < 4)
+            {
+                return Payload.Empty;
+            }
+
+            var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer.AsSpan(0, 4));
+            ValidateIncomingLength(totalLength);
+
+            var frame = Payload.Rent(totalLength);
+            BinaryPrimitives.WriteInt32LittleEndian(frame.Memory.Span.Slice(0, 4), totalLength);
+
+            try
+            {
+                read = await ReadExactAsync(frame.Memory.Slice(4), ct, timeFirstRead: true).ConfigureAwait(false);
+                if (read < totalLength - 4)
+                {
+                    frame.Dispose();
+                    throw new InvalidDataException(
+                        $"Connection closed after {read + 4} of {totalLength} frame bytes.");
+                }
+            }
+            catch
             {
                 frame.Dispose();
-                throw new InvalidDataException(
-                    $"Connection closed after {read + 4} of {totalLength} frame bytes.");
+                throw;
             }
-        }
-        catch
-        {
-            frame.Dispose();
-            throw;
-        }
 
-        return frame;
+            return frame;
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeReceives);
+        }
     }
 
     /// <summary>
@@ -144,7 +154,7 @@ public sealed class StreamConnection : IRpcChannel
             return;
         }
 
-        if (_ownsStream)
+        if (_ownsStream || Volatile.Read(ref _activeReceives) != 0)
         {
             await DisposeStreamAsync(_stream).ConfigureAwait(false);
         }
