@@ -27,6 +27,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-call-accounting
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
 ```
 
 ## History
@@ -80,6 +81,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Lazy unlimited host-call accounting | this commit | `--probe-host-call-accounting` | Avoided constructing interpolated quota messages on successful host-call charges, and skipped per-binding call dictionaries when a descriptor has no `MaxCallsPerRun`. The 1M-call unlimited path improved from 73.7 ms and 232,000,136 B to 2.6 ms and 40 B. The limited control path, which still tracks per-binding counts, improved from 58.8 ms and 232,000,136 B to 35.6 ms and 256 B by removing successful-path quota-string allocation. |
 | Allocation-free no-op compiled binding dispatch | this commit | `--probe-binding-dispatch-scope` | Converted the binding grant-clock scope from an allocated `IDisposable` class to a concrete struct and made binding-return validation messages lazy for the success path. The 500k-call no-arg `Unit` binding probe improved from 228.4 ms and 87,769,944 B to 218.1 ms and 184 B. The intermediate struct-scope-only sample measured 222.8 ms and 68,000,184 B, isolating the remaining allocation to the eager return-validation message. |
 | Shared generated zero-arg binding arrays | this commit | `--probe-compiled-binding-arity` | Reused `Array.Empty<SandboxValue>()` for generated-code `CreateLiteralValueArray(0)` calls. The generated-shape zero-argument runtime-stub binding probe improved from 236.4 ms and 12,000,184 B to 221.7 ms and 184 B for 500k calls, while `ChargeValueArray` kept the same sandbox fuel/allocation charges. |
+| Capability grant lookup cache | this commit | `--probe-capability-grant-lookup` | Cached the last successful `SandboxContext.GetCapability` grant by requested capability id and `EffectiveGrantClock`, avoiding the common capability-backed binding sequence that calls `RequireCapability` and then resolves the same grant again. The 1M-pair probe improved from 24.5 ms (24.5 ns/op) and 728 B to 2.2 ms (2.2 ns/op) and 728 B; this is a time-only improvement with expiry/clock semantics preserved. |
 
 Versioning note for the two-argument binding fast path: `CallBinding2` and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade

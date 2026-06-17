@@ -16,6 +16,7 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 | Unlimited host-call accounting built quota strings and updated per-binding counts even without a per-binding limit. | `--probe-host-call-accounting` | 1,000,000 `ChargeHostCall` calls | 73.7 ms | 73.7 | 232,000,136 B | 232.0 | 2.6 ms | 2.6 | 40 B | 0.0 | Limited-control path moved from 58.8 ms / 232,000,136 B to 35.6 ms / 256 B. |
 | No-op compiled binding dispatch allocated a grant-clock scope and a success-path return-validation message. | `--probe-binding-dispatch-scope` | 500,000 no-arg `Unit` binding calls | 228.4 ms | 456.8 | 87,769,944 B | 175.5 | 218.1 ms | 436.2 | 184 B | 0.0 | Struct grant-clock scope alone reduced the probe to 68,000,184 B; lazy return-validation messages removed the remaining per-call allocation. |
 | Generated zero-argument runtime-stub binding calls allocated a fresh empty argument array. | `--probe-compiled-binding-arity` | 500,000 generated-shape zero-arg binding calls | 236.4 ms | 472.8 | 12,000,184 B | 24.0 | 221.7 ms | 443.4 | 184 B | 0.0 | `ChargeValueArray` still charges the same resource fuel/allocation; only the backing CLR empty array is shared. |
+| Capability-gated dispatch/bindings resolved the same grant twice. | `--probe-capability-grant-lookup` | 1,000,000 `RequireCapability` + `GetCapability` pairs | 24.5 ms | 24.5 | 728 B | ~0 | 2.2 ms | 2.2 | 728 B | ~0 | Time-only improvement; grant cache is keyed by capability id and `EffectiveGrantClock`. |
 
 ## Probe Commands
 
@@ -27,4 +28,5 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-host-call-accounting
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
 ```

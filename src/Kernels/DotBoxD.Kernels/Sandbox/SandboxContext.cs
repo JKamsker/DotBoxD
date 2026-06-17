@@ -9,6 +9,9 @@ public sealed partial class SandboxContext
 {
     private DeterministicRandom? _deterministicRandom;
     private BindingReturnCreditTracker? _returnCredits;
+    private string? _lastCapabilityId;
+    private DateTimeOffset _lastCapabilityClock;
+    private CapabilityGrant? _lastCapabilityGrant;
     private int _callDepth;
 
     public SandboxContext(
@@ -45,20 +48,31 @@ public sealed partial class SandboxContext
 
     public void RequireCapability(string capabilityId)
     {
-        if (!Policy.GrantsCapability(capabilityId, EffectiveGrantClock))
-        {
-            throw DenyCapability(capabilityId);
-        }
+        _ = GetCapability(capabilityId);
     }
 
     public CapabilityGrant GetCapability(string capabilityId)
     {
+        var now = EffectiveGrantClock;
+        if (_lastCapabilityGrant is { } cachedGrant &&
+            _lastCapabilityClock == now &&
+            string.Equals(_lastCapabilityId, capabilityId, StringComparison.Ordinal))
+        {
+            return cachedGrant;
+        }
+
         // Single indexed lookup: resolve the grant once and reuse it for the
         // permission decision instead of scanning the grant list twice (once to
         // authorize, once to fetch). The denial audit and error stay identical.
-        return Policy.TryGetGrant(capabilityId, EffectiveGrantClock, out var grant)
-            ? grant
-            : throw DenyCapability(capabilityId);
+        if (Policy.TryGetGrant(capabilityId, now, out var grant))
+        {
+            _lastCapabilityId = capabilityId;
+            _lastCapabilityClock = now;
+            _lastCapabilityGrant = grant;
+            return grant;
+        }
+
+        throw DenyCapability(capabilityId);
     }
 
     private SandboxRuntimeException DenyCapability(string capabilityId)

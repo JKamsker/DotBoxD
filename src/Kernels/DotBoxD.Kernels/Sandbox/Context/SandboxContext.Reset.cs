@@ -7,6 +7,9 @@ public sealed partial class SandboxContext
         _deterministicRandom = null;
         _returnCredits = null;
         _bindingGrantClock = null;
+        _lastCapabilityId = null;
+        _lastCapabilityClock = default;
+        _lastCapabilityGrant = null;
         _callDepth = 0;
     }
 }
