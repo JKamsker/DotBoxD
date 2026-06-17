@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
     <ProjectReference Include="..\..\..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
     <ProjectReference Include="..\..\..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
+    <ProjectReference Include="..\DotBoxD.Kernels.Game.Plugin\DotBoxD.Kernels.Game.Plugin.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\DotBoxD.Kernels.Game.Server.Abstractions\DotBoxD.Kernels.Game.Server.Abstractions.csproj" />
   </ItemGroup>
 
