@@ -87,6 +87,32 @@ public sealed class KernelRpcMarshallerDtoOrderTests
         Assert.True(dto.Success);
     }
 
+    [Fact]
+    public void ToSandboxValue_ignores_inherited_dto_properties()
+    {
+        var dto = new DerivedDto(10, true);
+
+        var sandbox = KernelRpcMarshaller.ToSandboxValue(dto, typeof(DerivedDto));
+
+        var record = Assert.IsType<RecordValue>(sandbox);
+        Assert.Equal(
+            [SandboxValue.FromInt32(10), SandboxValue.FromBool(true)],
+            record.Fields);
+    }
+
+    [Fact]
+    public void FromSandboxValue_uses_declared_dto_properties_only()
+    {
+        var sandbox = SandboxValue.FromRecord(
+            [SandboxValue.FromInt32(11), SandboxValue.FromBool(false)]);
+
+        var dto = Assert.IsType<DerivedDto>(
+            KernelRpcMarshaller.FromSandboxValue(sandbox, typeof(DerivedDto)));
+
+        Assert.Equal(11, dto.MonsterId);
+        Assert.False(dto.Success);
+    }
+
     private sealed class ReorderedDto
     {
         public ReorderedDto(bool success, int monsterId)
@@ -117,5 +143,17 @@ public sealed class KernelRpcMarshallerDtoOrderTests
         public int MonsterId { get; }
 
         public bool Success { get; }
+    }
+
+    private abstract class BaseDto
+    {
+        public int BaseId => 99;
+    }
+
+    private sealed class DerivedDto(int monsterId, bool success) : BaseDto
+    {
+        public int MonsterId { get; } = monsterId;
+
+        public bool Success { get; } = success;
     }
 }
