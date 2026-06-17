@@ -62,12 +62,110 @@ function Normalize-ApiLine([string] $Line) {
 }
 
 function Remove-LineComment([string] $Line) {
-    $commentIndex = $Line.IndexOf("//", [StringComparison]::Ordinal)
-    if ($commentIndex -lt 0) {
-        return $Line
+    $doubleQuote = [char]34
+    $singleQuote = [char]39
+    $backslash = [char]92
+    $slash = [char]47
+    $at = [char]64
+    $nullChar = [char]0
+
+    $inString = $false
+    $inVerbatimString = $false
+    $inRawString = $false
+    $rawStringQuotes = 0
+    $inChar = $false
+
+    for ($index = 0; $index -lt $Line.Length; $index++) {
+        $current = $Line[$index]
+        $next = if ($index + 1 -lt $Line.Length) { $Line[$index + 1] } else { $nullChar }
+
+        if ($inRawString) {
+            if ($current -eq $doubleQuote) {
+                $quoteCount = Count-ConsecutiveChars $Line $index $doubleQuote
+                if ($quoteCount -ge $rawStringQuotes) {
+                    $index += $rawStringQuotes - 1
+                    $inRawString = $false
+                }
+            }
+
+            continue
+        }
+
+        if ($inString) {
+            if ($inVerbatimString) {
+                if ($current -eq $doubleQuote -and $next -eq $doubleQuote) {
+                    $index++
+                } elseif ($current -eq $doubleQuote) {
+                    $inString = $false
+                    $inVerbatimString = $false
+                }
+
+                continue
+            }
+
+            if ($current -eq $backslash) {
+                $index++
+            } elseif ($current -eq $doubleQuote) {
+                $inString = $false
+            }
+
+            continue
+        }
+
+        if ($inChar) {
+            if ($current -eq $backslash) {
+                $index++
+            } elseif ($current -eq $singleQuote) {
+                $inChar = $false
+            }
+
+            continue
+        }
+
+        if ($current -eq $slash -and $next -eq $slash) {
+            return $Line.Substring(0, $index)
+        }
+
+        if ($current -eq $at -and $next -eq $doubleQuote) {
+            $inString = $true
+            $inVerbatimString = $true
+            $index++
+            continue
+        }
+
+        if ($current -eq $doubleQuote) {
+            $quoteCount = Count-ConsecutiveChars $Line $index $doubleQuote
+            if ($quoteCount -ge 3) {
+                $inRawString = $true
+                $rawStringQuotes = $quoteCount
+                $index += $quoteCount - 1
+            } else {
+                $inString = $true
+                $inVerbatimString = $false
+            }
+
+            continue
+        }
+
+        if ($current -eq $singleQuote) {
+            $inChar = $true
+        }
     }
 
-    return $Line.Substring(0, $commentIndex)
+    return $Line
+}
+
+function Count-ConsecutiveChars([string] $Text, [int] $StartIndex, [char] $Character) {
+    $count = 0
+    for ($index = $StartIndex; $index -lt $Text.Length; $index++) {
+        if ($Text[$index] -ne $Character) {
+            break
+        }
+
+        $count++
+    }
+
+    return $count
 }
 
 function Get-ParenthesisDelta([string] $Text) {
