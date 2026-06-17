@@ -61,7 +61,7 @@ public sealed class GamePluginControlServiceTests
         {
             cts.Cancel();
 
-            await Assert.ThrowsAsync<OperationCanceledException>(
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 async () => await hold.WaitAsync(TimeSpan.FromSeconds(1)));
         }
         finally
