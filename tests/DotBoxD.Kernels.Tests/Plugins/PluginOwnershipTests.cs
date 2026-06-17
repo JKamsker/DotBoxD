@@ -1,6 +1,10 @@
+using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.Plugins.Rpc;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Policies;
 
 namespace DotBoxD.Kernels.Tests.Plugins;
@@ -94,6 +98,55 @@ public sealed class PluginOwnershipTests
     }
 
     [Fact]
+    public async Task Session_dispose_waits_for_in_flight_owned_setting_update()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
+        var session = server.CreateSession();
+        var kernel = await session.InstallAsync(FireDamagePluginPackage.Create());
+        var definition = Assert.Single(kernel.Value.Definitions, s => s.Name == "DamageType");
+        var setting = new BlockingLiveSetting(definition, "fire");
+        ReplaceSetting(kernel.Value, setting);
+        var update = Task.Run(async () => await session.UpdateSettingsAsync(
+            "fire-damage",
+            new Dictionary<string, object?> { ["DamageType"] = "ice" }).AsTask());
+        Task? dispose = null;
+        var disposedBeforeUpdateCompleted = false;
+        try
+        {
+            var updateReachedSetting = await Task.WhenAny(setting.Started, update)
+                .WaitAsync(TimeSpan.FromSeconds(5)) == setting.Started;
+            if (!updateReachedSetting)
+            {
+                await update;
+                Assert.Fail("The live setting update completed before reaching the blocking setting.");
+            }
+
+            var disposeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            dispose = Task.Run(() => {
+                disposeStarted.SetResult();
+                session.Dispose();
+            });
+            await disposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            disposedBeforeUpdateCompleted =
+                await Task.WhenAny(dispose, Task.Delay(250)) == dispose;
+        }
+        finally
+        {
+            setting.Release();
+        }
+
+        await update.WaitAsync(TimeSpan.FromSeconds(5));
+        if (dispose is not null)
+        {
+            await dispose.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        Assert.False(disposedBeforeUpdateCompleted);
+        Assert.Equal("ice", setting.CurrentValue);
+        Assert.True((bool)kernel.IsRevoked);
+    }
+
+    [Fact]
     public async Task Disposed_session_rejects_further_installs()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: LongWallPluginPolicy());
@@ -163,4 +216,41 @@ public sealed class PluginOwnershipTests
             .WithMaxHostCalls(1_000)
             .WithWallTime(TimeSpan.FromSeconds(10))
             .Build();
+
+    private static void ReplaceSetting(LiveSettingStore store, ILiveSetting setting)
+    {
+        var field = typeof(LiveSettingStore).GetField("_settings", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var settings = (Dictionary<string, ILiveSetting>)field.GetValue(store)!;
+        settings[setting.Name] = setting;
+    }
+
+    private sealed class BlockingLiveSetting(
+        LiveSettingDefinition definition,
+        object? initialValue) : ILiveSetting
+    {
+        private readonly TaskCompletionSource _started =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private object? _value = initialValue;
+
+        public Task Started => _started.Task;
+        public string Name => definition.Name;
+        public LiveSettingDefinition Definition => definition;
+        public object? CurrentValue => _value;
+
+        public SandboxValue ToSandboxValue()
+            => SandboxValue.FromString((string)_value!);
+
+        public void SetObject(object? value)
+        {
+            _started.SetResult();
+            _release.Task.GetAwaiter().GetResult();
+            _value = value;
+        }
+
+        public void Release()
+            => _release.TrySetResult();
+    }
 }
