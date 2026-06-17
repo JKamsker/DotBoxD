@@ -145,7 +145,8 @@ public sealed class TcpConnection : IRpcChannel
                 if (bytesRead < totalLength - 4)
                 {
                     payload.Dispose();
-                    return Payload.Empty; // Connection closed
+                    throw new InvalidDataException(
+                        $"Connection closed after {bytesRead} of {totalLength - 4} frame bytes.");
                 }
             }
             catch
