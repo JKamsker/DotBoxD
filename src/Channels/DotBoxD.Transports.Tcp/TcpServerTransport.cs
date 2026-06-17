@@ -212,6 +212,8 @@ public sealed class TcpServerTransport : IServerTransport
 
     public Task StopAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         // Reset state so the transport can be restarted with StartAsync, and so a subsequent
         // AcceptAsync surfaces "not started" instead of accepting on a stopped listener.
         Volatile.Write(ref _started, 0);
