@@ -20,7 +20,7 @@ public sealed class GamePluginControlServiceTests
         var world = gameServer
             .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
             .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [server.Hooks])!;
+            .Invoke(null, [server.Hooks, server.Subscriptions])!;
         sink.GetType().GetMethod("Bind", BindingFlags.Public | BindingFlags.Instance)!.Invoke(sink, [world]);
         var session = server.CreateSession();
         var service = Create(
@@ -48,7 +48,7 @@ public sealed class GamePluginControlServiceTests
         var world = gameServer
             .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
             .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [server.Hooks])!;
+            .Invoke(null, [server.Hooks, server.Subscriptions])!;
         sink.GetType().GetMethod("Bind", BindingFlags.Public | BindingFlags.Instance)!.Invoke(sink, [world]);
         var session = server.CreateSession();
         var service = Create(
@@ -90,7 +90,7 @@ public sealed class GamePluginControlServiceTests
         var world = gameServer
             .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
             .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [server.Hooks])!;
+            .Invoke(null, [server.Hooks, server.Subscriptions])!;
         var service = Create(
             gameServer,
             "DotBoxD.Kernels.Game.Server.Ipc.GamePluginControlService",
@@ -124,7 +124,7 @@ public sealed class GamePluginControlServiceTests
         var world = gameServer
             .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
             .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [server.Hooks])!;
+            .Invoke(null, [server.Hooks, server.Subscriptions])!;
         var service = Create(
             gameServer,
             "DotBoxD.Kernels.Game.Server.Ipc.GamePluginControlService",
@@ -142,7 +142,7 @@ public sealed class GamePluginControlServiceTests
     }
 
     [Fact]
-    public async Task KillMonsterAsync_requires_session_owned_write_kernel()
+    public async Task InvokeServerExtensionAsync_requires_session_owned_server_extension()
     {
         var gameServer = Assembly.LoadFrom(GameServerAssemblyPath());
         var sink = (IPluginMessageSink)Create(gameServer, "DotBoxD.Kernels.Game.Server.Simulation.GameCommandSink");
@@ -150,7 +150,7 @@ public sealed class GamePluginControlServiceTests
         var world = gameServer
             .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
             .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [server.Hooks])!;
+            .Invoke(null, [server.Hooks, server.Subscriptions])!;
         var service = Create(
             gameServer,
             "DotBoxD.Kernels.Game.Server.Ipc.GamePluginControlService",
@@ -159,19 +159,17 @@ public sealed class GamePluginControlServiceTests
             sink,
             world);
 
-        var killed = await KillMonsterAsync(service, "monster-4");
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await InvokeServerExtensionAsync(service, "monster-killer", []));
 
-        Assert.False(killed);
-        Assert.Equal(45, await GetEntityHealthAsync(service, "monster-4"));
+        Assert.Contains("not owned by this plugin session", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void GameServer_project_builds_child_plugin_project()
     {
         var project = XDocument.Load(GameServerProjectPath());
-        var pluginReference = Assert.Single(project.Descendants("ProjectReference"), IsGamePluginReference);
-
-        Assert.Equal("false", (string?)pluginReference.Attribute("ReferenceOutputAssembly"));
+        Assert.DoesNotContain(project.Descendants("ProjectReference"), IsGamePluginReference);
     }
 
     private static object Create(Assembly assembly, string typeName, params object[] args)
@@ -190,20 +188,12 @@ public sealed class GamePluginControlServiceTests
         return await ((ValueTask<string>)result!).ConfigureAwait(false);
     }
 
-    private static async Task<bool> KillMonsterAsync(object service, string monsterId)
+    private static async Task<byte[]> InvokeServerExtensionAsync(object service, string pluginId, byte[] arguments)
     {
         var result = service.GetType()
-            .GetMethod("KillMonsterAsync", BindingFlags.Public | BindingFlags.Instance)!
-            .Invoke(service, [monsterId, CancellationToken.None]);
-        return await ((ValueTask<bool>)result!).ConfigureAwait(false);
-    }
-
-    private static async Task<int> GetEntityHealthAsync(object service, string entityId)
-    {
-        var result = service.GetType()
-            .GetMethod("GetEntityHealthAsync", BindingFlags.Public | BindingFlags.Instance)!
-            .Invoke(service, [entityId, CancellationToken.None]);
-        return await ((ValueTask<int>)result!).ConfigureAwait(false);
+            .GetMethod("InvokeServerExtensionAsync", BindingFlags.Public | BindingFlags.Instance)!
+            .Invoke(service, [pluginId, arguments, CancellationToken.None]);
+        return await ((ValueTask<byte[]>)result!).ConfigureAwait(false);
     }
 
     private static ValueTask HoldUntilShutdownAsync(object service, CancellationToken cancellationToken)
@@ -229,7 +219,7 @@ public sealed class GamePluginControlServiceTests
     {
         var include = ((string?)reference.Attribute("Include"))?.Replace('\\', '/');
         return include?.EndsWith(
-            "/DotBoxD.Kernels.Game.Plugin/DotBoxD.Kernels.Game.Plugin.csproj",
+            "/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj",
             StringComparison.Ordinal) is true;
     }
 
@@ -247,13 +237,12 @@ public sealed class GamePluginControlServiceTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Server",
+            "Examples.GameServer.Server",
             "bin",
             configuration,
             "net10.0",
-            "DotBoxD.Kernels.Game.Server.dll"));
+            "Examples.GameServer.Server.dll"));
     }
 
     private static string GamePluginAssemblyPath()
@@ -270,13 +259,12 @@ public sealed class GamePluginControlServiceTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Plugin",
+            "Examples.GameServer.Plugin",
             "bin",
             configuration,
             "net10.0",
-            "DotBoxD.Kernels.Game.Plugin.dll"));
+            "Examples.GameServer.Plugin.dll"));
     }
 
     private static string GameServerProjectPath()
@@ -288,8 +276,7 @@ public sealed class GamePluginControlServiceTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Server",
-            "DotBoxD.Kernels.Game.Server.csproj"));
+            "Examples.GameServer.Server",
+            "Examples.GameServer.Server.csproj"));
 }

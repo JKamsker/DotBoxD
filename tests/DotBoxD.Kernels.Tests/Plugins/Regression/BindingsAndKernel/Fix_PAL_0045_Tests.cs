@@ -40,7 +40,7 @@ public sealed class Fix_PAL_0045_Tests
         var server = PluginAddendumTestPolicies.CreateServer(messages);
         var kernel = await server.InstallAsync(package);
 
-        server.Hooks.On<MetadataOnlyConventionEvent>().UseKernel(kernel);
+        server.Hooks.On<MetadataOnlyConventionEvent>().Use(kernel);
         await server.Hooks.PublishAsync(new MetadataOnlyConventionEvent
         {
             TargetId = "player-1",

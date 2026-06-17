@@ -9,7 +9,11 @@ namespace Snap.Two
     /// </summary>
     public sealed class OneDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.Two.IOne _service;
+        private readonly global::Snap.Two.IOne? _service;
+
+        internal OneDispatcher()
+        {
+        }
 
         public OneDispatcher(global::Snap.Two.IOne service)
         {
@@ -25,12 +29,17 @@ namespace Snap.Two
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IOne' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "AAsync":
                 {
                     var arg = serializer.Deserialize<int>(payload);
-                    var __dotboxd_task = _service.AAsync(arg);
+                    var __dotboxd_task = __service.AAsync(arg);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;

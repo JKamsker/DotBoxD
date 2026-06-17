@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
-/// Converts between the compact kernel RPC wire IR and the sandbox values consumed by installed verified
+/// Converts between the compact server extension wire IR and the sandbox values consumed by installed verified
 /// IR. The expected sandbox type is supplied by the server-side installed function signature.
 /// </summary>
 public static class KernelRpcValueConverter
@@ -23,7 +23,7 @@ public static class KernelRpcValueConverter
             ListValue list => KernelRpcValue.List(ConvertList(list.Values)),
             RecordValue record => KernelRpcValue.Record(ConvertList(record.Fields)),
             _ => throw new NotSupportedException(
-                $"Kernel RPC IPC cannot marshal sandbox value '{value.GetType().Name}'.")
+                $"Server extension IPC cannot marshal sandbox value '{value.GetType().Name}'.")
         };
     }
 
@@ -70,11 +70,10 @@ public static class KernelRpcValueConverter
         {
             value.RequireKind(KernelRpcValueKind.List);
             var itemType = expectedType.Arguments[0];
-            var source = value.ItemSpan;
-            var items = new SandboxValue[source.Length];
-            for (var i = 0; i < source.Length; i++)
+            var items = new SandboxValue[value.Items.Length];
+            for (var i = 0; i < value.Items.Length; i++)
             {
-                items[i] = ToSandboxValue(source[i], itemType);
+                items[i] = ToSandboxValue(value.Items[i], itemType);
             }
 
             return SandboxValue.FromList(items, itemType);
@@ -83,23 +82,22 @@ public static class KernelRpcValueConverter
         if (expectedType.IsRecord)
         {
             value.RequireKind(KernelRpcValueKind.Record);
-            var source = value.ItemSpan;
-            if (source.Length != expectedType.Arguments.Count)
+            if (value.Items.Length != expectedType.Arguments.Count)
             {
                 throw new NotSupportedException(
-                    $"Kernel RPC IPC record expected {expectedType.Arguments.Count} field(s) but received {source.Length}.");
+                    $"Server extension IPC record expected {expectedType.Arguments.Count} field(s) but received {value.Items.Length}.");
             }
 
-            var fields = new SandboxValue[source.Length];
-            for (var i = 0; i < source.Length; i++)
+            var fields = new SandboxValue[value.Items.Length];
+            for (var i = 0; i < value.Items.Length; i++)
             {
-                fields[i] = ToSandboxValue(source[i], expectedType.Arguments[i]);
+                fields[i] = ToSandboxValue(value.Items[i], expectedType.Arguments[i]);
             }
 
             return SandboxValue.FromRecord(fields);
         }
 
-        throw new NotSupportedException($"Kernel RPC IPC cannot marshal expected sandbox type '{expectedType}'.");
+        throw new NotSupportedException($"Server extension IPC cannot marshal expected sandbox type '{expectedType}'.");
     }
 
     private static KernelRpcValue[] ConvertList(IReadOnlyList<SandboxValue> values)

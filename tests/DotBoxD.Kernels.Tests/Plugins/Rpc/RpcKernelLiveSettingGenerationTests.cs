@@ -16,7 +16,7 @@ public sealed class RpcKernelLiveSettingGenerationTests
 
             namespace Sample;
 
-            [KernelRpcService("threshold")]
+            [ServerExtension("threshold")]
             public sealed partial class ThresholdKernel
             {
                 [LiveSetting]

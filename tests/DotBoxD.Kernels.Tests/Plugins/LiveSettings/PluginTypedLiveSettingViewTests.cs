@@ -13,7 +13,7 @@ public sealed class PluginTypedLiveSettingViewTests
         var messages = new InMemoryPluginMessageSink();
         var server = PluginAddendumTestPolicies.CreateServer(messages);
         await server.InstallAsync(FireDamagePluginPackage.Create());
-        server.Hooks.On<DamageEvent>().UseKernel<FireDamageKernel>();
+        server.Hooks.On<DamageEvent>().Use<FireDamageKernel>();
 
         var primary = server.Kernels.Get<FireDamageKernel>("fire-damage");
         _ = server.Kernels.Get<AlternateFireDamageSettings>("fire-damage");

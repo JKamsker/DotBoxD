@@ -17,7 +17,7 @@ internal static class PluginKernelModelFactory
             return null;
         }
 
-        var pluginId = PluginSymbolReader.PluginId(context.Attributes);
+        var pluginId = PluginSymbolReader.PluginId(context.Attributes) ?? KernelId(type.Name);
         var eventTypes = PluginSymbolReader.EventTypes(type);
         if (string.IsNullOrWhiteSpace(pluginId)) {
             var diagnostic = PluginKernelDiagnostic.Create(
@@ -216,6 +216,37 @@ internal static class PluginKernelModelFactory
             ? kernelName.Substring(0, kernelName.Length - DotBoxDGenerationNames.KernelSuffix.Length) +
                 DotBoxDGenerationNames.PluginPackageSuffix
             : kernelName + DotBoxDGenerationNames.PluginPackageSuffix;
+
+    private static string KernelId(string kernelName)
+    {
+        var name = kernelName.EndsWith(DotBoxDGenerationNames.KernelSuffix, StringComparison.Ordinal)
+            ? kernelName.Substring(0, kernelName.Length - DotBoxDGenerationNames.KernelSuffix.Length)
+            : kernelName;
+        return ToKebabCase(name);
+    }
+
+    private static string ToKebabCase(string value)
+    {
+        var builder = new System.Text.StringBuilder(value.Length + 4);
+        for (var i = 0; i < value.Length; i++)
+        {
+            var ch = value[i];
+            if (char.IsUpper(ch))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('-');
+                }
+
+                builder.Append(char.ToLowerInvariant(ch));
+                continue;
+            }
+
+            builder.Append(ch);
+        }
+
+        return builder.ToString();
+    }
 
     private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)
     {

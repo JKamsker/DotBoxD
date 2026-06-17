@@ -4,7 +4,7 @@ using DotBoxD.Plugins.Runtime.Hooks;
 
 namespace DotBoxD.Plugins.Runtime;
 
-public sealed class HookPipeline<TEvent>
+public sealed class HookPipeline<TEvent> : IKernelHandlerPipeline
 {
     private readonly object _gate = new();
 
@@ -13,7 +13,8 @@ public sealed class HookPipeline<TEvent>
     // start of a publish preserves stable per-publish semantics, because installed delegates
     // never mutate an existing array in place.
     private volatile Func<TEvent, HookContext, ValueTask<bool>>[] _filters = [];
-    private volatile HookHandler<TEvent>[] _handlers = [];
+    private volatile Func<TEvent, HookContext, ValueTask>[] _handlers = [];
+    private readonly Dictionary<InstalledKernel, List<Func<TEvent, HookContext, ValueTask>>> _kernelHandlers = [];
     private readonly IPluginEventAdapter<TEvent> _adapter;
     private readonly IPluginMessageSink _messages;
     private readonly HookContext _defaultContext;
@@ -35,7 +36,7 @@ public sealed class HookPipeline<TEvent>
 
     /// <summary>
     /// Installs an analyzer-generated hook-chain package and wires it into this pipeline. Called by
-    /// the generated interceptor that replaces an <c>InvokeKernel(lambda)</c> call site, so the lowered
+    /// the generated interceptor that replaces a <c>Run(lambda)</c> call site, so the lowered
     /// chain runs as verified IR instead of throwing. Blocks on install at setup time.
     /// </summary>
     public HookPipeline<TEvent> UseGeneratedChain(PluginPackage package)
@@ -50,7 +51,16 @@ public sealed class HookPipeline<TEvent>
             ]);
         }
 
-        return UseKernel(_installer(package));
+        var kernel = _installer(package);
+        try
+        {
+            return Use(kernel);
+        }
+        catch
+        {
+            _kernels.Remove(kernel);
+            throw;
+        }
     }
 
     public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
@@ -82,10 +92,9 @@ public sealed class HookPipeline<TEvent>
 
     public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTask> handler)
     {
-        ArgumentNullException.ThrowIfNull(handler);
         lock (_gate)
         {
-            _handlers = [.. _handlers, new HookHandler<TEvent>(null, handler)];
+            _handlers = [.. _handlers, handler];
         }
 
         return this;
@@ -111,16 +120,16 @@ public sealed class HookPipeline<TEvent>
     }
 
     /// <summary>Native host terminal — runs in-process (NOT sandboxed). Use sparingly.</summary>
-    public HookPipeline<TEvent> InvokeLocal(Func<TEvent, HookContext, ValueTask> handler)
+    public HookPipeline<TEvent> RunLocal(Func<TEvent, HookContext, ValueTask> handler)
         => InvokeHostHandler(handler);
 
-    public HookPipeline<TEvent> InvokeLocal(Action<TEvent, HookContext> handler)
+    public HookPipeline<TEvent> RunLocal(Action<TEvent, HookContext> handler)
         => InvokeHostHandler(handler);
 
-    public HookPipeline<TEvent> InvokeLocal(Func<TEvent, ValueTask> handler)
+    public HookPipeline<TEvent> RunLocal(Func<TEvent, ValueTask> handler)
         => InvokeHostHandler(handler);
 
-    public HookPipeline<TEvent> InvokeLocal(Action<TEvent> handler)
+    public HookPipeline<TEvent> RunLocal(Action<TEvent> handler)
         => InvokeHostHandler(handler);
 
     /// <summary>Projects the flowing element to a new type for downstream Where/terminal stages.</summary>
@@ -142,40 +151,75 @@ public sealed class HookPipeline<TEvent>
     /// The terminal the analyzer lowers to verified IR. It never runs as host code: un-lowered it
     /// throws, so plugin logic cannot accidentally execute unsandboxed.
     /// </summary>
-    public HookPipeline<TEvent> InvokeKernel(Func<TEvent, HookContext, ValueTask> handler)
+    public HookPipeline<TEvent> Run(Func<TEvent, HookContext, ValueTask> handler)
         => throw HookLowering.NotLowered();
 
-    public HookPipeline<TEvent> InvokeKernel(Action<TEvent, HookContext> handler)
+    public HookPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
         => throw HookLowering.NotLowered();
 
-    public HookPipeline<TEvent> InvokeKernel(Func<TEvent, ValueTask> handler)
+    public HookPipeline<TEvent> Run(Func<TEvent, ValueTask> handler)
         => throw HookLowering.NotLowered();
 
-    public HookPipeline<TEvent> InvokeKernel(Action<TEvent> handler)
+    public HookPipeline<TEvent> Run(Action<TEvent> handler)
         => throw HookLowering.NotLowered();
 
-    public HookPipeline<TEvent> UseKernel(InstalledKernel kernel)
+    public HookPipeline<TEvent> Use(InstalledKernel kernel)
     {
-        ArgumentNullException.ThrowIfNull(kernel);
         kernel.ValidateFor(_adapter);
+        var handler = (Func<TEvent, HookContext, ValueTask>)
+            ((e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
         lock (_gate)
         {
-            _handlers = [
-                .. _handlers,
-                new HookHandler<TEvent>(
-                    kernel,
-                    (e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken))
-            ];
+            _handlers = [.. _handlers, handler];
+            if (!_kernelHandlers.TryGetValue(kernel, out var handlers))
+            {
+                handlers = [];
+                _kernelHandlers[kernel] = handlers;
+            }
+
+            handlers.Add(handler);
         }
 
         return this;
     }
 
-    public HookPipeline<TEvent> UseKernel<TKernel>() where TKernel : class
-        => UseKernel(_kernels.GetByKernelType<TKernel>());
+    public HookPipeline<TEvent> Use<TKernel>() where TKernel : class
+        => Use(_kernels.GetByKernelType<TKernel>());
 
     internal bool UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => ReferenceEquals(_adapter, adapter);
+
+    void IKernelHandlerPipeline.RemoveKernel(InstalledKernel kernel)
+        => RemoveKernel(kernel);
+
+    private void RemoveKernel(InstalledKernel kernel)
+    {
+        lock (_gate)
+        {
+            if (!_kernelHandlers.Remove(kernel, out var handlers))
+            {
+                return;
+            }
+
+            _handlers = RemoveHandlers(_handlers, handlers);
+        }
+    }
+
+    private static Func<TEvent, HookContext, ValueTask>[] RemoveHandlers(
+        Func<TEvent, HookContext, ValueTask>[] current,
+        List<Func<TEvent, HookContext, ValueTask>> removed)
+    {
+        var next = new List<Func<TEvent, HookContext, ValueTask>>(current.Length);
+        foreach (var handler in current)
+        {
+            if (!removed.Contains(handler))
+            {
+                next.Add(handler);
+            }
+        }
+
+        return next.Count == current.Length ? current : [.. next];
+    }
 
     internal ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken)
     {
@@ -191,84 +235,58 @@ public sealed class HookPipeline<TEvent>
         {
             var filter = filters[i](e, context);
             if (!filter.IsCompletedSuccessfully)
+            {
                 return PublishAfterFilterAwaitAsync(filter, filters, handlers, e, context, i);
+            }
 
             if (!filter.Result)
+            {
                 return ValueTask.CompletedTask;
+            }
         }
 
         for (var i = 0; i < handlers.Length; i++)
         {
-            var handler = handlers[i].Invoke(e, context);
+            var handler = handlers[i](e, context);
             if (!handler.IsCompletedSuccessfully)
+            {
                 return PublishAfterHandlerAwaitAsync(handler, handlers, e, context, i);
+            }
         }
 
         return ValueTask.CompletedTask;
     }
 
-    internal void RemoveKernel(InstalledKernel kernel)
-    {
-        lock (_gate)
-        {
-            var handlers = _handlers;
-            var retainedCount = 0;
-            for (var i = 0; i < handlers.Length; i++)
-            {
-                if (!ReferenceEquals(handlers[i].Kernel, kernel))
-                {
-                    retainedCount++;
-                }
-            }
-
-            if (retainedCount == handlers.Length)
-            {
-                return;
-            }
-
-            var retained = new HookHandler<TEvent>[retainedCount];
-            var index = 0;
-            for (var i = 0; i < handlers.Length; i++)
-            {
-                if (!ReferenceEquals(handlers[i].Kernel, kernel))
-                {
-                    retained[index] = handlers[i];
-                    index++;
-                }
-            }
-
-            _handlers = retained;
-        }
-    }
-
     private static async ValueTask PublishAfterFilterAwaitAsync(
         ValueTask<bool> pending,
         Func<TEvent, HookContext, ValueTask<bool>>[] filters,
-        HookHandler<TEvent>[] handlers,
+        Func<TEvent, HookContext, ValueTask>[] handlers,
         TEvent e,
         HookContext context,
         int index)
     {
-        if (!await pending.ConfigureAwait(false)) {
+        if (!await pending.ConfigureAwait(false))
+        {
             return;
         }
 
         for (var i = index + 1; i < filters.Length; i++)
         {
-            if (!await filters[i](e, context).ConfigureAwait(false)) {
+            if (!await filters[i](e, context).ConfigureAwait(false))
+            {
                 return;
             }
         }
 
         for (var i = 0; i < handlers.Length; i++)
         {
-            await handlers[i].Invoke(e, context).ConfigureAwait(false);
+            await handlers[i](e, context).ConfigureAwait(false);
         }
     }
 
     private static async ValueTask PublishAfterHandlerAwaitAsync(
         ValueTask pending,
-        HookHandler<TEvent>[] handlers,
+        Func<TEvent, HookContext, ValueTask>[] handlers,
         TEvent e,
         HookContext context,
         int index)
@@ -276,11 +294,7 @@ public sealed class HookPipeline<TEvent>
         await pending.ConfigureAwait(false);
         for (var i = index + 1; i < handlers.Length; i++)
         {
-            await handlers[i].Invoke(e, context).ConfigureAwait(false);
+            await handlers[i](e, context).ConfigureAwait(false);
         }
     }
-
-    private readonly record struct HookHandler<T>(
-        InstalledKernel? Kernel,
-        Func<T, HookContext, ValueTask> Invoke);
 }

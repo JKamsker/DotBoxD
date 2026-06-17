@@ -1,15 +1,12 @@
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins;
 
-using System.Collections;
-using System.Diagnostics.CodeAnalysis;
 using DotBoxD.Kernels;
 using DotBoxD.Hosting;
 
@@ -32,6 +29,7 @@ public sealed partial class PluginServer : IDisposable
         Events = new PluginEventAdapterRegistry();
         Kernels = new KernelRegistry();
         Hooks = new HookRegistry(messages, Events, Kernels, InstallChainPackage);
+        Subscriptions = new SubscriptionRegistry(messages, Events, Kernels, InstallChainPackage);
     }
 
     // Synchronous installer the hook pipelines use to wire analyzer-generated chain packages at
@@ -43,6 +41,7 @@ public sealed partial class PluginServer : IDisposable
             .GetResult();
 
     public HookRegistry Hooks { get; }
+    public SubscriptionRegistry Subscriptions { get; }
     public KernelRegistry Kernels { get; }
     public PluginEventAdapterRegistry Events { get; }
 
@@ -75,6 +74,18 @@ public sealed partial class PluginServer : IDisposable
         return new PluginServer(host, defaultPolicy, messages, executionMode);
     }
 
+    /// <summary>
+    /// Analyzes a package against this server's registered host bindings and returns the concrete
+    /// capabilities its verified module requires. Use this to build a least-privilege install policy
+    /// from host-trusted binding metadata instead of trusting the package manifest.
+    /// </summary>
+    public IReadOnlyList<string> GetRequiredCapabilities(PluginPackage package)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ThrowIfDisposed();
+        return _host.GetRequiredCapabilities(package.Module);
+    }
+
     public LiveValue<T> BindValue<T>(string name, T initialValue)
         => new(name, initialValue);
 
@@ -83,7 +94,9 @@ public sealed partial class PluginServer : IDisposable
 
     public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
-        Hooks.RegisterEventAdapter(adapter);
+        Hooks.EnsureCanRegister(adapter);
+        Subscriptions.EnsureCanRegister(adapter);
+        Events.Register(adapter);
         return this;
     }
 
@@ -94,16 +107,16 @@ public sealed partial class PluginServer : IDisposable
         => InstallCoreAsync(package, policy, owner: null, cancellationToken);
 
     /// <summary>
-    /// Installs a <b>kernel RPC service</b> package — a kernel invoked request/response (via
-    /// <see cref="InstalledKernel.InvokeRpcAsync"/>) rather than wired to an event. It is validated by
-    /// <see cref="RpcKernelPackageValidator"/> (no event subscription/contract) and always runs
-    /// interpreted, since record/object I/O is interpreter-only.
+    /// Installs a <b>server extension</b> package: a kernel invoked request/response (via
+    /// <see cref="InstalledKernel.InvokeServerExtensionAsync"/>) rather than wired to an event. It is
+    /// validated by <see cref="RpcKernelPackageValidator"/> because the manifest uses the existing
+    /// <c>rpcEntrypoint</c> field and has no event subscription/contract.
     /// </summary>
-    public ValueTask<InstalledKernel> InstallRpcAsync(
+    public ValueTask<InstalledKernel> InstallServerExtensionAsync(
         PluginPackage package,
         SandboxPolicy? policy = null,
         CancellationToken cancellationToken = default)
-        => InstallRpcCoreAsync(package, policy, owner: null, cancellationToken);
+        => InstallServerExtensionCoreAsync(package, policy, owner: null, cancellationToken);
 
     /// <summary>
     /// Creates a new ownership session. Every kernel installed through the session is tagged with it
@@ -122,12 +135,11 @@ public sealed partial class PluginServer : IDisposable
         var removed = Kernels.Remove(pluginId);
         if (removed is not null)
         {
-            Hooks.RemoveKernel(removed);
-            RemoveRpcServiceRegistrations(pluginId);
-            return true;
+            RemoveKernelReferences(removed);
+            ClearServerExtensionRegistrations(pluginId);
         }
 
-        return false;
+        return removed is not null;
     }
 
     internal ValueTask<InstalledKernel> InstallOwnedAsync(
@@ -137,12 +149,12 @@ public sealed partial class PluginServer : IDisposable
         CancellationToken cancellationToken)
         => InstallCoreAsync(package, policy, owner, cancellationToken);
 
-    internal ValueTask<InstalledKernel> InstallOwnedRpcAsync(
+    internal ValueTask<InstalledKernel> InstallOwnedServerExtensionAsync(
         PluginSession owner,
         PluginPackage package,
         SandboxPolicy? policy,
         CancellationToken cancellationToken)
-        => InstallRpcCoreAsync(package, policy, owner, cancellationToken);
+        => InstallServerExtensionCoreAsync(package, policy, owner, cancellationToken);
 
     internal bool UninstallOwned(PluginSession owner, string pluginId)
     {
@@ -156,12 +168,11 @@ public sealed partial class PluginServer : IDisposable
         var removed = Kernels.RemoveOwned(owner, pluginId);
         if (removed is not null)
         {
-            Hooks.RemoveKernel(removed);
-            RemoveRpcServiceRegistrations(pluginId);
-            return true;
+            RemoveKernelReferences(removed);
+            ClearServerExtensionRegistrations(pluginId);
         }
 
-        return false;
+        return removed is not null;
     }
 
     private async ValueTask<InstalledKernel> InstallCoreAsync(
@@ -172,21 +183,20 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         PluginPackageValidator.Validate(package);
-        var plan = await PreparePluginPlanAsync(package, policy ?? _defaultPolicy, cancellationToken)
+        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
         var replaced = Kernels.Add(kernel);
         if (replaced is not null)
         {
-            Hooks.RemoveKernel(replaced);
-            RemoveRpcServiceRegistrations(replaced.Manifest.PluginId);
+            RemoveKernelReferences(replaced);
         }
 
         return kernel;
     }
 
-    private async ValueTask<InstalledKernel> InstallRpcCoreAsync(
+    private async ValueTask<InstalledKernel> InstallServerExtensionCoreAsync(
         PluginPackage package,
         SandboxPolicy? policy,
         object? owner,
@@ -194,67 +204,26 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         RpcKernelPackageValidator.Validate(package);
-        var plan = await PreparePluginPlanAsync(package, policy ?? _defaultPolicy, cancellationToken)
+        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
             .ConfigureAwait(false);
         RpcKernelPackageValidator.ValidatePrepared(package, plan);
-        // RPC kernels honor the server's execution mode like event kernels — their record/list IR
-        // compiles to verified IL (record.new/record.get) so Auto/Compiled produces fast code.
+        // Server-extension kernels honor the server's execution mode like event kernels; their
+        // record/list IR compiles to verified IL (record.new/record.get), so Auto/Compiled produces fast code.
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
         var replaced = Kernels.Add(kernel);
         if (replaced is not null)
         {
-            Hooks.RemoveKernel(replaced);
-            RemoveRpcServiceRegistrations(replaced.Manifest.PluginId);
+            RemoveKernelReferences(replaced);
         }
 
+        ClearServerExtensionRegistrations(package.Manifest.PluginId);
         return kernel;
     }
 
-    private async ValueTask<ExecutionPlan> PreparePluginPlanAsync(
-        PluginPackage package,
-        SandboxPolicy policy,
-        CancellationToken cancellationToken)
+    private void RemoveKernelReferences(InstalledKernel kernel)
     {
-        try
-        {
-            return await _host.PrepareAsync(package.Module, policy, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (SandboxValidationException ex) when (HasAsyncPolicyDenial(ex.Diagnostics))
-        {
-            throw new SandboxValidationException(AppendAsyncPolicyDiagnostic(ex.Diagnostics));
-        }
-    }
-
-    private static bool HasAsyncPolicyDenial(IReadOnlyList<SandboxDiagnostic> diagnostics)
-    {
-        for (var i = 0; i < diagnostics.Count; i++)
-        {
-            var diagnostic = diagnostics[i];
-            if (diagnostic.Code is "E-POLICY-CAP" or "E-POLICY-EFFECT" &&
-                (diagnostic.Message.Contains(RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
-                 diagnostic.Message.Contains(nameof(SandboxEffect.Concurrency), StringComparison.Ordinal)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static IReadOnlyList<SandboxDiagnostic> AppendAsyncPolicyDiagnostic(
-        IReadOnlyList<SandboxDiagnostic> diagnostics)
-    {
-        var copy = new SandboxDiagnostic[diagnostics.Count + 1];
-        for (var i = 0; i < diagnostics.Count; i++)
-        {
-            copy[i] = diagnostics[i];
-        }
-
-        copy[^1] = new SandboxDiagnostic(
-            "DBXK043",
-            $"Plugin requires async but policy does not grant '{RuntimeCapabilityIds.Async}'.");
-        return copy;
+        Hooks.RemoveKernel(kernel);
+        Subscriptions.RemoveKernel(kernel);
     }
 
     /// <summary>
@@ -282,160 +251,4 @@ public sealed partial class PluginServer : IDisposable
 
     private void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-}
-
-public sealed class KernelRegistry : IEnumerable<InstalledKernel>
-{
-    private readonly object _gate = new();
-    private readonly Dictionary<string, InstalledKernel> _kernels = new(StringComparer.Ordinal);
-
-    public InstalledKernel Get(string pluginId)
-    {
-        lock (_gate)
-        {
-            return _kernels[pluginId];
-        }
-    }
-
-    public TypedInstalledKernel<TState> Get<TState>(string pluginId) where TState : class
-        => new(Get(pluginId));
-
-    /// <summary>
-    /// Probes installation state without throwing, letting an admin/host UI discover whether a
-    /// plugin id is currently installed and read its live kernel without catching
-    /// <see cref="KeyNotFoundException"/>.
-    /// </summary>
-    public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
-    {
-        ArgumentNullException.ThrowIfNull(pluginId);
-        lock (_gate)
-        {
-            return _kernels.TryGetValue(pluginId, out kernel);
-        }
-    }
-
-    internal bool TryGetOwned(
-        PluginSession owner,
-        string pluginId,
-        [MaybeNullWhen(false)] out InstalledKernel kernel)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
-        ArgumentNullException.ThrowIfNull(pluginId);
-        lock (_gate)
-        {
-            if (!_kernels.TryGetValue(pluginId, out kernel) ||
-                !ReferenceEquals(kernel.OwnerId, owner))
-            {
-                kernel = null;
-                return false;
-            }
-
-            return true;
-        }
-    }
-
-    /// <summary>
-    /// Returns a stable snapshot of the currently installed kernels for inventory rendering. The
-    /// returned list is detached from registry internals, so it is safe to enumerate while installs
-    /// and uninstalls continue concurrently.
-    /// </summary>
-    public IReadOnlyList<InstalledKernel> Snapshot()
-    {
-        lock (_gate)
-        {
-            return _kernels.Values.ToArray();
-        }
-    }
-
-    /// <summary>
-    /// Enumerates the currently installed kernels over a stable snapshot, so an admin/host UI can
-    /// iterate the inventory directly (for example with <c>foreach</c> or LINQ) without taking a
-    /// dependency on <see cref="Snapshot"/>. Enumeration is detached from registry internals and is
-    /// therefore unaffected by concurrent installs and uninstalls.
-    /// </summary>
-    public IEnumerator<InstalledKernel> GetEnumerator() => Snapshot().GetEnumerator();
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    internal InstalledKernel GetByKernelType<TKernel>() where TKernel : class
-    {
-        var pluginId = KernelTypeMetadata.PluginId(typeof(TKernel));
-        return Get(pluginId);
-    }
-
-    internal InstalledKernel? Add(InstalledKernel kernel)
-    {
-        InstalledKernel? revoke = null;
-        lock (_gate)
-        {
-            if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
-                !ReferenceEquals(existing, kernel))
-            {
-                // Fail closed if a different owner already has this id. Same-owner reinstalls and
-                // direct server reinstalls (null/null) keep replace semantics; null/non-null crossings
-                // are rejected so sessions cannot hijack server kernels or vice versa.
-                if (!ReferenceEquals(existing.OwnerId, kernel.OwnerId))
-                {
-                    throw new SandboxValidationException([
-                        new SandboxDiagnostic(
-                            "DBXK060",
-                            $"plugin id '{kernel.Manifest.PluginId}' is owned by another session and cannot be replaced.")
-                    ]);
-                }
-
-                revoke = existing;
-            }
-
-            _kernels[kernel.Manifest.PluginId] = kernel;
-        }
-
-        revoke?.Revoke();
-        return revoke;
-    }
-
-    /// <summary>
-    /// Removes and revokes a kernel only if it is owned by <paramref name="owner"/>, so a session
-    /// disposal never tears down a server-owned or different-session kernel with the same id.
-    /// </summary>
-    internal InstalledKernel? RemoveOwned(PluginSession owner, string pluginId)
-    {
-        InstalledKernel? kernel;
-        lock (_gate)
-        {
-            if (!_kernels.TryGetValue(pluginId, out kernel))
-            {
-                return null;
-            }
-
-            if (!ReferenceEquals(kernel.OwnerId, owner))
-            {
-                return null;
-            }
-
-            _kernels.Remove(pluginId);
-        }
-
-        kernel.Revoke();
-        return kernel;
-    }
-
-    internal InstalledKernel? Remove(string pluginId)
-    {
-        InstalledKernel? kernel;
-        lock (_gate)
-        {
-            if (!_kernels.Remove(pluginId, out kernel))
-            {
-                return null;
-            }
-        }
-
-        if (kernel is null)
-        {
-            return null;
-        }
-
-        kernel.Revoke();
-        return kernel;
-    }
 }

@@ -15,6 +15,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// </summary>
 internal static class DotBoxDHostBindingExpressionLowerer
 {
+    private const string HostCapabilityAttribute = "DotBoxD.Abstractions.HostCapabilityAttribute";
+
     public static DotBoxDExpressionModel? TryLower(
         InvocationExpressionSyntax invocation,
         DotBoxDExpressionLoweringContext context,
@@ -27,7 +29,7 @@ internal static class DotBoxDHostBindingExpressionLowerer
             return null;
         }
 
-        var (bindingId, capability, effects, isAsync) = binding;
+        var (bindingId, capability, effects, _) = binding;
         var returnType = DotBoxDTypeNameReader.SandboxTypeName(method.ReturnType);
         if (string.Equals(returnType, DotBoxDGenerationNames.ManifestTypes.Unsupported, StringComparison.Ordinal))
         {
@@ -64,23 +66,17 @@ internal static class DotBoxDHostBindingExpressionLowerer
             allocates |= lowered.Allocates;
         }
 
-        context.Capabilities?.Add(capability);
+        if (capability is { Length: > 0 } requiredCapability)
+        {
+            context.Capabilities?.Add(requiredCapability);
+        }
+
         if (context.Effects is { } effectSink)
         {
             foreach (var effect in effects)
             {
                 effectSink.Add(effect);
             }
-
-            if (isAsync)
-            {
-                effectSink.Add(DotBoxDGenerationNames.Effects.Concurrency);
-            }
-        }
-
-        if (isAsync || effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
-        {
-            context.Capabilities?.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
         }
 
         var source =
@@ -89,7 +85,7 @@ internal static class DotBoxDHostBindingExpressionLowerer
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }
 
-    internal static (string BindingId, string Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
+    internal static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
         IMethodSymbol method)
     {
         foreach (var attribute in method.GetAttributes())
@@ -112,17 +108,126 @@ internal static class DotBoxDHostBindingExpressionLowerer
             }
         }
 
+        return TryAutoHostBinding(method);
+    }
+
+    private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? TryAutoHostBinding(
+        IMethodSymbol method)
+    {
+        if (method.MethodKind != MethodKind.Ordinary ||
+            method.IsStatic ||
+            method.IsGenericMethod ||
+            !HasDotBoxDServiceAttribute(method.ContainingType))
+        {
+            return null;
+        }
+
+        var capability = HostCapability(method);
+        return (
+            HostBindingRoute(method.ContainingType, method),
+            capability,
+            AutoEffectNames(method, capability),
+            IsTaskLike(method.ReturnType));
+    }
+
+    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    {
+        foreach (var attribute in type.GetAttributes())
+        {
+            if (string.Equals(
+                    attribute.AttributeClass?.ToDisplayString(),
+                    DotBoxDGenerationNames.Metadata.DotBoxDServiceAttribute,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string HostBindingRoute(INamedTypeSymbol type, IMethodSymbol method)
+    {
+        var ns = type.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : type.ContainingNamespace.ToDisplayString() + ".";
+        return "host." + ns + type.MetadataName + "." + method.Name;
+    }
+
+    private static string? HostCapability(IMethodSymbol method)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), HostCapabilityAttribute, StringComparison.Ordinal) &&
+                attribute.ConstructorArguments.Length == 1 &&
+                attribute.ConstructorArguments[0].Value is string capability &&
+                !string.IsNullOrWhiteSpace(capability))
+            {
+                return capability;
+            }
+        }
+
         return null;
     }
+
+    private static IReadOnlyList<string> AutoEffectNames(IMethodSymbol method, string? capability)
+    {
+        var effects = new List<string> { DotBoxDGenerationNames.Effects.Cpu };
+        var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
+        if (ReturnAllocates(returnType))
+        {
+            effects.Add(DotBoxDGenerationNames.Effects.Alloc);
+        }
+
+        effects.Add(IsWriteMethod(method, capability)
+            ? DotBoxDGenerationNames.Effects.HostStateWrite
+            : DotBoxDGenerationNames.Effects.HostStateRead);
+        return effects;
+    }
+
+    private static bool IsWriteMethod(IMethodSymbol method, string? capability)
+        => capability?.Contains(".write.", StringComparison.Ordinal) == true ||
+           method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Set", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Update", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Add", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Remove", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Move", StringComparison.Ordinal) ||
+           method.Name.StartsWith("Teleport", StringComparison.Ordinal);
+
+    private static bool ReturnAllocates(ITypeSymbol type)
+        => !IsUnitTaskLike(type) &&
+           (type.SpecialType == SpecialType.System_String ||
+           DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcTypeMapper.ListElementType(type) is not null ||
+           type is INamedTypeSymbol named &&
+           DotBoxD.Plugins.Analyzer.Analysis.Rpc.DotBoxDRpcTypeMapper.IsRecordDto(named));
+
+    private static bool IsUnitTaskLike(ITypeSymbol type)
+        => type is INamedTypeSymbol
+        {
+            IsGenericType: false,
+            Name: "Task" or "ValueTask",
+            ContainingNamespace: { } ns
+        } &&
+        string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
+
+    private static bool IsTaskLike(ITypeSymbol type)
+        => type is INamedTypeSymbol
+        {
+            Name: "Task" or "ValueTask",
+            ContainingNamespace: { } ns
+        } &&
+        string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
 
     private static bool IsAsync(AttributeData attribute)
     {
         foreach (var argument in attribute.NamedArguments)
         {
             if (string.Equals(argument.Key, "IsAsync", StringComparison.Ordinal) &&
-                argument.Value.Value is bool isAsync)
+                argument.Value.Value is bool value)
             {
-                return isAsync;
+                return value;
             }
         }
 

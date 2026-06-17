@@ -21,9 +21,32 @@ internal static class PluginManifestCapabilityValidator
             return;
         }
 
+        var missing = expected.Except(declared, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var extra = declared.Except(expected, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var details = new List<string>();
+        if (missing.Length > 0)
+        {
+            details.Add("missing: " + string.Join(", ", missing));
+        }
+
+        if (extra.Length > 0)
+        {
+            details.Add("extra: " + string.Join(", ", extra));
+        }
+
+        if (declared.Count != manifest.RequiredCapabilities.Count)
+        {
+            details.Add("duplicates present");
+        }
+
+        var message = details.Count == 0
+            ? "Plugin manifest requiredCapabilities do not match verified entrypoint capabilities."
+            : "Plugin manifest requiredCapabilities do not match verified entrypoint capabilities (" +
+              string.Join("; ", details) +
+              ").";
         diagnostics.Add(new SandboxDiagnostic(
             "DBXK044",
-            "Plugin manifest requiredCapabilities do not match verified entrypoint capabilities."));
+            message));
     }
 
     private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)

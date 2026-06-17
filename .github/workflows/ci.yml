@@ -110,6 +110,11 @@ jobs:
           }
           if ($failed) { throw "One or more test projects failed after retry." }
 
+      - name: GameServer example smoke
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: ./eng/scripts/check-docs-smoke.ps1 -Configuration Release
+
       - name: Upload test results (TRX)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -217,9 +222,6 @@ jobs:
       - name: Docs & examples smoke
         shell: pwsh
         run: ./eng/scripts/check-docs-smoke.ps1 -Configuration Release
-
-      - name: End-to-end acceptance sample
-        run: dotnet run -c Release --no-build --project samples/Pushdown/DotBoxD.EndToEnd
 
   pack-packages:
     name: Pack NuGet packages

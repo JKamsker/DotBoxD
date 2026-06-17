@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcClientAccessibilityTests
+public sealed class ServerExtensionClientAccessibilityTests
 {
     [Fact]
     public void Generated_client_matches_internal_service_interface_accessibility()
@@ -21,7 +21,7 @@ public sealed class KernelRpcClientAccessibilityTests
                 ValueTask<int> EchoAsync(int value);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(int value, HookContext ctx)
@@ -31,7 +31,7 @@ public sealed class KernelRpcClientAccessibilityTests
             }
             """);
 
-        Assert.NotNull(assembly.GetType("Sample.EchoKernelRpcClient", throwOnError: true));
+        Assert.NotNull(assembly.GetType("Sample.EchoKernelServerExtensionClient", throwOnError: true));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class KernelRpcClientAccessibilityTests
                     ValueTask<int> EchoAsync(int value);
                 }
 
-                [KernelRpcService("echo", typeof(IEchoService))]
+                [ServerExtension("echo", typeof(IEchoService))]
                 public sealed partial class EchoKernel
                 {
                     public int Echo(int value, HookContext ctx)

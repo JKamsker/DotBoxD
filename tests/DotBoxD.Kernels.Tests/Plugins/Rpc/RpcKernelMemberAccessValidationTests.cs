@@ -15,7 +15,7 @@ public sealed class RpcKernelMemberAccessValidationTests
 
             namespace Sample;
 
-            [KernelRpcService("field-read")]
+            [ServerExtension("field-read")]
             public sealed partial class FieldReadKernel
             {
                 private readonly int _offset = 1;

@@ -28,7 +28,7 @@ public sealed class RpcKernelNamedArgumentGenerationTests
 
         public readonly record struct FightResult(int MonsterId, bool Success);
 
-        [KernelRpcService("named-host-binding")]
+        [ServerExtension("named-host-binding")]
         public sealed partial class NamedHostBindingKernel
         {
             public List<FightResult> Check(List<int> monsterIds, HookContext ctx)
@@ -54,7 +54,7 @@ public sealed class RpcKernelNamedArgumentGenerationTests
 
         public readonly record struct FightResult(int MonsterId, bool Success);
 
-        [KernelRpcService("named-record-constructor")]
+        [ServerExtension("named-record-constructor")]
         public sealed partial class NamedRecordConstructorKernel
         {
             public List<FightResult> Build(List<int> monsterIds, HookContext ctx)
@@ -89,7 +89,7 @@ public sealed class RpcKernelNamedArgumentGenerationTests
             public bool Success { get; }
         }
 
-        [KernelRpcService("reordered-record-constructor")]
+        [ServerExtension("reordered-record-constructor")]
         public sealed partial class ReorderedRecordConstructorKernel
         {
             public List<FightResult> Build(List<int> monsterIds, HookContext ctx)
@@ -113,13 +113,13 @@ public sealed class RpcKernelNamedArgumentGenerationTests
             "Sample.NamedHostBindingPluginPackage");
 
         using var server = PluginServer.Create(configureHost: AddThresholdBinding, defaultPolicy: ThresholdPolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
         var ids = SandboxValue.FromList(
             [SandboxValue.FromInt32(9), SandboxValue.FromInt32(10), SandboxValue.FromInt32(11)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([ids]);
+        var result = await kernel.InvokeServerExtensionAsync([ids]);
 
         var list = Assert.IsType<ListValue>(result);
         Assert.Equal(3, list.Values.Count);
@@ -136,13 +136,13 @@ public sealed class RpcKernelNamedArgumentGenerationTests
             "Sample.NamedRecordConstructorPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: CpuPolicy().Build());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
         var ids = SandboxValue.FromList(
             [SandboxValue.FromInt32(9), SandboxValue.FromInt32(10)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([ids]);
+        var result = await kernel.InvokeServerExtensionAsync([ids]);
 
         var list = Assert.IsType<ListValue>(result);
         Assert.Equal(2, list.Values.Count);
@@ -158,13 +158,13 @@ public sealed class RpcKernelNamedArgumentGenerationTests
             "Sample.ReorderedRecordConstructorPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: CpuPolicy().Build());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
         var ids = SandboxValue.FromList(
             [SandboxValue.FromInt32(9), SandboxValue.FromInt32(10)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([ids]);
+        var result = await kernel.InvokeServerExtensionAsync([ids]);
 
         var list = Assert.IsType<ListValue>(result);
         Assert.Equal(2, list.Values.Count);

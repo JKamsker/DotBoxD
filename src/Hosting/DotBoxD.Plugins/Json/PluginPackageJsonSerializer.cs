@@ -38,7 +38,7 @@ public static partial class PluginPackageJsonSerializer
             });
 
             var package = ReadPackage(document.RootElement);
-            // A kernel RPC service package has its own shape (no event subscription/contract), so it is
+            // A server extension package has its own shape (no event subscription/contract), so it is
             // validated by RpcKernelPackageValidator instead of the event-kernel validator.
             if (package.Manifest.RpcEntrypoint is not null)
             {
@@ -93,7 +93,7 @@ public static partial class PluginPackageJsonSerializer
             RequiredCapabilities = element.TryGetProperty("requiredCapabilities", out var requiredCapabilities)
                 ? ReadStringArray(requiredCapabilities, "requiredCapabilities")
                 : [],
-            // Present only for kernel RPC service kernels; event kernels omit it.
+            // Present only for server extension kernels; event kernels omit it.
             RpcEntrypoint = element.TryGetProperty("rpcEntrypoint", out var rpcEntrypoint)
                 ? ReadStringValue(rpcEntrypoint, "rpcEntrypoint")
                 : null
@@ -235,7 +235,7 @@ public static class PluginServerJsonExtensions
         cancellationToken.ThrowIfCancellationRequested();
         var package = PluginPackageJsonSerializer.Import(json);
         return package.Manifest.RpcEntrypoint is not null
-            ? server.InstallRpcAsync(package, policy, cancellationToken)
+            ? server.InstallServerExtensionAsync(package, policy, cancellationToken)
             : server.InstallAsync(package, policy, cancellationToken);
     }
 
@@ -249,7 +249,7 @@ public static class PluginServerJsonExtensions
         cancellationToken.ThrowIfCancellationRequested();
         var package = PluginPackageJsonSerializer.Import(json);
         return package.Manifest.RpcEntrypoint is not null
-            ? session.InstallRpcAsync(package, policy, cancellationToken)
+            ? session.InstallServerExtensionAsync(package, policy, cancellationToken)
             : session.InstallAsync(package, policy, cancellationToken);
     }
 }

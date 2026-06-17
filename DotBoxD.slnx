@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/samples/GameServer/">
+    <Project Path="samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj" />
+    <Project Path="samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj" />
+    <Project Path="samples/GameServer/Examples.GameServer.Server.Abstractions/Examples.GameServer.Server.Abstractions.csproj" />
+    <Project Path="samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj" />
+  </Folder>
 
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
@@ -47,11 +53,15 @@
   <Folder Name="/src/CodeGeneration/">
     <Project Path="src/CodeGeneration/DotBoxD.Services.SourceGenerator/DotBoxD.Services.SourceGenerator.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
+    <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginAbstractions/DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
+    <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginLocal/DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />
     <Project Path="tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj" />
+    <Project Path="tests/DotBoxD.Services.TestContracts/DotBoxD.Services.TestContracts.csproj" />
     <Project Path="tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj" />
     <Project Path="tests/DotBoxD.Services.Tests.GeneratedFixtures/DotBoxD.Services.Tests.GeneratedFixtures.csproj" />
   </Folder>
@@ -61,36 +71,7 @@
     <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
   </Folder>
 
-  <Folder Name="/samples/Services/">
-    <Project Path="samples/Services/GameService/Shared/Shared.csproj" />
-    <Project Path="samples/Services/GameService/Server/Server.csproj" />
-    <Project Path="samples/Services/GameService/Client/Client.csproj" />
-    <Project Path="samples/Services/Inventory/Shared/Inventory.Shared.csproj" />
-    <Project Path="samples/Services/Inventory/Server/Inventory.Server.csproj" />
-    <Project Path="samples/Services/Inventory/Client/Inventory.Client.csproj" />
-  </Folder>
   <Folder Name="/samples/" />
-
-  <Folder Name="/samples/Kernels/">
-    <Project Path="samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/DotBoxD.Kernels.Example.Capabilities.csproj" />
-    <Project Path="samples/Kernels/Hosting/DotBoxD.Kernels.Example.Hosting/DotBoxD.Kernels.Example.Hosting.csproj" />
-    <Project Path="samples/Kernels/HttpTransport/DotBoxD.Kernels.HttpTransportExample/DotBoxD.Kernels.HttpTransportExample.csproj" />
-    <Project Path="samples/Kernels/LocalPlugin/DotBoxD.Kernels.PluginLocal/DotBoxD.Kernels.PluginLocal.csproj" />
-    <Project Path="samples/Kernels/PluginAuthoring/DotBoxD.Kernels.Example.PluginAuthoring/DotBoxD.Kernels.Example.PluginAuthoring.csproj" />
-  </Folder>
-  <Folder Name="/samples/Kernels/GameServer/">
-    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Plugin/DotBoxD.Kernels.Game.Plugin.csproj" />
-    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Server.Abstractions/DotBoxD.Kernels.Game.Server.Abstractions.csproj" />
-    <Project Path="samples/Kernels/GameServer/DotBoxD.Kernels.Game.Server/DotBoxD.Kernels.Game.Server.csproj" />
-  </Folder>
-
-  <Folder Name="/samples/Pushdown/">
-    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Shared/DotBoxD.Kernels.PluginIpc.Shared.csproj" />
-    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Server.Abstractions/DotBoxD.Kernels.PluginIpc.Server.Abstractions.csproj" />
-    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Server/DotBoxD.Kernels.PluginIpc.Server.csproj" />
-    <Project Path="samples/Pushdown/PluginIpc/DotBoxD.Kernels.PluginIpc.Client/DotBoxD.Kernels.PluginIpc.Client.csproj" />
-    <Project Path="samples/Pushdown/DotBoxD.EndToEnd/DotBoxD.EndToEnd.csproj" />
-  </Folder>
 
   <Folder Name="/tools/">
     <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />

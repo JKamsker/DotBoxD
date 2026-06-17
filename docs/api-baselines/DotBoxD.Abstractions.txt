@@ -2,37 +2,59 @@
 # Package: DotBoxD.Abstractions
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
+protected static NotSupportedException ControlPlaneOnly()
 public bool IsAsync { get; set; }
 public CancellationToken CancellationToken { get; }
+public delegate ValueTask<TReturn> RemoteServerInvocation<TWorld, TCaptures, TReturn>( TWorld world, TCaptures captures)
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
 public InMemoryPluginMessageSink()
 public interface IEventKernel<TEvent>
+public interface IExtensibleControl
+public interface ILiveSettingsHandle<TKernel> where TKernel : class, new()
 public interface IPluginEventAdapter<in TEvent>
 public interface IPluginEventValueWriter<in TEvent> : IPluginEventAdapter<TEvent>
 public interface IPluginMessageSink
+public interface IPluginServer<TWorld> where TWorld : class
+public interface IServerExtensionClientAccessor
+public interface IServerExtensionClientRegistry : IServerExtensionWireClient
+public interface IServerExtensionWireClient
+public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
 public IReadOnlyList<PluginMessage> Messages => _readOnlyMessages
-public KernelRpcServiceAttribute(string id, Type serviceType)
-public KernelRpcServiceAttribute(string id) => Id = id
+public PluginAttribute(string id) => Id = id
 public SandboxEffect Effects { get; } = effects
 public sealed class CapabilityAttribute(string id) : Attribute
+public sealed class EventKernelAttribute(string? id = null) : Attribute
+public sealed class GeneratePluginRegistrationAccumulatorAttribute( string accumulatorName, string methodName) : Attribute
+public sealed class GeneratePluginRegistrationRootAccumulatorAttribute(string accumulatorName) : Attribute
+public sealed class GeneratePluginServerAttribute : Attribute
 public sealed class HookContext
 public sealed class HostBindingAttribute(string bindingId, string capability, SandboxEffect effects) : Attribute
+public sealed class HostCapabilityAttribute(string capability) : Attribute
 public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class KernelMethodAttribute : Attribute
-public sealed class KernelRpcClientMethodAttribute(Type receiverType, string? name = null) : Attribute
-public sealed class KernelRpcClientPropertyAttribute(Type receiverType, string? name = null) : Attribute
-public sealed class KernelRpcServiceAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
-public sealed class PluginAttribute(string id) : Attribute
+public sealed class PluginAttribute : Attribute
+public sealed class ServerExtensionAttribute : Attribute
+public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
+public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
 public sealed record PluginMessage(string TargetId, string Message)
+public ServerExtensionAttribute(string id, Type serviceType)
+public ServerExtensionAttribute(string id) => Id = id
+public ServerExtensionAttribute(Type grafts, string? id = null)
+public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; } = bindingId
 public string Capability { get; } = capability
 public string Id { get; }
 public string Id { get; } = id
+public string MethodName { get; } = methodName
+public string? Id { get; }
+public string? Id { get; } = id
 public string? Name { get; } = name
 public THost Host<THost>() where THost : class
 public Type ReceiverType { get; } = receiverType
+public Type? Grafts { get; }
+public Type? ReceiverType { get; } = receiverType
 public Type? ServiceType { get; }
 public ValueTask SendAsync(string targetId, string message, CancellationToken cancellationToken = default)
 public void Send(string targetId, string message)

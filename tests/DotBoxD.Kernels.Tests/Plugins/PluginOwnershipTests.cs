@@ -173,11 +173,11 @@ public sealed class PluginOwnershipTests
     public async Task Session_rpc_install_cannot_replace_server_owned_rpc_kernel()
     {
         using var server = CreateRpcServer();
-        var serverKernel = await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller());
+        var serverKernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
         var session = server.CreateSession();
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await session.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller()).AsTask());
+            async () => await session.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller()).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK060");
         Assert.False((bool)serverKernel.IsRevoked);
@@ -191,10 +191,10 @@ public sealed class PluginOwnershipTests
     {
         using var server = CreateRpcServer();
         var session = server.CreateSession();
-        var sessionKernel = await session.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller());
+        var sessionKernel = await session.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller()).AsTask());
+            async () => await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller()).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK060");
         Assert.False((bool)sessionKernel.IsRevoked);

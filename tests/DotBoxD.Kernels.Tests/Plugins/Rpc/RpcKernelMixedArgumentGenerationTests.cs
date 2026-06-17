@@ -28,7 +28,7 @@ public sealed class RpcKernelMixedArgumentGenerationTests
 
         public readonly record struct FightResult(int MonsterId, bool Success);
 
-        [KernelRpcService("mixed-host-binding")]
+        [ServerExtension("mixed-host-binding")]
         public sealed partial class MixedHostBindingKernel
         {
             public List<FightResult> Check(List<int> monsterIds, HookContext ctx)
@@ -54,7 +54,7 @@ public sealed class RpcKernelMixedArgumentGenerationTests
 
         public readonly record struct FightResult(int MonsterId, bool Success);
 
-        [KernelRpcService("mixed-record-constructor")]
+        [ServerExtension("mixed-record-constructor")]
         public sealed partial class MixedRecordConstructorKernel
         {
             public List<FightResult> Build(List<int> monsterIds, HookContext ctx)
@@ -78,13 +78,13 @@ public sealed class RpcKernelMixedArgumentGenerationTests
             "Sample.MixedHostBindingPluginPackage");
 
         using var server = PluginServer.Create(configureHost: AddThresholdBinding, defaultPolicy: ThresholdPolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
         var ids = SandboxValue.FromList(
             [SandboxValue.FromInt32(9), SandboxValue.FromInt32(10)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([ids]);
+        var result = await kernel.InvokeServerExtensionAsync([ids]);
 
         var list = Assert.IsType<ListValue>(result);
         Assert.Equal(2, list.Values.Count);
@@ -100,13 +100,13 @@ public sealed class RpcKernelMixedArgumentGenerationTests
             "Sample.MixedRecordConstructorPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: CpuPolicy().Build());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
         var ids = SandboxValue.FromList(
             [SandboxValue.FromInt32(9), SandboxValue.FromInt32(10)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([ids]);
+        var result = await kernel.InvokeServerExtensionAsync([ids]);
 
         var list = Assert.IsType<ListValue>(result);
         Assert.Equal(2, list.Values.Count);
@@ -135,7 +135,7 @@ public sealed class RpcKernelMixedArgumentGenerationTests
                 bool CanFight({{parameter}});
             }
 
-            [KernelRpcService("ref-host-binding")]
+            [ServerExtension("ref-host-binding")]
             public sealed partial class RefHostBindingKernel
             {
                 public List<int> Check(List<int> monsterIds, HookContext ctx)

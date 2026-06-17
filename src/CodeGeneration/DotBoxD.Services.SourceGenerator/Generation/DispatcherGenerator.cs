@@ -6,18 +6,6 @@ using DotBoxD.Services.SourceGenerator.Models;
 
 namespace DotBoxD.Services.SourceGenerator.Generation;
 
-/// <summary>
-/// Generates server dispatcher classes for DotBoxD services. The dispatcher's
-/// <c>DispatchAsync</c> is itself async, but it calls the user's service method using
-/// the exact shape declared on the interface (sync vs async, with or without a
-/// <see cref="System.Threading.CancellationToken"/>). All emitted type references are
-/// fully qualified. When a service method's return type is itself a
-/// <c>[DotBoxDService]</c> interface the dispatcher registers the returned instance with
-/// the per-connection <c>IInstanceRegistry</c> and serializes a
-/// <c>ServiceHandle</c> in its place. Every dispatcher also
-/// emits a <c>DispatchOnInstanceAsync</c> override that resolves a registered instance
-/// and runs the same switch against it — so any service may be reached as a sub-service.
-/// </summary>
 internal static class DispatcherGenerator
 {
     public static string Generate(ServiceModel service, CancellationToken ct = default)
@@ -39,12 +27,16 @@ internal static class DispatcherGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine($"    /// Server dispatcher for {service.InterfaceName}.");
         sb.AppendLine("    /// </summary>");
-        var dispatcherInterfaces = CanDispatchWithoutStreaming(service)
+        var dispatcherInterfaces = DispatcherGeneratorHelpers.CanDispatchWithoutStreaming(service)
             ? $"{ServicesGeneratorTypeNames.GlobalServiceDispatcher}, {ServicesGeneratorTypeNames.GlobalNonStreamingServiceDispatcher}"
             : ServicesGeneratorTypeNames.GlobalServiceDispatcher;
         sb.AppendLine($"    public sealed class {dispatcherName} : {dispatcherInterfaces}");
         sb.AppendLine("    {");
-        sb.AppendLine($"        private readonly {qualifiedInterface} _service;");
+        sb.AppendLine($"        private readonly {qualifiedInterface}? _service;");
+        sb.AppendLine();
+        sb.AppendLine($"        internal {dispatcherName}()");
+        sb.AppendLine("        {");
+        sb.AppendLine("        }");
         sb.AppendLine();
         sb.AppendLine($"        public {dispatcherName}({qualifiedInterface} service)");
         sb.AppendLine("        {");
@@ -69,11 +61,6 @@ internal static class DispatcherGenerator
     private static string QualifyServiceType(ServiceModel service, string typeName) =>
         IdentifierHelpers.QualifyTypeName(service.Namespace, typeName);
 
-    /// <summary>
-    /// Emits either <c>DispatchAsync</c> (singleton case) or <c>DispatchOnInstanceAsync</c>
-    /// (instance case). Both share the same switch body — only the receiver expression
-    /// differs (<c>_service</c> vs the registry-resolved instance).
-    /// </summary>
     private static void EmitDispatchAsync(
         StringBuilder sb,
         ServiceModel service,
@@ -112,7 +99,12 @@ internal static class DispatcherGenerator
         }
         else
         {
-            receiver = "_service";
+            sb.AppendLine("            if (_service is null)");
+            sb.AppendLine("            {");
+            sb.AppendLine($"                throw new {ServicesGeneratorTypeNames.GlobalServiceNotFoundException}(\"Service '{service.ServiceName}' can only dispatch instance calls.\", {ServicesGeneratorTypeNames.GlobalServiceNotFoundKind}.Service);");
+            sb.AppendLine("            }");
+            sb.AppendLine("            var __service = _service;");
+            receiver = "__service";
         }
 
         sb.AppendLine("            switch (method)");
@@ -148,7 +140,7 @@ internal static class DispatcherGenerator
         sb.AppendLine($"                case \"{method.RpcName}\":");
         sb.AppendLine("                {");
 
-        var requestParameters = GetRequestParameters(method.Parameters, ct);
+            var requestParameters = DispatcherGeneratorHelpers.GetRequestParameters(method.Parameters, ct);
         if (requestParameters.Count == 1)
         {
             var wireType = ProxyGenerationHelpers.GetWireType(requestParameters[0]);
@@ -192,8 +184,8 @@ internal static class DispatcherGenerator
                 continue;
             }
 
-            var local = locals.Reserve("__dotboxd_arg" + argumentRequestIndex, ct);
-            sb.AppendLine($"                    var {local} = {BuildStreamingArgument(parameter, source)};");
+                    var local = locals.Reserve("__dotboxd_arg" + argumentRequestIndex, ct);
+                    sb.AppendLine($"                    var {local} = {DispatcherGeneratorHelpers.BuildStreamingArgument(parameter, source)};");
             argumentExpressions[i] = local;
         }
 
@@ -256,15 +248,24 @@ internal static class DispatcherGenerator
 
             case MethodReturnKind.TaskOfSubService:
             case MethodReturnKind.ValueTaskOfSubService:
+            case MethodReturnKind.SyncSubService:
             {
                 // Sub-service return: don't serialize the live instance; instead register
                 // it with the per-connection registry and ship back a ServiceHandle the
                 // client can wrap in a sub-proxy.
                 var info = method.SubService!;
-                sb.AppendLine($"                    var __dotboxd_task = {call};");
-                sb.AppendLine("                    var __sub = __dotboxd_task.IsCompletedSuccessfully");
-                sb.AppendLine("                        ? __dotboxd_task.Result");
-                sb.AppendLine("                        : await __dotboxd_task;");
+                if (method.ReturnKind == MethodReturnKind.SyncSubService)
+                {
+                    sb.AppendLine($"                    var __sub = {call};");
+                }
+                else
+                {
+                    sb.AppendLine($"                    var __dotboxd_task = {call};");
+                    sb.AppendLine("                    var __sub = __dotboxd_task.IsCompletedSuccessfully");
+                    sb.AppendLine("                        ? __dotboxd_task.Result");
+                    sb.AppendLine("                        : await __dotboxd_task;");
+                }
+
                 if (info.AllowsNull)
                 {
                     sb.AppendLine("                    if (__sub is null)");
@@ -337,63 +338,4 @@ internal static class DispatcherGenerator
         sb.AppendLine("                }");
     }
 
-    private static string BuildStreamingArgument(ParameterModel parameter, string source) =>
-        parameter.StreamKind switch
-        {
-            ParameterStreamKind.Stream => $"streaming.GetStream({source})",
-            ParameterStreamKind.Pipe => $"streaming.GetPipe({source})",
-            ParameterStreamKind.AsyncEnumerable => $"streaming.GetAsyncEnumerable<{parameter.StreamItemType}>({source})",
-            _ => source,
-        };
-
-    private static List<ParameterModel> GetRequestParameters(
-        EquatableArray<ParameterModel> parameters,
-        CancellationToken ct)
-    {
-        var requestParameters = new List<ParameterModel>();
-        foreach (var p in parameters.Array)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (!p.IsCancellationToken)
-            {
-                requestParameters.Add(p);
-            }
-        }
-
-        return requestParameters;
-    }
-
-    private static bool CanDispatchWithoutStreaming(ServiceModel service)
-    {
-        foreach (var method in service.Methods.Array)
-        {
-            if (method.UnsupportedReason is null && UsesStreaming(method))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool UsesStreaming(MethodModel method)
-    {
-        if (NamingHelpers.IsStreamReturn(method.ReturnKind) ||
-            NamingHelpers.IsPipeReturn(method.ReturnKind) ||
-            NamingHelpers.IsAsyncEnumerableReturn(method.ReturnKind))
-        {
-            return true;
-        }
-
-        foreach (var parameter in method.Parameters.Array)
-        {
-            if (parameter.StreamKind != ParameterStreamKind.None)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

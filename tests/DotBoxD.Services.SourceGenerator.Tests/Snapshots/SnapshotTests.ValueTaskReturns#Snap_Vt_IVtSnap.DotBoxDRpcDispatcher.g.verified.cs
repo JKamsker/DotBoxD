@@ -9,7 +9,11 @@ namespace Snap.Vt
     /// </summary>
     public sealed class VtSnapDispatcher : global::DotBoxD.Services.Server.IServiceDispatcher, global::DotBoxD.Services.Server.INonStreamingServiceDispatcher
     {
-        private readonly global::Snap.Vt.IVtSnap _service;
+        private readonly global::Snap.Vt.IVtSnap? _service;
+
+        internal VtSnapDispatcher()
+        {
+        }
 
         public VtSnapDispatcher(global::Snap.Vt.IVtSnap service)
         {
@@ -25,12 +29,17 @@ namespace Snap.Vt
         public async global::System.Threading.Tasks.Task DispatchAsync(string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct = default)
 #pragma warning restore CS1998
         {
+            if (_service is null)
+            {
+                throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IVtSnap' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
+            }
+            var __service = _service;
             switch (method)
             {
                 case "AddAsync":
                 {
                     var args = serializer.Deserialize<(int, int)>(payload);
-                    var __dotboxd_task = _service.AddAsync(args.Item1, args.Item2);
+                    var __dotboxd_task = __service.AddAsync(args.Item1, args.Item2);
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result
                         : await __dotboxd_task;
@@ -39,7 +48,7 @@ namespace Snap.Vt
                 }
                 case "PingAsync":
                 {
-                    var __dotboxd_task = _service.PingAsync();
+                    var __dotboxd_task = __service.PingAsync();
                     if (!__dotboxd_task.IsCompletedSuccessfully)
                     {
                         await __dotboxd_task;

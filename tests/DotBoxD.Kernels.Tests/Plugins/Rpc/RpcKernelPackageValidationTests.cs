@@ -21,7 +21,7 @@ public sealed class RpcKernelPackageValidationTests
         };
 
         var ex = await Assert.ThrowsAsync<SandboxValidationException>(
-            async () => await server.InstallRpcAsync(invalid).AsTask());
+            async () => await server.InstallServerExtensionAsync(invalid).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK073");
     }

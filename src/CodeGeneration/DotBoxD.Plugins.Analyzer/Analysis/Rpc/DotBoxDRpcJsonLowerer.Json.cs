@@ -25,7 +25,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Obj(("f64", value.ToString("R", CultureInfo.InvariantCulture)));
     }
 
-    private static string Var(string name) => Obj(("var", Str(name)));
+    internal static string Var(string name) => Obj(("var", Str(name)));
 
     private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
 

@@ -1,3 +1,6 @@
+extern alias GameServerAbstractions;
+extern alias GameServerPlugin;
+
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using DotBoxD.Abstractions;
@@ -8,6 +11,9 @@ using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Plugins.Runtime.Subscriptions;
+using DotBoxD.Services.Attributes;
+using GameServerAbstractions::DotBoxD.Kernels.Game.Server.Abstractions;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Contracts;
@@ -34,20 +40,34 @@ public sealed class PluginAnalyzerTypeNameContractTests
         => new(StringComparer.Ordinal)
         {
             [nameof(TypeNames.GlobalPrefix)] = "global::",
+            [nameof(TypeNames.GeneratedInterceptorsNamespace)] = "DotBoxD.Plugins.Generated",
 
             [nameof(TypeNames.PluginAttribute)] = TypeName(typeof(PluginAttribute)),
+            [nameof(TypeNames.EventKernelAttribute)] = TypeName(typeof(EventKernelAttribute)),
             [nameof(TypeNames.LiveSettingAttribute)] = TypeName(typeof(LiveSettingAttribute)),
             [nameof(TypeNames.EventKernelInterface)] = OriginalTypeName(typeof(IEventKernel<>), "TEvent"),
             [nameof(TypeNames.RangeAttribute)] = TypeName(typeof(RangeAttribute)),
             [nameof(TypeNames.HostBindingAttribute)] = TypeName(typeof(HostBindingAttribute)),
             [nameof(TypeNames.CapabilityAttribute)] = TypeName(typeof(CapabilityAttribute)),
             [nameof(TypeNames.KernelMethodAttribute)] = TypeName(typeof(KernelMethodAttribute)),
-            [nameof(TypeNames.KernelRpcServiceAttribute)] = TypeName(typeof(KernelRpcServiceAttribute)),
-            [nameof(TypeNames.KernelRpcClientPropertyAttribute)] = TypeName(typeof(KernelRpcClientPropertyAttribute)),
-            [nameof(TypeNames.KernelRpcClientMethodAttribute)] = TypeName(typeof(KernelRpcClientMethodAttribute)),
+            [nameof(TypeNames.ServerExtensionAttribute)] = TypeName(typeof(ServerExtensionAttribute)),
+            [nameof(TypeNames.ServerExtensionClientAttribute)] = TypeName(typeof(ServerExtensionClientAttribute)),
+            [nameof(TypeNames.ServerExtensionMethodAttribute)] = TypeName(typeof(ServerExtensionMethodAttribute)),
+            [nameof(TypeNames.GeneratePluginServerAttribute)] = TypeName(typeof(GeneratePluginServerAttribute)),
+            [nameof(TypeNames.DotBoxDServiceAttribute)] = TypeName(typeof(DotBoxDServiceAttribute)),
             [nameof(TypeNames.HookContext)] = TypeName(typeof(HookContext)),
+            [nameof(TypeNames.ServerInvocationDelegateType)] = RemoteServerInvocationTypeName(),
+            [nameof(TypeNames.ServerInvocationDelegateOriginal)] = RemoteServerInvocationOriginalName(),
+            [nameof(TypeNames.GameWorldAccessType)] = TypeName(typeof(IGameWorldAccess)),
+            [nameof(TypeNames.GameWorldMonsterSnapshotType)] = TypeName(typeof(MonsterSnapshot)),
             [nameof(TypeNames.HookPipelineOriginal)] = OriginalTypeName(typeof(HookPipeline<>), "TEvent"),
             [nameof(TypeNames.HookStageOriginal)] = OriginalTypeName(typeof(HookStage<,>), "TEvent", "TCurrent"),
+            [nameof(TypeNames.RemoteHookPipelineOriginal)] = OriginalTypeName(typeof(RemoteHookPipeline<>), "TEvent"),
+            [nameof(TypeNames.RemoteHookStageOriginal)] = OriginalTypeName(typeof(RemoteHookStage<,>), "TEvent", "TCurrent"),
+            [nameof(TypeNames.SubscriptionPipelineOriginal)] = OriginalTypeName(typeof(SubscriptionPipeline<>), "TEvent"),
+            [nameof(TypeNames.SubscriptionStageOriginal)] = OriginalTypeName(typeof(SubscriptionStage<,>), "TEvent", "TCurrent"),
+            [nameof(TypeNames.RemoteSubscriptionPipelineOriginal)] = OriginalTypeName(typeof(RemoteSubscriptionPipeline<>), "TEvent"),
+            [nameof(TypeNames.RemoteSubscriptionStageOriginal)] = OriginalTypeName(typeof(RemoteSubscriptionStage<,>), "TEvent", "TCurrent"),
 
             [nameof(TypeNames.ListOriginal)] = OriginalTypeName(typeof(List<>), "T"),
             [nameof(TypeNames.ReadOnlyListOriginal)] = OriginalTypeName(typeof(IReadOnlyList<>), "T"),
@@ -103,6 +123,12 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GlobalSandboxType)] = GlobalTypeName(typeof(SandboxType)),
             [nameof(TypeNames.GlobalSandboxValue)] = GlobalTypeName(typeof(SandboxValue)),
         };
+
+    private static string RemoteServerInvocationTypeName()
+        => TypeName(typeof(RemoteServerInvocation<,,>));
+
+    private static string RemoteServerInvocationOriginalName()
+        => RemoteServerInvocationTypeName() + "<TWorld, TCaptures, TReturn>";
 
     private static string GlobalTypeName(Type type) => TypeNames.GlobalPrefix + TypeName(type);
 

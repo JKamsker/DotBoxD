@@ -1,6 +1,6 @@
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcServiceRegistrationTests
+public sealed class ServerExtensionRegistrationTests
 {
     [Fact]
     public async Task Uninstall_clears_rpc_service_registration()
@@ -8,13 +8,13 @@ public sealed class KernelRpcServiceRegistrationTests
         using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: RpcKernelTestPackages.AddKillBinding,
             defaultPolicy: RpcKernelTestPackages.KillPolicy());
-        var pluginId = await server.RegisterRpcServiceAsync<IMonsterKillerService, BatchKillerKernel>();
+        var pluginId = await server.RegisterServerExtensionAsync<IMonsterKillerService, BatchKillerKernel>();
 
         Assert.True(server.Uninstall(pluginId));
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => server.RpcService<IMonsterKillerService>());
-        Assert.Contains("No kernel RPC service is registered", ex.Message);
+            () => server.ServerExtension<IMonsterKillerService>());
+        Assert.Contains("No server extension is registered", ex.Message);
     }
 
     [Fact]
@@ -23,12 +23,12 @@ public sealed class KernelRpcServiceRegistrationTests
         using var server = DotBoxD.Plugins.PluginServer.Create(
             configureHost: RpcKernelTestPackages.AddKillBinding,
             defaultPolicy: RpcKernelTestPackages.KillPolicy());
-        await server.RegisterRpcServiceAsync<IMonsterKillerService, BatchKillerKernel>();
+        await server.RegisterServerExtensionAsync<IMonsterKillerService, BatchKillerKernel>();
 
-        await server.InstallRpcAsync(RpcKernelTestPackages.MonsterKiller());
+        await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => server.RpcService<IMonsterKillerService>());
-        Assert.Contains("No kernel RPC service is registered", ex.Message);
+            () => server.ServerExtension<IMonsterKillerService>());
+        Assert.Contains("No server extension is registered", ex.Message);
     }
 }

@@ -17,7 +17,7 @@ public sealed class RpcKernelLiveSettingRuntimeTests
 
             namespace Sample;
 
-            [KernelRpcService("threshold")]
+            [ServerExtension("threshold")]
             public sealed partial class ThresholdKernel
             {
                 [LiveSetting]
@@ -31,12 +31,12 @@ public sealed class RpcKernelLiveSettingRuntimeTests
             """,
             "Sample.ThresholdPluginPackage");
         using var server = PluginServer.Create();
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
         var settings = server.Kernels.Get<ThresholdSettings>(package.Manifest.PluginId);
 
         settings.Value.Threshold = 9;
 
-        var result = await kernel.InvokeRpcAsync([]);
+        var result = await kernel.InvokeServerExtensionAsync([]);
 
         Assert.Equal(9, Assert.IsType<I32Value>(result).Value);
     }

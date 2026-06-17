@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcClientProxyValidationTests
+public sealed class ServerExtensionClientProxyValidationTests
 {
     [Fact]
     public void Generated_client_rejects_service_interfaces_with_non_method_members()
@@ -22,7 +22,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int> EchoAsync(int value);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(int value, HookContext ctx)
@@ -55,7 +55,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int> EchoAsync(int __arguments);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(int __arguments, HookContext ctx)
@@ -65,7 +65,7 @@ public sealed class KernelRpcClientProxyValidationTests
             }
             """);
 
-        Assert.NotNull(assembly.GetType("Sample.EchoKernelRpcClient", throwOnError: true));
+        Assert.NotNull(assembly.GetType("Sample.EchoKernelServerExtensionClient", throwOnError: true));
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int> EchoAsync(int[,] values);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(int[,] values, HookContext ctx)
@@ -118,7 +118,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int[][]> EchoAsync(int[][] values);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int[][] Echo(int[][] values, HookContext ctx)
@@ -128,7 +128,7 @@ public sealed class KernelRpcClientProxyValidationTests
             }
             """);
 
-        Assert.NotNull(assembly.GetType("Sample.EchoKernelRpcClient", throwOnError: true));
+        Assert.NotNull(assembly.GetType("Sample.EchoKernelServerExtensionClient", throwOnError: true));
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int> EchoAsync(int? value);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(int? value, HookContext ctx)
@@ -175,7 +175,7 @@ public sealed class KernelRpcClientProxyValidationTests
 
             namespace Sample;
 
-            [KernelRpcService("echo")]
+            [ServerExtension("echo")]
             public sealed partial class EchoKernel
             {
                 public int Echo(ref int value, HookContext ctx)
@@ -202,7 +202,7 @@ public sealed class KernelRpcClientProxyValidationTests
 
             public sealed class First
             {
-                [KernelRpcService("first")]
+                [ServerExtension("first")]
                 public sealed partial class EchoKernel
                 {
                     public int Echo(HookContext ctx)
@@ -214,7 +214,7 @@ public sealed class KernelRpcClientProxyValidationTests
 
             public sealed class Second
             {
-                [KernelRpcService("second")]
+                [ServerExtension("second")]
                 public sealed partial class EchoKernel
                 {
                     public int Echo(HookContext ctx)
@@ -248,7 +248,7 @@ public sealed class KernelRpcClientProxyValidationTests
                 ValueTask<int> EchoAsync(ref int value);
             }
 
-            [KernelRpcService("echo", typeof(IEchoService))]
+            [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
                 public int Echo(ref int value, HookContext ctx) => value;

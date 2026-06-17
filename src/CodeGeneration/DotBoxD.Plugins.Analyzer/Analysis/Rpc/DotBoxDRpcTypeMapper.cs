@@ -1,10 +1,11 @@
 using Microsoft.CodeAnalysis;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 /// <summary>
-/// Maps C# types used by a <c>[KernelRpcService]</c> batch method onto DotBoxD.Kernels JSON IR types: scalars to
+/// Maps C# types used by a <c>[ServerExtension]</c> batch method onto DotBoxD.Kernels JSON IR types: scalars to
 /// their sandbox names, <c>List&lt;T&gt;</c>/<c>IEnumerable&lt;T&gt;</c>/<c>T[]</c> to <c>List</c>, and a
 /// DTO (record/struct/class of supported fields) to a positional <c>Record</c>. A DTO's fields are its
 /// public instance properties in declaration order, which is also the order <c>record.new</c> arguments
@@ -15,7 +16,11 @@ internal static class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
-        RejectNullableValueType(type);
+        type = DotBoxDTypeNameReader.UnwrapTaskLike(type);
+        if (IsNullableValueType(type))
+        {
+            throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
+        }
 
         switch (type.SpecialType)
         {
@@ -43,7 +48,7 @@ internal static class DotBoxDRpcTypeMapper
             return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
         }
 
-        throw new NotSupportedException($"Kernel RPC service type '{type.ToDisplayString()}' is not supported.");
+        throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
     }
 
     public static bool IsScalar(ITypeSymbol type)
@@ -54,14 +59,12 @@ internal static class DotBoxDRpcTypeMapper
     /// <c>IReadOnlyList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, or <c>T[]</c>), else null.</summary>
     public static ITypeSymbol? ListElementType(ITypeSymbol type)
     {
-        RejectNullableValueType(type);
-
         if (type is IArrayTypeSymbol array)
         {
             if (array.Rank != 1)
             {
                 throw new NotSupportedException(
-                    $"Kernel RPC service multidimensional array type '{type.ToDisplayString()}' is not supported.");
+                    $"Server extension multidimensional array type '{array.ToDisplayString()}' is not supported.");
             }
 
             return array.ElementType;
@@ -84,12 +87,10 @@ internal static class DotBoxDRpcTypeMapper
     }
 
     public static bool IsRecordDto(INamedTypeSymbol type)
-    {
-        RejectNullableValueType(type);
-        return type.TypeKind is TypeKind.Class or TypeKind.Struct &&
-               !IsScalar(type) &&
-               RecordFields(type).Count > 0;
-    }
+        => type.TypeKind is TypeKind.Class or TypeKind.Struct &&
+           !IsScalar(type) &&
+           !IsNullableValueType(type) &&
+           RecordFields(type).Count > 0;
 
     /// <summary>The DTO's positional fields: public instance properties with a getter, in declaration
     /// order (for a positional record this is its primary-constructor parameter order).</summary>
@@ -116,14 +117,7 @@ internal static class DotBoxDRpcTypeMapper
 
     private static string Scalar(string name) => "\"" + name + "\"";
 
-    private static void RejectNullableValueType(ITypeSymbol type)
-    {
-        if (type.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T)
-        {
-            return;
-        }
-
-        throw new NotSupportedException(
-            $"Kernel RPC service nullable type '{type.ToDisplayString()}' is not supported.");
-    }
+    private static bool IsNullableValueType(ITypeSymbol type)
+        => type is INamedTypeSymbol named &&
+           named.ConstructedFrom.SpecialType == SpecialType.System_Nullable_T;
 }

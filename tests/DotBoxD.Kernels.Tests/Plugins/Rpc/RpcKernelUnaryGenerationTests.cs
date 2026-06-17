@@ -16,7 +16,7 @@ public sealed class RpcKernelUnaryGenerationTests
 
         namespace Sample;
 
-        [KernelRpcService("logical-not")]
+        [ServerExtension("logical-not")]
         public sealed partial class LogicalNotKernel
         {
             public bool Flip(bool value, HookContext ctx)
@@ -34,9 +34,9 @@ public sealed class RpcKernelUnaryGenerationTests
             "Sample.LogicalNotPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
-        var result = await kernel.InvokeRpcAsync([SandboxValue.FromBool(true)]);
+        var result = await kernel.InvokeServerExtensionAsync([SandboxValue.FromBool(true)]);
 
         Assert.False(Assert.IsType<BoolValue>(result).Value);
     }

@@ -15,6 +15,8 @@ internal enum MethodReturnKind
     Task,
     /// <summary><see cref="System.Threading.Tasks.Task{TResult}"/> — async with payload.</summary>
     TaskOf,
+    /// <summary>A synchronous <c>[DotBoxDService]</c> interface return — nested sub-service.</summary>
+    SyncSubService,
     /// <summary>Non-generic <see cref="System.Threading.Tasks.ValueTask"/> — async, no payload.</summary>
     ValueTask,
     /// <summary><see cref="System.Threading.Tasks.ValueTask{TResult}"/> — async with payload.</summary>
@@ -66,7 +68,15 @@ internal sealed record ServiceModel(
     string InterfaceName,
     string ServiceName,
     EquatableArray<MethodModel> Methods,
+    EquatableArray<ServicePropertyModel> Properties,
     string RawServiceName = "");
+
+/// <summary>Immutable, value-equatable representation of a get-only sub-service property.</summary>
+internal sealed record ServicePropertyModel(
+    string Name,
+    string Type,
+    string? ProxyType,
+    bool IsInstanceId);
 
 /// <summary>
 /// Immutable, value-equatable representation of a service method. When
@@ -189,6 +199,7 @@ internal static class NamingHelpers
         {
             MethodReturnKind.Void => "void",
             MethodReturnKind.Sync => unwrappedReturnType!,
+            MethodReturnKind.SyncSubService => unwrappedReturnType!,
             MethodReturnKind.Task => ServicesGeneratorTypeNames.GlobalTask,
             MethodReturnKind.TaskOf => ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalTask, unwrappedReturnType!),
             MethodReturnKind.ValueTask => ServicesGeneratorTypeNames.GlobalValueTask,
@@ -239,6 +250,7 @@ internal static class NamingHelpers
     /// </summary>
     public static bool HasReturnValue(MethodReturnKind kind) =>
         kind == MethodReturnKind.Sync ||
+        kind == MethodReturnKind.SyncSubService ||
         kind == MethodReturnKind.TaskOf ||
         kind == MethodReturnKind.ValueTaskOf ||
         kind == MethodReturnKind.TaskOfSubService ||
@@ -255,6 +267,7 @@ internal static class NamingHelpers
 
     /// <summary>True for the two sub-service-returning kinds.</summary>
     public static bool IsSubServiceReturn(MethodReturnKind kind) =>
+        kind == MethodReturnKind.SyncSubService ||
         kind == MethodReturnKind.TaskOfSubService ||
         kind == MethodReturnKind.ValueTaskOfSubService;
 

@@ -37,7 +37,8 @@ internal static class UnaryPureIntrinsicDispatcher
     }
 
     public static bool IsCandidate(string id)
-        => id is "math.abs" or "math.sqrt" or "math.floor" or "math.ceil" or "math.round" or "string.length";
+        => id is "math.abs" or "math.sqrt" or "math.floor" or "math.ceil" or "math.round"
+            or "int32.toStringInvariant" or "string.length";
 
     private static async ValueTask<SandboxValue> AwaitOperand(
         string id,
@@ -70,6 +71,8 @@ internal static class UnaryPureIntrinsicDispatcher
         context.ChargeBindingCall(descriptor);
         return method switch {
             nameof(Runtime.CompiledRuntime.AbsI32) => Runtime.CompiledRuntime.AbsI32(operand),
+            nameof(Runtime.CompiledRuntime.Int32ToStringInvariant) =>
+                Runtime.CompiledRuntime.Int32ToStringInvariant(context, operand),
             nameof(Runtime.CompiledRuntime.StringLength) => Runtime.CompiledRuntime.StringLength(operand),
             nameof(Runtime.CompiledRuntime.SqrtF64) => Runtime.CompiledRuntime.SqrtF64(operand),
             nameof(Runtime.CompiledRuntime.FloorF64) => Runtime.CompiledRuntime.FloorF64(operand),
@@ -98,6 +101,7 @@ internal static class UnaryPureIntrinsicDispatcher
     {
         method = id switch {
             "math.abs" => nameof(Runtime.CompiledRuntime.AbsI32),
+            "int32.toStringInvariant" => nameof(Runtime.CompiledRuntime.Int32ToStringInvariant),
             "string.length" => nameof(Runtime.CompiledRuntime.StringLength),
             "math.sqrt" => nameof(Runtime.CompiledRuntime.SqrtF64),
             "math.floor" => nameof(Runtime.CompiledRuntime.FloorF64),
@@ -111,6 +115,7 @@ internal static class UnaryPureIntrinsicDispatcher
     private static (SandboxType Parameter, SandboxType Return) Shape(string method)
         => method switch {
             nameof(Runtime.CompiledRuntime.AbsI32) => (SandboxType.I32, SandboxType.I32),
+            nameof(Runtime.CompiledRuntime.Int32ToStringInvariant) => (SandboxType.I32, SandboxType.String),
             nameof(Runtime.CompiledRuntime.StringLength) => (SandboxType.String, SandboxType.I32),
             _ => (SandboxType.F64, SandboxType.F64)
         };

@@ -27,7 +27,7 @@ public sealed class RpcKernelObjectCreationValidationTests
                 public bool Success { get; set; }
             }
 
-            [KernelRpcService("mixed-creation")]
+            [ServerExtension("mixed-creation")]
             public sealed partial class MixedCreationKernel
             {
                 public KillResult Build(int monsterId, HookContext ctx)

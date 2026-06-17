@@ -13,7 +13,7 @@ public interface IAsyncNumberService
     ValueTask<int> GetAsync();
 }
 
-public sealed class KernelRpcServiceProxyAsyncTests
+public sealed class ServerExtensionProxyAsyncTests
 {
     [Fact]
     public async Task ValueTask_service_method_returns_before_kernel_rpc_completes()
@@ -22,8 +22,8 @@ public sealed class KernelRpcServiceProxyAsyncTests
         using var server = PluginServer.Create(
             configureHost: builder => builder.AddBinding(PendingBinding(pending)),
             defaultPolicy: AsyncPolicy());
-        var kernel = await server.InstallRpcAsync(PendingNumberPackage());
-        var service = KernelRpcServiceProxy.Create<IAsyncNumberService>(kernel);
+        var kernel = await server.InstallServerExtensionAsync(PendingNumberPackage());
+        var service = ServerExtensionProxy.Create<IAsyncNumberService>(kernel);
 
         var invocation = Task.Run(() => service.GetAsync());
 

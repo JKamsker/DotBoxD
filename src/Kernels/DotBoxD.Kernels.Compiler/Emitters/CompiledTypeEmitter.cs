@@ -28,6 +28,23 @@ internal static class CompiledTypeEmitter
             return;
         }
 
+        if (type.IsRecord)
+        {
+            EmitInt32(il, type.Arguments.Count);
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.CreateTypeArray)));
+            for (var i = 0; i < type.Arguments.Count; i++)
+            {
+                il.Emit(OpCodes.Dup);
+                EmitInt32(il, i);
+                EmitMetered(il, type.Arguments[i]);
+                il.Emit(OpCodes.Stelem_Ref);
+            }
+
+            CompiledMeterEmitter.Fuel(il, 1);
+            il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeRecord)));
+            return;
+        }
+
         CompiledMeterEmitter.Fuel(il, 1);
         il.Emit(OpCodes.Ldstr, type.Name);
         il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.TypeScalar)));

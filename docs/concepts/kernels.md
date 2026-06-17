@@ -26,5 +26,7 @@ Async binding tails are also capability-gated. Policies must grant `dotboxd.runt
 > **Important:** the kernel sandbox is the real boundary. It is **not** the same as loading a .NET
 > plugin assembly — see [security/sandbox-caveats.md](../security/sandbox-caveats.md).
 
-Diagnostics use the `DBXK###` prefix. **See also:** [`samples/Kernels`](../../samples/Kernels),
-[plugins authoring](../../samples/Kernels/PluginAuthoring), and [runtime](runtime.md).
+Diagnostics use the `DBXK###` prefix. **See also:** the GameServer sample under
+[`samples/GameServer`](../../samples/GameServer), [runtime](runtime.md), and
+[`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for kernel scenarios no longer shown
+by maintained samples.

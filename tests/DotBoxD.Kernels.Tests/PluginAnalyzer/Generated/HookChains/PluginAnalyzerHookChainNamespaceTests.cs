@@ -29,7 +29,7 @@ public sealed class PluginAnalyzerHookChainNamespaceTests
                         public static void Configure(HookRegistry hooks)
                             => hooks.On<AggroEvent>()
                                 .Where((e, ctx) => e.Distance <= 5)
-                                .InvokeKernel((e, ctx) => ctx.Messages.Send(e.TargetId, "calm"));
+                                .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "calm"));
                     }
                 }
             }

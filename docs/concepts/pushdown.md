@@ -37,7 +37,8 @@ Because the batch logic is author-supplied, it runs as a validated sandboxed ker
 host bindings the server already exposes, under the same capability + fuel/quota limits as event kernels.
 A method reachable via normal RPC is **not** automatically reachable from a kernel.
 
-**See also:** the runnable [`samples/Pushdown/DotBoxD.EndToEnd`](../../samples/Pushdown/DotBoxD.EndToEnd)
-(prints the round-trip win) and [`samples/Pushdown/PluginIpc`](../../samples/Pushdown/PluginIpc).
+**See also:** the runnable GameServer sample under
+[`samples/GameServer`](../../samples/GameServer), which demonstrates the
+`MonsterKillerKernel` kernel RPC path.
 Roadmap items (`DotBoxD.Pushdown.Linq`, fluent client API) are tracked in
 [follow-up-issues](../architecture/follow-up-issues.md).

@@ -19,7 +19,7 @@ public sealed class Fix_API_0024_Tests
 
         Assert.Contains(
             baseline,
-            entry => entry.Contains("RegisterRpcServiceAsync<TService, TKernel>", StringComparison.Ordinal) &&
+            entry => entry.Contains("RegisterServerExtensionAsync<TService, TKernel>", StringComparison.Ordinal) &&
                      entry.Contains("where TService : class", StringComparison.Ordinal) &&
                      entry.Contains("where TKernel : class", StringComparison.Ordinal));
     }

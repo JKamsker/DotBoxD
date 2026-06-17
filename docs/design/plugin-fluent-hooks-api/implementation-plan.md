@@ -22,7 +22,7 @@ claims the reviews corrected (noted inline there).
 | **B3 (capability gating)** — wildcard-gated install enforcement | ✅ **done, tested** — `CapabilityPattern` + `PolicyResolver`/`PolicyGrantValidator` authorize a concrete required capability under a wildcard grant and fail closed otherwise. **Example demo done, e2e:** `[HostBinding(id, capability, effects)]` host-service methods (`DotBoxDHostBindingExpressionLowerer`) lower a `ctx.Host<T>().M(args)` call to a `CallExpression(id, args)`; the analyzer derives `RequiredCapabilities` (host-binding caps, `[Capability]`-gated event-property reads, the message-write Send cap) and the host-binding effects into the manifest. `IGameWorldAccess.GetHealth` lowers to `host.world.getHealth`; the server builds a per-kernel least-privilege policy from each manifest's `RequiredCapabilities`, so the guardian gets `game.world.monster.read.*` (matching `…read.health`) and a write/threat kernel is denied at install. Verified by `PluginAnalyzerHostBindingTests` (7) and the GameServer example (exit 0). |
 | **Auth/signing/policy-resolver** | deferred appendix (no consumer; see §below) |
 
-Every shipped item above is committed with a green `dotnet build DotBoxD.Kernels.slnx -c Release` and a green
+Every shipped item above is committed with a green `dotnet build DotBoxD.slnx -c Release` and a green
 `tests/DotBoxD.Kernels.Tests` run.
 
 ## What the reviews changed (the short version)
@@ -69,15 +69,15 @@ Every shipped item above is committed with a green `dotnet build DotBoxD.Kernels
 
 ### Phase A — example cleanup, renames, Program classes, slnx  *(low risk; this session)*
 No framework/API changes; keeps the current functional install path working.
-- Rename `examples/GameServer/DotBoxD.Kernels.Game.PluginHost` → `DotBoxD.Kernels.Game.Plugin` (folder, csproj, namespaces,
+- Rename the old GameServer plugin-host project → `Examples.GameServer.Plugin` (folder and csproj; namespaces stay under `DotBoxD.Kernels.Game.*`),
   generated package namespaces).
 - Server: `PluginHostLauncher` → `PluginLauncher`; constants/env var (`SAFEIR_GAME_PLUGINHOST_DLL` →
   `SAFEIR_GAME_PLUGIN_DLL`); update call site.
 - Delete `Local/LocalPreview.cs`, `Local/PluginHostPolicy.cs`, `Local/RecordingMessageSink.cs`.
 - Both `Program` → full `internal static class Program` with `Main`; preserve exit-code contract.
-- `DotBoxD.Kernels.slnx` nested solution folders mirroring disk.
+- `DotBoxD.slnx` nested solution folders mirroring disk.
 - Update `scripts/check-docs-smoke.ps1`, `docs/Specs/Addendum/Examples.md`, `README.md`.
-- **Verify:** `dotnet build DotBoxD.Kernels.slnx -c Release`; run the server example end-to-end (baseline +
+- **Verify:** `dotnet build DotBoxD.slnx -c Release`; run the server example end-to-end (baseline +
   with-plugin phases, exit 0); `./scripts/check-docs-smoke.ps1 -Configuration Release`.
 
 ### Phase B — fluent surface, ownership, convention wiring, capability gating  *(framework work in `src/`)*

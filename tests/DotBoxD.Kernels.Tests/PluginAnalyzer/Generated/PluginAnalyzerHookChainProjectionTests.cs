@@ -36,7 +36,7 @@ public sealed class PluginAnalyzerHookChainProjectionTests
                     => hooks.On<ProbeEvent>()
                         .Select((e, ctx) => ctx.Host<IProbeWorld>().Label(e.TargetId))
                         .Where(label => label == "ready" && label != "")
-                        .InvokeKernel((label, ctx) => ctx.Messages.Send(label, label));
+                        .Run((label, ctx) => ctx.Messages.Send(label, label));
             }
             """);
 

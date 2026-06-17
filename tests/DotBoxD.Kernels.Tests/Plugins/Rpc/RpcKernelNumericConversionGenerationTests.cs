@@ -16,7 +16,7 @@ public sealed class RpcKernelNumericConversionGenerationTests
 
         namespace Sample;
 
-        [KernelRpcService("long-literal")]
+        [ServerExtension("long-literal")]
         public sealed partial class LongLiteralKernel
         {
             public long Zero(HookContext ctx)
@@ -34,7 +34,7 @@ public sealed class RpcKernelNumericConversionGenerationTests
 
         namespace Sample;
 
-        [KernelRpcService("long-parameter")]
+        [ServerExtension("long-parameter")]
         public sealed partial class LongParameterKernel
         {
             public long Echo(int value, HookContext ctx)
@@ -52,9 +52,9 @@ public sealed class RpcKernelNumericConversionGenerationTests
             "Sample.LongLiteralPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
-        var result = await kernel.InvokeRpcAsync([]);
+        var result = await kernel.InvokeServerExtensionAsync([]);
 
         Assert.Equal(0L, Assert.IsType<I64Value>(result).Value);
     }
@@ -67,9 +67,9 @@ public sealed class RpcKernelNumericConversionGenerationTests
             "Sample.LongParameterPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
-        var result = await kernel.InvokeRpcAsync([SandboxValue.FromInt32(42)]);
+        var result = await kernel.InvokeServerExtensionAsync([SandboxValue.FromInt32(42)]);
 
         Assert.Equal(42L, Assert.IsType<I64Value>(result).Value);
     }

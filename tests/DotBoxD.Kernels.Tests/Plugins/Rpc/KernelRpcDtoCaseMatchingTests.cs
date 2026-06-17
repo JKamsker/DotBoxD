@@ -7,7 +7,7 @@ using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcDtoCaseMatchingTests
+public sealed class ServerExtensionsDtoCaseMatchingTests
 {
     private const string CaseResultSource = """
         using System.Threading.Tasks;
@@ -33,7 +33,7 @@ public sealed class KernelRpcDtoCaseMatchingTests
             ValueTask<CaseResult> GetAsync();
         }
 
-        [KernelRpcService("case-result", typeof(ICaseService))]
+        [ServerExtension("case-result", typeof(ICaseService))]
         public sealed partial class CaseKernel
         {
             public CaseResult Get(HookContext ctx)
@@ -63,9 +63,9 @@ public sealed class KernelRpcDtoCaseMatchingTests
             CaseResultSource,
             "Sample.CasePluginPackage");
         using var server = PluginServer.Create();
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
 
-        var result = Assert.IsType<RecordValue>(await kernel.InvokeRpcAsync([]));
+        var result = Assert.IsType<RecordValue>(await kernel.InvokeServerExtensionAsync([]));
 
         Assert.Equal(
             [SandboxValue.FromInt32(10), SandboxValue.FromInt32(20)],
@@ -76,8 +76,8 @@ public sealed class KernelRpcDtoCaseMatchingTests
     public async Task Generated_ipc_client_prefers_exact_case_constructor_parameter_matches()
     {
         var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(CaseResultSource);
-        var clientType = assembly.GetType("Sample.CaseKernelRpcClient", throwOnError: true)!;
-        var wireClient = new RecordingKernelRpcWireClient(CaseResultResponse());
+        var clientType = assembly.GetType("Sample.CaseKernelServerExtensionClient", throwOnError: true)!;
+        var wireClient = new RecordingServerExtensionsWireClient(CaseResultResponse());
         var create = clientType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
         var service = create.Invoke(null, [wireClient, "case-result"])!;
         var method = service.GetType().GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Instance)!;
@@ -125,9 +125,9 @@ public sealed class KernelRpcDtoCaseMatchingTests
         public int monsterId { get; }
     }
 
-    private sealed class RecordingKernelRpcWireClient(byte[] response) : IKernelRpcWireClient
+    private sealed class RecordingServerExtensionsWireClient(byte[] response) : DotBoxD.Plugins.IServerExtensionWireClient
     {
-        public ValueTask<byte[]> InvokeKernelRpcAsync(
+        public ValueTask<byte[]> InvokeServerExtensionAsync(
             string pluginId,
             byte[] arguments,
             CancellationToken cancellationToken = default)

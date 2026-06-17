@@ -15,75 +15,11 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 /// results and the matching <see cref="SandboxResourceUsage"/> counters. A release could regress non-fuel
 /// wiring while docs-smoke still passed because no user-facing sample exercised those knobs.
 ///
-/// The fix adds <c>samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/ResourceLimitsExample.cs</c>, wires
-/// it into the Capabilities example runner (which the docs-smoke script executes), and links it from the
-/// addendum examples doc. These tests pin both halves of the fix: (1) the runnable example exists, is
-/// wired into the smoke-executed runner, and is documented; and (2) the behavior the example demonstrates
-/// over the real public host API actually holds.
+/// The old runnable resource-limit example is no longer maintained. These tests keep the public
+/// behavior covered and require the example gap to be documented.
 /// </summary>
 public sealed class Fix_CMP_0019_Tests
 {
-    private const string ExampleRelative =
-        "samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/ResourceLimitsExample.cs";
-
-    private const string RunnerRelative =
-        "samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Program.cs";
-
-    private const string DocsRelative = "docs/Specs/Addendum/Examples.md";
-
-    [Fact]
-    public void Runnable_resource_limits_example_exists_and_wires_the_public_non_fuel_knobs()
-    {
-        var example = ReadRepositoryText(ExampleRelative);
-
-        foreach (var knob in new[]
-        {
-            "WithMaxLoopIterations",
-            "WithMaxHostCalls",
-            "WithWallTime",
-            "WithMaxListLength",
-            "WithMaxStringLength"
-        })
-        {
-            Assert.True(
-                example.Contains(knob, StringComparison.Ordinal),
-                $"Resource-limits example must demonstrate the public {knob} quota knob.");
-        }
-
-        // The proof must surface the public result codes and usage counters, not just configure limits.
-        Assert.True(
-            example.Contains("ResourceUsage.LoopIterations", StringComparison.Ordinal),
-            "Resource-limits example must read back the LoopIterations usage counter.");
-        Assert.True(
-            example.Contains("ResourceUsage.HostCalls", StringComparison.Ordinal),
-            "Resource-limits example must read back the HostCalls usage counter.");
-        Assert.True(
-            example.Contains("Error?.Code", StringComparison.Ordinal),
-            "Resource-limits example must surface the public SandboxErrorCode result.");
-    }
-
-    [Fact]
-    public void Resource_limits_example_is_wired_into_the_smoke_executed_runner()
-    {
-        // The docs-smoke script runs the addendum example project, so the example only provides
-        // release coverage if the runner actually invokes it.
-        var runner = ReadRepositoryText(RunnerRelative);
-
-        Assert.True(
-            runner.Contains("ResourceLimitsExample.RunAsync", StringComparison.Ordinal),
-            "The Capabilities example runner (Program.cs) must invoke ResourceLimitsExample so docs-smoke executes it.");
-    }
-
-    [Fact]
-    public void Resource_limits_example_is_linked_from_the_public_examples_doc()
-    {
-        var docs = ReadRepositoryText(DocsRelative);
-
-        Assert.True(
-            docs.Contains("ResourceLimitsExample.cs", StringComparison.Ordinal),
-            "Public examples doc must link the runnable resource-limits example file.");
-    }
-
     [Fact]
     public async Task Loop_iteration_quota_surfaces_quota_exceeded_and_meters_iterations()
     {
@@ -235,6 +171,14 @@ public sealed class Fix_CMP_0019_Tests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+    }
+
+    [Fact]
+    public void Removed_resource_limit_sample_is_listed_as_an_example_coverage_gap()
+    {
+        var gaps = ReadRepositoryText("docs/examples/coverage-gaps.md");
+
+        Assert.Contains("Standalone resource-limit demonstrations", gaps);
     }
 
     [Fact]

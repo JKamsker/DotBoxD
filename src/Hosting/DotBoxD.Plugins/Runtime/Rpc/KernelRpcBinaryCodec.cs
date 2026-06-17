@@ -4,7 +4,7 @@ using System.Buffers.Binary;
 using System.Text;
 
 /// <summary>
-/// Encodes kernel RPC IR values as a small binary payload: one value-kind byte followed by only the
+/// Encodes server extension IR values as a small binary payload: one value-kind byte followed by only the
 /// active scalar or child sequence. The IPC layer transports the resulting bytes as an ordinary binary
 /// argument, avoiding reflection-bound DTO maps and repeated string kind tags on the wire.
 /// </summary>
@@ -30,12 +30,12 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var remainingItems = MaxDecodeItems;
-        var count = ReadItemCount(ref reader, ref remainingItems);
+        var count = reader.ReadLength();
+        reader.ReserveItems(count);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader, depth: 0, ref remainingItems);
+            values[i] = ReadValue(ref reader, 0);
         }
 
         reader.EnsureConsumed();
@@ -52,8 +52,7 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var remainingItems = MaxDecodeItems;
-        var value = ReadValue(ref reader, depth: 0, ref remainingItems);
+        var value = ReadValue(ref reader, 0);
         reader.EnsureConsumed();
         return value;
     }
@@ -82,50 +81,53 @@ public static class KernelRpcBinaryCodec
                 return;
             case KernelRpcValueKind.List:
             case KernelRpcValueKind.Record:
-                WriteItems(stream, value.ItemSpan);
+                WriteItems(stream, value.Items);
                 return;
             default:
-                throw new NotSupportedException($"Kernel RPC value kind '{value.Kind}' is not supported.");
+                throw new NotSupportedException($"Server extension value kind '{value.Kind}' is not supported.");
         }
     }
 
-    private static KernelRpcValue ReadValue(ref Reader reader, int depth, ref int remainingItems)
+    private static KernelRpcValue ReadValue(ref Reader reader, int depth)
     {
         var kind = (KernelRpcValueKind)reader.ReadByte();
         return kind switch
         {
             KernelRpcValueKind.Unit => KernelRpcValue.Unit(),
-            KernelRpcValueKind.Bool => KernelRpcValue.Bool(ReadBool(ref reader)),
+            KernelRpcValueKind.Bool => ReadBool(ref reader),
             KernelRpcValueKind.I32 => KernelRpcValue.Int32(reader.ReadInt32()),
             KernelRpcValueKind.I64 => KernelRpcValue.Int64(reader.ReadInt64()),
-            KernelRpcValueKind.F64 => KernelRpcValue.Double(ReadFiniteDouble(ref reader)),
+            KernelRpcValueKind.F64 => ReadDouble(ref reader),
             KernelRpcValueKind.String => KernelRpcValue.String(reader.ReadString()),
-            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader, depth, ref remainingItems)),
-            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader, depth, ref remainingItems)),
-            _ => throw new FormatException($"Kernel RPC payload contains unknown value kind '{kind}'.")
+            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader, depth)),
+            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader, depth)),
+            _ => throw new FormatException($"Server extension payload contains unknown value kind '{kind}'.")
         };
     }
 
-    private static bool ReadBool(ref Reader reader)
+    private static KernelRpcValue ReadBool(ref Reader reader)
     {
         var value = reader.ReadByte();
         return value switch
         {
-            0 => false,
-            1 => true,
-            _ => throw new FormatException("Kernel RPC payload contains invalid bool value.")
+            0 => KernelRpcValue.Bool(false),
+            1 => KernelRpcValue.Bool(true),
+            _ => throw new FormatException("Server extension payload contains an invalid bool value.")
         };
     }
 
-    private static double ReadFiniteDouble(ref Reader reader)
+    private static KernelRpcValue ReadDouble(ref Reader reader)
     {
         var value = BitConverter.Int64BitsToDouble(reader.ReadInt64());
-        return double.IsFinite(value)
-            ? value
-            : throw new FormatException("Kernel RPC payload contains non-finite F64 value.");
+        if (!double.IsFinite(value))
+        {
+            throw new FormatException("Server extension payload contains a non-finite F64 value.");
+        }
+
+        return KernelRpcValue.Double(value);
     }
 
-    private static void WriteItems(MemoryStream stream, ReadOnlySpan<KernelRpcValue> items)
+    private static void WriteItems(MemoryStream stream, KernelRpcValue[] items)
     {
         WriteLength(stream, items.Length);
         foreach (var item in items)
@@ -134,38 +136,28 @@ public static class KernelRpcBinaryCodec
         }
     }
 
-    private static KernelRpcValue[] ReadItems(ref Reader reader, int depth, ref int remainingItems)
+    private static KernelRpcValue[] ReadItems(ref Reader reader, int depth)
     {
-        if (depth >= MaxDecodeDepth)
+        var nextDepth = depth + 1;
+        if (nextDepth > MaxDecodeDepth)
         {
-            throw new FormatException("Kernel RPC payload exceeds maximum nesting depth.");
+            throw new FormatException("Server extension payload exceeds the maximum nesting depth.");
         }
 
-        var count = ReadItemCount(ref reader, ref remainingItems);
+        var count = reader.ReadLength();
+        reader.ReserveItems(count);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader, depth + 1, ref remainingItems);
+            values[i] = ReadValue(ref reader, nextDepth);
         }
 
         return values;
     }
 
-    private static int ReadItemCount(ref Reader reader, ref int remainingItems)
-    {
-        var count = reader.ReadLength();
-        if (count > MaxDecodeItems || count > remainingItems)
-        {
-            throw new FormatException("Kernel RPC payload contains too many items.");
-        }
-
-        remainingItems -= count;
-        return count;
-    }
-
     private static void WriteString(MemoryStream stream, string value)
     {
-        var bytes = StrictUtf8.GetBytes(value);
+        var bytes = Encoding.UTF8.GetBytes(value);
         WriteLength(stream, bytes.Length);
         stream.Write(bytes);
     }
@@ -188,7 +180,7 @@ public static class KernelRpcBinaryCodec
     {
         if (value < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(value), "Kernel RPC payload lengths must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(value), "Server extension payload lengths must be non-negative.");
         }
 
         var remaining = (uint)value;
@@ -204,14 +196,19 @@ public static class KernelRpcBinaryCodec
     private ref struct Reader
     {
         private ReadOnlySpan<byte> _remaining;
+        private int _items;
 
-        public Reader(ReadOnlySpan<byte> payload) => _remaining = payload;
+        public Reader(ReadOnlySpan<byte> payload)
+        {
+            _remaining = payload;
+            _items = 0;
+        }
 
         public byte ReadByte()
         {
             if (_remaining.IsEmpty)
             {
-                throw new FormatException("Kernel RPC payload ended unexpectedly.");
+                throw new FormatException("Server extension payload ended unexpectedly.");
             }
 
             var value = _remaining[0];
@@ -233,48 +230,56 @@ public static class KernelRpcBinaryCodec
 
         public int ReadLength()
         {
-            var result = 0;
+            ulong result = 0;
             var shift = 0;
             while (shift < 35)
             {
                 var next = ReadByte();
-                var payload = next & 0x7F;
-                if (shift == 28 && payload > 0x07)
-                {
-                    throw new FormatException("Kernel RPC payload contains an invalid length prefix.");
-                }
-
-                result |= payload << shift;
+                result |= (ulong)(next & 0x7F) << shift;
                 if ((next & 0x80) == 0)
                 {
-                    return result;
+                    if (result > int.MaxValue)
+                    {
+                        throw new FormatException("Server extension payload contains an invalid length prefix.");
+                    }
+
+                    return (int)result;
                 }
 
                 shift += 7;
             }
 
-            throw new FormatException("Kernel RPC payload contains an invalid length prefix.");
+            throw new FormatException("Server extension payload contains an invalid length prefix.");
         }
 
         public string ReadString()
         {
             var length = ReadLength();
-            var bytes = Read(length);
             try
             {
-                return StrictUtf8.GetString(bytes);
+                return StrictUtf8.GetString(Read(length));
             }
             catch (DecoderFallbackException ex)
             {
-                throw new FormatException("Kernel RPC payload contains invalid UTF-8 string.", ex);
+                throw new FormatException("Server extension payload contains invalid UTF-8.", ex);
             }
+        }
+
+        public void ReserveItems(int count)
+        {
+            if (count < 0 || _items > MaxDecodeItems - count)
+            {
+                throw new FormatException("Server extension payload contains too many items.");
+            }
+
+            _items += count;
         }
 
         public void EnsureConsumed()
         {
             if (!_remaining.IsEmpty)
             {
-                throw new FormatException("Kernel RPC payload contains trailing bytes.");
+                throw new FormatException("Server extension payload contains trailing bytes.");
             }
         }
 
@@ -282,7 +287,7 @@ public static class KernelRpcBinaryCodec
         {
             if (length < 0 || _remaining.Length < length)
             {
-                throw new FormatException("Kernel RPC payload ended unexpectedly.");
+                throw new FormatException("Server extension payload ended unexpectedly.");
             }
 
             var bytes = _remaining[..length];

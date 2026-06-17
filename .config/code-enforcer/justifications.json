@@ -2,6 +2,18 @@
   "version": 1,
   "files": [
     {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainModelFactory.cs",
+      "justification": "True-async hook-chain lowering shares projection, terminal, and remote-fallback model construction in one pass. Keep listed until hook-chain model construction is split by stage family."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/InvokeAsync/InvokeAsyncCallShape.cs",
+      "justification": "InvokeAsync call-shape modeling keeps explicit, implicit, and receiver capture state together to avoid divergent lowering rules. Keep listed until capture variants are split behind a common model."
+    },
+    {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/RpcKernelModelFactory.cs",
+      "justification": "Server-extension model construction still coordinates service metadata, receiver handles, and generated RPC kernel shapes. Keep listed until RPC model discovery is split by source feature."
+    },
+    {
       "path": "src/CodeGeneration/DotBoxD.Services.SourceGenerator/Generation/DispatcherGenerator.cs",
       "justification": "Pre-existing generator emission file surfaced after correcting the line guard root. Keep listed until the generator is split by dispatcher sections."
     },
@@ -114,8 +126,16 @@
       "justification": "Host-binding analyzer scenarios share generated source fixtures and package assertions; keep together until the fixture can be extracted cleanly."
     },
     {
+      "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/InvokeAsync/InvokeAsyncGenerationTests.cs",
+      "justification": "InvokeAsync generation scenarios share compilation helpers and snapshot assertions for the true-async interceptor surface. Keep listed until capture and no-capture cases move to separate fixtures."
+    },
+    {
       "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/KernelMethod/PluginAnalyzerKernelMethodTests.cs",
       "justification": "Pre-existing kernel-method analyzer fixture surfaced after correcting the line guard root. Keep listed until cases are split by expression/control-flow feature."
+    },
+    {
+      "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Runtime/HookChainRuntimeTests.cs",
+      "justification": "Hook-chain runtime coverage shares interceptor compilation and publish helpers across local, projected, and remote chains. Keep listed until runtime scenarios are split by chain type."
     },
     {
       "path": "tests/DotBoxD.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs",
@@ -236,8 +256,16 @@
       "justification": "Pre-existing source-generator lowering folder has many focused helper files. Keep listed until the lowering model is split into subfolders."
     },
     {
+      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc",
+      "justification": "Server-extension RPC analysis is split into focused emitters, validators, seeders, and model readers. Keep listed until client, kernel, and DTO analysis move into subfolders."
+    },
+    {
       "path": "src/Hosting/DotBoxD.Hosting/Execution",
       "justification": "Pre-existing execution folder groups compiled, interpreted, prepared, and worker execution pieces. Keep listed until execution modes are moved into subfolders."
+    },
+    {
+      "path": "src/Hosting/DotBoxD.Plugins/Runtime",
+      "justification": "Plugin runtime root temporarily hosts registry, lifecycle, binding, and package-validation pieces while remote plugin server work lands. Keep listed until remaining root services are split into subfolders."
     },
     {
       "path": "tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated",
@@ -248,5 +276,10 @@
       "justification": "Pre-existing RPC plugin regression folder groups service, generator, runtime, and IPC tests. Keep listed until RPC tests are split into subfolders."
     }
   ],
-  "rootFolders": []
+  "rootFolders": [
+    {
+      "path": "src/Hosting/DotBoxD.Hosting",
+      "justification": "Hosting project root contains public host entrypoints and focused companion files. Keep listed until public surface and internals can be moved into dedicated subfolders without API churn."
+    }
+  ]
 }

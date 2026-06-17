@@ -6,7 +6,7 @@ using PluginServer = DotBoxD.Plugins.PluginServer;
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 /// <summary>
-/// Phase C lowering: the generator lowers an inline On&lt;TEvent&gt;().Where(lambda).InvokeKernel(lambda)
+/// Phase C lowering: the generator lowers an inline On&lt;TEvent&gt;().Where(lambda).Run(lambda)
 /// chain into a verified-IR package — the lambda bodies become the module's ShouldHandle/Handle — and
 /// fails safe (emits nothing, no DBXK100) for shapes outside the supported subset.
 /// </summary>
@@ -16,7 +16,7 @@ public sealed class PluginAnalyzerHookChainTests
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
     [Fact]
-    public void Lowers_a_Where_then_InvokeKernel_chain_to_a_package()
+    public void Lowers_a_Where_then_Run_chain_to_a_package()
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
@@ -32,7 +32,7 @@ public sealed class PluginAnalyzerHookChainTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<MonsterAggroEvent>()
                         .Where((e, ctx) => e.Distance <= 5)
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
             }
             """);
 
@@ -43,7 +43,7 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
-    public void Lowers_a_bare_InvokeKernel_chain_with_no_Where()
+    public void Lowers_a_bare_Run_chain_with_no_Where()
     {
         var result = RunGenerator("""
             using DotBoxD.Plugins;
@@ -58,7 +58,7 @@ public sealed class PluginAnalyzerHookChainTests
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<AttackEvent>()
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.AttackerId, "taunt"));
+                        .Run((e, ctx) => ctx.Messages.Send(e.AttackerId, "taunt"));
             }
             """);
 
@@ -82,9 +82,9 @@ public sealed class PluginAnalyzerHookChainTests
 
             public static class Usage
             {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<TickEvent>()
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send("clock", "tick"));
+                    public static void Configure(HookRegistry hooks)
+                        => hooks.On<TickEvent>()
+                        .Run((e, ctx) => ctx.Messages.Send("clock", "tick"));
             }
             """);
 
@@ -113,7 +113,7 @@ public sealed class PluginAnalyzerHookChainTests
                         .Where((e, ctx) => e.Distance <= 5)
                         .Select((e, ctx) => e.MonsterLevel - e.PlayerLevel)
                         .Where((gap, ctx) => gap >= 3)
-                        .InvokeKernel((gap, ctx) => ctx.Messages.Send("monster", "calm"));
+                        .Run((gap, ctx) => ctx.Messages.Send("monster", "calm"));
             }
             """);
 
@@ -140,7 +140,7 @@ public sealed class PluginAnalyzerHookChainTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<MonsterAggroEvent>()
                         .Select((e, ctx) => e.MonsterId)
-                        .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
+                        .Run((id, ctx) => ctx.Messages.Send(id, "calm"));
             }
             """);
 
@@ -168,7 +168,7 @@ public sealed class PluginAnalyzerHookChainTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<MonsterAggroEvent>()
                         .Where(e => e.Distance <= 5)
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
             }
             """);
 
@@ -196,7 +196,7 @@ public sealed class PluginAnalyzerHookChainTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<MonsterAggroEvent>()
                         .Where((e) => e.Distance <= 5)
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
             }
             """);
 
@@ -225,7 +225,7 @@ public sealed class PluginAnalyzerHookChainTests
                     => hooks.On<MonsterAggroEvent>()
                         .Select(e => e.MonsterLevel - e.PlayerLevel)
                         .Where(gap => gap >= 3)
-                        .InvokeKernel((gap, ctx) => ctx.Messages.Send("monster", "calm"));
+                        .Run((gap, ctx) => ctx.Messages.Send("monster", "calm"));
             }
             """);
 
@@ -255,7 +255,7 @@ public sealed class PluginAnalyzerHookChainTests
                         .Where(e => e.Distance <= 5)
                         .Where((e, ctx) => e.MonsterLevel >= 3)
                         .Select(e => e.MonsterId)
-                        .InvokeKernel((id, ctx) => ctx.Messages.Send(id, "calm"));
+                        .Run((id, ctx) => ctx.Messages.Send(id, "calm"));
             }
             """);
 
@@ -266,7 +266,7 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
-    public void Does_not_lower_an_element_only_InvokeKernel_terminal()
+    public void Does_not_lower_an_element_only_Run_terminal()
     {
         // An element-only terminal has no context, so it cannot ctx.Messages.Send — the only lowerable
         // terminal effect. It must fail safe: no HookChain_ package, leaving the runtime terminal to throw.
@@ -284,7 +284,7 @@ public sealed class PluginAnalyzerHookChainTests
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<MonsterAggroEvent>()
                         .Where((e, ctx) => e.Distance <= 5)
-                        .InvokeKernel(e => default);
+                        .Run(e => default);
             }
             """);
 
@@ -308,9 +308,9 @@ public sealed class PluginAnalyzerHookChainTests
 
             public static class Usage
             {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<MixedEvent>()
-                        .InvokeKernel((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                    public static void Configure(HookRegistry hooks)
+                        => hooks.On<MixedEvent>()
+                        .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
             }
             """);
 
@@ -345,7 +345,7 @@ public sealed class PluginAnalyzerHookChainTests
                 {
                     public static void Configure(HookRegistry hooks)
                         => hooks.On<ExistingAttributeEvent>()
-                            .InvokeKernel((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                            .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
                 }
             }
             """);

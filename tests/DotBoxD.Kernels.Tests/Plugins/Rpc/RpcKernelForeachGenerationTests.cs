@@ -17,7 +17,7 @@ public sealed class RpcKernelForeachGenerationTests
 
         namespace Sample;
 
-        [KernelRpcService("foreach-collision")]
+        [ServerExtension("foreach-collision")]
         public sealed partial class ForeachCollisionKernel
         {
             public int SumWithLocal(List<int> values, HookContext ctx)
@@ -42,12 +42,12 @@ public sealed class RpcKernelForeachGenerationTests
             "Sample.ForeachCollisionPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
         var values = SandboxValue.FromList(
             [SandboxValue.FromInt32(1), SandboxValue.FromInt32(2), SandboxValue.FromInt32(3)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([values]);
+        var result = await kernel.InvokeServerExtensionAsync([values]);
 
         Assert.Equal(106, Assert.IsType<I32Value>(result).Value);
     }
@@ -63,7 +63,7 @@ public sealed class RpcKernelForeachGenerationTests
 
             namespace Sample;
 
-            [KernelRpcService("foreach-string")]
+            [ServerExtension("foreach-string")]
             public sealed partial class ForeachStringKernel
             {
                 public int CountName(string name, HookContext ctx)
@@ -98,7 +98,7 @@ public sealed class RpcKernelForeachGenerationTests
 
             namespace Sample;
 
-            [KernelRpcService("foreach-conversion")]
+            [ServerExtension("foreach-conversion")]
             public sealed partial class ForeachConversionKernel
             {
                 public long Sum(List<int> values, HookContext ctx)
@@ -116,12 +116,12 @@ public sealed class RpcKernelForeachGenerationTests
             "Sample.ForeachConversionPluginPackage");
 
         using var server = PluginServer.Create(defaultPolicy: PurePolicy());
-        var kernel = await server.InstallRpcAsync(package);
+        var kernel = await server.InstallServerExtensionAsync(package);
         var values = SandboxValue.FromList(
             [SandboxValue.FromInt32(1), SandboxValue.FromInt32(2), SandboxValue.FromInt32(3)],
             SandboxType.I32);
 
-        var result = await kernel.InvokeRpcAsync([values]);
+        var result = await kernel.InvokeServerExtensionAsync([values]);
 
         Assert.Equal(6L, Assert.IsType<I64Value>(result).Value);
     }

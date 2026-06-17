@@ -9,7 +9,7 @@ internal static class RpcKernelClientServiceMethodResolver
     {
         if (serviceType.TypeKind != TypeKind.Interface)
         {
-            throw new NotSupportedException("Kernel RPC service client generation requires an interface contract type.");
+            throw new NotSupportedException("Server extension client generation requires an interface contract type.");
         }
 
         var methods = new List<IMethodSymbol>();
@@ -46,7 +46,7 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         throw new NotSupportedException(
-            $"Kernel RPC service method '{serviceMethod.Name}' must match kernel method '{expectedName}' or '{expectedName}Async'.");
+            $"Server extension method '{serviceMethod.Name}' must match kernel method '{expectedName}' or '{expectedName}Async'.");
     }
 
     private static void ValidateParameters(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)
@@ -55,7 +55,7 @@ internal static class RpcKernelClientServiceMethodResolver
         if (serviceMethod.Parameters.Length != kernelParameterCount)
         {
             throw new NotSupportedException(
-                $"Kernel RPC service method '{serviceMethod.Name}' must declare {kernelParameterCount} parameter(s).");
+                $"Server extension method '{serviceMethod.Name}' must declare {kernelParameterCount} parameter(s).");
         }
 
         for (var i = 0; i < kernelParameterCount; i++)
@@ -79,7 +79,7 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         throw new NotSupportedException(
-            $"Kernel RPC service parameter '{serviceParameter.Name}' must match kernel parameter '{kernelParameter.Name}'.");
+            $"Server extension parameter '{serviceParameter.Name}' must match kernel parameter '{kernelParameter.Name}'.");
     }
 
     private static void ValidateParameterModifiers(
@@ -93,7 +93,7 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         throw new NotSupportedException(
-            $"Kernel RPC service parameter '{serviceParameter.Name}' modifier '{DescribeParameterModifiers(serviceParameter)}' must match kernel parameter '{kernelParameter.Name}' modifier '{DescribeParameterModifiers(kernelParameter)}'.");
+            $"Server extension parameter '{serviceParameter.Name}' modifier '{DescribeParameterModifiers(serviceParameter)}' must match kernel parameter '{kernelParameter.Name}' modifier '{DescribeParameterModifiers(kernelParameter)}'.");
     }
 
     private static void ValidateReturn(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)
@@ -104,7 +104,7 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         throw new NotSupportedException(
-            $"Kernel RPC service method '{serviceMethod.Name}' return type must match kernel method '{kernelMethod.Name}'.");
+            $"Server extension method '{serviceMethod.Name}' return type must match kernel method '{kernelMethod.Name}'.");
     }
 
     private static IEnumerable<ISymbol> ServiceMembers(INamedTypeSymbol serviceType)
@@ -125,7 +125,7 @@ internal static class RpcKernelClientServiceMethodResolver
 
     private static NotSupportedException UnsupportedServiceShape(INamedTypeSymbol serviceType)
         => new(
-            $"Kernel RPC service interface '{serviceType.ToDisplayString()}' must declare exactly one method and no other members.");
+            $"Server extension interface '{serviceType.ToDisplayString()}' must declare exactly one method and no other members.");
 
     private static void RejectRefLikeParameter(IParameterSymbol parameter, string owner)
     {
@@ -135,7 +135,7 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         throw new NotSupportedException(
-            $"Kernel RPC {owner} parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
+            $"Server extension {owner} parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
     }
 
     private static ITypeSymbol UnwrapReturn(ITypeSymbol type)

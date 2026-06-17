@@ -34,6 +34,11 @@ internal static class BindingCallEmitter
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldstr, call.Name);
             il.Emit(OpCodes.Call, Runtime(nameof(Kernels.Runtime.CompiledRuntime.ChargeBindingCall)));
+            if (DirectRuntimeMethodRequiresContext(binding.Compiled.Method))
+            {
+                il.Emit(OpCodes.Ldarg_0);
+            }
+
             foreach (var local in locals)
             {
                 il.Emit(OpCodes.Ldloc, local);
@@ -122,4 +127,8 @@ internal static class BindingCallEmitter
            binding.Safety == BindingSafety.PureIntrinsic &&
            (binding.Effects & ~(SandboxEffect.Cpu | SandboxEffect.Alloc)) == SandboxEffect.None &&
            binding.AuditLevel == AuditLevel.None;
+
+    private static bool DirectRuntimeMethodRequiresContext(string method)
+        => method is nameof(Kernels.Runtime.CompiledRuntime.ConcatString)
+            or nameof(Kernels.Runtime.CompiledRuntime.Int32ToStringInvariant);
 }

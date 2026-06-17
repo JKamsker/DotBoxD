@@ -46,12 +46,12 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Installs a <b>kernel RPC service</b> package owned by this session (see
-    /// <see cref="PluginServer.InstallRpcAsync"/>). Same ownership/atomicity guarantees as
+    /// Installs a <b>server extension</b> package owned by this session (see
+    /// <see cref="PluginServer.InstallServerExtensionAsync"/>). Same ownership/atomicity guarantees as
     /// <see cref="InstallAsync"/>; the kernel is invoked request/response via
-    /// <see cref="InstalledKernel.InvokeRpcAsync"/> and revoked when the session is disposed.
+    /// <see cref="InstalledKernel.InvokeServerExtensionAsync"/> and revoked when the session is disposed.
     /// </summary>
-    public async ValueTask<InstalledKernel> InstallRpcAsync(
+    public async ValueTask<InstalledKernel> InstallServerExtensionAsync(
         PluginPackage package,
         SandboxPolicy? policy = null,
         CancellationToken cancellationToken = default)
@@ -61,7 +61,7 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            var kernel = await _server.InstallOwnedRpcAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
+            var kernel = await _server.InstallOwnedServerExtensionAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
             _owned.Add(package.Manifest.PluginId);
             return kernel;
         }
@@ -98,7 +98,8 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
                 ]);
             }
 
-            if (!_server.Kernels.TryGetOwned(this, pluginId, out var ownedKernel))
+            if (!_server.Kernels.TryGet(pluginId, out var ownedKernel) ||
+                !ReferenceEquals(ownedKernel.OwnerId, this))
             {
                 _owned.Remove(pluginId);
                 throw new SandboxValidationException([
@@ -130,7 +131,8 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
                 return false;
             }
 
-            if (_server.Kernels.TryGetOwned(this, pluginId, out _))
+            if (_server.Kernels.TryGet(pluginId, out var kernel) &&
+                ReferenceEquals(kernel.OwnerId, this))
             {
                 return true;
             }

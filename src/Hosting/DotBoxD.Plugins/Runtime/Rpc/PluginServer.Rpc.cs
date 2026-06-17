@@ -5,67 +5,55 @@ using DotBoxD.Plugins.Runtime.Rpc;
 namespace DotBoxD.Plugins;
 
 /// <summary>
-/// In-process kernel RPC service convenience surface: register a batch kernel under a service contract,
-/// then obtain a typed proxy that invokes it request/response. This is the in-process form of the
-/// followup's <c>server.RegisterKernelRpcService&lt;TService, TKernel&gt;()</c> /
-/// <c>server.KernelRpcService&lt;TService&gt;()</c>; over IPC the same shape is forwarded by a remote
-/// facade (see the GameServer example).
+/// In-process server-extension convenience surface: register a batch kernel under a service contract,
+/// then obtain a typed proxy that invokes it request/response. Plugin-facing remote facades usually
+/// expose the same capability from the domain surface they extend.
 /// </summary>
 public sealed partial class PluginServer
 {
-    private readonly ConcurrentDictionary<Type, string> _rpcServices = new();
+    private readonly ConcurrentDictionary<Type, string> _serverExtensions = new();
 
     /// <summary>
-    /// Resolves <typeparamref name="TKernel"/>'s generated verified-IR package, installs it as a kernel
-    /// RPC service, and binds the <typeparamref name="TService"/> contract to it for
-    /// <see cref="RpcService{TService}"/>.
+    /// Resolves <typeparamref name="TKernel"/>'s generated verified-IR package, installs it as a server
+    /// extension, and binds the <typeparamref name="TService"/> contract to it for
+    /// <see cref="ServerExtension{TService}"/>.
     /// </summary>
-    public async ValueTask<string> RegisterRpcServiceAsync<TService, TKernel>(
+    public async ValueTask<string> RegisterServerExtensionAsync<TService, TKernel>(
         SandboxPolicy? policy = null,
         CancellationToken cancellationToken = default)
         where TService : class
         where TKernel : class
     {
         var package = KernelPackageRegistry.Resolve(typeof(TKernel));
-        var kernel = await InstallRpcAsync(package, policy, cancellationToken).ConfigureAwait(false);
-        _rpcServices[typeof(TService)] = kernel.Manifest.PluginId;
+        var kernel = await InstallServerExtensionAsync(package, policy, cancellationToken).ConfigureAwait(false);
+        _serverExtensions[typeof(TService)] = kernel.Manifest.PluginId;
         return kernel.Manifest.PluginId;
     }
 
     /// <summary>
     /// Returns a typed proxy implementing <typeparamref name="TService"/> whose calls run the bound batch
     /// kernel request/response (arguments and results are marshaled to and from the sandbox). Throws if no
-    /// kernel was registered for the contract.
+    /// extension was registered for the contract.
     /// </summary>
-    public TService RpcService<TService>() where TService : class
+    public TService ServerExtension<TService>() where TService : class
     {
-        var serviceType = typeof(TService);
-        if (!_rpcServices.TryGetValue(serviceType, out var pluginId))
+        if (!_serverExtensions.TryGetValue(typeof(TService), out var pluginId))
         {
-            throw NoRpcServiceRegistered(serviceType);
+            throw new InvalidOperationException(
+                $"No server extension is registered for '{typeof(TService)}'. Call RegisterServerExtensionAsync first.");
         }
 
-        if (!Kernels.TryGet(pluginId, out var kernel))
-        {
-            _rpcServices.TryRemove(serviceType, out _);
-            throw NoRpcServiceRegistered(serviceType);
-        }
-
-        return KernelRpcServiceProxy.Create<TService>(kernel);
+        return ServerExtensionProxy.Create<TService>(Kernels.Get(pluginId));
     }
 
-    private void RemoveRpcServiceRegistrations(string pluginId)
+    private void ClearServerExtensionRegistrations(string pluginId)
     {
-        foreach (var registration in _rpcServices)
+        foreach (var pair in _serverExtensions)
         {
-            if (string.Equals(registration.Value, pluginId, StringComparison.Ordinal))
+            if (string.Equals(pair.Value, pluginId, StringComparison.Ordinal))
             {
-                _rpcServices.TryRemove(registration.Key, out _);
+                _serverExtensions.TryRemove(pair.Key, out _);
             }
         }
     }
-
-    private static InvalidOperationException NoRpcServiceRegistered(Type serviceType)
-        => new(
-            $"No kernel RPC service is registered for '{serviceType}'. Call RegisterRpcServiceAsync first.");
 }

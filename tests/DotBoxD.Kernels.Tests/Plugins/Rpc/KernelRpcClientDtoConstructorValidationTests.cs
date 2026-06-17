@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcClientDtoConstructorValidationTests
+public sealed class ServerExtensionClientDtoConstructorValidationTests
 {
     [Fact]
     public void Generated_client_rejects_private_matching_dto_constructor()
@@ -37,7 +37,7 @@ public sealed class KernelRpcClientDtoConstructorValidationTests
                 ValueTask<KillResult> KillAsync(int monsterId);
             }
 
-            [KernelRpcService("kill", typeof(IKillService))]
+            [ServerExtension("kill", typeof(IKillService))]
             public sealed partial class KillKernel
             {
                 public KillResult Kill(int monsterId, HookContext ctx)

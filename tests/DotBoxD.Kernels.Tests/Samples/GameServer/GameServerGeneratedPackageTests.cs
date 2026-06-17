@@ -46,7 +46,7 @@ public sealed class GameServerGeneratedPackageTests
                 "IEventKernel<MonsterAggroEvent>",
                 "MonsterAggroEvent",
                 null,
-                ["dotboxd.runtime.async", "game.world.monster.read.health", "host.message.write"]
+                ["dotboxd.runtime.async", "host.message.write"]
             },
             {
                 "DotBoxD.Kernels.Game.Plugin.Kernels.RetaliationKernel",
@@ -57,17 +57,29 @@ public sealed class GameServerGeneratedPackageTests
                 ["dotboxd.runtime.async", "host.message.write"]
             },
             {
-                "DotBoxD.Kernels.Game.Plugin.MonsterKillerKernel",
+                "DotBoxD.Kernels.Game.Plugin.Kernels.MonsterKillerKernel",
                 "monster-killer",
                 "MonsterKillerKernel",
                 null,
-                "KillMonsters",
+                "KillMonstersAsync",
                 [
-                    "game.world.monster.read.health",
+                    "game.world.entity.read.health",
+                    "game.world.entity.read.level",
+                    "game.world.entity.read.position",
                     "game.world.monster.read.kind",
-                    "game.world.monster.read.level",
-                    "game.world.monster.read.position",
                     "game.world.monster.write.kill"
+                ]
+            },
+            {
+                "DotBoxD.Kernels.Game.Plugin.Kernels.BlinkKernel",
+                "blink",
+                "BlinkKernel",
+                null,
+                "BlinkBehindAsync",
+                [
+                    "game.world.combat.threat",
+                    "game.world.entity.read.position",
+                    "game.world.monster.write.position"
                 ]
             }
         };
@@ -89,12 +101,11 @@ public sealed class GameServerGeneratedPackageTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Plugin",
+            "Examples.GameServer.Plugin",
             "bin",
             configuration,
             "net10.0",
-            "DotBoxD.Kernels.Game.Plugin.dll"));
+            "Examples.GameServer.Plugin.dll"));
     }
 }

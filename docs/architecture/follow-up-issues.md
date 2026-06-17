@@ -4,8 +4,8 @@ Deferred work that was intentionally left out of the mechanical ShaRPC/Safe-IR -
 rebrand and the Phase 4 meta-package / acceptance-sample work. Each item is a discrete future task;
 none of them block the current green build.
 
-- [ ] **Fluent kernel-authoring API (`DotBoxDKernel.Create<…>`).** Today kernels are authored as raw
-  JSON IR (see `samples/Pushdown/DotBoxD.EndToEnd/CartTotalKernel.cs`). Design a typed, fluent builder so
+- [ ] **Fluent kernel-authoring API (`DotBoxDKernel.Create<…>`).** Today kernels can be authored as raw
+  JSON IR. Design a typed, fluent builder so
   hosts can express a kernel in C# (parameters, locals, loops, bindings) and have it lowered to validated
   IR, instead of hand-writing JSON.
 

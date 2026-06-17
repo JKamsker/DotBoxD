@@ -43,6 +43,7 @@ public enum GeneratedReturnKind.AsyncEnumerable
 public enum GeneratedReturnKind.Pipe
 public enum GeneratedReturnKind.Stream
 public enum GeneratedReturnKind.Sync
+public enum GeneratedReturnKind.SyncNestedService
 public enum GeneratedReturnKind.Task
 public enum GeneratedReturnKind.TaskOfAsyncEnumerable
 public enum GeneratedReturnKind.TaskOfNestedService

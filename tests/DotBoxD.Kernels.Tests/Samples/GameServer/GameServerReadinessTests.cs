@@ -242,12 +242,11 @@ public sealed class GameServerReadinessTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Server",
+            "Examples.GameServer.Server",
             "bin",
             configuration,
             "net10.0",
-            "DotBoxD.Kernels.Game.Server.dll"));
+            "Examples.GameServer.Server.dll"));
     }
 }

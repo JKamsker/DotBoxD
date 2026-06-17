@@ -23,10 +23,11 @@ The Kernels and Pushdown stack targets `net10.0`.
 
 ## The 3 ways to use one contract
 
-The snippets below use the real, compiling API. The Services and Kernels examples are distilled from the
-runnable acceptance sample at [`samples/Pushdown/DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd);
-the Pushdown example uses the kernel-RPC-service surface
-(see [`samples/Pushdown/PluginIpc`](samples/Pushdown/PluginIpc) and the proxy tests).
+The snippets below use the real, compiling API. The maintained runnable example is the GameServer
+sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
+which combines service IPC, event kernels, live settings, host bindings, policies, and kernel RPC.
+Features that used to be split across removed samples are tracked in
+[`docs/examples/coverage-gaps.md`](docs/examples/coverage-gaps.md).
 
 ### 1. Services — define a contract, host it, call it remotely
 
@@ -61,8 +62,7 @@ var unitPrice = await catalog.GetUnitPriceAsync("sword"); // one remote round-tr
 
 The `[DotBoxDService]` attribute drives the `DotBoxD.Services.SourceGenerator`, which emits a typed
 proxy, a dispatcher, and the `ProvideCatalogService(...)` / `Get<ICatalogService>()` extensions at
-compile time. The GameService sample shows the same model over **TCP** with bidirectional callbacks
-(see [`samples/Services/GameService`](samples/Services/GameService)).
+compile time.
 
 ### 2. Kernels — run validated logic under a policy
 
@@ -146,11 +146,10 @@ List<KillResult> killed = server.RpcService<IMonsterKillerService>().KillMonster
 The batch logic is **author-supplied**, so it runs as a validated sandboxed kernel under the same trust
 model as event kernels: it can reach only the host bindings the server already exposes, gated by
 capabilities and fuel/quota limits, and it can take and return complex objects and lists of objects
-(via the IR `Record` type). See [`samples/Pushdown/PluginIpc`](samples/Pushdown/PluginIpc) for the
-kernel-RPC-service-over-IPC sample and
+(via the IR `Record` type). The GameServer sample demonstrates kernel RPC over the plugin IPC
+control plane; see
 [`docs/design/plugin-fluent-hooks-api/followups.md`](docs/design/plugin-fluent-hooks-api/followups.md)
-for the full design. (The simpler [`DotBoxD.EndToEnd`](samples/Pushdown/DotBoxD.EndToEnd) sample shows a
-host-owned aggregate calling a kernel — a variant of the same server-side-execution idea.)
+for the full design.
 
 ---
 
@@ -168,10 +167,10 @@ dotnet add package DotBoxD.Pushdown.Services --prerelease
 ```
 
 Then read [`docs/getting-started`](docs/getting-started/) for first-service, first-kernel, and
-pushdown walkthroughs, or run the acceptance sample:
+pushdown walkthroughs, or run the maintained example:
 
 ```bash
-dotnet run -c Release --project samples/Pushdown/DotBoxD.EndToEnd
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 ---

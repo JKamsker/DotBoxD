@@ -12,10 +12,8 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 // (SandboxHostBuilder.AddBinding + BindingDescriptor + CapabilityGrantValidator), but there was no
 // package-backed public example or docs smoke that registers a custom binding, grants the matching
 // capability, executes JSON IR against it, and inspects the expected audit/resource result. The
-// runnable walkthrough now lives in
-// samples/Kernels/Capabilities/DotBoxD.Kernels.Example.Capabilities/Examples/CustomBindingExample.cs (exercised by the docs
-// smoke). These tests lock the public custom-binding boundary that walkthrough demonstrates so the
-// example cannot silently drift from the descriptor/policy/grant-validator contract it documents.
+// old runnable custom-binding walkthrough is no longer maintained as a sample, so these tests lock
+// the public descriptor/policy/grant-validator contract directly.
 public sealed class Fix_CMP_0022_Tests
 {
     private const string TenantReadCapability = "tenant.read";

@@ -4,7 +4,7 @@ using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class KernelRpcClientExtensionInterfaceTests
+public sealed class ServerExtensionClientExtensionInterfaceTests
 {
     private const string ExplicitInterfaceReceiverSource = """
         using System.Collections.Generic;
@@ -17,18 +17,18 @@ public sealed class KernelRpcClientExtensionInterfaceTests
 
         namespace Sample;
 
-        public interface IKernelRpcBacked
+        public interface IServerExtensionsBacked
         {
-            IKernelRpcClientRegistry KernelRpc { get; }
+            DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
-        public sealed class RemoteMonsterControl : IKernelRpcBacked
+        public sealed class RemoteMonsterControl : IServerExtensionsBacked
         {
-            private readonly IKernelRpcClientRegistry _kernelRpc;
+            private readonly DotBoxD.Plugins.IServerExtensionClientRegistry _kernelRpc;
 
-            public RemoteMonsterControl(IKernelRpcClientRegistry kernelRpc) => _kernelRpc = kernelRpc;
+            public RemoteMonsterControl(DotBoxD.Plugins.IServerExtensionClientRegistry kernelRpc) => _kernelRpc = kernelRpc;
 
-            IKernelRpcClientRegistry IKernelRpcBacked.KernelRpc => _kernelRpc;
+            DotBoxD.Plugins.IServerExtensionClientRegistry IServerExtensionsBacked.ServerExtensions => _kernelRpc;
         }
 
         public interface IMonsterKillerService
@@ -44,8 +44,8 @@ public sealed class KernelRpcClientExtensionInterfaceTests
 
         public readonly record struct KillResult(int MonsterId, bool Success);
 
-        [KernelRpcClientProperty(typeof(RemoteMonsterControl))]
-        [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+        [ServerExtensionClient(typeof(RemoteMonsterControl))]
+        [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
         public sealed partial class MonsterKillerKernel
         {
             public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
@@ -69,7 +69,7 @@ public sealed class KernelRpcClientExtensionInterfaceTests
         var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(ExplicitInterfaceReceiverSource);
         var controlType = assembly.GetType("Sample.RemoteMonsterControl", throwOnError: true)!;
         var probeType = assembly.GetType("Sample.Probe", throwOnError: true)!;
-        var registry = new RecordingKernelRpcRegistry(KillResultsResponse());
+        var registry = new RecordingServerExtensionsRegistry(KillResultsResponse());
         var control = Activator.CreateInstance(controlType, [registry])!;
 
         var service = probeType.GetMethod("Service", BindingFlags.Public | BindingFlags.Static)!
@@ -106,18 +106,18 @@ public sealed class KernelRpcClientExtensionInterfaceTests
 
             public sealed class Owner
             {
-                private interface IKernelRpcBacked
+                private interface IServerExtensionsBacked
                 {
-                    IKernelRpcClientRegistry KernelRpc { get; }
+                    DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
                 }
 
-                public sealed class RemoteMonsterControl : IKernelRpcBacked
+                public sealed class RemoteMonsterControl : IServerExtensionsBacked
                 {
-                    IKernelRpcClientRegistry IKernelRpcBacked.KernelRpc => null!;
+                    DotBoxD.Plugins.IServerExtensionClientRegistry IServerExtensionsBacked.ServerExtensions => null!;
                 }
 
-                [KernelRpcClientProperty(typeof(RemoteMonsterControl))]
-                [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+                [ServerExtensionClient(typeof(RemoteMonsterControl))]
+                [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
                 public sealed partial class MonsterKillerKernel
                 {
                     public int Kill(int monsterId, HookContext ctx)
@@ -131,7 +131,7 @@ public sealed class KernelRpcClientExtensionInterfaceTests
         Assert.Contains(
             diagnostics,
             d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("KernelRpc property", StringComparison.Ordinal));
+                 d.GetMessage().Contains("ServerExtensions property", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
     }
 
@@ -156,7 +156,7 @@ public sealed class KernelRpcClientExtensionInterfaceTests
         Assert.Equal(success, type.GetProperty("Success")!.GetValue(result));
     }
 
-    private sealed class RecordingKernelRpcRegistry(byte[] response) : IKernelRpcClientRegistry
+    private sealed class RecordingServerExtensionsRegistry(byte[] response) : DotBoxD.Plugins.IServerExtensionClientRegistry
     {
         public string? LastPluginId { get; private set; }
         public string? LastServiceType { get; private set; }
@@ -167,7 +167,7 @@ public sealed class KernelRpcClientExtensionInterfaceTests
             return "monster-killer";
         }
 
-        public ValueTask<byte[]> InvokeKernelRpcAsync(
+        public ValueTask<byte[]> InvokeServerExtensionAsync(
             string pluginId,
             byte[] arguments,
             CancellationToken cancellationToken = default)
