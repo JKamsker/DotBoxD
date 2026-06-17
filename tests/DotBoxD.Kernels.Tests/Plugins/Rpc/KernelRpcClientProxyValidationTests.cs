@@ -192,6 +192,46 @@ public sealed class KernelRpcClientProxyValidationTests
     }
 
     [Fact]
+    public void Kernel_rpc_service_rejects_duplicate_generated_package_names_from_nested_kernels()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            public sealed class First
+            {
+                [KernelRpcService("first")]
+                public sealed partial class EchoKernel
+                {
+                    public int Echo(HookContext ctx)
+                    {
+                        return 1;
+                    }
+                }
+            }
+
+            public sealed class Second
+            {
+                [KernelRpcService("second")]
+                public sealed partial class EchoKernel
+                {
+                    public int Echo(HookContext ctx)
+                    {
+                        return 2;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("Plugin package name 'EchoPluginPackage' is generated more than once", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Generated_client_rejects_ref_parameters_even_when_contract_matches()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
