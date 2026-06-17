@@ -179,6 +179,7 @@ internal sealed partial class SandboxWorkerExecutor
         var observedHostCalls = 0;
         var observedLogEvents = 0;
         var observedBindingBaseFuel = 0L;
+        Dictionary<string, int>? observedBindingCalls = null;
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.RunId != runId ||
@@ -190,7 +191,12 @@ internal sealed partial class SandboxWorkerExecutor
             if (IsBindingAudit(auditEvent.Kind))
             {
                 observedHostCalls++;
-                if (!TryAddBindingBaseFuel(plan, auditEvent, ref observedBindingBaseFuel))
+                observedBindingCalls ??= new Dictionary<string, int>(StringComparer.Ordinal);
+                if (!TryRecordBindingAuditEvidence(
+                    plan,
+                    auditEvent,
+                    observedBindingCalls,
+                    ref observedBindingBaseFuel))
                 {
                     return false;
                 }
@@ -235,9 +241,10 @@ internal sealed partial class SandboxWorkerExecutor
     private static bool IsBindingAudit(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
 
-    private static bool TryAddBindingBaseFuel(
+    private static bool TryRecordBindingAuditEvidence(
         ExecutionPlan plan,
         SandboxAuditEvent auditEvent,
+        Dictionary<string, int> observedBindingCalls,
         ref long observedBindingBaseFuel)
     {
         if (auditEvent.BindingId is null ||
@@ -249,12 +256,18 @@ internal sealed partial class SandboxWorkerExecutor
         try
         {
             observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
-            return true;
         }
         catch (OverflowException)
         {
             return false;
         }
+
+        var calls = observedBindingCalls.TryGetValue(auditEvent.BindingId, out var existing)
+            ? existing + 1
+            : 1;
+        observedBindingCalls[auditEvent.BindingId] = calls;
+        return binding.CostModel.MaxCallsPerRun is not { } maxCalls ||
+            calls <= maxCalls;
     }
 
     private static bool AuditEvidenceUsageMatches(
