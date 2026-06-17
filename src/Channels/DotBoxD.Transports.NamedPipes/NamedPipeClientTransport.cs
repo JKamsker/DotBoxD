@@ -9,6 +9,12 @@ namespace DotBoxD.Transports.NamedPipes;
 /// </summary>
 public sealed class NamedPipeClientTransport : ITransport
 {
+    /// <summary>
+    /// Default inter-read idle timeout applied to client connections' in-progress frame body reads.
+    /// Mirrors <see cref="NamedPipeServerTransport.DefaultFrameReadIdleTimeout"/>.
+    /// </summary>
+    public static readonly TimeSpan DefaultFrameReadIdleTimeout = NamedPipeServerTransport.DefaultFrameReadIdleTimeout;
+
     private readonly string _serverName;
     private readonly string _pipeName;
     private readonly int _maxMessageSize;
@@ -31,6 +37,13 @@ public sealed class NamedPipeClientTransport : ITransport
         _pipeName = ValidateName(pipeName, nameof(pipeName));
         _maxMessageSize = ValidateMaxMessageSize(maxMessageSize);
     }
+
+    /// <summary>
+    /// Inter-read idle timeout applied to the client connection's in-progress frame body reads.
+    /// <see langword="null"/> uses <see cref="DefaultFrameReadIdleTimeout"/>;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="StreamConnection"/>.
+    /// </summary>
+    public TimeSpan? FrameReadIdleTimeout { get; init; }
 
     public IRpcChannel? Connection => _connection;
 
@@ -60,7 +73,12 @@ public sealed class NamedPipeClientTransport : ITransport
             }
 
             await stream.ConnectAsync(connectCts.Token).ConfigureAwait(false);
-            _connection = new StreamConnection(stream, RemoteEndpoint, ownsStream: true, _maxMessageSize);
+            _connection = new StreamConnection(
+                stream,
+                RemoteEndpoint,
+                ownsStream: true,
+                _maxMessageSize,
+                FrameReadIdleTimeout ?? DefaultFrameReadIdleTimeout);
         }
         catch
         {
