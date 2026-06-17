@@ -73,6 +73,32 @@ public sealed class GamePluginControlServiceTests
     }
 
     [Fact]
+    public async Task HoldUntilShutdownAsync_does_not_mark_ready_when_precancelled()
+    {
+        var gameServer = Assembly.LoadFrom(GameServerAssemblyPath());
+        var sink = (IPluginMessageSink)Create(gameServer, "DotBoxD.Kernels.Game.Server.Simulation.GameCommandSink");
+        using var server = PluginServer.Create(sink);
+        var world = gameServer
+            .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
+            .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [server.Hooks])!;
+        var service = Create(
+            gameServer,
+            "DotBoxD.Kernels.Game.Server.Ipc.GamePluginControlService",
+            server,
+            server.CreateSession(),
+            sink,
+            world);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await HoldUntilShutdownAsync(service, cts.Token));
+
+        Assert.False(ReadyTask(service).IsCompleted);
+    }
+
+    [Fact]
     public async Task KillMonsterAsync_requires_session_owned_write_kernel()
     {
         var gameServer = Assembly.LoadFrom(GameServerAssemblyPath());
@@ -144,6 +170,11 @@ public sealed class GamePluginControlServiceTests
             .Invoke(service, [cancellationToken]);
         return (ValueTask)result!;
     }
+
+    private static Task ReadyTask(object service)
+        => (Task)service.GetType()
+            .GetProperty("Ready", BindingFlags.Public | BindingFlags.Instance)!
+            .GetValue(service)!;
 
     private static bool IsGamePluginReference(XElement reference)
     {
