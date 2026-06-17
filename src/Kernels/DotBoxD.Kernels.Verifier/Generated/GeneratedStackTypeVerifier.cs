@@ -31,12 +31,13 @@ internal static class GeneratedStackTypeVerifier
         // buffer from the incoming snapshot avoids cloning the whole stack on
         // every reachable instruction.
         var stack = new List<string>();
+        var callSignatures = new ParsedCallSignatureCache();
 
         while (queue.Count > 0)
         {
             var offset = queue.Dequeue();
             var instruction = analysis.ByOffset[offset];
-            Transfer(instruction, stacks[offset], stack, signature, diagnostics);
+            Transfer(instruction, stacks[offset], stack, signature, callSignatures, diagnostics);
             foreach (var successor in analysis.SuccessorsByOffset[instruction.Offset])
             {
                 TrackSuccessor(successor, stack, analysis.ByOffset, stacks, queue, diagnostics);
@@ -49,6 +50,7 @@ internal static class GeneratedStackTypeVerifier
         IReadOnlyList<string> input,
         List<string> stack,
         GeneratedMethodSignature signature,
+        ParsedCallSignatureCache callSignatures,
         List<VerificationDiagnostic> diagnostics)
     {
         stack.Clear();
@@ -115,7 +117,7 @@ internal static class GeneratedStackTypeVerifier
                 PopExpected(instruction, stack, Int32Name, diagnostics);
                 break;
             case ILOpCode.Call or ILOpCode.Callvirt or ILOpCode.Newobj:
-                Call(instruction, stack, diagnostics);
+                Call(instruction, stack, callSignatures, diagnostics);
                 break;
             case ILOpCode.Stelem_ref:
                 StoreElement(instruction, stack, diagnostics);

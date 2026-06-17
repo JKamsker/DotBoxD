@@ -12,12 +12,13 @@ internal static class GeneratedStackTypeOperations
     public static void Call(
         GeneratedInstruction instruction,
         List<string> stack,
+        ParsedCallSignatureCache callSignatures,
         List<VerificationDiagnostic> diagnostics)
     {
-        var signature = ParsedCallSignature.Parse(instruction.CalledMember);
-        foreach (var parameter in signature.Parameters.Reverse())
+        var signature = callSignatures.Get(instruction.CalledMember);
+        for (var i = signature.Parameters.Count - 1; i >= 0; i--)
         {
-            PopExpected(instruction, stack, parameter, diagnostics);
+            PopExpected(instruction, stack, signature.Parameters[i], diagnostics);
         }
 
         if (signature.ReturnType != VoidName)
@@ -259,28 +260,4 @@ internal static class GeneratedStackTypeOperations
             "V-STACK-TYPE",
             $"opcode '{instruction.Opcode}' expected {expected} but found {actual}"));
 
-    private sealed record ParsedCallSignature(string ReturnType, IReadOnlyList<string> Parameters)
-    {
-        public static ParsedCallSignature Parse(string? signature)
-        {
-            if (signature is null)
-            {
-                return new ParsedCallSignature(UnknownType, []);
-            }
-
-            var start = signature.IndexOf('(');
-            var end = signature.LastIndexOf("):", StringComparison.Ordinal);
-            if (start < 0 || end < start)
-            {
-                return new ParsedCallSignature(UnknownType, []);
-            }
-
-            var returnType = signature[(end + 2)..];
-            var parameterText = signature[(start + 1)..end];
-            IReadOnlyList<string> parameters = parameterText.Length == 0
-                ? []
-                : parameterText.Split(',', StringSplitOptions.None);
-            return new ParsedCallSignature(returnType, parameters);
-        }
-    }
 }
