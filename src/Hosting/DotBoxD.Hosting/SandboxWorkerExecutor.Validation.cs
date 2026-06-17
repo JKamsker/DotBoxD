@@ -178,6 +178,7 @@ internal sealed partial class SandboxWorkerExecutor
         var summaryCount = 0;
         var observedHostCalls = 0;
         var observedLogEvents = 0;
+        var observedBindingBaseFuel = 0L;
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.RunId != runId ||
@@ -189,6 +190,10 @@ internal sealed partial class SandboxWorkerExecutor
             if (IsBindingAudit(auditEvent.Kind))
             {
                 observedHostCalls++;
+                if (!TryAddBindingBaseFuel(plan, auditEvent, ref observedBindingBaseFuel))
+                {
+                    return false;
+                }
             }
 
             if (auditEvent.Kind == "SandboxLog")
@@ -210,7 +215,11 @@ internal sealed partial class SandboxWorkerExecutor
 
         if (summaryCount != 1 ||
             summary!.Success != result.Succeeded ||
-            !AuditEvidenceUsageMatches(result.ResourceUsage, observedHostCalls, observedLogEvents))
+            !AuditEvidenceUsageMatches(
+                result.ResourceUsage,
+                observedHostCalls,
+                observedLogEvents,
+                observedBindingBaseFuel))
         {
             return false;
         }
@@ -226,10 +235,34 @@ internal sealed partial class SandboxWorkerExecutor
     private static bool IsBindingAudit(string kind)
         => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
 
+    private static bool TryAddBindingBaseFuel(
+        ExecutionPlan plan,
+        SandboxAuditEvent auditEvent,
+        ref long observedBindingBaseFuel)
+    {
+        if (auditEvent.BindingId is null ||
+            !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
+        {
+            return false;
+        }
+
+        try
+        {
+            observedBindingBaseFuel = checked(observedBindingBaseFuel + binding.CostModel.BaseFuel);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
     private static bool AuditEvidenceUsageMatches(
         SandboxResourceUsage usage,
         int observedHostCalls,
-        int observedLogEvents)
+        int observedLogEvents,
+        long observedBindingBaseFuel)
         => usage.HostCalls >= observedHostCalls &&
-           usage.LogEvents >= observedLogEvents;
+           usage.LogEvents >= observedLogEvents &&
+           usage.FuelUsed >= observedBindingBaseFuel;
 }
