@@ -145,8 +145,18 @@ internal sealed class RemoteEntityControl
 
 internal sealed class RemoteKernelHandle<TKernel> where TKernel : class, new()
 {
+    private static readonly PropertyInfo[] LiveSettingProperties = typeof(TKernel)
+        .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+        .Where(p =>
+            p.GetMethod is not null &&
+            p.SetMethod is not null &&
+            p.GetCustomAttribute<LiveSettingAttribute>() is not null)
+        .ToArray();
+
     private readonly IGamePluginControlService _control;
     private readonly string _pluginId;
+    private readonly SemaphoreSlim _settingsGate = new(1, 1);
+    private readonly TKernel _current = new();
 
     public RemoteKernelHandle(IGamePluginControlService control, string pluginId)
     {
@@ -156,23 +166,44 @@ internal sealed class RemoteKernelHandle<TKernel> where TKernel : class, new()
 
     /// <summary>
     /// Sets live setting values from a typed lambda. The lambda mutates a local draft; the resulting
-    /// <c>[LiveSetting]</c> values are shipped over IPC. (For read-modify-write against live server
-    /// state, do it server-side under the kernel's execution gate.)
+    /// changed <c>[LiveSetting]</c> values are shipped over IPC. (For read-modify-write against live
+    /// server state, do it server-side under the kernel's execution gate.)
     /// </summary>
-    public ValueTask SetValuesAsync(Action<TKernel> set, bool atomic = false)
+    public async ValueTask SetValuesAsync(Action<TKernel> set, bool atomic = false)
     {
         ArgumentNullException.ThrowIfNull(set);
-        var draft = new TKernel();
-        set(draft);
+        await _settingsGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var draft = new TKernel();
+            CopyLiveProperties(_current, draft);
+            set(draft);
 
-        var updates = typeof(TKernel)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.GetMethod is not null && p.GetCustomAttribute<LiveSettingAttribute>() is not null)
-            .Select(p => new LiveSettingUpdate(
-                p.Name,
-                Convert.ToString(p.GetValue(draft), CultureInfo.InvariantCulture) ?? string.Empty))
-            .ToArray();
+            var updates = LiveSettingProperties
+                .Where(p => !Equals(p.GetValue(_current), p.GetValue(draft)))
+                .Select(p => new LiveSettingUpdate(
+                    p.Name,
+                    Convert.ToString(p.GetValue(draft), CultureInfo.InvariantCulture) ?? string.Empty))
+                .ToArray();
 
-        return _control.UpdateSettingsAsync(_pluginId, updates, atomic);
+            if (updates.Length > 0)
+            {
+                await _control.UpdateSettingsAsync(_pluginId, updates, atomic).ConfigureAwait(false);
+            }
+
+            CopyLiveProperties(draft, _current);
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
+    }
+
+    private static void CopyLiveProperties(TKernel source, TKernel destination)
+    {
+        foreach (var property in LiveSettingProperties)
+        {
+            property.SetValue(destination, property.GetValue(source));
+        }
     }
 }
