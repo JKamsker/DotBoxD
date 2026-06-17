@@ -171,6 +171,10 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/check-release-workflow-security.ps1
 
+      - name: Release readiness
+        shell: pwsh
+        run: ./eng/scripts/check-release-readiness.ps1
+
       - name: Security-boundary required tests
         shell: pwsh
         run: |
