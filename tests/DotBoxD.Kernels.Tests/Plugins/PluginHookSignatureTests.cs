@@ -120,6 +120,18 @@ public sealed class PluginHookSignatureTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK034");
     }
 
+    [Fact]
+    public void RegisterEventAdapter_rejects_different_adapter_after_pipeline_exists()
+    {
+        var server = DotBoxD.Plugins.PluginServer.Create();
+        _ = server.Hooks.On(DamageEventAdapter.Instance);
+
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => server.RegisterEventAdapter(new MismatchedDamageEventAdapter()));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK034");
+    }
+
     private sealed class AdminDamageEventAdapter : IPluginEventAdapter<DamageEvent>
     {
         public string EventName => "AdminEvent";
