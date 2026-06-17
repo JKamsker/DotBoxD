@@ -121,11 +121,6 @@ public sealed class StreamConnection : IRpcChannel
             if (read < totalLength - 4)
             {
                 frame.Dispose();
-                if (read == 0)
-                {
-                    return Payload.Empty;
-                }
-
                 throw new InvalidDataException(
                     $"Connection closed after {read + 4} of {totalLength} frame bytes.");
             }
