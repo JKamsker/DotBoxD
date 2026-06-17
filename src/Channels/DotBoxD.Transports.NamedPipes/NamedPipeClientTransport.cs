@@ -14,6 +14,7 @@ public sealed class NamedPipeClientTransport : ITransport
     private readonly int _maxMessageSize;
     private NamedPipeClientStream? _stream;
     private StreamConnection? _connection;
+    private CancellationTokenSource? _connectCts;
     private int _disposed;
 
     public NamedPipeClientTransport(string pipeName, int maxMessageSize = MessageFramer.MaxMessageSize)
@@ -48,16 +49,37 @@ public sealed class NamedPipeClientTransport : ITransport
             _pipeName,
             PipeDirection.InOut,
             PipeOptions.Asynchronous);
+        var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _stream = stream;
+        _connectCts = connectCts;
         try
         {
-            await stream.ConnectAsync(ct).ConfigureAwait(false);
-            _stream = stream;
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(nameof(NamedPipeClientTransport));
+            }
+
+            await stream.ConnectAsync(connectCts.Token).ConfigureAwait(false);
             _connection = new StreamConnection(stream, RemoteEndpoint, ownsStream: true, _maxMessageSize);
         }
         catch
         {
+            if (ReferenceEquals(_stream, stream))
+            {
+                _stream = null;
+            }
+
             stream.Dispose();
             throw;
+        }
+        finally
+        {
+            if (ReferenceEquals(_connectCts, connectCts))
+            {
+                _connectCts = null;
+            }
+
+            connectCts.Dispose();
         }
 
         // Test seam (null/no-op in production): lets a test deterministically interleave DisposeAsync
@@ -95,6 +117,15 @@ public sealed class NamedPipeClientTransport : ITransport
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
+        }
+
+        try
+        {
+            _connectCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // ConnectAsync can finish and dispose the linked CTS while DisposeAsync is starting.
         }
 
         if (_connection is not null)
