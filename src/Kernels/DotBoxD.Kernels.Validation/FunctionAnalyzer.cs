@@ -374,7 +374,7 @@ internal sealed class FunctionAnalyzer
                 RequiredCapabilities.Add(binding.RequiredCapability);
             }
 
-            if (recordCapabilities && binding.IsAsync)
+            if (recordCapabilities && RequiresRuntimeAsync(binding))
             {
                 RequiredCapabilities.Add(RuntimeCapabilityIds.Async);
             }
@@ -453,6 +453,9 @@ internal sealed class FunctionAnalyzer
 
     private static bool CanReorderBinding(BindingSignature binding)
         => binding.Safety == BindingSafety.PureIntrinsic && IsPure(binding.Effects);
+
+    private static bool RequiresRuntimeAsync(BindingSignature binding)
+        => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
 
     private static bool IsPure(SandboxEffect effects) => (effects & ~SandboxEffects.Pure) == SandboxEffect.None;
 

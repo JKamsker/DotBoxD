@@ -94,7 +94,7 @@ public sealed class ModuleValidator
                     required.Add(binding.RequiredCapability);
                 }
 
-                if (binding.IsAsync)
+                if (RequiresRuntimeAsync(binding))
                 {
                     required.Add(RuntimeCapabilityIds.Async);
                 }
@@ -103,6 +103,9 @@ public sealed class ModuleValidator
 
         return required;
     }
+
+    private static bool RequiresRuntimeAsync(BindingSignature binding)
+        => binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0;
 
     private static bool HasNoErrors(IReadOnlyList<SandboxDiagnostic> diagnostics)
     {
