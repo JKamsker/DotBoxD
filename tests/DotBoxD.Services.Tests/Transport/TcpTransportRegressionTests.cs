@@ -214,6 +214,33 @@ public sealed class TcpTransportRegressionTests
     }
 
     [Fact]
+    public async Task ConnectAsync_WhenConnectionConstructionThrows_DisposesConnectedSocket()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
+        await server.StartAsync();
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        var acceptTask = server.AcceptAsync();
+        var transport = new TcpTransport(IPAddress.Loopback.ToString(), port)
+        {
+            FrameReadIdleTimeout = TimeSpan.Zero,
+        };
+
+        try
+        {
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => transport.ConnectAsync());
+            await using var accepted = await acceptTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            using var eof = await accepted.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Equal(0, eof.Length);
+        }
+        finally
+        {
+            await transport.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task DisposeAsync_AfterFailedConnect_IsCleanAndBlocksReconnect()
     {
         var deadPort = ReserveThenReleasePort();
