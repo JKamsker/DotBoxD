@@ -126,6 +126,30 @@ public sealed class SafeFileSystemTests
     }
 
     [Fact]
+    public async Task File_read_allocation_failure_audits_streamed_bytes()
+    {
+        using var temp = TempDirectory.Create();
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
+        var policy = FilePolicyBuilder()
+            .GrantFileRead(temp.Path, 1024)
+            .WithMaxAllocatedBytes(4)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
+        Assert.Equal(5, result.ResourceUsage.FileBytesRead);
+        var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.readText" && !e.Success);
+        Assert.Equal(5, audit.Bytes);
+        Assert.Equal("5", audit.Fields!["bytesRead"]);
+    }
+
+    [Fact]
     public async Task File_write_is_denied_without_host_grant()
     {
         var host = SandboxTestHost.Create();
