@@ -10,6 +10,8 @@ public sealed partial class SandboxContext
         _lastCapabilityId = null;
         _lastCapabilityClock = default;
         _lastCapabilityGrant = null;
+        _lastBindingId = null;
+        _lastBindingDescriptor = null;
         _callDepth = 0;
     }
 }

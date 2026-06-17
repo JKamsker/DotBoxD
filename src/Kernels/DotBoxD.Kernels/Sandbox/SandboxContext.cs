@@ -12,6 +12,8 @@ public sealed partial class SandboxContext
     private string? _lastCapabilityId;
     private DateTimeOffset _lastCapabilityClock;
     private CapabilityGrant? _lastCapabilityGrant;
+    private string? _lastBindingId;
+    private BindingDescriptor? _lastBindingDescriptor;
     private int _callDepth;
 
     public SandboxContext(
@@ -89,6 +91,20 @@ public sealed partial class SandboxContext
         return new SandboxRuntimeException(new SandboxError(
             SandboxErrorCode.PermissionDenied,
             $"capability {capabilityId} is not granted"));
+    }
+
+    internal BindingDescriptor GetBindingDescriptor(string id)
+    {
+        if (_lastBindingDescriptor is { } descriptor &&
+            string.Equals(_lastBindingId, id, StringComparison.Ordinal))
+        {
+            return descriptor;
+        }
+
+        descriptor = Bindings.GetDescriptor(id);
+        _lastBindingId = id;
+        _lastBindingDescriptor = descriptor;
+        return descriptor;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
