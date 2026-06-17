@@ -212,6 +212,34 @@ public sealed class RpcKernelGenerationTests
         Assert.Equal("\b\f", text.Value);
     }
 
+    [Theory]
+    [InlineData("double.NaN")]
+    [InlineData("double.PositiveInfinity")]
+    [InlineData("double.NegativeInfinity")]
+    public void Non_finite_double_literals_are_rejected_by_rpc_analyzer(string literal)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics($$"""
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [KernelRpcService("bad-f64")]
+            public sealed partial class BadF64Kernel
+            {
+                public double Read(HookContext ctx)
+                {
+                    return {{literal}};
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("finite", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void AssertKill(SandboxValue value, int expectedId, bool expectedSuccess)
     {
         var record = Assert.IsType<RecordValue>(value);
