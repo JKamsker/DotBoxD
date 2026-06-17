@@ -13,6 +13,7 @@ public sealed class StreamConnection : IRpcChannel
     private readonly Stream _stream;
     private readonly bool _ownsStream;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly CancellationTokenSource _disposeCts = new();
     private readonly string _remoteEndpoint;
     private readonly int _maxMessageSize;
     private readonly TimeSpan _frameReadIdleTimeout;
@@ -76,7 +77,7 @@ public sealed class StreamConnection : IRpcChannel
         ThrowIfDisposed();
         MessageFramer.ValidateOutgoingFrame(data.Span, _maxMessageSize);
 
-        await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+        await WaitForSendSlotAsync(ct).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
@@ -154,12 +155,11 @@ public sealed class StreamConnection : IRpcChannel
             return;
         }
 
+        _disposeCts.Cancel();
         if (_ownsStream || Volatile.Read(ref _activeReceives) != 0)
         {
             await DisposeStreamAsync(_stream).ConfigureAwait(false);
         }
-
-        _sendLock.Dispose();
     }
 
     public ValueTask DisposeAsync() => new(CloseAsync());
@@ -167,6 +167,26 @@ public sealed class StreamConnection : IRpcChannel
     private void ThrowIfDisposed()
     {
         if (Volatile.Read(ref _disposed) != 0)
+        {
+            throw new ObjectDisposedException(nameof(StreamConnection));
+        }
+    }
+
+    private async Task WaitForSendSlotAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (ct.CanBeCanceled)
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
+                await _sendLock.WaitAsync(linked.Token).ConfigureAwait(false);
+                return;
+            }
+
+            await _sendLock.WaitAsync(_disposeCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested &&
+            Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(StreamConnection));
         }
