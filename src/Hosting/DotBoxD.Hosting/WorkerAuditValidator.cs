@@ -158,6 +158,7 @@ internal static class WorkerAuditValidator
             !CapabilityMatches(auditEvent, binding) ||
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
+            !LogAuditMatchesPolicy(plan, auditEvent) ||
             !RequiredBindingFieldsMatch(plan, auditEvent))
         {
             return false;
@@ -185,6 +186,11 @@ internal static class WorkerAuditValidator
 
     private static bool ResultMatches(SandboxAuditEvent auditEvent)
         => auditEvent.Success ? auditEvent.ErrorCode is null : auditEvent.ErrorCode is not null;
+
+    private static bool LogAuditMatchesPolicy(ExecutionPlan plan, SandboxAuditEvent auditEvent)
+        => auditEvent.Kind != "SandboxLog" ||
+           auditEvent.Message is not null &&
+           auditEvent.Message.Length <= plan.Budget.MaxLogMessageLength;
 
     private static bool RequiredBindingFieldsMatch(ExecutionPlan plan, SandboxAuditEvent auditEvent)
     {

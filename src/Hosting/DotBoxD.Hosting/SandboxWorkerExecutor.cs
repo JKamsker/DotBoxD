@@ -244,12 +244,24 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
         // allocating an intermediate summary array.
         SandboxAuditEvent? summary = null;
         var summaryCount = 0;
+        var observedHostCalls = 0;
+        var observedLogEvents = 0;
         foreach (var auditEvent in result.AuditEvents)
         {
             if (auditEvent.RunId != runId ||
                 !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
             {
                 return false;
+            }
+
+            if (IsBindingAudit(auditEvent.Kind))
+            {
+                observedHostCalls++;
+            }
+
+            if (auditEvent.Kind == "SandboxLog")
+            {
+                observedLogEvents++;
             }
 
             if (auditEvent.Kind == "RunSummary")
@@ -264,7 +276,9 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
             }
         }
 
-        if (summaryCount != 1 || summary!.Success != result.Succeeded)
+        if (summaryCount != 1 ||
+            summary!.Success != result.Succeeded ||
+            !AuditEvidenceUsageMatches(result.ResourceUsage, observedHostCalls, observedLogEvents))
         {
             return false;
         }
@@ -276,4 +290,14 @@ internal sealed class SandboxWorkerExecutor(ConfiguredSandboxWorker? worker)
               summary.ErrorCode is { } code &&
               Enum.IsDefined(code));
     }
+
+    private static bool IsBindingAudit(string kind)
+        => kind is "BindingCall" or "SandboxLog" or "PluginMessage";
+
+    private static bool AuditEvidenceUsageMatches(
+        SandboxResourceUsage usage,
+        int observedHostCalls,
+        int observedLogEvents)
+        => usage.HostCalls >= observedHostCalls &&
+           usage.LogEvents >= observedLogEvents;
 }
