@@ -73,6 +73,30 @@ public sealed class GamePluginControlServiceTests
     }
 
     [Fact]
+    public async Task KillMonsterAsync_requires_session_owned_write_kernel()
+    {
+        var gameServer = Assembly.LoadFrom(GameServerAssemblyPath());
+        var sink = (IPluginMessageSink)Create(gameServer, "DotBoxD.Kernels.Game.Server.Simulation.GameCommandSink");
+        using var server = PluginServer.Create(sink);
+        var world = gameServer
+            .GetType("DotBoxD.Kernels.Game.Server.Simulation.GameWorld", throwOnError: true)!
+            .GetMethod("CreateDefault", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [server.Hooks])!;
+        var service = Create(
+            gameServer,
+            "DotBoxD.Kernels.Game.Server.Ipc.GamePluginControlService",
+            server,
+            server.CreateSession(),
+            sink,
+            world);
+
+        var killed = await KillMonsterAsync(service, "monster-4");
+
+        Assert.False(killed);
+        Assert.Equal(45, await GetEntityHealthAsync(service, "monster-4"));
+    }
+
+    [Fact]
     public void GameServer_project_builds_child_plugin_project()
     {
         var project = XDocument.Load(GameServerProjectPath());
@@ -95,6 +119,22 @@ public sealed class GamePluginControlServiceTests
             .GetMethod("InstallPluginAsync", BindingFlags.Public | BindingFlags.Instance)!
             .Invoke(service, [json, CancellationToken.None]);
         return await ((ValueTask<string>)result!).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> KillMonsterAsync(object service, string monsterId)
+    {
+        var result = service.GetType()
+            .GetMethod("KillMonsterAsync", BindingFlags.Public | BindingFlags.Instance)!
+            .Invoke(service, [monsterId, CancellationToken.None]);
+        return await ((ValueTask<bool>)result!).ConfigureAwait(false);
+    }
+
+    private static async Task<int> GetEntityHealthAsync(object service, string entityId)
+    {
+        var result = service.GetType()
+            .GetMethod("GetEntityHealthAsync", BindingFlags.Public | BindingFlags.Instance)!
+            .Invoke(service, [entityId, CancellationToken.None]);
+        return await ((ValueTask<int>)result!).ConfigureAwait(false);
     }
 
     private static ValueTask HoldUntilShutdownAsync(object service, CancellationToken cancellationToken)
