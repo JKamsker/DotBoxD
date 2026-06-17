@@ -14,6 +14,7 @@ internal static class PolicyGrantValidator
         SandboxPolicy policy,
         IBindingCatalog bindings,
         IReadOnlySet<string> requiredCapabilities,
+        IReadOnlyList<CapabilityRequest> requestedCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
         var now = policy.GrantClock;
@@ -22,7 +23,7 @@ internal static class PolicyGrantValidator
         {
             if (IsActive(grant, now))
             {
-                ValidateGrant(grant, bindings, requiredCapabilities, diagnostics);
+                ValidateGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
             }
         }
     }
@@ -107,11 +108,12 @@ internal static class PolicyGrantValidator
         CapabilityGrant grant,
         IBindingCatalog bindings,
         IReadOnlySet<string> requiredCapabilities,
+        IReadOnlyList<CapabilityRequest> requestedCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
         if (CapabilityPattern.IsWildcard(grant.Id))
         {
-            ValidateWildcardGrant(grant, bindings, requiredCapabilities, diagnostics);
+            ValidateWildcardGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
             return;
         }
 
@@ -132,6 +134,7 @@ internal static class PolicyGrantValidator
         CapabilityGrant grant,
         IBindingCatalog bindings,
         IReadOnlySet<string> requiredCapabilities,
+        IReadOnlyList<CapabilityRequest> requestedCapabilities,
         List<SandboxDiagnostic> diagnostics)
     {
         var matched = false;
@@ -144,6 +147,21 @@ internal static class PolicyGrantValidator
 
             matched = true;
             ValidateConcreteGrant(required, grant, bindings, diagnostics);
+        }
+
+        foreach (var request in requestedCapabilities)
+        {
+            if (requiredCapabilities.Contains(request.Id) ||
+                !CapabilityPattern.Matches(grant.Id, request.Id))
+            {
+                continue;
+            }
+
+            matched = true;
+            if (!ValidateConcreteGrant(request.Id, grant, bindings, diagnostics))
+            {
+                RequireAllowedKeys(grant, diagnostics, NoAllowedParameterKeys);
+            }
         }
 
         if (!matched)

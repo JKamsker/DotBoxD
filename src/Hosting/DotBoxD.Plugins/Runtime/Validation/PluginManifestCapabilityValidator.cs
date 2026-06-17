@@ -28,7 +28,9 @@ internal static class PluginManifestCapabilityValidator
 
     private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)
     {
-        var required = new HashSet<string>(StringComparer.Ordinal);
+        var required = new HashSet<string>(
+            plan.Module.CapabilityRequests.Select(request => request.Id),
+            StringComparer.Ordinal);
         foreach (var entrypoint in entrypoints)
         {
             if (!plan.BindingReferences.TryGetValue(entrypoint, out var references))

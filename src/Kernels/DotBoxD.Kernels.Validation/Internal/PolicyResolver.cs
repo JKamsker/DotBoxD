@@ -24,7 +24,12 @@ internal static class PolicyResolver
             diagnostics.Add(new SandboxDiagnostic("E-POLICY-EFFECT", "policy declares unknown effects"));
         }
 
-        PolicyGrantValidator.Validate(policy, bindings, requiredCapabilities, diagnostics);
+        PolicyGrantValidator.Validate(
+            policy,
+            bindings,
+            requiredCapabilities,
+            module.CapabilityRequests,
+            diagnostics);
 
         // Capture the grant clock once so every membership probe in this validation pass
         // shares a single consistent snapshot instead of re-reading DateTimeOffset.UtcNow

@@ -126,8 +126,7 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
-        builder.AppendLine(
-            $"            [new {TypeNames.GlobalCapabilityRequest}({TypeNames.GlobalPluginMessageBindings}.CapabilityId, {LiteralReader.StringLiteral(DotBoxDGenerationNames.Capabilities.MessageWriteReason)})],");
+        DotBoxDCapabilityRequestSourceEmitter.Emit(builder, model.RequiredCapabilities);
         builder.Append("            [")
             .Append(DotBoxDGenerationNames.Entrypoints.ShouldHandle)
             .Append("(parameters), ")
