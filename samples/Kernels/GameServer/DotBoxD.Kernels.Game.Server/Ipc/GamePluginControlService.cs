@@ -81,12 +81,12 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     {
         ArgumentNullException.ThrowIfNull(pluginId);
         ArgumentNullException.ThrowIfNull(arguments);
-        if (!_session.Owns(pluginId))
+        if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
+            !ReferenceEquals(kernel.OwnerId, _session))
         {
             throw new InvalidOperationException($"Kernel RPC service '{pluginId}' is not owned by this plugin session.");
         }
 
-        var kernel = _server.Kernels.Get(pluginId);
         var function = RpcEntrypoint(kernel);
         var rpcArguments = KernelRpcBinaryCodec.DecodeArguments(arguments);
         var liveSettings = kernel.Manifest.LiveSettings.Count;
