@@ -118,6 +118,10 @@ internal static class RpcKernelClientExtensionModelFactory
 
     private static INamedTypeSymbol? ValidateReceiver(INamedTypeSymbol receiverType, string memberName, string memberKind)
     {
+        EnsureAccessibleFromGeneratedClient(
+            receiverType,
+            $"Kernel RPC client {memberKind} '{memberName}' receiver type '{receiverType.ToDisplayString()}'");
+
         if (ReceiverHasMember(receiverType, memberName))
         {
             throw new NotSupportedException(
@@ -129,6 +133,13 @@ internal static class RpcKernelClientExtensionModelFactory
         {
             throw new NotSupportedException(
                 $"Kernel RPC client {memberKind} '{memberName}' requires '{receiverType.ToDisplayString()}' to expose an instance KernelRpc property assignable to {RegistryType}.");
+        }
+
+        if (registryAccess.InterfaceType is { } interfaceType)
+        {
+            EnsureAccessibleFromGeneratedClient(
+                interfaceType,
+                $"Kernel RPC client {memberKind} '{memberName}' KernelRpc property interface '{interfaceType.ToDisplayString()}'");
         }
 
         return registryAccess.InterfaceType;
@@ -192,10 +203,49 @@ internal static class RpcKernelClientExtensionModelFactory
     }
 
     private static bool IsAccessible(IMethodSymbol getter)
-        => getter.DeclaredAccessibility is
-            Accessibility.Public or
-            Accessibility.Internal or
-            Accessibility.ProtectedOrInternal;
+        => IsAccessibleFromGeneratedClient(getter.DeclaredAccessibility);
+
+    private static void EnsureAccessibleFromGeneratedClient(ITypeSymbol type, string description)
+    {
+        if (!IsTypeAccessibleFromGeneratedClient(type))
+        {
+            throw new NotSupportedException($"{description} must be accessible from generated client code.");
+        }
+    }
+
+    private static bool IsTypeAccessibleFromGeneratedClient(ITypeSymbol type)
+        => type switch
+        {
+            INamedTypeSymbol named => IsNamedTypeAccessibleFromGeneratedClient(named),
+            IArrayTypeSymbol array => IsTypeAccessibleFromGeneratedClient(array.ElementType),
+            IPointerTypeSymbol pointer => IsTypeAccessibleFromGeneratedClient(pointer.PointedAtType),
+            ITypeParameterSymbol or IDynamicTypeSymbol => true,
+            _ => false
+        };
+
+    private static bool IsNamedTypeAccessibleFromGeneratedClient(INamedTypeSymbol type)
+    {
+        for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
+        {
+            if (!IsAccessibleFromGeneratedClient(current.DeclaredAccessibility))
+            {
+                return false;
+            }
+
+            foreach (var typeArgument in current.TypeArguments)
+            {
+                if (!IsTypeAccessibleFromGeneratedClient(typeArgument))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsAccessibleFromGeneratedClient(Accessibility accessibility)
+        => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
 
     private static bool IsKernelRpcClientRegistry(ITypeSymbol type)
     {
