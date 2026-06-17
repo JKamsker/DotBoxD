@@ -26,6 +26,24 @@ public sealed class RpcKernelNumericConversionGenerationTests
         }
         """;
 
+    private const string LongParameterSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [KernelRpcService("long-parameter")]
+        public sealed partial class LongParameterKernel
+        {
+            public long Echo(int value, HookContext ctx)
+            {
+                return value;
+            }
+        }
+        """;
+
     [Fact]
     public async Task Generated_rpc_kernel_preserves_implicit_numeric_literal_conversions()
     {
@@ -39,6 +57,21 @@ public sealed class RpcKernelNumericConversionGenerationTests
         var result = await kernel.InvokeRpcAsync([]);
 
         Assert.Equal(0L, Assert.IsType<I64Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Generated_rpc_kernel_preserves_implicit_numeric_variable_conversions()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            LongParameterSource,
+            "Sample.LongParameterPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallRpcAsync(package);
+
+        var result = await kernel.InvokeRpcAsync([SandboxValue.FromInt32(42)]);
+
+        Assert.Equal(42L, Assert.IsType<I64Value>(result).Value);
     }
 
     private static SandboxPolicy PurePolicy()
