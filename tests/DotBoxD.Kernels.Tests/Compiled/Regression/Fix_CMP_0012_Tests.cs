@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Schema;
 using DotBoxD.Kernels.Tests.Compiled.Regression.SchemaDrift;
 using DotBoxD.Plugins.Json;
@@ -139,6 +140,39 @@ public sealed class Fix_CMP_0012_Tests
             string.Join(" ", schemaFailures));
     }
 
+    [Fact]
+    public void Plugin_package_schema_value_domains_match_importer()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath(PackageSchemaRelative)));
+        var defs = document.RootElement.GetProperty("$defs");
+        var manifestProperties = defs.GetProperty("manifest").GetProperty("properties");
+
+        AssertEnum(manifestProperties.GetProperty("mode"), ["Auto", "Interpreted", "Compiled"]);
+        AssertEnum(
+            manifestProperties.GetProperty("effects").GetProperty("items"),
+            Enum.GetNames<SandboxEffect>().Where(name => name != nameof(SandboxEffect.None)));
+        AssertEnum(
+            defs.GetProperty("liveSetting").GetProperty("properties").GetProperty("type"),
+            ["bool", "int", "long", "double", "string"]);
+    }
+
+    [Fact]
+    public void Module_schema_i32_literal_range_matches_importer()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath(ModuleSchemaRelative)));
+        var i32 = document.RootElement
+            .GetProperty("$defs")
+            .GetProperty("literal")
+            .GetProperty("properties")
+            .GetProperty("i32");
+
+        Assert.True(i32.TryGetProperty("minimum", out var minimum), "i32 schema is missing minimum.");
+        Assert.Equal(int.MinValue, minimum.GetInt32());
+
+        Assert.True(i32.TryGetProperty("maximum", out var maximum), "i32 schema is missing maximum.");
+        Assert.Equal(int.MaxValue, maximum.GetInt32());
+    }
+
     /// <summary>
     /// Extracts the property-name array passed to <c>RequireAllowedProperties(..., "name", [..])</c>
     /// for the given requirement name from the maintained importer source.
@@ -162,6 +196,15 @@ public sealed class Fix_CMP_0012_Tests
     private static bool SameSet(IEnumerable<string> left, IEnumerable<string> right)
         => new HashSet<string>(left, StringComparer.Ordinal)
             .SetEquals(new HashSet<string>(right, StringComparer.Ordinal));
+
+    private static void AssertEnum(JsonElement schema, IEnumerable<string> expected)
+    {
+        Assert.True(schema.TryGetProperty("enum", out var actual), "schema is missing enum.");
+        var actualValues = actual.EnumerateArray().Select(item => item.GetString()!).ToArray();
+        Assert.True(
+            SameSet(actualValues, expected),
+            $"Schema enum drifted. Schema: [{string.Join(", ", actualValues)}]. Expected: [{string.Join(", ", expected)}].");
+    }
 
     private static string SchemaVersionOf(string schemaJson)
     {
