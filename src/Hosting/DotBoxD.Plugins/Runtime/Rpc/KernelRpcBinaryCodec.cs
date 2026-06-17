@@ -30,11 +30,12 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var count = ReadItemCount(ref reader);
+        var remainingItems = MaxDecodeItems;
+        var count = ReadItemCount(ref reader, ref remainingItems);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader, depth: 0);
+            values[i] = ReadValue(ref reader, depth: 0, ref remainingItems);
         }
 
         reader.EnsureConsumed();
@@ -51,7 +52,8 @@ public static class KernelRpcBinaryCodec
     public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
     {
         var reader = new Reader(payload.Span);
-        var value = ReadValue(ref reader, depth: 0);
+        var remainingItems = MaxDecodeItems;
+        var value = ReadValue(ref reader, depth: 0, ref remainingItems);
         reader.EnsureConsumed();
         return value;
     }
@@ -87,7 +89,7 @@ public static class KernelRpcBinaryCodec
         }
     }
 
-    private static KernelRpcValue ReadValue(ref Reader reader, int depth)
+    private static KernelRpcValue ReadValue(ref Reader reader, int depth, ref int remainingItems)
     {
         var kind = (KernelRpcValueKind)reader.ReadByte();
         return kind switch
@@ -98,8 +100,8 @@ public static class KernelRpcBinaryCodec
             KernelRpcValueKind.I64 => KernelRpcValue.Int64(reader.ReadInt64()),
             KernelRpcValueKind.F64 => KernelRpcValue.Double(ReadFiniteDouble(ref reader)),
             KernelRpcValueKind.String => KernelRpcValue.String(reader.ReadString()),
-            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader, depth)),
-            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader, depth)),
+            KernelRpcValueKind.List => KernelRpcValue.List(ReadItems(ref reader, depth, ref remainingItems)),
+            KernelRpcValueKind.Record => KernelRpcValue.Record(ReadItems(ref reader, depth, ref remainingItems)),
             _ => throw new FormatException($"Kernel RPC payload contains unknown value kind '{kind}'.")
         };
     }
@@ -132,31 +134,32 @@ public static class KernelRpcBinaryCodec
         }
     }
 
-    private static KernelRpcValue[] ReadItems(ref Reader reader, int depth)
+    private static KernelRpcValue[] ReadItems(ref Reader reader, int depth, ref int remainingItems)
     {
         if (depth >= MaxDecodeDepth)
         {
             throw new FormatException("Kernel RPC payload exceeds maximum nesting depth.");
         }
 
-        var count = ReadItemCount(ref reader);
+        var count = ReadItemCount(ref reader, ref remainingItems);
         var values = new KernelRpcValue[count];
         for (var i = 0; i < count; i++)
         {
-            values[i] = ReadValue(ref reader, depth + 1);
+            values[i] = ReadValue(ref reader, depth + 1, ref remainingItems);
         }
 
         return values;
     }
 
-    private static int ReadItemCount(ref Reader reader)
+    private static int ReadItemCount(ref Reader reader, ref int remainingItems)
     {
         var count = reader.ReadLength();
-        if (count > MaxDecodeItems)
+        if (count > MaxDecodeItems || count > remainingItems)
         {
             throw new FormatException("Kernel RPC payload contains too many items.");
         }
 
+        remainingItems -= count;
         return count;
     }
 
