@@ -20,6 +20,7 @@ internal static partial class RpcKernelClientProxyEmitter
         INamedTypeSymbol serviceType,
         IMethodSymbol serviceMethod)
     {
+        EnsureAccessibleFromGeneratedClient(serviceType);
         if (serviceType.TypeKind != TypeKind.Interface)
         {
             throw new NotSupportedException("Kernel RPC service client generation requires an interface contract type.");
@@ -29,7 +30,25 @@ internal static partial class RpcKernelClientProxyEmitter
     }
 
     internal static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
-        => RpcKernelClientServiceMethodResolver.Resolve(serviceType, kernelMethod);
+    {
+        EnsureAccessibleFromGeneratedClient(serviceType);
+        return RpcKernelClientServiceMethodResolver.Resolve(serviceType, kernelMethod);
+    }
+
+    private static void EnsureAccessibleFromGeneratedClient(INamedTypeSymbol serviceType)
+    {
+        for (INamedTypeSymbol? current = serviceType; current is not null; current = current.ContainingType)
+        {
+            if (!IsAccessibleFromGeneratedClient(current.DeclaredAccessibility))
+            {
+                throw new NotSupportedException(
+                    $"Kernel RPC service interface '{serviceType.ToDisplayString()}' must be accessible from generated client code.");
+            }
+        }
+    }
+
+    private static bool IsAccessibleFromGeneratedClient(Accessibility accessibility)
+        => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
 
     private static bool IsGenericTask(ITypeSymbol type, out ITypeSymbol inner)
         => TryGenericTaskLike(type, "Task", out inner);
