@@ -54,7 +54,8 @@ public sealed partial class GeneratedAssemblyVerifier
         MetadataReader reader,
         VerificationPolicy policy,
         TypeDefinition type,
-        List<VerificationDiagnostic> diagnostics)
+        List<VerificationDiagnostic> diagnostics,
+        MemberSignatureCache memberSignatures)
     {
         var executeMethods = 0;
         foreach (var methodHandle in type.GetMethods())
@@ -87,7 +88,7 @@ public sealed partial class GeneratedAssemblyVerifier
             if (method.RelativeVirtualAddress != 0)
             {
                 var body = peReader.GetMethodBody(method.RelativeVirtualAddress);
-                var instructions = GeneratedIlReader.ReadInstructions(reader, body, diagnostics);
+                var instructions = GeneratedIlReader.ReadInstructions(reader, body, diagnostics, memberSignatures);
                 OpCodeVerifier.VerifyBody(reader, policy, body, instructions, diagnostics);
                 GeneratedMethodShapeVerifier.VerifyBody(reader, method, body, instructions, name, diagnostics);
             }
