@@ -59,6 +59,9 @@ $requiredIds = @(
     "DotBoxD.Hosting.Http",
     "DotBoxD.Plugins",
     "DotBoxD.Abstractions",
+    "DotBoxD",
+    "DotBoxD.Services",
+    "DotBoxD.Services.All",
     "DotBoxD.Plugins.Analyzer",
     "DotBoxD.Pushdown.Services"
 )
@@ -112,6 +115,7 @@ $nugetConfig = @"
   -->
   <packageSourceMapping>
     <packageSource key="local">
+      <package pattern="DotBoxD" />
       <package pattern="DotBoxD.*" />
     </packageSource>
     <packageSource key="nuget.org">
@@ -290,5 +294,65 @@ dotnet run --project $resolvedWorkRoot --configuration $Configuration --no-build
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+
+function Invoke-ServiceGeneratorSmoke([string] $Name, [string] $PackageId) {
+    $projectRoot = Join-Path $resolvedWorkRoot $Name
+    New-Item -ItemType Directory -Path $projectRoot | Out-Null
+
+    $project = @"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="$PackageId" Version="$($versions[$PackageId])" />
+  </ItemGroup>
+</Project>
+"@
+    Set-Content -LiteralPath (Join-Path $projectRoot "$Name.csproj") -Value $project
+
+    $program = @"
+using DotBoxD.Services.Attributes;
+using DotBoxD.Services.Generated;
+
+var service = DotBoxDGenerated.Services.SingleOrDefault(s => s.ServiceType == typeof(IMetaSmokeService));
+if (service.ServiceName != "IMetaSmokeService")
+{
+    throw new InvalidOperationException("The service source generator did not register IMetaSmokeService.");
+}
+
+Console.WriteLine(service.ProxyType.Name + ":" + service.DispatcherType.Name);
+
+[DotBoxDService]
+public interface IMetaSmokeService
+{
+    Task<int> EchoAsync(int value, CancellationToken ct = default);
+}
+"@
+    Set-Content -LiteralPath (Join-Path $projectRoot "Program.cs") -Value $program
+
+    dotnet restore $projectRoot --configfile (Join-Path $resolvedWorkRoot "NuGet.config")
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet build $projectRoot --configuration $Configuration --no-restore
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet run --project $projectRoot --configuration $Configuration --no-build
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
+Invoke-ServiceGeneratorSmoke "DotBoxD.Services.All.MetaSmoke" "DotBoxD.Services.All"
+Invoke-ServiceGeneratorSmoke "DotBoxD.MetaSmoke" "DotBoxD"
 
 Write-Host "Package consumer smoke passed."
