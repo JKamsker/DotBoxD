@@ -133,6 +133,94 @@ public sealed class KernelRpcClientExtensionTests
                  d.GetMessage().Contains("KernelRpc property", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Generated_extension_reports_inaccessible_receiver_type()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IMonsterKillerService
+            {
+                ValueTask<int> KillAsync(int monsterId);
+            }
+
+            public sealed class Owner
+            {
+                private sealed class RemoteMonsterControl
+                {
+                    public IKernelRpcClientRegistry KernelRpc { get; } = null!;
+                }
+
+                [KernelRpcClientProperty(typeof(RemoteMonsterControl))]
+                [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+                public sealed partial class MonsterKillerKernel
+                {
+                    public int Kill(int monsterId, HookContext ctx)
+                    {
+                        return monsterId;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("accessible from generated client code", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
+    }
+
+    [Fact]
+    public void Generated_extension_reports_inaccessible_receiver_type_argument()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed class RemoteMonsterControl<TToken>
+            {
+                public IKernelRpcClientRegistry KernelRpc { get; } = null!;
+            }
+
+            public interface IMonsterKillerService
+            {
+                ValueTask<int> KillAsync(int monsterId);
+            }
+
+            public sealed class Owner
+            {
+                private sealed class SecretToken;
+
+                [KernelRpcClientProperty(typeof(RemoteMonsterControl<SecretToken>))]
+                [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+                public sealed partial class MonsterKillerKernel
+                {
+                    public int Kill(int monsterId, HookContext ctx)
+                    {
+                        return monsterId;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("accessible from generated client code", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
+    }
+
     private static string ConflictSource(
         string receiverMember,
         string classAttributes,

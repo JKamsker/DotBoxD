@@ -87,6 +87,54 @@ public sealed class KernelRpcClientExtensionInterfaceTests
         AssertGeneratedKillResult(values[0], 4, true);
     }
 
+    [Fact]
+    public void Generated_domain_extension_reports_inaccessible_explicit_interface_kernel_rpc_property()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IMonsterKillerService
+            {
+                ValueTask<int> KillAsync(int monsterId);
+            }
+
+            public sealed class Owner
+            {
+                private interface IKernelRpcBacked
+                {
+                    IKernelRpcClientRegistry KernelRpc { get; }
+                }
+
+                public sealed class RemoteMonsterControl : IKernelRpcBacked
+                {
+                    IKernelRpcClientRegistry IKernelRpcBacked.KernelRpc => null!;
+                }
+
+                [KernelRpcClientProperty(typeof(RemoteMonsterControl))]
+                [KernelRpcService("monster-killer", typeof(IMonsterKillerService))]
+                public sealed partial class MonsterKillerKernel
+                {
+                    public int Kill(int monsterId, HookContext ctx)
+                    {
+                        return monsterId;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("KernelRpc property", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
+    }
+
     private static byte[] KillResultsResponse()
         => KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.List(
         [
