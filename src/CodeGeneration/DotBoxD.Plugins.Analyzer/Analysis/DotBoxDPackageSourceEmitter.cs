@@ -152,7 +152,7 @@ internal static class DotBoxDPackageSourceEmitter
             .Append('(').Append(ReadOnlyListOf(TypeNames.GlobalParameter)).AppendLine(" parameters)");
         builder.AppendLine("        => new(");
         builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {TypeNames.GlobalSandboxType}.Unit,");
-        builder.AppendLine($"            [new {TypeNames.GlobalReturnStatement}({HandleExpression(model.Handle)}, Span)]);");
+        builder.AppendLine($"            {HandleBody(model.Handle).Source});");
         builder.AppendLine();
     }
 
@@ -336,4 +336,14 @@ internal static class DotBoxDPackageSourceEmitter
 
     private static string HandleExpression(DotBoxDHandleModel handle)
         => $"new {TypeNames.GlobalCallExpression}({TypeNames.GlobalPluginMessageBindings}.SendBindingId, [{handle.Target.Source}, {handle.Message.Source}], null, Span)";
+
+    private static DotBoxDStatementBodyModel HandleBody(DotBoxDHandleModel handle)
+    {
+        var returned = DotBoxDStatementBodyModelFactory.Return(
+            HandleExpression(handle),
+            handle.Target.Allocates || handle.Message.Allocates);
+        return handle.Prefix is null
+            ? returned
+            : DotBoxDStatementBodyModelFactory.Concat(handle.Prefix, returned);
+    }
 }

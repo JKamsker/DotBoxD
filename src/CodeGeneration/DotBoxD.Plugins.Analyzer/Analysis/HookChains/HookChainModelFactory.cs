@@ -67,7 +67,7 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        var stages = new List<Stage>();
+        var stages = new List<HookChainStage>();
         var seed = WalkToSeed(terminalAccess.Expression, stages);
         if (seed is null)
         {
@@ -95,49 +95,22 @@ internal static class HookChainModelFactory
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
 
-        // Forward pass: track the projected-element binding; record each Where with the context that
-        // was current at its position (event mode, or projected after a Select).
-        var whereStages = new List<(ExpressionSyntax Body, DotBoxDExpressionLoweringContext Context)>();
-        DotBoxDExpressionModel? projected = null;
-        var shouldHandleEventParam = DotBoxDGenerationNames.DefaultEventParameterName;
-
-        foreach (var stage in stages)
-        {
-            var (elementParam, _) = LambdaParameters(stage.Lambda);
-            if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
-            {
-                return null;
-            }
-
-            var context = Context(elementParam, eventProperties, projected, model, cancellationToken, capabilities, effects);
-            if (stage.IsSelect)
-            {
-                projected = DotBoxDExpressionModelFactory.Create(body, context);
-            }
-            else
-            {
-                whereStages.Add((body, context));
-                if (projected is null)
-                {
-                    shouldHandleEventParam = elementParam;
-                }
-            }
-        }
-
-        // AND-compose the Where conditions in source order: fold from the last so the first Where is
-        // the outermost branch (if w0 then (if w1 then ... else false) else false).
-        var shouldHandle = DotBoxDConditionBodyModelFactory.AlwaysTrue();
-        for (var i = whereStages.Count - 1; i >= 0; i--)
-        {
-            shouldHandle = DotBoxDConditionBodyModelFactory.CreateBranch(
-                whereStages[i].Body,
-                shouldHandle,
-                DotBoxDConditionBodyModelFactory.AlwaysFalse(),
-                whereStages[i].Context);
-        }
-
-        var handleContext = Context(terminalElementParam, eventProperties, projected, model, cancellationToken, capabilities, effects);
-        var handle = DotBoxDHandleModelFactory.CreateFromSend(sendInvocation, handleContext);
+        var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
+            stages,
+            eventProperties,
+            model,
+            cancellationToken,
+            capabilities,
+            effects);
+        var handle = HookChainStageLowerer.CreateHandle(
+            stages,
+            terminalElementParam,
+            sendInvocation,
+            eventProperties,
+            model,
+            cancellationToken,
+            capabilities,
+            effects);
 
         var chainId = HookChainIdentity.Compute(invocation);
         var kernelName = "HookChain_" + chainId;
@@ -147,7 +120,7 @@ internal static class HookChainModelFactory
             KernelName: kernelName,
             PackageName: kernelName + "PluginPackage",
             EventName: eventType.MetadataName,
-            EventParameterName: shouldHandleEventParam,
+            EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam,
             HandleEventParameterName: terminalElementParam,
             HandleContextParameterName: terminalContextParam,
@@ -208,23 +181,7 @@ internal static class HookChainModelFactory
         bool receiverIsPipeline)
         => receiverIsPipeline ? eventType : receiverType.TypeArguments[1];
 
-    private static DotBoxDExpressionLoweringContext Context(
-        string elementParam,
-        EquatableArray<EventPropertyModel> eventProperties,
-        DotBoxDExpressionModel? projected,
-        SemanticModel model,
-        CancellationToken cancellationToken,
-        ICollection<string> capabilities,
-        ICollection<string> effects)
-        => projected is null
-            ? new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken,
-                capabilities: capabilities, effects: effects)
-            : new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken, elementParam, projected,
-                capabilities, effects);
-
-    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<Stage> stages)
+    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<HookChainStage> stages)
     {
         var current = receiver;
         while (current is InvocationExpressionSyntax invocation &&
@@ -240,7 +197,7 @@ internal static class HookChainModelFactory
             if ((isSelect || string.Equals(name, WhereMethod, StringComparison.Ordinal)) &&
                 TryLambda(invocation, out var lambda))
             {
-                stages.Add(new Stage(isSelect, lambda));
+                stages.Add(new HookChainStage(isSelect, lambda));
                 current = access.Expression;
                 continue;
             }
@@ -309,19 +266,6 @@ internal static class HookChainModelFactory
             default:
                 return (null, null);
         }
-    }
-
-    private readonly struct Stage
-    {
-        public Stage(bool isSelect, LambdaExpressionSyntax lambda)
-        {
-            IsSelect = isSelect;
-            Lambda = lambda;
-        }
-
-        public bool IsSelect { get; }
-
-        public LambdaExpressionSyntax Lambda { get; }
     }
 
     private static bool ContainsUnsupported(EquatableArray<EventPropertyModel> eventProperties)
