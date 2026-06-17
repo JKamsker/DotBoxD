@@ -110,6 +110,33 @@ public sealed class TcpTransportRegressionTests
     }
 
     [Fact]
+    public async Task ReceiveAsync_RejectsTruncatedFrameBody()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
+        await server.StartAsync();
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        using var rawClient = new TcpClient();
+        var acceptTask = server.AcceptAsync();
+        await rawClient.ConnectAsync(IPAddress.Loopback, port);
+        await using var serverConnection = await acceptTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var totalLength = MessageFramer.HeaderSize + 4;
+        var truncated = new byte[MessageFramer.HeaderSize + 1];
+        BinaryPrimitives.WriteInt32LittleEndian(truncated, totalLength);
+        BinaryPrimitives.WriteInt32LittleEndian(truncated.AsSpan(4), 42);
+        truncated[8] = (byte)MessageType.Request;
+        truncated[9] = 0x7F;
+
+        await rawClient.GetStream().WriteAsync(truncated);
+        await rawClient.GetStream().FlushAsync();
+        rawClient.Client.Shutdown(SocketShutdown.Send);
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => serverConnection.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
     public async Task StartAsync_AfterStopAsync_RestartsSuccessfully()
     {
         await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
