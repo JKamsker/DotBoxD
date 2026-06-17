@@ -62,7 +62,7 @@ internal static class RpcKernelPackageValidator
         }
 
         ValidateMode(package.Manifest, diagnostics);
-        _ = ValidateEffects(package.Manifest, diagnostics);
+        _ = PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
         ValidateLiveSettings(package.Manifest, diagnostics);
         ThrowIfErrors(diagnostics);
     }
@@ -70,7 +70,7 @@ internal static class RpcKernelPackageValidator
     public static void ValidatePrepared(PluginPackage package, ExecutionPlan plan)
     {
         var diagnostics = new List<SandboxDiagnostic>();
-        var manifestEffects = ValidateEffects(package.Manifest, diagnostics);
+        var manifestEffects = PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
         var entrypointId = package.Manifest.RpcEntrypoint;
         if (string.IsNullOrWhiteSpace(entrypointId) ||
             !PluginEntrypointIndex.Build(package).TryGet(entrypointId, out var entrypoint))
@@ -135,30 +135,6 @@ internal static class RpcKernelPackageValidator
                     $"Kernel RPC entrypoint '{function.Id}' must declare live setting '{settings[i].Name}' as a trailing parameter of type '{expected}'."));
             }
         }
-    }
-
-    private static SandboxEffect ValidateEffects(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
-    {
-        var effects = SandboxEffect.None;
-        foreach (var effect in manifest.Effects)
-        {
-            if (!Enum.TryParse<SandboxEffect>(effect, ignoreCase: false, out var parsed) ||
-                parsed == SandboxEffect.None ||
-                !parsed.ContainsOnlyKnownBits())
-            {
-                diagnostics.Add(new SandboxDiagnostic("DBXK040", $"Plugin manifest effect '{effect}' is not supported."));
-                continue;
-            }
-
-            effects |= parsed;
-        }
-
-        if (effects == SandboxEffect.None)
-        {
-            diagnostics.Add(new SandboxDiagnostic("DBXK040", "Plugin manifest must declare verified effects."));
-        }
-
-        return effects;
     }
 
     private static void ValidateMode(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
