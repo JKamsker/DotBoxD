@@ -228,7 +228,7 @@ public static partial class SafeFileSystem
         CheckAttributes(root);
 
         var relative = Path.GetRelativePath(root, fullPath);
-        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathFullyQualified(relative))
+        if (IsRootEscapeRelativePath(relative))
         {
             throw Error(SandboxErrorCode.PermissionDenied, "file access denied: path is outside the granted sandbox root");
         }
@@ -245,6 +245,12 @@ public static partial class SafeFileSystem
             }
         }
     }
+
+    internal static bool IsRootEscapeRelativePath(string relative)
+        => Path.IsPathFullyQualified(relative) ||
+           relative.Equals("..", StringComparison.Ordinal) ||
+           relative.StartsWith("../", StringComparison.Ordinal) ||
+           relative.StartsWith(@"..\", StringComparison.Ordinal);
 
     private static void CheckAttributes(string path)
     {

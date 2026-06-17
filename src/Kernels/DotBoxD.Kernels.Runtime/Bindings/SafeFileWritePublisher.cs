@@ -42,7 +42,7 @@ internal static class SafeFileWritePublisher
 
         var root = rootFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var relative = Path.GetRelativePath(root, directory);
-        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathFullyQualified(relative)) {
+        if (SafeFileSystem.IsRootEscapeRelativePath(relative)) {
             throw Error(SandboxErrorCode.PermissionDenied, "file access denied: path is outside the granted sandbox root");
         }
 
