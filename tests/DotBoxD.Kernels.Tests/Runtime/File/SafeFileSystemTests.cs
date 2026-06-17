@@ -68,6 +68,25 @@ public sealed class SafeFileSystemTests
     }
 
     [Fact]
+    public async Task File_read_allows_in_root_filename_starting_with_two_dots()
+    {
+        using var temp = TempDirectory.Create();
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "..safe.txt"), "safe");
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("..safe.txt"));
+        var policy = FilePolicyBuilder()
+            .GrantFileRead(temp.Path, 1024)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("safe", ((StringValue)result.Value!).Value);
+    }
+
+    [Fact]
     public async Task File_read_respects_byte_quota_while_streaming()
     {
         using var temp = TempDirectory.Create();
@@ -138,6 +157,24 @@ public sealed class SafeFileSystemTests
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.writeText" && e.Success);
         Assert.Equal("file", audit.Fields!["resourceKind"]);
         Assert.Equal("7", audit.Fields["bytesWritten"]);
+    }
+
+    [Fact]
+    public async Task File_write_allows_in_root_filename_starting_with_two_dots()
+    {
+        using var temp = TempDirectory.Create();
+        var host = SandboxTestHost.Create();
+        var module = await host.ImportJsonAsync(FileWriteJson("..safe.txt", "written"));
+        var policy = FilePolicyBuilder()
+            .GrantFileWrite(temp.Path, 1024, allowCreate: true, allowOverwrite: false)
+            .WithFuel(5_000)
+            .Build();
+        var plan = await host.PrepareAsync(module, policy);
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+        Assert.Equal("written", await System.IO.File.ReadAllTextAsync(Path.Combine(temp.Path, "..safe.txt")));
     }
 
     [Theory]
