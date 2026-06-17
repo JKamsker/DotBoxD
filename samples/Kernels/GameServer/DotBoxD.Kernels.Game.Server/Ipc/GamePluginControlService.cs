@@ -125,6 +125,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
 
     public async ValueTask HoldUntilShutdownAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         _ready.TrySetResult();
         await _shutdown.Task.WaitAsync(ct).ConfigureAwait(false);
     }
