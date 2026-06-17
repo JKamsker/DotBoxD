@@ -96,9 +96,9 @@ public sealed partial class SandboxHost : IDisposable
                 $"sandbox isolation '{(int)options.Isolation}' is not supported"));
         }
 
-        if (TryGetRevokedCapability(plan, entrypoint, out var revoked))
+        if (TryGetCapabilityDenial(plan, entrypoint, out var denial))
         {
-            return Publish(CapabilityRevokedResult(plan, options, revoked));
+            return Publish(CapabilityDeniedResult(plan, options, denial));
         }
 
         if (options.RequireDeterministic && !plan.Policy.Deterministic)

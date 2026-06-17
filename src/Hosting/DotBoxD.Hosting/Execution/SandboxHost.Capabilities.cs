@@ -42,6 +42,31 @@ public sealed partial class SandboxHost
         return false;
     }
 
+    private bool TryGetCapabilityDenial(
+        ExecutionPlan plan,
+        string entrypoint,
+        out CapabilityDenial denial)
+    {
+        if (TryGetRevokedCapability(plan, entrypoint, out var revoked))
+        {
+            denial = new RevokedCapabilityDenial(revoked);
+            return true;
+        }
+
+        var now = plan.Policy.GrantClock;
+        foreach (var capabilityId in RequiredCapabilities(plan, entrypoint))
+        {
+            if (!plan.Policy.GrantsCapability(capabilityId, now))
+            {
+                denial = new UnavailableCapabilityDenial(new UnavailableCapability(capabilityId, now));
+                return true;
+            }
+        }
+
+        denial = null!;
+        return false;
+    }
+
     private static IEnumerable<string> RequiredCapabilities(ExecutionPlan plan, string entrypoint)
     {
         var required = new HashSet<string>(
@@ -132,4 +157,12 @@ public sealed partial class SandboxHost
     }
 
     private sealed record RevokedCapability(string Id, string Reason, DateTimeOffset RevokedAt);
+
+    private sealed record UnavailableCapability(string Id, DateTimeOffset CheckedAt);
+
+    private abstract record CapabilityDenial;
+
+    private sealed record RevokedCapabilityDenial(RevokedCapability Revoked) : CapabilityDenial;
+
+    private sealed record UnavailableCapabilityDenial(UnavailableCapability Unavailable) : CapabilityDenial;
 }
