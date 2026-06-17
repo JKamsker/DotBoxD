@@ -12,6 +12,7 @@ public static partial class SafeFileSystem
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
+        var fileBytesReadBefore = context.Budget.FileBytesRead;
         try
         {
             var resolved = ResolvePath(context, path, "file.read", "file.readText");
@@ -41,25 +42,25 @@ public static partial class SafeFileSystem
         }
         catch (SandboxRuntimeException ex)
         {
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, ex.Error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), ex.Error.Code);
             throw;
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.readText denied: request timed out");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (OperationCanceledException)
         {
             var error = new SandboxError(SandboxErrorCode.Cancelled, "file.readText cancelled");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
         catch (Exception)
         {
             var error = new SandboxError(SandboxErrorCode.HostFailure, "file.readText failed");
-            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), null, error.Code);
+            SafeFileAudit.Read(context, startedAt, false, FailureResource(path, "file.read"), ObservedReadBytes(context, fileBytesReadBefore), error.Code);
             throw new SandboxRuntimeException(error);
         }
     }
@@ -172,6 +173,12 @@ public static partial class SafeFileSystem
         => SandboxLiteralConstraints.IsPortableRelativePath(path.RelativePath)
             ? path.RelativePath
             : $"sandbox://{capabilityId}/[invalid-path]";
+
+    private static long? ObservedReadBytes(SandboxContext context, long fileBytesReadBefore)
+    {
+        var observedBytes = context.Budget.FileBytesRead - fileBytesReadBefore;
+        return observedBytes > 0 ? observedBytes : null;
+    }
 
     private static async ValueTask<MemoryStream> ReadLimitedBytesAsync(
         SandboxContext context,

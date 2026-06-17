@@ -129,12 +129,13 @@ public sealed class SafeFileSystemTests
     public async Task File_read_allocation_failure_audits_streamed_bytes()
     {
         using var temp = TempDirectory.Create();
-        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), "hello");
+        var text = new string('x', 600);
+        await System.IO.File.WriteAllTextAsync(Path.Combine(temp.Path, "text.txt"), text);
         var host = SandboxTestHost.Create();
         var module = await host.ImportJsonAsync(InterpreterAndPolicyTests.FileReadJson("text.txt"));
         var policy = FilePolicyBuilder()
             .GrantFileRead(temp.Path, 1024)
-            .WithMaxAllocatedBytes(4)
+            .WithMaxAllocatedBytes(500)
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
@@ -143,10 +144,10 @@ public sealed class SafeFileSystemTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.QuotaExceeded, result.Error!.Code);
-        Assert.Equal(5, result.ResourceUsage.FileBytesRead);
+        Assert.Equal(600, result.ResourceUsage.FileBytesRead);
         var audit = Assert.Single(result.AuditEvents, e => e.BindingId == "file.readText" && !e.Success);
-        Assert.Equal(5, audit.Bytes);
-        Assert.Equal("5", audit.Fields!["bytesRead"]);
+        Assert.Equal(600, audit.Bytes);
+        Assert.Equal("600", audit.Fields!["bytesRead"]);
     }
 
     [Fact]
