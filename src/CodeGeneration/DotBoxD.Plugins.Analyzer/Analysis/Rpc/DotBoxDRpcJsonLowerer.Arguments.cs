@@ -22,6 +22,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         for (var ordinal = 0; ordinal < arguments.Count; ordinal++)
         {
             var argument = arguments[ordinal];
+            if (argument.RefKindKeyword.ValueText.Length != 0)
+            {
+                throw new NotSupportedException($"{description} call cannot use ref, in, or out arguments.");
+            }
+
             int index;
             if (argument.NameColon is { } name)
             {
