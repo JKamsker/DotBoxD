@@ -1,6 +1,7 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 using System.Collections.Generic;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelClientServiceMethodResolver
@@ -98,7 +99,9 @@ internal static class RpcKernelClientServiceMethodResolver
 
     private static void ValidateReturn(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)
     {
-        if (SymbolEqualityComparer.Default.Equals(UnwrapReturn(serviceMethod.ReturnType), kernelMethod.ReturnType))
+        var serviceReturn = DotBoxDTypeNameReader.UnwrapTaskLike(serviceMethod.ReturnType);
+        var kernelReturn = DotBoxDTypeNameReader.UnwrapTaskLike(kernelMethod.ReturnType);
+        if (SymbolEqualityComparer.Default.Equals(serviceReturn, kernelReturn))
         {
             return;
         }
@@ -138,9 +141,6 @@ internal static class RpcKernelClientServiceMethodResolver
             $"Server extension {owner} parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
     }
 
-    private static ITypeSymbol UnwrapReturn(ITypeSymbol type)
-        => IsGenericTask(type, out var inner) || IsGenericValueTask(type, out inner) ? inner : type;
-
     private static string DescribeParameterModifiers(IParameterSymbol parameter)
     {
         var modifier = parameter.RefKind switch
@@ -155,31 +155,5 @@ internal static class RpcKernelClientServiceMethodResolver
         return parameter.IsParams
             ? modifier == "none" ? "params" : "params " + modifier
             : modifier;
-    }
-
-    private static bool IsGenericTask(ITypeSymbol type, out ITypeSymbol inner)
-        => TryGenericTaskLike(type, "Task", out inner);
-
-    private static bool IsGenericValueTask(ITypeSymbol type, out ITypeSymbol inner)
-        => TryGenericTaskLike(type, "ValueTask", out inner);
-
-    private static bool TryGenericTaskLike(ITypeSymbol type, string name, out ITypeSymbol inner)
-    {
-        if (type is INamedTypeSymbol
-            {
-                IsGenericType: true,
-                TypeArguments.Length: 1,
-                Name: var typeName,
-                ContainingNamespace: { } ns
-            } named &&
-            string.Equals(typeName, name, StringComparison.Ordinal) &&
-            string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal))
-        {
-            inner = named.TypeArguments[0];
-            return true;
-        }
-
-        inner = type;
-        return false;
     }
 }

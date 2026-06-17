@@ -81,7 +81,7 @@ public static class KernelRpcBinaryCodec
                 return;
             case KernelRpcValueKind.List:
             case KernelRpcValueKind.Record:
-                WriteItems(stream, value.Items);
+                WriteItems(stream, value.ItemSpan);
                 return;
             default:
                 throw new NotSupportedException($"Server extension value kind '{value.Kind}' is not supported.");
@@ -127,7 +127,7 @@ public static class KernelRpcBinaryCodec
         return KernelRpcValue.Double(value);
     }
 
-    private static void WriteItems(MemoryStream stream, KernelRpcValue[] items)
+    private static void WriteItems(MemoryStream stream, ReadOnlySpan<KernelRpcValue> items)
     {
         WriteLength(stream, items.Length);
         foreach (var item in items)

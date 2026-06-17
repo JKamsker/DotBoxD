@@ -92,7 +92,7 @@ public sealed class ServerExtensionProxyTests
         [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
         public sealed partial class MonsterKillerKernel
         {
-            public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
+            public async ValueTask<List<KillResult>> KillMonsters(List<int> monsterIds, HookContext ctx)
             {
                 var results = new List<KillResult>();
                 foreach (var id in monsterIds)
