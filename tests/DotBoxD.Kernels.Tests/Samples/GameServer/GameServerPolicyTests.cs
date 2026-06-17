@@ -6,9 +6,9 @@ namespace DotBoxD.Kernels.Tests.Samples.GameServer;
 public sealed class GameServerPolicyTests
 {
     [Fact]
-    public void Event_kernel_policy_does_not_grant_monster_write_capabilities()
+    public void Policy_does_not_grant_undeclared_monster_write_capabilities()
     {
-        var policy = InvokePolicy("ForKernel", "game.world.monster.write.kill");
+        var policy = InvokePolicy("ForKernel", "host.message.write");
 
         Assert.False(policy.GrantsCapability("game.world.monster.write.kill"));
         Assert.DoesNotContain(
@@ -17,9 +17,9 @@ public sealed class GameServerPolicyTests
     }
 
     [Fact]
-    public void Rpc_kernel_policy_grants_monster_write_capabilities()
+    public void Policy_grants_declared_monster_write_capabilities()
     {
-        var policy = InvokePolicy("ForRpcKernel", "game.world.monster.write.kill");
+        var policy = InvokePolicy("ForKernel", "game.world.monster.write.kill");
 
         Assert.True(policy.GrantsCapability("game.world.monster.write.kill"));
     }
@@ -48,12 +48,11 @@ public sealed class GameServerPolicyTests
             "..",
             "..",
             "samples",
-            "Kernels",
             "GameServer",
-            "DotBoxD.Kernels.Game.Server",
+            "Examples.GameServer.Server",
             "bin",
             configuration,
             "net10.0",
-            "DotBoxD.Kernels.Game.Server.dll"));
+            "Examples.GameServer.Server.dll"));
     }
 }
