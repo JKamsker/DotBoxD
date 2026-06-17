@@ -27,27 +27,22 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return LiteralJson(expression, constant.Value);
         }
 
-        switch (expression)
+        var lowered = expression switch
         {
-            case ParenthesizedExpressionSyntax parenthesized:
-                return LowerExpression(parenthesized.Expression);
-            case IdentifierNameSyntax identifier:
-                return Var(identifier.Identifier.ValueText);
-            case PrefixUnaryExpressionSyntax unary:
-                return LowerUnary(unary);
-            case BinaryExpressionSyntax binary:
-                return BinaryJson(JsonBinaryOperator(binary), LowerExpression(binary.Left), LowerExpression(binary.Right));
-            case InvocationExpressionSyntax invocation:
-                return LowerInvocation(invocation);
-            case ObjectCreationExpressionSyntax creation:
-                return LowerRecordCreation(creation);
-            case ElementAccessExpressionSyntax element:
-                return LowerElementAccess(element);
-            case MemberAccessExpressionSyntax member:
-                return LowerMemberAccess(member);
-            default:
-                throw new NotSupportedException($"Kernel RPC service expression '{expression}' is not supported.");
-        }
+            ParenthesizedExpressionSyntax parenthesized => LowerExpression(parenthesized.Expression),
+            IdentifierNameSyntax identifier => Var(identifier.Identifier.ValueText),
+            PrefixUnaryExpressionSyntax unary => LowerUnary(unary),
+            BinaryExpressionSyntax binary => BinaryJson(
+                JsonBinaryOperator(binary),
+                LowerExpression(binary.Left),
+                LowerExpression(binary.Right)),
+            InvocationExpressionSyntax invocation => LowerInvocation(invocation),
+            ObjectCreationExpressionSyntax creation => LowerRecordCreation(creation),
+            ElementAccessExpressionSyntax element => LowerElementAccess(element),
+            MemberAccessExpressionSyntax member => LowerMemberAccess(member),
+            _ => throw new NotSupportedException($"Kernel RPC service expression '{expression}' is not supported.")
+        };
+        return ApplyNumericConversion(expression, lowered);
     }
 
     private string LowerUnary(PrefixUnaryExpressionSyntax unary)

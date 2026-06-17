@@ -12,6 +12,7 @@ internal sealed class FunctionAnalyzer
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly Dictionary<string, SandboxFunction> _functions;
     private readonly CollectionCallAnalyzer _collections;
+    private readonly NumericConversionCallAnalyzer _numericConversions;
     private readonly IReadOnlySet<string> _declaredOpaqueIdTypes;
     private readonly Dictionary<string, FunctionAnalysis> _analyzed = new(StringComparer.Ordinal);
     private readonly HashSet<string> _analyzing = new(StringComparer.Ordinal);
@@ -32,6 +33,7 @@ internal sealed class FunctionAnalyzer
         }
 
         _collections = new CollectionCallAnalyzer(diagnostics, AnalyzeExpression, declaredOpaqueIdTypes);
+        _numericConversions = new NumericConversionCallAnalyzer(diagnostics, AnalyzeExpression);
     }
 
     public HashSet<string> RequiredCapabilities { get; } = new(StringComparer.Ordinal);
@@ -333,6 +335,17 @@ internal sealed class FunctionAnalyzer
         bool recordCapabilities)
     {
         ValidateGenericType(call);
+        if (_numericConversions.TryAnalyze(
+                call,
+                scope,
+                ref effects,
+                ref canReorder,
+                recordCapabilities,
+                out var convertedType))
+        {
+            return convertedType;
+        }
+
         if (_collections.TryAnalyze(
                 call,
                 scope,
