@@ -173,7 +173,7 @@ jobs:
 
       - name: Release readiness
         shell: pwsh
-        run: ./eng/scripts/check-release-readiness.ps1
+        run: ./eng/scripts/check-release-readiness.ps1 -RequireComplete
 
       - name: Security-boundary required tests
         shell: pwsh
