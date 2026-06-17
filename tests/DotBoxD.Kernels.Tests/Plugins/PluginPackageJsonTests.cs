@@ -60,6 +60,19 @@ public sealed class PluginPackageJsonTests
     }
 
     [Fact]
+    public void Import_rejects_required_capabilities_that_are_not_an_array()
+    {
+        var json = JsonDamagePackage().Replace(
+            "\"requiredCapabilities\": [\"dotboxd.runtime.async\", \"host.message.write\"]",
+            "\"requiredCapabilities\": \"host.message.write\"",
+            StringComparison.Ordinal);
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
+    }
+
+    [Fact]
     public void Import_rejects_oversized_package_json_before_dom_parse()
     {
         var oversized = "{\"manifest\":\"" + new string('x', 1_048_577) + "\"}";
