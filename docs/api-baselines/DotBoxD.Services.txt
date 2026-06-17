@@ -9,6 +9,7 @@ public async Task StartAsync(CancellationToken ct = default)
 public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
 public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
 public async ValueTask DisposeAsync()
+public async ValueTask ReleaseAsync(string serviceName, string instanceId)
 public bool DisableInboundRequestCancellation { get; init; }
 public bool EnableLowAllocationValueTaskInvocations { get; init; }
 public bool IsConnected =>
