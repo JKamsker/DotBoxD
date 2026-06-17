@@ -172,7 +172,7 @@ Layer 1 makes Layer 2 unreachable for honest plugins.
 
 ---
 
-## 6. How the example uses it (samples/Kernels/GameServer)
+## 6. How the example uses it (samples/GameServer)
 
 - The server defines `IGameWorldAccess` with the gated monster operations (§2) and binds it into the
   sandbox as `game.world.*` bindings; it marks `MonsterAggroEvent.MonsterHealth` `[Capability(...)]`.

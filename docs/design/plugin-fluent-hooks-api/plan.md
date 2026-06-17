@@ -36,12 +36,12 @@ Delivers the rename, `Program` class, policy-on-server, and slnx nesting. Uses a
 example-local client shim so the plugin reads `server.Hooks.On<>().UseKernel<>()`.
 
 ### A1. Rename `DotBoxD.Kernels.Game.PluginHost` → `DotBoxD.Kernels.Game.Plugin`
-- Folder + csproj: the old GameServer plugin-host project → `samples/Kernels/GameServer/Examples.GameServer.Plugin/`,
+- Folder + csproj: the old GameServer plugin-host project → `samples/GameServer/Examples.GameServer.Plugin/`,
   `DotBoxD.Kernels.Game.PluginHost.csproj` → `Examples.GameServer.Plugin.csproj` (assembly/DLL follow automatically).
 - Namespace `DotBoxD.Kernels.Game.PluginHost` → `DotBoxD.Kernels.Game.Plugin` in `Kernels/GuardianKernel.cs`,
   `Kernels/RetaliationKernel.cs`, `Program.cs` (and any kept files). Generated
   `GuardianPluginPackage`/`RetaliationPluginPackage` move to the new namespace automatically.
-- Server side: `samples/Kernels/GameServer/Examples.GameServer.Server/Ipc/PluginHostLauncher.cs` → rename file +
+- Server side: `samples/GameServer/Examples.GameServer.Server/Ipc/PluginHostLauncher.cs` → rename file +
   type to `PluginLauncher`; constants `HostProjectDir`→`"Examples.GameServer.Plugin"`,
   `HostDllName`→`"Examples.GameServer.Plugin.dll"`, env var `SAFEIR_GAME_PLUGINHOST_DLL`→`SAFEIR_GAME_PLUGIN_DLL`.
   Update the call site in the server `Program.cs` (`PluginLauncher.Launch`).
@@ -66,7 +66,7 @@ shim → `server.Hooks.On<MonsterAggroEvent>().UseKernel<GuardianKernel>()` /
 `LocalPreview`, no explicit `Export`/`InstallPluginAsync`, no "opaque IR" comments.
 
 ### A4. Example-local client shim `RemotePluginServer`
-New `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` exposing a server-shaped
+New `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` exposing a server-shaped
 surface (`Hooks.On<TEvent>().UseKernel<TKernel>()`, `Kernels.Get(id).Set(..).ApplyAsync(atomic:)`)
 that maps onto the existing, unchanged `IGamePluginControlService` IPC contract
 (`InstallPluginAsync`, `UpdateSettingsAsync`). `UseKernel<TKernel>()` is `async` (a real IPC
@@ -76,13 +76,13 @@ In Phase B this delegates to the generated registry (B4) so the catalog can be d
 
 ### A5. slnx nesting
 Edit `DotBoxD.slnx`: replace the flat `/examples/` block with nested solution folders
-(`/samples/Kernels/GameServer/`) mirroring disk; keep an
+(`/samples/GameServer/`) mirroring disk; keep an
 empty parent `/samples/`. Only the GameServer plugin project *path* changes (the rename); all other
 paths stay, only their containing `<Folder>` changes. `/src/`, `/tests/`, `/benchmarks/`, `/tools/`
 untouched.
 
 **Phase A verify:** `dotnet build DotBoxD.slnx -c Release`;
-`dotnet run --project samples/Kernels/GameServer/Examples.GameServer.Server -c Release` (server self-launches the
+`dotnet run --project samples/GameServer/Examples.GameServer.Server -c Release` (server self-launches the
 renamed plugin; exit 0, baseline + with-plugin phases print); `./scripts/check-docs-smoke.ps1 -Configuration Release`.
 
 ---
@@ -206,8 +206,8 @@ lowers, ships, and runs sandboxed.
 ## Critical files (by phase)
 
 - **A:** old GameServer plugin-host project (→ `Examples.GameServer.Plugin/**`),
-  `samples/Kernels/GameServer/Examples.GameServer.Server/Ipc/PluginHostLauncher.cs`,
-  `samples/Kernels/GameServer/Examples.GameServer.Server/Program.cs`, `DotBoxD.slnx`,
+  `samples/GameServer/Examples.GameServer.Server/Ipc/PluginHostLauncher.cs`,
+  `samples/GameServer/Examples.GameServer.Server/Program.cs`, `DotBoxD.slnx`,
   `scripts/check-docs-smoke.ps1`, `docs/Specs/Addendum/Examples.md`, `README.md`.
 - **B:** `src/DotBoxD.Plugins/Runtime/HookRegistry.cs`, `src/DotBoxD.Plugins/PluginServer.cs`,
   new `src/DotBoxD.Plugins/Runtime/KernelPackageRegistry.cs`,

@@ -71,7 +71,7 @@ Why this is better than binding a bare kernel into a hook:
 - **Domain naming.** "implements `IMonsterAggroService`" says what the kernel *is*, not just which
   event it reads.
 - **Typed wiring, no string switch.** Today the server hand-maps a manifest subscription string to an
-  adapter in a `switch` ([GamePluginControlService.cs](../../../samples/Kernels/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)).
+  adapter in a `switch` ([GamePluginControlService.cs](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)).
   The contract carries `TEvent` in its type, so wiring is generic (§4) and that switch is **deleted**.
 - **Server-side typed access.** The server references the contract (it published it), so
   `server.Kernels.Get<IMonsterAggroService>()` is meaningful even though it never sees the kernel type

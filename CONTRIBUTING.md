@@ -23,7 +23,7 @@ dotnet test    DotBoxD.slnx -c Release --no-build
 Run the maintained GameServer example:
 
 ```bash
-dotnet run -c Release --project samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 > Warnings are treated as errors in CI (`TreatWarningsAsErrors` is on when `GITHUB_ACTIONS=true`).

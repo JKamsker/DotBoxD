@@ -20,7 +20,7 @@ Diagnostics from the generator use the `DBXS###` prefix — see
 [reference/diagnostics.md](../reference/diagnostics.md).
 
 **See also:** the GameServer sample under
-[`samples/Kernels/GameServer`](../../samples/Kernels/GameServer), the legacy RPC docs under
+[`samples/GameServer`](../../samples/GameServer), the legacy RPC docs under
 [`docs/channels/`](../channels/) (quick-start, API reference, Unity integration, transports,
 performance), [pushdown](pushdown.md) for composing services server-side, and
 [`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for service scenarios no longer shown

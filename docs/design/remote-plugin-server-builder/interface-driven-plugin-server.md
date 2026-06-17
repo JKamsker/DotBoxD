@@ -21,7 +21,7 @@ preserved.
 Today every plugin-side surface — `RemotePluginServer` (facade), `RemotePluginServerBuilder`,
 `RemoteServiceControl`, `RemoteWorldControl`, `RemoteMonsterControl`, `RemoteEntityControl`,
 `RemoteServerExtensionControl`, `RemoteKernelHandle` — is **hand-written** in
-`samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/`. Only the registration accumulators are
+`samples/GameServer/Examples.GameServer.Plugin/Client/`. Only the registration accumulators are
 generated. That is a lot of boilerplate per game, and it duplicates the wire contract: the control method
 `RemoteMonsterControl.KillAsync` hand-forwards to `IGamePluginControlService.KillMonsterAsync`, the world
 read `RemoteEntityControl.GetHealthAsync` to `GetEntityHealthAsync`, and so on.

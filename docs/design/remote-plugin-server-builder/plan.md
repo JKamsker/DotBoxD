@@ -8,7 +8,7 @@
 
 ## Context
 
-The GameServer sample plugin (`samples/Kernels/GameServer/Examples.GameServer.Plugin/Program.cs`) registers
+The GameServer sample plugin (`samples/GameServer/Examples.GameServer.Plugin/Program.cs`) registers
 kernels imperatively today:
 
 ```csharp
@@ -117,7 +117,7 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
     beyond the GameServer sample. The accumulators wrap `RemoteKernelControl`/`RemoteKernelRpcControl`,
     which are `internal sealed` in the sample — so the builder needs the controls exposed. The cleanest
     way: keep the builder in the **sample** but add a **sample-side test project**
-    `samples/Kernels/GameServer/Examples.GameServer.Plugin.Tests` with `InternalsVisibleTo`.
+    `samples/GameServer/Examples.GameServer.Plugin.Tests` with `InternalsVisibleTo`.
   - **Option B: builder stays sample-local (`Client/`), tests live in a new sample-side test project.**
   The existing `tests/DotBoxD.Kernels.Tests` project has **no reference** to any `Examples.GameServer.*`
   assembly and no `InternalsVisibleTo`, so it **cannot** host builder runtime tests as-is. This must be
@@ -128,10 +128,10 @@ wire change, no new attribute. The imperative `Program.cs` block keeps compiling
 
 | File | Action |
 |---|---|
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServerBuilder.cs` | **Create.** `RemotePluginServerBuilder` (private ctor; `FromConnection(IGamePluginControlService)` and `FromPipeName(string)` sync factories — both return the builder synchronously, `FromPipeName` deferring `RpcMessagePackIpc.ConnectNamedPipeAsync` to `StartAsync`); `SetupKernels(Action<KernelRegistrationAccumulator>)`; `SetupKernelRpc(Action<KernelRpcRegistrationAccumulator>)`; **`Build() : RemotePluginServer` (sync, no I/O)**. Plus the two accumulators (each collects `Func<ValueTask>` and flushes sequentially in order). |
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` | **Modify.** Add the lifecycle: a started-flag gate on `Kernels`/`KernelRpc`/`World`; `StartAsync(CancellationToken)` (connect-if-deferred → flush kernel then RPC registrations → mark started); `RunAsync(CancellationToken)` (= `StartAsync` + `HoldUntilShutdownAsync`); implement `IAsyncDisposable` (disposes the owned connection only when opened via `FromPipeName`). The existing public `Register`/`Get`/`World` surface is unchanged; this only adds members. |
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Program.cs` | **Modify.** Keep the imperative block intact (compiles + runs). Add the builder block as a sibling demonstration (or a second `RunWithBuilderAsync` entry selected by a `--use-builder` arg), using `Build()` → `await StartAsync()` → work → `await HoldUntilShutdownAsync()`. |
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj` | **Create.** xUnit project, `ProjectReference` to `Examples.GameServer.Plugin`; add `[assembly: InternalsVisibleTo("Examples.GameServer.Plugin.Tests")]` to the plugin (e.g. in a new `AssemblyInfo.cs` or csproj `<InternalsVisibleTo>`). |
+| `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServerBuilder.cs` | **Create.** `RemotePluginServerBuilder` (private ctor; `FromConnection(IGamePluginControlService)` and `FromPipeName(string)` sync factories — both return the builder synchronously, `FromPipeName` deferring `RpcMessagePackIpc.ConnectNamedPipeAsync` to `StartAsync`); `SetupKernels(Action<KernelRegistrationAccumulator>)`; `SetupKernelRpc(Action<KernelRpcRegistrationAccumulator>)`; **`Build() : RemotePluginServer` (sync, no I/O)**. Plus the two accumulators (each collects `Func<ValueTask>` and flushes sequentially in order). |
+| `samples/GameServer/Examples.GameServer.Plugin/Client/RemotePluginServer.cs` | **Modify.** Add the lifecycle: a started-flag gate on `Kernels`/`KernelRpc`/`World`; `StartAsync(CancellationToken)` (connect-if-deferred → flush kernel then RPC registrations → mark started); `RunAsync(CancellationToken)` (= `StartAsync` + `HoldUntilShutdownAsync`); implement `IAsyncDisposable` (disposes the owned connection only when opened via `FromPipeName`). The existing public `Register`/`Get`/`World` surface is unchanged; this only adds members. |
+| `samples/GameServer/Examples.GameServer.Plugin/Program.cs` | **Modify.** Keep the imperative block intact (compiles + runs). Add the builder block as a sibling demonstration (or a second `RunWithBuilderAsync` entry selected by a `--use-builder` arg), using `Build()` → `await StartAsync()` → work → `await HoldUntilShutdownAsync()`. |
+| `samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj` | **Create.** xUnit project, `ProjectReference` to `Examples.GameServer.Plugin`; add `[assembly: InternalsVisibleTo("Examples.GameServer.Plugin.Tests")]` to the plugin (e.g. in a new `AssemblyInfo.cs` or csproj `<InternalsVisibleTo>`). |
 | `DotBoxD.slnx` | **Modify.** Add the new test project under the GameServer solution folder. |
 
 ### Builder shape (sketch — single, reconciled form)
@@ -258,7 +258,7 @@ New project `Examples.GameServer.Plugin.Tests` with a recording fake `IGamePlugi
 ### Exit criteria (Phase 1)
 
 `dotnet build DotBoxD.slnx -c Release` green; new test project green; the GameServer E2E
-(`dotnet run --project samples/Kernels/GameServer/Examples.GameServer.Server -c Release`) exits 0 on both
+(`dotnet run --project samples/GameServer/Examples.GameServer.Server -c Release`) exits 0 on both
 the imperative and `--use-builder` paths with identical output; existing
 `tests/DotBoxD.Kernels.Tests` unaffected.
 
@@ -329,7 +329,7 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 | `src/CodeGeneration/.../PluginPackageGenerator.cs` | **Modify.** Add the fourth `CreateSyntaxProvider` pipeline; register the package output (reuse `AddSource(package.HintName, package.Source)`); wire the combined attribute-dedup provider; register the interceptor output. |
 | `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs` | **Modify.** Add `Metadata.KernelInvocationSurfaceType` constant (FQN of `RemoteKernelControl`). |
 | `src/CodeGeneration/DotBoxD.Plugins.Fody/**` | **Create.** Fody add-in that discovers generated `InvokeAsync_*` call sites, maps each interceptor to its compiler display class, rewrites safe reflection helper calls to static closure-field IL, and leaves reflection fallback calls untouched otherwise. |
-| `samples/Kernels/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
+| `samples/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
 
 ### Generator / runtime / wire pieces that change
 

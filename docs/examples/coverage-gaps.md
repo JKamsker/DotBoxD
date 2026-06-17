@@ -3,7 +3,7 @@
 The only maintained runnable example is now:
 
 ```text
-samples/Kernels/GameServer
+samples/GameServer
 ```
 
 The previous example set is preserved at the Git tag `examples-before-prune-2026-06-15`. Use that tag

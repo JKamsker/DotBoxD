@@ -19,7 +19,7 @@ Services, Kernels, and Pushdown.
   release pipeline with provenance attestation.
 - **Meta-packages:** `DotBoxD` (net10.0, full stack) and `DotBoxD.Services.All` (netstandard2.1,
   Unity/IL2CPP service bundle).
-- **GameServer example:** `samples/Kernels/GameServer/Examples.GameServer.Server` is the maintained
+- **GameServer example:** `samples/GameServer/Examples.GameServer.Server` is the maintained
   runnable example for service IPC, event kernels, live settings, host bindings, policies, and
   kernel RPC. Removed sample coverage is tracked in `docs/examples/coverage-gaps.md`.
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture

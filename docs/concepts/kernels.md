@@ -23,6 +23,6 @@ and the full spec under [`docs/Specs/`](../Specs/).
 > plugin assembly — see [security/sandbox-caveats.md](../security/sandbox-caveats.md).
 
 Diagnostics use the `DBXK###` prefix. **See also:** the GameServer sample under
-[`samples/Kernels/GameServer`](../../samples/Kernels/GameServer), [runtime](runtime.md), and
+[`samples/GameServer`](../../samples/GameServer), [runtime](runtime.md), and
 [`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for kernel scenarios no longer shown
 by maintained samples.

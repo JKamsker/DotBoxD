@@ -44,5 +44,5 @@ The maintained GameServer sample demonstrates service IPC, event kernels, live s
 bindings, policy-gated execution, kernel RPC, and unload-on-disconnect:
 
 ```bash
-dotnet run -c Release --project samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```

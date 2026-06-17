@@ -25,7 +25,7 @@ Or reference individual packages — see the table in the root [README](../../RE
 3. Connect from the client and call the generated typed proxy.
 
 The maintained runnable sample uses the same generated service pattern for its plugin control plane:
-[`samples/Kernels/GameServer/Examples.GameServer.Server`](../../samples/Kernels/GameServer/Examples.GameServer.Server).
+[`samples/GameServer/Examples.GameServer.Server`](../../samples/GameServer/Examples.GameServer.Server).
 See [concepts/services.md](../concepts/services.md).
 
 ## First Kernel (sandbox)
@@ -45,7 +45,7 @@ submits work in one round-trip instead of N. The GameServer sample demonstrates 
 ## Run the maintained example
 
 ```bash
-dotnet run -c Release --project samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 It demonstrates service IPC, event kernels, live settings, host bindings, policy-gated execution,

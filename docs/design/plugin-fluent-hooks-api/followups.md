@@ -71,7 +71,7 @@ build. This matches the host-binding precedent.
 
 ### Example
 
-`GuardianKernel.ShouldHandle` ([example](../../../samples/Kernels/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs))
+`GuardianKernel.ShouldHandle` ([example](../../../samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs))
 factors its "is this monster bullying a weaker player in range?" rule into
 `IsBullyingLowLevelPlayer([KernelMethod])`, passing the live settings as arguments. The example runs
 end-to-end unchanged (exit 0; damage/tick drops from baseline exactly as before).

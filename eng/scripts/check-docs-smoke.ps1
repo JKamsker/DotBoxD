@@ -5,8 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$gameServerExample = Join-Path $root "samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj"
-$gamePluginDll = Join-Path $root "samples/Kernels/GameServer/Examples.GameServer.Plugin/bin/$Configuration/net10.0/Examples.GameServer.Plugin.dll"
+$gameServerExample = Join-Path $root "samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj"
+$gamePluginDll = Join-Path $root "samples/GameServer/Examples.GameServer.Plugin/bin/$Configuration/net10.0/Examples.GameServer.Plugin.dll"
 
 function Resolve-RepoPath([string] $Path) {
     $normalized = $Path.Trim().Trim('"').Replace('\', [System.IO.Path]::DirectorySeparatorChar)

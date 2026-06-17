@@ -2,12 +2,12 @@
 
 The addendum is now demonstrated through one maintained runnable example:
 
-- `samples/Kernels/GameServer/Examples.GameServer.Server.Abstractions` defines the server-owned event
+- `samples/GameServer/Examples.GameServer.Server.Abstractions` defines the server-owned event
   contracts, plugin control-plane service contract, MessagePack DTOs, and host binding facade.
-- `samples/Kernels/GameServer/Examples.GameServer.Plugin` is the plugin child process. It authors
+- `samples/GameServer/Examples.GameServer.Plugin` is the plugin child process. It authors
   kernels in C#, resolves the analyzer-generated packages, ships verified IR over IPC, tunes live
   settings, and invokes a kernel RPC service.
-- `samples/Kernels/GameServer/Examples.GameServer.Server` is the parent process. It hosts the world
+- `samples/GameServer/Examples.GameServer.Server` is the parent process. It hosts the world
   simulation, installs packages into `DotBoxD.Plugins`, grants least-privilege policies, binds
   host-world capabilities, and unloads kernels when the plugin connection ends.
 
@@ -146,7 +146,7 @@ package receives write capability only because its manifest declares the kill bi
 ### 6. Run The Example
 
 ```powershell
-dotnet run --project samples\Kernels\GameServer\Examples.GameServer.Server\Examples.GameServer.Server.csproj
+dotnet run --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 The server prints a baseline phase, launches the plugin child process, installs event kernels and the

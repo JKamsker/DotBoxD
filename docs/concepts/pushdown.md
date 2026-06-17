@@ -38,7 +38,7 @@ host bindings the server already exposes, under the same capability + fuel/quota
 A method reachable via normal RPC is **not** automatically reachable from a kernel.
 
 **See also:** the runnable GameServer sample under
-[`samples/Kernels/GameServer`](../../samples/Kernels/GameServer), which demonstrates the
+[`samples/GameServer`](../../samples/GameServer), which demonstrates the
 `MonsterKillerKernel` kernel RPC path.
 Roadmap items (`DotBoxD.Pushdown.Linq`, fluent client API) are tracked in
 [follow-up-issues](../architecture/follow-up-issues.md).

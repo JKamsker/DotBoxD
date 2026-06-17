@@ -61,8 +61,8 @@ internal static class PluginLauncher
             return configured;
         }
 
-        // Server base dir: .../samples/Kernels/GameServer/Examples.GameServer.Server/bin/<Config>/net10.0/
-        // Sibling plugin:  .../samples/Kernels/GameServer/Examples.GameServer.Plugin/bin/<Config>/net10.0/<dll>
+        // Server base dir: .../samples/GameServer/Examples.GameServer.Server/bin/<Config>/net10.0/
+        // Sibling plugin:  .../samples/GameServer/Examples.GameServer.Plugin/bin/<Config>/net10.0/<dll>
         var serverBase = AppContext.BaseDirectory;
         var candidate = SiblingPluginPath(serverBase);
         if (candidate is not null && File.Exists(candidate))

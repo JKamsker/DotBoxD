@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
+    <ProjectReference Include="..\..\..\src\Hosting\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\src\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
+    <ProjectReference Include="..\..\..\src\Pushdown\DotBoxD.Pushdown.Services\DotBoxD.Pushdown.Services.csproj" />
     <ProjectReference Include="..\Examples.GameServer.Server.Abstractions\Examples.GameServer.Server.Abstractions.csproj" />
   </ItemGroup>
 

@@ -7,7 +7,7 @@ public sealed class PluginAdapterDocumentationTests
     {
         var examples = ReadRepositoryText("docs/Specs/Addendum/Examples.md");
 
-        Assert.Contains("samples/Kernels/GameServer/Examples.GameServer.Server", examples);
+        Assert.Contains("samples/GameServer/Examples.GameServer.Server", examples);
         Assert.Contains("Examples.GameServer.Plugin", examples);
         Assert.Contains("server never compiles or loads the plugin assembly", examples);
     }
@@ -16,9 +16,9 @@ public sealed class PluginAdapterDocumentationTests
     public void Game_server_sample_uses_explicit_event_contracts_and_message_policy()
     {
         var contracts = ReadRepositoryText(
-            "samples/Kernels/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs");
+            "samples/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs");
         var policy = ReadRepositoryText(
-            "samples/Kernels/GameServer/Examples.GameServer.Server/ServerPolicy.cs");
+            "samples/GameServer/Examples.GameServer.Server/ServerPolicy.cs");
 
         Assert.Contains("IEventKernel<MonsterAggroEvent>", contracts);
         Assert.Contains("IEventKernel<AttackEvent>", contracts);

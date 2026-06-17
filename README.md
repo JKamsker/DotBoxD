@@ -24,7 +24,7 @@ The Kernels and Pushdown stack targets `net10.0`.
 ## The 3 ways to use one contract
 
 The snippets below use the real, compiling API. The maintained runnable example is the GameServer
-sample at [`samples/Kernels/GameServer/Examples.GameServer.Server`](samples/Kernels/GameServer/Examples.GameServer.Server),
+sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
 which combines service IPC, event kernels, live settings, host bindings, policies, and kernel RPC.
 Features that used to be split across removed samples are tracked in
 [`docs/examples/coverage-gaps.md`](docs/examples/coverage-gaps.md).
@@ -170,7 +170,7 @@ Then read [`docs/getting-started`](docs/getting-started/) for first-service, fir
 pushdown walkthroughs, or run the maintained example:
 
 ```bash
-dotnet run -c Release --project samples/Kernels/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 ```
 
 ---
