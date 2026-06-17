@@ -203,6 +203,10 @@ public static class PluginDiagnosticCodes
             "A kernel RPC service entrypoint returns an unsupported type.",
             "The verified RPC entrypoint's return type is not a supported sandbox type (scalar, list, or record).",
             "Return a supported scalar, a List of one, or a DTO/record built from supported field types."),
+        new("DBXK073", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A kernel RPC service manifest also declares hook subscriptions.",
+            "RPC packages are request/response entrypoints and must not be installable as event hook kernels in the same manifest.",
+            "Remove subscriptions from the RPC manifest, or package the event hook kernel separately without rpcEntrypoint."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =

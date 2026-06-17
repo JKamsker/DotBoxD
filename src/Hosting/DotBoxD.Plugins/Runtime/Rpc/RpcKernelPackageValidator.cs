@@ -54,6 +54,13 @@ internal static class RpcKernelPackageValidator
                 $"Kernel RPC entrypoint '{package.Manifest.RpcEntrypoint}' is missing or not a public entrypoint."));
         }
 
+        if (package.Manifest.Subscriptions.Count > 0)
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK073",
+                "Kernel RPC service manifests must not declare hook subscriptions."));
+        }
+
         ValidateMode(package.Manifest, diagnostics);
         _ = ValidateEffects(package.Manifest, diagnostics);
         ValidateLiveSettings(package.Manifest, diagnostics);
