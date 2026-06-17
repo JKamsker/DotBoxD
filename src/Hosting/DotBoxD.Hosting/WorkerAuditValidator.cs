@@ -5,6 +5,7 @@ namespace DotBoxD.Hosting;
 
 using System.Globalization;
 using DotBoxD.Kernels;
+using DotBoxD.Kernels.Runtime;
 
 internal static class WorkerAuditValidator
 {
@@ -201,5 +202,6 @@ internal static class WorkerAuditValidator
     }
 
     private static bool TextIsSafe(string? value)
-        => value is null || value.All(c => !char.IsControl(c));
+        => value is null ||
+           string.Equals(AuditTextSanitizer.SanitizeAndRedact(value), value, StringComparison.Ordinal);
 }
