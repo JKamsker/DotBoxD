@@ -52,6 +52,39 @@ public sealed class RpcKernelForeachGenerationTests
         Assert.Equal(106, Assert.IsType<I32Value>(result).Value);
     }
 
+    [Fact]
+    public void Kernel_rpc_service_rejects_foreach_over_non_list_source()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [KernelRpcService("foreach-string")]
+            public sealed partial class ForeachStringKernel
+            {
+                public int CountName(string name, HookContext ctx)
+                {
+                    var count = 0;
+                    foreach (var ch in name)
+                    {
+                        count++;
+                    }
+
+                    return count;
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("foreach source 'name' must be a supported list type", StringComparison.Ordinal));
+    }
+
     private static SandboxPolicy PurePolicy()
         => SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
