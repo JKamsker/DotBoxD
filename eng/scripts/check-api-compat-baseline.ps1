@@ -20,13 +20,19 @@ $packages = @(
     @{ Id = "DotBoxD.Kernels.Serialization.Json"; Path = "src/Kernels/DotBoxD.Kernels.Serialization.Json" },
     @{ Id = "DotBoxD.Hosting.Http"; Path = "src/Hosting/DotBoxD.Hosting.Http" },
     @{ Id = "DotBoxD.Pushdown.Services"; Path = "src/Pushdown/DotBoxD.Pushdown.Services" },
+    @{ Id = "DotBoxD.Services"; Path = "src/Services/DotBoxD.Services" },
+    @{ Id = "DotBoxD.Codecs.MessagePack"; Path = "src/Channels/DotBoxD.Codecs.MessagePack" },
+    @{ Id = "DotBoxD.Transports.NamedPipes"; Path = "src/Channels/DotBoxD.Transports.NamedPipes" },
+    @{ Id = "DotBoxD.Transports.Tcp"; Path = "src/Channels/DotBoxD.Transports.Tcp" },
     @{ Id = "DotBoxD.Kernels.Interpreter"; Path = "src/Kernels/DotBoxD.Kernels.Interpreter" },
     @{ Id = "DotBoxD.Kernels.Compiler"; Path = "src/Kernels/DotBoxD.Kernels.Compiler" },
     @{ Id = "DotBoxD.Kernels.Verifier"; Path = "src/Kernels/DotBoxD.Kernels.Verifier" },
     @{ Id = "DotBoxD.Hosting"; Path = "src/Hosting/DotBoxD.Hosting" },
     @{ Id = "DotBoxD.Plugins.Analyzer"; Path = "src/CodeGeneration/DotBoxD.Plugins.Analyzer" },
     @{ Id = "DotBoxD.Plugins"; Path = "src/Hosting/DotBoxD.Plugins" },
-    @{ Id = "DotBoxD.Abstractions"; Path = "src/Hosting/DotBoxD.Abstractions" }
+    @{ Id = "DotBoxD.Abstractions"; Path = "src/Hosting/DotBoxD.Abstractions" },
+    @{ Id = "DotBoxD"; Path = "src/Meta/DotBoxD" },
+    @{ Id = "DotBoxD.Services.All"; Path = "src/Meta/DotBoxD.Services.All" }
 )
 
 function Normalize-ApiLine([string] $Line) {
