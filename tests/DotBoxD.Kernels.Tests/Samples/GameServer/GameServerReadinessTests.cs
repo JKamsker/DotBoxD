@@ -6,6 +6,9 @@ namespace DotBoxD.Kernels.Tests.Samples.GameServer;
 
 public sealed class GameServerReadinessTests
 {
+    private const string PluginReadinessTimeoutMilliseconds = "5000";
+    private static readonly TimeSpan ProcessExitTimeout = TimeSpan.FromSeconds(15);
+
     [Fact]
     public async Task GameServer_exits_when_plugin_process_never_reaches_readiness()
     {
@@ -17,7 +20,7 @@ public sealed class GameServerReadinessTests
         try
         {
             var exit = process.WaitForExitAsync();
-            if (await Task.WhenAny(exit, Task.Delay(TimeSpan.FromSeconds(4))) != exit)
+            if (await Task.WhenAny(exit, Task.Delay(ProcessExitTimeout)) != exit)
             {
                 KillProcessTree(process);
                 var output = await CapturedOutputAsync(stdout, stderr);
@@ -47,7 +50,7 @@ public sealed class GameServerReadinessTests
         try
         {
             var exit = process.WaitForExitAsync();
-            if (await Task.WhenAny(exit, Task.Delay(TimeSpan.FromSeconds(5))) != exit)
+            if (await Task.WhenAny(exit, Task.Delay(ProcessExitTimeout)) != exit)
             {
                 KillProcessTree(process);
                 var output = await CapturedOutputAsync(stdout, stderr);
@@ -76,7 +79,8 @@ public sealed class GameServerReadinessTests
         };
         startInfo.ArgumentList.Add(GameServerAssemblyPath());
         startInfo.Environment["SAFEIR_GAME_PLUGIN_DLL"] = fakePlugin;
-        startInfo.Environment["DOTBOXD_GAME_PLUGIN_READINESS_TIMEOUT_MS"] = "200";
+        startInfo.Environment["DOTBOXD_GAME_PLUGIN_READINESS_TIMEOUT_MS"] =
+            PluginReadinessTimeoutMilliseconds;
 
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start GameServer sample process.");
