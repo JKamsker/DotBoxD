@@ -254,7 +254,10 @@ internal static partial class RpcKernelClientProxyEmitter
         {
             foreach (var constructor in type.InstanceConstructors)
             {
-                if (constructor.Parameters.Length != fields.Count || constructor.Parameters.Length == 0)
+                if (constructor.DeclaredAccessibility is not (
+                        Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
+                    constructor.Parameters.Length != fields.Count ||
+                    constructor.Parameters.Length == 0)
                 {
                     continue;
                 }
@@ -280,7 +283,6 @@ internal static partial class RpcKernelClientProxyEmitter
             throw new NotSupportedException(
                 $"Kernel RPC DTO '{type.ToDisplayString()}' must expose a constructor matching its public fields.");
         }
-
         private static int FieldIndex(IReadOnlyList<IPropertySymbol> fields, string? name)
         {
             for (var i = 0; i < fields.Count; i++)
