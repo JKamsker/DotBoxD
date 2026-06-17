@@ -85,6 +85,47 @@ public sealed class RpcKernelForeachGenerationTests
                  d.GetMessage().Contains("foreach source 'name' must be a supported list type", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Generated_rpc_foreach_preserves_iteration_variable_numeric_conversion()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            """
+            using System.Collections.Generic;
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [KernelRpcService("foreach-conversion")]
+            public sealed partial class ForeachConversionKernel
+            {
+                public long Sum(List<int> values, HookContext ctx)
+                {
+                    long total = 0;
+                    foreach (long value in values)
+                    {
+                        total += value;
+                    }
+
+                    return total;
+                }
+            }
+            """,
+            "Sample.ForeachConversionPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallRpcAsync(package);
+        var values = SandboxValue.FromList(
+            [SandboxValue.FromInt32(1), SandboxValue.FromInt32(2), SandboxValue.FromInt32(3)],
+            SandboxType.I32);
+
+        var result = await kernel.InvokeRpcAsync([values]);
+
+        Assert.Equal(6L, Assert.IsType<I64Value>(result).Value);
+    }
+
     private static SandboxPolicy PurePolicy()
         => SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
