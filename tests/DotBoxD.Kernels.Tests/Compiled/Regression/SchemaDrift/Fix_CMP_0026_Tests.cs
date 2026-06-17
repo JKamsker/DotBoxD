@@ -1,7 +1,26 @@
+using System.Text.Json;
+using DotBoxD.Plugins.Json;
+
 namespace DotBoxD.Kernels.Tests.Compiled.Regression.SchemaDrift;
 
 public sealed class Fix_CMP_0026_Tests
 {
+    [Fact]
+    public void Plugin_package_schema_execution_mode_matches_case_insensitive_importer()
+    {
+        using var document = JsonDocument.Parse(PluginPackageJsonSchemas.PackageEnvelope);
+        var mode = document.RootElement
+            .GetProperty("$defs")
+            .GetProperty("manifest")
+            .GetProperty("properties")
+            .GetProperty("mode");
+
+        Assert.False(mode.TryGetProperty("enum", out _));
+        Assert.Equal(
+            "^(?:[Aa][Uu][Tt][Oo]|[Ii][Nn][Tt][Ee][Rr][Pp][Rr][Ee][Tt][Ee][Dd]|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Dd])$",
+            mode.GetProperty("pattern").GetString());
+    }
+
     [Fact]
     public void Drift_guard_rejects_same_property_set_when_required_properties_are_relaxed()
     {
