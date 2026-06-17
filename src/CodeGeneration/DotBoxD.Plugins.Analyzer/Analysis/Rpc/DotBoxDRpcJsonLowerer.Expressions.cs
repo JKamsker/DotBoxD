@@ -30,7 +30,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         var lowered = expression switch
         {
             ParenthesizedExpressionSyntax parenthesized => LowerExpression(parenthesized.Expression),
-            IdentifierNameSyntax identifier => Var(identifier.Identifier.ValueText),
+            IdentifierNameSyntax identifier => LowerIdentifier(identifier),
             PrefixUnaryExpressionSyntax unary => LowerUnary(unary),
             BinaryExpressionSyntax binary => BinaryJson(
                 JsonBinaryOperator(binary),
