@@ -58,28 +58,21 @@ internal static class GeneratedMethodFlowAnalyzer
         return successors;
     }
 
-    private static Dictionary<int, IReadOnlyList<GeneratedInstruction>> PredecessorMap(
+    private static Dictionary<int, PredecessorSummary> PredecessorMap(
         IReadOnlyList<GeneratedInstruction> instructions,
         IReadOnlyDictionary<int, SuccessorSet> successorsByOffset)
     {
-        var predecessors = new Dictionary<int, List<GeneratedInstruction>>();
+        var predecessors = new Dictionary<int, PredecessorSummary>();
         foreach (var instruction in instructions)
         {
             foreach (var successor in successorsByOffset[instruction.Offset])
             {
-                if (!predecessors.TryGetValue(successor, out var current))
-                {
-                    current = [];
-                    predecessors.Add(successor, current);
-                }
-
-                current.Add(instruction);
+                predecessors.TryGetValue(successor, out var current);
+                predecessors[successor] = current.Add(instruction);
             }
         }
 
-        return predecessors.ToDictionary(
-            item => item.Key,
-            item => (IReadOnlyList<GeneratedInstruction>)item.Value.ToArray());
+        return predecessors;
     }
 
     public static IEnumerable<int> Successors(
@@ -230,9 +223,9 @@ internal static class GeneratedMethodFlowAnalyzer
             return existing == VisitColor.Visiting;
         }
 
-        var stack = new Stack<Frame>();
+        var stack = new Stack<FlowVisitFrame>();
         colors[offset] = VisitColor.Visiting;
-        stack.Push(new Frame(offset, successorsByOffset[offset].GetEnumerator()));
+        stack.Push(new FlowVisitFrame(offset, successorsByOffset[offset].GetEnumerator()));
 
         while (stack.Count > 0)
         {
@@ -257,7 +250,7 @@ internal static class GeneratedMethodFlowAnalyzer
                 }
 
                 colors[successor] = VisitColor.Visiting;
-                stack.Push(new Frame(successor, successorsByOffset[successor].GetEnumerator()));
+                stack.Push(new FlowVisitFrame(successor, successorsByOffset[successor].GetEnumerator()));
                 continue;
             }
 
@@ -275,16 +268,6 @@ internal static class GeneratedMethodFlowAnalyzer
         => reachable.Contains(offset)
             && byOffset.TryGetValue(offset, out var instruction)
             && !IsLoopIterationCharge(instruction);
-
-    // Reference type with a mutable enumerator field: SuccessorSet.Enumerator is a mutable
-    // struct, so it must live in an addressable field that MoveNext() can advance in place.
-    // Exposing it through a property would mutate a throwaway copy and never advance.
-    private sealed class Frame(int offset, SuccessorSet.Enumerator successors)
-    {
-        public int Offset { get; } = offset;
-
-        public SuccessorSet.Enumerator Successors = successors;
-    }
 
     private static bool IsLoopIterationCharge(GeneratedInstruction instruction)
         => instruction.CalledMember == GeneratedMethodShapeSignatures.ChargeLoopIterationSignature;
@@ -308,11 +291,5 @@ internal static class GeneratedMethodFlowAnalyzer
         }
 
         return null;
-    }
-
-    private enum VisitColor
-    {
-        Visiting,
-        Visited
     }
 }
