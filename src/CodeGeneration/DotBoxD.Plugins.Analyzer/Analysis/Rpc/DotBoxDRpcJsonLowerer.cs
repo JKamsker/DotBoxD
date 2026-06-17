@@ -20,6 +20,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly ICollection<string> _capabilities;
     private readonly ICollection<string> _effects;
     private readonly CancellationToken _cancellationToken;
+    private readonly HashSet<string> _reservedNames = new(StringComparer.Ordinal);
     private int _tempCounter;
 
     /// <summary>True once the body builds a list or record, so the manifest declares the Alloc effect.</summary>
@@ -37,7 +38,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _cancellationToken = cancellationToken;
     }
 
-    public string LowerBody(BlockSyntax block) => LowerStatements(block.Statements);
+    public string LowerBody(BlockSyntax block)
+    {
+        ReserveUserNames(block);
+        return LowerStatements(block.Statements);
+    }
 
     private string LowerStatements(IEnumerable<StatementSyntax> statements)
     {
@@ -147,9 +152,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private void LowerForEach(ForEachStatementSyntax loop, List<string> output)
     {
-        var source = "__sir_src" + _tempCounter;
-        var index = "__sir_i" + _tempCounter;
-        _tempCounter++;
+        var suffix = NextLoopTempSuffix();
+        var source = "__sir_src" + suffix;
+        var index = "__sir_i" + suffix;
         output.Add(SetStatement(source, LowerExpression(loop.Expression)));
 
         var body = new List<string>
@@ -164,6 +169,34 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             ("start", I32(0)),
             ("end", Call("list.count", null, Var(source))),
             ("body", "[" + string.Join(",", body) + "]")));
+    }
+
+    private void ReserveUserNames(BlockSyntax block)
+    {
+        foreach (var token in block.DescendantTokens())
+        {
+            if (token.IsKind(SyntaxKind.IdentifierToken))
+            {
+                _reservedNames.Add(token.ValueText);
+            }
+        }
+    }
+
+    private int NextLoopTempSuffix()
+    {
+        while (true)
+        {
+            var suffix = _tempCounter++;
+            if (_reservedNames.Contains("__sir_src" + suffix) ||
+                _reservedNames.Contains("__sir_i" + suffix))
+            {
+                continue;
+            }
+
+            _reservedNames.Add("__sir_src" + suffix);
+            _reservedNames.Add("__sir_i" + suffix);
+            return suffix;
+        }
     }
 
     private string LowerIf(IfStatementSyntax branch)
