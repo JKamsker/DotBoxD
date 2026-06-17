@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Xml.Linq;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.PluginLocal;
 using DotBoxD.Plugins;
@@ -71,6 +72,15 @@ public sealed class GamePluginControlServiceTests
         }
     }
 
+    [Fact]
+    public void GameServer_project_builds_child_plugin_project()
+    {
+        var project = XDocument.Load(GameServerProjectPath());
+        var pluginReference = Assert.Single(project.Descendants("ProjectReference"), IsGamePluginReference);
+
+        Assert.Equal("false", (string?)pluginReference.Attribute("ReferenceOutputAssembly"));
+    }
+
     private static object Create(Assembly assembly, string typeName, params object[] args)
         => Activator.CreateInstance(
             assembly.GetType(typeName, throwOnError: true)!,
@@ -95,6 +105,14 @@ public sealed class GamePluginControlServiceTests
         return (ValueTask)result!;
     }
 
+    private static bool IsGamePluginReference(XElement reference)
+    {
+        var include = ((string?)reference.Attribute("Include"))?.Replace('\\', '/');
+        return include?.EndsWith(
+            "/DotBoxD.Kernels.Game.Plugin/DotBoxD.Kernels.Game.Plugin.csproj",
+            StringComparison.Ordinal) is true;
+    }
+
     private static string GameServerAssemblyPath()
     {
         var output = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(
@@ -117,4 +135,18 @@ public sealed class GamePluginControlServiceTests
             "net10.0",
             "DotBoxD.Kernels.Game.Server.dll"));
     }
+
+    private static string GameServerProjectPath()
+        => Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "..",
+            "samples",
+            "Kernels",
+            "GameServer",
+            "DotBoxD.Kernels.Game.Server",
+            "DotBoxD.Kernels.Game.Server.csproj"));
 }
