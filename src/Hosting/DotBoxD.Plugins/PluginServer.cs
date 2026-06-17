@@ -180,6 +180,7 @@ public sealed partial class PluginServer : IDisposable
         if (replaced is not null)
         {
             Hooks.RemoveKernel(replaced);
+            RemoveRpcServiceRegistrations(replaced.Manifest.PluginId);
         }
 
         return kernel;
@@ -203,6 +204,7 @@ public sealed partial class PluginServer : IDisposable
         if (replaced is not null)
         {
             Hooks.RemoveKernel(replaced);
+            RemoveRpcServiceRegistrations(replaced.Manifest.PluginId);
         }
 
         return kernel;
