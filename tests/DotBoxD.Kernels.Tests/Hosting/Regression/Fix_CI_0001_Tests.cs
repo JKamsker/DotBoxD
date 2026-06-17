@@ -15,9 +15,18 @@ public sealed class Fix_CI_0001_Tests
                 Enumerable.Range(0, 351).Select(i => $"// probe {i}"));
 
             using var process = StartLineGuard();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            var exitTask = process.WaitForExitAsync();
+            if (await Task.WhenAny(exitTask, Task.Delay(TimeSpan.FromSeconds(15))) != exitTask)
+            {
+                KillProcess(process);
+                Assert.Fail("CodeEnforcer did not finish while scanning an over-limit probe file.");
+            }
+
+            await exitTask;
+            var output = await outputTask;
+            var error = await errorTask;
 
             Assert.NotEqual(
                 0,
@@ -49,6 +58,20 @@ public sealed class Fix_CI_0001_Tests
         startInfo.ArgumentList.Add("350");
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start PowerShell.");
+    }
+
+    private static void KillProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 
     private static string RepositoryRoot()
