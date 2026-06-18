@@ -42,6 +42,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-proxy-lookup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-installed-rpc-input
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-items
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-list-writer
 ```
 
 ## History
@@ -113,6 +114,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Server-extension proxy lookup cache | this commit | `--probe-server-extension-proxy-lookup` | Cached the typed `DispatchProxy` inside the server-extension service registration and cleared that registration on uninstall or direct same-plugin replacement. The 1M lookup probe compares simulated legacy `ServerExtensionProxy.Create` calls at 321.7 ms and 288,002,456 B with cached `PluginServer.ServerExtension<TService>` lookups at 22.3 ms and 80 B. |
 | Installed RPC entrypoint input cache | this commit | `--probe-installed-rpc-input` | Cached the resolved server-extension RPC `SandboxFunction` and caller argument count on `InstalledKernel` construction instead of scanning module functions for every invocation. The 200k input-build probe over 512 module functions improved from the legacy scan at 350.9 ms and 6,400,040 B to the cached shape at 1.4 ms and 40 B. |
 | Kernel RPC value indexed read path | this commit | `--probe-kernel-rpc-value-items` | Added read-only `ItemCount`/`GetItem` accessors so generated plugin RPC readers can materialize lists and records without cloning the defensive `Items` array. The 1M 4-field record-read probe improved from the legacy `Items` clone shape at 38.6 ms and 184,000,040 B to indexed reads at 3.2 ms and 40 B; `Items` still returns a copy for public callers. |
+| Kernel RPC generated counted list writers | this commit | `--probe-kernel-rpc-value-list-writer` | Emitted direct `KernelRpcValue[]` fills for counted array/list arguments instead of building a temporary `List<KernelRpcValue>` and calling `ToArray()`. The 1M 4-item `List<int>` write probe improved from 77.1 ms and 584,000,040 B to 43.4 ms and 368,000,040 B; plain `IEnumerable<T>` keeps the foreach fallback. |
 
 Versioning note for the two-argument binding fast path: `CallBinding2` and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade

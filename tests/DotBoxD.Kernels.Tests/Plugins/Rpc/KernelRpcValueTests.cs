@@ -74,6 +74,39 @@ public sealed class KernelRpcValueTests
         => AssertGeneratedReaderUsesIndexedItems(
             ServerExtensionClientExtensionTests.DirectSyncExtensionSource);
 
+    [Fact]
+    public void Generated_list_writers_fill_rpc_arrays_for_counted_lists()
+    {
+        var source = string.Join(
+            "\n",
+            PluginAnalyzerGeneratedPackageFactory.GeneratedSources(
+                ServerExtensionProxyTests.MonsterKillerWithGeneratedClientSource));
+
+        Assert.Contains(
+            "new global::DotBoxD.Plugins.KernelRpcValue[value.Count]",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("var __item = value[i];", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "new global::System.Collections.Generic.List<global::DotBoxD.Plugins.KernelRpcValue>()",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_list_writers_keep_foreach_fallback_for_enumerables()
+    {
+        var source = string.Join(
+            "\n",
+            PluginAnalyzerGeneratedPackageFactory.GeneratedSources(EnumerableServerExtensionSource));
+
+        Assert.Contains(
+            "new global::System.Collections.Generic.List<global::DotBoxD.Plugins.KernelRpcValue>()",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("foreach (var __item in value)", source, StringComparison.Ordinal);
+    }
+
     private static void AssertGeneratedReaderUsesIndexedItems(string testSource)
     {
         var source = string.Join(
@@ -85,4 +118,29 @@ public sealed class KernelRpcValueTests
         Assert.Contains("value.GetItem(0)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("value.Items", source, StringComparison.Ordinal);
     }
+
+    private const string EnumerableServerExtensionSource = """
+        using System.Collections.Generic;
+        using System.Threading.Tasks;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IEchoService
+        {
+            ValueTask<int> EchoAsync(IEnumerable<int> values);
+        }
+
+        [ServerExtension("echo", typeof(IEchoService))]
+        public sealed partial class EchoKernel
+        {
+            public int Echo(IEnumerable<int> values, HookContext ctx)
+            {
+                return 0;
+            }
+        }
+        """;
 }

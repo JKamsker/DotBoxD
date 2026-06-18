@@ -147,6 +147,11 @@ if (args.Contains("--probe-kernel-rpc-value-items", StringComparer.OrdinalIgnore
     return;
 }
 
+if (args.Contains("--probe-kernel-rpc-value-list-writer", StringComparer.OrdinalIgnoreCase)) {
+    DotBoxD.Kernels.Benchmarks.Runtime.KernelRpcValueListWriterProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-literal-scalar-safety", StringComparer.OrdinalIgnoreCase)) {
     DotBoxD.Kernels.Benchmarks.Validation.LiteralScalarSafetyProbe.Run();
     return;
