@@ -163,6 +163,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                     ? LowerExpression(assignment.Right)
                     : LowerCompound(assignment, target);
                 return SetStatement(target.Identifier.ValueText, value);
+            case AssignmentExpressionSyntax { Left: ElementAccessExpressionSyntax element } assignment
+                when assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
+                     TryLowerMapIndexSet(element, assignment.Right) is { } mapSet:
+                return mapSet;
             case AssignmentExpressionSyntax assignment
                 when _assignmentOverride?.Invoke(assignment, LowerExpression) is { } lowered:
                 return lowered;
@@ -193,6 +197,30 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _ => throw new NotSupportedException($"Server extension assignment '{assignment.Kind()}' is not supported.")
         };
         return BinaryJson(op, Var(target.Identifier.ValueText), LowerExpression(assignment.Right));
+    }
+
+    /// <summary>
+    /// Lowers <c>dict[key] = value</c> on a map-typed local to a rebinding <c>map.set</c>: because the kernel
+    /// map is immutable, the assignment becomes <c>dict = map.set(dict, key, value)</c> (the same
+    /// rebind-the-local shape <c>list.add</c> uses). Returns null when the indexed target is not a map local
+    /// so the assignment falls through to the other statement forms.
+    /// </summary>
+    private string? TryLowerMapIndexSet(ElementAccessExpressionSyntax element, ExpressionSyntax valueExpression)
+    {
+        var receiverType = _model.GetTypeInfo(element.Expression, _cancellationToken).Type;
+        if (element.Expression is not IdentifierNameSyntax mapLocal ||
+            element.ArgumentList.Arguments.Count != 1 ||
+            receiverType is null ||
+            DotBoxDRpcTypeMapper.MapTypes(receiverType) is null)
+        {
+            return null;
+        }
+
+        var name = mapLocal.Identifier.ValueText;
+        var keyJson = LowerExpression(element.ArgumentList.Arguments[0].Expression);
+        var valueJson = LowerExpression(valueExpression);
+        Allocates = true;
+        return SetStatement(name, Call("map.set", null, Var(name), keyJson, valueJson));
     }
 
     private string? TryLowerListAdd(InvocationExpressionSyntax invocation)
