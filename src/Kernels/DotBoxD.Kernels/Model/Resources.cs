@@ -11,6 +11,8 @@ public sealed partial class ResourceMeter
     private const int LoopDeadlineCheckInterval = 4096;
 
     private Dictionary<string, int>? _callsByBinding;
+    private string? _lastLimitedBindingId;
+    private int _lastLimitedBindingCalls;
     private long _deadline;
     private int _chargesSinceDeadlineCheck;
 
