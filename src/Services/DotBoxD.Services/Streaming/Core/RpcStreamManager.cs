@@ -189,10 +189,8 @@ internal sealed class RpcStreamManager
         RpcStreamAttachment[]? attachments,
         CancellationToken ct)
     {
-        if (attachments is null || attachments.Length == 0)
-        {
-            return RpcOutboundStreamSet.Empty;
-        }
+        if (attachments is null || attachments.Length == 0) { return RpcOutboundStreamSet.Empty; }
+        if (attachments.Length == 1) { return RegisterOutbound(attachments[0], ct); }
         var rows = new (RpcStreamAttachment Attachment, RpcStreamSendState State)[attachments.Length];
         var added = new RpcStreamSendState[attachments.Length];
         var addedCount = 0;
