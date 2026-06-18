@@ -49,7 +49,58 @@ public sealed record LiveSettingDefinition(
     object? Min = null,
     object? Max = null);
 
-public sealed record HookSubscriptionManifest(string Event, string Kernel);
+public sealed record HookSubscriptionManifest(string Event, string Kernel)
+{
+    private IReadOnlyList<IndexedPredicate> _indexedPredicates = [];
+
+    /// <summary>
+    /// Host-readable, index-eligible constraints DotBoxD extracted from the lowered <c>.Where(...)</c>
+    /// chain — each a single <c>event-property &lt;op&gt; constant</c> comparison that the host may compile
+    /// into an equality/range dispatch bucket to prefilter events <i>before</i> the verified IR predicate
+    /// runs. Always a subset of the real predicate (every entry is a necessary AND condition), so rejecting
+    /// on any entry is safe regardless of <see cref="IndexCoversPredicate"/>. Optional; empty when the
+    /// predicate had no index-eligible leaves. Set via object initializer.
+    /// </summary>
+    public IReadOnlyList<IndexedPredicate> IndexedPredicates
+    {
+        get => _indexedPredicates;
+        init => _indexedPredicates = PluginModelCopy.List(value ?? []);
+    }
+
+    /// <summary>
+    /// <c>true</c> only when the entire lowered predicate is exactly the conjunction of
+    /// <see cref="IndexedPredicates"/> — i.e. the index fully covers it, so a host whose index check passes
+    /// MAY skip the verified IR. <c>false</c> (the conservative default) means the index is a prefilter
+    /// only and the verified IR predicate must still run after the host's index check accepts an event.
+    /// </summary>
+    public bool IndexCoversPredicate { get; init; }
+}
+
+/// <summary>
+/// One index-eligible predicate from a lowered <c>.Where(...)</c> chain: a comparison between an event
+/// property (<see cref="Path"/>) and a compile-time constant (<see cref="Value"/>). Hosts match
+/// <see cref="Path"/> against their own indexed fields and dispatch through equality/range buckets.
+/// </summary>
+public sealed record IndexedPredicate(
+    string Path,
+    IndexPredicateOperator Operator,
+    object? Value,
+    string ValueType);
+
+/// <summary>
+/// The comparison an <see cref="IndexedPredicate"/> applies, normalized so the event property is always the
+/// left operand (<c>e.Damage &gt;= 5</c> and <c>5 &lt;= e.Damage</c> both lower to
+/// <see cref="GreaterThanOrEqual"/>).
+/// </summary>
+public enum IndexPredicateOperator
+{
+    Equals,
+    NotEquals,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+}
 
 public sealed record KernelEntrypoints(string ShouldHandle, string Handle);
 

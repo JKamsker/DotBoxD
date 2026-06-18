@@ -208,10 +208,66 @@ public static partial class PluginPackageJsonSerializer
 
     private static HookSubscriptionManifest ReadSubscription(JsonElement element)
     {
-        RequireAllowedProperties(element, "hook subscription", ["event", "kernel"]);
+        RequireAllowedProperties(
+            element,
+            "hook subscription",
+            ["event", "kernel", "indexedPredicates", "indexCoversPredicate"]);
         return new HookSubscriptionManifest(
             RequiredString(element, "event"),
-            RequiredString(element, "kernel"));
+            RequiredString(element, "kernel"))
+        {
+            // Optional for back-compat: manifests exported before index metadata omit both keys.
+            IndexedPredicates = element.TryGetProperty("indexedPredicates", out var predicates)
+                ? ReadIndexedPredicates(predicates)
+                : [],
+            IndexCoversPredicate = element.TryGetProperty("indexCoversPredicate", out var covers) &&
+                ReadBoolValue(covers, "indexCoversPredicate")
+        };
+    }
+
+    private static IReadOnlyList<IndexedPredicate> ReadIndexedPredicates(JsonElement array)
+    {
+        RequireArray(array, "indexedPredicates");
+        var predicates = AllocateArray<IndexedPredicate>(array, out var count);
+        if (count == 0)
+        {
+            return predicates;
+        }
+
+        var index = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            predicates[index++] = ReadIndexedPredicate(item);
+        }
+
+        return predicates;
+    }
+
+    private static IndexedPredicate ReadIndexedPredicate(JsonElement element)
+    {
+        RequireAllowedProperties(element, "indexed predicate", ["path", "operator", "value", "valueType"]);
+        var valueType = RequiredString(element, "valueType");
+        // Unlike a live-setting default, an index predicate value is the constant being compared against —
+        // null is not a valid index value (and the schema forbids it), so reject it rather than carry a
+        // null the host can never match.
+        var value = ReadLiveSettingValue(Required(element, "value"), valueType, "indexed predicate value")
+            ?? throw Error("E-JSON-VALUE", "indexed predicate value must not be null");
+        return new IndexedPredicate(
+            RequiredString(element, "path"),
+            ReadIndexPredicateOperator(RequiredString(element, "operator")),
+            value,
+            valueType);
+    }
+
+    private static IndexPredicateOperator ReadIndexPredicateOperator(string value)
+    {
+        if (!Enum.TryParse<IndexPredicateOperator>(value, ignoreCase: false, out var op) ||
+            !Enum.IsDefined(op))
+        {
+            throw Error("E-JSON-OPERATOR", $"unsupported index predicate operator '{value}'");
+        }
+
+        return op;
     }
 
     private static KernelEntrypoints ReadEntrypoints(JsonElement element)
