@@ -174,6 +174,52 @@ public sealed class ServerExtensionProxyTests
         AssertGeneratedKillResult(results[1], 5, false);
     }
 
+    private const string RecordParameterClientSource = """
+        using System.Threading.Tasks;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public readonly record struct WorldRangeQuery(int Center, int Radius, int MaxResults);
+
+        public interface IRangeQueryService
+        {
+            ValueTask<int> CountInRangeAsync(WorldRangeQuery query);
+        }
+
+        [ServerExtension("range-query", typeof(IRangeQueryService))]
+        public sealed partial class RangeQueryKernel
+        {
+            public int CountInRange(WorldRangeQuery query, HookContext ctx)
+            {
+                return query.Center + query.Radius + query.MaxResults;
+            }
+        }
+        """;
+
+    [Fact]
+    public async Task A_generated_client_marshals_a_record_parameter_to_a_record_value()
+    {
+        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(RecordParameterClientSource);
+        var clientType = assembly.GetType("Sample.RangeQueryKernelServerExtensionClient", throwOnError: true)!;
+        var wireClient = new RecordingServerExtensionWireClient(KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.Int32(9)));
+        var service = clientType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [wireClient, "range-query"])!;
+        var queryType = assembly.GetType("Sample.WorldRangeQuery", throwOnError: true)!;
+
+        await AwaitValueTaskResult(service.GetType()
+            .GetMethod("CountInRangeAsync", BindingFlags.Public | BindingFlags.Instance)!
+            .Invoke(service, [Activator.CreateInstance(queryType, [2, 3, 4])])!);
+
+        var arguments = KernelRpcBinaryCodec.DecodeArguments(wireClient.LastArguments);
+        var record = Assert.Single(arguments);
+        record.RequireKind(KernelRpcValueKind.Record);
+        Assert.Equal([2, 3, 4], record.Items.Select(item => item.Int32Value));
+    }
+
     [Fact]
     public void Generated_client_rejects_service_parameter_modifier_mismatch()
     {

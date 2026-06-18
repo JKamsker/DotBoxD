@@ -83,17 +83,14 @@ internal static partial class RpcKernelClientProxyEmitter
         ValueTask
     }
 
-    private sealed partial class ProxySourceWriter
+    private sealed class ProxySourceWriter
     {
         private readonly INamedTypeSymbol _kernelType;
         private readonly INamedTypeSymbol _serviceType;
         private readonly IMethodSymbol _serviceMethod;
         private readonly ITypeSymbol _payloadReturnType;
         private readonly ReturnShape _returnShape;
-        private readonly StringBuilder _helpers = new();
-        private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, string> _writers = new(StringComparer.Ordinal);
-        private int _nextHelper;
+        private readonly RpcKernelValueConversionEmitter _conv = new();
 
         public ProxySourceWriter(
             INamedTypeSymbol kernelType,
@@ -128,7 +125,7 @@ internal static partial class RpcKernelClientProxyEmitter
             builder.Append("        => new ").Append(clientName).AppendLine("(client, pluginId);");
             builder.AppendLine();
             AppendServiceMethod(builder);
-            builder.Append(_helpers);
+            builder.Append(_conv.Helpers);
             builder.AppendLine("}");
             return builder.ToString();
         }
@@ -160,7 +157,7 @@ internal static partial class RpcKernelClientProxyEmitter
             {
                 var parameter = _serviceMethod.Parameters[i];
                 builder.Append("        ").Append(arguments).Append('[').Append(i).Append("] = ")
-                    .Append(WriteExpression(parameter.Type, Identifier(parameter.Name))).AppendLine(";");
+                    .Append(_conv.WriteExpression(parameter.Type, Identifier(parameter.Name))).AppendLine(";");
             }
 
             builder.Append("        var ").Append(request)
@@ -182,7 +179,7 @@ internal static partial class RpcKernelClientProxyEmitter
             builder.Append("        var ").Append(result)
                 .Append(" = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(")
                 .Append(response).AppendLine(");");
-            builder.Append("        return ").Append(ReadExpression(_payloadReturnType, result)).AppendLine(";");
+            builder.Append("        return ").Append(_conv.ReadExpression(_payloadReturnType, result)).AppendLine(";");
             builder.AppendLine("    }");
             builder.AppendLine();
         }
@@ -214,8 +211,6 @@ internal static partial class RpcKernelClientProxyEmitter
             return string.Join(", ", parts);
         }
 
-        private string NextHelperName(string prefix) => prefix + "KernelRpcValue" + _nextHelper++;
-
         private sealed class GeneratedLocalNames
         {
             private readonly HashSet<string> _used = new(StringComparer.Ordinal);
@@ -241,9 +236,6 @@ internal static partial class RpcKernelClientProxyEmitter
         }
 
         private static string TypeName(ITypeSymbol type)
-            => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-        private static string TypeKey(ITypeSymbol type)
             => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         private static string Identifier(string name) => "@" + name;

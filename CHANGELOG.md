@@ -22,6 +22,11 @@ Services, Kernels, and Pushdown.
 - **GameServer example:** `samples/GameServer/Examples.GameServer.Server` is the maintained
   runnable example for service IPC, event kernels, live settings, host bindings, policies, and
   kernel RPC. Removed sample coverage is tracked in `docs/examples/coverage-gaps.md`.
+- **Server-extension DTO parameters:** `[ServerExtensionMethod]` entrypoints now accept record/
+  value-object parameters — including nested DTOs and plain `class` DTOs — on the grafted client path,
+  matching the typed-proxy path (issue #41). The proxy and grafted clients now share one marshaller, which
+  also fixes invalid generated C# for a record return whose field is a `List<T>`. `samples/GameServer` adds
+  a `WorldRangeQuery` value-object example (`RangeMonsterKillerKernel.KillMonstersInRangeAsync`).
 - **Documentation & repo polish:** new top-level README, `docs/` information architecture
   (getting-started, concepts, security, reference, contributing), `SECURITY.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and GitHub repo metadata files.

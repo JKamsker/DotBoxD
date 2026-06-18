@@ -71,6 +71,20 @@ public sealed class GameServerGeneratedPackageTests
                 ]
             },
             {
+                "DotBoxD.Kernels.Game.Plugin.Kernels.RangeMonsterKillerKernel",
+                "range-monster-killer",
+                "RangeMonsterKillerKernel",
+                null,
+                "KillMonstersInRangeAsync",
+                [
+                    "game.world.entity.read.health",
+                    "game.world.entity.read.level",
+                    "game.world.entity.read.position",
+                    "game.world.monster.read.kind",
+                    "game.world.monster.write.kill"
+                ]
+            },
+            {
                 "DotBoxD.Kernels.Game.Plugin.Kernels.BlinkKernel",
                 "blink",
                 "BlinkKernel",
