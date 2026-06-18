@@ -14,7 +14,7 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
         CancellationToken cancellationToken)
     {
         var diagnostics = new List<VerificationDiagnostic>();
-        var assemblyHash = Convert.ToHexString(SHA256.HashData(assemblyBytes.Span)).ToLowerInvariant();
+        var assemblyHash = ComputeSha256LowerHex(assemblyBytes.Span);
         if (string.IsNullOrWhiteSpace(manifest.AssemblyHash))
         {
             diagnostics.Add(new VerificationDiagnostic("V-MANIFEST-HASH", "assembly hash is required"));
@@ -52,6 +52,29 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
             policy.VerifierVersion,
             DateTimeOffset.UtcNow));
     }
+
+    private static string ComputeSha256LowerHex(ReadOnlySpan<byte> source)
+    {
+        Span<byte> hash = stackalloc byte[32];
+        var bytesWritten = SHA256.HashData(source, hash);
+        if (bytesWritten != hash.Length)
+        {
+            throw new CryptographicException("SHA-256 hash length mismatch.");
+        }
+
+        Span<char> hex = stackalloc char[hash.Length * 2];
+        for (var i = 0; i < hash.Length; i++)
+        {
+            var value = hash[i];
+            hex[i * 2] = ToLowerHex(value >> 4);
+            hex[(i * 2) + 1] = ToLowerHex(value & 0xF);
+        }
+
+        return new string(hex);
+    }
+
+    private static char ToLowerHex(int value)
+        => (char)(value < 10 ? '0' + value : 'a' + (value - 10));
 
     private static void VerifyMetadata(
         PEReader peReader,
