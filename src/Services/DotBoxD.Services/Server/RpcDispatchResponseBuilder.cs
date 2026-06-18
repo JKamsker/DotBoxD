@@ -123,8 +123,6 @@ internal sealed class RpcDispatchResponseBuilder
 
         if (streaming.Response is { } stream)
         {
-            writer.Dispose();
-            PooledBufferWriter? responseWriter = null;
             try
             {
                 var response = new RpcResponse
@@ -133,19 +131,16 @@ internal sealed class RpcDispatchResponseBuilder
                     IsSuccess = true,
                     Stream = stream.Handle,
                 };
-                responseWriter = MessageFramer.RentFrameWriter();
-                MessageFramer.WriteFramePrefix(responseWriter, messageId, MessageType.Response);
-                var responseEnvelopeStart = responseWriter.WrittenCount;
-                _serializer.Serialize(responseWriter, response);
-                var responseEnvelopeLength = responseWriter.WrittenCount - responseEnvelopeStart;
-                MessageFramer.CompleteFrame(responseWriter, responseEnvelopeLength);
-                var result = new RpcDispatchResult(responseWriter, stream);
-                responseWriter = null;
-                return result;
+                writer.Rewind(MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize);
+                var responseEnvelopeStart = writer.WrittenCount;
+                _serializer.Serialize(writer, response);
+                var responseEnvelopeLength = writer.WrittenCount - responseEnvelopeStart;
+                MessageFramer.CompleteFrame(writer, responseEnvelopeLength);
+                return new RpcDispatchResult(writer, stream);
             }
             catch
             {
-                responseWriter?.Dispose();
+                writer.Dispose();
                 await streaming.AbandonResponseAsync().ConfigureAwait(false);
                 throw;
             }
