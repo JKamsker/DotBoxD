@@ -71,6 +71,32 @@ public sealed class VerifierStackTypeTests
             d.Message.Contains("inconsistent stack types", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("i32-to-i64")]
+    [InlineData("i32-to-f64")]
+    [InlineData("i64-to-f64")]
+    public async Task Verifier_allows_generated_numeric_conversion_opcodes(string conversion)
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(NumericConversionAssembly(conversion));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "V-OPCODE");
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == "V-STACK-TYPE" &&
+            d.Message.Contains("Conv_", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("f64-to-i64")]
+    [InlineData("value-to-f64")]
+    public async Task Verifier_rejects_invalid_numeric_conversion_operands(string conversion)
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(NumericConversionAssembly(conversion));
+
+        Assert.Contains(result.Diagnostics, d =>
+            d.Code == "V-STACK-TYPE" &&
+            d.Message.Contains("Conv_", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static byte[] OperandOutOfRangeAssembly(string opcode)
         => VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
@@ -142,6 +168,44 @@ public sealed class VerifierStackTypeTests
             }
 
             il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] NumericConversionAssembly(string conversion)
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var il = DefineExecute(type).GetILGenerator();
+            switch (conversion)
+            {
+                case "i32-to-i64":
+                    il.Emit(OpCodes.Ldc_I4, 123);
+                    il.Emit(OpCodes.Conv_I8);
+                    il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I64))!);
+                    break;
+                case "i32-to-f64":
+                    il.Emit(OpCodes.Ldc_I4, 123);
+                    il.Emit(OpCodes.Conv_R8);
+                    il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.F64))!);
+                    break;
+                case "i64-to-f64":
+                    il.Emit(OpCodes.Ldc_I8, 456L);
+                    il.Emit(OpCodes.Conv_R8);
+                    il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.F64))!);
+                    break;
+                case "f64-to-i64":
+                    il.Emit(OpCodes.Ldc_R8, 1.25);
+                    il.Emit(OpCodes.Conv_I8);
+                    il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.I64))!);
+                    break;
+                case "value-to-f64":
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Conv_R8);
+                    il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.F64))!);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(conversion), conversion, null);
+            }
+
             il.Emit(OpCodes.Ret);
         });
 

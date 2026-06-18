@@ -102,6 +102,7 @@ internal static class GeneratedStackVerifier
             ILOpCode.Beq or ILOpCode.Beq_s or ILOpCode.Bne_un or ILOpCode.Bne_un_s
                 or ILOpCode.Blt or ILOpCode.Blt_s or ILOpCode.Bgt or ILOpCode.Bgt_s
                 or ILOpCode.Ble or ILOpCode.Ble_s or ILOpCode.Bge or ILOpCode.Bge_s => -2,
+            ILOpCode.Conv_i8 or ILOpCode.Conv_r8 => 0,
             ILOpCode.Dup => 1,
             ILOpCode.Stelem_ref => -3,
             ILOpCode.Call or ILOpCode.Callvirt or ILOpCode.Newobj => CallDelta(instruction.CalledMember, callDeltas),

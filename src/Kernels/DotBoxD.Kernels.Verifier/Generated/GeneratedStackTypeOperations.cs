@@ -95,6 +95,38 @@ internal static class GeneratedStackTypeOperations
         stack.Add(value);
     }
 
+    public static void ConvertToInt64(
+        GeneratedInstruction instruction,
+        List<string> stack,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var value = PopAny(instruction, stack, diagnostics);
+        if (value is not (Int32Name or UnknownType))
+        {
+            AddTypeDiagnostic(instruction, Int32Name, value, diagnostics);
+            stack.Add(UnknownType);
+            return;
+        }
+
+        stack.Add(Int64Name);
+    }
+
+    public static void ConvertToDouble(
+        GeneratedInstruction instruction,
+        List<string> stack,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        var value = PopAny(instruction, stack, diagnostics);
+        if (value is not (Int32Name or Int64Name or UnknownType))
+        {
+            AddTypeDiagnostic(instruction, "System.Int32 or System.Int64", value, diagnostics);
+            stack.Add(UnknownType);
+            return;
+        }
+
+        stack.Add(DoubleName);
+    }
+
     public static void Compare(
         GeneratedInstruction instruction,
         List<string> stack,

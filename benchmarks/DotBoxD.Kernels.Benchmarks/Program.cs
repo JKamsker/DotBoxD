@@ -87,6 +87,11 @@ if (args.Contains("--probe-raw-unary-negation", StringComparer.OrdinalIgnoreCase
     return;
 }
 
+if (args.Contains("--probe-numeric-conversion", StringComparer.OrdinalIgnoreCase)) {
+    DotBoxD.Kernels.Benchmarks.Runtime.NumericConversionProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-binding-return-credit", StringComparer.OrdinalIgnoreCase)) {
     DotBoxD.Kernels.Benchmarks.Runtime.BindingReturnCreditProbe.Run();
     return;

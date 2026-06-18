@@ -37,6 +37,11 @@ internal sealed class ExpressionEmitter
 
     public void EmitAs(Expression expression, StackKind want)
     {
+        if (NumericConversionCallEmitter.TryEmitRaw(expression, want, _stackPlan, _il, EmitAs))
+        {
+            return;
+        }
+
         if (want == StackKind.I32 && I32MathIntrinsicEmitter.TryEmit(expression, _bindings, _il, EmitAs))
         {
             return;

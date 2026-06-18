@@ -22,8 +22,8 @@ internal static class OpCodeVerifier
         ILOpCode.Blt, ILOpCode.Blt_s, ILOpCode.Bgt, ILOpCode.Bgt_s, ILOpCode.Ble, ILOpCode.Ble_s,
         ILOpCode.Bge, ILOpCode.Bge_s, ILOpCode.Add, ILOpCode.Sub, ILOpCode.Mul, ILOpCode.Div,
         ILOpCode.Rem, ILOpCode.Neg, ILOpCode.And, ILOpCode.Or, ILOpCode.Xor, ILOpCode.Not,
-        ILOpCode.Ceq, ILOpCode.Clt, ILOpCode.Cgt, ILOpCode.Call, ILOpCode.Ret, ILOpCode.Pop, ILOpCode.Dup,
-        ILOpCode.Stelem_ref
+        ILOpCode.Ceq, ILOpCode.Clt, ILOpCode.Cgt, ILOpCode.Conv_i8, ILOpCode.Conv_r8, ILOpCode.Call,
+        ILOpCode.Ret, ILOpCode.Pop, ILOpCode.Dup, ILOpCode.Stelem_ref
     ];
 
     private static readonly HashSet<ILOpCode> Forbidden = [

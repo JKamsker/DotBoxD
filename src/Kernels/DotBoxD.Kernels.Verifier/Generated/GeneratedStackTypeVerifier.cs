@@ -104,6 +104,12 @@ internal static class GeneratedStackTypeVerifier
             case ILOpCode.Ceq or ILOpCode.Clt or ILOpCode.Cgt:
                 Compare(instruction, stack, diagnostics);
                 break;
+            case ILOpCode.Conv_i8:
+                ConvertToInt64(instruction, stack, diagnostics);
+                break;
+            case ILOpCode.Conv_r8:
+                ConvertToDouble(instruction, stack, diagnostics);
+                break;
             case ILOpCode.Beq or ILOpCode.Beq_s or ILOpCode.Bne_un or ILOpCode.Bne_un_s
                 or ILOpCode.Blt or ILOpCode.Blt_s or ILOpCode.Bgt or ILOpCode.Bgt_s
                 or ILOpCode.Ble or ILOpCode.Ble_s or ILOpCode.Bge or ILOpCode.Bge_s:
