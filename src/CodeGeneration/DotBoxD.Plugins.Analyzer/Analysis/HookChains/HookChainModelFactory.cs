@@ -122,6 +122,12 @@ internal static class HookChainModelFactory
             capabilities,
             effects);
 
+        var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
+            stages,
+            eventProperties,
+            model,
+            cancellationToken);
+
         var chainId = HookChainIdentity.Compute(invocation);
         var kernelName = "HookChain_" + chainId;
         var modelResult = new PluginKernelModel(
@@ -139,7 +145,9 @@ internal static class HookChainModelFactory
             ShouldHandle: shouldHandle,
             Handle: handle,
             ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects),
-            RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]));
+            RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
+            IndexPredicates: indexPredicates,
+            IndexCoversPredicate: indexCoversPredicate);
 
         return new HookChainResult(
             modelResult,

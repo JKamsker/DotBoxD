@@ -54,7 +54,7 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {TypeNames.GlobalExecutionMode}.Auto,");
         EmitEffects(builder, model.ManifestEffects);
         builder.AppendLine("            settings,");
-        builder.AppendLine($"            [new {TypeNames.GlobalHookSubscriptionManifest}({LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})])");
+        EmitSubscriptions(builder, model);
         EmitRequiredCapabilities(builder, model.RequiredCapabilities);
         builder.Append("        return ").Append(TypeNames.GlobalPluginPackage).AppendLine(".Create(manifest, CreateModule(settings));");
         builder.AppendLine("    }");
@@ -103,6 +103,49 @@ internal static class DotBoxDPackageSourceEmitter
 
         builder.AppendLine("],");
     }
+
+    // Emits the single hook-subscription manifest. When the lowered .Where(...) chain yielded index
+    // metadata, it rides along in an object initializer; otherwise the output is identical to the
+    // pre-feature two-argument form so unrelated chains generate byte-for-byte the same source.
+    private static void EmitSubscriptions(StringBuilder builder, PluginKernelModel model)
+    {
+        var head = $"            [new {TypeNames.GlobalHookSubscriptionManifest}(" +
+            $"{LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})";
+        if (model.IndexPredicates.Count == 0)
+        {
+            builder.Append(head).AppendLine("])");
+            return;
+        }
+
+        builder.AppendLine(head);
+        builder.AppendLine("            {");
+        builder.Append("                ").Append(IndexedPredicatesProperty).Append(" = [");
+        for (var i = 0; i < model.IndexPredicates.Count; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(", ");
+            }
+
+            var predicate = model.IndexPredicates[i];
+            builder.Append("new ").Append(TypeNames.GlobalIndexedPredicate).Append('(')
+                .Append(LiteralReader.StringLiteral(predicate.Path)).Append(", ")
+                .Append(TypeNames.GlobalIndexPredicateOperator).Append('.').Append(predicate.Operator).Append(", ")
+                .Append(predicate.ValueLiteral).Append(", ")
+                .Append(LiteralReader.StringLiteral(predicate.ValueType)).Append(')');
+        }
+
+        builder.AppendLine("],");
+        builder.Append("                ").Append(IndexCoversPredicateProperty).Append(" = ")
+            .Append(model.IndexCoversPredicate
+                ? DotBoxDGenerationNames.CSharpLiterals.True
+                : DotBoxDGenerationNames.CSharpLiterals.False)
+            .AppendLine(",");
+        builder.AppendLine("            }])");
+    }
+
+    private const string IndexedPredicatesProperty = "IndexedPredicates";
+    private const string IndexCoversPredicateProperty = "IndexCoversPredicate";
 
     private static void EmitRequiredCapabilities(StringBuilder builder, EquatableArray<string> capabilities)
     {

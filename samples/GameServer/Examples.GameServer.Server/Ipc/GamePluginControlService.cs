@@ -61,6 +61,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
         var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
         WireSubscription(kernel);
+        EventIndexDiagnostics.Report(kernel);
         Console.WriteLine($"[server] installed subscription kernel '{kernel.Manifest.PluginId}'.");
         return kernel.Manifest.PluginId;
     }
