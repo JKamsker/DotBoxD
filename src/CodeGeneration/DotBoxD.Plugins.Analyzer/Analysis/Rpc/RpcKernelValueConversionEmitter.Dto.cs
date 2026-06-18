@@ -59,8 +59,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("    {");
         _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Record);");
-        _helpers.AppendLine("        var __fields = value.Items;");
-        _helpers.Append("        if (__fields.Length != ").Append(fields.Count).AppendLine(")");
+        _helpers.Append("        if (value.ItemCount != ").Append(fields.Count).AppendLine(")");
         _helpers.AppendLine("        {");
         _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension record field count did not match the generated DTO shape.\");");
         _helpers.AppendLine("        }");
@@ -92,7 +91,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
             for (var i = 0; i < fields.Count; i++)
             {
                 initializer.Append("            ").Append(Identifier(fields[i].Name)).Append(" = ")
-                    .Append(ReadExpression(fields[i].Type, "__fields[" + i + "]")).AppendLine(",");
+                    .Append(ReadExpression(fields[i].Type, "value.GetItem(" + i + ")")).AppendLine(",");
             }
 
             initializer.Append("        };");
@@ -124,7 +123,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         foreach (var parameter in constructor.Parameters)
         {
             var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            arguments.Add(ReadExpression(fields[fieldIndex].Type, "__fields[" + fieldIndex + "]"));
+            arguments.Add(ReadExpression(fields[fieldIndex].Type, "value.GetItem(" + fieldIndex + ")"));
         }
 
         return arguments;
