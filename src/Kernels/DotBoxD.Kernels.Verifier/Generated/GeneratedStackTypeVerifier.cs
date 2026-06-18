@@ -12,6 +12,7 @@ internal static class GeneratedStackTypeVerifier
         MetadataReader reader,
         MethodDefinition method,
         MethodBodyBlock body,
+        MethodSignature<string> methodSignature,
         GeneratedMethodFlow analysis,
         List<VerificationDiagnostic> diagnostics)
     {
@@ -20,7 +21,7 @@ internal static class GeneratedStackTypeVerifier
             return;
         }
 
-        var signature = GeneratedMethodSignatureReader.Read(reader, method, body);
+        var signature = GeneratedMethodSignatureReader.Read(reader, method, body, methodSignature);
         var stacks = new Dictionary<int, StackTypeSnapshot>();
         var queue = new Queue<int>();
         stacks[analysis.Instructions[0].Offset] = StackTypeSnapshot.Empty;

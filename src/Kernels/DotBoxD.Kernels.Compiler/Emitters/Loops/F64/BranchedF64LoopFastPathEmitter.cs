@@ -1,17 +1,11 @@
 using System.Reflection.Emit;
-using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Bindings;
 
 namespace DotBoxD.Kernels.Compiler.Emitters.Loops;
 
 using static Compiler.IlEmitterPrimitives;
 
-// Compiled fast path for `forRange { if (<i32 comparison>) { <i32 assigns> } else { <i32 assigns> } }`.
-// Emits the condition and both branches as unboxed raw i32 (via RawI32ExpressionPlan + the *I32Raw helpers) and
-// charges fuel in bulk per iteration instead of per node: the loop iteration meter covers the loop base + the
-// if-statement + the (always-evaluated) condition, and each branch charges its own statically-known body fuel
-// once. Total per-iteration fuel is byte-identical to the general emitter (LoopIteration 5 + Fuel(1) per
-// statement + Fuel(1) per expression node).
-internal sealed class BranchedI32LoopFastPathEmitter
+internal sealed class BranchedF64LoopFastPathEmitter
 {
     private const int LoopFuel = 5;
 
@@ -19,19 +13,45 @@ internal sealed class BranchedI32LoopFastPathEmitter
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
     private readonly IReadOnlyDictionary<string, SandboxFunction> _functions;
+    private readonly IBindingCatalog _bindings;
+    private readonly IReadOnlySet<string> _nonNegativeF64Locals;
     private readonly Func<string, (LocalBuilder Local, StackKind Kind)> _declare;
 
-    private BranchedI32LoopFastPathEmitter(ILGenerator il, LocalStackKindPlanner stackPlan, ExpressionEmitter expressions, IReadOnlyDictionary<string, SandboxFunction> functions, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+    private BranchedF64LoopFastPathEmitter(
+        ILGenerator il,
+        LocalStackKindPlanner stackPlan,
+        ExpressionEmitter expressions,
+        IReadOnlyDictionary<string, SandboxFunction> functions,
+        IBindingCatalog bindings,
+        IReadOnlySet<string> nonNegativeF64Locals,
+        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
     {
         _il = il;
         _stackPlan = stackPlan;
         _expressions = expressions;
         _functions = functions;
+        _bindings = bindings;
+        _nonNegativeF64Locals = nonNegativeF64Locals;
         _declare = declare;
     }
 
-    public static bool TryEmit(ForRangeStatement range, ILGenerator il, LocalStackKindPlanner stackPlan, ExpressionEmitter expressions, IReadOnlyDictionary<string, SandboxFunction> functions, Func<string, (LocalBuilder Local, StackKind Kind)> declare)
-        => new BranchedI32LoopFastPathEmitter(il, stackPlan, expressions, functions, declare).TryEmit(range);
+    public static bool TryEmit(
+        ForRangeStatement range,
+        ILGenerator il,
+        LocalStackKindPlanner stackPlan,
+        ExpressionEmitter expressions,
+        IReadOnlyDictionary<string, SandboxFunction> functions,
+        IBindingCatalog bindings,
+        IReadOnlySet<string> nonNegativeF64Locals,
+        Func<string, (LocalBuilder Local, StackKind Kind)> declare)
+        => new BranchedF64LoopFastPathEmitter(
+            il,
+            stackPlan,
+            expressions,
+            functions,
+            bindings,
+            nonNegativeF64Locals,
+            declare).TryEmit(range);
 
     private bool TryEmit(ForRangeStatement range)
     {
@@ -61,8 +81,6 @@ internal sealed class BranchedI32LoopFastPathEmitter
         _il.Emit(OpCodes.Ldloc, index);
         _il.Emit(OpCodes.Ldloc, end);
         _il.Emit(OpCodes.Bge, finishLabel);
-
-        // Loop base + the if-statement + the always-evaluated condition, charged once for the iteration.
         CompiledMeterEmitter.LoopIteration(_il, LoopFuel + 1 + condition.Fuel);
         var (loopVar, _) = _declare(range.LocalName);
         _il.Emit(OpCodes.Ldloc, index);
@@ -70,7 +88,6 @@ internal sealed class BranchedI32LoopFastPathEmitter
 
         condition.Emit(_il, _declare);
         _il.Emit(OpCodes.Brfalse, elseLabel);
-
         EmitBranch(thenBranch);
         _il.Emit(OpCodes.Br, nextLabel);
         _il.MarkLabel(elseLabel);
@@ -109,8 +126,15 @@ internal sealed class BranchedI32LoopFastPathEmitter
         for (var i = 0; i < statements.Count; i++)
         {
             if (statements[i] is not AssignmentStatement assignment ||
-                _stackPlan.LocalKind(assignment.Name) != StackKind.I32 ||
-                !RawI32ExpressionPlan.TryCreate(assignment.Value, _stackPlan, _functions, out var expression))
+                _stackPlan.LocalKind(assignment.Name) != StackKind.F64 ||
+                !RawF64ExpressionPlan.TryCreate(
+                    assignment.Value,
+                    assignment.Name,
+                    _stackPlan,
+                    _bindings,
+                    _nonNegativeF64Locals,
+                    out var expression) ||
+                expression.BindingCallCount > 0)
             {
                 return false;
             }
@@ -123,7 +147,7 @@ internal sealed class BranchedI32LoopFastPathEmitter
         return true;
     }
 
-    private readonly record struct AssignmentPlan(string Target, RawI32ExpressionPlan Expression);
+    private readonly record struct AssignmentPlan(string Target, RawF64ExpressionPlan Expression);
 
     private readonly record struct Branch(AssignmentPlan[] Assignments, int Fuel);
 }

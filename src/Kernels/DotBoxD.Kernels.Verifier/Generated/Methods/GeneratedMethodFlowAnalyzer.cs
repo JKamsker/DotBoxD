@@ -10,11 +10,18 @@ internal static class GeneratedMethodFlowAnalyzer
     {
         var byOffset = new Dictionary<int, GeneratedInstruction>(instructions.Count);
         var indexByOffset = new Dictionary<int, int>(instructions.Count);
+        var hasBranches = false;
         for (var i = 0; i < instructions.Count; i++)
         {
             var instruction = instructions[i];
             byOffset.Add(instruction.Offset, instruction);
             indexByOffset.Add(instruction.Offset, i);
+            hasBranches |= instruction.Opcode.IsBranch();
+        }
+
+        if (!hasBranches)
+        {
+            return AnalyzeLinear(instructions, byOffset, indexByOffset, stateFor);
         }
 
         var successorsByOffset = SuccessorMap(instructions, indexByOffset);
@@ -32,6 +39,75 @@ internal static class GeneratedMethodFlowAnalyzer
             states,
             returnStates,
             HasUnmeteredCycle(byOffset, successorsByOffset, states));
+    }
+
+    private static GeneratedMethodFlow AnalyzeLinear(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        IReadOnlyDictionary<int, GeneratedInstruction> byOffset,
+        IReadOnlyDictionary<int, int> indexByOffset,
+        Func<GeneratedInstruction, GeneratedMeterState> stateFor)
+    {
+        var successorsByOffset = LinearSuccessorMap(instructions, indexByOffset);
+        var predecessorsByOffset = PredecessorMap(instructions, successorsByOffset);
+        var reachableCalls = new HashSet<string>(StringComparer.Ordinal);
+        var entryStates = new Dictionary<int, GeneratedMeterState>();
+        var returnStates = new List<GeneratedMeterState>();
+        var state = GeneratedMeterState.None;
+        for (var i = 0; i < instructions.Count; i++)
+        {
+            var instruction = instructions[i];
+            entryStates[instruction.Offset] = state;
+            state |= stateFor(instruction);
+            if (instruction.CalledMember is not null)
+            {
+                reachableCalls.Add(instruction.CalledMember);
+            }
+
+            if (instruction.Opcode == ILOpCode.Ret)
+            {
+                returnStates.Add(state);
+                break;
+            }
+        }
+
+        return new GeneratedMethodFlow(
+            instructions,
+            byOffset,
+            indexByOffset,
+            successorsByOffset,
+            predecessorsByOffset,
+            reachableCalls,
+            entryStates,
+            returnStates,
+            HasUnmeteredCycle: false);
+    }
+
+    private static Dictionary<int, SuccessorSet> LinearSuccessorMap(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        IReadOnlyDictionary<int, int> indexByOffset)
+    {
+        var successors = new Dictionary<int, SuccessorSet>(instructions.Count);
+        for (var i = 0; i < instructions.Count; i++)
+        {
+            var instruction = instructions[i];
+            if (instruction.Opcode == ILOpCode.Ret)
+            {
+                successors[instruction.Offset] = SuccessorSet.Empty;
+                continue;
+            }
+
+            if (indexByOffset.ContainsKey(instruction.NextOffset))
+            {
+                successors[instruction.Offset] = SuccessorSet.One(instruction.NextOffset);
+                continue;
+            }
+
+            successors[instruction.Offset] = i + 1 < instructions.Count
+                ? SuccessorSet.One(instructions[i + 1].Offset)
+                : SuccessorSet.Empty;
+        }
+
+        return successors;
     }
 
     private static Dictionary<int, SuccessorSet> SuccessorMap(
@@ -150,12 +226,6 @@ internal static class GeneratedMethodFlowAnalyzer
         IReadOnlyDictionary<int, GeneratedMeterState> reachableStates,
         Dictionary<int, VisitColor> colors)
     {
-        // Iterative depth-first search. The recursive form blew the call stack for methods
-        // with long linear instruction chains (e.g. large constant collection literals), so
-        // the traversal frame is kept on an explicit stack instead. The grey/black coloring
-        // and the "a grey successor is a back edge" cycle rule are preserved exactly: a node
-        // is marked Visiting when first entered, its successors are explored, then it is marked
-        // Visited once its whole subtree completes.
         if (!IsTraversable(offset, byOffset, reachableStates))
         {
             return false;

@@ -57,7 +57,8 @@ internal static class InvokeAsyncReceiverResolver
            name.EndsWith("Server", StringComparison.Ordinal);
 
     private static bool IsGeneratedServerInterfaceCandidate(INamedTypeSymbol type)
-        => type.TypeKind == TypeKind.Interface && IsGeneratedServerInterfaceNameCandidate(type.Name);
+        => type.TypeKind is TypeKind.Interface or TypeKind.Error &&
+           IsGeneratedServerInterfaceNameCandidate(type.Name);
 
     private static bool TryResolveGeneratedBuilderLocal(
         SemanticModel model,

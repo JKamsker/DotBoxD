@@ -2,6 +2,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using DotBoxD.Kernels.Verifier.Generated.Methods;
 
 namespace DotBoxD.Kernels.Verifier.Generated;
 
@@ -84,13 +85,14 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
         CancellationToken cancellationToken)
     {
         var memberSignatures = new MemberSignatureCache();
+        var methodSignatures = new MethodDefinitionSignatureCache();
         PeStructureVerifier.Verify(peReader, diagnostics);
         VerifyAssemblyReferences(reader, policy, diagnostics);
         VerifyTypeReferences(reader, policy, diagnostics);
         VerifyMemberReferences(reader, policy, diagnostics, memberSignatures);
         VerifyCustomAttributes(reader, diagnostics);
         MetadataTableVerifier.Verify(reader, diagnostics);
-        VerifyDefinitions(peReader, reader, policy, diagnostics, cancellationToken, memberSignatures);
+        VerifyDefinitions(peReader, reader, policy, diagnostics, cancellationToken, memberSignatures, methodSignatures);
         if (reader.ManifestResources.Count > 0)
         {
             diagnostics.Add(new VerificationDiagnostic("V-RESOURCE", "embedded resources are not allowed"));
@@ -178,7 +180,8 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
         VerificationPolicy policy,
         List<VerificationDiagnostic> diagnostics,
         CancellationToken cancellationToken,
-        MemberSignatureCache memberSignatures)
+        MemberSignatureCache memberSignatures,
+        MethodDefinitionSignatureCache methodSignatures)
     {
         var generatedTypeCount = 0;
         foreach (var typeHandle in reader.TypeDefinitions)
@@ -195,7 +198,7 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
             VerifyTypeSurface(reader, type, diagnostics);
             GenericParameterVerifier.VerifyType(reader, type, diagnostics);
             VerifyFields(reader, type, diagnostics);
-            VerifyMethods(peReader, reader, policy, type, diagnostics, memberSignatures);
+            VerifyMethods(peReader, reader, policy, type, diagnostics, memberSignatures, methodSignatures);
         }
 
         if (generatedTypeCount != 1)
