@@ -23,6 +23,13 @@ internal static class AdvancedUsage
         var killResults = await server.Monsters.KillMonstersAsync(["monster-3", "monster-4", "player-1"]);
         Console.WriteLine($"[plugin] Monsters.KillMonstersAsync(...) => {killResults.Count} results.");
 
+        // ── Same graft, but the query is ONE value object (a record DTO parameter) instead of loose ints. The
+        // record — including its nested WorldPoint — is marshalled across the wire and read server-side.
+        var rangeKills = await server.Monsters.KillMonstersInRangeAsync(
+            new WorldRangeQuery(new WorldPoint(2), Radius: 3, MaxResults: 2),
+            ["monster-3", "monster-4", "player-1"]);
+        Console.WriteLine($"[plugin] Monsters.KillMonstersInRangeAsync(query, ...) => {rangeKills.Count} results.");
+
         // ── Entity HANDLE — Get(id) captures the id once; every call on the handle omits it.
         var monster = server.Monsters.Get("monster-2");
         var hp = await monster.GetHealthAsync();

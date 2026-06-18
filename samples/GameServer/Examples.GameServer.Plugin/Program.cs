@@ -51,8 +51,9 @@ internal static class Program
                 s.Hooks.On<MonsterAggroEvent>().Use<GuardianKernel>();
                 s.Subscriptions.On<AttackEvent>().Use<RetaliationKernel>();
 
-                s.Monsters.Extend<MonsterKillerKernel>();   // grafts onto IMonsterControl (batch)
-                s.Monsters.Extend<BlinkKernel>();           // grafts onto IMonster handles (per-instance)
+                s.Monsters.Extend<MonsterKillerKernel>();        // grafts onto IMonsterControl (batch)
+                s.Monsters.Extend<RangeMonsterKillerKernel>();   // batch with a value-object query parameter
+                s.Monsters.Extend<BlinkKernel>();                // grafts onto IMonster handles (per-instance)
             })
             .Build();
         await server.StartAsync();

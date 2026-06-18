@@ -138,6 +138,48 @@ public sealed class RpcKernelGenerationTests
         }
         """;
 
+    private const string RecordParameterSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public readonly record struct WorldPoint(int Position);
+        public readonly record struct WorldRangeQuery(WorldPoint Center, int Radius, int MaxResults);
+
+        [ServerExtension("range-query")]
+        public sealed partial class RangeQueryKernel
+        {
+            public int CountInRange(WorldRangeQuery query, HookContext ctx)
+            {
+                return query.Center.Position + query.Radius + query.MaxResults;
+            }
+        }
+        """;
+
+    [Fact]
+    public async Task A_generated_batch_kernel_reads_a_nested_record_parameter_server_side()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(RecordParameterSource, "Sample.RangeQueryPluginPackage");
+        Assert.Equal("CountInRange", package.Manifest.RpcEntrypoint);
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var query = SandboxValue.FromRecord(
+        [
+            SandboxValue.FromRecord([SandboxValue.FromInt32(5)]),
+            SandboxValue.FromInt32(6),
+            SandboxValue.FromInt32(7)
+        ]);
+
+        var result = await kernel.InvokeServerExtensionAsync([query]);
+
+        Assert.Equal(18, Assert.IsType<I32Value>(result).Value);
+    }
+
     [Fact]
     public async Task A_generated_batch_kernel_installs_and_returns_a_list_of_dtos_in_one_roundtrip()
     {
