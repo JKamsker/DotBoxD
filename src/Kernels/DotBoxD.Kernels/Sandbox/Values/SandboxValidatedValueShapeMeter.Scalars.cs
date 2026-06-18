@@ -63,8 +63,7 @@ internal static partial class SandboxValidatedValueShapeMeter
     {
         if (expectedType.Arguments.Count != 0 ||
             !string.Equals(expectedType.Name, typeName, StringComparison.Ordinal) ||
-            !expectedType.IsKnown() ||
-            expectedType.IsForbidden())
+            !expectedType.IsKnown())
         {
             throw Error(failure);
         }

@@ -38,8 +38,7 @@ public static class SandboxValueValidator
 
             if (!IsKnownValueKind(frame.Value) ||
                 frame.Value.Type != frame.ExpectedType ||
-                !frame.ExpectedType.IsKnown() ||
-                frame.ExpectedType.IsForbidden())
+                !frame.ExpectedType.IsKnown())
             {
                 throw Error(errorCode, message);
             }
@@ -77,8 +76,7 @@ public static class SandboxValueValidator
 
         if (!IsKnownValueKind(value) ||
             value.Type != expectedType ||
-            !expectedType.IsKnown() ||
-            expectedType.IsForbidden())
+            !expectedType.IsKnown())
         {
             throw Error(errorCode, message);
         }

@@ -380,7 +380,7 @@ internal sealed class FunctionAnalyzer
             return;
         }
 
-        if (!call.GenericType.IsKnown(_declaredOpaqueIdTypes) || call.GenericType.IsForbidden())
+        if (!call.GenericType.IsKnown(_declaredOpaqueIdTypes))
         {
             _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{call.GenericType}'", Span: call.Span));
         }

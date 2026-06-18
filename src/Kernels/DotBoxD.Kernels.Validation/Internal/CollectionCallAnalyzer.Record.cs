@@ -98,7 +98,7 @@ internal sealed partial class CollectionCallAnalyzer
 
     private void CheckKnownType(SandboxType type, SourceSpan span)
     {
-        if (!type.IsKnown(_declaredOpaqueIdTypes) || type.IsForbidden())
+        if (!type.IsKnown(_declaredOpaqueIdTypes))
         {
             _diagnostics.Add(new SandboxDiagnostic("E-TYPE-UNKNOWN", $"unknown or forbidden type '{type}'", Span: span));
         }

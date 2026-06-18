@@ -121,8 +121,7 @@ internal static partial class SandboxValidatedValueShapeMeter
     {
         if (!IsKnownValueKind(value) ||
             value.Type != expectedType ||
-            !expectedType.IsKnown() ||
-            expectedType.IsForbidden())
+            !expectedType.IsKnown())
         {
             throw Error(failure);
         }
