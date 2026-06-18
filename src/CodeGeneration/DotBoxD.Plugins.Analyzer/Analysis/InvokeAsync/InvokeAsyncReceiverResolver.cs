@@ -29,7 +29,7 @@ internal static class InvokeAsyncReceiverResolver
 
         if (semanticType is not null &&
             IsGeneratedServerInterfaceCandidate(semanticType) &&
-            TryResolveGeneratedServerInterface(
+            InvokeAsyncGeneratedServerInterfaceResolver.TryResolve(
                 model.Compilation,
                 semanticType,
                 cancellationToken,
@@ -195,57 +195,6 @@ internal static class InvokeAsyncReceiverResolver
         return false;
     }
 
-    private static bool TryResolveGeneratedServerInterface(
-        Compilation compilation,
-        INamedTypeSymbol type,
-        CancellationToken cancellationToken,
-        out string receiverType,
-        out string? serverAccessType,
-        out INamedTypeSymbol worldType)
-    {
-        receiverType = string.Empty;
-        serverAccessType = null;
-        worldType = null!;
-        var candidates = new List<(INamedTypeSymbol Facade, INamedTypeSymbol World)>();
-        var expectedNamespace = type.ContainingNamespace.IsGlobalNamespace
-            ? string.Empty
-            : type.ContainingNamespace.ToDisplayString();
-        foreach (var symbol in compilation.GetSymbolsWithName(_ => true, SymbolFilter.Type, cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (symbol is not INamedTypeSymbol candidate ||
-                !TryResolveWorld(candidate, out var candidateWorld) ||
-                !string.Equals(type.Name, ServerInterfaceName(candidateWorld), StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var candidateNamespace = candidate.ContainingNamespace.IsGlobalNamespace
-                ? string.Empty
-                : candidate.ContainingNamespace.ToDisplayString();
-            if (!string.IsNullOrEmpty(expectedNamespace) &&
-                string.Equals(expectedNamespace, candidateNamespace, StringComparison.Ordinal))
-            {
-                receiverType = PluginServerInterfaceTypeName(candidateWorld);
-                serverAccessType = ServerInterfaceTypeName(candidate, candidateWorld);
-                worldType = candidateWorld;
-                return true;
-            }
-
-            candidates.Add((candidate, candidateWorld));
-        }
-
-        if (candidates.Count != 1)
-        {
-            return false;
-        }
-
-        receiverType = PluginServerInterfaceTypeName(candidates[0].World);
-        serverAccessType = ServerInterfaceTypeName(candidates[0].Facade, candidates[0].World);
-        worldType = candidates[0].World;
-        return true;
-    }
-
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDGenerationNames.Metadata.GeneratePluginServerAttribute);
 
@@ -268,6 +217,9 @@ internal static class InvokeAsyncReceiverResolver
         return false;
     }
 
+    private static string PluginServerInterfaceTypeName(INamedTypeSymbol worldType)
+        => "global::DotBoxD.Abstractions.IPluginServer<" + TypeName(worldType) + ">";
+
     private static string ServerInterfaceTypeName(INamedTypeSymbol facadeType, INamedTypeSymbol worldType)
     {
         var ns = facadeType.ContainingNamespace.IsGlobalNamespace
@@ -275,9 +227,6 @@ internal static class InvokeAsyncReceiverResolver
             : facadeType.ContainingNamespace.ToDisplayString() + ".";
         return "global::" + ns + ServerInterfaceName(worldType);
     }
-
-    private static string PluginServerInterfaceTypeName(INamedTypeSymbol worldType)
-        => "global::DotBoxD.Abstractions.IPluginServer<" + TypeName(worldType) + ">";
 
     private static string ServerInterfaceName(INamedTypeSymbol worldType)
     {

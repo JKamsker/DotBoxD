@@ -8,7 +8,13 @@ internal sealed class InvokeAsyncResultReaderSource
 {
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly StringBuilder _helpers = new();
+    private readonly string _helperPrefix;
     private int _nextHelper;
+
+    public InvokeAsyncResultReaderSource(string helperPrefix = "ReadInvokeAsyncResult")
+    {
+        _helperPrefix = helperPrefix;
+    }
 
     public static (string Expression, string Helpers) Create(ITypeSymbol type, string expression)
     {
@@ -164,7 +170,7 @@ internal sealed class InvokeAsyncResultReaderSource
         return -1;
     }
 
-    private string NextHelperName() => "ReadInvokeAsyncResult" + _nextHelper++;
+    private string NextHelperName() => _helperPrefix + _nextHelper++;
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
