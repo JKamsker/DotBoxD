@@ -20,17 +20,18 @@ internal static class InvokeAsyncReceiverResolver
         serverAccessType = null;
         worldType = null!;
 
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol semanticType &&
-            TryResolveWorld(semanticType, out worldType))
+        var semanticType = model.GetTypeInfo(receiver, cancellationToken).Type as INamedTypeSymbol;
+        if (semanticType is not null && TryResolveWorld(semanticType, out worldType))
         {
             receiverType = TypeName(semanticType);
             return true;
         }
 
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol generatedInterfaceType &&
+        if (semanticType is not null &&
+            IsGeneratedServerInterfaceCandidate(semanticType) &&
             TryResolveGeneratedServerInterface(
                 model.Compilation,
-                generatedInterfaceType,
+                semanticType,
                 cancellationToken,
                 out receiverType,
                 out serverAccessType,
@@ -49,6 +50,14 @@ internal static class InvokeAsyncReceiverResolver
 
         return false;
     }
+
+    internal static bool IsGeneratedServerInterfaceNameCandidate(string name)
+        => name.Length > "IServer".Length &&
+           name.StartsWith("I", StringComparison.Ordinal) &&
+           name.EndsWith("Server", StringComparison.Ordinal);
+
+    private static bool IsGeneratedServerInterfaceCandidate(INamedTypeSymbol type)
+        => type.TypeKind == TypeKind.Interface && IsGeneratedServerInterfaceNameCandidate(type.Name);
 
     private static bool TryResolveGeneratedBuilderLocal(
         SemanticModel model,
