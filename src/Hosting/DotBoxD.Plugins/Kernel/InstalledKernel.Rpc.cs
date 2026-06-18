@@ -98,7 +98,7 @@ public sealed partial class InstalledKernel
             Value.CopySandboxValues(liveSettings, values, callerCount);
         }
 
-        return SandboxValue.FromList(values, values[0].Type);
+        return SandboxValue.FromOwnedList(values, values[0].Type);
     }
 
     private SandboxFunction FindRpcEntrypoint(string entrypoint)
