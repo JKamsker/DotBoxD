@@ -19,16 +19,6 @@ internal readonly record struct PredecessorSummary(int Count, int Offset)
         => Count == 0 ? new PredecessorSummary(1, predecessor.Offset) : this with { Count = Count + 1 };
 }
 
-// Reference type with a mutable enumerator field: SuccessorSet.Enumerator is a mutable
-// struct, so it must live in an addressable field that MoveNext() can advance in place.
-// Exposing it through a property would mutate a throwaway copy and never advance.
-internal sealed class FlowVisitFrame(int offset, SuccessorSet.Enumerator successors)
-{
-    public int Offset { get; } = offset;
-
-    public SuccessorSet.Enumerator Successors = successors;
-}
-
 internal enum VisitColor
 {
     Visiting,

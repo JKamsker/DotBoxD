@@ -168,14 +168,16 @@ internal static class GeneratedMethodFlowAnalyzer
 
         var stack = new Stack<FlowVisitFrame>();
         colors[offset] = VisitColor.Visiting;
-        stack.Push(new FlowVisitFrame(offset, successorsByOffset[offset].GetEnumerator()));
+        stack.Push(new FlowVisitFrame(offset, NextSuccessorIndex: 0));
 
         while (stack.Count > 0)
         {
-            var frame = stack.Peek();
-            if (frame.Successors.MoveNext())
+            var frame = stack.Pop();
+            var successors = successorsByOffset[frame.Offset];
+            if (frame.NextSuccessorIndex < successors.Count)
             {
-                var successor = frame.Successors.Current;
+                var successor = successors[frame.NextSuccessorIndex];
+                stack.Push(frame with { NextSuccessorIndex = frame.NextSuccessorIndex + 1 });
 
                 if (!IsTraversable(successor, byOffset, reachableStates))
                 {
@@ -193,12 +195,11 @@ internal static class GeneratedMethodFlowAnalyzer
                 }
 
                 colors[successor] = VisitColor.Visiting;
-                stack.Push(new FlowVisitFrame(successor, successorsByOffset[successor].GetEnumerator()));
+                stack.Push(new FlowVisitFrame(successor, NextSuccessorIndex: 0));
                 continue;
             }
 
             colors[frame.Offset] = VisitColor.Visited;
-            stack.Pop();
         }
 
         return false;
@@ -215,4 +216,5 @@ internal static class GeneratedMethodFlowAnalyzer
     private static bool IsLoopIterationCharge(GeneratedInstruction instruction)
         => instruction.CalledMember == GeneratedMethodShapeSignatures.ChargeLoopIterationSignature;
 
+    private readonly record struct FlowVisitFrame(int Offset, int NextSuccessorIndex);
 }
