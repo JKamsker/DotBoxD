@@ -166,8 +166,43 @@ public sealed class HookPipeline<TEvent> : IKernelHandlerPipeline
     public HookPipeline<TEvent> Use(InstalledKernel kernel)
     {
         kernel.ValidateFor(_adapter);
-        var handler = (Func<TEvent, HookContext, ValueTask>)
-            ((e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
+        AddKernelHandler(kernel, (e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
+        return this;
+    }
+
+    public HookPipeline<TEvent> Use<TKernel>() where TKernel : class
+        => Use(_kernels.GetByKernelType<TKernel>());
+
+    /// <summary>
+    /// Wires a lowered <b>local-terminal</b> chain kernel (a remote <c>RunLocal</c> chain): the kernel's
+    /// lowered <c>Where</c>/<c>Select</c> always run here in the sandbox, and for each event that passes the
+    /// filter the projected value is encoded and handed to <paramref name="push"/> — the control-plane
+    /// callback that delivers it across the IPC boundary to the plugin's native delegate. Non-matching events
+    /// never reach <paramref name="push"/>, so filtering provably happens server-side before any IPC.
+    /// </summary>
+    public HookPipeline<TEvent> UseProjecting(InstalledKernel kernel, string subscriptionId, RemoteLocalPush push)
+    {
+        ArgumentNullException.ThrowIfNull(kernel);
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(push);
+        kernel.ValidateFor(_adapter);
+        AddKernelHandler(kernel, async (e, context) =>
+        {
+            var projection = await kernel.InvokeProjectingAsync(_adapter, e, context.CancellationToken).ConfigureAwait(false);
+            if (!projection.Matched)
+            {
+                return;
+            }
+
+            var payload = KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(projection.Value));
+            await push(subscriptionId, payload, context.CancellationToken).ConfigureAwait(false);
+        });
+
+        return this;
+    }
+
+    private void AddKernelHandler(InstalledKernel kernel, Func<TEvent, HookContext, ValueTask> handler)
+    {
         lock (_gate)
         {
             _handlers = [.. _handlers, handler];
@@ -179,12 +214,7 @@ public sealed class HookPipeline<TEvent> : IKernelHandlerPipeline
 
             handlers.Add(handler);
         }
-
-        return this;
     }
-
-    public HookPipeline<TEvent> Use<TKernel>() where TKernel : class
-        => Use(_kernels.GetByKernelType<TKernel>());
 
     internal bool UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => ReferenceEquals(_adapter, adapter);

@@ -111,7 +111,8 @@ internal static class DotBoxDPackageSourceEmitter
     {
         var head = $"            [new {TypeNames.GlobalHookSubscriptionManifest}(" +
             $"{LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})";
-        if (model.IndexPredicates.Count == 0)
+        var hasIndex = model.IndexPredicates.Count > 0;
+        if (!hasIndex && !model.LocalTerminal)
         {
             builder.Append(head).AppendLine("])");
             return;
@@ -119,33 +120,47 @@ internal static class DotBoxDPackageSourceEmitter
 
         builder.AppendLine(head);
         builder.AppendLine("            {");
-        builder.Append("                ").Append(IndexedPredicatesProperty).Append(" = [");
-        for (var i = 0; i < model.IndexPredicates.Count; i++)
+        if (hasIndex)
         {
-            if (i > 0)
+            builder.Append("                ").Append(IndexedPredicatesProperty).Append(" = [");
+            for (var i = 0; i < model.IndexPredicates.Count; i++)
             {
-                builder.Append(", ");
+                if (i > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                var predicate = model.IndexPredicates[i];
+                builder.Append("new ").Append(TypeNames.GlobalIndexedPredicate).Append('(')
+                    .Append(LiteralReader.StringLiteral(predicate.Path)).Append(", ")
+                    .Append(TypeNames.GlobalIndexPredicateOperator).Append('.').Append(predicate.Operator).Append(", ")
+                    .Append(predicate.ValueLiteral).Append(", ")
+                    .Append(LiteralReader.StringLiteral(predicate.ValueType)).Append(')');
             }
 
-            var predicate = model.IndexPredicates[i];
-            builder.Append("new ").Append(TypeNames.GlobalIndexedPredicate).Append('(')
-                .Append(LiteralReader.StringLiteral(predicate.Path)).Append(", ")
-                .Append(TypeNames.GlobalIndexPredicateOperator).Append('.').Append(predicate.Operator).Append(", ")
-                .Append(predicate.ValueLiteral).Append(", ")
-                .Append(LiteralReader.StringLiteral(predicate.ValueType)).Append(')');
+            builder.AppendLine("],");
+            builder.Append("                ").Append(IndexCoversPredicateProperty).Append(" = ")
+                .Append(model.IndexCoversPredicate
+                    ? DotBoxDGenerationNames.CSharpLiterals.True
+                    : DotBoxDGenerationNames.CSharpLiterals.False)
+                .AppendLine(",");
         }
 
-        builder.AppendLine("],");
-        builder.Append("                ").Append(IndexCoversPredicateProperty).Append(" = ")
-            .Append(model.IndexCoversPredicate
-                ? DotBoxDGenerationNames.CSharpLiterals.True
-                : DotBoxDGenerationNames.CSharpLiterals.False)
-            .AppendLine(",");
+        if (model.LocalTerminal)
+        {
+            builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")
+                .Append(DotBoxDGenerationNames.CSharpLiterals.True).AppendLine(",");
+            builder.Append("                ").Append(ProjectedTypeProperty).Append(" = ")
+                .Append(LiteralReader.StringLiteral(model.ProjectedType!)).AppendLine(",");
+        }
+
         builder.AppendLine("            }])");
     }
 
     private const string IndexedPredicatesProperty = "IndexedPredicates";
     private const string IndexCoversPredicateProperty = "IndexCoversPredicate";
+    private const string LocalTerminalProperty = "LocalTerminal";
+    private const string ProjectedTypeProperty = "ProjectedType";
 
     private static void EmitRequiredCapabilities(StringBuilder builder, EquatableArray<string> capabilities)
     {
@@ -193,14 +208,31 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.ShouldHandle)}, true, parameters, {TypeNames.GlobalSandboxType}.Bool,");
         builder.AppendLine($"            {model.ShouldHandle.Source});");
         builder.AppendLine();
+        // A RunLocal chain's Handle RETURNS the projected value (the lowered Select), so its return type is the
+        // projected sandbox type and its body returns that value. An ordinary chain's Handle performs the host
+        // send and returns Unit — emitted byte-for-byte as before.
+        var (handleReturnType, handleBodySource) = model.LocalTerminal
+            ? ($"{TypeNames.GlobalSandboxType}.{ProjectionReturnMember(model.ProjectedType!)}", model.ProjectionBody!.Source)
+            : ($"{TypeNames.GlobalSandboxType}.Unit", HandleBody(model.Handle!).Source);
         builder.Append("    private static ").Append(TypeNames.GlobalSandboxFunction).Append(' ')
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
             .Append('(').Append(ReadOnlyListOf(TypeNames.GlobalParameter)).AppendLine(" parameters)");
         builder.AppendLine("        => new(");
-        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {TypeNames.GlobalSandboxType}.Unit,");
-        builder.AppendLine($"            {HandleBody(model.Handle).Source});");
+        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {handleReturnType},");
+        builder.AppendLine($"            {handleBodySource});");
         builder.AppendLine();
     }
+
+    // Maps a projected manifest type to the SandboxType member used as the Handle entrypoint's return type.
+    private static string ProjectionReturnMember(string manifestType) => manifestType switch
+    {
+        DotBoxDGenerationNames.ManifestTypes.Bool => "Bool",
+        DotBoxDGenerationNames.ManifestTypes.Int => "I32",
+        DotBoxDGenerationNames.ManifestTypes.Long => "I64",
+        DotBoxDGenerationNames.ManifestTypes.Double => "F64",
+        DotBoxDGenerationNames.ManifestTypes.String => "String",
+        _ => throw new InvalidOperationException($"Unsupported projected terminal type '{manifestType}'."),
+    };
 
     private static void EmitHelpers(StringBuilder builder, PluginKernelModel model)
     {

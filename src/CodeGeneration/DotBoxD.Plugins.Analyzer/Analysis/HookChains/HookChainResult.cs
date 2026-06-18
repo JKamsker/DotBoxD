@@ -18,4 +18,7 @@ internal sealed record HookChainInterception(
     string ReceiverTypeFullName,
     string HandlerTypeFullName,
     string ReturnTypeFullName,
-    string PackageFullName);
+    string PackageFullName,
+    // When true the chain is a lowered RunLocal: the interceptor wires it via UseGeneratedLocalChain
+    // (installing the filter+projection package AND registering the native handler) instead of UseGeneratedChain.
+    bool IsLocalTerminal = false);

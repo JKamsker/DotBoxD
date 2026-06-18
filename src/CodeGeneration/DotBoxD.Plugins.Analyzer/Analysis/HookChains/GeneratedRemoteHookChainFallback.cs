@@ -73,7 +73,8 @@ internal static class GeneratedRemoteHookChainFallback
         bool receiverIsStage,
         string terminalElementTypeFullName,
         string packageFullName,
-        GeneratedRemoteHookChainKind kind)
+        GeneratedRemoteHookChainKind kind,
+        bool isLocal = false)
     {
         var pipelineName = kind == GeneratedRemoteHookChainKind.Hook
             ? "DotBoxD.Plugins.Runtime.RemoteHookPipeline"
@@ -95,7 +96,8 @@ internal static class GeneratedRemoteHookChainFallback
             receiverType,
             handlerType,
             pipelineType,
-            packageFullName);
+            packageFullName,
+            isLocal);
     }
 
     public static string TypeFullName(

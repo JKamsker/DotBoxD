@@ -60,7 +60,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .CreateSyntaxProvider(
                 static (node, _) => node is InvocationExpressionSyntax
                 {
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Run" }
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Run" or "RunLocal" }
                 },
                 static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
             .Where(static result => result is not null)

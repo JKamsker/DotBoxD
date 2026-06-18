@@ -20,6 +20,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 internal static class HookChainModelFactory
 {
     private const string RunMethod = "Run";
+    private const string RunLocalMethod = "RunLocal";
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
@@ -47,8 +48,14 @@ internal static class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            !string.Equals(terminalAccess.Name.Identifier.ValueText, RunMethod, StringComparison.Ordinal))
+        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess)
+        {
+            return null;
+        }
+
+        var terminalName = terminalAccess.Name.Identifier.ValueText;
+        var isLocal = string.Equals(terminalName, RunLocalMethod, StringComparison.Ordinal);
+        if (!isLocal && !string.Equals(terminalName, RunMethod, StringComparison.Ordinal))
         {
             return null;
         }
@@ -67,20 +74,47 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        if (!TryLambda(invocation, out var terminalLambda) ||
-            terminalLambda.ExpressionBody is not InvocationExpressionSyntax sendInvocation)
+        // RunLocal lowers ONLY for remote receivers: a local PluginServer.Hooks RunLocal already runs as a
+        // native in-process handler and must never be lowered/intercepted.
+        if (isLocal && !IsRemoteReceiver(model, terminalAccess.Expression, cancellationToken, generatedRemoteKind))
+        {
+            return null;
+        }
+
+        if (!TryLambda(invocation, out var terminalLambda))
         {
             return null;
         }
 
         var (terminalElementParam, terminalContextParam) = LambdaParameters(terminalLambda);
-        if (terminalElementParam is null || terminalContextParam is null ||
-            !DotBoxDHandleModelFactory.IsContextSend(sendInvocation.Expression, terminalContextParam))
+        if (terminalElementParam is null)
         {
             return null;
         }
 
+        // Run requires a single ctx.Messages.Send(...) terminal lowered to Handle. RunLocal's lambda body is
+        // never inspected — it stays native client C#; only Where/Select lower.
+        InvocationExpressionSyntax? sendInvocation = null;
+        if (!isLocal)
+        {
+            if (terminalLambda.ExpressionBody is not InvocationExpressionSyntax send ||
+                terminalContextParam is null ||
+                !DotBoxDHandleModelFactory.IsContextSend(send.Expression, terminalContextParam))
+            {
+                return null;
+            }
+
+            sendInvocation = send;
+        }
+
         stages.Reverse(); // seed-to-terminal order
+
+        // v1 RunLocal requires a Select: the projected value is what crosses the wire. Whole-event projection
+        // is out of scope.
+        if (isLocal && !stages.Any(stage => stage.IsSelect))
+        {
+            return null;
+        }
 
         if (!GeneratedRemoteHookChainFallback.TryEventType(model, seed, cancellationToken, out var eventType))
         {
@@ -112,15 +146,43 @@ internal static class HookChainModelFactory
             cancellationToken,
             capabilities,
             effects);
-        var handle = HookChainStageLowerer.CreateHandle(
-            stages,
-            terminalElementParam,
-            sendInvocation,
-            eventProperties,
-            model,
-            cancellationToken,
-            capabilities,
-            effects);
+
+        DotBoxDHandleModel? handle = null;
+        DotBoxDStatementBodyModel? projectionBody = null;
+        string? projectedType = null;
+        EquatableArray<string> manifestEffects;
+        if (isLocal)
+        {
+            var projection = HookChainStageLowerer.CreateProjection(
+                stages,
+                eventProperties,
+                model,
+                cancellationToken,
+                capabilities,
+                effects);
+            // v1 only marshals scalar/string projections over the wire.
+            if (!IsWireScalar(projection.ProjectedType))
+            {
+                return null;
+            }
+
+            projectionBody = projection.Body;
+            projectedType = projection.ProjectedType;
+            manifestEffects = DotBoxDManifestEffectModel.Create(shouldHandle, projection.Body, effects);
+        }
+        else
+        {
+            handle = HookChainStageLowerer.CreateHandle(
+                stages,
+                terminalElementParam,
+                sendInvocation!,
+                eventProperties,
+                model,
+                cancellationToken,
+                capabilities,
+                effects);
+            manifestEffects = DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects);
+        }
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
             stages,
@@ -130,6 +192,7 @@ internal static class HookChainModelFactory
 
         var chainId = HookChainIdentity.Compute(invocation);
         var kernelName = "HookChain_" + chainId;
+        var contextParameterName = terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName;
         var modelResult = new PluginKernelModel(
             PluginId: "chain-" + chainId,
             Namespace: HookChainIdentity.Namespace(invocation),
@@ -137,17 +200,20 @@ internal static class HookChainModelFactory
             PackageName: kernelName + "PluginPackage",
             EventName: EventTypeName.Qualified(eventType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
-            ContextParameterName: terminalContextParam,
+            ContextParameterName: contextParameterName,
             HandleEventParameterName: terminalElementParam,
-            HandleContextParameterName: terminalContextParam,
+            HandleContextParameterName: contextParameterName,
             EventProperties: eventProperties,
             LiveSettings: default,
             ShouldHandle: shouldHandle,
             Handle: handle,
-            ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects),
+            ManifestEffects: manifestEffects,
             RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
             IndexPredicates: indexPredicates,
-            IndexCoversPredicate: indexCoversPredicate);
+            IndexCoversPredicate: indexCoversPredicate,
+            LocalTerminal: isLocal,
+            ProjectedType: projectedType,
+            ProjectionBody: projectionBody);
 
         return new HookChainResult(
             modelResult,
@@ -160,8 +226,38 @@ internal static class HookChainModelFactory
                 stages,
                 terminalElementTypeFullName,
                 generatedRemoteKind,
+                isLocal,
                 cancellationToken));
     }
+
+    // RunLocal must lower only for the remote builder family. A known concrete receiver is remote only when
+    // its original definition is one of the Remote* pipeline/stage types (the local HookPipeline/HookStage
+    // run RunLocal natively); an unresolved receiver is remote when the seed matched a remote registry shape.
+    private static bool IsRemoteReceiver(
+        SemanticModel model,
+        ExpressionSyntax receiver,
+        CancellationToken cancellationToken,
+        GeneratedRemoteHookChainKind? generatedRemoteKind)
+    {
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol type &&
+            IsSupportedHookChainType(type))
+        {
+            var original = type.OriginalDefinition.ToDisplayString();
+            return string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
+                   string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
+                   string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
+                   string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal);
+        }
+
+        return generatedRemoteKind is not null;
+    }
+
+    private static bool IsWireScalar(string manifestType)
+        => string.Equals(manifestType, DotBoxDGenerationNames.ManifestTypes.Bool, StringComparison.Ordinal) ||
+           string.Equals(manifestType, DotBoxDGenerationNames.ManifestTypes.Int, StringComparison.Ordinal) ||
+           string.Equals(manifestType, DotBoxDGenerationNames.ManifestTypes.Long, StringComparison.Ordinal) ||
+           string.Equals(manifestType, DotBoxDGenerationNames.ManifestTypes.Double, StringComparison.Ordinal) ||
+           string.Equals(manifestType, DotBoxDGenerationNames.ManifestTypes.String, StringComparison.Ordinal);
 
     private static HookChainInterception? Interception(
         InvocationExpressionSyntax invocation,
@@ -172,6 +268,7 @@ internal static class HookChainModelFactory
         IReadOnlyList<HookChainStage> stages,
         string terminalElementTypeFullName,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
+        bool isLocal,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
@@ -194,7 +291,8 @@ internal static class HookChainModelFactory
                 receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                packageFullName);
+                packageFullName,
+                isLocal);
         }
 
         if (generatedRemoteKind is null)
@@ -208,7 +306,8 @@ internal static class HookChainModelFactory
             stages.Any(stage => stage.IsSelect),
             terminalElementTypeFullName,
             packageFullName,
-            generatedRemoteKind.Value);
+            generatedRemoteKind.Value,
+            isLocal);
     }
 
     private static string TerminalElementTypeFullName(

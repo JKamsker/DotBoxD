@@ -36,6 +36,40 @@ public sealed class RemoteSubscriptionStage<TEvent, TCurrent>
     public RemoteSubscriptionPipeline<TEvent> UseGeneratedChain(PluginPackage package)
         => _root.UseGeneratedChain(package);
 
+    /// <summary>
+    /// Installs a lowered <c>RunLocal</c> subscription chain whose projected type is
+    /// <typeparamref name="TCurrent"/> (produced by the preceding <c>Select</c>). The filter+projection
+    /// installs server-side; the native delegate receives the projected value pushed back per matching event.
+    /// </summary>
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TCurrent, HookContext, ValueTask> handler)
+        => _root.InstallLocal(package, handler);
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TCurrent, HookContext> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TCurrent, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, _) => handler(value));
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TCurrent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        });
+    }
+
     public RemoteSubscriptionPipeline<TEvent> Run(Func<TCurrent, HookContext, ValueTask> handler)
         => throw NotLowered();
 

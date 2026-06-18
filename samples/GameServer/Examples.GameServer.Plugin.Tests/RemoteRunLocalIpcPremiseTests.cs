@@ -1,0 +1,123 @@
+using DotBoxD.Abstractions;
+using DotBoxD.Kernels.Game.Plugin.Authoring;
+using DotBoxD.Kernels.Game.Server.Abstractions.Events;
+using DotBoxD.Kernels;
+using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
+using DotBoxD.Services.Peer;
+using DotBoxD.Transports.NamedPipes;
+
+namespace DotBoxD.Kernels.Game.Plugin.Tests;
+
+/// <summary>
+/// End-to-end proof that a remote <c>RunLocal</c> chain honours the 2-process premise across a REAL named-pipe
+/// IPC boundary: <c>Where</c>+<c>Select</c> run server-side as verified IR, only the projected <c>MonsterId</c>
+/// crosses the pipe (and only for events that pass the filter), and the native <c>RunLocal</c> delegate runs on
+/// the plugin side. The chain is authored in the plugin project (<see cref="LocalReactions"/>) so the analyzer
+/// lowers it; the install callback captures the lowered package and the per-event push is delivered through the
+/// generated <see cref="IPluginEventCallback"/> over a live <see cref="RpcMessagePackIpc"/> pipe.
+/// </summary>
+/// <remarks>
+/// This hard-fails if the premise breaks: if filtering leaked off the server, the per-event push count would
+/// equal the number of events published (2) instead of the number that match the filter (1); if projection
+/// leaked off the server, the raw event — not the scalar <c>MonsterId</c> — would have to cross the wire.
+/// </remarks>
+public sealed class RemoteRunLocalIpcPremiseTests
+{
+    // Plugin-side callback the server calls over the pipe: counts pushes and decodes the projected value back
+    // into the native RunLocal delegate via the client-side registry.
+    private sealed class CallbackSink(RemoteLocalHandlerRegistry registry) : IPluginEventCallback
+    {
+        private int _pushCount;
+        public int PushCount => Volatile.Read(ref _pushCount);
+
+        public async ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _pushCount);
+            await registry.DispatchAsync(
+                subscriptionId,
+                projectedValue,
+                new HookContext(new InMemoryPluginMessageSink(), ct),
+                ct);
+        }
+    }
+
+    [Fact]
+    public async Task RunLocal_chain_filters_and_projects_server_side_and_pushes_only_the_projection_over_ipc()
+    {
+        // --- Plugin authoring: ConfigureCalmReaction lowers Where+Select to a server-side projection kernel.
+        // The install callback captures the lowered package; the native delegate registers client-side. ---
+        var calmedOnPluginSide = new List<string>();
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        PluginPackage? lowered = null;
+        string? subscriptionId = null;
+        var hooks = new RemoteHookRegistry(
+            package =>
+            {
+                lowered = package;
+                subscriptionId = package.Manifest.PluginId;
+                return ValueTask.FromResult(package.Manifest.PluginId);
+            },
+            localHandlers);
+
+        LocalReactions.ConfigureCalmReaction(hooks, monsterId =>
+        {
+            lock (calmedOnPluginSide)
+            {
+                calmedOnPluginSide.Add(monsterId);
+            }
+        });
+
+        Assert.NotNull(lowered);
+        Assert.NotNull(subscriptionId);
+        // Premise: Where+Select lowered to a server-side projection kernel — marked local, needs no capability.
+        var subscription = Assert.Single(lowered!.Manifest.Subscriptions);
+        Assert.True(subscription.LocalTerminal);
+        Assert.Empty(lowered.Manifest.RequiredCapabilities);
+
+        // --- Live named-pipe IPC: two peers. The plugin PROVIDES the callback; the server GETS the proxy. ---
+        var pipeName = "dotboxd-runlocal-e2e-" + Guid.NewGuid().ToString("N");
+        var serverPeerReady = new TaskCompletionSource<RpcPeer>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var ipcHost = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer => serverPeerReady.TrySetResult(peer));
+        await ipcHost.StartAsync();
+
+        var callbackSink = new CallbackSink(localHandlers);
+        await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
+            new NamedPipeClientTransport(".", pipeName),
+            peer => peer.ProvidePluginEventCallback(callbackSink));
+
+        var serverPeer = await serverPeerReady.Task;
+        var pushProxy = serverPeer.GetPluginEventCallback();
+
+        // --- Server side: install the lowered package and wire the projecting push across the pipe. ---
+        var serverMessages = new InMemoryPluginMessageSink();
+        using var server = PluginServer.Create(serverMessages, defaultPolicy: ProjectionPolicy());
+        var kernel = await server.InstallAsync(lowered!);
+        RemoteLocalPush push = (subId, payload, ct) => pushProxy.OnEventAsync(subId, payload, ct);
+        server.Hooks.On<MonsterAggroEvent>().UseProjecting(kernel, subscriptionId!, push);
+
+        // --- Drive events server-side: one matches the filter (Distance <= 4), one does not. PublishAsync
+        // awaits the handler, which awaits the cross-pipe push, so delivery is observed without polling. ---
+        await server.Hooks.PublishAsync(new MonsterAggroEvent("monster-7", "player-1", 3, 8, 1));   // matches
+        await server.Hooks.PublishAsync(new MonsterAggroEvent("monster-9", "player-2", 10, 8, 1));  // filtered server-side
+
+        // PREMISE 1: the filter ran SERVER-SIDE before any IPC — exactly one of two events crossed the pipe.
+        Assert.Equal(1, callbackSink.PushCount);
+        // PREMISE 2: the native RunLocal delegate ran on the PLUGIN side with only the projected MonsterId.
+        Assert.Equal(["monster-7"], calmedOnPluginSide);
+        // PREMISE 3: a projection terminal performs no host send — nothing else was produced server-side.
+        Assert.Empty(serverMessages.Messages);
+    }
+
+    private static SandboxPolicy ProjectionPolicy()
+        => SandboxPolicyBuilder.Create()
+            .WithFuel(100_000)
+            .WithMaxHostCalls(1_000)
+            .WithWallTime(TimeSpan.FromSeconds(10))
+            .Build();
+}

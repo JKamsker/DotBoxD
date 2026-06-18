@@ -15,11 +15,16 @@ internal sealed record PluginKernelModel(
     EquatableArray<EventPropertyModel> EventProperties,
     EquatableArray<LiveSettingModel> LiveSettings,
     DotBoxDStatementBodyModel ShouldHandle,
-    DotBoxDHandleModel Handle,
+    DotBoxDHandleModel? Handle,
     EquatableArray<string> ManifestEffects,
     EquatableArray<string> RequiredCapabilities,
     EquatableArray<IndexPredicateModel> IndexPredicates,
-    bool IndexCoversPredicate);
+    bool IndexCoversPredicate,
+    // Local-terminal (remote RunLocal) chains: the Handle entrypoint RETURNS the projected value
+    // (ProjectionBody) of manifest type ProjectedType instead of performing a host send (Handle is null).
+    bool LocalTerminal = false,
+    string? ProjectedType = null,
+    DotBoxDStatementBodyModel? ProjectionBody = null);
 
 internal sealed record EventPropertyModel(string Name, string Type);
 

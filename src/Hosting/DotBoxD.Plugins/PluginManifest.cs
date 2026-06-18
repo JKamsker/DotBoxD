@@ -74,6 +74,22 @@ public sealed record HookSubscriptionManifest(string Event, string Kernel)
     /// only and the verified IR predicate must still run after the host's index check accepts an event.
     /// </summary>
     public bool IndexCoversPredicate { get; init; }
+
+    /// <summary>
+    /// <c>true</c> when this subscription is a lowered <b>local-terminal</b> chain (a remote
+    /// <c>RunLocal</c>): the <c>Where</c>/<c>Select</c> filter and projection run server-side as verified IR
+    /// and the <c>Handle</c> entrypoint <i>returns</i> the projected value (rather than performing a host
+    /// send) so the host pushes it across the IPC boundary to the plugin's native delegate. The default
+    /// <c>false</c> is an ordinary side-effecting chain whose <c>Handle</c> result is discarded.
+    /// </summary>
+    public bool LocalTerminal { get; init; }
+
+    /// <summary>
+    /// For a <see cref="LocalTerminal"/> chain, the manifest type name of the projected value the
+    /// <c>Handle</c> entrypoint returns (e.g. <c>"string"</c>, <c>"int"</c>) — the value the host encodes and
+    /// pushes to the plugin. <c>null</c> for ordinary chains. Additive; defaults to <c>null</c>.
+    /// </summary>
+    public string? ProjectedType { get; init; }
 }
 
 /// <summary>

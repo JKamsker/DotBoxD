@@ -44,9 +44,20 @@ internal static class DotBoxDHookChainInterceptorEmitter
                 .AppendLine("(");
             builder.Append("            this ").Append(interception.ReceiverTypeFullName).AppendLine(" pipeline,");
             builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler)");
-            builder.Append("            => pipeline.UseGeneratedChain(")
-                .Append(interception.PackageFullName)
-                .AppendLine(".Create());");
+            if (interception.IsLocalTerminal)
+            {
+                // RunLocal: install the lowered filter+projection package AND register the native handler so
+                // the server pushes each filtered, projected value back to it.
+                builder.Append("            => pipeline.UseGeneratedLocalChain(")
+                    .Append(interception.PackageFullName)
+                    .AppendLine(".Create(), handler);");
+            }
+            else
+            {
+                builder.Append("            => pipeline.UseGeneratedChain(")
+                    .Append(interception.PackageFullName)
+                    .AppendLine(".Create());");
+            }
         }
 
         builder.AppendLine("    }");

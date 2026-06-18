@@ -41,7 +41,11 @@ internal sealed class GamePluginHost : IAsyncDisposable
             peer =>
             {
                 var session = server.CreateSession();
-                var service = new GamePluginControlService(server, session, sink, world);
+
+                // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push
+                // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
+                var eventCallback = peer.GetPluginEventCallback();
+                var service = new GamePluginControlService(server, session, sink, world, eventCallback);
                 peer.Disconnected += (_, _) =>
                 {
                     session.Dispose();                  // revoke + unregister the kernels this peer owned

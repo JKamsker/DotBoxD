@@ -120,7 +120,17 @@ internal static class PluginPreparedPackageValidator
             return;
         }
 
-        ValidateReturnTypes(plan, shouldHandle, handle, diagnostics);
+        var localTerminal = false;
+        foreach (var subscription in package.Manifest.Subscriptions)
+        {
+            if (subscription.LocalTerminal)
+            {
+                localTerminal = true;
+                break;
+            }
+        }
+
+        ValidateReturnTypes(plan, shouldHandle, handle, localTerminal, diagnostics);
         if (!ParametersMatch(shouldHandle.Parameters, handle.Parameters))
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK034", "Kernel entrypoints must use the same parameter shape."));
@@ -141,6 +151,7 @@ internal static class PluginPreparedPackageValidator
         ExecutionPlan plan,
         SandboxFunction shouldHandle,
         SandboxFunction handle,
+        bool localTerminal,
         List<SandboxDiagnostic> diagnostics)
     {
         if (plan.FunctionAnalysis.TryGetValue(shouldHandle.Id, out var shouldAnalysis) &&
@@ -149,8 +160,23 @@ internal static class PluginPreparedPackageValidator
             diagnostics.Add(new SandboxDiagnostic("DBXK033", "Kernel ShouldHandle entrypoint must return Bool."));
         }
 
-        if (plan.FunctionAnalysis.TryGetValue(handle.Id, out var handleAnalysis) &&
-            handleAnalysis.ReturnType != SandboxType.Unit)
+        if (!plan.FunctionAnalysis.TryGetValue(handle.Id, out var handleAnalysis))
+        {
+            return;
+        }
+
+        // An ordinary chain's Handle performs a host send and returns Unit. A local-terminal (RunLocal) chain's
+        // Handle RETURNS the projected value the host pushes to the plugin, so it must NOT be Unit.
+        if (localTerminal)
+        {
+            if (handleAnalysis.ReturnType == SandboxType.Unit)
+            {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK033",
+                    "Local-terminal (RunLocal) kernel Handle entrypoint must return the projected value, not Unit."));
+            }
+        }
+        else if (handleAnalysis.ReturnType != SandboxType.Unit)
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK033", "Kernel Handle entrypoint must return Unit."));
         }

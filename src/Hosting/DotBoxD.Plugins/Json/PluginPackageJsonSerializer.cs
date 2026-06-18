@@ -211,7 +211,7 @@ public static partial class PluginPackageJsonSerializer
         RequireAllowedProperties(
             element,
             "hook subscription",
-            ["event", "kernel", "indexedPredicates", "indexCoversPredicate"]);
+            ["event", "kernel", "indexedPredicates", "indexCoversPredicate", "localTerminal", "projectedType"]);
         return new HookSubscriptionManifest(
             RequiredString(element, "event"),
             RequiredString(element, "kernel"))
@@ -221,7 +221,13 @@ public static partial class PluginPackageJsonSerializer
                 ? ReadIndexedPredicates(predicates)
                 : [],
             IndexCoversPredicate = element.TryGetProperty("indexCoversPredicate", out var covers) &&
-                ReadBoolValue(covers, "indexCoversPredicate")
+                ReadBoolValue(covers, "indexCoversPredicate"),
+            // Optional: present only for lowered RunLocal (local-terminal) chains.
+            LocalTerminal = element.TryGetProperty("localTerminal", out var localTerminal) &&
+                ReadBoolValue(localTerminal, "localTerminal"),
+            ProjectedType = element.TryGetProperty("projectedType", out var projectedType)
+                ? projectedType.GetString()
+                : null
         };
     }
 

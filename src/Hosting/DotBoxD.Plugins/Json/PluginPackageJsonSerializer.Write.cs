@@ -128,6 +128,17 @@ public static partial class PluginPackageJsonSerializer
                 writer.WriteBoolean("indexCoversPredicate", subscription.IndexCoversPredicate);
             }
 
+            // Emitted only for lowered RunLocal chains, so ordinary subscription manifests stay byte-for-byte unchanged.
+            if (subscription.LocalTerminal)
+            {
+                writer.WriteBoolean("localTerminal", subscription.LocalTerminal);
+            }
+
+            if (subscription.ProjectedType is { } projectedType)
+            {
+                writer.WriteString("projectedType", projectedType);
+            }
+
             writer.WriteEndObject();
         }
 

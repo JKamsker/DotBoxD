@@ -69,6 +69,55 @@ internal static class HookChainStageLowerer
         return new DotBoxDHandleModel(handle.Target, handle.Message, prefix);
     }
 
+    /// <summary>
+    /// Lowers the chain's <c>Select</c> stages into a value-returning <c>Handle</c> body for a
+    /// <c>RunLocal</c> terminal: each <c>Select</c> assigns its projection to a temp (threaded into the next),
+    /// and the body returns the final projected value. No host send is emitted, so the chain needs no
+    /// capability. Returns the body and the projected value's manifest type. The caller guarantees at least
+    /// one <c>Select</c> stage.
+    /// </summary>
+    public static (DotBoxDStatementBodyModel Body, string ProjectedType) CreateProjection(
+        IReadOnlyList<HookChainStage> stages,
+        EquatableArray<EventPropertyModel> eventProperties,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        ICollection<string> capabilities,
+        ICollection<string> effects)
+    {
+        DotBoxDExpressionModel? current = null;
+        DotBoxDStatementBodyModel? prefix = null;
+        for (var i = 0; i < stages.Count; i++)
+        {
+            if (!stages[i].IsSelect)
+            {
+                continue;
+            }
+
+            var projection = LowerSelect(
+                stages[i],
+                current,
+                eventProperties,
+                model,
+                cancellationToken,
+                capabilities,
+                effects);
+            prefix = prefix is null
+                ? projection.Assignment
+                : DotBoxDStatementBodyModelFactory.Concat(prefix, projection.Assignment);
+            current = projection.Current;
+        }
+
+        if (current is null)
+        {
+            // The caller (HookChainModelFactory) requires a Select before lowering a RunLocal chain.
+            throw new NotSupportedException();
+        }
+
+        var returned = DotBoxDStatementBodyModelFactory.Return(current.Source, current.Allocates);
+        var body = prefix is null ? returned : DotBoxDStatementBodyModelFactory.Concat(prefix, returned);
+        return (body, current.Type);
+    }
+
     private static DotBoxDStatementBodyModel BuildShouldHandle(
         IReadOnlyList<HookChainStage> stages,
         int index,

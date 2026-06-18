@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Kernels.Game.Server.Simulation;
 using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Hooks;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
 namespace DotBoxD.Kernels.Game.Server.Ipc;
@@ -20,15 +21,30 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     private readonly PluginSession _session;
     private readonly GameCommandSink _sink;
     private readonly GameWorld _world;
+    private readonly IPluginEventCallback? _eventCallback;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _shutdown = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    // Back-compat 4-arg ctor (no event-callback transport): a plugin that never uses a remote RunLocal chain
+    // needs no callback. Kept as a distinct overload so reflection-based construction with four positional
+    // arguments resolves unambiguously.
     public GamePluginControlService(PluginServer server, PluginSession session, GameCommandSink sink, GameWorld world)
+        : this(server, session, sink, world, null)
+    {
+    }
+
+    public GamePluginControlService(
+        PluginServer server,
+        PluginSession session,
+        GameCommandSink sink,
+        GameWorld world,
+        IPluginEventCallback? eventCallback)
     {
         _server = server;
         _session = session;
         _sink = sink;
         _world = world;
+        _eventCallback = eventCallback;
     }
 
     /// <summary>Completes once the plugin has installed its kernels and is holding the connection.</summary>
@@ -171,14 +187,29 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         switch (SimpleEventName(subscription))
         {
             case "MonsterAggroEvent":
-                _server.Hooks.On<MonsterAggroEvent>().Use(kernel);
+                WireHookFor<MonsterAggroEvent>(kernel);
                 break;
             case "AttackEvent":
-                _server.Hooks.On<AttackEvent>().Use(kernel);
+                WireHookFor<AttackEvent>(kernel);
                 break;
             default:
                 throw new InvalidOperationException(
                     $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
+        }
+    }
+
+    // A local-terminal (RunLocal) chain projects server-side and pushes the projected value back to the
+    // plugin's native delegate; an ordinary chain runs entirely server-side via Use(kernel).
+    private void WireHookFor<TEvent>(InstalledKernel kernel)
+    {
+        var pipeline = _server.Hooks.On<TEvent>();
+        if (IsLocalTerminal(kernel.Manifest))
+        {
+            pipeline.UseProjecting(kernel, kernel.Manifest.PluginId, LocalPush());
+        }
+        else
+        {
+            pipeline.Use(kernel);
         }
     }
 
@@ -200,23 +231,43 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         switch (SimpleEventName(subscription))
         {
             case "MonsterAggroEvent":
-                if (!TryRouteThroughIndex<MonsterAggroEvent>(kernel))
-                {
-                    _server.Subscriptions.On<MonsterAggroEvent>().Use(kernel);
-                }
-
+                WireSubscriptionFor<MonsterAggroEvent>(kernel);
                 break;
             case "AttackEvent":
-                if (!TryRouteThroughIndex<AttackEvent>(kernel))
-                {
-                    _server.Subscriptions.On<AttackEvent>().Use(kernel);
-                }
-
+                WireSubscriptionFor<AttackEvent>(kernel);
                 break;
             default:
                 throw new InvalidOperationException(
                     $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
         }
+    }
+
+    private void WireSubscriptionFor<TEvent>(InstalledKernel kernel)
+    {
+        // A local-terminal (RunLocal) chain must keep the projection on the broad pipeline so the host can
+        // capture the projected value and push it back — index routing would run the kernel and discard it.
+        if (IsLocalTerminal(kernel.Manifest))
+        {
+            _server.Subscriptions.On<TEvent>().UseProjecting(kernel, kernel.Manifest.PluginId, LocalPush());
+            return;
+        }
+
+        if (!TryRouteThroughIndex<TEvent>(kernel))
+        {
+            _server.Subscriptions.On<TEvent>().Use(kernel);
+        }
+    }
+
+    private static bool IsLocalTerminal(PluginManifest manifest)
+        => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].LocalTerminal;
+
+    // Binds the per-event server->plugin push to the connection's client-provided callback. Throws if the
+    // plugin connected without providing one (a RunLocal chain requires the event-callback transport).
+    private RemoteLocalPush LocalPush()
+    {
+        var callback = _eventCallback ?? throw new InvalidOperationException(
+            "the connected plugin did not provide an IPluginEventCallback; a remote RunLocal chain requires it.");
+        return (subscriptionId, projectedValue, ct) => callback.OnEventAsync(subscriptionId, projectedValue, ct);
     }
 
     // Issue #49: an indexed subscription is dispatched through the world's EventIndexRegistry — events are

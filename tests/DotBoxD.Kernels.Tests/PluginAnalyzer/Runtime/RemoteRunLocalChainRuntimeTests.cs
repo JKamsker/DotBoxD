@@ -1,0 +1,202 @@
+using System.Reflection;
+using DotBoxD.Kernels.Policies;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Policies;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Plugins.Runtime.Rpc;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+
+namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
+
+/// <summary>
+/// Phase 4 proof for a remote <c>RunLocal</c> chain: only <c>Where</c>/<c>Select</c> lower (to a verified-IR
+/// kernel that filters and projects), the <c>RunLocal</c> body stays native client C#, and the projected value
+/// is pushed across the IPC boundary per matching event. These tests mechanically enforce the premise that
+/// <b>filtering and projection always run server-side and only the projected result crosses the wire</b>
+/// (<see cref="ChainAggroEvent"/> is shared with <see cref="HookChainRuntimeTests"/>).
+/// </summary>
+public sealed class RemoteRunLocalChainRuntimeTests
+{
+    // A remote RunLocal chain: Where + Select lower; the native RunLocal terminal records what it receives.
+    private const string RemoteRunLocalSource = """
+        using System.Collections.Generic;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class RemoteRunLocalUsage
+        {
+            public static readonly List<string> Received = new();
+
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 4)
+                    .Select(e => e.MonsterId)
+                    .RunLocal((id, ctx) => Received.Add(id));
+        }
+        """;
+
+    [Fact]
+    public void RunLocal_chain_lowers_to_a_local_terminal_projection_package()
+    {
+        var package = LowerToPackage(RemoteRunLocalSource);
+
+        var subscription = Assert.Single(package.Manifest.Subscriptions);
+        Assert.True(subscription.LocalTerminal);          // marked as a local-terminal (RunLocal) chain
+        Assert.Equal("string", subscription.ProjectedType); // projects e.MonsterId -> string
+        // A pure projection performs no host send, so it requires no capability.
+        Assert.Empty(package.Manifest.RequiredCapabilities);
+    }
+
+    [Fact]
+    public async Task The_interceptor_registers_the_native_delegate_which_receives_the_decoded_projection()
+    {
+        var assembly = Compile(RemoteRunLocalSource, enableInterceptors: true);
+
+        // Install callback returns the package id; the RunLocal interceptor must call UseGeneratedLocalChain,
+        // which installs the package AND registers the native delegate keyed by that id.
+        PluginPackage? installed = null;
+        string? subscriptionId = null;
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        var registry = new RemoteHookRegistry(
+            package =>
+            {
+                installed = package;
+                subscriptionId = package.Manifest.PluginId;
+                return ValueTask.FromResult(package.Manifest.PluginId);
+            },
+            localHandlers);
+
+        var usage = assembly.GetType("ChainSample.RemoteRunLocalUsage")!;
+        usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]);
+
+        Assert.NotNull(installed);          // package installed (UseGeneratedLocalChain, not a throw)
+        Assert.NotNull(subscriptionId);
+        Assert.True(Assert.Single(installed!.Manifest.Subscriptions).LocalTerminal);
+
+        // Deliver a server-pushed projected value: it must decode and reach the native RunLocal delegate.
+        // (UseGeneratedChain would NOT have registered a handler, so this dispatch would throw instead.)
+        await localHandlers.DispatchAsync(
+            subscriptionId!,
+            EncodeString("monster-7"),
+            new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None));
+
+        var received = (List<string>)usage
+            .GetField("Received", BindingFlags.Public | BindingFlags.Static)!
+            .GetValue(null)!;
+        Assert.Equal("monster-7", Assert.Single(received));
+    }
+
+    [Fact]
+    public async Task The_server_filters_and_projects_then_pushes_only_the_projected_value_for_matching_events()
+    {
+        var package = LowerToPackage(RemoteRunLocalSource);
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        // Installing runs the verifier over the value-returning Handle entrypoint — proving it verifies.
+        var kernel = await server.InstallAsync(package);
+
+        var pushedSubscriptions = new List<string>();
+        var pushedPayloads = new List<byte[]>();
+        RemoteLocalPush push = (subscriptionId, payload, _) =>
+        {
+            pushedSubscriptions.Add(subscriptionId);
+            pushedPayloads.Add(payload);
+            return ValueTask.CompletedTask;
+        };
+        server.Hooks.On<ChainAggroEvent>().UseProjecting(kernel, "sub-1", push);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-7", 3));   // 3 <= 4 → matches
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-9", 10));  // 10 > 4 → filtered server-side
+
+        // PREMISE: the filter ran server-side BEFORE any IPC, so exactly one of two events crossed the wire.
+        Assert.Equal("sub-1", Assert.Single(pushedSubscriptions));
+        Assert.Single(pushedPayloads);
+        // PREMISE: a projection terminal performs no host send — the only thing produced is the pushed value.
+        Assert.Empty(messages.Messages);
+
+        // PREMISE: only the PROJECTED value (MonsterId) crossed, not the raw event — it decodes on the client
+        // back to exactly the projection.
+        var clientRegistry = new RemoteLocalHandlerRegistry();
+        string? received = null;
+        clientRegistry.Register<string>("sub-1", (id, _) =>
+        {
+            received = id;
+            return ValueTask.CompletedTask;
+        });
+        await clientRegistry.DispatchAsync(
+            "sub-1",
+            pushedPayloads[0],
+            new HookContext(messages, CancellationToken.None));
+        Assert.Equal("monster-7", received);
+    }
+
+    private static byte[] EncodeString(string value)
+    {
+        var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(string));
+        return KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(sandboxValue));
+    }
+
+    private static PluginPackage LowerToPackage(string source)
+    {
+        var assembly = Compile(source, enableInterceptors: true);
+        var packageType = assembly.GetTypes().Single(type =>
+            type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
+            type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+        return (PluginPackage)packageType
+            .GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, null)!;
+    }
+
+    private static Assembly Compile(string source, bool enableInterceptors)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (enableInterceptors)
+        {
+            parseOptions = parseOptions.WithFeatures(
+                [new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+        }
+
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDRemoteRunLocalRuntimeTest",
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        using var stream = new MemoryStream();
+        var emit = output.Emit(stream);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
+        return Assembly.Load(stream.ToArray());
+    }
+
+    private static SandboxPolicy ChainPolicy()
+        => SandboxPolicyBuilder.Create()
+            .GrantLogging()
+            .GrantHostMessageWrite()
+            .WithFuel(100_000)
+            .WithMaxHostCalls(1_000)
+            .WithWallTime(TimeSpan.FromSeconds(10))
+            .Build();
+
+    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    {
+        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
+        return references.Select(reference => MetadataReference.CreateFromFile(reference));
+    }
+}

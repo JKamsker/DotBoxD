@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime.Input;
+using DotBoxD.Plugins.Runtime.Lifecycle;
 
 namespace DotBoxD.Plugins.Runtime;
 
@@ -30,7 +31,23 @@ internal static class KernelEntrypointValidator
 
         var expected = PluginParameterShape.BuildExpected(adapterShape.Parameters, manifest.LiveSettings);
         ValidateFunction(plan, entrypoints.ShouldHandle, SandboxType.Bool, expected);
-        ValidateFunction(plan, entrypoints.Handle, SandboxType.Unit, expected);
+        ValidateFunction(plan, entrypoints.Handle, HandleReturnType(manifest), expected);
+    }
+
+    // An ordinary chain's Handle returns Unit (it performs a host send). A local-terminal (RunLocal) chain's
+    // Handle returns the projected value the host pushes to the plugin, so its expected return type is the
+    // subscription's declared ProjectedType.
+    private static SandboxType HandleReturnType(PluginManifest manifest)
+    {
+        foreach (var subscription in manifest.Subscriptions)
+        {
+            if (subscription.LocalTerminal && subscription.ProjectedType is { } projectedType)
+            {
+                return LiveSettingTypeConverter.ToSandboxType(projectedType);
+            }
+        }
+
+        return SandboxType.Unit;
     }
 
     private static void ValidateFunction(
