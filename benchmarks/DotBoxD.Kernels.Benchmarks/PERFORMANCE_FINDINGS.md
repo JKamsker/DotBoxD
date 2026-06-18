@@ -17,6 +17,7 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 | No-op compiled binding dispatch allocated a grant-clock scope and a success-path return-validation message. | `--probe-binding-dispatch-scope` | 500,000 no-arg `Unit` binding calls | 228.4 ms | 456.8 | 87,769,944 B | 175.5 | 218.1 ms | 436.2 | 184 B | 0.0 | Struct grant-clock scope alone reduced the probe to 68,000,184 B; lazy return-validation messages removed the remaining per-call allocation. |
 | Generated zero-argument runtime-stub binding calls allocated a fresh empty argument array. | `--probe-compiled-binding-arity` | 500,000 generated-shape zero-arg binding calls | 236.4 ms | 472.8 | 12,000,184 B | 24.0 | 221.7 ms | 443.4 | 184 B | 0.0 | `ChargeValueArray` still charges the same resource fuel/allocation; only the backing CLR empty array is shared. |
 | Capability-gated dispatch/bindings resolved the same grant twice. | `--probe-capability-grant-lookup` | 1,000,000 `RequireCapability` + `GetCapability` pairs | 24.5 ms | 24.5 | 728 B | ~0 | 2.2 ms | 2.2 | 728 B | ~0 | Time-only improvement; grant cache is keyed by capability id and `EffectiveGrantClock`. |
+| Structural compiled binding validation materialized `SandboxValue.Type` for nested list/map/record arguments. | `--probe-compiled-binding-structural-validation` | 1,000,000 list + record argument-pair validations (2,000,000 checks) | 350.2 ms | 175.1 | 520,000,040 B | 260.0 | 74.8 ms | 37.4 | 40 B | ~0 | Probe compares the legacy `.Type.Equals` shape check with the direct matcher now used by the dispatcher. |
 
 ## Probe Commands
 
@@ -29,4 +30,5 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-structural-validation
 ```

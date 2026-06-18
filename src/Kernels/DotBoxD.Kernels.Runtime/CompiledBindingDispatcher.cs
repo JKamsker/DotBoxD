@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Runtime;
 
 using DotBoxD.Kernels;
 
-internal static class CompiledBindingDispatcher
+internal static partial class CompiledBindingDispatcher
 {
     [ThreadStatic] private static ICompiledAwaitPump? _pump;
 
@@ -195,50 +195,6 @@ internal static class CompiledBindingDispatcher
         }
     }
 
-    // Compiled IR was already verified against the binding signature and every
-    // argument value reaches this dispatcher having passed full recursive validation
-    // at a trust boundary (entrypoint inputs via EntrypointBinder, binding returns via
-    // ChargeBindingReturn) and stays typed through every internal constructor. The hot
-    // path therefore only needs to confirm the wrapper kind plus declared element
-    // metadata via the value's snapshotted Type, not re-walk every nested element on
-    // each call. A shallow Type comparison keeps the boundary that distinguishes, e.g.,
-    // a scalar from a List<I32> argument while skipping the per-call collection re-walk.
-    private static void ValidateArguments(BindingDescriptor descriptor, IReadOnlyList<SandboxValue> args)
-    {
-        if (args.Count != descriptor.Parameters.Count)
-        {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.ValidationError,
-                $"binding '{descriptor.Id}' argument count does not match verified plan"));
-        }
-
-        for (var i = 0; i < descriptor.Parameters.Count; i++)
-        {
-            if (!args[i].Type.Equals(descriptor.Parameters[i]))
-            {
-                throw new SandboxRuntimeException(new SandboxError(
-                    SandboxErrorCode.ValidationError,
-                    $"binding '{descriptor.Id}' argument type does not match verified plan"));
-            }
-        }
-    }
-
-    private static void ValidateArguments(BindingDescriptor descriptor, SandboxValue arg0, SandboxValue arg1)
-    {
-        if (descriptor.Parameters.Count != 2)
-        {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.ValidationError,
-                $"binding '{descriptor.Id}' argument count does not match verified plan"));
-        }
-
-        if (!arg0.Type.Equals(descriptor.Parameters[0]) || !arg1.Type.Equals(descriptor.Parameters[1]))
-        {
-            throw new SandboxRuntimeException(new SandboxError(
-                SandboxErrorCode.ValidationError,
-                $"binding '{descriptor.Id}' argument type does not match verified plan"));
-        }
-    }
 }
 
 internal interface ICompiledAwaitPump

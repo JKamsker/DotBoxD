@@ -28,6 +28,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-binding-dispatch-scope
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-arity
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-capability-grant-lookup
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-compiled-binding-structural-validation
 ```
 
 ## History
@@ -82,6 +83,7 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 | Allocation-free no-op compiled binding dispatch | this commit | `--probe-binding-dispatch-scope` | Converted the binding grant-clock scope from an allocated `IDisposable` class to a concrete struct and made binding-return validation messages lazy for the success path. The 500k-call no-arg `Unit` binding probe improved from 228.4 ms and 87,769,944 B to 218.1 ms and 184 B. The intermediate struct-scope-only sample measured 222.8 ms and 68,000,184 B, isolating the remaining allocation to the eager return-validation message. |
 | Shared generated zero-arg binding arrays | this commit | `--probe-compiled-binding-arity` | Reused `Array.Empty<SandboxValue>()` for generated-code `CreateLiteralValueArray(0)` calls. The generated-shape zero-argument runtime-stub binding probe improved from 236.4 ms and 12,000,184 B to 221.7 ms and 184 B for 500k calls, while `ChargeValueArray` kept the same sandbox fuel/allocation charges. |
 | Capability grant lookup cache | this commit | `--probe-capability-grant-lookup` | Cached the last successful `SandboxContext.GetCapability` grant by requested capability id and `EffectiveGrantClock`, avoiding the common capability-backed binding sequence that calls `RequireCapability` and then resolves the same grant again. The 1M-pair probe improved from 24.5 ms (24.5 ns/op) and 728 B to 2.2 ms (2.2 ns/op) and 728 B; this is a time-only improvement with expiry/clock semantics preserved. |
+| Structural compiled binding validation | this commit | `--probe-compiled-binding-structural-validation` | Replaced the compiled binding dispatcher's structural `.Type.Equals(expected)` argument check with a direct shape matcher keyed by scalar kind and list/map/record metadata, preserving mismatch errors while avoiding nested `SandboxType` materialization. The 1M list + record argument-pair probe (2M validations) improved from 350.2 ms, 175.1 ns/check, and 520,000,040 B to 74.8 ms, 37.4 ns/check, and 40 B. |
 
 Versioning note for the two-argument binding fast path: `CallBinding2` and `ChargeValueArray`
 are public generated-code ABI on `CompiledRuntime` for the same reason as the existing facade

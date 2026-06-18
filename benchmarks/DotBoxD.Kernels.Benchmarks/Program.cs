@@ -62,6 +62,11 @@ if (args.Contains("--probe-compiled-binding-fast-path", StringComparer.OrdinalIg
     return;
 }
 
+if (args.Contains("--probe-compiled-binding-structural-validation", StringComparer.OrdinalIgnoreCase)) {
+    DotBoxD.Kernels.Benchmarks.Runtime.CompiledBindingStructuralValidationProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-binding-return-credit", StringComparer.OrdinalIgnoreCase)) {
     DotBoxD.Kernels.Benchmarks.Runtime.BindingReturnCreditProbe.Run();
     return;
