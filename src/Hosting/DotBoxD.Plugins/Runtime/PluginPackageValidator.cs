@@ -59,6 +59,8 @@ internal static class PluginPackageValidator
                     "DBXK013",
                     $"Hook subscription kernel '{subscription.Kernel}' must match module kernel '{metadataKernel}'."));
             }
+
+            ValidateIndexedPredicates(subscription, diagnostics);
         }
 
         ThrowIfErrors(diagnostics);
@@ -80,6 +82,32 @@ internal static class PluginPackageValidator
 
         ValidateManifestText(metadataKernel, "kernel metadata", diagnostics);
         return metadataKernel;
+    }
+
+    private static void ValidateIndexedPredicates(
+        HookSubscriptionManifest subscription,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var predicate in subscription.IndexedPredicates) {
+            ValidateManifestText(predicate.Path, "indexed predicate path", diagnostics);
+            if (!Enum.IsDefined(predicate.Operator)) {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK046",
+                    $"Indexed predicate operator '{predicate.Operator}' is not supported."));
+            }
+
+            if (predicate.ValueType is not ("bool" or "int" or "long" or "double" or "string")) {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK047",
+                    $"Indexed predicate value type '{predicate.ValueType}' is not supported."));
+            }
+        }
+
+        if (subscription.IndexCoversPredicate && subscription.IndexedPredicates.Count == 0) {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK048",
+                "A hook subscription cannot claim full index coverage with no indexed predicates."));
+        }
     }
 
     private static void ValidateEntrypoints(

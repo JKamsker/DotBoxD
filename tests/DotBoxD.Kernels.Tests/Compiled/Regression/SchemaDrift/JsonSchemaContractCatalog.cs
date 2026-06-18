@@ -33,6 +33,7 @@ internal static class JsonSchemaContractCatalog
             "plugin manifest" => ["pluginId", "contract", "mode", "effects", "liveSettings", "subscriptions"],
             "live setting" => ["name", "type", "defaultValue"],
             "hook subscription" => ["event", "kernel"],
+            "indexed predicate" => ["path", "operator", "value", "valueType"],
             "kernel entrypoints" => [],
             _ => throw new ArgumentOutOfRangeException(nameof(requirementName), requirementName, null)
         };
@@ -68,6 +69,11 @@ internal static class JsonSchemaContractCatalog
             "binary expression" => new Dictionary<string, string[]>
             {
                 ["op"] = ["add", "sub", "mul", "div", "rem", "eq", "ne", "lt", "lte", "gt", "gte", "and", "or"]
+            },
+            "indexed predicate" => new Dictionary<string, string[]>
+            {
+                ["operator"] = ["Equals", "NotEquals", "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual"],
+                ["valueType"] = ["bool", "int", "long", "double", "string"]
             },
             _ => new Dictionary<string, string[]>()
         };

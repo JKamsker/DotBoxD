@@ -118,7 +118,11 @@ internal static class PluginKernelModelFactory
                 ShouldHandle: shouldHandleBody,
                 Handle: handleModel,
                 ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandleBody, handleModel, effects),
-                RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]));
+                RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
+                // Index-predicate metadata is only mined from inline .Where(...) chains; kernel-class
+                // ShouldHandle bodies stay non-indexed (broad fan-out, the existing behavior).
+                IndexPredicates: default,
+                IndexCoversPredicate: false);
             return new PluginKernelModelResult(model, null);
         }
         catch (NotSupportedException ex)

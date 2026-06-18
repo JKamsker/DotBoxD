@@ -14,6 +14,7 @@ public async ValueTask<InstalledKernel> InstallServerExtensionAsync( PluginPacka
 public async ValueTask<SandboxValue> InvokeServerExtensionAsync( IReadOnlyList<SandboxValue> arguments, CancellationToken cancellationToken = default)
 public async ValueTask<string> RegisterServerExtensionAsync<TService, TKernel>( SandboxPolicy? policy = null, CancellationToken cancellationToken = default) where TService : class where TKernel : class
 public bool BoolValue
+public bool IndexCoversPredicate { get; init; }
 public bool IsRevoked => Volatile.Read(ref _revoked) != 0
 public bool Owns(string pluginId)
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
@@ -22,6 +23,13 @@ public class ServerExtensionProxy : DispatchProxy
 public const string CapabilityId = "host.message.write"
 public const string SendBindingId = "host.message.send"
 public double DoubleValue
+public enum IndexPredicateOperator
+public enum IndexPredicateOperator.Equals
+public enum IndexPredicateOperator.GreaterThan
+public enum IndexPredicateOperator.GreaterThanOrEqual
+public enum IndexPredicateOperator.LessThan
+public enum IndexPredicateOperator.LessThanOrEqual
+public enum IndexPredicateOperator.NotEquals
 public enum KernelRpcValueKind : byte
 public enum KernelRpcValueKind.Bool = 1
 public enum KernelRpcValueKind.F64 = 4
@@ -90,6 +98,7 @@ public interface IServerExtensionClientRegistry :
 public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtensionWireClient
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()
 public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value); }
+public IReadOnlyList<IndexedPredicate> IndexedPredicates
 public IReadOnlyList<InstalledKernel> Snapshot()
 public IReadOnlyList<LiveSettingDefinition> Definitions
 public IReadOnlyList<LiveSettingDefinition> LiveSettings { get => _liveSettings; init => _liveSettings = PluginModelCopy.List(value); }
@@ -200,6 +209,7 @@ public sealed partial class InstalledKernel
 public sealed partial class PluginServer
 public sealed partial class PluginServer : IDisposable
 public sealed record HookSubscriptionManifest(string Event, string Kernel)
+public sealed record IndexedPredicate( string Path, IndexPredicateOperator Operator, object? Value, string ValueType)
 public sealed record KernelEntrypoints(string ShouldHandle, string Handle)
 public sealed record LiveSettingDefinition( string Name, string Type, object? DefaultValue, object? Min = null, object? Max = null)
 public sealed record PluginDiagnosticReference( string Code, PluginDiagnosticPhase Phase, PluginDiagnosticAudience Audience, string Meaning, string LikelyCause, string Remediation)
