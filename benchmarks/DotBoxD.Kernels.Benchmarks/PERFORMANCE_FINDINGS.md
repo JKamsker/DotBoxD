@@ -33,6 +33,7 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 | Type validation checked `IsForbidden` after `IsKnown`, repeating the structural walk. | `--probe-sandbox-type-validation` | 1,000,000 nested `SandboxType.IsKnown` validation checks | 532.4 ms | 532.4 | 40 B | ~0 | 294.4 ms | 294.4 | 40 B | ~0 | `IsKnown` already rejects forbidden names recursively; diagnostics remain on the same unknown-or-forbidden branches. |
 | Registered server-extension service lookup created a fresh `DispatchProxy` on every call. | `--probe-server-extension-proxy-lookup` | 1,000,000 `ServerExtension<TService>` lookups | 321.7 ms | 321.7 | 288,002,456 B | 288.0 | 22.3 ms | 22.3 | 80 B | ~0 | Probe simulates the old lookup with direct `ServerExtensionProxy.Create`; cached registrations are invalidated on unregister/replacement. |
 | Installed server-extension invocation scanned module functions to resolve the same RPC entrypoint on every call. | `--probe-installed-rpc-input` | 200,000 RPC input builds over 512 module functions | 350.9 ms | 1,754.5 | 6,400,040 B | 32.0 | 1.4 ms | 7.0 | 40 B | ~0 | Cached the resolved `SandboxFunction` and caller argument count on `InstalledKernel` construction. |
+| Generated plugin RPC readers cloned defensive `KernelRpcValue.Items` arrays while materializing list and record results. | `--probe-kernel-rpc-value-items` | 1,000,000 reads of a 4-field RPC record | 38.6 ms | 38.6 | 184,000,040 B | 184.0 | 3.2 ms | 3.2 | 40 B | ~0 | Public `Items` still returns a copy; generated readers use `ItemCount` and `GetItem(index)`. |
 
 ## Probe Commands
 
@@ -58,4 +59,5 @@ dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseShar
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-sandbox-type-validation
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-server-extension-proxy-lookup
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-installed-rpc-input
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-kernel-rpc-value-items
 ```

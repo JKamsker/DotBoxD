@@ -45,6 +45,8 @@ public readonly struct KernelRpcValue
 
     internal string StringValue { get; }
 
+    public int ItemCount => (_items ?? EmptyItems).Length;
+
     public KernelRpcValue[] Items => CopyItems(_items ?? EmptyItems);
 
     internal ReadOnlySpan<KernelRpcValue> ItemSpan => _items ?? EmptyItems;
@@ -145,6 +147,8 @@ public readonly struct KernelRpcValue
         ArgumentNullException.ThrowIfNull(fields);
         return new KernelRpcValue(KernelRpcValueKind.Record, 0L, 0D, string.Empty, UseOwnedItems(fields));
     }
+
+    public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index];
 
     private static KernelRpcValue[] CopyItems(KernelRpcValue[] items)
         => items.Length == 0

@@ -103,14 +103,14 @@ internal static partial class RpcKernelClientProxyEmitter
             _readers[key] = method;
             var elementType = DotBoxDRpcTypeMapper.ListElementType(type)!;
             var elementName = TypeName(elementType);
-            var itemExpression = ReadExpression(elementType, "__source[i]");
+            var itemExpression = ReadExpression(elementType, "value.GetItem(i)");
             var arrayType = type as IArrayTypeSymbol;
             var returnType = arrayType is not null ? TypeName(type) : $"global::System.Collections.Generic.List<{elementName}>";
             _helpers.Append("    private static ").Append(returnType).Append(' ').Append(method)
                 .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.List);");
-            _helpers.AppendLine("        var __source = value.Items;");
+            _helpers.AppendLine("        var __count = value.ItemCount;");
             AppendListReaderBody(elementName, itemExpression, arrayType);
             _helpers.AppendLine();
             _helpers.AppendLine("        return __result;");
@@ -124,9 +124,9 @@ internal static partial class RpcKernelClientProxyEmitter
             if (arrayType is not null)
             {
                 _helpers.Append("        var __result = ")
-                    .Append(ArrayCreation(arrayType, "__source.Length"))
+                    .Append(ArrayCreation(arrayType, "__count"))
                     .AppendLine(";");
-                _helpers.AppendLine("        for (var i = 0; i < __source.Length; i++)");
+                _helpers.AppendLine("        for (var i = 0; i < __count; i++)");
                 _helpers.AppendLine("        {");
                 _helpers.Append("            __result[i] = ").Append(itemExpression).AppendLine(";");
                 _helpers.AppendLine("        }");
@@ -134,8 +134,8 @@ internal static partial class RpcKernelClientProxyEmitter
             }
 
             _helpers.Append("        var __result = new global::System.Collections.Generic.List<")
-                .Append(elementName).AppendLine(">(__source.Length);");
-            _helpers.AppendLine("        for (var i = 0; i < __source.Length; i++)");
+                .Append(elementName).AppendLine(">(__count);");
+            _helpers.AppendLine("        for (var i = 0; i < __count; i++)");
             _helpers.AppendLine("        {");
             _helpers.Append("            __result.Add(").Append(itemExpression).AppendLine(");");
             _helpers.AppendLine("        }");
@@ -210,8 +210,7 @@ internal static partial class RpcKernelClientProxyEmitter
                 .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Record);");
-            _helpers.AppendLine("        var __fields = value.Items;");
-            _helpers.Append("        if (__fields.Length != ").Append(fields.Count).AppendLine(")");
+            _helpers.Append("        if (value.ItemCount != ").Append(fields.Count).AppendLine(")");
             _helpers.AppendLine("        {");
             _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension record field count did not match the generated DTO shape.\");");
             _helpers.AppendLine("        }");
@@ -244,7 +243,7 @@ internal static partial class RpcKernelClientProxyEmitter
             foreach (var parameter in constructor.Parameters)
             {
                 var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                arguments.Add(ReadExpression(fields[fieldIndex].Type, "__fields[" + fieldIndex + "]"));
+                arguments.Add(ReadExpression(fields[fieldIndex].Type, "value.GetItem(" + fieldIndex + ")"));
             }
 
             return arguments;

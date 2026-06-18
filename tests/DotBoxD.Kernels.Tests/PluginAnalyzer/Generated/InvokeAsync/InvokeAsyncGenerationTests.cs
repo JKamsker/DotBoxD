@@ -79,5 +79,8 @@ public sealed class InvokeAsyncGenerationTests
         Assert.Contains("\"parameters\\\":[{\\\"name\\\":\\\"bag\\\"", source, StringComparison.Ordinal);
         Assert.Contains("__syncOut_LastHealth", source, StringComparison.Ordinal);
         Assert.Contains("captures.LastHealth =", source, StringComparison.Ordinal);
+        Assert.Contains("__result.ItemCount", source, StringComparison.Ordinal);
+        Assert.Contains("__result.GetItem(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("__result.Items", source, StringComparison.Ordinal);
     }
 }

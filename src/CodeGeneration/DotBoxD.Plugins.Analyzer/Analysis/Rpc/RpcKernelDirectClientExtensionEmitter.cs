@@ -193,14 +193,14 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var method = NextHelperName("Read");
             _readers[key] = method;
             var elementType = DotBoxDRpcTypeMapper.ListElementType(type)!;
-            var itemExpression = ReadExpression(elementType, "__source[i]");
+            var itemExpression = ReadExpression(elementType, "value.GetItem(i)");
             _helpers.Append("    private static global::System.Collections.Generic.List<").Append(TypeName(elementType)).Append("> ")
                 .Append(method).AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.List);");
-            _helpers.AppendLine("        var __source = value.Items;");
-            _helpers.Append("        var __result = new global::System.Collections.Generic.List<").Append(TypeName(elementType)).AppendLine(">(__source.Length);");
-            _helpers.AppendLine("        for (var i = 0; i < __source.Length; i++)");
+            _helpers.AppendLine("        var __count = value.ItemCount;");
+            _helpers.Append("        var __result = new global::System.Collections.Generic.List<").Append(TypeName(elementType)).AppendLine(">(__count);");
+            _helpers.AppendLine("        for (var i = 0; i < __count; i++)");
             _helpers.AppendLine("        {");
             _helpers.Append("            __result.Add(").Append(itemExpression).AppendLine(");");
             _helpers.AppendLine("        }");
@@ -225,7 +225,6 @@ internal static class RpcKernelDirectClientExtensionEmitter
                 .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Record);");
-            _helpers.AppendLine("        var __fields = value.Items;");
             _helpers.Append("        return new ").Append(TypeName(type)).Append('(');
             for (var i = 0; i < fields.Count; i++)
             {
@@ -234,7 +233,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
                     _helpers.Append(", ");
                 }
 
-                _helpers.Append(ReadExpression(fields[i].Type, "__fields[" + i + "]"));
+                _helpers.Append(ReadExpression(fields[i].Type, "value.GetItem(" + i + ")"));
             }
             _helpers.AppendLine(");");
             _helpers.AppendLine("    }");
