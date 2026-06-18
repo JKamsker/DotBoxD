@@ -23,10 +23,10 @@ internal static class DotBoxDManifestEffectModel
 
     public static EquatableArray<string> Create(
         DotBoxDStatementBodyModel shouldHandle,
-        DotBoxDHandleModel handle,
+        DotBoxDStatementBodyModel handleBody,
         ICollection<string>? extraEffects = null)
     {
-        var baseEffects = shouldHandle.Allocates || handle.Allocates
+        var baseEffects = shouldHandle.Allocates || handleBody.Allocates
             ? AllocatingEffects
             : NonAllocatingEffects;
         if (extraEffects is null || extraEffects.Count == 0)

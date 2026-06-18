@@ -8,6 +8,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// </summary>
 internal sealed record HookChainResult(PluginKernelModel Model, HookChainInterception? Interception);
 
+internal enum HookChainInterceptorInstallKind
+{
+    GeneratedChain,
+    HostCallback
+}
+
 /// <summary>
 /// Everything the generator needs to emit one <c>[InterceptsLocation]</c> method that wires a lowered
 /// chain into the pipeline it was called on. All fields are equatable strings/flags so the generator's
@@ -18,4 +24,5 @@ internal sealed record HookChainInterception(
     string ReceiverTypeFullName,
     string HandlerTypeFullName,
     string ReturnTypeFullName,
-    string PackageFullName);
+    string PackageFullName,
+    HookChainInterceptorInstallKind InstallKind);

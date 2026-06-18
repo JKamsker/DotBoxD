@@ -73,6 +73,7 @@ internal static class GeneratedRemoteHookChainFallback
         bool receiverIsStage,
         string terminalElementTypeFullName,
         string packageFullName,
+        HookChainInterceptorInstallKind installKind,
         GeneratedRemoteHookChainKind kind)
     {
         var pipelineName = kind == GeneratedRemoteHookChainKind.Hook
@@ -87,15 +88,20 @@ internal static class GeneratedRemoteHookChainFallback
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix +
               stageName + "<" + eventTypeFullName + ", " + terminalElementTypeFullName + ">"
             : pipelineType;
-        var handlerType = DotBoxDGenerationNames.TypeNames.GlobalAction + "<" +
-            terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalHookContext + ">";
+        var handlerType = installKind == HookChainInterceptorInstallKind.HostCallback
+            ? DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
+              terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalHookContext + ", " +
+              DotBoxDGenerationNames.TypeNames.GlobalValueTask + ">"
+            : DotBoxDGenerationNames.TypeNames.GlobalAction + "<" +
+              terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalHookContext + ">";
 
         return new HookChainInterception(
             attributeSyntax,
             receiverType,
             handlerType,
             pipelineType,
-            packageFullName);
+            packageFullName,
+            installKind);
     }
 
     public static string TypeFullName(

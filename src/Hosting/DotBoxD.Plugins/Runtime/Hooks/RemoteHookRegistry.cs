@@ -9,9 +9,15 @@ namespace DotBoxD.Plugins.Runtime;
 public sealed class RemoteHookRegistry
 {
     private readonly Func<PluginPackage, ValueTask<string>> _install;
+    private readonly Func<RemoteHostCallbackRegistration, ValueTask<string>>? _installHostCallback;
 
-    public RemoteHookRegistry(Func<PluginPackage, ValueTask<string>> install)
-        => _install = install ?? throw new ArgumentNullException(nameof(install));
+    public RemoteHookRegistry(
+        Func<PluginPackage, ValueTask<string>> install,
+        Func<RemoteHostCallbackRegistration, ValueTask<string>>? installHostCallback = null)
+    {
+        _install = install ?? throw new ArgumentNullException(nameof(install));
+        _installHostCallback = installHostCallback;
+    }
 
-    public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install);
+    public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _installHostCallback);
 }

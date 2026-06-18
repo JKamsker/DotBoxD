@@ -43,6 +43,23 @@ public sealed class GeneratedRemoteHookChainFallbackTests
         }
         """;
 
+    private const string HostCallbackSubscriptionSource = """
+        using System.Threading.Tasks;
+        using DotBoxD.Plugins.Runtime;
+
+        namespace ChainSample;
+
+        public static class RemoteServerUsage
+        {
+            public static void Configure(IGeneratedWorldServer server)
+            {
+                server.Subscriptions.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                    .Where(e => e.Distance <= 5)
+                    .RunHost((e, ctx) => ValueTask.CompletedTask);
+            }
+        }
+        """;
+
     [Fact]
     public void Fallback_lowers_remote_hook_chains_when_the_server_type_is_generated_later()
         => AssertFallbackLowers(Source, "DotBoxDGeneratedRemoteHookFallbackTest");
@@ -51,7 +68,17 @@ public sealed class GeneratedRemoteHookChainFallbackTests
     public void Fallback_lowers_remote_subscription_chains_when_the_server_type_is_generated_later()
         => AssertFallbackLowers(SubscriptionSource, "DotBoxDGeneratedRemoteSubscriptionFallbackTest");
 
-    private static void AssertFallbackLowers(string source, string assemblyName)
+    [Fact]
+    public void Fallback_lowers_remote_subscription_RunHost_chains()
+        => AssertFallbackLowers(
+            HostCallbackSubscriptionSource,
+            "DotBoxDGeneratedRemoteSubscriptionHostFallbackTest",
+            "UseGeneratedHostCallbackChain");
+
+    private static void AssertFallbackLowers(
+        string source,
+        string assemblyName,
+        string expectedInterceptorCall = "UseGeneratedChain")
     {
         var parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Preview)
@@ -76,6 +103,7 @@ public sealed class GeneratedRemoteHookChainFallbackTests
         var generatedSources = result.GeneratedTrees.Select(tree => tree.GetText().ToString()).ToArray();
         Assert.Contains(generatedSources, source => source.Contains("HookChain_", StringComparison.Ordinal));
         Assert.Contains(generatedSources, source => source.Contains("HookChainInterceptors", StringComparison.Ordinal));
+        Assert.Contains(generatedSources, source => source.Contains(expectedInterceptorCall, StringComparison.Ordinal));
     }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()

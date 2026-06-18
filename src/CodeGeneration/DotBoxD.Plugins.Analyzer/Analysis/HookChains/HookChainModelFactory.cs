@@ -20,6 +20,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 internal static class HookChainModelFactory
 {
     private const string RunMethod = "Run";
+    private const string RunHostMethod = "RunHost";
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
@@ -47,8 +48,19 @@ internal static class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
-            !string.Equals(terminalAccess.Name.Identifier.ValueText, RunMethod, StringComparison.Ordinal))
+        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess)
+        {
+            return null;
+        }
+
+        var terminalMethod = terminalAccess.Name.Identifier.ValueText;
+        var installKind = terminalMethod switch
+        {
+            RunMethod => HookChainInterceptorInstallKind.GeneratedChain,
+            RunHostMethod => HookChainInterceptorInstallKind.HostCallback,
+            _ => (HookChainInterceptorInstallKind?)null
+        };
+        if (installKind is null)
         {
             return null;
         }
@@ -67,20 +79,22 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        if (!TryLambda(invocation, out var terminalLambda) ||
-            terminalLambda.ExpressionBody is not InvocationExpressionSyntax sendInvocation)
+        if (!TryLambda(invocation, out var terminalLambda))
         {
             return null;
         }
 
         var (terminalElementParam, terminalContextParam) = LambdaParameters(terminalLambda);
-        if (terminalElementParam is null || terminalContextParam is null ||
-            !DotBoxDHandleModelFactory.IsContextSend(sendInvocation.Expression, terminalContextParam))
+        if (terminalElementParam is null)
         {
             return null;
         }
 
         stages.Reverse(); // seed-to-terminal order
+        if (installKind == HookChainInterceptorInstallKind.HostCallback && stages.Any(stage => stage.IsSelect))
+        {
+            return null;
+        }
 
         if (!GeneratedRemoteHookChainFallback.TryEventType(model, seed, cancellationToken, out var eventType))
         {
@@ -112,15 +126,18 @@ internal static class HookChainModelFactory
             cancellationToken,
             capabilities,
             effects);
-        var handle = HookChainStageLowerer.CreateHandle(
-            stages,
-            terminalElementParam,
-            sendInvocation,
-            eventProperties,
-            model,
-            cancellationToken,
-            capabilities,
-            effects);
+        var handleBody = installKind == HookChainInterceptorInstallKind.HostCallback
+            ? DotBoxDHandleBodyModelFactory.ReturnUnit()
+            : LowerSendHandle(
+                stages,
+                terminalLambda,
+                terminalElementParam,
+                terminalContextParam,
+                eventProperties,
+                model,
+                cancellationToken,
+                capabilities,
+                effects);
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
             stages,
@@ -137,14 +154,14 @@ internal static class HookChainModelFactory
             PackageName: kernelName + "PluginPackage",
             EventName: EventTypeName.Qualified(eventType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
-            ContextParameterName: terminalContextParam,
+            ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,
-            HandleContextParameterName: terminalContextParam,
+            HandleContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             EventProperties: eventProperties,
             LiveSettings: default,
             ShouldHandle: shouldHandle,
-            Handle: handle,
-            ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handle, effects),
+            HandleBody: handleBody,
+            ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandle, handleBody, effects),
             RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate);
@@ -160,7 +177,38 @@ internal static class HookChainModelFactory
                 stages,
                 terminalElementTypeFullName,
                 generatedRemoteKind,
+                installKind.Value,
                 cancellationToken));
+    }
+
+    private static DotBoxDStatementBodyModel LowerSendHandle(
+        IReadOnlyList<HookChainStage> stages,
+        LambdaExpressionSyntax terminalLambda,
+        string terminalElementParam,
+        string? terminalContextParam,
+        EquatableArray<EventPropertyModel> eventProperties,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        ICollection<string> capabilities,
+        ICollection<string> effects)
+    {
+        if (terminalContextParam is null ||
+            terminalLambda.ExpressionBody is not InvocationExpressionSyntax sendInvocation ||
+            !DotBoxDHandleModelFactory.IsContextSend(sendInvocation.Expression, terminalContextParam))
+        {
+            throw new NotSupportedException();
+        }
+
+        var handle = HookChainStageLowerer.CreateHandle(
+            stages,
+            terminalElementParam,
+            sendInvocation,
+            eventProperties,
+            model,
+            cancellationToken,
+            capabilities,
+            effects);
+        return DotBoxDHandleBodyModelFactory.FromSend(handle);
     }
 
     private static HookChainInterception? Interception(
@@ -172,6 +220,7 @@ internal static class HookChainModelFactory
         IReadOnlyList<HookChainStage> stages,
         string terminalElementTypeFullName,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
+        HookChainInterceptorInstallKind installKind,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
@@ -194,7 +243,8 @@ internal static class HookChainModelFactory
                 receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                packageFullName);
+                packageFullName,
+                installKind);
         }
 
         if (generatedRemoteKind is null)
@@ -208,6 +258,7 @@ internal static class HookChainModelFactory
             stages.Any(stage => stage.IsSelect),
             terminalElementTypeFullName,
             packageFullName,
+            installKind,
             generatedRemoteKind.Value);
     }
 

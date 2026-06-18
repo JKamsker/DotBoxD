@@ -103,6 +103,7 @@ internal static class PluginKernelModelFactory
                 cancellationToken,
                 capabilities,
                 effects);
+            var handleBody = DotBoxDHandleBodyModelFactory.FromSend(handleModel);
             var model = new PluginKernelModel(
                 PluginId: validatedPluginId,
                 Namespace: type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString(),
@@ -116,8 +117,8 @@ internal static class PluginKernelModelFactory
                 EventProperties: eventProperties,
                 LiveSettings: liveSettings,
                 ShouldHandle: shouldHandleBody,
-                Handle: handleModel,
-                ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandleBody, handleModel, effects),
+                HandleBody: handleBody,
+                ManifestEffects: DotBoxDManifestEffectModel.Create(shouldHandleBody, handleBody, effects),
                 RequiredCapabilities: EquatableArray<string>.FromOwned([.. capabilities]),
                 // Index-predicate metadata is only mined from inline .Where(...) chains; kernel-class
                 // ShouldHandle bodies stay non-indexed (broad fan-out, the existing behavior).

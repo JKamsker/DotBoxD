@@ -15,7 +15,7 @@ internal sealed record PluginKernelModel(
     EquatableArray<EventPropertyModel> EventProperties,
     EquatableArray<LiveSettingModel> LiveSettings,
     DotBoxDStatementBodyModel ShouldHandle,
-    DotBoxDHandleModel Handle,
+    DotBoxDStatementBodyModel HandleBody,
     EquatableArray<string> ManifestEffects,
     EquatableArray<string> RequiredCapabilities,
     EquatableArray<IndexPredicateModel> IndexPredicates,
