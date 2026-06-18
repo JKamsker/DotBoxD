@@ -69,6 +69,7 @@ public static class QueryFilterEvaluator
 
     private static bool EvaluateIn(QueryFilter filter, object target, MemberValueReader reader)
     {
+        EnsureInWidth(filter);
         var actual = reader.Read(target, filter.Field);
         foreach (var candidate in filter.Values)
         {
@@ -84,9 +85,21 @@ public static class QueryFilterEvaluator
     private static void Measure(QueryFilter filter, int depth, ref int budget)
     {
         CheckBudget(depth, ref budget);
+        EnsureInWidth(filter);
         foreach (var child in filter.Children)
         {
             Measure(child, depth + 1, ref budget);
+        }
+    }
+
+    // A wide In list never grows the node tree (its candidates live in Values, not Children), so it slips past
+    // the node/depth budget while still forcing a per-event linear scan. Bound it explicitly.
+    private static void EnsureInWidth(QueryFilter filter)
+    {
+        if (filter.Kind == QueryFilterKind.In && filter.Values.Count > QueryEvaluationLimits.MaxInValues)
+        {
+            throw new InvalidOperationException(
+                $"Query filter 'In' list exceeds the maximum of {QueryEvaluationLimits.MaxInValues} values.");
         }
     }
 

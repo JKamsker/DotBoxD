@@ -93,16 +93,27 @@ public sealed class QueryProjectionJsonConverter : JsonConverter<QueryProjection
             var name = field.TryGetProperty("name", out var n) && n.GetString() is { } parsed
                 ? parsed
                 : throw new JsonException("Query projection field is missing 'name'.");
-            if (field.TryGetProperty("path", out var path) && path.GetString() is { } pathText)
+
+            // A field is either a member read ('path') or a constant ('value'), never both or neither —
+            // otherwise the projection shape is ambiguous and must be rejected rather than silently coerced.
+            var hasPath = field.TryGetProperty("path", out var path);
+            var hasValue = field.TryGetProperty("value", out var v);
+            if (hasPath == hasValue)
             {
-                fields.Add(QueryProjectionField.FromMember(name, pathText));
+                throw new JsonException(
+                    $"Query projection field '{name}' must contain exactly one of 'path' or 'value'.");
+            }
+
+            if (hasPath)
+            {
+                fields.Add(QueryProjectionField.FromMember(
+                    name,
+                    path.GetString() ?? throw new JsonException(
+                        $"Query projection field '{name}' property 'path' must be a string.")));
             }
             else
             {
-                var constant = field.TryGetProperty("value", out var v)
-                    ? v.Deserialize<QueryValue>(options) ?? QueryValue.Null
-                    : QueryValue.Null;
-                fields.Add(QueryProjectionField.FromConstant(name, constant));
+                fields.Add(QueryProjectionField.FromConstant(name, v.Deserialize<QueryValue>(options) ?? QueryValue.Null));
             }
         }
 

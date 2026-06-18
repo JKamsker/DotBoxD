@@ -67,7 +67,7 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
-        var ignoreCase = IsIgnoreCase(call.Arguments, parameter);
+        var ignoreCase = IsIgnoreCase(call, call.Arguments, parameter);
         filter = QueryFilter.Compare(path, op, makeValue(raw, call.Arguments[0]), ignoreCase);
         return true;
     }
@@ -94,7 +94,22 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(UnwrapSpan(collection), parameter));
+        var unwrapped = UnwrapSpan(collection);
+
+        // An instance collection (HashSet/Dictionary/SortedSet) can carry a custom equality comparer that
+        // changes membership semantics; lowering it to a case-sensitive ordinal In would silently drop or add
+        // matches. Reject the case-insensitive / culture-sensitive comparers rather than mis-translate.
+        if (call.Object is not null &&
+            QueryValueFactory.TryEvaluateObject(unwrapped, parameter, out var collectionObject) &&
+            collectionObject is not null &&
+            HasNonOrdinalComparer(collectionObject))
+        {
+            throw QueryTranslationException.Unsupported(
+                call,
+                "Contains over a collection with a case-insensitive or culture-sensitive equality comparer is not supported; use a default/ordinal collection.");
+        }
+
+        filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
         return true;
     }
 
@@ -116,13 +131,39 @@ internal static class MethodCallFilterTranslator
         return stripped;
     }
 
-    private static bool IsIgnoreCase(IReadOnlyList<Expression> arguments, ParameterExpression parameter)
+    private static bool IsIgnoreCase(MethodCallExpression call, IReadOnlyList<Expression> arguments, ParameterExpression parameter)
     {
         for (var i = 1; i < arguments.Count; i++)
         {
             if (QueryValueFactory.TryEvaluateObject(arguments[i], parameter, out var raw) &&
-                raw is StringComparison comparison &&
-                comparison.ToString().Contains("IgnoreCase", StringComparison.Ordinal))
+                raw is StringComparison comparison)
+            {
+                // The evaluator compares ordinally, so only the ordinal modes can be honored faithfully. A
+                // culture-sensitive overload would silently change semantics — reject it instead of downgrading.
+                return comparison switch
+                {
+                    StringComparison.Ordinal => false,
+                    StringComparison.OrdinalIgnoreCase => true,
+                    _ => throw QueryTranslationException.Unsupported(
+                        call,
+                        $"StringComparison.{comparison} is culture-sensitive; only Ordinal and OrdinalIgnoreCase are supported."),
+                };
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasNonOrdinalComparer(object collection)
+    {
+        if (collection.GetType().GetProperty("Comparer")?.GetValue(collection) is not { } comparer)
+        {
+            return false;
+        }
+
+        foreach (var rejected in NonOrdinalComparers)
+        {
+            if (ReferenceEquals(comparer, rejected))
             {
                 return true;
             }
@@ -130,4 +171,15 @@ internal static class MethodCallFilterTranslator
 
         return false;
     }
+
+    // The case-insensitive / culture-sensitive StringComparer singletons. A collection built with one of these
+    // has membership semantics an ordinal In cannot reproduce, so Contains over it is rejected.
+    private static readonly object[] NonOrdinalComparers =
+    [
+        StringComparer.OrdinalIgnoreCase,
+        StringComparer.InvariantCulture,
+        StringComparer.InvariantCultureIgnoreCase,
+        StringComparer.CurrentCulture,
+        StringComparer.CurrentCultureIgnoreCase,
+    ];
 }

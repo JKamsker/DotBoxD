@@ -68,8 +68,20 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                 continue;
             }
 
-            await entry.Dispatch(projected, context).ConfigureAwait(false);
-            entry.Handle.RecordDispatch();
+            try
+            {
+                await entry.Dispatch(projected, context).ConfigureAwait(false);
+                entry.Handle.RecordDispatch();
+            }
+            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Isolate one subscriber's handler failure so it cannot starve the other dynamic queries
+                // matching this event — they share a single forwarding host handler at the registry layer.
+            }
         }
     }
 

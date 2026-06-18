@@ -27,7 +27,18 @@ internal sealed class RegistryQueryBinding(SubscriptionRegistry registry)
                 return;
             }
 
-            registry.On<TEvent>().InvokeHostHandler((e, context) => Host.PublishAsync(e, context));
+            try
+            {
+                registry.On<TEvent>().InvokeHostHandler((e, context) => Host.PublishAsync(e, context));
+            }
+            catch
+            {
+                // Installation failed (e.g. no event adapter is registered yet, or a conflicting one is bound);
+                // un-mark the type so a later retry — after the host registers a suitable adapter — installs the
+                // forwarder instead of early-returning and silently never reaching the query host.
+                _forwarded.Remove(typeof(TEvent));
+                throw;
+            }
         }
     }
 }

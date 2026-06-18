@@ -41,6 +41,22 @@ public sealed record QueryValue
     /// </summary>
     public string? ParameterKey { get; init; }
 
+    /// <summary>
+    /// Value equality covers only the value payload (<see cref="Kind"/> and its scalar fields). The provenance
+    /// <see cref="ParameterKey"/> is deliberately excluded so two structurally identical literals captured at
+    /// different positions compare equal and hash alike, matching the documented contract.
+    /// </summary>
+    public bool Equals(QueryValue? other) =>
+        other is not null
+        && Kind == other.Kind
+        && Boolean == other.Boolean
+        && Integer == other.Integer
+        && Number == other.Number
+        && String == other.String;
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Kind, Boolean, Integer, Number, String);
+
     /// <summary>The shared <c>null</c> literal.</summary>
     public static QueryValue Null { get; } = new(QueryValueKind.Null, false, 0, 0, null);
 
@@ -108,6 +124,14 @@ public sealed record QueryValue
                 result = FromNumber((double)m);
                 return true;
             case Enum e:
+                // A ulong-backed enum whose value exceeds long.MaxValue overflows Convert.ToInt64; carry it as
+                // a double (matching the ulong case above) instead of throwing during capture/translation.
+                if (Enum.GetUnderlyingType(e.GetType()) == typeof(ulong))
+                {
+                    result = FromNumber((double)Convert.ToUInt64(e, CultureInfo.InvariantCulture));
+                    return true;
+                }
+
                 result = FromInteger(Convert.ToInt64(e, CultureInfo.InvariantCulture));
                 return true;
             default:

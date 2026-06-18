@@ -7,51 +7,70 @@ namespace DotBoxD.Queryable.Text;
 /// <summary>Recursive-descent parser for the query text DSL (see <see cref="QueryText"/>).</summary>
 internal static class QueryTextParser
 {
+    // Bounds parser recursion so deeply nested text (e.g. thousands of '(' or 'not') raises a catchable
+    // QueryTranslationException instead of an uncatchable StackOverflowException. The runtime evaluator is
+    // separately bounded by QueryEvaluationLimits once an AST exists.
+    private const int MaxParseDepth = 256;
+
     public static QueryFilter Parse(string text)
     {
         var cursor = new Cursor(QueryTextTokenizer.Tokenize(text));
-        var filter = ParseOr(cursor);
+        var filter = ParseOr(cursor, depth: 0);
         cursor.ExpectEnd();
         return filter;
     }
 
-    private static QueryFilter ParseOr(Cursor cursor)
+    private static QueryFilter ParseOr(Cursor cursor, int depth)
     {
-        var terms = new List<QueryFilter> { ParseAnd(cursor) };
+        EnsureDepth(depth);
+        var terms = new List<QueryFilter> { ParseAnd(cursor, depth + 1) };
         while (cursor.TryConsumeKeywordOrSymbol("or", "||"))
         {
-            terms.Add(ParseAnd(cursor));
+            terms.Add(ParseAnd(cursor, depth + 1));
         }
 
         return terms.Count == 1 ? terms[0] : QueryFilter.Or(terms);
     }
 
-    private static QueryFilter ParseAnd(Cursor cursor)
+    private static QueryFilter ParseAnd(Cursor cursor, int depth)
     {
-        var terms = new List<QueryFilter> { ParseUnary(cursor) };
+        EnsureDepth(depth);
+        var terms = new List<QueryFilter> { ParseUnary(cursor, depth + 1) };
         while (cursor.TryConsumeKeywordOrSymbol("and", "&&"))
         {
-            terms.Add(ParseUnary(cursor));
+            terms.Add(ParseUnary(cursor, depth + 1));
         }
 
         return terms.Count == 1 ? terms[0] : QueryFilter.And(terms);
     }
 
-    private static QueryFilter ParseUnary(Cursor cursor)
-        => cursor.TryConsumeKeywordOrSymbol("not", "!")
-            ? QueryFilter.Not(ParseUnary(cursor))
-            : ParsePrimary(cursor);
-
-    private static QueryFilter ParsePrimary(Cursor cursor)
+    private static QueryFilter ParseUnary(Cursor cursor, int depth)
     {
+        EnsureDepth(depth);
+        return cursor.TryConsumeKeywordOrSymbol("not", "!")
+            ? QueryFilter.Not(ParseUnary(cursor, depth + 1))
+            : ParsePrimary(cursor, depth + 1);
+    }
+
+    private static QueryFilter ParsePrimary(Cursor cursor, int depth)
+    {
+        EnsureDepth(depth);
         if (cursor.TryConsumeSymbol("("))
         {
-            var filter = ParseOr(cursor);
+            var filter = ParseOr(cursor, depth + 1);
             cursor.ExpectSymbol(")");
             return filter;
         }
 
         return cursor.TryConsumeSymbol("*") ? QueryFilter.MatchAll : ParseLeaf(cursor);
+    }
+
+    private static void EnsureDepth(int depth)
+    {
+        if (depth > MaxParseDepth)
+        {
+            throw new QueryTranslationException($"Query text nesting exceeds the maximum depth of {MaxParseDepth}.");
+        }
     }
 
     private static QueryFilter ParseLeaf(Cursor cursor)

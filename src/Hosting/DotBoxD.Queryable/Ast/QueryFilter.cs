@@ -70,7 +70,7 @@ public sealed record QueryFilter
     /// <summary>Builds a conjunction; an empty operand list collapses to <see cref="MatchAll"/>.</summary>
     public static QueryFilter And(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.And, children);
 
-    /// <summary>Builds a disjunction.</summary>
+    /// <summary>Builds a disjunction; an empty operand list collapses to the never-match filter (<c>Not(MatchAll)</c>).</summary>
     public static QueryFilter Or(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.Or, children);
 
     /// <summary>Builds a negation of <paramref name="child"/>.</summary>
@@ -129,7 +129,10 @@ public sealed record QueryFilter
 
         if (flattened.Count == 0)
         {
-            return MatchAll;
+            // An empty conjunction is vacuously true (match-all); an empty disjunction has no satisfiable
+            // alternative, so it is the never-match filter (Not(MatchAll)) rather than a silent widening to
+            // match-all — which would turn a dynamically-supplied empty "or" into a dispatch-everything subscription.
+            return kind == QueryFilterKind.And ? MatchAll : Not(MatchAll);
         }
 
         return flattened.Count == 1

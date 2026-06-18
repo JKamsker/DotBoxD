@@ -11,4 +11,7 @@ public static class QueryEvaluationLimits
 
     /// <summary>The maximum total number of nodes (connectives plus leaves) in a filter tree.</summary>
     public const int MaxNodes = 256;
+
+    /// <summary>The maximum number of candidate values in a single <c>In</c> node (its values are not tree nodes).</summary>
+    public const int MaxInValues = 256;
 }

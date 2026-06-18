@@ -1,0 +1,138 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DotBoxD.Abstractions;
+using DotBoxD.Queryable.Ast;
+using DotBoxD.Queryable.Authoring;
+using DotBoxD.Queryable.Execution;
+using DotBoxD.Queryable.Serialization;
+using DotBoxD.Queryable.Text;
+using DotBoxD.Queryable.Translation;
+
+namespace DotBoxD.Kernels.Tests.Queryable;
+
+/// <summary>
+/// Pins the PR-review hardening fixes across the queryable surface: empty-disjunction semantics, value
+/// equality provenance, ulong enums, string-comparison/comparer rejection, In-list and parse-depth bounds,
+/// projection field validation, read-only serializer options, and dispatch isolation.
+/// </summary>
+public sealed class QueryReviewHardeningTests
+{
+    private enum UlongBackedEnum : ulong
+    {
+        Max = ulong.MaxValue,
+    }
+
+    [Fact]
+    public void Empty_disjunction_is_never_match_while_empty_conjunction_is_match_all()
+    {
+        var or = QueryFilter.Or([]);
+        Assert.Equal(QueryFilterKind.Not, or.Kind);
+        Assert.Equal(QueryFilterKind.MatchAll, or.Children[0].Kind);
+
+        Assert.Equal(QueryFilterKind.MatchAll, QueryFilter.And([]).Kind);
+    }
+
+    [Fact]
+    public void Value_equality_ignores_capture_provenance()
+    {
+        var a = QueryValue.FromInteger(5) with { ParameterKey = "p0" };
+        var b = QueryValue.FromInteger(5) with { ParameterKey = "p1" };
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Ulong_backed_enum_constant_is_captured_as_a_number_without_overflowing()
+    {
+        Assert.True(QueryValue.TryFromObject(UlongBackedEnum.Max, out var value));
+        Assert.Equal(QueryValueKind.Number, value.Kind);
+        Assert.Equal((double)ulong.MaxValue, value.Number);
+    }
+
+    [Fact]
+    public void Culture_sensitive_string_comparison_is_rejected()
+        => Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => e.TargetId.StartsWith("x", StringComparison.InvariantCultureIgnoreCase)));
+
+    [Fact]
+    public void Contains_over_a_case_insensitive_collection_is_rejected()
+    {
+        var watched = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a", "b" };
+        Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId)));
+    }
+
+    [Fact]
+    public void Contains_over_a_default_collection_still_lowers_to_in()
+    {
+        var ids = new[] { "a", "b" };
+        var filter = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => ids.Contains(e.AttackerId));
+        Assert.Equal(QueryFilterKind.In, filter.Kind);
+    }
+
+    [Fact]
+    public void Oversized_in_list_is_rejected_by_the_limit_check()
+    {
+        var tooMany = Enumerable.Range(0, QueryEvaluationLimits.MaxInValues + 1)
+            .Select(i => QueryValue.FromInteger(i))
+            .ToList();
+        Assert.Throws<InvalidOperationException>(() => QueryFilterEvaluator.EnsureWithinLimits(QueryFilter.In("Damage", tooMany)));
+
+        var withinLimit = QueryFilter.In("Damage", Enumerable.Range(0, 4).Select(i => QueryValue.FromInteger(i)).ToList());
+        QueryFilterEvaluator.EnsureWithinLimits(withinLimit); // does not throw
+    }
+
+    [Fact]
+    public void Deeply_nested_text_is_rejected_instead_of_overflowing_the_stack()
+    {
+        var deep = string.Concat(Enumerable.Repeat("not ", 2000)) + "AttackerId == \"a\"";
+        Assert.Throws<QueryTranslationException>(() => QueryText.Parse(deep));
+    }
+
+    [Fact]
+    public void Projection_field_must_have_exactly_one_of_path_or_value()
+    {
+        var validJson = JsonSerializer.Serialize(
+            QueryProjection.Construct("T", [QueryProjectionField.FromMember("a", "X")]),
+            EventQueryJson.Options);
+
+        var both = validJson.Replace("\"path\":\"X\"", "\"path\":\"X\",\"value\":1");
+        var neither = validJson.Replace("\"path\":\"X\"", "\"other\":1");
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<QueryProjection>(both, EventQueryJson.Options));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<QueryProjection>(neither, EventQueryJson.Options));
+    }
+
+    [Fact]
+    public void Shared_serializer_options_are_read_only()
+    {
+        Assert.True(EventQueryJson.Options.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => EventQueryJson.Options.Converters.Add(new JsonStringEnumConverter()));
+    }
+
+    [Fact]
+    public async Task One_failing_query_handler_does_not_starve_the_others()
+    {
+        var host = new EventQueryHost();
+        var second = 0;
+
+        await host.Query<AttackTestEvent>()
+            .SubscribeAsync((_, _) => throw new InvalidOperationException("boom"));
+        await host.Query<AttackTestEvent>()
+            .SubscribeAsync((_, _) =>
+            {
+                second++;
+                return ValueTask.CompletedTask;
+            });
+
+        var context = new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None);
+
+        // The first subscriber throws; the dispatcher must isolate it so the second still runs and the
+        // publish does not surface the handler exception.
+        await host.PublishAsync(new AttackTestEvent("a", "b", 1, 1), context);
+
+        Assert.Equal(1, second);
+    }
+}

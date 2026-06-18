@@ -13,7 +13,8 @@ public static class EventQueryJson
 {
     /// <summary>
     /// The shared serializer options: short enum tokens, raw scalar values, and compact tagged-union
-    /// filter/projection documents. Property order is deterministic (member declaration order).
+    /// filter/projection documents. Property order is deterministic (member declaration order). The instance
+    /// is read-only (frozen), so it is safe to share and cannot be mutated out from under the fingerprint.
     /// </summary>
     public static JsonSerializerOptions Options { get; } = CreateOptions(indented: false);
 
@@ -34,17 +35,27 @@ public static class EventQueryJson
             ?? throw new JsonException("Event query document JSON deserialized to null.");
     }
 
-    private static JsonSerializerOptions CreateOptions(bool indented) => new()
+    private static JsonSerializerOptions CreateOptions(bool indented)
     {
-        WriteIndented = indented,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters =
+        var options = new JsonSerializerOptions
         {
-            new JsonStringEnumConverter(),
-            new QueryValueJsonConverter(),
-            new QueryFilterJsonConverter(),
-            new QueryProjectionJsonConverter(),
-            new EventQueryDocumentJsonConverter(),
-        },
-    };
+            WriteIndented = indented,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Converters =
+            {
+                new JsonStringEnumConverter(),
+                new QueryValueJsonConverter(),
+                new QueryFilterJsonConverter(),
+                new QueryProjectionJsonConverter(),
+                new EventQueryDocumentJsonConverter(),
+            },
+        };
+
+        // Freeze so the shared, process-wide instance cannot be mutated: a stray converter add or a
+        // WriteIndented flip would silently change every fingerprint / cache key computed through it.
+        // populateMissingResolver: true installs the default reflection-based resolver (the same one the
+        // serializer would use implicitly), which MakeReadOnly() otherwise requires to be set first.
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
 }

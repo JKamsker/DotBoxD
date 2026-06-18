@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string] $PackageDirectory = "artifacts/packages",
     [switch] $AllowPrereleaseVersions,
     [string[]] $AllowedPrereleasePackageIds = @(),
