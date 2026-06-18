@@ -175,12 +175,10 @@ internal static class HookChainModelFactory
             IndexCoversPredicate: indexCoversPredicate)
         {
             // Persist the local-terminal nature in the manifest (mine's host-readable mark) so the runtime
-            // knows to push rather than run; a null projection (no Select) is a whole-event push.
+            // knows to push rather than run; a null ProjectedType (no Select) is a whole-event push, a
+            // non-null one is a projection push — so the payload kind needs no separate persisted field.
             LocalTerminal = installKind == HookChainInterceptorInstallKind.LocalCallback,
             ProjectedType = localCallbackProjection?.Value.Type,
-            LocalPayloadKind = localCallbackProjection is null
-                ? LocalPayloadKind.Event
-                : LocalPayloadKind.Projection,
         };
 
         return new HookChainResult(

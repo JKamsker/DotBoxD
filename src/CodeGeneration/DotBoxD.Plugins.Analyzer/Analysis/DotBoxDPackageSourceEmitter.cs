@@ -148,8 +148,9 @@ internal static class DotBoxDPackageSourceEmitter
                 .AppendLine(",");
         }
 
-        // Mine's host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes (Event vs
-        // Projection is carried via LocalPayloadKind in a later phase) rather than re-deriving from IR.
+        // Host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes rather than
+        // re-deriving from IR. A null ProjectedType (no Select) marks a whole-event push; a non-null one
+        // marks a projection push — so the payload kind is derivable and needs no separate field.
         if (model.LocalTerminal)
         {
             builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")

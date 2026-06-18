@@ -28,21 +28,13 @@ internal sealed record PluginKernelModel(
     /// </summary>
     public bool LocalTerminal { get; init; }
 
-    /// <summary>The manifest type the <c>Select</c> projection returns (null for a whole-event RunLocal).</summary>
+    /// <summary>
+    /// The manifest type the <c>Select</c> projection returns, or <c>null</c> for a whole-event
+    /// <c>RunLocal</c> (no <c>Select</c>). The runtime treats a null <see cref="ProjectedType"/> on a
+    /// <see cref="LocalTerminal"/> chain as a whole-event push and a non-null one as a projection push,
+    /// so the payload kind needs no separate persisted field.
+    /// </summary>
     public string? ProjectedType { get; init; }
-
-    /// <summary>Whether the host pushes the whole event or the projected value to the plugin's delegate.</summary>
-    public LocalPayloadKind LocalPayloadKind { get; init; }
-}
-
-/// <summary>
-/// What a remote <c>RunLocal</c> host pushes back to the plugin: the original event (no <c>Select</c>) or the
-/// value the <c>Select</c> projection produced.
-/// </summary>
-internal enum LocalPayloadKind
-{
-    Event,
-    Projection
 }
 
 internal sealed record EventPropertyModel(string Name, string Type);
