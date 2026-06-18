@@ -3,12 +3,14 @@
 # Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
 
 public bool Boolean { get; }
+public bool Equals(QueryValue? other) =>
 public bool HasSubscriptions<TEvent>() => TryGetDispatcher<TEvent>() is not null
 public bool IgnoreCase { get; init; }
 public bool IsCompiled => _isCompiled()
 public bool IsEquality => Operator == QueryComparisonOperator.Equal
 public bool IsRoutable => RoutingKeys.Count > 0
 public const int MaxDepth = 32
+public const int MaxInValues = 256
 public const int MaxNodes = 256
 public double Number { get; }
 public enum IndexCoverage
@@ -59,6 +61,7 @@ public long Integer { get; }
 public long Matches => Interlocked.Read(ref _matches)
 public object? Read(object target, string path)
 public override EventQueryDocument Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+public override int GetHashCode() => HashCode.Combine(Kind, Boolean, Integer, Number, String)
 public override QueryFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 public override QueryProjection Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 public override QueryValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
@@ -110,6 +113,7 @@ public static bool IsSatisfiable(QueryFilter filter)
 public static bool TryFromObject(object? value, out QueryValue result)
 public static class EventQueryCanonicalizer
 public static class EventQueryDiagnostics
+public static class EventQueryIndexAdapter
 public static class EventQueryJson
 public static class EventQueryPlanner
 public static class ExpressionQueryTranslator
@@ -128,6 +132,9 @@ public static EventQueryDocument Deserialize(string json)
 public static EventQueryPlan Plan(EventQueryDocument document)
 public static EventQueryPlan Plan(QueryFilter filter)
 public static Func<object, bool> Compile(QueryFilter filter, MemberValueReader reader)
+public static HostIndexedPredicate ToIndexedPredicate(IndexedPredicate source)
+public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(EventQueryPlan plan)
+public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(IReadOnlyList<IndexedPredicate> predicates)
 public static IReadOnlyList<string> Describe(EventQuerySubscriptionHandle handle)
 public static JsonSerializerOptions Options { get; } = CreateOptions(indented: false)
 public static QueryFilter And(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.And, children)
