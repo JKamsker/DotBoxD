@@ -171,15 +171,34 @@ internal static class RpcKernelDirectClientExtensionEmitter
             _helpers.Append("    private static global::DotBoxD.Plugins.KernelRpcValue ").Append(method)
                 .Append('(').Append(TypeName(type)).AppendLine(" value)");
             _helpers.AppendLine("    {");
+            AppendListWriterBody(type, itemExpression);
+            _helpers.AppendLine("    }");
+            _helpers.AppendLine();
+            return method;
+        }
+
+        private void AppendListWriterBody(ITypeSymbol type, string itemExpression)
+        {
+            if (DotBoxDRpcTypeMapper.SupportsIndexedListWrite(type))
+            {
+                var countExpression = type is IArrayTypeSymbol ? "value.Length" : "value.Count";
+                _helpers.Append("        var __items = new global::DotBoxD.Plugins.KernelRpcValue[")
+                    .Append(countExpression).AppendLine("];");
+                _helpers.Append("        for (var i = 0; i < ").Append(countExpression).AppendLine("; i++)");
+                _helpers.AppendLine("        {");
+                _helpers.AppendLine("            var __item = value[i];");
+                _helpers.Append("            __items[i] = ").Append(itemExpression).AppendLine(";");
+                _helpers.AppendLine("        }");
+                _helpers.AppendLine("        return global::DotBoxD.Plugins.KernelRpcValue.List(__items);");
+                return;
+            }
+
             _helpers.AppendLine("        var __items = new global::System.Collections.Generic.List<global::DotBoxD.Plugins.KernelRpcValue>();");
             _helpers.AppendLine("        foreach (var __item in value)");
             _helpers.AppendLine("        {");
             _helpers.Append("            __items.Add(").Append(itemExpression).AppendLine(");");
             _helpers.AppendLine("        }");
             _helpers.AppendLine("        return global::DotBoxD.Plugins.KernelRpcValue.List(__items.ToArray());");
-            _helpers.AppendLine("    }");
-            _helpers.AppendLine();
-            return method;
         }
 
         private string EnsureListReader(ITypeSymbol type)
@@ -193,14 +212,14 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var method = NextHelperName("Read");
             _readers[key] = method;
             var elementType = DotBoxDRpcTypeMapper.ListElementType(type)!;
-            var itemExpression = ReadExpression(elementType, "__source[i]");
+            var itemExpression = ReadExpression(elementType, "value.GetItem(i)");
             _helpers.Append("    private static global::System.Collections.Generic.List<").Append(TypeName(elementType)).Append("> ")
                 .Append(method).AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.List);");
-            _helpers.AppendLine("        var __source = value.Items;");
-            _helpers.Append("        var __result = new global::System.Collections.Generic.List<").Append(TypeName(elementType)).AppendLine(">(__source.Length);");
-            _helpers.AppendLine("        for (var i = 0; i < __source.Length; i++)");
+            _helpers.AppendLine("        var __count = value.ItemCount;");
+            _helpers.Append("        var __result = new global::System.Collections.Generic.List<").Append(TypeName(elementType)).AppendLine(">(__count);");
+            _helpers.AppendLine("        for (var i = 0; i < __count; i++)");
             _helpers.AppendLine("        {");
             _helpers.Append("            __result.Add(").Append(itemExpression).AppendLine(");");
             _helpers.AppendLine("        }");
@@ -225,7 +244,6 @@ internal static class RpcKernelDirectClientExtensionEmitter
                 .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
             _helpers.AppendLine("    {");
             _helpers.AppendLine("        value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Record);");
-            _helpers.AppendLine("        var __fields = value.Items;");
             _helpers.Append("        return new ").Append(TypeName(type)).Append('(');
             for (var i = 0; i < fields.Count; i++)
             {
@@ -234,7 +252,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
                     _helpers.Append(", ");
                 }
 
-                _helpers.Append(ReadExpression(fields[i].Type, "__fields[" + i + "]"));
+                _helpers.Append(ReadExpression(fields[i].Type, "value.GetItem(" + i + ")"));
             }
             _helpers.AppendLine(");");
             _helpers.AppendLine("    }");
