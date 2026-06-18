@@ -50,6 +50,13 @@ internal static class Program
         sink.Bind(world);
         worldHost.Bind(world);
 
+        // Register an opt-in dynamic event query (DotBoxD.Queryable) alongside the generated plugin path.
+        // It observes attacks for the whole run; its filter/projection is captured as a portable AST and the
+        // server logs the resulting plan below.
+        Console.WriteLine("--- DYNAMIC QUERY (DotBoxD.Queryable) ---");
+        await Queries.DynamicQueries.ConfigureAsync(server).ConfigureAwait(false);
+        Console.WriteLine();
+
         var playerHpBaseline = PlayerHpById(world);
 
         Console.WriteLine("=== DotBoxD.Kernels Game Server (golden example) ===");
