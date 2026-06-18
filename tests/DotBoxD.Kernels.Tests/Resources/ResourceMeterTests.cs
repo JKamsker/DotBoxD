@@ -99,6 +99,21 @@ public sealed class ResourceMeterTests
     }
 
     [Fact]
+    public void Flat_scalar_list_fast_path_matches_shape_scan_fuel_boundary()
+    {
+        var freeMeter = new ResourceMeter(new ResourceLimits(MaxFuel: 0));
+        var freeValue = CreateFlatScalarList(61);
+
+        freeMeter.ChargeValue(freeValue);
+
+        var chargedMeter = new ResourceMeter(new ResourceLimits(MaxFuel: 0));
+        var chargedValue = CreateFlatScalarList(62);
+        var ex = Assert.Throws<SandboxRuntimeException>(() => chargedMeter.ChargeValue(chargedValue));
+
+        Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
+
+    [Fact]
     public void Flat_scalar_list_charge_preserves_resource_usage()
     {
         var meter = new ResourceMeter(new ResourceLimits());
@@ -170,4 +185,11 @@ public sealed class ResourceMeterTests
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
         Assert.Equal(3, meter.HostCalls);
     }
+
+    private static SandboxValue CreateFlatScalarList(int count)
+        => SandboxValue.FromList(
+            Enumerable.Range(0, count)
+                .Select(SandboxValue.FromInt32)
+                .ToArray(),
+            SandboxType.I32);
 }
