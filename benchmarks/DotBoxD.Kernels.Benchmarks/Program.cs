@@ -102,6 +102,11 @@ if (args.Contains("--probe-map-remove", StringComparer.OrdinalIgnoreCase)) {
     return;
 }
 
+if (args.Contains("--probe-list-add-type-match", StringComparer.OrdinalIgnoreCase)) {
+    DotBoxD.Kernels.Benchmarks.Core.ListAddTypeMatchProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-host-call-accounting", StringComparer.OrdinalIgnoreCase)) {
     DotBoxD.Kernels.Benchmarks.Runtime.HostCallAccountingProbe.Run();
     return;

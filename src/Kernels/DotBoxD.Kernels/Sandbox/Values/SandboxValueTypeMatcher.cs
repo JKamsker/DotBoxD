@@ -30,6 +30,34 @@ internal static class SandboxValueTypeMatcher
                record.Fields.Count == expectedType.Arguments.Count;
     }
 
+    public static bool MatchesExactType(SandboxValue value, SandboxType expectedType)
+    {
+        if (expectedType.Name == SandboxType.RecordName)
+        {
+            return value is RecordValue record && RecordMatchesExactType(record, expectedType);
+        }
+
+        return MatchesValidationFrame(value, expectedType);
+    }
+
+    private static bool RecordMatchesExactType(RecordValue record, SandboxType expectedType)
+    {
+        if (record.Fields.Count != expectedType.Arguments.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < record.Fields.Count; i++)
+        {
+            if (!MatchesExactType(record.Fields[i], expectedType.Arguments[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool ScalarMatches(SandboxValue value, string expectedName)
         => value switch
         {
