@@ -57,6 +57,11 @@ if (args.Contains("--probe-value-shape-cache", StringComparer.OrdinalIgnoreCase)
     return;
 }
 
+if (args.Contains("--probe-validated-value-type", StringComparer.OrdinalIgnoreCase)) {
+    DotBoxD.Kernels.Benchmarks.Validation.ValidatedValueTypeProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-compiled-binding-fast-path", StringComparer.OrdinalIgnoreCase)) {
     DotBoxD.Kernels.Benchmarks.Runtime.CompiledBindingFastPathProbe.Run();
     return;

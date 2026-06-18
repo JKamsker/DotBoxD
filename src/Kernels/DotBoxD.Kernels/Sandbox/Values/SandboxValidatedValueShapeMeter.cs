@@ -49,6 +49,11 @@ internal static partial class SandboxValidatedValueShapeMeter
             return scalarShape;
         }
 
+        if (!expectedType.IsKnown())
+        {
+            throw Error(failure);
+        }
+
         var active = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var stack = new Stack<Frame>();
         var shape = new ValueShape(0, 0, 0, 0, 0, 0);
@@ -119,17 +124,11 @@ internal static partial class SandboxValidatedValueShapeMeter
         SandboxType expectedType,
         ValidationFailure failure)
     {
-        if (!IsKnownValueKind(value) ||
-            value.Type != expectedType ||
-            !expectedType.IsKnown())
+        if (!SandboxValueTypeMatcher.MatchesValidationFrame(value, expectedType))
         {
             throw Error(failure);
         }
     }
-
-    private static bool IsKnownValueKind(SandboxValue value)
-        => value is UnitValue or BoolValue or I32Value or I64Value or F64Value or StringValue or OpaqueIdValue
-            or SandboxPathValue or SandboxUriValue or ListValue or MapValue or RecordValue;
 
     private static long AddLong(long current, long amount, string quotaMessage)
     {
