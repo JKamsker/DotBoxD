@@ -37,7 +37,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     {
         _channel = channel;
         _sender = new RpcPeerSender(channel, () => Volatile.Read(ref _closed) != 0);
-        _streams = new RpcStreamManager(serializer, _sender.SendAsync, options.ExceptionTransformer);
+        _streams = new RpcStreamManager(serializer, _sender.SendAsync, options.ExceptionTransformer, _sender.SendFrameValueAsync);
         _inbound = new RpcPeerInboundDispatcher(
             serializer,
             options,
