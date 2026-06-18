@@ -90,7 +90,8 @@ internal sealed class MethodEmitter
                 UpdateF64Facts(assignment.Name, assignment.Value);
                 return false;
             case ReturnStatement ret:
-                if (BoolReturnFastPathEmitter.TryEmit(ret.Value, _il, _stackPlan, Declare))
+                if (BoolReturnFastPathEmitter.TryEmit(ret.Value, _il, _stackPlan, Declare) ||
+                    F64RawReturnEmitter.TryEmit(ret.Value, _function.ReturnType, _bindings, _il, _expressions))
                 {
                     EmitReturnValue();
                     return true;

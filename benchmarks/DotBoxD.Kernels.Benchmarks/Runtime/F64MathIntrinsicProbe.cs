@@ -14,13 +14,16 @@ internal static class F64MathIntrinsicProbe
     {
         _ = MeasureBoxed(Warmup);
         _ = MeasureRaw(Warmup);
+        _ = MeasureRawReturn(Warmup);
 
         var boxed = MeasureBoxed(Iterations);
         var raw = MeasureRaw(Iterations);
+        var rawReturn = MeasureRawReturn(Iterations);
 
         Console.WriteLine($"iterations = {Iterations:N0}");
         Write("boxed direct FloorF64", boxed);
         Write("raw FloorF64Raw", raw);
+        Write("raw FloorF64Raw + box", rawReturn);
         Console.WriteLine($"saved per call: {(boxed.AllocatedBytes - raw.AllocatedBytes) / (double)Iterations:N1} B");
     }
 
@@ -65,6 +68,32 @@ internal static class F64MathIntrinsicProbe
             meter.ChargeHostCall("math.floor", maxCallsPerRun: null);
             meter.ChargeFuel(2);
             total += CompiledRuntime.FloorF64Raw((i % 101) + 0.75);
+        }
+
+        sw.Stop();
+        return new Measurement(
+            sw.Elapsed.TotalMilliseconds,
+            GC.GetAllocatedBytesForCurrentThread() - before,
+            meter.HostCalls,
+            total);
+    }
+
+    private static Measurement MeasureRawReturn(int iterations)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var meter = new ResourceMeter(new ResourceLimits(MaxHostCalls: int.MaxValue, MaxFuel: long.MaxValue));
+        var total = 0.0;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var sw = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; i++)
+        {
+            meter.ChargeHostCall("math.floor", maxCallsPerRun: null);
+            meter.ChargeFuel(2);
+            var value = CompiledRuntime.F64(CompiledRuntime.FloorF64Raw((i % 101) + 0.75));
+            total += ((F64Value)value).Value;
         }
 
         sw.Stop();
