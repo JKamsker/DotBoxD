@@ -120,17 +120,19 @@ internal static class PluginPreparedPackageValidator
             return;
         }
 
-        var localTerminal = false;
+        // Only a PROJECTION RunLocal (LocalTerminal with a declared ProjectedType) returns a non-Unit Handle;
+        // a whole-event RunLocal (no ProjectedType) and an ordinary chain both keep a Unit-returning Handle.
+        var handleReturnsProjection = false;
         foreach (var subscription in package.Manifest.Subscriptions)
         {
-            if (subscription.LocalTerminal)
+            if (subscription.LocalTerminal && subscription.ProjectedType is not null)
             {
-                localTerminal = true;
+                handleReturnsProjection = true;
                 break;
             }
         }
 
-        ValidateReturnTypes(plan, shouldHandle, handle, localTerminal, diagnostics);
+        ValidateReturnTypes(plan, shouldHandle, handle, handleReturnsProjection, diagnostics);
         if (!ParametersMatch(shouldHandle.Parameters, handle.Parameters))
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK034", "Kernel entrypoints must use the same parameter shape."));
@@ -151,7 +153,7 @@ internal static class PluginPreparedPackageValidator
         ExecutionPlan plan,
         SandboxFunction shouldHandle,
         SandboxFunction handle,
-        bool localTerminal,
+        bool handleReturnsProjection,
         List<SandboxDiagnostic> diagnostics)
     {
         if (plan.FunctionAnalysis.TryGetValue(shouldHandle.Id, out var shouldAnalysis) &&
@@ -165,15 +167,16 @@ internal static class PluginPreparedPackageValidator
             return;
         }
 
-        // An ordinary chain's Handle performs a host send and returns Unit. A local-terminal (RunLocal) chain's
-        // Handle RETURNS the projected value the host pushes to the plugin, so it must NOT be Unit.
-        if (localTerminal)
+        // A projection RunLocal chain's Handle RETURNS the projected value (any non-Unit type; the exact type
+        // is enforced when the plugin decodes the pushed value, and may be non-scalar). An ordinary chain and
+        // a whole-event RunLocal (no Select) both keep a Unit Handle.
+        if (handleReturnsProjection)
         {
             if (handleAnalysis.ReturnType == SandboxType.Unit)
             {
                 diagnostics.Add(new SandboxDiagnostic(
                     "DBXK033",
-                    "Local-terminal (RunLocal) kernel Handle entrypoint must return the projected value, not Unit."));
+                    "Projection RunLocal kernel Handle entrypoint must return the projected value, not Unit."));
             }
         }
         else if (handleAnalysis.ReturnType != SandboxType.Unit)
