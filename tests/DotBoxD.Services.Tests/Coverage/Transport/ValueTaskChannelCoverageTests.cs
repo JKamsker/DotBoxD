@@ -121,6 +121,29 @@ public sealed class ValueTaskChannelCoverageTests
     }
 
     [Fact]
+    public async Task InvokeValueAsync_NoResult_FaultsPendingOnce_OnLowAllocationPath()
+    {
+        await using var harness = new ValueTaskInvokerHarness(
+            new RpcPeerOptions
+            {
+                EnableLowAllocationValueTaskInvocations = true,
+                RequestTimeout = System.Threading.Timeout.InfiniteTimeSpan,
+            });
+
+        var call = harness.Invoker.InvokeValueAsync<int>("Svc", "Op", 42);
+
+        Assert.Equal(0, harness.SendTaskCalls);
+        Assert.Equal(1, harness.SendFrameCalls);
+
+        // The pooled no-response IValueTaskSource (PendingValueTaskNoResponse) must surface the connection
+        // failure, and a redundant failure must not re-complete or throw on the already-faulted source.
+        harness.Invoker.FailPending(new ServiceConnectionException("Connection closed."));
+        harness.Invoker.FailPending(new ServiceConnectionException("Connection closed again."));
+
+        await Assert.ThrowsAsync<ServiceConnectionException>(() => call.AsTask().WaitAsync(Timeout));
+    }
+
+    [Fact]
     public async Task InvokeValueAsync_OptInUsesTaskBackedResponsePath_WhenTimeoutOrCancellationIsRequired()
     {
         await using (var timeoutHarness = new ValueTaskInvokerHarness(

@@ -72,6 +72,57 @@ public sealed class Fix_CMP_0034_Tests
         Assert.Equal(ExecutionMode.Compiled, result.ActualMode);
     }
 
+    [Theory]
+    [InlineData("abs")]
+    [InlineData("min")]
+    [InlineData("max")]
+    [InlineData("clamp")]
+    public async Task I32_math_intrinsic_loop_preserves_value_host_calls_and_per_iteration_fuel(string intrinsic)
+    {
+        var interpretedSmall = await RunLoopAsync(intrinsic, ExecutionMode.Interpreted, 50);
+        var interpretedLarge = await RunLoopAsync(intrinsic, ExecutionMode.Interpreted, 100);
+        var compiledSmall = await RunLoopAsync(intrinsic, ExecutionMode.Compiled, 50);
+        var compiledLarge = await RunLoopAsync(intrinsic, ExecutionMode.Compiled, 100);
+
+        Assert.True(interpretedSmall.Succeeded, interpretedSmall.Error?.SafeMessage);
+        Assert.True(interpretedLarge.Succeeded, interpretedLarge.Error?.SafeMessage);
+        Assert.True(compiledSmall.Succeeded, compiledSmall.Error?.SafeMessage);
+        Assert.True(compiledLarge.Succeeded, compiledLarge.Error?.SafeMessage);
+
+        // Result and host-call charges are exact cross-mode invariants.
+        Assert.Equal(((I32Value)interpretedLarge.Value!).Value, ((I32Value)compiledLarge.Value!).Value);
+        Assert.Equal(interpretedLarge.ResourceUsage.HostCalls, compiledLarge.ResourceUsage.HostCalls);
+
+        // Compiled execution adds a fixed per-run fuel overhead over the interpreter, so absolute fuel differs by
+        // a constant. That constant cancels in the delta between two iteration counts, leaving the marginal fuel
+        // charged per loop iteration — which the raw-IL intrinsic fast path must keep identical to the interpreter.
+        Assert.Equal(
+            interpretedLarge.ResourceUsage.FuelUsed - interpretedSmall.ResourceUsage.FuelUsed,
+            compiledLarge.ResourceUsage.FuelUsed - compiledSmall.ResourceUsage.FuelUsed);
+    }
+
+    private static async Task<SandboxExecutionResult> RunLoopAsync(
+        string intrinsic,
+        ExecutionMode mode,
+        int iterations)
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ImportJsonAsync(ModuleJson(intrinsic));
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create()
+                .WithFuel(20_000)
+                .WithMaxHostCalls(1_000)
+                .WithMaxLoopIterations(1_000)
+                .Build());
+
+        return await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromInt32(iterations),
+            new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
+    }
+
     private static int Expected(string intrinsic, int iterations)
     {
         var total = 0;

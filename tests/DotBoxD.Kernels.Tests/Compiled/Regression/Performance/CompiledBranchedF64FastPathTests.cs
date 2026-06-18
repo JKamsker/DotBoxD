@@ -64,6 +64,46 @@ public sealed class CompiledBranchedF64FastPathTests
             "branched f64 fast path should bulk-charge the condition and branch bodies");
     }
 
+    [Fact]
+    public async Task Branched_F64_loop_matches_interpreter_bitwise_and_per_iteration_fuel()
+    {
+        var interpretedSmall = await RunAsync(ExecutionMode.Interpreted, 50);
+        var interpretedLarge = await RunAsync(ExecutionMode.Interpreted, 100);
+        var compiledSmall = await RunAsync(ExecutionMode.Compiled, 50);
+        var compiledLarge = await RunAsync(ExecutionMode.Compiled, 100);
+
+        Assert.True(interpretedSmall.Succeeded, interpretedSmall.Error?.SafeMessage);
+        Assert.True(interpretedLarge.Succeeded, interpretedLarge.Error?.SafeMessage);
+        Assert.True(compiledSmall.Succeeded, compiledSmall.Error?.SafeMessage);
+        Assert.True(compiledLarge.Succeeded, compiledLarge.Error?.SafeMessage);
+
+        // The raw-IL fast path must reproduce the interpreter's f64 result to the last bit (not just 10 decimals).
+        Assert.Equal(
+            BitConverter.DoubleToInt64Bits(((F64Value)interpretedLarge.Value!).Value),
+            BitConverter.DoubleToInt64Bits(((F64Value)compiledLarge.Value!).Value));
+
+        // Compiled execution adds a fixed per-run fuel overhead, so absolute fuel differs by a constant; the
+        // constant cancels in the delta between two iteration counts. The marginal fuel charged per loop iteration
+        // must stay identical even though the fast path bulk-charges the condition and branch bodies.
+        Assert.Equal(
+            interpretedLarge.ResourceUsage.FuelUsed - interpretedSmall.ResourceUsage.FuelUsed,
+            compiledLarge.ResourceUsage.FuelUsed - compiledSmall.ResourceUsage.FuelUsed);
+    }
+
+    private static async Task<SandboxExecutionResult> RunAsync(ExecutionMode mode, int iterations)
+    {
+        using var host = SandboxTestHost.Create(compiler: true);
+        var module = await host.ImportJsonAsync(ModuleJson());
+        var plan = await host.PrepareAsync(
+            module,
+            SandboxPolicyBuilder.Create().WithFuel(20_000).WithMaxLoopIterations(1_000).Build());
+        return await host.ExecuteAsync(
+            plan,
+            "main",
+            SandboxValue.FromInt32(iterations),
+            new SandboxExecutionOptions { Mode = mode, AllowFallbackToInterpreter = false });
+    }
+
     private static double Expected(int iterations)
     {
         var total = 1.0;
