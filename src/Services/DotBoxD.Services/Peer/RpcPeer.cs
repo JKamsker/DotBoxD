@@ -26,6 +26,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
     private readonly RpcStreamManager _streams;
     private readonly object _lifecycleLock = new();
     private readonly IServiceProvider? _serviceProvider;
+    private Dictionary<Type, ProxyCacheEntry>? _proxyCache;
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
     private Task? _disposeTask;
@@ -191,9 +192,33 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             {
                 throw new ObjectDisposedException(nameof(RpcPeer));
             }
-        }
 
-        return GeneratedServiceRegistry.CreateProxy<TService>(this);
+            var serviceType = typeof(TService);
+            if (_proxyCache is not null && _proxyCache.TryGetValue(serviceType, out var cached))
+            {
+                if (cached.RegistryVersion == GeneratedServiceRegistry.CurrentRegistrationVersion)
+                {
+                    return (TService)cached.Proxy;
+                }
+
+                if (GeneratedServiceRegistry.IsRegistrationCurrent(
+                    serviceType,
+                    cached.RegistrationVersion,
+                    out var currentRegistryVersion))
+                {
+                    _proxyCache[serviceType] = new ProxyCacheEntry(
+                        cached.Proxy,
+                        cached.RegistrationVersion,
+                        currentRegistryVersion);
+                    return (TService)cached.Proxy;
+                }
+            }
+
+            var proxy = GeneratedServiceRegistry.CreateProxy(serviceType, this, out var registrationVersion);
+            (_proxyCache ??= new Dictionary<Type, ProxyCacheEntry>())[serviceType] =
+                new ProxyCacheEntry(proxy, registrationVersion, registrationVersion);
+            return (TService)proxy;
+        }
     }
 
     /// <summary>Begins the read loop. Idempotent; safe to call from a fluent chain.</summary>
@@ -332,6 +357,7 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
 
             _disposed = 1;
             Interlocked.Exchange(ref _closed, 1);
+            _proxyCache = null;
             cts = _cts;
             readLoop = _readLoop;
             cts?.Cancel();
@@ -419,4 +445,9 @@ public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
             Disconnected,
             this,
             new RpcDisconnectedEventArgs(_channel.RemoteEndpoint, error));
+
+    private readonly record struct ProxyCacheEntry(
+        object Proxy,
+        long RegistrationVersion,
+        long RegistryVersion);
 }
