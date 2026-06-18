@@ -35,18 +35,31 @@ public static partial class KernelRpcMarshaller
                     nameof(value));
             }
 
-            var items = new List<SandboxValue>();
-            foreach (var item in enumerable)
+            var itemType = SandboxTypeOf(elementType);
+            if (value is ICollection collection)
             {
-                items.Add(ToSandboxValue(item, elementType));
+                var items = new SandboxValue[collection.Count];
+                var index = 0;
+                foreach (var item in enumerable)
+                {
+                    items[index++] = ToSandboxValue(item, elementType);
+                }
+
+                return SandboxValue.FromOwnedList(items, itemType);
             }
 
-            return SandboxValue.FromList(items, SandboxTypeOf(elementType));
+            var values = new List<SandboxValue>();
+            foreach (var item in enumerable)
+            {
+                values.Add(ToSandboxValue(item, elementType));
+            }
+
+            return SandboxValue.FromOwnedList(values.ToArray(), itemType);
         }
 
         if (IsDto(type))
         {
-            var fields = RecordFields(type);
+            var fields = GetRecordShape(type).Fields;
             var values = new SandboxValue[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
@@ -71,18 +84,24 @@ public static partial class KernelRpcMarshaller
 
         if (ElementType(type) is { } elementType && value is ListValue list)
         {
-            var resultList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))!;
+            if (type.IsArray)
+            {
+                return ToArray(list.Values, elementType);
+            }
+
+            var resultList = CreateList(elementType);
             foreach (var item in list.Values)
             {
                 resultList.Add(FromSandboxValue(item, elementType));
             }
 
-            return type.IsArray ? ToArray(resultList, elementType) : resultList;
+            return resultList;
         }
 
         if (IsDto(type) && value is RecordValue record)
         {
-            var fields = RecordFields(type);
+            var shape = GetRecordShape(type);
+            var fields = shape.Fields;
             if (record.Fields.Count != fields.Count)
             {
                 throw new NotSupportedException($"Server extension record has {record.Fields.Count} fields but '{type}' expects {fields.Count}.");
@@ -94,7 +113,7 @@ public static partial class KernelRpcMarshaller
                 arguments[i] = FromSandboxValue(record.Fields[i], fields[i].PropertyType);
             }
 
-            return Construct(type, fields, arguments);
+            return shape.Construct(arguments);
         }
 
         throw new NotSupportedException($"Server extension cannot marshal a sandbox value to type '{type}'.");
@@ -113,7 +132,7 @@ public static partial class KernelRpcMarshaller
         if (ElementType(type) is { } elementType) return SandboxType.List(SandboxTypeOf(elementType));
         if (IsDto(type))
         {
-            var fields = RecordFields(type);
+            var fields = GetRecordShape(type).Fields;
             var fieldTypes = new SandboxType[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
@@ -162,10 +181,14 @@ public static partial class KernelRpcMarshaller
             $"Kernel RPC service nullable type '{type}' is not supported.");
     }
 
-    private static Array ToArray(IList list, Type elementType)
+    private static Array ToArray(IReadOnlyList<SandboxValue> values, Type elementType)
     {
-        var array = Array.CreateInstance(elementType, list.Count);
-        list.CopyTo(array, 0);
+        var array = Array.CreateInstance(elementType, values.Count);
+        for (var i = 0; i < values.Count; i++)
+        {
+            array.SetValue(FromSandboxValue(values[i], elementType), i);
+        }
+
         return array;
     }
 }

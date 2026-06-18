@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
 
@@ -6,7 +7,8 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 public static partial class KernelRpcMarshaller
 {
     private static readonly ConcurrentDictionary<Type, OptionalType> ElementTypeCache = new();
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<PropertyInfo>> RecordFieldCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> ListTypeCache = new();
+    private static readonly ConcurrentDictionary<Type, RecordShape> RecordShapeCache = new();
 
     private static Type? ElementType(Type type)
         => ElementTypeCache.GetOrAdd(type, static candidate => new OptionalType(FindElementType(candidate))).Value;
@@ -44,10 +46,18 @@ public static partial class KernelRpcMarshaller
            !type.IsEnum &&
            ElementType(type) is null &&
            (type.IsClass || type.IsValueType) &&
-           RecordFields(type).Count > 0;
+           GetRecordShape(type).Fields.Count > 0;
 
-    private static IReadOnlyList<PropertyInfo> RecordFields(Type type)
-        => RecordFieldCache.GetOrAdd(type, static candidate =>
+    private static IList CreateList(Type elementType)
+    {
+        var listType = ListTypeCache.GetOrAdd(
+            elementType,
+            static type => typeof(List<>).MakeGenericType(type));
+        return (IList)Activator.CreateInstance(listType)!;
+    }
+
+    private static RecordShape GetRecordShape(Type type)
+        => RecordShapeCache.GetOrAdd(type, static candidate =>
         {
             var properties = new List<PropertyInfo>();
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
@@ -61,80 +71,141 @@ public static partial class KernelRpcMarshaller
             }
 
             properties.Sort(static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
-            return properties;
+            return new RecordShape(candidate, properties.ToArray());
         });
 
-    private static object Construct(Type type, IReadOnlyList<PropertyInfo> fields, object?[] arguments)
+    private sealed class RecordShape
     {
-        foreach (var constructor in type.GetConstructors())
+        private readonly ConstructorInfo? _constructor;
+        private readonly int[] _constructorMap;
+        private readonly bool _constructorUsesFieldOrder;
+        private readonly Type _type;
+
+        public RecordShape(Type type, PropertyInfo[] fields)
         {
-            var parameters = constructor.GetParameters();
-            if (parameters.Length != fields.Count || parameters.Length == 0)
+            _type = type;
+            Fields = fields;
+            (_constructor, _constructorMap) = FindConstructor(type, fields);
+            _constructorUsesFieldOrder = IsIdentityMap(_constructorMap);
+        }
+
+        public IReadOnlyList<PropertyInfo> Fields { get; }
+
+        public object Construct(object?[] arguments)
+        {
+            if (_constructor is not null)
             {
-                continue;
+                return _constructor.Invoke(_constructorUsesFieldOrder ? arguments : OrderArguments(arguments));
             }
 
-            var ordered = new object?[parameters.Length];
-            var assigned = new bool[parameters.Length];
-            var matched = true;
-            for (var i = 0; i < parameters.Length; i++)
+            var instance = Activator.CreateInstance(_type)
+                ?? throw new NotSupportedException($"Server extension could not construct '{_type}'.");
+            for (var i = 0; i < Fields.Count; i++)
+            {
+                Fields[i].SetValue(instance, arguments[i]);
+            }
+
+            return instance;
+        }
+
+        private object?[] OrderArguments(object?[] arguments)
+        {
+            var ordered = new object?[_constructorMap.Length];
+            for (var i = 0; i < ordered.Length; i++)
+            {
+                ordered[i] = arguments[_constructorMap[i]];
+            }
+
+            return ordered;
+        }
+
+        private static (ConstructorInfo? Constructor, int[] Map) FindConstructor(
+            Type type,
+            IReadOnlyList<PropertyInfo> fields)
+        {
+            foreach (var constructor in type.GetConstructors())
+            {
+                var parameters = constructor.GetParameters();
+                if (parameters.Length != fields.Count || parameters.Length == 0)
+                {
+                    continue;
+                }
+
+                var map = new int[parameters.Length];
+                var assigned = new bool[parameters.Length];
+                if (TryMapConstructor(parameters, fields, map, assigned))
+                {
+                    return (constructor, map);
+                }
+            }
+
+            return (null, []);
+        }
+
+        private static bool TryMapConstructor(
+            IReadOnlyList<ParameterInfo> parameters,
+            IReadOnlyList<PropertyInfo> fields,
+            int[] map,
+            bool[] assigned)
+        {
+            for (var i = 0; i < parameters.Count; i++)
             {
                 var fieldIndex = FieldIndex(fields, parameters[i].Name);
                 if (fieldIndex < 0 ||
                     assigned[fieldIndex] ||
                     parameters[i].ParameterType != fields[fieldIndex].PropertyType)
                 {
-                    matched = false;
-                    break;
+                    return false;
                 }
 
-                ordered[i] = arguments[fieldIndex];
+                map[i] = fieldIndex;
                 assigned[fieldIndex] = true;
             }
 
-            if (matched)
-            {
-                return constructor.Invoke(ordered);
-            }
+            return true;
         }
 
-        var instance = Activator.CreateInstance(type)
-            ?? throw new NotSupportedException($"Server extension could not construct '{type}'.");
-        for (var i = 0; i < fields.Count; i++)
+        private static bool IsIdentityMap(IReadOnlyList<int> map)
         {
-            fields[i].SetValue(instance, arguments[i]);
+            for (var i = 0; i < map.Count; i++)
+            {
+                if (map[i] != i)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
-        return instance;
-    }
-
-    private static int FieldIndex(IReadOnlyList<PropertyInfo> fields, string? name)
-    {
-        for (var i = 0; i < fields.Count; i++)
+        private static int FieldIndex(IReadOnlyList<PropertyInfo> fields, string? name)
         {
-            if (string.Equals(fields[i].Name, name, StringComparison.Ordinal))
+            for (var i = 0; i < fields.Count; i++)
             {
-                return i;
+                if (string.Equals(fields[i].Name, name, StringComparison.Ordinal))
+                {
+                    return i;
+                }
             }
+
+            var match = -1;
+            for (var i = 0; i < fields.Count; i++)
+            {
+                if (!string.Equals(fields[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (match >= 0)
+                {
+                    return -1;
+                }
+
+                match = i;
+            }
+
+            return match;
         }
-
-        var match = -1;
-        for (var i = 0; i < fields.Count; i++)
-        {
-            if (!string.Equals(fields[i].Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (match >= 0)
-            {
-                return -1;
-            }
-
-            match = i;
-        }
-
-        return match;
     }
 
     private readonly record struct OptionalType(Type? Value);
