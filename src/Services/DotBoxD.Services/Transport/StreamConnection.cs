@@ -103,7 +103,12 @@ public sealed class StreamConnection : IRpcChannel
 
     public async Task<Payload> ReceiveAsync(CancellationToken ct = default)
     {
-        Interlocked.Increment(ref _activeReceives);
+        var trackActiveReceive = !_ownsStream;
+        if (trackActiveReceive)
+        {
+            Interlocked.Increment(ref _activeReceives);
+        }
+
         try
         {
             ThrowIfDisposed();
@@ -141,7 +146,10 @@ public sealed class StreamConnection : IRpcChannel
         }
         finally
         {
-            Interlocked.Decrement(ref _activeReceives);
+            if (trackActiveReceive)
+            {
+                Interlocked.Decrement(ref _activeReceives);
+            }
         }
     }
 
