@@ -271,13 +271,15 @@ internal static class DotBoxDExpressionModelFactory
         if (member.Expression is IdentifierNameSyntax identifier) {
             // After a Select, the downstream lambda's parameter is the PROJECTED element. A field access on it
             // (dto.X) reads the projection's field by name via record.get — checked BEFORE the event-property
-            // branch so a field that shares a name with an event property is never silently misread as it.
+            // branch so a field that shares a name with an event property is never silently misread as it. If it
+            // is not a record field (e.g. .Count on a projected list), fall through to the general member chain.
             if (context.ProjectedElementName is { } projectedName &&
                 string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal)) {
-                return LowerProjectedRecordField(memberName, context);
+                if (TryLowerProjectedRecordField(memberName, context) is { } projectedField) {
+                    return projectedField;
+                }
             }
-
-            if (string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
+            else if (string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
                 for (var i = 0; i < context.EventProperties.Count; i++) {
                     var property = context.EventProperties[i];
                     if (string.Equals(property.Name, memberName, StringComparison.Ordinal)) {
@@ -297,21 +299,29 @@ internal static class DotBoxDExpressionModelFactory
             return LowerIdentifier(memberName, context);
         }
 
+        // General member chain: a `.Count`/`.Length` read on a list-shaped receiver, or a field read on a record
+        // receiver. The receiver may itself be a projected element, an event property, a host-call result, or a
+        // further chain hop — it is lowered recursively and dispatched on its sandbox shape, so e.g.
+        // `ctx...GetInRange(id, 4).Count` or `dto.Inner.Field` lower. Anything else fails safe.
+        if (TryLowerMemberChain(member, memberName, context) is { } chained) {
+            return chained;
+        }
+
         return Unsupported(member);
     }
 
     // Reads a field of the projected record (after a Select) as record.get(projection, index). The field is
     // matched by name against the projected DTO's declared fields — the same positional order record.new emitted
     // and the kernel parameter / decoder use — so dto.Field crosses to exactly that field's value and type.
-    // Anything that is not a declared field of a record projection fails safe; it is never reinterpreted as an
-    // event property.
-    private static DotBoxDExpressionModel LowerProjectedRecordField(
+    // Returns null when the projection is not a record or has no such field, so the caller can try the general
+    // member chain; it is never reinterpreted as an event property.
+    private static DotBoxDExpressionModel? TryLowerProjectedRecordField(
         string memberName,
         DotBoxDExpressionLoweringContext context)
     {
         if (context.ProjectedElement is { } projected &&
             context.ProjectedElementType is INamedTypeSymbol recordType &&
-            DotBoxDRpcTypeMapper.IsRecordDto(recordType))
+            IsRecordShaped(recordType))
         {
             var fields = DotBoxDRpcTypeMapper.RecordFields(recordType);
             for (var i = 0; i < fields.Count; i++)
@@ -321,19 +331,106 @@ internal static class DotBoxDExpressionModelFactory
                     continue;
                 }
 
-                var source =
-                    $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
-                    $"{LiteralReader.StringLiteral("record.get")}, " +
-                    $"[{projected.Source}, {DotBoxDGenerationNames.Helpers.I32}({i})], null, Span)";
-                return new DotBoxDExpressionModel(
-                    source,
-                    SandboxTypeSourceEmitter.ManifestTag(fields[i].Type),
-                    false);
+                return RecordGet(projected, i, fields[i].Type, allocates: false);
             }
         }
 
-        throw new NotSupportedException(
-            $"Cannot read member '{memberName}' of the projected value; only fields of a projected record are readable.");
+        return null;
+    }
+
+    // The general member chain: lower the receiver expression, then read `.Count`/`.Length` off a list value
+    // (list.count -> i32) or a named field off a record value (record.get -> field type). The receiver's CLR
+    // type drives which read applies; the lowered receiver's sandbox shape is double-checked so a mismatch
+    // fails safe rather than emitting an invalid intrinsic.
+    private static DotBoxDExpressionModel? TryLowerMemberChain(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        var receiverType = ResolveType(member.Expression, context);
+        if (receiverType is null)
+        {
+            return null;
+        }
+
+        if ((string.Equals(memberName, "Count", StringComparison.Ordinal) ||
+             string.Equals(memberName, "Length", StringComparison.Ordinal)) &&
+            IsListShaped(receiverType))
+        {
+            var receiver = Lower(member.Expression, context);
+            if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.List, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var source =
+                $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
+                $"{LiteralReader.StringLiteral("list.count")}, [{receiver.Source}], null, Span)";
+            return new DotBoxDExpressionModel(source, DotBoxDGenerationNames.ManifestTypes.Int, receiver.Allocates);
+        }
+
+        if (receiverType is INamedTypeSymbol named && IsRecordShaped(named))
+        {
+            var fields = DotBoxDRpcTypeMapper.RecordFields(named);
+            for (var i = 0; i < fields.Count; i++)
+            {
+                if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var receiver = Lower(member.Expression, context);
+                if (!string.Equals(receiver.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                return RecordGet(receiver, i, fields[i].Type, receiver.Allocates);
+            }
+        }
+
+        return null;
+    }
+
+    // A type is "record-shaped" only when its marshaller manifest tag is Record — i.e. it is a wire-eligible DTO
+    // and NOT a list/map/scalar. This mirrors SandboxTypeSourceEmitter's list-before-record dispatch and avoids
+    // the trap where IsRecordDto alone is true for a List/collection (which exposes public Count/Capacity
+    // properties) and a field read would be emitted as record.get on a List value.
+    private static bool IsRecordShaped(ITypeSymbol type)
+        => string.Equals(
+            SandboxTypeSourceEmitter.ManifestTag(type),
+            DotBoxDGenerationNames.ManifestTypes.Record,
+            StringComparison.Ordinal);
+
+    private static DotBoxDExpressionModel RecordGet(
+        DotBoxDExpressionModel record,
+        int index,
+        ITypeSymbol fieldType,
+        bool allocates)
+    {
+        var source =
+            $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
+            $"{LiteralReader.StringLiteral("record.get")}, " +
+            $"[{record.Source}, {DotBoxDGenerationNames.Helpers.I32}({index})], null, Span)";
+        return new DotBoxDExpressionModel(source, SandboxTypeSourceEmitter.ManifestTag(fieldType), allocates);
+    }
+
+    private static ITypeSymbol? ResolveType(ExpressionSyntax expression, DotBoxDExpressionLoweringContext context)
+    {
+        var info = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        return info.Type ?? info.ConvertedType;
+    }
+
+    private static bool IsListShaped(ITypeSymbol type)
+    {
+        try
+        {
+            return DotBoxDRpcTypeMapper.ListElementType(type) is not null;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
