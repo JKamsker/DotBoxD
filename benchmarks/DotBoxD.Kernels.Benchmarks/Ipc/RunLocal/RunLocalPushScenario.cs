@@ -113,13 +113,13 @@ internal sealed class RunLocalPushScenario
     }
 
     /// <summary>
-    /// The server-side encode half exactly as the push path runs it: <c>SandboxValue → KernelRpcValue</c> then
-    /// encode into a reused buffer (no per-call array). Returns the byte count so nothing is allocated to observe.
+    /// The server-side encode half exactly as the push path runs it: encode a sandbox value straight into a
+    /// reused buffer (no per-call array). Returns the byte count so nothing is allocated to observe.
     /// </summary>
     public int Encode()
     {
         _encodeWriter.ResetWrittenCount();
-        KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(Payload), _encodeWriter);
+        KernelRpcBinaryCodec.EncodeValue(Payload, _encodeWriter);
         return _encodeWriter.WrittenCount;
     }
 
@@ -136,7 +136,7 @@ internal sealed class RunLocalPushScenario
     public ValueTask RoundTripAsync()
     {
         _encodeWriter.ResetWrittenCount();
-        KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(Payload), _encodeWriter);
+        KernelRpcBinaryCodec.EncodeValue(Payload, _encodeWriter);
         return _registry.DispatchAsync(SubscriptionId, _encodeWriter.WrittenMemory, _context);
     }
 
@@ -150,8 +150,7 @@ internal sealed class RunLocalPushScenario
         return instance;
     }
 
-    private static byte[] Encode(SandboxValue payload)
-        => KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(payload));
+    private static byte[] Encode(SandboxValue payload) => KernelRpcBinaryCodec.EncodeValue(payload);
 
     // Registers the native terminal twice per case: once through the runtime fallback (the 2-arg overload) and
     // once with a generated-shape decoder (the 3-arg path), so the probe/benchmark can compare both decode halves. The

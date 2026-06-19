@@ -15,13 +15,12 @@ public sealed class RemoteLocalHandlerRegistryTests
 {
     private static HookContext Context() => new(new InMemoryPluginMessageSink(), CancellationToken.None);
 
-    // Encodes a CLR value exactly as the server push handler would: marshal to a sandbox value, convert to the
-    // wire IR, then binary-encode.
+    // Encodes a CLR value exactly as the server push handler would: marshal to a sandbox value, then
+    // binary-encode.
     private static byte[] EncodeProjected<T>(T value)
     {
         var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(T));
-        var wire = KernelRpcValueConverter.FromSandboxValue(sandboxValue);
-        return KernelRpcBinaryCodec.EncodeValue(wire);
+        return KernelRpcBinaryCodec.EncodeValue(sandboxValue);
     }
 
     [Fact]

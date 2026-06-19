@@ -849,3 +849,32 @@ WholeEvent     66.7 / 288.0     35.6 /  40.0
 
 The remaining generated decode allocation is now the intrinsic CLR result cost: strings, lists, and DTO objects,
 not the intermediate wire tree.
+
+## RunLocal direct SandboxValue binary encode
+
+The server-side push path now encodes `SandboxValue` straight into the binary payload instead of first building
+a parallel `KernelRpcValue` graph. The old `KernelRpcValue` route remains for compatibility and is used as a
+byte-for-byte parity oracle in codec tests.
+
+Command:
+
+```text
+dotnet run --project benchmarks\DotBoxD.Kernels.Benchmarks\DotBoxD.Kernels.Benchmarks.csproj -c Release -- --probe-runlocal-push
+```
+
+Representative local run, 200k measured iterations. The "before" values are the encode half after generated
+direct binary decode; "after" is direct `SandboxValue` encode:
+
+```text
+Case          Before ms/Bop    After ms/Bop
+Int32          12.0 /   0.0      8.2 /   0.0
+String         20.1 /   0.0     17.9 /   0.0
+Enum           13.2 /   0.0      8.3 /   0.0
+ListInt32      78.6 / 192.0     52.2 /   0.0
+Dto            65.2 / 136.0     44.2 /   0.0
+AnonymousDto   64.1 / 136.0     44.1 /   0.0
+WholeEvent     91.0 / 248.0     58.5 /   0.0
+```
+
+This removes the encode-side intermediate wire tree. Scalar rows were already allocation-free; record and list
+pushes now are too.

@@ -258,7 +258,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     private static byte[] EncodeString(string value)
     {
         var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(string));
-        return KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(sandboxValue));
+        return KernelRpcBinaryCodec.EncodeValue(sandboxValue);
     }
 
     private static PluginPackage LowerToPackage(string source)
