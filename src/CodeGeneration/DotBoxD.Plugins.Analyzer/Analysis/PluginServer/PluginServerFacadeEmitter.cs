@@ -37,7 +37,7 @@ internal static class PluginServerFacadeEmitter
             .Append(" : ").AppendLine(model.ServerInterfaceName);
         builder.AppendLine("{");
         builder.AppendLine("    private const string NotStartedMessage = \"Call StartAsync() before using the server.\";");
-        builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
+        builder.AppendLine("    private readonly global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
         builder.AppendLine("    private readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>> _anonymousKernels = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
@@ -45,6 +45,12 @@ internal static class PluginServerFacadeEmitter
         builder.Append("    private ").Append(model.WorldType).AppendLine("? _world;");
         builder.AppendLine("    private global::DotBoxD.Plugins.Runtime.RemoteHookRegistry? _hooks;");
         builder.AppendLine("    private global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry? _subscriptions;");
+        if (model.EventCallbackType is not null)
+        {
+            // Owns the native RunLocal terminals; the server pushes filtered+projected values back to it via the
+            // reverse event callback provided on the peer in StartAsync.
+            builder.AppendLine("    private readonly global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry _localHandlers = new();");
+        }
         builder.AppendLine("    private global::DotBoxD.Services.Peer.RpcPeerSession? _session;");
         foreach (var control in model.Controls)
         {
@@ -81,13 +87,13 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.Append("    internal ").Append(model.ClassName)
-            .AppendLine("(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory)");
+            .AppendLine("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory)");
         builder.AppendLine("        : this(connectionFactory, setup: null)");
         builder.AppendLine("    {");
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.Append("    internal ").Append(model.ClassName)
-            .Append("(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
+            .Append("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
         builder.AppendLine("    {");
         builder.AppendLine("        _connectionFactory = connectionFactory ?? throw new global::System.ArgumentNullException(nameof(connectionFactory));");
@@ -101,11 +107,32 @@ internal static class PluginServerFacadeEmitter
         PluginServerFacadeSurfaceEmitter.AppendInstallSurface(builder, model);
         PluginServerSetupEmitter.AppendSetupMembers(builder, model);
         AppendLiveSettingsHandle(builder, model);
+        AppendRemoteLocalEventSink(builder, model);
         foreach (var control in model.Controls)
         {
             PluginServerWrapperEmitter.AppendControlWrapper(builder, model, control);
         }
         builder.AppendLine("}");
+    }
+
+    // Generated bridge implementing the discovered reverse event-callback contract. Each server push decodes
+    // through the local-handler registry into the native RunLocal delegate, mirroring the hand-written
+    // CallbackSink the remote-RunLocal IPC tests use. A throwaway message sink is supplied because a RunLocal
+    // terminal performs no host send.
+    private static void AppendRemoteLocalEventSink(StringBuilder builder, PluginServerFacadeModel model)
+    {
+        if (model.EventCallbackType is null)
+        {
+            return;
+        }
+
+        builder.Append("    private sealed class RemoteLocalEventSink : ").AppendLine(model.EventCallbackType);
+        builder.AppendLine("    {");
+        builder.AppendLine("        private readonly global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry _localHandlers;");
+        builder.AppendLine("        public RemoteLocalEventSink(global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry localHandlers) => _localHandlers = localHandlers;");
+        builder.AppendLine("        public global::System.Threading.Tasks.ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, global::System.Threading.CancellationToken ct = default)");
+        builder.AppendLine("            => _localHandlers.DispatchAsync(subscriptionId, projectedValue, new global::DotBoxD.Abstractions.HookContext(new global::DotBoxD.Abstractions.InMemoryPluginMessageSink(), ct), ct);");
+        builder.AppendLine("    }");
     }
 
     private static void AppendLifecycle(StringBuilder builder, PluginServerFacadeModel model)
@@ -121,7 +148,17 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        if (!_started)");
         builder.AppendLine("        {");
         builder.AppendLine("            if (_connectionFactory is null) { throw new global::System.InvalidOperationException(NotStartedMessage); }");
-        builder.AppendLine("            _session = await _connectionFactory(cancellationToken).ConfigureAwait(false);");
+        if (model.EventCallbackType is not null)
+        {
+            // Provide the reverse event-callback sink during the connect (before the peer starts — services can
+            // only be registered then) so the server can push filtered+projected values to native RunLocal
+            // terminals. The sink forwards each pushed event to the facade's local-handler registry.
+            builder.AppendLine("            _session = await _connectionFactory(peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Provide" + model.EventCallbackProvideSuffix + "(peer, new RemoteLocalEventSink(_localHandlers)), cancellationToken).ConfigureAwait(false);");
+        }
+        else
+        {
+            builder.AppendLine("            _session = await _connectionFactory(null, cancellationToken).ConfigureAwait(false);");
+        }
         builder.AppendLine("            var control = _session.Get<" + model.ControlServiceType + ">();");
             builder.AppendLine("            var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(_session.Peer);");
         builder.AppendLine("            Initialize(control, world);");
@@ -172,8 +209,9 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        _control = control;");
         builder.AppendLine("        _world = world;");
-        builder.AppendLine("        _hooks = new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package => InstallPluginPackageAsync(package));");
-        builder.AppendLine("        _subscriptions = new global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry(package => InstallSubscriptionPackageAsync(package));");
+        var localHandlersArg = model.EventCallbackType is not null ? ", _localHandlers" : string.Empty;
+        builder.AppendLine("        _hooks = new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package => InstallPluginPackageAsync(package)" + localHandlersArg + ");");
+        builder.AppendLine("        _subscriptions = new global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry(package => InstallSubscriptionPackageAsync(package)" + localHandlersArg + ");");
         foreach (var control in model.Controls)
         {
             builder.Append("        _").Append(FieldName(control.Name)).Append(" = world is null ? null : new ")

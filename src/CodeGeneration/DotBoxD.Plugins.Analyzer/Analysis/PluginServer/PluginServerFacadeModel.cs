@@ -14,7 +14,14 @@ internal sealed record PluginServerFacadeModel(
     string ControlServiceType,
     string LiveSettingUpdateType,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
-    EquatableArray<PluginServerControlProperty> Controls);
+    EquatableArray<PluginServerControlProperty> Controls,
+    // Reverse server->plugin event-callback contract for remote RunLocal chains, discovered by the
+    // {worldNs}.Ipc.IPluginEventCallback convention (null when the world declares none). When set, the facade
+    // owns a RemoteLocalHandlerRegistry, threads it into the hook/subscription registries, and provides a
+    // generated sink on the peer so the server can push filtered+projected values back to native RunLocal
+    // delegates. EventCallbackProvideSuffix is the generated DotBoxDGeneratedExtensions.Provide{Suffix} name.
+    string? EventCallbackType = null,
+    string? EventCallbackProvideSuffix = null);
 
 internal sealed record PluginServerControlProperty(
     string Name,

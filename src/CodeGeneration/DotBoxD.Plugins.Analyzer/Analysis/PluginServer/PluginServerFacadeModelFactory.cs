@@ -46,6 +46,7 @@ internal static class PluginServerFacadeModelFactory
         var controls = ResolveControls(worldType, cancellationToken);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var controlNs = controlServiceType.ContainingNamespace.ToDisplayString();
+        var eventCallbackType = PluginServerEventCallbackResolver.Resolve(compilation, worldType);
         return new PluginServerFacadeModel(
             ns,
             AccessibilityText(type.DeclaredAccessibility),
@@ -62,7 +63,11 @@ internal static class PluginServerFacadeModelFactory
             "global::" + controlNs + ".LiveSettingUpdate",
             new EquatableArray<PluginServerForwardedMethod>(
                 ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
-            new EquatableArray<PluginServerControlProperty>(controls));
+            new EquatableArray<PluginServerControlProperty>(controls),
+            eventCallbackType is null ? null : TypeName(eventCallbackType),
+            eventCallbackType is null
+                ? null
+                : PluginServerWorldExtensionSuffixResolver.Resolve(compilation, eventCallbackType, cancellationToken));
     }
 
     private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)

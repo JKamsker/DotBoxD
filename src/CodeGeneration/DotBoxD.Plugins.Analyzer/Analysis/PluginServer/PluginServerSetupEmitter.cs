@@ -31,18 +31,18 @@ internal static class PluginServerSetupEmitter
             "Builder for the generated plugin server. Use Setup to record installs without I/O, then Build to create the runtime facade.");
         builder.Append("public sealed class ").Append(model.ClassName).AppendLine("Builder");
         builder.AppendLine("{");
-        builder.AppendLine("    private readonly global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
+        builder.AppendLine("    private readonly global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
         builder.Append("    private readonly ").Append(model.ControlServiceType).AppendLine("? _control;");
         builder.Append("    private readonly ").Append(model.WorldType).AppendLine("? _world;");
         builder.Append("    private global::System.Action<").Append(model.SetupInterfaceName).AppendLine(">? _setup;");
-        builder.AppendLine("    private " + model.ClassName + "Builder(global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory) => _connectionFactory = connectionFactory;");
+        builder.AppendLine("    private " + model.ClassName + "Builder(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory) => _connectionFactory = connectionFactory;");
         builder.AppendLine("    private " + model.ClassName + "Builder(" + model.ControlServiceType + " control, " + model.WorldType + "? world) { _control = control; _world = world; }");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
             "Creates a builder that connects to a running game server by named pipe when StartAsync is called.");
         builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
-        builder.AppendLine("        => new(ct => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, cancellationToken: ct)));");
+        builder.AppendLine("        => new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, configurePeer, cancellationToken: ct)));");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
