@@ -1,10 +1,23 @@
 # Server-Side Projection Pipeline
 
-**Status:** Design / proposed
+**Status:** Implemented (P0–P5); see status note below
 **Author:** (drafted with Claude Code)
 **Related:** [`plugin-fluent-hooks-api`](../plugin-fluent-hooks-api/plan.md), [`remote-plugin-server-builder`](../remote-plugin-server-builder/plan.md), PR #63 (full marshaller type set + `record.get`)
 
 > This doc captures the design for richer **server-side `Where`/`Select` projections** that feed a **client-side `RunLocal`**, so chains like the two below become first-class. It is grounded in the current analyzer/runtime — every claim cites a real symbol.
+
+### Implementation status
+
+| Phase | Delivered | Notes |
+|---|---|---|
+| **P0** record.get downstream-field reads | ✅ | collision-safe; filter-project-filter tests |
+| **P1** `ctx` host calls in `Select` | ✅ | already reachable via `ctx.Host<T>()`; the invocation lowering ignores the receiver, so scalar host reads in `Select` projected to `RunLocal` work end-to-end |
+| **P2** non-scalar host returns | ✅ | host bindings may return list/map/DTO/Guid/enum (verifier + runtime already accept these); analyzer gate relaxed to the marshaller manifest tag |
+| **P3** member-chain reads (`.Count`, fields) | ✅ | recursive `LowerMemberAccess`; `list.count` over a projected list **and** a host-call result; record-field gating fixed to use the manifest tag (a `List` exposes `Count`/`Capacity` and was misread as a record) |
+| **P4** anonymous-type projections | ⚠️ **intermediate only** | anon tuples lower to `record.new` and filter server-side; a **terminal** anon projection is **infeasible** (the interceptor handler parameter cannot name an anonymous type) — such chains are skipped, see §5.4 |
+| **P5** derived-ctor-field handling | ✅ **fail-safe** | a field set only in the ctor body is rejected (chain skipped), never silently dropped; delivered as fail-safe-skip + test rather than a separate analyzer warning (the generator path skips silently and a new diagnostic would churn the diag/baseline catalog) |
+
+The marquee `Where → Select(ctx.…GetInRange(id, 4).Count) → Where(count) → RunLocal` shape (P1+P2+P3) is covered end-to-end against the real binding-dispatch path.
 
 ---
 
@@ -40,7 +53,7 @@ These are written against an **entity-graph** mental model. The platform is deli
 |---|---|
 | Host entities crossing the wire | **Read-only snapshots** — project ids/scalars, not live handles. No reverse-RPC, no client-side mutation of server state. |
 | Side effects (e.g. "set aggro to 0") | A **separate server-side call** keyed by id (the existing `server.Api.Monsters.Get(id).…` service idiom), invoked from `RunLocal`. **Not** in scope as a mutation of the projected snapshot. |
-| Projection shape | **Both** named DTOs *and* anonymous types. |
+| Projection shape | Named DTOs anywhere; anonymous types as **intermediate** server-side projections only (the terminal pushed value must be named — see §5.4). |
 | DTO constructor with derived fields | **Every persisted field is an explicit constructor argument.** The ctor body is **not** replicated into IR (see §5.4). |
 | Aggregates (e.g. "players nearby") | The **worked examples use `GetInRange(...).Count`** (collection host-return + member-chain `.Count`) to **prove the capability** — a scalar `CountInRange` is then a trivial subset, and a real host API would add performant scalar aggregates where needed. Both forms supported. |
 | Host-call lowering | **One dialect** — the hook-chain `Select`/`Where` path reuses the kernel's host-binding lowerer rather than forking. |
@@ -198,22 +211,14 @@ This requires threading the *current sandbox type* down the chain (the context a
 
 > **Every field carried over the wire must be an explicit constructor argument.** The constructor *body* does not run server-side; `Select(e => new MonsterAggroInfo(…, monsterName, …))` must pass `monsterName` in, not derive it inside the ctor. A field set only in the ctor body is absent from the IR record and unreadable by any downstream server-side `record.get`. (An analyzer **diagnostic** should flag a DTO field that is neither a ctor parameter nor otherwise populated — fail loud, not silent.)
 
-**Anonymous types** (`new { A = …, B = … }`): supported by emitting a new `DotBoxDAnonymousObjectCreationExpressionLowerer`:
+**Anonymous types** (`new { A = …, B = … }`) — implemented by `DotBoxDAnonymousObjectCreationExpressionLowerer`, **as intermediate server-side projections only**:
 
-1. Resolve the synthesized type via `model.GetTypeInfo(node)`; it is an `INamedTypeSymbol` and passes `IsRecordDto` (class, public props, declaration order).
-2. Lower each initializer value in declaration order → emit `record.new` (identical to the named path). Downstream `x.A` resolves via `record.get` by member name (§5.3 / PR #63).
-3. **Decode side — the subtle part.** The generated `ReadProjected` decoder lives in the **same compilation** as the user's `RunLocal` lambda, so the anonymous type is *the same CLR type*. But you **cannot name** `<>f__AnonymousType…` in emitted source. Therefore the decoder must **reconstruct with an anonymous-object-creation expression** that mirrors the projection shape exactly:
+1. Resolve the synthesized type via `model.GetTypeInfo(node)`; it is an `INamedTypeSymbol` with `IsAnonymousType` whose `TypeKind` is `Class`, so `IsRecordDto` already treats it as a structural record (public props, declaration order).
+2. Lower each initializer in declaration order → emit `record.new` (identical to the named path). A downstream `Where`/`Select` reads `x.A` via `record.get` by member name (§5.3). So an anonymous tuple can be built server-side, filtered on its fields, and transformed — e.g. `Select(e => new { Id = e.Id, N = … }).Where(x => x.N > 3).Select(x => x.Id)`.
 
-   ```csharp
-   // emitted: never names the synthesized type; relies on same-assembly structural unification
-   new { A = ReadA(value.GetItem(0)), players = ReadPlayers(value.GetItem(1)) }
-   ```
+> **Correction (found during implementation):** an anonymous type **cannot be the terminal (pushed) projection**. The earlier "reconstruct via `new { }`" idea does not solve the real blocker — the generated **interceptor's handler parameter** is typed `Action<TProjected, HookContext>`, and a C# interceptor method signature **cannot name** an anonymous `TProjected`. The decoder return type has the same problem. This is a hard language limitation, not a codegen choice. So a chain whose terminal projection is anonymous is **skipped** (`HookChainModelFactory` returns null when `projectedTypeSymbol.IsAnonymousType`), leaving it un-intercepted rather than emitting code that names `<anonymous type>`.
 
-   Member **names, types, and order** must match the `Select`'s `new { … }` exactly so C# unifies them to one anonymous type. The reconstruction is inlined at the dispatch site (or a generic `static T Read<T>(…, Func<…,T> factory)` helper with `T` inferred) so the unnameable type is never written as a return type.
-
-   This corrects the naive "anonymous types break across assemblies" conclusion: the decoder is **not** in a separate assembly, and it must **not** try to name the type — reconstruct via `new { }`.
-
-**Trade-off to document for authors:** an anonymous projection is **structural, not nominal** — usable only inside the `RunLocal` lambda, never passed to another method. Prefer a named DTO when the value needs to travel further. (This is why both are offered; named is the default recommendation.)
+**Author rule:** the value pushed to `RunLocal` must be a **named** type (record/DTO/scalar/list). Anonymous types are for intermediate stages. This makes named DTOs the default for anything that crosses the wire.
 
 ### 5.5 Read-only snapshots + side effects by id (locked model, G6)
 
