@@ -38,6 +38,9 @@ internal static class DotBoxDExpressionModelFactory
             MemberAccessExpressionSyntax member => LowerMemberAccess(member, context),
             InterpolatedStringExpressionSyntax interpolated =>
                 DotBoxDInterpolatedStringExpressionLowerer.Lower(interpolated, part => Lower(part, context)),
+            BaseObjectCreationExpressionSyntax creation
+                when DotBoxDRecordCreationExpressionLowerer.TryLower(creation, context, part => Lower(part, context)) is { } record =>
+                record,
             LiteralExpressionSyntax literal => DotBoxDLiteralExpressionLowerer.Lower(literal),
             _ => Unsupported(expression)
         };

@@ -142,15 +142,21 @@ internal static class HookChainModelFactory
                 cancellationToken,
                 capabilities,
                 effects);
+        // The CLR type the pushed value carries: the final Select element, or the whole event when there is no
+        // Select. Resolved once and reused for both the Handle return SandboxType (projection chains) and the
+        // reflection-free decoder. Null only for a non-local chain.
+        var projectedTypeSymbol = installKind == HookChainInterceptorInstallKind.LocalCallback
+            ? ProjectedTypeSymbol(stages, eventType, model, cancellationToken)
+            : null;
         var handleReturnType = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? LocalCallbackHandleReturnType(localCallbackProjection)
+            ? LocalCallbackHandleReturnType(localCallbackProjection, projectedTypeSymbol)
             : DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
 
         // The reflection-free decoder for the pushed value's projected type (final Select element, or the whole
         // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
         // keep the reflective 2-arg registration so they do not regress.
         var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? BuildLocalDecoderSource(stages, eventType, model, cancellationToken)
+            ? BuildLocalDecoderSource(projectedTypeSymbol)
             : null;
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
@@ -209,17 +215,10 @@ internal static class HookChainModelFactory
     // terminal handler receives: the final Select element type, or the whole event when there is no Select.
     // Returns null when the type is not wire-eligible (the reader emitter declines) so the chain falls back to
     // the reflective registration.
-    private static string? BuildLocalDecoderSource(
-        IReadOnlyList<HookChainStage> stages,
-        INamedTypeSymbol eventType,
-        SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        var projectedType = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
-        return projectedType is null
+    private static string? BuildLocalDecoderSource(ITypeSymbol? projectedTypeSymbol)
+        => projectedTypeSymbol is null
             ? null
-            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedType);
-    }
+            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedTypeSymbol);
 
     // The CLR type the pushed value decodes to: the final Select body's type (using the same
     // ConvertedType ?? Type resolution as TerminalElementTypeFullName so the generated ReadProjected return
@@ -282,10 +281,26 @@ internal static class HookChainModelFactory
             ? DotBoxDHandleBodyModelFactory.ReturnUnit()
             : DotBoxDHandleBodyModelFactory.ReturnExpression(projection.Value, projection.Prefix);
 
-    private static string LocalCallbackHandleReturnType(HookChainProjection? projection)
-        => projection is null
-            ? DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit"
-            : $"TypeOf({LiteralReader.StringLiteral(projection.Value.Type)})";
+    private static string LocalCallbackHandleReturnType(
+        HookChainProjection? projection,
+        ITypeSymbol? projectedTypeSymbol)
+    {
+        if (projection is null)
+        {
+            // Whole-event push: the Handle returns Unit and the host pushes the event record itself.
+            return DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
+        }
+
+        // A projection chain's Handle returns the projected value, so its return type is the full SandboxType the
+        // projected CLR type maps to (scalar, Guid, enum, list, map, or DTO record). A projection whose type is
+        // not marshaller-eligible yields no source and the chain fails safe (TryCreate returns null, no package).
+        if (projectedTypeSymbol is not null && Rpc.SandboxTypeSourceEmitter.TryEmit(projectedTypeSymbol) is { } source)
+        {
+            return source;
+        }
+
+        throw new NotSupportedException();
+    }
 
     private static DotBoxDStatementBodyModel LowerSendHandle(
         IReadOnlyList<HookChainStage> stages,

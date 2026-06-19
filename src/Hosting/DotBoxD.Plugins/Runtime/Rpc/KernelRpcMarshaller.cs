@@ -181,6 +181,7 @@ public static partial class KernelRpcMarshaller
         if (type == typeof(long)) return SandboxType.I64;
         if (type == typeof(double)) return SandboxType.F64;
         if (type == typeof(string)) return SandboxType.String;
+        if (type == typeof(Guid)) return SandboxType.Guid;
         if (type.IsEnum) return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
         if (ElementType(type) is { } elementType) return SandboxType.List(SandboxTypeOf(elementType));
         if (MapTypes(type) is { } mapTypes)
@@ -211,6 +212,7 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(long) => SandboxValue.FromInt64((long)value!),
             var t when t == typeof(double) => SandboxValue.FromDouble((double)value!),
             var t when t == typeof(string) => SandboxValue.FromString((string)value!),
+            var t when t == typeof(Guid) => SandboxValue.FromGuid((Guid)value!),
             _ => null
         };
 
@@ -223,6 +225,7 @@ public static partial class KernelRpcMarshaller
             (var t, I64Value l) when t == typeof(long) => l.Value,
             (var t, F64Value d) when t == typeof(double) => d.Value,
             (var t, StringValue s) when t == typeof(string) => s.Value,
+            (var t, GuidValue g) when t == typeof(Guid) => g.Value,
             _ => null
         };
         return result is not null;

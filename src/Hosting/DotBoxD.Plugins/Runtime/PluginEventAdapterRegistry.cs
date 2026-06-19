@@ -2,7 +2,7 @@ using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime.Input;
-using DotBoxD.Plugins.Runtime.Lifecycle;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime;
 
@@ -104,13 +104,17 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
         for (var i = 0; i < properties.Count; i++)
         {
             var property = properties[i];
-            var settingType = LiveSettingTypeConverter.FromClrType(property.PropertyType);
+            // Event properties marshal through KernelRpcMarshaller — the full marshaller-eligible set (scalars,
+            // Guid, enums, lists/arrays, maps, and DTO records), not just the 5 live-setting scalars — so the
+            // adapter's parameter shape and per-event values match the SandboxTypes the analyzer now emits for the
+            // kernel (see SandboxTypeSourceEmitter). This is what lets a whole-event RunLocal push the entire
+            // record (Guid id, enum, nested DTO, …) rather than only scalar events.
             _properties[i] = new ConventionEventProperty<TEvent>(
-                settingType,
+                property.PropertyType,
                 CreateGetter(property));
             parameters[i] = new Parameter(
                 EventParameterName(property.Name),
-                LiveSettingTypeConverter.ToSandboxType(settingType));
+                KernelRpcMarshaller.SandboxTypeOf(property.PropertyType));
         }
 
         Parameters = parameters;
@@ -294,9 +298,24 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
 }
 
 internal readonly record struct ConventionEventProperty<TEvent>(
-    string SettingType,
+    Type PropertyType,
     Func<TEvent, object?> Getter)
 {
     public SandboxValue ToSandboxValue(TEvent e)
-        => LiveSettingTypeConverter.ToSandboxValue(SettingType, Getter(e));
+    {
+        var value = Getter(e);
+
+        // The sandbox/wire model has no null. Preserve the historical scalar behaviour of treating a null
+        // string as empty; other null reference-typed properties fail with a clear message instead of the
+        // marshaller's bare ArgumentNullException.
+        if (value is null)
+        {
+            return PropertyType == typeof(string)
+                ? SandboxValue.FromString(string.Empty)
+                : throw new NotSupportedException(
+                    $"Event property of type '{PropertyType}' was null; the sandbox value model has no null.");
+        }
+
+        return KernelRpcMarshaller.ToSandboxValue(value, PropertyType);
+    }
 }

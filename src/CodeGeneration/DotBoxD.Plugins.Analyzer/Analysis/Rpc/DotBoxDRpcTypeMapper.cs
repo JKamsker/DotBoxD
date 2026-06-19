@@ -31,6 +31,11 @@ internal static class DotBoxDRpcTypeMapper
             case SpecialType.System_String: return Scalar("String");
         }
 
+        if (IsGuid(type))
+        {
+            return Scalar("Guid");
+        }
+
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
             return Scalar(EnumUsesI64(enumType) ? "I64" : "I32");
@@ -72,6 +77,12 @@ internal static class DotBoxDRpcTypeMapper
     public static bool IsScalar(ITypeSymbol type)
         => type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Int32
             or SpecialType.System_Int64 or SpecialType.System_Double or SpecialType.System_String;
+
+    /// <summary><see cref="System.Guid"/> is a first-class 16-byte scalar (sandbox <c>Guid</c> kind), distinct
+    /// from <c>string</c>. Detected structurally so it is robust to display-format differences.</summary>
+    public static bool IsGuid(ITypeSymbol type)
+        => type is INamedTypeSymbol { Name: "Guid", ContainingNamespace: { Name: "System" } ns }
+           && ns.ContainingNamespace is { IsGlobalNamespace: true };
 
     /// <summary>The element type of a list-shaped parameter/return (<c>List&lt;T&gt;</c>,
     /// <c>IReadOnlyList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, or <c>T[]</c>), else null.</summary>
