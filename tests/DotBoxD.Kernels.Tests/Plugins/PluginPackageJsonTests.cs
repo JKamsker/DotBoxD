@@ -72,6 +72,21 @@ public sealed class PluginPackageJsonTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-TYPE");
     }
 
+    [Fact]
+    public void Import_rejects_projected_type_that_is_not_a_string()
+    {
+        var json = JsonDamagePackage().Replace(
+            """{ "event": "DamageEvent", "kernel": "JsonDamageKernel" }""",
+            """{ "event": "DamageEvent", "kernel": "JsonDamageKernel", "localTerminal": true, "projectedType": 123 }""",
+            StringComparison.Ordinal);
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "E-JSON-TYPE" &&
+            d.Message.Contains("'projectedType' must be a string", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("3")]
     [InlineData("Cpu, Alloc")]

@@ -5,26 +5,26 @@ public sealed class GamePluginControlServiceSourceTests
     [Fact]
     public void InvokeServerExtensionAsync_uses_owner_checked_kernel_snapshot()
     {
-        var source = File.ReadAllText(GamePluginControlServicePath());
-        var method = ExtractInvokeServerExtensionAsync(source);
+        var source = File.ReadAllText(GamePluginServerExtensionInvokerPath());
+        var method = ExtractInvokeAsync(source);
 
         Assert.DoesNotContain("_server.Kernels.Get(pluginId)", method, StringComparison.Ordinal);
         Assert.Contains("ReferenceEquals(kernel.OwnerId, _session)", method, StringComparison.Ordinal);
     }
 
-    private static string ExtractInvokeServerExtensionAsync(string source)
+    private static string ExtractInvokeAsync(string source)
     {
-        const string startMarker = "public async ValueTask<byte[]> InvokeServerExtensionAsync";
-        const string endMarker = "public ValueTask UpdateSettingsAsync";
+        const string startMarker = "public async ValueTask<byte[]> InvokeAsync";
+        const string endMarker = "private static SandboxFunction RpcEntrypoint";
         var start = source.IndexOf(startMarker, StringComparison.Ordinal);
         var end = source.IndexOf(endMarker, start, StringComparison.Ordinal);
 
-        Assert.True(start >= 0, "InvokeServerExtensionAsync method was not found.");
-        Assert.True(end > start, "UpdateSettingsAsync method marker was not found.");
+        Assert.True(start >= 0, "InvokeAsync method was not found.");
+        Assert.True(end > start, "RpcEntrypoint method marker was not found.");
         return source[start..end];
     }
 
-    private static string GamePluginControlServicePath()
+    private static string GamePluginServerExtensionInvokerPath()
         => Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..",
@@ -36,5 +36,5 @@ public sealed class GamePluginControlServiceSourceTests
             "GameServer",
             "Examples.GameServer.Server",
             "Ipc",
-            "GamePluginControlService.cs"));
+            "GamePluginServerExtensionInvoker.cs"));
 }

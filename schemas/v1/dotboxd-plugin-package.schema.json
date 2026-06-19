@@ -136,6 +136,14 @@
         "indexCoversPredicate": {
           "type": "boolean",
           "description": "True only when the verified predicate is exactly the conjunction of indexedPredicates, so a host whose index check passes may skip the verified IR. Optional; defaults to false."
+        },
+        "localTerminal": {
+          "type": "boolean",
+          "description": "True for a lowered RunLocal chain: the verified IR filters and projects server-side and the host pushes only the projected value to the plugin's native delegate. Optional; defaults to false."
+        },
+        "projectedType": {
+          "type": "string",
+          "description": "The manifest type of the Select projection a local-terminal chain returns (bool/int/long/double/string). Optional; present only when localTerminal is true."
         }
       }
     },

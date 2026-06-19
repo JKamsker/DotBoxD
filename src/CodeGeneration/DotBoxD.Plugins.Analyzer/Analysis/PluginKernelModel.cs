@@ -15,11 +15,36 @@ internal sealed record PluginKernelModel(
     EquatableArray<EventPropertyModel> EventProperties,
     EquatableArray<LiveSettingModel> LiveSettings,
     DotBoxDStatementBodyModel ShouldHandle,
-    DotBoxDHandleModel Handle,
+    DotBoxDStatementBodyModel HandleBody,
+    string HandleReturnTypeSource,
     EquatableArray<string> ManifestEffects,
     EquatableArray<string> RequiredCapabilities,
     EquatableArray<IndexPredicateModel> IndexPredicates,
-    bool IndexCoversPredicate);
+    bool IndexCoversPredicate)
+{
+    /// <summary>
+    /// True for a lowered remote <c>RunLocal</c> chain: the verified IR filters and projects server-side and
+    /// the host pushes only the result back to the plugin's native delegate. Default false for ordinary chains.
+    /// </summary>
+    public bool LocalTerminal { get; init; }
+
+    /// <summary>
+    /// The manifest type the <c>Select</c> projection returns, or <c>null</c> for a whole-event
+    /// <c>RunLocal</c> (no <c>Select</c>). The runtime treats a null <see cref="ProjectedType"/> on a
+    /// <see cref="LocalTerminal"/> chain as a whole-event push and a non-null one as a projection push,
+    /// so the payload kind needs no separate persisted field.
+    /// </summary>
+    public string? ProjectedType { get; init; }
+
+    /// <summary>
+    /// The generated reflection-free <c>ReadProjected(KernelRpcValue) -&gt; TProjected</c> reader (plus its
+    /// conversion helpers) for a <see cref="LocalTerminal"/> chain whose projected type is wire-eligible, or
+    /// <c>null</c> when there is no decoder (not a local chain, or the type falls back to the reflective decode
+    /// path). Stored as an equatable string so an <c>ITypeSymbol</c> never crosses the incremental provider
+    /// boundary; the emitter appends it verbatim to the package class.
+    /// </summary>
+    public string? LocalDecoderSource { get; init; }
+}
 
 internal sealed record EventPropertyModel(string Name, string Type);
 

@@ -1,0 +1,44 @@
+namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+
+using System.Text;
+using Microsoft.CodeAnalysis;
+
+/// <summary>
+/// Emits the reflection-free, box-free reader a lowered remote <c>RunLocal</c> chain uses to turn the pushed
+/// <c>KernelRpcValue</c> back into its projected CLR type — the decode-side counterpart to the runtime's
+/// <c>LocalCallbackProjection</c> encode. It reuses <see cref="RpcKernelValueConversionEmitter"/>,
+/// the same proven reader the server-extension client proxy emits, so RunLocal decode rides the same
+/// generated path: scalars/enums from typed <c>KernelRpcValue</c> fields, lists/arrays via <c>GetItem(i)</c>,
+/// and DTOs through the real constructor with field-count guards — no <c>SandboxValue</c> graph, no reflection.
+/// </summary>
+internal static class RpcLocalDecoderEmitter
+{
+    /// <summary>
+    /// Returns the <c>ReadProjected</c> method plus its conversion helpers for appending to the per-chain
+    /// package class, or <c>null</c> when <paramref name="projectedType"/> is not wire-eligible — in which case
+    /// the chain keeps the reflective 2-arg registration so non-eligible types do not regress.
+    /// </summary>
+    public static string? TryEmit(ITypeSymbol projectedType)
+    {
+        try
+        {
+            var conv = new RpcKernelValueConversionEmitter();
+            // Compute the read expression first: it appends any nested list/DTO helpers to conv.Helpers, so the
+            // ReadProjected body never splices a helper into the middle of itself.
+            var readExpression = conv.ReadExpression(projectedType, "value");
+            var typeName = projectedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+            var builder = new StringBuilder();
+            builder.Append("    public static ").Append(typeName)
+                .AppendLine(" ReadProjected(global::DotBoxD.Plugins.KernelRpcValue value)");
+            builder.Append("        => ").Append(readExpression).AppendLine(";");
+            builder.AppendLine();
+            builder.Append(conv.Helpers);
+            return builder.ToString();
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+}
