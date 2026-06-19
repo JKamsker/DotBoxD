@@ -25,6 +25,7 @@ public static partial class KernelRpcMarshaller
         private readonly ConstructorInfo? _constructor;
         private readonly int[] _constructorMap;
         private readonly Func<object, object?>[] _getters;
+        private readonly Func<KernelRpcValue, object>? _kernelFactory;
         private readonly Func<RecordValue, object>? _recordFactory;
         private readonly Type _type;
 
@@ -35,6 +36,7 @@ public static partial class KernelRpcMarshaller
             _getters = CreateGetters(fields);
             (_constructor, _constructorMap) = FindConstructor(type, fields);
             _recordFactory = CreateRecordFactory(_constructor, _constructorMap, fields);
+            _kernelFactory = RecordShapeKernelFactory.Create(_constructor, _constructorMap, fields);
         }
 
         public IReadOnlyList<PropertyInfo> Fields { get; }
@@ -53,6 +55,22 @@ public static partial class KernelRpcMarshaller
             for (var i = 0; i < Fields.Count; i++)
             {
                 arguments[i] = FromSandboxValue(record.Fields[i], Fields[i].PropertyType);
+            }
+
+            return ConstructFromArguments(arguments);
+        }
+
+        public object Construct(KernelRpcValue value)
+        {
+            if (_kernelFactory is not null)
+            {
+                return _kernelFactory(value);
+            }
+
+            var arguments = new object?[Fields.Count];
+            for (var i = 0; i < Fields.Count; i++)
+            {
+                arguments[i] = FromKernelRpcValue(value.GetItem(i), Fields[i].PropertyType);
             }
 
             return ConstructFromArguments(arguments);

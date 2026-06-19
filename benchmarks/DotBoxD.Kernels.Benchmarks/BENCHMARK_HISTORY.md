@@ -787,3 +787,34 @@ AnonymousDto  decode-gen   52.9    200.0
 
 The generated anonymous decoder removes the `SandboxValue` fallback path for this shape: about 36% less decode
 time and 112 fewer bytes/op in this probe run.
+
+## Runtime RunLocal fallback direct KernelRpcValue decode
+
+Changed `RemoteLocalHandlerRegistry`'s 2-arg registration path from `KernelRpcValue -> SandboxValue ->
+KernelRpcMarshaller.FromSandboxValue` to a direct `KernelRpcValue -> CLR` marshaller. DTO constructor shapes use
+the same cached `RecordShape` metadata and now compile a `KernelRpcValue` constructor delegate alongside the
+existing `SandboxValue` delegate.
+
+Command:
+
+```text
+dotnet run --project benchmarks\DotBoxD.Kernels.Benchmarks\DotBoxD.Kernels.Benchmarks.csproj -c Release -- --probe-runlocal-push
+```
+
+Representative local run, 200k measured iterations. The "before" values are the previous ledger run for the
+2-arg fallback decode half; "after" is after direct `KernelRpcValue` fallback decode:
+
+```text
+Case          Before ms/Bop    After ms/Bop
+Int32          55.1 /  24.0     27.3 /  24.0
+String         77.0 /  64.0     33.0 /  40.0
+Enum           59.9 /  24.0     30.7 /  24.0
+ListInt32     305.3 / 480.0     92.4 / 336.0
+Dto           188.8 / 312.0     61.9 / 200.0
+AnonymousDto   83.3 / 312.0     81.3 / 200.0
+WholeEvent     68.8 / 416.0     81.9 / 288.0
+```
+
+The direct fallback removes the `SandboxValue` graph from 2-arg dispatch. DTO/anonymous fallback allocation now
+matches the generated decoder's intrinsic object/string cost in this probe; wall-clock remains noisier for the
+wider record rows, but the allocation reduction is stable.

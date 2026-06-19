@@ -123,7 +123,7 @@ internal sealed class RunLocalPushScenario
         return _encodeWriter.WrittenCount;
     }
 
-    /// <summary>The client-side decode half via the reflective fallback (SandboxValue graph + reflection).</summary>
+    /// <summary>The client-side decode half via the runtime fallback decoder.</summary>
     public ValueTask DecodeInvokeAsync() => _registry.DispatchAsync(SubscriptionId, Encoded, _context);
 
     /// <summary>
@@ -153,8 +153,8 @@ internal sealed class RunLocalPushScenario
     private static byte[] Encode(SandboxValue payload)
         => KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(payload));
 
-    // Registers the native terminal twice per case: once reflectively (the 2-arg fallback) and once with a
-    // generated-shape decoder (the 3-arg path), so the probe/benchmark can compare the two decode halves. The
+    // Registers the native terminal twice per case: once through the runtime fallback (the 2-arg overload) and
+    // once with a generated-shape decoder (the 3-arg path), so the probe/benchmark can compare both decode halves. The
     // generated decoders read straight off KernelRpcValue's typed fields — byte-for-byte what
     // RpcKernelValueConversionEmitter emits — so they faithfully model the generator's output.
     private void Register(RunLocalPushCase scenario)

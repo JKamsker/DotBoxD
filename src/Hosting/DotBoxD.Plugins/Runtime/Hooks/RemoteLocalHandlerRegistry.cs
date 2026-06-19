@@ -43,13 +43,12 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(handler);
 
-        // Reflective fallback: convert the pushed wire value through the SandboxValue graph and reconstruct the
-        // CLR value by reflection. Used when the projected type has no generated decoder (not wire-eligible).
-        var expectedType = KernelRpcMarshaller.SandboxTypeOf(typeof(TProjected));
+        // Runtime fallback: validate the projected type once, then decode straight from KernelRpcValue. This is
+        // used when the projected type has no generated decoder, so it avoids the SandboxValue graph on dispatch.
+        _ = KernelRpcMarshaller.SandboxTypeOf(typeof(TProjected));
         return RegisterHandler(subscriptionId, (wireValue, context) =>
         {
-            var sandboxValue = KernelRpcValueConverter.ToSandboxValue(wireValue, expectedType);
-            var projected = (TProjected)KernelRpcMarshaller.FromSandboxValue(sandboxValue, typeof(TProjected))!;
+            var projected = (TProjected)KernelRpcMarshaller.FromKernelRpcValue(wireValue, typeof(TProjected))!;
             return handler(projected, context);
         });
     }

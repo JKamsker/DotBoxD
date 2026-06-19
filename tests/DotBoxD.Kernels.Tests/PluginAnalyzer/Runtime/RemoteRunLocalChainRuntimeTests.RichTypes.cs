@@ -43,7 +43,7 @@ public sealed record EncounterEvent(
 /// Rich-type coverage for remote <c>RunLocal</c>: a whole-event push of an event carrying Guid/enum/array/nested
 /// DTO, and projections to each non-scalar kind (Guid, enum, list, nested DTO, and a constructed
 /// <c>new Dto(...)</c>). Every case asserts the value survives the full server-filter -&gt; server-project/encode
-/// -&gt; wire -&gt; decode path with field-level fidelity, over BOTH decode paths (the reflective fallback and the
+/// -&gt; wire -&gt; decode path with field-level fidelity, over BOTH decode paths (the runtime fallback and the
 /// generated reflection-free decoder), and that filtering stays server-side.
 /// </summary>
 public sealed partial class RemoteRunLocalChainRuntimeTests
@@ -249,8 +249,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         return pushed[0];
     }
 
-    // The reflective fallback decode path (RemoteLocalHandlerRegistry's 2-arg Register): wire -> SandboxValue ->
-    // CLR via reflection.
+    // The runtime fallback decode path (RemoteLocalHandlerRegistry's 2-arg Register): wire -> CLR without a
+    // generated decoder.
     private static T DecodeReflective<T>(byte[] payload)
     {
         var wire = KernelRpcBinaryCodec.DecodeValue(payload);
