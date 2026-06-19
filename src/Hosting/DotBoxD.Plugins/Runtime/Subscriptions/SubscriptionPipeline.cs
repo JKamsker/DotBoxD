@@ -148,8 +148,39 @@ public sealed class SubscriptionPipeline<TEvent> : IKernelHandlerPipeline
     public SubscriptionPipeline<TEvent> Use(InstalledKernel kernel)
     {
         kernel.ValidateFor(_adapter);
-        var handler = (Func<TEvent, HookContext, ValueTask>)
-            ((e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
+        AddKernelHandler(kernel, (e, context) => kernel.InvokeAsync(_adapter, e, context.CancellationToken));
+        return this;
+    }
+
+    public SubscriptionPipeline<TEvent> Use<TKernel>() where TKernel : class
+        => Use(_kernels.GetByKernelType<TKernel>());
+
+    /// <summary>
+    /// Wires a lowered <b>local-terminal</b> subscription chain (a remote <c>RunLocal</c> chain): the lowered
+    /// <c>Where</c>/<c>Select</c> always run here in the sandbox, and for each event that passes the filter the
+    /// projected value is encoded and handed to <paramref name="push"/> for delivery across the IPC boundary to
+    /// the plugin's native delegate. Non-matching events never reach <paramref name="push"/>.
+    /// </summary>
+    public SubscriptionPipeline<TEvent> UseProjecting(InstalledKernel kernel, string subscriptionId, Hooks.RemoteLocalPush push)
+    {
+        ArgumentNullException.ThrowIfNull(kernel);
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(push);
+        kernel.ValidateFor(_adapter);
+        var wholeEvent = Hooks.LocalCallbackProjection.IsWholeEvent(kernel.Manifest);
+        if (wholeEvent)
+        {
+            Hooks.LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
+        }
+
+        AddKernelHandler(kernel, (e, context) =>
+            Hooks.LocalCallbackProjection.PushAsync(kernel, _adapter, e, context, wholeEvent, subscriptionId, push));
+
+        return this;
+    }
+
+    private void AddKernelHandler(InstalledKernel kernel, Func<TEvent, HookContext, ValueTask> handler)
+    {
         lock (_gate)
         {
             _handlers = [.. _handlers, handler];
@@ -161,12 +192,7 @@ public sealed class SubscriptionPipeline<TEvent> : IKernelHandlerPipeline
 
             handlers.Add(handler);
         }
-
-        return this;
     }
-
-    public SubscriptionPipeline<TEvent> Use<TKernel>() where TKernel : class
-        => Use(_kernels.GetByKernelType<TKernel>());
 
     internal bool UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => ReferenceEquals(_adapter, adapter);

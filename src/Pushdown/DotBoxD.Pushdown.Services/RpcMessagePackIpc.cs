@@ -120,6 +120,27 @@ public static class RpcMessagePackIpc
         return ConnectAsync(new NamedPipeClientTransport(serverName, pipeName), options, cancellationToken);
     }
 
+    /// <summary>
+    /// Connects to a named-pipe server and, when <paramref name="configurePeer"/> is supplied, registers
+    /// bidirectional services on the peer before it starts — the only point at which a client may provide a
+    /// reverse callback (e.g. a remote <c>RunLocal</c> event sink). A <c>null</c> callback connects without
+    /// registering any client-side service. The pipe name is validated as in the other overloads.
+    /// </summary>
+    public static Task<RpcPeerSession> ConnectNamedPipeAsync(
+        string pipeName,
+        Action<RpcPeer>? configurePeer,
+        NamedPipeTransportOptions? namedPipeOptions = null,
+        RpcPeerOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var pipeOptions = namedPipeOptions ?? NamedPipeTransportOptions.Default;
+        ValidatePipeName(pipeName, pipeOptions);
+        var transport = new NamedPipeClientTransport(".", pipeName);
+        return configurePeer is null
+            ? ConnectAsync(transport, options, cancellationToken)
+            : ConnectAsync(transport, configurePeer, options, cancellationToken);
+    }
+
     private static void ValidatePipeName(string pipeName, NamedPipeTransportOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

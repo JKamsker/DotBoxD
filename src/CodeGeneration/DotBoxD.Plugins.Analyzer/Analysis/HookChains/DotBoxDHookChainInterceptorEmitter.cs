@@ -44,9 +44,16 @@ internal static class DotBoxDHookChainInterceptorEmitter
                 .AppendLine("(");
             builder.Append("            this ").Append(interception.ReceiverTypeFullName).AppendLine(" pipeline,");
             builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler)");
-            builder.Append("            => pipeline.UseGeneratedChain(")
+            builder.Append("            => pipeline.")
+                .Append(interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback
+                    ? "UseGeneratedLocalChain"
+                    : "UseGeneratedChain")
+                .Append('(')
                 .Append(interception.PackageFullName)
-                .AppendLine(".Create());");
+                .Append(interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback
+                    ? ".Create(), handler"
+                    : ".Create()")
+                .AppendLine(");");
         }
 
         builder.AppendLine("    }");
