@@ -14,7 +14,7 @@
 | **P1** `ctx` host calls in `Select` | ✅ | already reachable via `ctx.Host<T>()`; the invocation lowering ignores the receiver, so scalar host reads in `Select` projected to `RunLocal` work end-to-end |
 | **P2** non-scalar host returns | ✅ | host bindings may return list/map/DTO/Guid/enum (verifier + runtime already accept these); analyzer gate relaxed to the marshaller manifest tag |
 | **P3** member-chain reads (`.Count`, fields) | ✅ | recursive `LowerMemberAccess`; `list.count` over a projected list **and** a host-call result; record-field gating fixed to use the manifest tag (a `List` exposes `Count`/`Capacity` and was misread as a record) |
-| **P4** anonymous-type projections | ⚠️ **intermediate only** | anon tuples lower to `record.new` and filter server-side; a **terminal** anon projection is **infeasible** (the interceptor handler parameter cannot name an anonymous type) — such chains are skipped, see §5.4 |
+| **P4** anonymous-type projections | ✅ **intermediate + terminal** | anon tuples lower to `record.new` and filter server-side; a **terminal** anon projection is wired by a **generic interceptor** (Roslyn infers the type parameters at the call site, so the source never names the anon type) and decoded by the **reflective registration** via the anon type's public positional constructor — full round-trip, see §5.4 |
 | **P5** derived-ctor-field handling | ✅ **fail-safe** | a field set only in the ctor body is rejected (chain skipped), never silently dropped; delivered as fail-safe-skip + test rather than a separate analyzer warning (the generator path skips silently and a new diagnostic would churn the diag/baseline catalog) |
 
 The marquee `Where → Select(ctx.…GetInRange(id, 4).Count) → Where(count) → RunLocal` shape (P1+P2+P3) is covered end-to-end against the real binding-dispatch path.
@@ -53,7 +53,7 @@ These are written against an **entity-graph** mental model. The platform is deli
 |---|---|
 | Host entities crossing the wire | **Read-only snapshots** — project ids/scalars, not live handles. No reverse-RPC, no client-side mutation of server state. |
 | Side effects (e.g. "set aggro to 0") | A **separate server-side call** keyed by id (the existing `server.Api.Monsters.Get(id).…` service idiom), invoked from `RunLocal`. **Not** in scope as a mutation of the projected snapshot. |
-| Projection shape | Named DTOs anywhere; anonymous types as **intermediate** server-side projections only (the terminal pushed value must be named — see §5.4). |
+| Projection shape | Named DTOs anywhere; anonymous types both as **intermediate** server-side projections and as the **terminal** pushed value (wired by a generic interceptor + reflective decode — see §5.4). Named DTOs remain the default (fast generated decoder; nominal/shareable). |
 | DTO constructor with derived fields | **Every persisted field is an explicit constructor argument.** The ctor body is **not** replicated into IR (see §5.4). |
 | Aggregates (e.g. "players nearby") | The **worked examples use `GetInRange(...).Count`** (collection host-return + member-chain `.Count`) to **prove the capability** — a scalar `CountInRange` is then a trivial subset, and a real host API would add performant scalar aggregates where needed. Both forms supported. |
 | Host-call lowering | **One dialect** — the hook-chain `Select`/`Where` path reuses the kernel's host-binding lowerer rather than forking. |
@@ -216,9 +216,22 @@ This requires threading the *current sandbox type* down the chain (the context a
 1. Resolve the synthesized type via `model.GetTypeInfo(node)`; it is an `INamedTypeSymbol` with `IsAnonymousType` whose `TypeKind` is `Class`, so `IsRecordDto` already treats it as a structural record (public props, declaration order).
 2. Lower each initializer in declaration order → emit `record.new` (identical to the named path). A downstream `Where`/`Select` reads `x.A` via `record.get` by member name (§5.3). So an anonymous tuple can be built server-side, filtered on its fields, and transformed — e.g. `Select(e => new { Id = e.Id, N = … }).Where(x => x.N > 3).Select(x => x.Id)`.
 
-> **Correction (found during implementation):** an anonymous type **cannot be the terminal (pushed) projection**. The earlier "reconstruct via `new { }`" idea does not solve the real blocker — the generated **interceptor's handler parameter** is typed `Action<TProjected, HookContext>`, and a C# interceptor method signature **cannot name** an anonymous `TProjected`. The decoder return type has the same problem. This is a hard language limitation, not a codegen choice. So a chain whose terminal projection is anonymous is **skipped** (`HookChainModelFactory` returns null when `projectedTypeSymbol.IsAnonymousType`), leaving it un-intercepted rather than emitting code that names `<anonymous type>`.
+**Terminal anonymous projections — supported via a generic interceptor.** An earlier iteration believed a terminal anonymous projection was infeasible (the interceptor's `Action<TProjected, HookContext>` handler parameter can't *name* an anonymous type in source). The resolution: an anonymous type has a real **metadata identity** — it's a legal type *argument* even though it has no source-nameable name — so the interceptor is emitted as a **generic method** and Roslyn infers the type arguments (including the anonymous one) at the intercepted call site:
 
-**Author rule:** the value pushed to `RunLocal` must be a **named** type (record/DTO/scalar/list). Anonymous types are for intermediate stages. This makes named DTOs the default for anything that crosses the wire.
+```csharp
+[InterceptsLocation(...)]
+public static RemoteHookPipeline<TEvent> Intercept_0<TEvent, TCurrent>(
+    this RemoteHookStage<TEvent, TCurrent> pipeline,        // TCurrent binds to the anon type
+    System.Action<TCurrent, HookContext> handler)
+    => pipeline.UseGeneratedLocalChain(Package.Create(), handler);   // 2-arg reflective form, no decoder
+```
+
+Key points:
+- The interceptor's generic **arity must match** the interceptable method's context (CS9177): `RunLocal` lives on `RemoteHookStage<TEvent, TCurrent>`, so **both** type arguments become parameters (`HookChainModelFactory.RewriteWithTypeParameters` abstracts every receiver type argument; the emitter writes the `<TEvent, TCurrent>` list).
+- **No `ReadProjected` decoder** is emitted for the anon case (a static method cannot declare an un-nameable return type) — `HasLocalDecoder` is false and the chain uses the **2-arg reflective registration** (`RemoteLocalHandlerRegistry.Register<TProjected>`), which reconstructs the anonymous type unchanged: anon types are DTO-shaped (public positional constructor + declaration-order properties), so `KernelRpcMarshaller.FromSandboxValue` builds them like any record.
+- **Fody is not involved.** C# interceptor call-site redirection is resolved by Roslyn *during* compilation, so a Cecil-injected interceptor (added post-build) would never be wired — even though Cecil *can* name an anon type by metadata token. The generic interceptor is the correct vector; reflection is the decode path.
+
+**Author guidance:** a named record/DTO is still the default for the pushed value (nominal, shareable, and it keeps the fast generated decoder). An anonymous terminal works but uses the slower reflective decode and is structural-only — usable inside the `RunLocal` lambda, never passed onward.
 
 ### 5.5 Read-only snapshots + side effects by id (locked model, G6)
 

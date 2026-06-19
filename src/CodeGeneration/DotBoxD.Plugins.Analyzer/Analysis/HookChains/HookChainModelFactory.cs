@@ -149,24 +149,21 @@ internal static class HookChainModelFactory
             ? ProjectedTypeSymbol(stages, eventType, model, cancellationToken)
             : null;
 
-        // An anonymous type cannot be the TERMINAL (pushed) projection: the generated interceptor's handler
-        // parameter and the reflection-free decoder must NAME the projected type, and a C# anonymous type has no
-        // nameable identity. Skip the chain (leave it un-intercepted) rather than emit code that names an
-        // <anonymous type>. Anonymous types stay usable as INTERMEDIATE, server-side projections — those resolve
-        // to a named terminal type and never reach here.
-        if (projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true })
-        {
-            return null;
-        }
+        // An anonymous type CAN be the terminal (pushed) projection — it has a real metadata identity Roslyn can
+        // infer as a type ARGUMENT — but it has no C#-source-nameable name. The interceptor handles it by binding
+        // the projection slot as a generic type PARAMETER (see Interception), and NO reflection-free decoder is
+        // emitted (a ReadProjected method cannot declare an anonymous return type); the chain falls back to the
+        // reflective registration, which reconstructs the anonymous type via its public positional constructor.
+        var projectionIsUnnameable = projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true };
 
         var handleReturnType = installKind == HookChainInterceptorInstallKind.LocalCallback
             ? LocalCallbackHandleReturnType(localCallbackProjection, projectedTypeSymbol)
             : DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
 
         // The reflection-free decoder for the pushed value's projected type (final Select element, or the whole
-        // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
-        // keep the reflective 2-arg registration so they do not regress.
-        var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
+        // event when there is no Select). Null for a non-local chain, an un-nameable (anonymous) projection, or a
+        // type that is not wire-eligible — those keep the reflective 2-arg registration so they do not regress.
+        var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback && !projectionIsUnnameable
             ? BuildLocalDecoderSource(projectedTypeSymbol)
             : null;
 
@@ -219,6 +216,7 @@ internal static class HookChainModelFactory
                 generatedRemoteKind,
                 installKind.Value,
                 localDecoderSource is not null,
+                projectedTypeSymbol,
                 cancellationToken));
     }
 
@@ -354,6 +352,7 @@ internal static class HookChainModelFactory
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         HookChainInterceptorInstallKind installKind,
         bool hasLocalDecoder,
+        ITypeSymbol? projectedTypeSymbol,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
@@ -371,6 +370,33 @@ internal static class HookChainModelFactory
             model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
             ReceiverKind(receiverType) is not null)
         {
+            // When the terminal projection is an anonymous type, neither the receiver (RemoteHookStage<TEvent, T>)
+            // nor the handler (Func/Action<T, ...>) can spell T in C# source. Emit a GENERIC interceptor whose
+            // arity matches the interceptable method's generic context (CS9177): EVERY receiver type argument
+            // becomes a type parameter (reusing the receiver's own parameter names), and the receiver/handler/
+            // return types reference those parameters. Roslyn infers them — including the anonymous one — at the
+            // call site, so the emitted source never names the anonymous type.
+            if (projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true } &&
+                method.Parameters[0].Type is INamedTypeSymbol handlerType)
+            {
+                var typeParameters = receiverType.ConstructedFrom.TypeParameters;
+                var substitution = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
+                for (var i = 0; i < receiverType.TypeArguments.Length && i < typeParameters.Length; i++)
+                {
+                    substitution[receiverType.TypeArguments[i]] = typeParameters[i].Name;
+                }
+
+                return new HookChainInterception(
+                    location.GetInterceptsLocationAttributeSyntax(),
+                    RewriteWithTypeParameters(receiverType, substitution),
+                    RewriteWithTypeParameters(handlerType, substitution),
+                    RewriteWithTypeParameters((INamedTypeSymbol)method.ReturnType, substitution),
+                    packageFullName,
+                    installKind,
+                    hasLocalDecoder,
+                    string.Join(", ", typeParameters.Select(parameter => parameter.Name)));
+            }
+
             return new HookChainInterception(
                 location.GetInterceptsLocationAttributeSyntax(),
                 receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -395,6 +421,34 @@ internal static class HookChainModelFactory
             installKind,
             generatedRemoteKind.Value,
             hasLocalDecoder);
+    }
+
+    // The fully-qualified display of <paramref name="type"/> with any type (at any nesting depth) present in
+    // <paramref name="substitution"/> replaced by its type-parameter name. Used to spell a generic interceptor's
+    // receiver/handler/return when a type argument is an un-nameable anonymous type.
+    private static string RewriteWithTypeParameters(ITypeSymbol type, Dictionary<ISymbol, string> substitution)
+    {
+        if (substitution.TryGetValue(type, out var parameterName))
+        {
+            return parameterName;
+        }
+
+        if (type is not INamedTypeSymbol { IsGenericType: true } named)
+        {
+            return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+
+        var prefix = named.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : named.ContainingNamespace.ToDisplayString() + ".";
+        var arguments = new List<string>(named.TypeArguments.Length);
+        foreach (var argument in named.TypeArguments)
+        {
+            arguments.Add(RewriteWithTypeParameters(argument, substitution));
+        }
+
+        return DotBoxDGenerationNames.TypeNames.GlobalPrefix + prefix + named.Name +
+            "<" + string.Join(", ", arguments) + ">";
     }
 
     private static string TerminalElementTypeFullName(

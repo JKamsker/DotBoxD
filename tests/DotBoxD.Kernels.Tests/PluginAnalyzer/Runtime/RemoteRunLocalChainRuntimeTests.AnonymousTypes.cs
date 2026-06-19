@@ -1,11 +1,16 @@
+using System.Reflection;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Hooks;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 /// <summary>
-/// P4 coverage: anonymous-object projections as INTERMEDIATE server-side stages. An anonymous type lowers to the
-/// same <c>record.new</c> as a named DTO, and a downstream <c>Where</c>/<c>Select</c> reads its fields via
-/// <c>record.get</c> — all server-side. The anonymous value is never pushed (the terminal projects a NAMED type),
-/// because the generated interceptor cannot name an anonymous type for the pushed value. Shares the
-/// <see cref="RemoteRunLocalChainRuntimeTests"/> harness.
+/// P4 coverage: anonymous-object projections, both as INTERMEDIATE server-side stages (lowering to the same
+/// <c>record.new</c> as a named DTO, fields read via <c>record.get</c>) and as the TERMINAL pushed value. A terminal
+/// anonymous projection is wired by a GENERIC interceptor whose type parameters Roslyn infers at the call site (the
+/// source never names the anonymous type) and decoded by the reflective registration via the anonymous type's
+/// public positional constructor. Shares the <see cref="RemoteRunLocalChainRuntimeTests"/> harness.
 /// </summary>
 public sealed partial class RemoteRunLocalChainRuntimeTests
 {
@@ -58,12 +63,59 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         """;
 
     [Fact]
-    public void Anonymous_terminal_projection_is_skipped_and_emits_valid_code()
+    public void Anonymous_terminal_projection_emits_a_generic_interceptor_that_compiles()
     {
-        // An anonymous type as the PUSHED value cannot be intercepted (the interceptor handler parameter and the
-        // decoder must name the projected type). The chain is skipped rather than emitting a ReadProjected that
-        // names <anonymous type> — so generation stays valid. Compile asserts emit success internally.
+        // The terminal projection is anonymous. Instead of skipping, the generator emits a GENERIC interceptor
+        // whose projection slot is a TProjected type parameter that Roslyn binds to the anonymous type at the call
+        // site — so the emitted source never names the anonymous type. Compile asserts the generic interceptor is
+        // valid C# that actually binds to the intercepted call (the load-bearing guarantee), and no ReadProjected
+        // decoder (which could not name an anonymous return type) is emitted.
         _ = Compile(AnonymousTerminalSource, enableInterceptors: true);
+        var generated = GeneratedSource(AnonymousTerminalSource);
+        Assert.Contains("Intercept_0<TEvent, TCurrent>", generated);
+        Assert.DoesNotContain("ReadProjected", generated);
+    }
+
+    private const string AnonTerminalRoundTripSource = Prelude + """
+        public static class AnonTerminalRoundTripUsage
+        {
+            public static readonly System.Collections.Generic.List<string> Received = new();
+
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<Ev.EncounterEvent>().Where(e => e.Distance <= 4)
+                    .Select(e => new { Id = e.EncounterId, Zone = e.Zone })
+                    .RunLocal((x, ctx) => { Received.Add(x.Id.ToString() + "|" + x.Zone); });
+        }
+        """;
+
+    [Fact]
+    public async Task Anonymous_terminal_projection_round_trips_to_the_native_run_local_delegate()
+    {
+        // Full client+server round-trip. The server projects the anonymous { Id, Zone } and pushes it; the generic
+        // interceptor wires the native RunLocal delegate, which receives the anonymous instance reconstructed by the
+        // reflective registration (anonymous types are DTO-shaped: public positional ctor + declaration-order props).
+        var payload = await PushFirstMatching(AnonTerminalRoundTripSource, Matching, Filtered);
+
+        var assembly = Compile(AnonTerminalRoundTripSource, enableInterceptors: true);
+        PluginPackage? installed = null;
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        var registry = new RemoteHookRegistry(
+            package => { installed = package; return ValueTask.FromResult(package.Manifest.PluginId); },
+            localHandlers);
+
+        var usage = assembly.GetType("ChainSample.AnonTerminalRoundTripUsage")!;
+        usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]);
+        Assert.NotNull(installed);   // the generic interceptor ran UseGeneratedLocalChain (did not throw)
+
+        await localHandlers.DispatchAsync(
+            installed!.Manifest.PluginId,
+            payload,
+            new HookContext(new InMemoryPluginMessageSink(), System.Threading.CancellationToken.None));
+
+        var received = (System.Collections.Generic.List<string>)usage
+            .GetField("Received", BindingFlags.Public | BindingFlags.Static)!
+            .GetValue(null)!;
+        Assert.Equal($"{SampleId}|crypt", Assert.Single(received));
     }
 
     [Fact]
