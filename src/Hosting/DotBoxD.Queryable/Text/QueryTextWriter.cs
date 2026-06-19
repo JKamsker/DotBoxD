@@ -111,6 +111,18 @@ internal static class QueryTextWriter
             case QueryValueKind.String:
                 WriteString(value.String ?? string.Empty, builder);
                 break;
+            case QueryValueKind.Decimal:
+                builder.Append(QueryValue.CanonicalDecimal(value.Decimal)).Append('m');
+                break;
+            case QueryValueKind.UnsignedInteger:
+                builder.Append(value.UnsignedInteger.ToString(CultureInfo.InvariantCulture)).Append('u');
+                break;
+            case QueryValueKind.Guid:
+                builder.Append("guid(\"").Append(value.Guid.ToString("D")).Append("\")");
+                break;
+            case QueryValueKind.Timestamp:
+                builder.Append("ts(\"").Append(QueryValue.CanonicalTimestamp(value.Timestamp)).Append("\")");
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(value), value.Kind, "Unknown value kind.");
         }

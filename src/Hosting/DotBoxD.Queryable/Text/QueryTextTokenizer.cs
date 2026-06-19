@@ -152,6 +152,17 @@ internal static class QueryTextTokenizer
             }
         }
 
+        // Typed numeric suffix: 'm'/'M' (decimal) or 'u'/'U' (unsigned). Consume one into the token so the
+        // parser can disambiguate it (e.g. 1.10m -> decimal, 42u -> ulong). Guard against eating into a word.
+        if (index < text.Length && text[index] is 'm' or 'M' or 'u' or 'U')
+        {
+            var after = index + 1;
+            if (after >= text.Length || !(char.IsLetterOrDigit(text[after]) || text[after] == '_'))
+            {
+                index++;
+            }
+        }
+
         return text[start..index];
     }
 

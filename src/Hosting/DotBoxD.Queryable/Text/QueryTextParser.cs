@@ -120,6 +120,8 @@ internal static class QueryTextParser
             case QueryTokenKind.Number:
                 cursor.Advance();
                 return ParseNumber(token.Text);
+            case QueryTokenKind.Word when token.Text is "guid" or "ts":
+                return ParseTaggedValue(cursor, token.Text);
             case QueryTokenKind.Word:
                 cursor.Advance();
                 return token.Text switch
@@ -136,6 +138,20 @@ internal static class QueryTextParser
 
     private static QueryValue ParseNumber(string raw)
     {
+        if (raw.Length > 1 && raw[^1] is 'm' or 'M')
+        {
+            return decimal.TryParse(raw[..^1], NumberStyles.Number, CultureInfo.InvariantCulture, out var dec)
+                ? QueryValue.FromDecimal(dec)
+                : throw new QueryTranslationException($"Invalid decimal '{raw}' in query text.");
+        }
+
+        if (raw.Length > 1 && raw[^1] is 'u' or 'U')
+        {
+            return ulong.TryParse(raw[..^1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var unsigned)
+                ? QueryValue.FromUnsignedInteger(unsigned)
+                : throw new QueryTranslationException($"Invalid unsigned integer '{raw}' in query text.");
+        }
+
         if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
         {
             return QueryValue.FromInteger(integer);
@@ -147,6 +163,32 @@ internal static class QueryTextParser
         }
 
         throw new QueryTranslationException($"Invalid number '{raw}' in query text.");
+    }
+
+    // Tag-prefixed value literals: guid("…") and ts("…"). The quoted form keeps the value's '-'/':' from
+    // tripping the number/operator lexers, and parsing always normalizes a timestamp to a UTC instant.
+    private static QueryValue ParseTaggedValue(Cursor cursor, string tag)
+    {
+        cursor.Advance(); // the tag word (guid/ts)
+        cursor.ExpectSymbol("(");
+        var inner = cursor.Current;
+        if (inner.Kind != QueryTokenKind.String)
+        {
+            throw new QueryTranslationException($"Expected a quoted value after '{tag}('.");
+        }
+
+        cursor.Advance();
+        cursor.ExpectSymbol(")");
+        return tag switch
+        {
+            "guid" => Guid.TryParse(inner.Text, out var g)
+                ? QueryValue.FromGuid(g)
+                : throw new QueryTranslationException($"Invalid guid '{inner.Text}' in query text."),
+            "ts" => DateTimeOffset.TryParse(inner.Text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dto)
+                ? QueryValue.FromTimestamp(dto)
+                : throw new QueryTranslationException($"Invalid timestamp '{inner.Text}' in query text."),
+            _ => throw new QueryTranslationException($"Unknown value tag '{tag}'."),
+        };
     }
 
     private sealed class Cursor(IReadOnlyList<QueryToken> tokens)

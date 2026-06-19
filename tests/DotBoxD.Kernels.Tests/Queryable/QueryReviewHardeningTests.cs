@@ -44,11 +44,11 @@ public sealed class QueryReviewHardeningTests
     }
 
     [Fact]
-    public void Ulong_backed_enum_constant_is_captured_as_a_number_without_overflowing()
+    public void Ulong_backed_enum_constant_is_captured_as_an_exact_unsigned_integer()
     {
         Assert.True(QueryValue.TryFromObject(UlongBackedEnum.Max, out var value));
-        Assert.Equal(QueryValueKind.Number, value.Kind);
-        Assert.Equal((double)ulong.MaxValue, value.Number);
+        Assert.Equal(QueryValueKind.UnsignedInteger, value.Kind);
+        Assert.Equal(ulong.MaxValue, value.UnsignedInteger);
     }
 
     [Fact]

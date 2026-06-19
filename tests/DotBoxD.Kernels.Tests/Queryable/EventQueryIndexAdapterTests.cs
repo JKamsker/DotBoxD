@@ -80,7 +80,7 @@ public sealed class EventQueryIndexAdapterTests
     }
 
     [Fact]
-    public void Floating_point_and_unsigned_members_map_to_the_double_token()
+    public void Floating_point_member_maps_to_the_double_token()
     {
         var doubleField = EventQueryIndexAdapter
             .ToIndexedPredicates(EventQueryPlanner.Plan(
@@ -88,14 +88,20 @@ public sealed class EventQueryIndexAdapterTests
             .Single(p => p.Path == "Score");
         Assert.Equal("double", doubleField.ValueType);
         Assert.Equal(1.5d, doubleField.Value);
+    }
 
-        // ulong is widened to double on capture, so its index bound is double-typed too.
-        var unsignedField = EventQueryIndexAdapter
-            .ToIndexedPredicates(EventQueryPlanner.Plan(
-                ExpressionQueryTranslator.TranslateFilter<UnsignedTestEvent>(e => e.Big == 5UL)))
-            .Single(p => p.Path == "Big");
-        Assert.Equal("double", unsignedField.ValueType);
-        Assert.Equal(5d, unsignedField.Value);
+    [Fact]
+    public void Unsigned_member_is_host_index_ineligible_but_equality_routable()
+    {
+        // ulong is now an exact kind the host index vocabulary (bool/int/long/double/string) cannot carry, so
+        // it is excluded from host IndexedPredicates and re-verified residually — but its equality still routes
+        // through the dispatcher's own composite index.
+        var plan = EventQueryPlanner.Plan(
+            ExpressionQueryTranslator.TranslateFilter<UnsignedTestEvent>(e => e.Big == 5UL));
+
+        Assert.DoesNotContain(plan.IndexedPredicates, p => p.Path == "Big");
+        Assert.Empty(EventQueryIndexAdapter.ToIndexedPredicates(plan));
+        Assert.Contains(plan.RoutingKeys, p => p.Path == "Big");
     }
 
     [Fact]

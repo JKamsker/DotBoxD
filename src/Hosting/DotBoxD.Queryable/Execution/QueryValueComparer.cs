@@ -5,12 +5,14 @@ namespace DotBoxD.Queryable.Execution;
 
 /// <summary>
 /// Compares a runtime member value against a portable <see cref="QueryValue"/> for a given
-/// <see cref="QueryComparisonOperator"/>. Integral values are compared exactly (a <see cref="QueryValueKind.Integer"/>
-/// literal against an integral member never loses precision through a <see cref="double"/> round-trip), integral
-/// and floating values still interoperate by widening to <see cref="double"/>, enums compare by their underlying
-/// value, strings ordinally (optionally ignoring case, including for ordered comparisons), and booleans by value.
-/// Incomparable operand pairs evaluate to <see langword="false"/> rather than throwing — and an incomparable
-/// pair is also <see langword="false"/> under <see cref="QueryComparisonOperator.NotEqual"/>, never a match.
+/// <see cref="QueryComparisonOperator"/>. Exact numeric kinds (<see cref="QueryValueKind.Integer"/>,
+/// <see cref="QueryValueKind.Decimal"/>, <see cref="QueryValueKind.UnsignedInteger"/>) compare via the widest
+/// EXACT common type (<see cref="decimal"/>) so no precision is lost — only a genuine <see cref="QueryValueKind.Number"/>
+/// (float/double) operand falls back to a <see cref="double"/> comparison. GUIDs compare by equality only,
+/// timestamps by their UTC instant (ordered), strings ordinally (optionally ignoring case, including ordered
+/// comparisons), and booleans by value. Incomparable operand pairs evaluate to <see langword="false"/> rather
+/// than throwing — and an incomparable pair is also <see langword="false"/> under
+/// <see cref="QueryComparisonOperator.NotEqual"/>, never a match.
 /// </summary>
 public static class QueryValueComparer
 {
@@ -85,21 +87,11 @@ public static class QueryValueComparer
 
                 break;
             case QueryValueKind.Integer:
-                // Exact integral comparison when the runtime value is genuinely integral; otherwise widen to
-                // double so an integral literal still interoperates with a floating-point member.
-                if (TryToInt64(actual, out var i))
-                {
-                    equal = i == expected.Integer;
-                    return true;
-                }
-
-                if (TryToDouble(actual, out var di))
-                {
-                    equal = di.Equals((double)expected.Integer);
-                    return true;
-                }
-
-                break;
+                return TryAreNumericEqual(actual, (decimal)expected.Integer, () => (double)expected.Integer, out equal);
+            case QueryValueKind.UnsignedInteger:
+                return TryAreNumericEqual(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger, out equal);
+            case QueryValueKind.Decimal:
+                return TryAreNumericEqual(actual, expected.Decimal, () => (double)expected.Decimal, out equal);
             case QueryValueKind.Number:
                 if (TryToDouble(actual, out var dn))
                 {
@@ -108,6 +100,42 @@ public static class QueryValueComparer
                 }
 
                 break;
+            case QueryValueKind.Guid:
+                if (actual is Guid g)
+                {
+                    equal = g == expected.Guid;
+                    return true;
+                }
+
+                break;
+            case QueryValueKind.Timestamp:
+                if (TryToInstantTicks(actual, out var ticks))
+                {
+                    equal = ticks == expected.Timestamp.UtcTicks;
+                    return true;
+                }
+
+                break;
+        }
+
+        equal = false;
+        return false;
+    }
+
+    // Exact comparison for the integral/decimal kinds: when the runtime value is exact-numeric, compare via
+    // decimal (no precision loss, full ulong range); only a float/double member falls back to double.
+    private static bool TryAreNumericEqual(object actual, decimal expected, Func<double> expectedAsDouble, out bool equal)
+    {
+        if (TryToDecimal(actual, out var dm))
+        {
+            equal = dm == expected;
+            return true;
+        }
+
+        if (TryToDouble(actual, out var d))
+        {
+            equal = d.Equals(expectedAsDouble());
+            return true;
         }
 
         equal = false;
@@ -119,21 +147,33 @@ public static class QueryValueComparer
         switch (expected.Kind)
         {
             case QueryValueKind.Integer:
-                if (TryToInt64(actual, out var i))
-                {
-                    return i.CompareTo(expected.Integer);
-                }
-
-                return TryToDouble(actual, out var di) ? di.CompareTo((double)expected.Integer) : null;
+                return OrderedNumeric(actual, (decimal)expected.Integer, () => (double)expected.Integer);
+            case QueryValueKind.UnsignedInteger:
+                return OrderedNumeric(actual, (decimal)expected.UnsignedInteger, () => (double)expected.UnsignedInteger);
+            case QueryValueKind.Decimal:
+                return OrderedNumeric(actual, expected.Decimal, () => (double)expected.Decimal);
             case QueryValueKind.Number:
                 return TryToDouble(actual, out var dn) ? dn.CompareTo(expected.Number) : null;
+            case QueryValueKind.Timestamp:
+                return TryToInstantTicks(actual, out var ticks) ? ticks.CompareTo(expected.Timestamp.UtcTicks) : null;
             case QueryValueKind.String:
                 return actual is string s
                     ? string.Compare(s, expected.String, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
                     : null;
             default:
+                // Guid (and Null/Boolean) have no meaningful ordering -> range operators evaluate false.
                 return null;
         }
+    }
+
+    private static int? OrderedNumeric(object? actual, decimal expected, Func<double> expectedAsDouble)
+    {
+        if (TryToDecimal(actual, out var dm))
+        {
+            return dm.CompareTo(expected);
+        }
+
+        return TryToDouble(actual, out var d) ? d.CompareTo(expectedAsDouble()) : null;
     }
 
     private static bool StringMatch(object? actual, QueryValue expected, bool ignoreCase, MatchMode mode)
@@ -153,23 +193,21 @@ public static class QueryValueComparer
         };
     }
 
-    // Exact Int64 view of a genuinely integral runtime value (integer types, in-range ulong, non-ulong enums).
-    // Floating-point and over-range/ulong-backed values return false so callers fall back to a double compare.
-    private static bool TryToInt64(object? value, out long result)
+    // Exact decimal view of an exact-numeric runtime value (all integral types incl. full-range ulong, decimal,
+    // and enums by their underlying value). Returns false for float/double/bool/string/null so those fall back
+    // to a double comparison. bool is explicitly excluded (Convert.ToDecimal(true) would yield 1m).
+    private static bool TryToDecimal(object? value, out decimal result)
     {
         switch (value)
         {
-            case sbyte or byte or short or ushort or int or uint or long:
-                result = Convert.ToInt64(value, CultureInfo.InvariantCulture);
+            case sbyte or byte or short or ushort or int or uint or long or ulong or decimal:
+                result = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
                 return true;
-            case ulong u when u <= long.MaxValue:
-                result = (long)u;
-                return true;
-            case Enum e when Enum.GetUnderlyingType(e.GetType()) != typeof(ulong):
-                result = Convert.ToInt64(e, CultureInfo.InvariantCulture);
+            case Enum e:
+                result = Convert.ToDecimal(e, CultureInfo.InvariantCulture);
                 return true;
             default:
-                result = 0;
+                result = 0m;
                 return false;
         }
     }
@@ -198,6 +236,32 @@ public static class QueryValueComparer
                     result = 0;
                     return false;
                 }
+        }
+    }
+
+    // Normalizes DateTime/DateTimeOffset/DateOnly to a single UTC instant in ticks (same Unspecified->UTC
+    // policy as QueryValue.FromTimestamp so a captured literal and a runtime member compare consistently).
+    private static bool TryToInstantTicks(object? value, out long ticks)
+    {
+        switch (value)
+        {
+            case DateTimeOffset dto:
+                ticks = dto.UtcTicks;
+                return true;
+            case DateTime dt:
+                ticks = (dt.Kind switch
+                {
+                    DateTimeKind.Utc => new DateTimeOffset(dt, TimeSpan.Zero),
+                    DateTimeKind.Local => new DateTimeOffset(dt),
+                    _ => new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc), TimeSpan.Zero),
+                }).UtcTicks;
+                return true;
+            case DateOnly d:
+                ticks = new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).UtcTicks;
+                return true;
+            default:
+                ticks = 0;
+                return false;
         }
     }
 
