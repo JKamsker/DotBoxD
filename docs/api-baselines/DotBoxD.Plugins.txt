@@ -353,6 +353,7 @@ public ValueTask ModifyAsync( Action<TSettings> modify, bool atomic = false, Can
 public ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
 public ValueTask<InstalledKernel> InstallAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public ValueTask<InstalledKernel> InstallServerExtensionAsync( PluginPackage package, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
+public void Clear() => _handlers.Clear()
 public void Dispose()
 public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
 public void Publish<TEvent>(TEvent value, CancellationToken cancellationToken = default)
