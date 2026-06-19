@@ -29,7 +29,7 @@ public static partial class KernelRpcMarshaller
         if (type.IsEnum)
         {
             return EnumUsesI64(type)
-                ? SandboxValue.FromInt64(Convert.ToInt64(value))
+                ? SandboxValue.FromInt64(EnumToInt64(value, type))
                 : SandboxValue.FromInt32(Convert.ToInt32(value));
         }
 
@@ -301,4 +301,11 @@ public static partial class KernelRpcMarshaller
         var underlying = Enum.GetUnderlyingType(type);
         return underlying == typeof(uint) || underlying == typeof(long) || underlying == typeof(ulong);
     }
+
+    // A ulong-backed enum value above long.MaxValue overflows a range-checked Convert.ToInt64; reinterpret its
+    // bits instead so the value carries losslessly (decode uses Enum.ToObject, which is also bit-preserving).
+    private static long EnumToInt64(object value, Type type)
+        => Enum.GetUnderlyingType(type) == typeof(ulong)
+            ? unchecked((long)Convert.ToUInt64(value))
+            : Convert.ToInt64(value);
 }

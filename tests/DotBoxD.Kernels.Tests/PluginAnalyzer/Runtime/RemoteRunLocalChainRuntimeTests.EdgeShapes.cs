@@ -10,6 +10,18 @@ public enum WideEnum : long
     Wide = 5_000_000_000L
 }
 
+/// <summary>A <c>ulong</c>-backed enum whose top value exceeds <c>long.MaxValue</c> — the value a range-checked
+/// <c>Convert.ToInt64</c> would overflow on; the bit-preserving path must carry it losslessly.</summary>
+public enum HugeEnum : ulong
+{
+    Zero = 0,
+    Top = 0xFFFFFFFFFFFFFFFF
+}
+
+/// <summary>An event carrying a <see cref="HugeEnum"/> property, exercising the marshaller's enum encode path
+/// (ConventionEventAdapter) for a ulong value above <c>long.MaxValue</c> in a whole-event push.</summary>
+public sealed record HugeEnumEvent(int Distance, HugeEnum Big);
+
 /// <summary>An event with a <see cref="List{T}"/> property — a different encode/decode path than <c>int[]</c>.</summary>
 public sealed record ScoreEvent(int Threshold, List<int> Scores);
 
@@ -153,5 +165,54 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
 
         Assert.Equal(WideEnum.Wide, DecodeReflective<WideEnum>(payload));
         Assert.Equal(WideEnum.Wide, DecodeGenerated<WideEnum>(WideEnumConstantSource, payload));
+    }
+
+    private const string HugeEnumConstantSource = Prelude + """
+        public static class HugeEnumConstantUsage
+        {
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<Ev.EncounterEvent>().Where(e => e.Distance <= 4)
+                    .Select(e => Ev.HugeEnum.Top).RunLocal((h, ctx) => { });
+        }
+        """;
+
+    private const string HugeEnumEventSource = Prelude + """
+        public static class HugeEnumEventUsage
+        {
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<Ev.HugeEnumEvent>().Where(e => e.Distance <= 4).RunLocal((e, ctx) => { });
+        }
+        """;
+
+    [Fact]
+    public async Task Ulong_enum_constant_above_long_max_round_trips()
+    {
+        // HugeEnum.Top = ulong.MaxValue, above long.MaxValue: the analyzer's value-preserving (unchecked) constant
+        // lowering carries the bits where a range-checked Convert.ToInt64 would overflow, and the decoder recovers it.
+        var payload = await PushFirstMatching(HugeEnumConstantSource, Matching, Filtered);
+
+        Assert.Equal(HugeEnum.Top, DecodeReflective<HugeEnum>(payload));
+        Assert.Equal(HugeEnum.Top, DecodeGenerated<HugeEnum>(HugeEnumConstantSource, payload));
+    }
+
+    [Fact]
+    public async Task Whole_event_with_a_ulong_enum_above_long_max_round_trips()
+    {
+        // Exercises the marshaller ENCODE path (ConventionEventAdapter) for a ulong enum property value above
+        // long.MaxValue — the value-preserving unchecked conversion must carry it through a whole-event push.
+        var payload = await PushFirstMatching(
+            HugeEnumEventSource,
+            new HugeEnumEvent(3, HugeEnum.Top),
+            new HugeEnumEvent(99, HugeEnum.Top));
+
+        foreach (var received in new[]
+                 {
+                     DecodeReflective<HugeEnumEvent>(payload),
+                     DecodeGenerated<HugeEnumEvent>(HugeEnumEventSource, payload),
+                 })
+        {
+            Assert.Equal(HugeEnum.Top, received.Big);
+            Assert.Equal(3, received.Distance);
+        }
     }
 }
