@@ -95,7 +95,8 @@ public static partial class KernelRpcMarshaller
             foreach (var property in candidate.GetProperties(flags))
             {
                 if (property.CanRead && property.GetIndexParameters().Length == 0 &&
-                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal))
+                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
+                    !IsIgnoredMember(property))
                 {
                     properties.Add(property);
                 }
@@ -104,6 +105,26 @@ public static partial class KernelRpcMarshaller
             properties.Sort(static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
             return new RecordShape(candidate, properties.ToArray());
         });
+
+    // A property marked [IgnoreDataMember] (System.Runtime.Serialization) is non-wire — a lazily-resolved or
+    // computed member, not serialized data — so it is excluded from the marshalled record shape, matching the
+    // analyzer (DotBoxDRpcTypeMapper.IsIgnoredDataMember) and the convention event adapter so all three readers
+    // agree on the wire field set. Matched by name via GetCustomAttributesData so the attribute need not load.
+    internal static bool IsIgnoredMember(PropertyInfo property)
+    {
+        foreach (var attribute in property.GetCustomAttributesData())
+        {
+            if (string.Equals(
+                    attribute.AttributeType.FullName,
+                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private sealed class RecordShape
     {

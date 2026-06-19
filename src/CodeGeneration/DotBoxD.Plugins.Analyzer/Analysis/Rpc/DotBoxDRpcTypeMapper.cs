@@ -180,13 +180,39 @@ internal static class DotBoxDRpcTypeMapper
                     GetMethod: not null,
                     IsIndexer: false
                 } property &&
-                !property.IsImplicitlyDeclared)
+                !property.IsImplicitlyDeclared &&
+                !IsIgnoredDataMember(property))
             {
                 fields.Add(property);
             }
         }
 
         return fields;
+    }
+
+    /// <summary>
+    /// True when <paramref name="property"/> is marked <c>[IgnoreDataMember]</c>
+    /// (<c>System.Runtime.Serialization</c>). Such a member is non-wire — a lazily-resolved or computed
+    /// projection of the record (e.g. a context snapshot resolved on first read), not part of its serialized
+    /// data — so it is excluded from the marshalled record/event field set. The runtime convention adapter and
+    /// the decode-side record shape exclude it too, keeping the analyzer's wire field set in lockstep with both
+    /// runtime readers, and letting a record/event that carries such a member still lower.
+    /// </summary>
+    public static bool IsIgnoredDataMember(IPropertySymbol property)
+    {
+        foreach (var attribute in property.GetAttributes())
+        {
+            if (attribute.AttributeClass is { } attributeClass &&
+                string.Equals(
+                    attributeClass.ToDisplayString(),
+                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>An enum marshals through its underlying integer; widths that overflow <c>I32</c>
@@ -218,7 +244,8 @@ internal static class DotBoxDRpcTypeMapper
                         GetMethod: not null,
                         IsIndexer: false
                     } property &&
-                    !property.IsImplicitlyDeclared)
+                    !property.IsImplicitlyDeclared &&
+                    !IsIgnoredDataMember(property))
                 {
                     throw new NotSupportedException(
                         $"Server extension DTO '{type.ToDisplayString()}' must not inherit public properties from " +
