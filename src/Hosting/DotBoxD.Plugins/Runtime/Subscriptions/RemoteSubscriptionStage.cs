@@ -41,9 +41,7 @@ public sealed class RemoteSubscriptionStage<TEvent, TCurrent>
     /// <typeparamref name="TCurrent"/> (produced by the preceding <c>Select</c>). The filter+projection
     /// installs server-side; the native delegate receives the projected value pushed back per matching event.
     /// </summary>
-    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(
-        PluginPackage package,
-        Func<TCurrent, HookContext, ValueTask> handler)
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TCurrent, HookContext, ValueTask> handler)
     {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(handler);
