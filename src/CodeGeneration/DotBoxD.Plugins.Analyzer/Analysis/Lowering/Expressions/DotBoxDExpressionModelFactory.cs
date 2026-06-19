@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -267,20 +268,29 @@ internal static class DotBoxDExpressionModelFactory
         DotBoxDExpressionLoweringContext context)
     {
         var memberName = member.Name.Identifier.ValueText;
-        if (member.Expression is IdentifierNameSyntax identifier &&
-            string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
-            for (var i = 0; i < context.EventProperties.Count; i++) {
-                var property = context.EventProperties[i];
-                if (string.Equals(property.Name, memberName, StringComparison.Ordinal)) {
-                    CollectEventPropertyCapability(member, context);
-                    return new DotBoxDExpressionModel(
-                        $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
-                        property.Type,
-                        false);
-                }
+        if (member.Expression is IdentifierNameSyntax identifier) {
+            // After a Select, the downstream lambda's parameter is the PROJECTED element. A field access on it
+            // (dto.X) reads the projection's field by name via record.get — checked BEFORE the event-property
+            // branch so a field that shares a name with an event property is never silently misread as it.
+            if (context.ProjectedElementName is { } projectedName &&
+                string.Equals(identifier.Identifier.ValueText, projectedName, StringComparison.Ordinal)) {
+                return LowerProjectedRecordField(memberName, context);
             }
 
-            throw new NotSupportedException($"Unknown event property '{memberName}'.");
+            if (string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal)) {
+                for (var i = 0; i < context.EventProperties.Count; i++) {
+                    var property = context.EventProperties[i];
+                    if (string.Equals(property.Name, memberName, StringComparison.Ordinal)) {
+                        CollectEventPropertyCapability(member, context);
+                        return new DotBoxDExpressionModel(
+                            $"{DotBoxDGenerationNames.Helpers.Var}({LiteralReader.StringLiteral(EventVariable(memberName))})",
+                            property.Type,
+                            false);
+                    }
+                }
+
+                throw new NotSupportedException($"Unknown event property '{memberName}'.");
+            }
         }
 
         if (member.Expression is ThisExpressionSyntax) {
@@ -288,6 +298,42 @@ internal static class DotBoxDExpressionModelFactory
         }
 
         return Unsupported(member);
+    }
+
+    // Reads a field of the projected record (after a Select) as record.get(projection, index). The field is
+    // matched by name against the projected DTO's declared fields — the same positional order record.new emitted
+    // and the kernel parameter / decoder use — so dto.Field crosses to exactly that field's value and type.
+    // Anything that is not a declared field of a record projection fails safe; it is never reinterpreted as an
+    // event property.
+    private static DotBoxDExpressionModel LowerProjectedRecordField(
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.ProjectedElement is { } projected &&
+            context.ProjectedElementType is INamedTypeSymbol recordType &&
+            DotBoxDRpcTypeMapper.IsRecordDto(recordType))
+        {
+            var fields = DotBoxDRpcTypeMapper.RecordFields(recordType);
+            for (var i = 0; i < fields.Count; i++)
+            {
+                if (!string.Equals(fields[i].Name, memberName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var source =
+                    $"new {DotBoxDGenerationNames.TypeNames.GlobalCallExpression}(" +
+                    $"{LiteralReader.StringLiteral("record.get")}, " +
+                    $"[{projected.Source}, {DotBoxDGenerationNames.Helpers.I32}({i})], null, Span)";
+                return new DotBoxDExpressionModel(
+                    source,
+                    SandboxTypeSourceEmitter.ManifestTag(fields[i].Type),
+                    false);
+            }
+        }
+
+        throw new NotSupportedException(
+            $"Cannot read member '{memberName}' of the projected value; only fields of a projected record are readable.");
     }
 
     /// <summary>

@@ -394,6 +394,7 @@ internal static class HookChainModelFactory
         CancellationToken cancellationToken)
     {
         DotBoxDExpressionModel? projected = null;
+        ITypeSymbol? projectedType = null;
         var terminalElementTypeFullName = eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         foreach (var stage in stages)
         {
@@ -412,7 +413,9 @@ internal static class HookChainModelFactory
             var scratchEffects = new SortedSet<string>(StringComparer.Ordinal);
             projected = DotBoxDExpressionModelFactory.Create(
                 body,
-                Context(elementParam, eventProperties, projected, model, cancellationToken, scratchCapabilities, scratchEffects));
+                Context(elementParam, eventProperties, projected, projectedType, model, cancellationToken, scratchCapabilities, scratchEffects));
+            var bodyTypeInfo = model.GetTypeInfo(body, cancellationToken);
+            projectedType = bodyTypeInfo.ConvertedType ?? bodyTypeInfo.Type;
             terminalElementTypeFullName = GeneratedRemoteHookChainFallback.TypeFullName(
                 body,
                 model,
@@ -427,6 +430,7 @@ internal static class HookChainModelFactory
         string elementParam,
         EquatableArray<EventPropertyModel> eventProperties,
         DotBoxDExpressionModel? projected,
+        ITypeSymbol? projectedType,
         SemanticModel model,
         CancellationToken cancellationToken,
         ICollection<string> capabilities,
@@ -436,8 +440,12 @@ internal static class HookChainModelFactory
                 elementParam, eventProperties, default, model, cancellationToken,
                 capabilities: capabilities, effects: effects)
             : new DotBoxDExpressionLoweringContext(
-                elementParam, eventProperties, default, model, cancellationToken, elementParam, projected,
-                capabilities, effects);
+                elementParam, eventProperties, default, model, cancellationToken,
+                projectedElementName: elementParam,
+                projectedElement: projected,
+                projectedElementType: projectedType,
+                capabilities: capabilities,
+                effects: effects);
 
     private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<HookChainStage> stages)
     {
