@@ -49,7 +49,7 @@ public static partial class KernelRpcMarshaller
                 var index = 0;
                 foreach (var item in enumerable)
                 {
-                    items[index++] = ToSandboxValue(item, elementType);
+                    items[index++] = MarshalChild(item, elementType, "List element");
                 }
 
                 return SandboxValue.FromOwnedList(items, itemType);
@@ -58,7 +58,7 @@ public static partial class KernelRpcMarshaller
             var values = new List<SandboxValue>();
             foreach (var item in enumerable)
             {
-                values.Add(ToSandboxValue(item, elementType));
+                values.Add(MarshalChild(item, elementType, "List element"));
             }
 
             return SandboxValue.FromOwnedList(values.ToArray(), itemType);
@@ -78,8 +78,8 @@ public static partial class KernelRpcMarshaller
             var entries = new Dictionary<SandboxValue, SandboxValue>(dictionary.Count);
             foreach (DictionaryEntry entry in dictionary)
             {
-                var key = ToSandboxValue(entry.Key, mapTypes.Key);
-                entries[key] = ToSandboxValue(entry.Value, mapTypes.Value);
+                var key = MarshalChild(entry.Key, mapTypes.Key, "Map key");
+                entries[key] = MarshalChild(entry.Value, mapTypes.Value, "Map value");
             }
 
             return SandboxValue.FromMap(entries, keyType, valueType);
@@ -91,13 +91,27 @@ public static partial class KernelRpcMarshaller
             var values = new SandboxValue[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                values[i] = ToSandboxValue(fields[i].GetValue(value), fields[i].PropertyType);
+                values[i] = MarshalChild(fields[i].GetValue(value), fields[i].PropertyType, $"DTO field '{fields[i].Name}'");
             }
 
             return SandboxValue.FromOwnedRecord(values);
         }
 
         throw new NotSupportedException($"Server extension cannot marshal type '{type}' to a sandbox value.");
+    }
+
+    // A nested child (list element, map key/value, or DTO field) of a marshaller-eligible value. The sandbox
+    // value model has no null, so a null child is rejected with a clear, contextual NotSupportedException rather
+    // than the bare ArgumentNullException ToSandboxValue would otherwise throw with only the parameter name.
+    private static SandboxValue MarshalChild(object? value, Type type, string context)
+    {
+        if (value is null)
+        {
+            throw new NotSupportedException(
+                $"{context} of type '{type}' was null; the sandbox value model has no null.");
+        }
+
+        return ToSandboxValue(value, type);
     }
 
     public static object? FromSandboxValue(SandboxValue value, Type type)
@@ -174,6 +188,16 @@ public static partial class KernelRpcMarshaller
     public static SandboxType SandboxTypeOf(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
+        return SandboxTypeOf(type, 0);
+    }
+
+    // The list/map/record nesting depth is bounded so a self-referential DTO (e.g. a class with a property of
+    // its own type) fails with a catchable NotSupportedException instead of an uncatchable StackOverflowException
+    // when, say, ConventionEventAdapter is constructed for it. Matches the analyzer's SandboxTypeSourceEmitter cap.
+    private const int MaxTypeNestingDepth = 16;
+
+    private static SandboxType SandboxTypeOf(Type type, int depth)
+    {
         RejectNullableValueType(type);
 
         if (type == typeof(bool)) return SandboxType.Bool;
@@ -183,10 +207,17 @@ public static partial class KernelRpcMarshaller
         if (type == typeof(string)) return SandboxType.String;
         if (type == typeof(Guid)) return SandboxType.Guid;
         if (type.IsEnum) return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
-        if (ElementType(type) is { } elementType) return SandboxType.List(SandboxTypeOf(elementType));
+
+        if (depth >= MaxTypeNestingDepth)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
+        }
+
+        if (ElementType(type) is { } elementType) return SandboxType.List(SandboxTypeOf(elementType, depth + 1));
         if (MapTypes(type) is { } mapTypes)
         {
-            return SandboxType.Map(SandboxTypeOf(mapTypes.Key), SandboxTypeOf(mapTypes.Value));
+            return SandboxType.Map(SandboxTypeOf(mapTypes.Key, depth + 1), SandboxTypeOf(mapTypes.Value, depth + 1));
         }
 
         if (IsDto(type))
@@ -195,7 +226,7 @@ public static partial class KernelRpcMarshaller
             var fieldTypes = new SandboxType[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                fieldTypes[i] = SandboxTypeOf(fields[i].PropertyType);
+                fieldTypes[i] = SandboxTypeOf(fields[i].PropertyType, depth + 1);
             }
 
             return SandboxType.Record(fieldTypes);

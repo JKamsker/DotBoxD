@@ -137,9 +137,12 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
         var properties = ReadablePropertiesInHierarchy(eventType).ToArray();
         ValidatePropertyNames(properties);
 
-        return TryConstructorPropertyOrder(eventType, properties, out var ordered)
-            ? ordered
-            : properties;
+        // Declaration order (MetadataToken within each hierarchy level), the single wire-field order shared with
+        // the analyzer's kernel parameters (PluginEventPropertyReader) and the decoder side
+        // (KernelRpcMarshaller.GetRecordShape, which reconstructs via the constructor map). Reordering to
+        // constructor-parameter order would only match positional records and would silently misalign the pushed
+        // whole-event record from the decoder for a non-positional event class.
+        return properties;
     }
 
     private static void ValidatePropertyNames(IReadOnlyList<PropertyInfo> properties)
@@ -180,92 +183,6 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
             }
         }
     }
-
-    private static bool TryConstructorPropertyOrder(
-        Type eventType,
-        IReadOnlyList<PropertyInfo> properties,
-        out IReadOnlyList<PropertyInfo> ordered)
-    {
-        foreach (var constructor in eventType.GetConstructors(BindingFlags.Instance | BindingFlags.Public))
-        {
-            var parameters = constructor.GetParameters();
-            if (parameters.Length == 0 || parameters.Length != properties.Count)
-            {
-                continue;
-            }
-
-            if (MatchesDeclaredPropertyOrder(parameters, properties))
-            {
-                ordered = properties;
-                return true;
-            }
-
-            if (ReorderedConstructorProperties(parameters, properties) is { } selected)
-            {
-                ordered = selected;
-                return true;
-            }
-        }
-
-        ordered = [];
-        return false;
-    }
-
-    private static bool MatchesDeclaredPropertyOrder(
-        IReadOnlyList<ParameterInfo> parameters,
-        IReadOnlyList<PropertyInfo> properties)
-    {
-        for (var i = 0; i < properties.Count; i++)
-        {
-            var parameter = parameters[i];
-            var property = properties[i];
-            if (!NameMatches(parameter.Name, property.Name) ||
-                property.PropertyType != parameter.ParameterType)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static PropertyInfo[]? ReorderedConstructorProperties(
-        IReadOnlyList<ParameterInfo> parameters,
-        IReadOnlyList<PropertyInfo> properties)
-    {
-        var selected = new PropertyInfo[parameters.Count];
-        for (var i = 0; i < parameters.Count; i++)
-        {
-            var parameter = parameters[i];
-            var property = FindProperty(properties, parameter);
-            if (property is null)
-            {
-                return null;
-            }
-
-            selected[i] = property;
-        }
-
-        return selected;
-    }
-
-    private static PropertyInfo? FindProperty(IReadOnlyList<PropertyInfo> properties, ParameterInfo parameter)
-    {
-        for (var i = 0; i < properties.Count; i++)
-        {
-            var property = properties[i];
-            if (NameMatches(parameter.Name, property.Name) &&
-                property.PropertyType == parameter.ParameterType)
-            {
-                return property;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool NameMatches(string? parameterName, string propertyName)
-        => string.Equals(parameterName, propertyName, StringComparison.OrdinalIgnoreCase);
 
     public IReadOnlyList<SandboxValue> ToSandboxValues(TEvent e)
     {
