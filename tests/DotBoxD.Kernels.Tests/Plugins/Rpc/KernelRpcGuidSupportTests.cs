@@ -91,5 +91,22 @@ public sealed class KernelRpcGuidSupportTests
         Assert.Equal(Sample, clr);
     }
 
+    [Fact]
+    public void Marshaller_rejects_a_guid_keyed_map_type()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(typeof(Dictionary<Guid, string>)));
+
+    [Fact]
+    public void Marshaller_rejects_a_guid_keyed_map_value()
+    {
+        // The kernel verifier only accepts a fixed set of scalar map keys (Guid is not one). The value-marshalling
+        // map branch must reject a Dictionary<Guid, V> exactly as the type-level SandboxTypeOf guard does, rather
+        // than producing a Map<Guid, V> that later fails IsKnown at install.
+        var map = new Dictionary<Guid, string> { [Sample] = "caster-7" };
+
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.ToSandboxValue(map, typeof(Dictionary<Guid, string>)));
+    }
+
     private sealed record GuidCarrier(Guid Id, string Name);
 }

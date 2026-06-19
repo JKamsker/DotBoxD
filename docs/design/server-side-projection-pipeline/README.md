@@ -6,7 +6,7 @@
 
 > This doc captures the design for richer **server-side `Where`/`Select` projections** that feed a **client-side `RunLocal`**, so chains like the two below become first-class. It is grounded in the current analyzer/runtime — every claim cites a real symbol.
 
-### Implementation status
+## Implementation status
 
 | Phase | Delivered | Notes |
 |---|---|---|
@@ -191,7 +191,7 @@ Relax `DotBoxDHostBindingExpressionLowerer`'s return check from "scalar-only" to
 - `List<string>` (e.g. nearby player **ids**) → enables `.Count` downstream,
 - a scalar DTO snapshot (e.g. `MonsterSnapshot` of scalars).
 
-It must **not** accept a live entity (`Monster`/`Player`) — those remain unmarshallable and fail safe. `ReturnAllocates` already adds the `Alloc` effect for these shapes, so effect inference is consistent.
+It must **not** accept a live entity (`Monster`/`Player`) — those remain unmarshallable and fail-safe. `ReturnAllocates` already adds the `Alloc` effect for these shapes, so effect inference is consistent.
 
 ### 5.3 Member-chain reads (G3)
 

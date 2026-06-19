@@ -74,6 +74,15 @@ public static partial class KernelRpcMarshaller
             }
 
             var keyType = SandboxTypeOf(mapTypes.Key);
+            // Mirror the SandboxTypeOf map-key guard: the kernel verifier only accepts a fixed set of scalar map
+            // keys (bool/int/long/string/opaque-id, not Guid or double). Reject an unsupported key here with a
+            // catchable NotSupportedException instead of producing a Map<Guid,V> that later fails IsKnown at install.
+            if (!keyType.IsValidMapKey())
+            {
+                throw new NotSupportedException(
+                    $"Kernel RPC service map key type '{mapTypes.Key}' is not a supported sandbox map key.");
+            }
+
             var valueType = SandboxTypeOf(mapTypes.Value);
             var entries = new Dictionary<SandboxValue, SandboxValue>(dictionary.Count);
             foreach (DictionaryEntry entry in dictionary)

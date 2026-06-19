@@ -412,6 +412,15 @@ internal static class HookChainModelFactory
             return null;
         }
 
+        // The generated-remote fallback spells the terminal element by its full type name, but an anonymous
+        // projection has no nameable name (terminalElementTypeFullName would be the un-spellable "<anonymous
+        // type ...>"). Only the known-stage branch above can emit a generic interceptor that lets Roslyn infer
+        // it; decline here so no broken source is emitted (the real RunLocal then fails fast at the call site).
+        if (projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true })
+        {
+            return null;
+        }
+
         return GeneratedRemoteHookChainFallback.CreateInterception(
             location.GetInterceptsLocationAttributeSyntax(),
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
