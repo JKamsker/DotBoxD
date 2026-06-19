@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
 
@@ -95,8 +96,13 @@ internal static class LocalCallbackProjection
             payloadValue = projection.Value;
         }
 
-        var payload = KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(payloadValue));
-        await push(subscriptionId, payload, context.CancellationToken).ConfigureAwait(false);
+        // Encode into a pooled buffer and hand its written span straight to the transport — no per-event
+        // MemoryStream, growth, or ToArray copy. The writer is disposed (its rented array returned to the pool)
+        // only when this method's scope exits, i.e. AFTER await push completes and the transport has finished
+        // copying the bytes; returning it sooner would alias a buffer the send still reads from.
+        using var writer = PooledRpcBufferWriter.Rent();
+        KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(payloadValue), writer);
+        await push(subscriptionId, writer.WrittenMemory, context.CancellationToken).ConfigureAwait(false);
     }
 
     // The event record's field order is the adapter's value-writer order, which the convention adapter derives

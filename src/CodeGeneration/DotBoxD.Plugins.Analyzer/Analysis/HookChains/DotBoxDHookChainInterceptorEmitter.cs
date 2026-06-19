@@ -50,14 +50,27 @@ internal static class DotBoxDHookChainInterceptorEmitter
                     : "UseGeneratedChain")
                 .Append('(')
                 .Append(interception.PackageFullName)
-                .Append(interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback
-                    ? ".Create(), handler"
-                    : ".Create()")
+                .Append(InstallArguments(interception))
                 .AppendLine(");");
         }
 
         builder.AppendLine("    }");
         builder.AppendLine("}");
         return builder.ToString();
+    }
+
+    // A non-local chain takes only the package; a local chain also takes the native handler, and — when the
+    // projected type is wire-eligible — the generated reflection-free decoder as the 3rd argument so decode
+    // skips the SandboxValue graph. A local chain without a decoder keeps the 2-arg reflective form.
+    private static string InstallArguments(HookChainInterception interception)
+    {
+        if (interception.InstallKind != HookChainInterceptorInstallKind.LocalCallback)
+        {
+            return ".Create()";
+        }
+
+        return interception.HasLocalDecoder
+            ? ".Create(), handler, " + interception.PackageFullName + ".ReadProjected"
+            : ".Create(), handler";
     }
 }

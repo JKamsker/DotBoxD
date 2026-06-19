@@ -47,7 +47,7 @@ public sealed class PluginServerRemoteLocalProvideShapeTests
                 [DotBoxDService]
                 public interface IPluginEventCallback
                 {
-                    ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default);
+                    ValueTask OnEventAsync(string subscriptionId, System.ReadOnlyMemory<byte> projectedValue, CancellationToken ct = default);
                 }
             }
 

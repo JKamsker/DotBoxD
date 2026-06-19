@@ -123,7 +123,9 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         RemoteLocalPush push = (subscriptionId, payload, _) =>
         {
             pushedSubscriptions.Add(subscriptionId);
-            pushedPayloads.Add(payload);
+            // Snapshot eagerly: the payload aliases a pooled buffer the push path returns once this completes,
+            // exactly as a real transport copies the bytes into its frame during the send.
+            pushedPayloads.Add(payload.ToArray());
             return ValueTask.CompletedTask;
         };
         server.Hooks.On<ChainAggroEvent>().UseProjecting(kernel, "sub-1", push);
@@ -176,7 +178,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var pushedPayloads = new List<byte[]>();
         RemoteLocalPush push = (_, payload, _) =>
         {
-            pushedPayloads.Add(payload);
+            pushedPayloads.Add(payload.ToArray());
             return ValueTask.CompletedTask;
         };
         server.Hooks.On<ChainAggroEvent>().UseProjecting(kernel, "sub-we", push);
@@ -219,6 +221,30 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         Assert.Equal(4, Assert.IsType<int>(predicate.Value));
         Assert.Equal("int", predicate.ValueType);
         Assert.True(subscription.IndexCoversPredicate);  // the Where is exactly this indexable comparison
+    }
+
+    [Fact]
+    public void Eligible_local_chains_emit_a_generated_reflection_free_decoder()
+    {
+        // Projection chain (e.MonsterId -> string): the package exposes a strongly-typed reader that reads the
+        // scalar straight off the wire value — no SandboxValue, no reflection — and the interceptor passes it as
+        // the 3rd UseGeneratedLocalChain argument.
+        var projection = GeneratedSource(RemoteRunLocalSource);
+        Assert.Contains(
+            "public static string ReadProjected(global::DotBoxD.Plugins.KernelRpcValue value)",
+            projection,
+            StringComparison.Ordinal);
+        Assert.Contains(".Create(), handler, ", projection, StringComparison.Ordinal);
+        Assert.Contains(".ReadProjected)", projection, StringComparison.Ordinal);
+
+        // Whole-event chain (the event record itself): the generated reader reconstructs the DTO via its real
+        // constructor, so even the whole-event decode is reflection-free.
+        var wholeEvent = GeneratedSource(RemoteWholeEventSource);
+        Assert.Contains(
+            "ReadProjected(global::DotBoxD.Plugins.KernelRpcValue value)",
+            wholeEvent,
+            StringComparison.Ordinal);
+        Assert.Contains(".Create(), handler, ", wholeEvent, StringComparison.Ordinal);
     }
 
     private static byte[] EncodeString(string value)
@@ -268,6 +294,29 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var emit = output.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics.Select(d => d.ToString())));
         return Assembly.Load(stream.ToArray());
+    }
+
+    // Runs the generator with interceptors enabled and returns the joined generated source, for asserting on
+    // the emitted decoder + interceptor wiring rather than only the runtime behavior.
+    private static string GeneratedSource(string source)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)
+            .WithFeatures([new KeyValuePair<string, string>("InterceptorsNamespaces", "DotBoxD.Plugins.Generated")]);
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDRemoteRunLocalDecoderTest",
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(ChainAggroEvent).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+        return string.Join(
+            "\n",
+            driver.RunGenerators(compilation).GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
     }
 
     private static SandboxPolicy ChainPolicy()

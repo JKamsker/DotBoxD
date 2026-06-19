@@ -26,7 +26,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         {
             lock (pushed)
             {
-                pushed.Add(payload);
+                // Snapshot eagerly — the payload aliases a pooled buffer returned once the push completes.
+                pushed.Add(payload.ToArray());
             }
 
             Volatile.Read(ref gate)?.TrySetResult();
@@ -77,7 +78,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         {
             lock (pushed)
             {
-                pushed.Add(payload);
+                pushed.Add(payload.ToArray());
             }
 
             Volatile.Read(ref gate)?.TrySetResult();
@@ -122,7 +123,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         byte[]? payload = null;
         server.Hooks.On<ChainAggroEvent>().UseProjecting(kernel, "sub-scalar", (_, p, _) =>
         {
-            payload = p;
+            // Snapshot eagerly — the payload aliases a pooled buffer returned once the push completes.
+            payload = p.ToArray();
             return ValueTask.CompletedTask;
         });
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-7", 3));

@@ -8,7 +8,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 /// the same <c>{worldNs}.Ipc</c> convention the factory uses for the control service. Optional: a world with no
 /// such contract keeps the original facade (no local handlers). Two guards keep the emitted facade compilable:
 /// a shape guard requires the <c>[DotBoxDService]</c> interface to carry the expected
-/// <c>OnEventAsync(string, byte[], CancellationToken) -&gt; ValueTask</c>/<c>ValueTask&lt;T&gt;</c> method, and a transport guard requires
+/// <c>OnEventAsync(string, ReadOnlyMemory&lt;byte&gt;, CancellationToken) -&gt; ValueTask</c>/<c>ValueTask&lt;T&gt;</c> method, and a transport guard requires
 /// the compilation to actually expose the generated <c>DotBoxDGeneratedExtensions.Provide{suffix}</c> extension
 /// (absent or ambiguous — e.g. a test stub — falls back to the original wiring instead of a dangling call).
 /// </summary>
@@ -55,7 +55,7 @@ internal static class PluginServerEventCallbackResolver
             if (member is IMethodSymbol { Parameters.Length: 3 } method &&
                 IsValueTask(method.ReturnType) &&
                 method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
-                method.Parameters[1].Type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte } &&
+                IsReadOnlyByteMemory(method.Parameters[1].Type) &&
                 string.Equals(
                     method.Parameters[2].Type.ToDisplayString(),
                     "System.Threading.CancellationToken",
@@ -67,6 +67,20 @@ internal static class PluginServerEventCallbackResolver
 
         return null;
     }
+
+    // The pushed payload crosses the wire as ReadOnlyMemory<byte> (the pooled encode hands its written span
+    // straight to the transport copy-free). A contract still typed byte[] no longer matches: the facade would
+    // silently fall back to the no-local-handler wiring, so RunLocal must declare ReadOnlyMemory<byte>.
+    private static bool IsReadOnlyByteMemory(ITypeSymbol type)
+        => type is INamedTypeSymbol
+        {
+            Name: "ReadOnlyMemory",
+            IsGenericType: true,
+            TypeArguments.Length: 1,
+            ContainingNamespace: { } ns
+        } named &&
+        named.TypeArguments[0].SpecialType == SpecialType.System_Byte &&
+        string.Equals(ns.ToDisplayString(), "System", StringComparison.Ordinal);
 
     private static bool IsValueTask(ITypeSymbol type)
         => type is INamedTypeSymbol

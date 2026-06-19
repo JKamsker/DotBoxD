@@ -35,6 +35,15 @@ internal sealed record PluginKernelModel(
     /// so the payload kind needs no separate persisted field.
     /// </summary>
     public string? ProjectedType { get; init; }
+
+    /// <summary>
+    /// The generated reflection-free <c>ReadProjected(KernelRpcValue) -&gt; TProjected</c> reader (plus its
+    /// conversion helpers) for a <see cref="LocalTerminal"/> chain whose projected type is wire-eligible, or
+    /// <c>null</c> when there is no decoder (not a local chain, or the type falls back to the reflective decode
+    /// path). Stored as an equatable string so an <c>ITypeSymbol</c> never crosses the incremental provider
+    /// boundary; the emitter appends it verbatim to the package class.
+    /// </summary>
+    public string? LocalDecoderSource { get; init; }
 }
 
 internal sealed record EventPropertyModel(string Name, string Type);

@@ -25,4 +25,7 @@ internal sealed record HookChainInterception(
     string HandlerTypeFullName,
     string ReturnTypeFullName,
     string PackageFullName,
-    HookChainInterceptorInstallKind InstallKind);
+    HookChainInterceptorInstallKind InstallKind,
+    // True when the lowered local chain has a generated reflection-free decoder, so the interceptor passes
+    // <Package>.ReadProjected as the 3rd UseGeneratedLocalChain argument; false keeps the 2-arg reflective form.
+    bool HasLocalDecoder = false);

@@ -13,5 +13,5 @@ namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 [DotBoxDService]
 public interface IPluginEventCallback
 {
-    ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default);
+    ValueTask OnEventAsync(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken ct = default);
 }

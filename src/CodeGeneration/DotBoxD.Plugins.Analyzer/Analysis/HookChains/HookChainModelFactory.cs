@@ -146,6 +146,13 @@ internal static class HookChainModelFactory
             ? LocalCallbackHandleReturnType(localCallbackProjection)
             : DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
 
+        // The reflection-free decoder for the pushed value's projected type (final Select element, or the whole
+        // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
+        // keep the reflective 2-arg registration so they do not regress.
+        var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
+            ? BuildLocalDecoderSource(stages, eventType, model, cancellationToken)
+            : null;
+
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
             stages,
             eventProperties,
@@ -179,6 +186,7 @@ internal static class HookChainModelFactory
             // non-null one is a projection push — so the payload kind needs no separate persisted field.
             LocalTerminal = installKind == HookChainInterceptorInstallKind.LocalCallback,
             ProjectedType = localCallbackProjection?.Value.Type,
+            LocalDecoderSource = localDecoderSource,
         };
 
         return new HookChainResult(
@@ -193,7 +201,59 @@ internal static class HookChainModelFactory
                 terminalElementTypeFullName,
                 generatedRemoteKind,
                 installKind.Value,
+                localDecoderSource is not null,
                 cancellationToken));
+    }
+
+    // Generates the reflection-free reader for the pushed value's projected type, mirroring the type the
+    // terminal handler receives: the final Select element type, or the whole event when there is no Select.
+    // Returns null when the type is not wire-eligible (the reader emitter declines) so the chain falls back to
+    // the reflective registration.
+    private static string? BuildLocalDecoderSource(
+        IReadOnlyList<HookChainStage> stages,
+        INamedTypeSymbol eventType,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var projectedType = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
+        return projectedType is null
+            ? null
+            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedType);
+    }
+
+    // The CLR type the pushed value decodes to: the final Select body's type (using the same
+    // ConvertedType ?? Type resolution as TerminalElementTypeFullName so the generated ReadProjected return
+    // type matches the handler's projected type), or the event type when the chain has no Select.
+    private static ITypeSymbol? ProjectedTypeSymbol(
+        IReadOnlyList<HookChainStage> stages,
+        INamedTypeSymbol eventType,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        ITypeSymbol projected = eventType;
+        foreach (var stage in stages)
+        {
+            if (!stage.IsSelect)
+            {
+                continue;
+            }
+
+            if (stage.Lambda.ExpressionBody is not { } body)
+            {
+                return null;
+            }
+
+            var typeInfo = model.GetTypeInfo(body, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type is null || type.TypeKind == TypeKind.Error)
+            {
+                return null;
+            }
+
+            projected = type;
+        }
+
+        return projected;
     }
 
     private static HookChainInterceptorInstallKind? InstallKind(
@@ -267,6 +327,7 @@ internal static class HookChainModelFactory
         string terminalElementTypeFullName,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         HookChainInterceptorInstallKind installKind,
+        bool hasLocalDecoder,
         CancellationToken cancellationToken)
     {
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
@@ -290,7 +351,8 @@ internal static class HookChainModelFactory
                 method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 packageFullName,
-                installKind);
+                installKind,
+                hasLocalDecoder);
         }
 
         if (generatedRemoteKind is null)
@@ -305,7 +367,8 @@ internal static class HookChainModelFactory
             terminalElementTypeFullName,
             packageFullName,
             installKind,
-            generatedRemoteKind.Value);
+            generatedRemoteKind.Value,
+            hasLocalDecoder);
     }
 
     private static string TerminalElementTypeFullName(
