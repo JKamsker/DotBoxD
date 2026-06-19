@@ -103,12 +103,12 @@ public sealed class RemoteLocalHandlerRegistryTests
         // and the latest handler wins.
         var registry = new RemoteLocalHandlerRegistry();
         string? observed = null;
-        registry.Register<string>("dup", (_, _) =>
+        var firstRegistration = registry.Register<string>("dup", (_, _) =>
         {
             observed = "first";
             return ValueTask.CompletedTask;
         });
-        registry.Register<string>("dup", (value, _) =>
+        var secondRegistration = registry.Register<string>("dup", (value, _) =>
         {
             observed = "second:" + value;
             return ValueTask.CompletedTask;
@@ -117,6 +117,17 @@ public sealed class RemoteLocalHandlerRegistryTests
         await registry.DispatchAsync("dup", EncodeProjected("x"), Context());
 
         Assert.Equal("second:x", observed);
+
+        firstRegistration.Dispose();
+        observed = null;
+
+        await registry.DispatchAsync("dup", EncodeProjected("y"), Context());
+
+        Assert.Equal("second:y", observed);
+
+        secondRegistration.Dispose();
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await registry.DispatchAsync("dup", EncodeProjected("z"), Context()));
     }
 
     [Fact]

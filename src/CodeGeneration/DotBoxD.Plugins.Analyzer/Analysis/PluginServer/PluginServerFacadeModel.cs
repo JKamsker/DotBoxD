@@ -21,7 +21,9 @@ internal sealed record PluginServerFacadeModel(
     // generated sink on the peer so the server can push filtered+projected values back to native RunLocal
     // delegates. EventCallbackProvideSuffix is the generated DotBoxDGeneratedExtensions.Provide{Suffix} name.
     string? EventCallbackType = null,
-    string? EventCallbackProvideSuffix = null);
+    string? EventCallbackProvideSuffix = null,
+    string? EventCallbackReturnType = null,
+    bool EventCallbackReturnHasValue = false);
 
 internal sealed record PluginServerControlProperty(
     string Name,

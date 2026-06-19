@@ -21,15 +21,25 @@ internal static class LocalCallbackProjection
     /// <summary>True when the local-terminal subscription pushes the whole event (no <c>Select</c>).</summary>
     public static bool IsWholeEvent(PluginManifest manifest)
     {
+        bool? wholeEvent = null;
         foreach (var subscription in manifest.Subscriptions)
         {
-            if (subscription.LocalTerminal)
+            if (!subscription.LocalTerminal)
             {
-                return subscription.ProjectedType is null;
+                continue;
             }
+
+            var current = subscription.ProjectedType is null;
+            if (wholeEvent is { } expected && expected != current)
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{manifest.PluginId}' has conflicting local-terminal projected type declarations.");
+            }
+
+            wholeEvent = current;
         }
 
-        return false;
+        return wholeEvent ?? false;
     }
 
     /// <summary>

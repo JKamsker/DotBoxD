@@ -8,13 +8,13 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 /// the same <c>{worldNs}.Ipc</c> convention the factory uses for the control service. Optional: a world with no
 /// such contract keeps the original facade (no local handlers). Two guards keep the emitted facade compilable:
 /// a shape guard requires the <c>[DotBoxDService]</c> interface to carry the expected
-/// <c>OnEventAsync(string, byte[], CancellationToken) -&gt; ValueTask</c> method, and a transport guard requires
+/// <c>OnEventAsync(string, byte[], CancellationToken) -&gt; ValueTask</c>/<c>ValueTask&lt;T&gt;</c> method, and a transport guard requires
 /// the compilation to actually expose the generated <c>DotBoxDGeneratedExtensions.Provide{suffix}</c> extension
 /// (absent or ambiguous — e.g. a test stub — falls back to the original wiring instead of a dangling call).
 /// </summary>
 internal static class PluginServerEventCallbackResolver
 {
-    public static (INamedTypeSymbol Type, string ProvideSuffix)? Resolve(
+    public static (INamedTypeSymbol Type, string ProvideSuffix, ITypeSymbol ReturnType, bool ReturnHasValue)? Resolve(
         Compilation compilation,
         INamedTypeSymbol worldType,
         CancellationToken cancellationToken)
@@ -25,11 +25,15 @@ internal static class PluginServerEventCallbackResolver
             return null;
         }
 
-        var suffix = PluginServerWorldExtensionSuffixResolver.Resolve(compilation, callback, cancellationToken);
-        return HasProvideExtension(compilation, suffix) ? (callback, suffix) : null;
+        var suffix = PluginServerWorldExtensionSuffixResolver.Resolve(compilation, callback.Value.Type, cancellationToken);
+        return HasProvideExtension(compilation, suffix)
+            ? (callback.Value.Type, suffix, callback.Value.Method.ReturnType, ReturnHasValue(callback.Value.Method.ReturnType))
+            : null;
     }
 
-    private static INamedTypeSymbol? ResolveContract(Compilation compilation, INamedTypeSymbol worldType)
+    private static (INamedTypeSymbol Type, IMethodSymbol Method)? ResolveContract(
+        Compilation compilation,
+        INamedTypeSymbol worldType)
     {
         var worldNamespace = worldType.ContainingNamespace.ToDisplayString();
         var callback = compilation.GetTypeByMetadataName(worldNamespace + ".Ipc.IPluginEventCallback");
@@ -40,14 +44,16 @@ internal static class PluginServerEventCallbackResolver
             return null;
         }
 
-        return HasEventCallbackShape(callback) ? callback : null;
+        var method = ResolveEventCallbackMethod(callback);
+        return method is null ? null : (callback, method);
     }
 
-    private static bool HasEventCallbackShape(INamedTypeSymbol callback)
+    private static IMethodSymbol? ResolveEventCallbackMethod(INamedTypeSymbol callback)
     {
         foreach (var member in callback.GetMembers("OnEventAsync"))
         {
             if (member is IMethodSymbol { Parameters.Length: 3 } method &&
+                IsValueTask(method.ReturnType) &&
                 method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
                 method.Parameters[1].Type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte } &&
                 string.Equals(
@@ -55,12 +61,24 @@ internal static class PluginServerEventCallbackResolver
                     "System.Threading.CancellationToken",
                     StringComparison.Ordinal))
             {
-                return true;
+                return method;
             }
         }
 
-        return false;
+        return null;
     }
+
+    private static bool IsValueTask(ITypeSymbol type)
+        => type is INamedTypeSymbol
+        {
+            Name: "ValueTask",
+            ContainingNamespace: { } ns
+        } named &&
+        string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal) &&
+        (!named.IsGenericType || named.TypeArguments.Length == 1);
+
+    private static bool ReturnHasValue(ITypeSymbol type)
+        => type is INamedTypeSymbol { IsGenericType: true };
 
     // The Provide{suffix} extension is generated into DotBoxDGeneratedExtensions by the services source
     // generator in the assembly that declares the contract. GetTypeByMetadataName returns null when that type is

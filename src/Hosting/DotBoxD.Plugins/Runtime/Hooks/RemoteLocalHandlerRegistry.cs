@@ -52,7 +52,7 @@ public sealed class RemoteLocalHandlerRegistry
         });
 
         _handlers[subscriptionId] = entry;
-        return new Registration(this, subscriptionId);
+        return new Registration(this, subscriptionId, entry);
     }
 
     /// <summary>
@@ -85,19 +85,33 @@ public sealed class RemoteLocalHandlerRegistry
     public bool Unregister(string subscriptionId)
         => !string.IsNullOrEmpty(subscriptionId) && _handlers.TryRemove(subscriptionId, out _);
 
+    private bool Unregister(string subscriptionId, Handler handler)
+        => !string.IsNullOrEmpty(subscriptionId) &&
+           ((ICollection<KeyValuePair<string, Handler>>)_handlers).Remove(
+               new KeyValuePair<string, Handler>(subscriptionId, handler));
+
     /// <summary>
     /// Removes all registered handlers. Called when the plugin connection tears down (session disposed / peer
     /// disconnected) so a dropped plugin's callbacks do not linger.
     /// </summary>
     public void Clear() => _handlers.Clear();
 
-    private sealed record Handler(SandboxType ExpectedType, Func<SandboxValue, HookContext, ValueTask> Invoke);
+    private sealed class Handler(
+        SandboxType expectedType,
+        Func<SandboxValue, HookContext, ValueTask> invoke)
+    {
+        public SandboxType ExpectedType { get; } = expectedType;
+        public Func<SandboxValue, HookContext, ValueTask> Invoke { get; } = invoke;
+    }
 
-    private sealed class Registration(RemoteLocalHandlerRegistry owner, string subscriptionId) : IDisposable
+    private sealed class Registration(
+        RemoteLocalHandlerRegistry owner,
+        string subscriptionId,
+        Handler handler) : IDisposable
     {
         private RemoteLocalHandlerRegistry? _owner = owner;
 
         public void Dispose()
-            => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId);
+            => Interlocked.Exchange(ref _owner, null)?.Unregister(subscriptionId, handler);
     }
 }

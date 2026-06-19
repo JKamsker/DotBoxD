@@ -182,6 +182,83 @@ public sealed class PluginServerRemoteLocalWiringTests
         Assert.DoesNotContain("RemoteLocalEventSink", generated, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Generated_plugin_server_omits_local_handlers_when_event_callback_return_type_is_not_value_task()
+    {
+        var (result, outputCompilation) = RunGenerator("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace WrongCallback.Game
+            {
+                [DotBoxDService]
+                public interface IGameWorldAccess;
+            }
+
+            namespace WrongCallback.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+
+                [DotBoxDService]
+                public interface IPluginEventCallback
+                {
+                    Task OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static WrongCallback.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+
+                    public static void ProvidePluginEventCallback(
+                        DotBoxD.Services.Peer.RpcPeer peer,
+                        WrongCallback.Game.Ipc.IPluginEventCallback implementation)
+                    {
+                    }
+                }
+            }
+
+            namespace WrongCallback.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using WrongCallback.Game;
+
+                [GeneratePluginServer]
+                public partial class RemotePluginServer : IGameWorldAccess;
+            }
+            """);
+        var generated = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Empty(outputCompilation.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Contains(
+            "new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package => InstallPluginPackageAsync(package));",
+            generated,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("_localHandlers", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("RemoteLocalEventSink", generated, StringComparison.Ordinal);
+    }
+
     private static (GeneratorDriverRunResult Result, Compilation OutputCompilation) RunGenerator(string source)
     {
         var compilation = CSharpCompilation.Create(

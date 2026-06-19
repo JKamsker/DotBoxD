@@ -107,32 +107,12 @@ internal static class PluginServerFacadeEmitter
         PluginServerFacadeSurfaceEmitter.AppendInstallSurface(builder, model);
         PluginServerSetupEmitter.AppendSetupMembers(builder, model);
         AppendLiveSettingsHandle(builder, model);
-        AppendRemoteLocalEventSink(builder, model);
+        PluginServerRemoteLocalEventSinkEmitter.Append(builder, model);
         foreach (var control in model.Controls)
         {
             PluginServerWrapperEmitter.AppendControlWrapper(builder, model, control);
         }
         builder.AppendLine("}");
-    }
-
-    // Generated bridge implementing the discovered reverse event-callback contract. Each server push decodes
-    // through the local-handler registry into the native RunLocal delegate, mirroring the hand-written
-    // CallbackSink the remote-RunLocal IPC tests use. A throwaway message sink is supplied because a RunLocal
-    // terminal performs no host send.
-    private static void AppendRemoteLocalEventSink(StringBuilder builder, PluginServerFacadeModel model)
-    {
-        if (model.EventCallbackType is null)
-        {
-            return;
-        }
-
-        builder.Append("    private sealed class RemoteLocalEventSink : ").AppendLine(model.EventCallbackType);
-        builder.AppendLine("    {");
-        builder.AppendLine("        private readonly global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry _localHandlers;");
-        builder.AppendLine("        public RemoteLocalEventSink(global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry localHandlers) => _localHandlers = localHandlers;");
-        builder.AppendLine("        public global::System.Threading.Tasks.ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, global::System.Threading.CancellationToken ct = default)");
-        builder.AppendLine("            => _localHandlers.DispatchAsync(subscriptionId, projectedValue, new global::DotBoxD.Abstractions.HookContext(new global::DotBoxD.Abstractions.InMemoryPluginMessageSink(), ct), ct);");
-        builder.AppendLine("    }");
     }
 
     private static void AppendLifecycle(StringBuilder builder, PluginServerFacadeModel model)

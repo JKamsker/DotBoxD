@@ -65,7 +65,9 @@ internal static class PluginServerFacadeModelFactory
                 ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
             new EquatableArray<PluginServerControlProperty>(controls),
             eventCallback is null ? null : TypeName(eventCallback.Value.Type),
-            eventCallback?.ProvideSuffix);
+            eventCallback?.ProvideSuffix,
+            eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
+            eventCallback?.ReturnHasValue ?? false);
     }
 
     private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)

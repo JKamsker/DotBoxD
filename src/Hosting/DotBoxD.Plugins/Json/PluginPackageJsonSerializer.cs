@@ -226,7 +226,7 @@ public static partial class PluginPackageJsonSerializer
             LocalTerminal = element.TryGetProperty("localTerminal", out var localTerminal) &&
                 ReadBoolValue(localTerminal, "localTerminal"),
             ProjectedType = element.TryGetProperty("projectedType", out var projectedType)
-                ? projectedType.GetString()
+                ? ReadStringValue(projectedType, "projectedType")
                 : null
         };
     }
