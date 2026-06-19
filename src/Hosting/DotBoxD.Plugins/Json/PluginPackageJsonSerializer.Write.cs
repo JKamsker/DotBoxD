@@ -122,6 +122,48 @@ public static partial class PluginPackageJsonSerializer
             writer.WriteStartObject();
             writer.WriteString("event", subscription.Event);
             writer.WriteString("kernel", subscription.Kernel);
+            WriteIndexedPredicates(writer, subscription.IndexedPredicates);
+            if (subscription.IndexCoversPredicate)
+            {
+                writer.WriteBoolean("indexCoversPredicate", subscription.IndexCoversPredicate);
+            }
+
+            // Emitted only for lowered RunLocal chains, so ordinary subscription manifests stay byte-for-byte unchanged.
+            if (subscription.LocalTerminal)
+            {
+                writer.WriteBoolean("localTerminal", subscription.LocalTerminal);
+            }
+
+            if (subscription.ProjectedType is { } projectedType)
+            {
+                writer.WriteString("projectedType", projectedType);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
+
+    // Emitted only when the lowered predicate had index-eligible leaves, so manifests for ordinary
+    // chains stay byte-for-byte identical to pre-feature output (and round-trip cleanly).
+    private static void WriteIndexedPredicates(Utf8JsonWriter writer, IReadOnlyList<IndexedPredicate> predicates)
+    {
+        if (predicates.Count == 0)
+        {
+            return;
+        }
+
+        writer.WritePropertyName("indexedPredicates");
+        writer.WriteStartArray();
+        foreach (var predicate in predicates)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("path", predicate.Path);
+            writer.WriteString("operator", predicate.Operator.ToString());
+            writer.WritePropertyName("value");
+            WriteLiveSettingValue(writer, predicate.Value, "indexed predicate value");
+            writer.WriteString("valueType", predicate.ValueType);
             writer.WriteEndObject();
         }
 

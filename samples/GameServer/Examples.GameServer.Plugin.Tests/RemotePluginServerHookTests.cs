@@ -80,9 +80,12 @@ public sealed class RemotePluginServerHookTests
 
         Program.ConfigureRuntimeHooks(server);
 
+        // One inline hook chain (MonsterAggroEvent calm), then two inline subscription chains on
+        // AttackEvent: the original taunt and the indexed taunt that ships index metadata (issue #47).
         Assert.Collection(
             control.Calls,
             call => Assert.StartsWith("kernel:chain-", call, StringComparison.Ordinal),
+            call => Assert.StartsWith("subscription:chain-", call, StringComparison.Ordinal),
             call => Assert.StartsWith("subscription:chain-", call, StringComparison.Ordinal));
     }
 }

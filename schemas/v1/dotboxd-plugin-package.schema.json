@@ -127,7 +127,42 @@
       "required": ["event", "kernel"],
       "properties": {
         "event": { "type": "string" },
-        "kernel": { "type": "string" }
+        "kernel": { "type": "string" },
+        "indexedPredicates": {
+          "type": "array",
+          "description": "Host-readable, index-eligible '.Where(...)' constraints (issue #47). Each is a necessary AND condition of the verified predicate, so a host may reject events on any of them. Optional; omitted when the predicate had no index-eligible leaves.",
+          "items": { "$ref": "#/$defs/indexedPredicate" }
+        },
+        "indexCoversPredicate": {
+          "type": "boolean",
+          "description": "True only when the verified predicate is exactly the conjunction of indexedPredicates, so a host whose index check passes may skip the verified IR. Optional; defaults to false."
+        },
+        "localTerminal": {
+          "type": "boolean",
+          "description": "True for a lowered RunLocal chain: the verified IR filters and projects server-side and the host pushes only the projected value to the plugin's native delegate. Optional; defaults to false."
+        },
+        "projectedType": {
+          "type": "string",
+          "description": "The manifest type of the Select projection a local-terminal chain returns (bool/int/long/double/string). Optional; present only when localTerminal is true."
+        }
+      }
+    },
+    "indexedPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "operator", "value", "valueType"],
+      "properties": {
+        "path": { "type": "string", "description": "The event property the constraint compares." },
+        "operator": {
+          "type": "string",
+          "enum": ["Equals", "NotEquals", "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual"],
+          "description": "Comparison normalized so the event property is the left operand."
+        },
+        "value": {
+          "description": "The compile-time constant compared against, as a JSON scalar interpreted per 'valueType'.",
+          "type": ["boolean", "integer", "number", "string"]
+        },
+        "valueType": { "type": "string", "enum": ["bool", "int", "long", "double", "string"] }
       }
     },
     "entrypoints": {

@@ -1,5 +1,6 @@
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Plugins.Runtime.Subscriptions;
 
 namespace DotBoxD.Plugins.Runtime;
@@ -7,9 +8,15 @@ namespace DotBoxD.Plugins.Runtime;
 public sealed class RemoteSubscriptionPipeline<TEvent>
 {
     private readonly Func<PluginPackage, ValueTask<string>> _install;
+    private readonly RemoteLocalHandlerRegistry? _localHandlers;
 
-    internal RemoteSubscriptionPipeline(Func<PluginPackage, ValueTask<string>> install)
-        => _install = install;
+    internal RemoteSubscriptionPipeline(
+        Func<PluginPackage, ValueTask<string>> install,
+        RemoteLocalHandlerRegistry? localHandlers = null)
+    {
+        _install = install;
+        _localHandlers = localHandlers;
+    }
 
     public RemoteSubscriptionPipeline<TEvent> Use<TKernel>() where TKernel : class
         => UseGeneratedChain(KernelPackageRegistry.Resolve<TKernel>());
@@ -19,6 +26,102 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(package);
         ValidateSubscription(package);
         _install(package).AsTask().GetAwaiter().GetResult();
+        return this;
+    }
+
+    /// <summary>
+    /// Installs a lowered <c>RunLocal</c> subscription chain: the lowered <c>Where</c>/<c>Select</c>
+    /// filter+projection installs server-side and the native <paramref name="handler"/> is registered against
+    /// the returned subscription id to receive each filtered, projected value pushed back over IPC.
+    /// </summary>
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, HookContext, ValueTask> handler)
+        => InstallLocal(package, handler);
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TEvent, HookContext> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) => handler(e));
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    // Decoder overloads: a whole-event RunLocal subscription whose event type is wire-eligible installs with the
+    // generated reflection-free decoder, emitted by the interceptor as the 3rd argument.
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, HookContext, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+        => InstallLocal(package, handler, decoder);
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TEvent, HookContext> handler, Func<KernelRpcValue, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) => handler(e), decoder);
+    }
+
+    public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TEvent> handler, Func<KernelRpcValue, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
+    internal RemoteSubscriptionPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(handler);
+        ValidateSubscription(package);
+        if (_localHandlers is null)
+        {
+            throw LocalHandlersNotSupported();
+        }
+
+        var subscriptionId = _install(package).AsTask().GetAwaiter().GetResult();
+        _localHandlers.Register(subscriptionId, handler);
+        return this;
+    }
+
+    internal RemoteSubscriptionPipeline<TEvent> InstallLocal<TProjected>(PluginPackage package, Func<TProjected, HookContext, ValueTask> handler, Func<KernelRpcValue, TProjected> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(decoder);
+        ValidateSubscription(package);
+        if (_localHandlers is null)
+        {
+            throw LocalHandlersNotSupported();
+        }
+
+        var subscriptionId = _install(package).AsTask().GetAwaiter().GetResult();
+        _localHandlers.Register(subscriptionId, handler, decoder);
         return this;
     }
 

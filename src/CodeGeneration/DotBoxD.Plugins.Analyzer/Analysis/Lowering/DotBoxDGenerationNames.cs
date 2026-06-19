@@ -79,6 +79,8 @@ internal static class DotBoxDGenerationNames
         public const string GlobalPluginPackage = GlobalPrefix + "DotBoxD.Plugins.PluginPackage";
         public const string GlobalPluginManifest = GlobalPrefix + "DotBoxD.Plugins.PluginManifest";
         public const string GlobalHookSubscriptionManifest = GlobalPrefix + "DotBoxD.Plugins.HookSubscriptionManifest";
+        public const string GlobalIndexedPredicate = GlobalPrefix + "DotBoxD.Plugins.IndexedPredicate";
+        public const string GlobalIndexPredicateOperator = GlobalPrefix + "DotBoxD.Plugins.IndexPredicateOperator";
         public const string GlobalLiveSettingDefinition = GlobalPrefix + "DotBoxD.Plugins.LiveSettingDefinition";
         public const string GlobalPluginPackageJsonSerializer = GlobalPrefix + "DotBoxD.Plugins.Json.PluginPackageJsonSerializer";
         public const string GlobalPluginMessageBindings = GlobalPrefix + "DotBoxD.Plugins.Runtime.PluginMessageBindings";

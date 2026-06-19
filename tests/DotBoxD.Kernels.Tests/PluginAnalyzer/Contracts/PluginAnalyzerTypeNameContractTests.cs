@@ -101,6 +101,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GlobalPluginPackage)] = GlobalTypeName(typeof(PluginPackage)),
             [nameof(TypeNames.GlobalPluginManifest)] = GlobalTypeName(typeof(PluginManifest)),
             [nameof(TypeNames.GlobalHookSubscriptionManifest)] = GlobalTypeName(typeof(HookSubscriptionManifest)),
+            [nameof(TypeNames.GlobalIndexedPredicate)] = GlobalTypeName(typeof(IndexedPredicate)),
+            [nameof(TypeNames.GlobalIndexPredicateOperator)] = GlobalTypeName(typeof(IndexPredicateOperator)),
             [nameof(TypeNames.GlobalLiveSettingDefinition)] = GlobalTypeName(typeof(LiveSettingDefinition)),
             [nameof(TypeNames.GlobalPluginPackageJsonSerializer)] = GlobalTypeName(typeof(PluginPackageJsonSerializer)),
             [nameof(TypeNames.GlobalPluginMessageBindings)] = GlobalTypeName(typeof(PluginMessageBindings)),

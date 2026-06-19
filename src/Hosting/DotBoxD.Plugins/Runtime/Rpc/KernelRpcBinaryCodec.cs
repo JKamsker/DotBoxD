@@ -1,13 +1,20 @@
 namespace DotBoxD.Plugins;
 
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Text;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 /// <summary>
 /// Encodes server extension IR values as a small binary payload: one value-kind byte followed by only the
 /// active scalar or child sequence. The IPC layer transports the resulting bytes as an ordinary binary
 /// argument, avoiding reflection-bound DTO maps and repeated string kind tags on the wire.
 /// </summary>
+/// <remarks>
+/// The encode side writes into an <see cref="IBufferWriter{T}"/> so the hot push path can supply a pooled
+/// buffer and hand its written span straight to the transport. The <c>byte[]</c>-returning overloads stay for
+/// server-extension callers and tests; they encode through a pooled writer and copy once at the boundary.
+/// </remarks>
 public static class KernelRpcBinaryCodec
 {
     private const int MaxDecodeDepth = 64;
@@ -17,14 +24,21 @@ public static class KernelRpcBinaryCodec
     public static byte[] EncodeArguments(IReadOnlyList<KernelRpcValue> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        var stream = new MemoryStream();
-        WriteLength(stream, arguments.Count);
+        using var writer = PooledRpcBufferWriter.Rent();
+        EncodeArguments(arguments, writer);
+        return writer.WrittenMemory.ToArray();
+    }
+
+    /// <summary>Encodes <paramref name="arguments"/> into <paramref name="writer"/> without an intermediate array.</summary>
+    public static void EncodeArguments(IReadOnlyList<KernelRpcValue> arguments, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteLength(writer, arguments.Count);
         for (var i = 0; i < arguments.Count; i++)
         {
-            WriteValue(stream, arguments[i]);
+            WriteValue(writer, arguments[i]);
         }
-
-        return stream.ToArray();
     }
 
     public static KernelRpcValue[] DecodeArguments(ReadOnlyMemory<byte> payload)
@@ -44,9 +58,16 @@ public static class KernelRpcBinaryCodec
 
     public static byte[] EncodeValue(KernelRpcValue value)
     {
-        var stream = new MemoryStream();
-        WriteValue(stream, value);
-        return stream.ToArray();
+        using var writer = PooledRpcBufferWriter.Rent();
+        EncodeValue(value, writer);
+        return writer.WrittenMemory.ToArray();
+    }
+
+    /// <summary>Encodes <paramref name="value"/> into <paramref name="writer"/> without an intermediate array.</summary>
+    public static void EncodeValue(KernelRpcValue value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteValue(writer, value);
     }
 
     public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
@@ -57,32 +78,32 @@ public static class KernelRpcBinaryCodec
         return value;
     }
 
-    private static void WriteValue(MemoryStream stream, KernelRpcValue value)
+    private static void WriteValue(IBufferWriter<byte> writer, KernelRpcValue value)
     {
-        stream.WriteByte((byte)value.Kind);
+        WriteByte(writer, (byte)value.Kind);
         switch (value.Kind)
         {
             case KernelRpcValueKind.Unit:
                 return;
             case KernelRpcValueKind.Bool:
-                stream.WriteByte(value.BoolValue ? (byte)1 : (byte)0);
+                WriteByte(writer, value.BoolValue ? (byte)1 : (byte)0);
                 return;
             case KernelRpcValueKind.I32:
-                WriteInt32(stream, value.Int32Value);
+                WriteInt32(writer, value.Int32Value);
                 return;
             case KernelRpcValueKind.I64:
-                WriteInt64(stream, value.Int64Value);
+                WriteInt64(writer, value.Int64Value);
                 return;
             case KernelRpcValueKind.F64:
-                WriteInt64(stream, BitConverter.DoubleToInt64Bits(value.DoubleValue));
+                WriteInt64(writer, BitConverter.DoubleToInt64Bits(value.DoubleValue));
                 return;
             case KernelRpcValueKind.String:
-                WriteString(stream, value.TextValue);
+                WriteString(writer, value.TextValue);
                 return;
             case KernelRpcValueKind.List:
             case KernelRpcValueKind.Record:
             case KernelRpcValueKind.Map:
-                WriteItems(stream, value.ItemSpan);
+                WriteItems(writer, value.ItemSpan);
                 return;
             default:
                 throw new NotSupportedException($"Server extension value kind '{value.Kind}' is not supported.");
@@ -129,12 +150,12 @@ public static class KernelRpcBinaryCodec
         return KernelRpcValue.Double(value);
     }
 
-    private static void WriteItems(MemoryStream stream, ReadOnlySpan<KernelRpcValue> items)
+    private static void WriteItems(IBufferWriter<byte> writer, ReadOnlySpan<KernelRpcValue> items)
     {
-        WriteLength(stream, items.Length);
+        WriteLength(writer, items.Length);
         foreach (var item in items)
         {
-            WriteValue(stream, item);
+            WriteValue(writer, item);
         }
     }
 
@@ -157,28 +178,37 @@ public static class KernelRpcBinaryCodec
         return values;
     }
 
-    private static void WriteString(MemoryStream stream, string value)
+    // Writes the UTF-8 bytes straight into the writer's span: GetByteCount sizes the rent and GetSpan/GetBytes
+    // fills it in place, so there is no per-string transient byte[] (the array the old MemoryStream path leaked).
+    private static void WriteString(IBufferWriter<byte> writer, string value)
     {
-        var bytes = Encoding.UTF8.GetBytes(value);
-        WriteLength(stream, bytes.Length);
-        stream.Write(bytes);
+        var byteCount = Encoding.UTF8.GetByteCount(value);
+        WriteLength(writer, byteCount);
+        if (byteCount == 0)
+        {
+            return;
+        }
+
+        var span = writer.GetSpan(byteCount);
+        var written = Encoding.UTF8.GetBytes(value, span);
+        writer.Advance(written);
     }
 
-    private static void WriteInt32(MemoryStream stream, int value)
+    private static void WriteInt32(IBufferWriter<byte> writer, int value)
     {
-        Span<byte> buffer = stackalloc byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(buffer, value);
-        stream.Write(buffer);
+        var span = writer.GetSpan(sizeof(int));
+        BinaryPrimitives.WriteInt32LittleEndian(span, value);
+        writer.Advance(sizeof(int));
     }
 
-    private static void WriteInt64(MemoryStream stream, long value)
+    private static void WriteInt64(IBufferWriter<byte> writer, long value)
     {
-        Span<byte> buffer = stackalloc byte[sizeof(long)];
-        BinaryPrimitives.WriteInt64LittleEndian(buffer, value);
-        stream.Write(buffer);
+        var span = writer.GetSpan(sizeof(long));
+        BinaryPrimitives.WriteInt64LittleEndian(span, value);
+        writer.Advance(sizeof(long));
     }
 
-    private static void WriteLength(MemoryStream stream, int value)
+    private static void WriteLength(IBufferWriter<byte> writer, int value)
     {
         if (value < 0)
         {
@@ -188,11 +218,18 @@ public static class KernelRpcBinaryCodec
         var remaining = (uint)value;
         while (remaining >= 0x80)
         {
-            stream.WriteByte((byte)((remaining & 0x7F) | 0x80));
+            WriteByte(writer, (byte)((remaining & 0x7F) | 0x80));
             remaining >>= 7;
         }
 
-        stream.WriteByte((byte)remaining);
+        WriteByte(writer, (byte)remaining);
+    }
+
+    private static void WriteByte(IBufferWriter<byte> writer, byte value)
+    {
+        var span = writer.GetSpan(1);
+        span[0] = value;
+        writer.Advance(1);
     }
 
     private ref struct Reader

@@ -4,6 +4,17 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
 internal static class DotBoxDManifestEffectModel
 {
+    private static readonly EquatableArray<string> NonAllocatingComputeEffects =
+        EquatableArray<string>.FromOwned(new[] {
+            DotBoxDGenerationNames.Effects.Cpu
+        });
+
+    private static readonly EquatableArray<string> AllocatingComputeEffects =
+        EquatableArray<string>.FromOwned(new[] {
+            DotBoxDGenerationNames.Effects.Cpu,
+            DotBoxDGenerationNames.Effects.Alloc
+        });
+
     private static readonly EquatableArray<string> NonAllocatingEffects =
         EquatableArray<string>.FromOwned(new[] {
             DotBoxDGenerationNames.Effects.Cpu,
@@ -23,12 +34,30 @@ internal static class DotBoxDManifestEffectModel
 
     public static EquatableArray<string> Create(
         DotBoxDStatementBodyModel shouldHandle,
-        DotBoxDHandleModel handle,
+        DotBoxDStatementBodyModel handleBody,
         ICollection<string>? extraEffects = null)
     {
-        var baseEffects = shouldHandle.Allocates || handle.Allocates
+        var baseEffects = shouldHandle.Allocates || handleBody.Allocates
             ? AllocatingEffects
             : NonAllocatingEffects;
+        return Merge(baseEffects, extraEffects);
+    }
+
+    public static EquatableArray<string> CreateLocalCallback(
+        DotBoxDStatementBodyModel shouldHandle,
+        DotBoxDStatementBodyModel handleBody,
+        ICollection<string>? extraEffects = null)
+    {
+        var baseEffects = shouldHandle.Allocates || handleBody.Allocates
+            ? AllocatingComputeEffects
+            : NonAllocatingComputeEffects;
+        return Merge(baseEffects, extraEffects);
+    }
+
+    private static EquatableArray<string> Merge(
+        EquatableArray<string> baseEffects,
+        ICollection<string>? extraEffects)
+    {
         if (extraEffects is null || extraEffects.Count == 0)
         {
             return baseEffects;

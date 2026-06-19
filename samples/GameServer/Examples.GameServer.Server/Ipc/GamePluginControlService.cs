@@ -1,8 +1,6 @@
-using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Kernels.Game.Server.Simulation;
 using DotBoxD.Plugins.Json;
-using DotBoxD.Plugins.Kernel;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
 namespace DotBoxD.Kernels.Game.Server.Ipc;
@@ -20,15 +18,49 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     private readonly PluginSession _session;
     private readonly GameCommandSink _sink;
     private readonly GameWorld _world;
+    private readonly GamePluginKernelWiring _kernelWiring;
+    private readonly GamePluginServerExtensionInvoker _serverExtensions;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _shutdown = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    // Back-compat 4-arg ctor (no event-callback transport): a plugin that never uses a remote RunLocal chain
+    // needs no callback. Kept as a distinct overload so reflection-based construction with four positional
+    // arguments resolves unambiguously.
     public GamePluginControlService(PluginServer server, PluginSession session, GameCommandSink sink, GameWorld world)
+        : this(server, session, sink, world, null)
+    {
+    }
+
+    public GamePluginControlService(
+        PluginServer server,
+        PluginSession session,
+        GameCommandSink sink,
+        GameWorld world,
+        IPluginEventCallback? eventCallback)
+        : this(
+            server,
+            session,
+            sink,
+            world,
+            new GamePluginKernelWiring(server, world, eventCallback),
+            new GamePluginServerExtensionInvoker(server, session))
+    {
+    }
+
+    private GamePluginControlService(
+        PluginServer server,
+        PluginSession session,
+        GameCommandSink sink,
+        GameWorld world,
+        GamePluginKernelWiring kernelWiring,
+        GamePluginServerExtensionInvoker serverExtensions)
     {
         _server = server;
         _session = session;
         _sink = sink;
         _world = world;
+        _kernelWiring = kernelWiring;
+        _serverExtensions = serverExtensions;
     }
 
     /// <summary>Completes once the plugin has installed its kernels and is holding the connection.</summary>
@@ -42,11 +74,11 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        ValidateSupportedEvent(package);
+        _kernelWiring.ValidateSupportedEvent(package);
         Console.WriteLine($"[server] installing plugin kernel '{package.Manifest.PluginId}'...");
         var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
         var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
-        WireHook(kernel);
+        _kernelWiring.WireHook(kernel);
         Console.WriteLine($"[server] installed plugin kernel '{kernel.Manifest.PluginId}'.");
         return kernel.Manifest.PluginId;
     }
@@ -56,11 +88,12 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        ValidateSupportedEvent(package);
+        _kernelWiring.ValidateSupportedEvent(package);
         Console.WriteLine($"[server] installing subscription kernel '{package.Manifest.PluginId}'...");
         var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
         var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
-        WireSubscription(kernel);
+        _kernelWiring.WireSubscription(kernel);
+        EventIndexDiagnostics.Report(kernel);
         Console.WriteLine($"[server] installed subscription kernel '{kernel.Manifest.PluginId}'.");
         return kernel.Manifest.PluginId;
     }
@@ -72,53 +105,24 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         var package = PluginPackageJsonSerializer.Import(packageJson);
         Console.WriteLine($"[server] installing server extension '{package.Manifest.PluginId}'...");
         var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
-        InstalledKernel kernel;
         try
         {
-            kernel = await _session.InstallServerExtensionAsync(package, policy, ct).ConfigureAwait(false);
+            var kernel = await _session.InstallServerExtensionAsync(package, policy, ct).ConfigureAwait(false);
+            Console.WriteLine($"[server] installed server extension '{kernel.Manifest.PluginId}'.");
+            return kernel.Manifest.PluginId;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[server] server extension install failed: {ex}");
             throw;
         }
-
-        Console.WriteLine($"[server] installed server extension '{kernel.Manifest.PluginId}'.");
-        return kernel.Manifest.PluginId;
     }
 
-    public async ValueTask<byte[]> InvokeServerExtensionAsync(
+    public ValueTask<byte[]> InvokeServerExtensionAsync(
         string pluginId,
         byte[] arguments,
         CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(pluginId);
-        ArgumentNullException.ThrowIfNull(arguments);
-        if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
-            !ReferenceEquals(kernel.OwnerId, _session))
-        {
-            throw new InvalidOperationException($"Server extension '{pluginId}' is not owned by this plugin session.");
-        }
-
-        var function = RpcEntrypoint(kernel);
-        var rpcArguments = KernelRpcBinaryCodec.DecodeArguments(arguments);
-        var liveSettings = kernel.Manifest.LiveSettings.Count;
-        var callerCount = function.Parameters.Count - liveSettings;
-        if (callerCount < 0 || rpcArguments.Length != callerCount)
-        {
-            throw new InvalidOperationException(
-                $"Server extension '{pluginId}' expects {callerCount} argument(s) but received {rpcArguments.Length}.");
-        }
-
-        var sandboxArguments = new SandboxValue[rpcArguments.Length];
-        for (var i = 0; i < rpcArguments.Length; i++)
-        {
-            sandboxArguments[i] = KernelRpcValueConverter.ToSandboxValue(rpcArguments[i], function.Parameters[i].Type);
-        }
-
-        var result = await kernel.InvokeServerExtensionAsync(sandboxArguments, ct).ConfigureAwait(false);
-        return KernelRpcBinaryCodec.EncodeValue(KernelRpcValueConverter.FromSandboxValue(result));
-    }
+        => _serverExtensions.InvokeAsync(pluginId, arguments, ct);
 
     public ValueTask UpdateSettingsAsync(
         string pluginId,
@@ -160,88 +164,4 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     // The per-entity domain calls (KillMonster / IsMonster / GetEntity*) moved to GameWorldAccess, which
     // implements IGameWorldAccess directly. This control service is now control-plane only. (GetWorldAsync
     // stays because it returns a whole WorldSnapshot for the server's own diagnostics, not a domain read.)
-
-    private void WireHook(InstalledKernel kernel)
-    {
-        // Map by the kernel's declared event so the server stays agnostic of plugin ids. Manifests now
-        // carry the fully-qualified event name; match on the simple-name tail so qualified and legacy
-        // simple-name manifests both wire correctly.
-        var subscription = SubscribedEvent(kernel.Manifest);
-        switch (SimpleEventName(subscription))
-        {
-            case "MonsterAggroEvent":
-                _server.Hooks.On<MonsterAggroEvent>().Use(kernel);
-                break;
-            case "AttackEvent":
-                _server.Hooks.On<AttackEvent>().Use(kernel);
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
-        }
-    }
-
-    private static void ValidateSupportedEvent(PluginPackage package)
-    {
-        var subscription = SubscribedEvent(package.Manifest);
-        if (SimpleEventName(subscription) is "MonsterAggroEvent" or "AttackEvent")
-        {
-            return;
-        }
-
-        throw new InvalidOperationException(
-            $"Plugin '{package.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
-    }
-
-    private void WireSubscription(InstalledKernel kernel)
-    {
-        var subscription = SubscribedEvent(kernel.Manifest);
-        switch (SimpleEventName(subscription))
-        {
-            case "MonsterAggroEvent":
-                _server.Subscriptions.On<MonsterAggroEvent>().Use(kernel);
-                break;
-            case "AttackEvent":
-                _server.Subscriptions.On<AttackEvent>().Use(kernel);
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
-        }
-    }
-
-    private static string? SubscribedEvent(PluginManifest manifest)
-        => manifest.Subscriptions.Count > 0 ? manifest.Subscriptions[0].Event : null;
-
-    private static string? SimpleEventName(string? eventName)
-    {
-        if (string.IsNullOrEmpty(eventName))
-        {
-            return eventName;
-        }
-
-        var lastDot = eventName!.LastIndexOf('.');
-        return lastDot >= 0 && lastDot < eventName.Length - 1
-            ? eventName[(lastDot + 1)..]
-            : eventName;
-    }
-
-    private static SandboxFunction RpcEntrypoint(InstalledKernel kernel)
-    {
-        if (kernel.Manifest.RpcEntrypoint is not { } entrypoint)
-        {
-            throw new InvalidOperationException($"Kernel '{kernel.Manifest.PluginId}' is not a server extension.");
-        }
-
-        foreach (var function in kernel.Package.Module.Functions)
-        {
-            if (function.IsEntrypoint && string.Equals(function.Id, entrypoint, StringComparison.Ordinal))
-            {
-                return function;
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"Server extension '{kernel.Manifest.PluginId}' is missing entrypoint '{entrypoint}'.");
-    }
 }

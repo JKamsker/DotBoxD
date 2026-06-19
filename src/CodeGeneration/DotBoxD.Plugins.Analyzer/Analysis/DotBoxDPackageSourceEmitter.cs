@@ -54,7 +54,7 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {TypeNames.GlobalExecutionMode}.Auto,");
         EmitEffects(builder, model.ManifestEffects);
         builder.AppendLine("            settings,");
-        builder.AppendLine($"            [new {TypeNames.GlobalHookSubscriptionManifest}({LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})])");
+        EmitSubscriptions(builder, model);
         EmitRequiredCapabilities(builder, model.RequiredCapabilities);
         builder.Append("        return ").Append(TypeNames.GlobalPluginPackage).AppendLine(".Create(manifest, CreateModule(settings));");
         builder.AppendLine("    }");
@@ -62,6 +62,21 @@ internal static class DotBoxDPackageSourceEmitter
         EmitModule(builder, model);
         EmitFunctions(builder, model);
         EmitHelpers(builder, model);
+        EmitLocalDecoder(builder, model);
+    }
+
+    // For a lowered RunLocal chain with a wire-eligible projected type, append the generated reflection-free
+    // reader (ReadProjected + its conversion helpers). The interceptor passes <Package>.ReadProjected as the
+    // 3rd UseGeneratedLocalChain argument so decode bypasses the SandboxValue graph and reflection entirely.
+    private static void EmitLocalDecoder(StringBuilder builder, PluginKernelModel model)
+    {
+        if (string.IsNullOrEmpty(model.LocalDecoderSource))
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.Append(model.LocalDecoderSource);
     }
 
     private static void EmitSettings(StringBuilder builder, PluginKernelModel model)
@@ -103,6 +118,72 @@ internal static class DotBoxDPackageSourceEmitter
 
         builder.AppendLine("],");
     }
+
+    // Emits the single hook-subscription manifest. When the lowered .Where(...) chain yielded index
+    // metadata, it rides along in an object initializer; otherwise the output is identical to the
+    // pre-feature two-argument form so unrelated chains generate byte-for-byte the same source.
+    private static void EmitSubscriptions(StringBuilder builder, PluginKernelModel model)
+    {
+        var head = $"            [new {TypeNames.GlobalHookSubscriptionManifest}(" +
+            $"{LiteralReader.StringLiteral(model.EventName)}, {LiteralReader.StringLiteral(model.KernelName)})";
+        var hasPredicates = model.IndexPredicates.Count > 0;
+        // No index metadata and not a local-terminal chain → emit the pre-feature two-argument form so
+        // ordinary (incl. .Run) chains generate byte-for-byte the same source.
+        if (!hasPredicates && !model.LocalTerminal)
+        {
+            builder.Append(head).AppendLine("])");
+            return;
+        }
+
+        builder.AppendLine(head);
+        builder.AppendLine("            {");
+        if (hasPredicates)
+        {
+            builder.Append("                ").Append(IndexedPredicatesProperty).Append(" = [");
+            for (var i = 0; i < model.IndexPredicates.Count; i++)
+            {
+                if (i > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                var predicate = model.IndexPredicates[i];
+                builder.Append("new ").Append(TypeNames.GlobalIndexedPredicate).Append('(')
+                    .Append(LiteralReader.StringLiteral(predicate.Path)).Append(", ")
+                    .Append(TypeNames.GlobalIndexPredicateOperator).Append('.').Append(predicate.Operator).Append(", ")
+                    .Append(predicate.ValueLiteral).Append(", ")
+                    .Append(LiteralReader.StringLiteral(predicate.ValueType)).Append(')');
+            }
+
+            builder.AppendLine("],");
+            builder.Append("                ").Append(IndexCoversPredicateProperty).Append(" = ")
+                .Append(model.IndexCoversPredicate
+                    ? DotBoxDGenerationNames.CSharpLiterals.True
+                    : DotBoxDGenerationNames.CSharpLiterals.False)
+                .AppendLine(",");
+        }
+
+        // Host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes rather than
+        // re-deriving from IR. A null ProjectedType (no Select) marks a whole-event push; a non-null one
+        // marks a projection push — so the payload kind is derivable and needs no separate field.
+        if (model.LocalTerminal)
+        {
+            builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")
+                .Append(DotBoxDGenerationNames.CSharpLiterals.True).AppendLine(",");
+            if (model.ProjectedType is not null)
+            {
+                builder.Append("                ").Append(ProjectedTypeProperty).Append(" = ")
+                    .Append(LiteralReader.StringLiteral(model.ProjectedType)).AppendLine(",");
+            }
+        }
+
+        builder.AppendLine("            }])");
+    }
+
+    private const string IndexedPredicatesProperty = "IndexedPredicates";
+    private const string IndexCoversPredicateProperty = "IndexCoversPredicate";
+    private const string LocalTerminalProperty = "LocalTerminal";
+    private const string ProjectedTypeProperty = "ProjectedType";
 
     private static void EmitRequiredCapabilities(StringBuilder builder, EquatableArray<string> capabilities)
     {
@@ -154,8 +235,8 @@ internal static class DotBoxDPackageSourceEmitter
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
             .Append('(').Append(ReadOnlyListOf(TypeNames.GlobalParameter)).AppendLine(" parameters)");
         builder.AppendLine("        => new(");
-        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {TypeNames.GlobalSandboxType}.Unit,");
-        builder.AppendLine($"            {HandleBody(model.Handle).Source});");
+        builder.AppendLine($"            {LiteralReader.StringLiteral(DotBoxDGenerationNames.Entrypoints.Handle)}, true, parameters, {model.HandleReturnTypeSource},");
+        builder.AppendLine($"            {model.HandleBody.Source});");
         builder.AppendLine();
     }
 
@@ -346,16 +427,4 @@ internal static class DotBoxDPackageSourceEmitter
             $"{TypeNames.GlobalExpression} left, {TypeNames.GlobalExpression} right",
             $"new {TypeNames.GlobalBinaryExpression}(left, {LiteralReader.StringLiteral(op)}, right, Span)");
 
-    private static string HandleExpression(DotBoxDHandleModel handle)
-        => $"new {TypeNames.GlobalCallExpression}({TypeNames.GlobalPluginMessageBindings}.SendBindingId, [{handle.Target.Source}, {handle.Message.Source}], null, Span)";
-
-    private static DotBoxDStatementBodyModel HandleBody(DotBoxDHandleModel handle)
-    {
-        var returned = DotBoxDStatementBodyModelFactory.Return(
-            HandleExpression(handle),
-            handle.Target.Allocates || handle.Message.Allocates);
-        return handle.Prefix is null
-            ? returned
-            : DotBoxDStatementBodyModelFactory.Concat(handle.Prefix, returned);
-    }
 }

@@ -95,5 +95,15 @@ internal static class Program
             .Where(e => e.Damage >= 5)
             .Select(e => e.AttackerId)
             .Run((attackerId, ctx) => ctx.Messages.Send(attackerId, "taunt:inline"));
+
+        // Indexed subscription: both .Where leaves compare an [EventIndexKey] property to a constant, so the
+        // lowered chain ships index metadata (AttackerId == "player-1", Damage >= 5) on the manifest. The
+        // host registers it into equality/range buckets and prefilters events before the verified IR runs —
+        // see the "[server] registered indexed ..." diagnostics. The verified predicate still executes as the
+        // correctness fallback for events the index lets through.
+        server.Subscriptions.On<AttackEvent>()
+            .Where(e => e.AttackerId == "player-1" && e.Damage >= 5)
+            .Select(e => e.TargetId)
+            .Run((targetId, ctx) => ctx.Messages.Send(targetId, "indexed-taunt:inline"));
     }
 }
