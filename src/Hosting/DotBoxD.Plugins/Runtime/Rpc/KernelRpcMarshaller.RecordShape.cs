@@ -8,20 +8,6 @@ public static partial class KernelRpcMarshaller
 {
     private sealed class RecordShape
     {
-        private static readonly MethodInfo FromSandboxValueMethod =
-            typeof(KernelRpcMarshaller).GetMethod(
-                nameof(FromSandboxValue),
-                BindingFlags.Public | BindingFlags.Static,
-                null,
-                [typeof(SandboxValue), typeof(Type)],
-                null)!;
-        private static readonly MethodInfo ReadBoolMethod = ScalarReader(nameof(ReadBool));
-        private static readonly MethodInfo ReadInt32Method = ScalarReader(nameof(ReadInt32));
-        private static readonly MethodInfo ReadInt64Method = ScalarReader(nameof(ReadInt64));
-        private static readonly MethodInfo ReadDoubleMethod = ScalarReader(nameof(ReadDouble));
-        private static readonly MethodInfo ReadStringMethod = ScalarReader(nameof(ReadString));
-        private static readonly MethodInfo ReadGuidMethod = ScalarReader(nameof(ReadGuid));
-
         private readonly ConstructorInfo? _constructor;
         private readonly int[] _constructorMap;
         private readonly Func<object, object?>[] _getters;
@@ -35,8 +21,10 @@ public static partial class KernelRpcMarshaller
             Fields = fields;
             _getters = CreateGetters(fields);
             (_constructor, _constructorMap) = FindConstructor(type, fields);
-            _recordFactory = CreateRecordFactory(_constructor, _constructorMap, fields);
-            _kernelFactory = RecordShapeKernelFactory.Create(_constructor, _constructorMap, fields);
+            _recordFactory = CreateRecordFactory(_constructor, _constructorMap, fields) ??
+                RecordShapeSetterFactory.CreateSandbox(type, fields);
+            _kernelFactory = RecordShapeKernelFactory.Create(_constructor, _constructorMap, fields) ??
+                RecordShapeSetterFactory.CreateKernel(type, fields);
         }
 
         public IReadOnlyList<PropertyInfo> Fields { get; }
@@ -119,19 +107,7 @@ public static partial class KernelRpcMarshaller
         }
 
         private static LinqExpression ReadSandboxField(LinqExpression sandboxField, Type fieldType)
-        {
-            if (fieldType == typeof(bool)) return LinqExpression.Call(ReadBoolMethod, sandboxField);
-            if (fieldType == typeof(int)) return LinqExpression.Call(ReadInt32Method, sandboxField);
-            if (fieldType == typeof(long)) return LinqExpression.Call(ReadInt64Method, sandboxField);
-            if (fieldType == typeof(double)) return LinqExpression.Call(ReadDoubleMethod, sandboxField);
-            if (fieldType == typeof(string)) return LinqExpression.Call(ReadStringMethod, sandboxField);
-            if (fieldType == typeof(Guid)) return LinqExpression.Call(ReadGuidMethod, sandboxField);
-
-            return LinqExpression.Call(
-                FromSandboxValueMethod,
-                sandboxField,
-                LinqExpression.Constant(fieldType, typeof(Type)));
-        }
+            => ReadSandboxRecordField(sandboxField, fieldType);
 
         private static Func<object, object?>[] CreateGetters(IReadOnlyList<PropertyInfo> fields)
         {
@@ -152,30 +128,6 @@ public static partial class KernelRpcMarshaller
             var boxed = LinqExpression.Convert(value, typeof(object));
             return LinqExpression.Lambda<Func<object, object?>>(boxed, instance).Compile();
         }
-
-        private static MethodInfo ScalarReader(string name)
-            => typeof(RecordShape).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        private static bool ReadBool(SandboxValue value)
-            => value is BoolValue typed ? typed.Value : throw CannotMarshalScalar(value, typeof(bool));
-
-        private static int ReadInt32(SandboxValue value)
-            => value is I32Value typed ? typed.Value : throw CannotMarshalScalar(value, typeof(int));
-
-        private static long ReadInt64(SandboxValue value)
-            => value is I64Value typed ? typed.Value : throw CannotMarshalScalar(value, typeof(long));
-
-        private static double ReadDouble(SandboxValue value)
-            => value is F64Value typed ? typed.Value : throw CannotMarshalScalar(value, typeof(double));
-
-        private static string ReadString(SandboxValue value)
-            => value is StringValue typed ? typed.Value : throw CannotMarshalScalar(value, typeof(string));
-
-        private static Guid ReadGuid(SandboxValue value)
-            => value is GuidValue typed ? typed.Value : throw CannotMarshalScalar(value, typeof(Guid));
-
-        private static NotSupportedException CannotMarshalScalar(SandboxValue value, Type type)
-            => new($"Server extension cannot marshal sandbox value '{value.Type}' to type '{type}'.");
 
         private static (ConstructorInfo? Constructor, int[] Map) FindConstructor(
             Type type,

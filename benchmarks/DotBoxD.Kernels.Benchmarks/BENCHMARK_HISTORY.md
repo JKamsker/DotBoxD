@@ -878,3 +878,27 @@ WholeEvent     91.0 / 248.0     58.5 /   0.0
 
 This removes the encode-side intermediate wire tree. Scalar rows were already allocation-free; record and list
 pushes now are too.
+
+## Compiled setter DTO fallback
+
+DTOs without a matching constructor used the fallback path: build an `object?[]`, call `Activator.CreateInstance`,
+then set every property through `PropertyInfo.SetValue`. `RecordShape` now compiles a parameterless
+object-initializer factory for public settable DTOs, using the same direct scalar readers as constructor DTOs.
+Shapes without a public parameterless constructor or public setters keep the old fallback.
+
+Command:
+
+```text
+dotnet run --project benchmarks\DotBoxD.Kernels.Benchmarks\DotBoxD.Kernels.Benchmarks.csproj -c Release -- --probe-kernel-rpc-marshaller-dto
+```
+
+Representative local run, 500k measured iterations. The "before" settable row is the same probe after adding
+the settable DTO case but before the compiled setter factory; "after" is the compiled setter factory:
+
+```text
+Case                         Before ms/Bop    After ms/Bop
+Settable DTO fallback         178.7 / 96.0     69.8 / 32.0
+```
+
+The remaining allocation is the DTO object itself. Constructor-backed anonymous DTO rows stayed in the same
+range (about 75 ms and 40 B/op), which confirms the shared field-reader refactor did not regress that path.

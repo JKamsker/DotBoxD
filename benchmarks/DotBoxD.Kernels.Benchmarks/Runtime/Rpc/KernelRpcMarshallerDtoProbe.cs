@@ -13,30 +13,47 @@ internal static class KernelRpcMarshallerDtoProbe
     private const int Iterations = 500_000;
 
     private static readonly ConcurrentDictionary<Type, LegacyAnonymousShape> LegacyShapes = new();
+    private static readonly ConcurrentDictionary<Type, LegacySettableShape> LegacySettableShapes = new();
 
     public static void Run()
     {
-        var sample = new { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Zone = "crypt" };
-        var type = sample.GetType();
-        var record = (RecordValue)SandboxValue.FromRecord(
+        var anonymousSample = new { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Zone = "crypt" };
+        var anonymousType = anonymousSample.GetType();
+        var anonymousRecord = (RecordValue)SandboxValue.FromRecord(
         [
-            SandboxValue.FromGuid(sample.Id),
-            SandboxValue.FromString(sample.Zone)
+            SandboxValue.FromGuid(anonymousSample.Id),
+            SandboxValue.FromString(anonymousSample.Zone)
         ]);
+        var settableRecord = (RecordValue)SandboxValue.FromRecord(
+        [
+            SandboxValue.FromInt32(73),
+            SandboxValue.FromString("crypt")
+        ]);
+        var settableType = typeof(SettableDto);
 
-        _ = Measure(Warmup, () => LegacyFromSandboxValue(record, type));
-        _ = Measure(Warmup, () => KernelRpcMarshaller.FromSandboxValue(record, type)!);
+        _ = Measure(Warmup, () => LegacyFromSandboxValue(anonymousRecord, anonymousType));
+        _ = Measure(Warmup, () => KernelRpcMarshaller.FromSandboxValue(anonymousRecord, anonymousType)!);
+        _ = Measure(Warmup, () => LegacySettableFromSandboxValue(settableRecord, settableType));
+        _ = Measure(Warmup, () => KernelRpcMarshaller.FromSandboxValue(settableRecord, settableType)!);
 
-        var legacy = Measure(Iterations, () => LegacyFromSandboxValue(record, type));
-        var cached = Measure(Iterations, () => KernelRpcMarshaller.FromSandboxValue(record, type)!);
+        var legacy = Measure(Iterations, () => LegacyFromSandboxValue(anonymousRecord, anonymousType));
+        var cached = Measure(Iterations, () => KernelRpcMarshaller.FromSandboxValue(anonymousRecord, anonymousType)!);
+        var legacySettable = Measure(Iterations, () => LegacySettableFromSandboxValue(settableRecord, settableType));
+        var cachedSettable = Measure(Iterations, () => KernelRpcMarshaller.FromSandboxValue(settableRecord, settableType)!);
 
         Console.WriteLine($"iterations = {Iterations:N0}");
         Write("legacy cached reflection anonymous DTO", legacy);
         Write("compiled shape anonymous DTO", cached);
+        Write("legacy reflection settable DTO", legacySettable);
+        Write("compiled shape settable DTO", cachedSettable);
     }
 
     private static object LegacyFromSandboxValue(RecordValue record, Type type)
         => LegacyShapes.GetOrAdd(type, static candidate => new LegacyAnonymousShape(candidate))
+            .Construct(record);
+
+    private static object LegacySettableFromSandboxValue(RecordValue record, Type type)
+        => LegacySettableShapes.GetOrAdd(type, static candidate => new LegacySettableShape(candidate))
             .Construct(record);
 
     private static Measurement Measure(int iterations, Func<object> deserialize)
@@ -90,6 +107,48 @@ internal static class KernelRpcMarshallerDtoProbe
 
             return _constructor.Invoke(arguments);
         }
+    }
+
+    private sealed class LegacySettableShape
+    {
+        private readonly PropertyInfo[] _fields;
+        private readonly Type _type;
+
+        public LegacySettableShape(Type type)
+        {
+            _type = type;
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            _fields = type.GetProperties(flags)
+                .Where(static property => property.CanRead &&
+                    property.GetIndexParameters().Length == 0 &&
+                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal))
+                .OrderBy(static property => property.MetadataToken)
+                .ToArray();
+        }
+
+        public object Construct(RecordValue record)
+        {
+            var arguments = new object?[_fields.Length];
+            for (var i = 0; i < _fields.Length; i++)
+            {
+                arguments[i] = KernelRpcMarshaller.FromSandboxValue(record.Fields[i], _fields[i].PropertyType);
+            }
+
+            var instance = Activator.CreateInstance(_type)!;
+            for (var i = 0; i < _fields.Length; i++)
+            {
+                _fields[i].SetValue(instance, arguments[i]);
+            }
+
+            return instance;
+        }
+    }
+
+    private sealed class SettableDto
+    {
+        public int Id { get; set; }
+
+        public string Zone { get; set; } = string.Empty;
     }
 
     private readonly record struct Measurement(double Milliseconds, long AllocatedBytes, int Checksum);
