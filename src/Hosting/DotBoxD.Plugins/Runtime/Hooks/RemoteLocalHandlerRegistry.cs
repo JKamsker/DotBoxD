@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime.Hooks;
@@ -10,7 +9,7 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 /// the implementation forwards <paramref name="projectedValue"/> over the IPC boundary keyed by
 /// <paramref name="subscriptionId"/>. Transport-agnostic so the pipeline does not depend on the RPC layer.
 /// </summary>
-public delegate ValueTask RemoteLocalPush(string subscriptionId, byte[] projectedValue, CancellationToken cancellationToken);
+public delegate ValueTask RemoteLocalPush(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken cancellationToken);
 
 /// <summary>
 /// Client-side registry for remote <c>RunLocal</c> terminals. A remote
@@ -44,13 +43,43 @@ public sealed class RemoteLocalHandlerRegistry
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(handler);
 
+        // Reflective fallback: convert the pushed wire value through the SandboxValue graph and reconstruct the
+        // CLR value by reflection. Used when the projected type has no generated decoder (not wire-eligible).
         var expectedType = KernelRpcMarshaller.SandboxTypeOf(typeof(TProjected));
-        var entry = new Handler(expectedType, async (sandboxValue, context) =>
+        return RegisterHandler(subscriptionId, async (wireValue, context) =>
         {
+            var sandboxValue = KernelRpcValueConverter.ToSandboxValue(wireValue, expectedType);
             var projected = (TProjected)KernelRpcMarshaller.FromSandboxValue(sandboxValue, typeof(TProjected))!;
             await handler(projected, context).ConfigureAwait(false);
         });
+    }
 
+    /// <summary>
+    /// Registers the native terminal delegate alongside a generated reflection-free <paramref name="decoder"/>
+    /// that reads <typeparamref name="TProjected"/> straight off the pushed <see cref="KernelRpcValue"/>'s typed
+    /// fields — no <c>SandboxValue</c> intermediate, no boxing, no reflection. Emitted by the plugin generator
+    /// for wire-eligible projected types; <see cref="Register{TProjected}(string, Func{TProjected, HookContext, ValueTask})"/>
+    /// remains the fallback for the rest. Idempotent in the same way as the 2-arg overload.
+    /// </summary>
+    public IDisposable Register<TProjected>(
+        string subscriptionId,
+        Func<TProjected, HookContext, ValueTask> handler,
+        Func<KernelRpcValue, TProjected> decoder)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(decoder);
+
+        return RegisterHandler(subscriptionId, async (wireValue, context) =>
+        {
+            var projected = decoder(wireValue);
+            await handler(projected, context).ConfigureAwait(false);
+        });
+    }
+
+    private IDisposable RegisterHandler(string subscriptionId, Func<KernelRpcValue, HookContext, ValueTask> invoke)
+    {
+        var entry = new Handler(invoke);
         _handlers[subscriptionId] = entry;
         return new Registration(this, subscriptionId, entry);
     }
@@ -77,8 +106,7 @@ public sealed class RemoteLocalHandlerRegistry
         }
 
         var wireValue = KernelRpcBinaryCodec.DecodeValue(projectedValue);
-        var sandboxValue = KernelRpcValueConverter.ToSandboxValue(wireValue, handler.ExpectedType);
-        await handler.Invoke(sandboxValue, context).ConfigureAwait(false);
+        await handler.Invoke(wireValue, context).ConfigureAwait(false);
     }
 
     /// <summary>Removes the handler for <paramref name="subscriptionId"/>. Returns <c>true</c> if one was present.</summary>
@@ -96,12 +124,9 @@ public sealed class RemoteLocalHandlerRegistry
     /// </summary>
     public void Clear() => _handlers.Clear();
 
-    private sealed class Handler(
-        SandboxType expectedType,
-        Func<SandboxValue, HookContext, ValueTask> invoke)
+    private sealed class Handler(Func<KernelRpcValue, HookContext, ValueTask> invoke)
     {
-        public SandboxType ExpectedType { get; } = expectedType;
-        public Func<SandboxValue, HookContext, ValueTask> Invoke { get; } = invoke;
+        public Func<KernelRpcValue, HookContext, ValueTask> Invoke { get; } = invoke;
     }
 
     private sealed class Registration(

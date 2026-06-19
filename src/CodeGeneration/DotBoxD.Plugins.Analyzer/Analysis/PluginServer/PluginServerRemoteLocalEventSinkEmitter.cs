@@ -27,12 +27,12 @@ internal static class PluginServerRemoteLocalEventSinkEmitter
     {
         if (!model.EventCallbackReturnHasValue)
         {
-            builder.Append("        public ").Append(model.EventCallbackReturnType).AppendLine(" OnEventAsync(string subscriptionId, byte[] projectedValue, global::System.Threading.CancellationToken ct = default)");
+            builder.Append("        public ").Append(model.EventCallbackReturnType).AppendLine(" OnEventAsync(string subscriptionId, global::System.ReadOnlyMemory<byte> projectedValue, global::System.Threading.CancellationToken ct = default)");
             builder.AppendLine("            => DispatchAsync(subscriptionId, projectedValue, ct);");
             return;
         }
 
-        builder.Append("        public async ").Append(model.EventCallbackReturnType).AppendLine(" OnEventAsync(string subscriptionId, byte[] projectedValue, global::System.Threading.CancellationToken ct = default)");
+        builder.Append("        public async ").Append(model.EventCallbackReturnType).AppendLine(" OnEventAsync(string subscriptionId, global::System.ReadOnlyMemory<byte> projectedValue, global::System.Threading.CancellationToken ct = default)");
         builder.AppendLine("        {");
         builder.AppendLine("            await DispatchAsync(subscriptionId, projectedValue, ct).ConfigureAwait(false);");
         builder.AppendLine("            return default!;");
@@ -41,7 +41,7 @@ internal static class PluginServerRemoteLocalEventSinkEmitter
 
     private static void AppendDispatchAsync(StringBuilder builder)
     {
-        builder.AppendLine("        private global::System.Threading.Tasks.ValueTask DispatchAsync(string subscriptionId, byte[] projectedValue, global::System.Threading.CancellationToken ct)");
+        builder.AppendLine("        private global::System.Threading.Tasks.ValueTask DispatchAsync(string subscriptionId, global::System.ReadOnlyMemory<byte> projectedValue, global::System.Threading.CancellationToken ct)");
         builder.AppendLine("            => _localHandlers.DispatchAsync(subscriptionId, projectedValue, new global::DotBoxD.Abstractions.HookContext(new global::DotBoxD.Abstractions.InMemoryPluginMessageSink(), ct), ct);");
     }
 }

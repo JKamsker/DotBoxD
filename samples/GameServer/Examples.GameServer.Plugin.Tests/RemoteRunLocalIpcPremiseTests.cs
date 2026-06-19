@@ -36,7 +36,7 @@ public sealed class RemoteRunLocalIpcPremiseTests
         private int _pushCount;
         public int PushCount => Volatile.Read(ref _pushCount);
 
-        public async ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default)
+        public async ValueTask OnEventAsync(string subscriptionId, ReadOnlyMemory<byte> projectedValue, CancellationToken ct = default)
         {
             Interlocked.Increment(ref _pushCount);
             await registry.DispatchAsync(

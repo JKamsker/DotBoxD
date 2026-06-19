@@ -54,7 +54,7 @@ public sealed class PluginServerRemoteLocalWiringTests
                 [DotBoxDService]
                 public interface IPluginEventCallback
                 {
-                    ValueTask OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default);
+                    ValueTask OnEventAsync(string subscriptionId, System.ReadOnlyMemory<byte> projectedValue, CancellationToken ct = default);
                 }
             }
 
@@ -217,7 +217,7 @@ public sealed class PluginServerRemoteLocalWiringTests
                 [DotBoxDService]
                 public interface IPluginEventCallback
                 {
-                    Task OnEventAsync(string subscriptionId, byte[] projectedValue, CancellationToken ct = default);
+                    Task OnEventAsync(string subscriptionId, System.ReadOnlyMemory<byte> projectedValue, CancellationToken ct = default);
                 }
             }
 

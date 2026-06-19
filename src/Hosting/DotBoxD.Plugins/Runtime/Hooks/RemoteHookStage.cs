@@ -70,6 +70,37 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
         });
     }
 
+    // Decoder overloads: a projection RunLocal chain whose projected type TCurrent is wire-eligible installs
+    // with the generated reflection-free decoder, emitted by the interceptor as the 3rd argument.
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TCurrent, HookContext, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+        => _root.InstallLocal(package, handler, decoder);
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TCurrent, HookContext> handler, Func<KernelRpcValue, TCurrent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, ctx) =>
+        {
+            handler(value, ctx);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TCurrent, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, _) => handler(value), decoder);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Action<TCurrent> handler, Func<KernelRpcValue, TCurrent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return _root.InstallLocal<TCurrent>(package, (value, _) =>
+        {
+            handler(value);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
     public RemoteHookPipeline<TEvent> Run(Func<TCurrent, HookContext, ValueTask> handler)
         => throw NotLowered();
 

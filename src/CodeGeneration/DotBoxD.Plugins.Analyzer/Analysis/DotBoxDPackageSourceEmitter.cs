@@ -62,6 +62,21 @@ internal static class DotBoxDPackageSourceEmitter
         EmitModule(builder, model);
         EmitFunctions(builder, model);
         EmitHelpers(builder, model);
+        EmitLocalDecoder(builder, model);
+    }
+
+    // For a lowered RunLocal chain with a wire-eligible projected type, append the generated reflection-free
+    // reader (ReadProjected + its conversion helpers). The interceptor passes <Package>.ReadProjected as the
+    // 3rd UseGeneratedLocalChain argument so decode bypasses the SandboxValue graph and reflection entirely.
+    private static void EmitLocalDecoder(StringBuilder builder, PluginKernelModel model)
+    {
+        if (string.IsNullOrEmpty(model.LocalDecoderSource))
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.Append(model.LocalDecoderSource);
     }
 
     private static void EmitSettings(StringBuilder builder, PluginKernelModel model)
