@@ -19,6 +19,8 @@
 
 The marquee `Where → Select(ctx.…GetInRange(id, 4).Count) → Where(count) → RunLocal` shape (P1+P2+P3) is covered end-to-end against the real binding-dispatch path.
 
+`Guid` is a first-class sandbox scalar across every layer the pipeline touches — wire codec, sandbox/wire converter, reflective marshaller, **and** the kernel JSON literal export/import (canonical hyphenated form). It is intentionally **not** a valid map *key* (the verifier's key set is bool/int/long/string/opaque-id); a `Dictionary<Guid,V>` is rejected up front at marshal time, mirrored in both `SandboxTypeOf` and `ToSandboxValue`.
+
 ---
 
 ## 1. Motivation — the two target chains
