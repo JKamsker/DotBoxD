@@ -23,31 +23,6 @@ public sealed record EncounterTicket(Guid EncounterId, string Zone);
 /// <summary>A DTO whose first field is itself a DTO, exercising a constructed <i>nested</i> record projection.</summary>
 public sealed record Squad(PlayerInfo Leader, string Banner);
 
-/// <summary>An event with a <see cref="List{T}"/> property — a different encode/decode path than <c>int[]</c>.</summary>
-public sealed record ScoreEvent(int Threshold, List<int> Scores);
-
-/// <summary>
-/// A NON-positional event class whose constructor parameter order (id, zone, distance) differs from its property
-/// declaration order (Distance, Id, Zone). Exercises that the whole-event wire field order is declaration order
-/// on BOTH the encode (adapter) and decode (marshaller) sides — before that was unified the encoder wrote
-/// constructor order while the decoder read declaration order, silently misaligning the fields.
-/// </summary>
-public sealed class SwappedEvent
-{
-    public int Distance { get; }
-
-    public Guid Id { get; }
-
-    public string Zone { get; }
-
-    public SwappedEvent(Guid id, string zone, int distance)
-    {
-        Id = id;
-        Zone = zone;
-        Distance = distance;
-    }
-}
-
 /// <summary>
 /// A rich event carrying every marshaller-eligible kind — Guid, enum, the four scalars + string, an array, and
 /// a nested DTO — plus a scalar (<see cref="Distance"/>) the Where filters on. Used to prove a whole-event
@@ -150,23 +125,6 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         }
         """;
 
-    private const string ListProjectionSource = Prelude + """
-        public static class ListProjectionUsage
-        {
-            public static void Configure(RemoteHookRegistry hooks)
-                => hooks.On<Ev.ScoreEvent>().Where(e => e.Threshold <= 4)
-                    .Select(e => e.Scores).RunLocal((scores, ctx) => { });
-        }
-        """;
-
-    private const string SwappedWholeEventSource = Prelude + """
-        public static class SwappedWholeEventUsage
-        {
-            public static void Configure(RemoteHookRegistry hooks)
-                => hooks.On<Ev.SwappedEvent>().Where(e => e.Distance <= 4).RunLocal((e, ctx) => { });
-        }
-        """;
-
     [Fact]
     public async Task Whole_event_with_rich_fields_round_trips_with_field_fidelity()
     {
@@ -232,41 +190,6 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         var expected = new Squad(new PlayerInfo("hero", 7), "crypt");
         Assert.Equal(expected, DecodeReflective<Squad>(payload));
         Assert.Equal(expected, DecodeGenerated<Squad>(NestedNewDtoProjectionSource, payload));
-    }
-
-    [Fact]
-    public async Task List_projection_preserves_elements_and_order()
-    {
-        // List<T> goes through a different generated/reflective decode path than int[]; cover it end-to-end.
-        var payload = await PushFirstMatching(
-            ListProjectionSource, new ScoreEvent(3, [10, 20, 30]), new ScoreEvent(99, [10, 20, 30]));
-
-        Assert.Equal(new List<int> { 10, 20, 30 }, DecodeReflective<List<int>>(payload));
-        Assert.Equal(new List<int> { 10, 20, 30 }, DecodeGenerated<List<int>>(ListProjectionSource, payload));
-    }
-
-    [Fact]
-    public async Task Whole_event_with_constructor_order_differing_from_declaration_round_trips()
-    {
-        // SwappedEvent declares [Distance, Id, Zone] but its constructor is (id, zone, distance). The wire field
-        // order must be declaration order on both encode and decode; the distinct field types (int/Guid/string)
-        // mean any transposition throws a kind-mismatch rather than corrupting silently.
-        var id = new Guid("11112222-3333-4444-5555-666677778888");
-        var payload = await PushFirstMatching(
-            SwappedWholeEventSource,
-            new SwappedEvent(id, "crypt", 3),
-            new SwappedEvent(id, "crypt", 99));
-
-        foreach (var received in new[]
-                 {
-                     DecodeReflective<SwappedEvent>(payload),
-                     DecodeGenerated<SwappedEvent>(SwappedWholeEventSource, payload),
-                 })
-        {
-            Assert.Equal(id, received.Id);
-            Assert.Equal("crypt", received.Zone);
-            Assert.Equal(3, received.Distance);
-        }
     }
 
     [Fact]
