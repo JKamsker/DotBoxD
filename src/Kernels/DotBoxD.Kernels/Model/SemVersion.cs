@@ -81,9 +81,4 @@ public sealed record SemVersion(int Major, int Minor, int Patch)
 
         return value;
     }
-
-    public static bool operator <(SemVersion left, SemVersion right) => Comparer<SemVersion>.Default.Compare(left, right) < 0;
-    public static bool operator <=(SemVersion left, SemVersion right) => Comparer<SemVersion>.Default.Compare(left, right) <= 0;
-    public static bool operator >(SemVersion left, SemVersion right) => Comparer<SemVersion>.Default.Compare(left, right) > 0;
-    public static bool operator >=(SemVersion left, SemVersion right) => Comparer<SemVersion>.Default.Compare(left, right) >= 0;
 }

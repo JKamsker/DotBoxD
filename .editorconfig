@@ -238,6 +238,7 @@ dotnet_diagnostic.MA0015.severity = none        # the codebase deliberately surf
 dotnet_diagnostic.MA0016.severity = suggestion  # return-type abstraction is case-by-case (20)
 dotnet_diagnostic.MA0099.severity = suggestion  # explicit enum-zero member (74)
 dotnet_diagnostic.MA0158.severity = suggestion  # System.Threading.Lock is net9+, repo multi-targets netstandard2.0/2.1 (62)
+dotnet_diagnostic.MA0097.severity = suggestion  # adding comparison operators to a public comparable type broadens the tracked API baseline; keep that a deliberate design decision, not an automated fix (1)
 
 # -- Enforced correctness / security (analyzers' default `warning`; all violations fixed) --
 # Listed for intent + auditability:
