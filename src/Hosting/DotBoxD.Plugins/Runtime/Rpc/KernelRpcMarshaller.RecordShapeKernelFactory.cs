@@ -12,7 +12,7 @@ public static partial class KernelRpcMarshaller
         public static Func<KernelRpcValue, object>? Create(
             ConstructorInfo? constructor,
             IReadOnlyList<int> constructorMap,
-            IReadOnlyList<PropertyInfo> fields)
+            IReadOnlyList<RecordMember> fields)
         {
             if (constructor is null)
             {
@@ -31,7 +31,7 @@ public static partial class KernelRpcMarshaller
                     Type.EmptyTypes,
                     LinqExpression.Constant(fieldIndex));
                 arguments[i] = LinqExpression.Convert(
-                    ReadKernelRecordField(kernelField, fields[fieldIndex].PropertyType),
+                    ReadKernelRecordField(kernelField, fields[fieldIndex].Type),
                     parameters[i].ParameterType);
             }
 
@@ -42,7 +42,7 @@ public static partial class KernelRpcMarshaller
 
     private static class RecordShapeSetterFactory
     {
-        public static Func<RecordValue, object>? CreateSandbox(Type type, IReadOnlyList<PropertyInfo> fields)
+        public static Func<RecordValue, object>? CreateSandbox(Type type, IReadOnlyList<RecordMember> fields)
         {
             if (!CanBindSetters(fields) || CreateNewExpression(type) is not { } newInstance)
             {
@@ -57,7 +57,7 @@ public static partial class KernelRpcMarshaller
             return LinqExpression.Lambda<Func<RecordValue, object>>(body, record).Compile();
         }
 
-        public static Func<KernelRpcValue, object>? CreateKernel(Type type, IReadOnlyList<PropertyInfo> fields)
+        public static Func<KernelRpcValue, object>? CreateKernel(Type type, IReadOnlyList<RecordMember> fields)
         {
             if (!CanBindSetters(fields) || CreateNewExpression(type) is not { } newInstance)
             {
@@ -73,21 +73,21 @@ public static partial class KernelRpcMarshaller
 
         private static IEnumerable<MemberBinding> SandboxBindings(
             LinqExpression recordFields,
-            IReadOnlyList<PropertyInfo> fields)
+            IReadOnlyList<RecordMember> fields)
         {
             for (var i = 0; i < fields.Count; i++)
             {
                 var field = fields[i];
                 var sandboxField = LinqExpression.Property(recordFields, "Item", LinqExpression.Constant(i));
                 yield return LinqExpression.Bind(
-                    field,
-                    LinqExpression.Convert(ReadSandboxRecordField(sandboxField, field.PropertyType), field.PropertyType));
+                    field.Member,
+                    LinqExpression.Convert(ReadSandboxRecordField(sandboxField, field.Type), field.Type));
             }
         }
 
         private static IEnumerable<MemberBinding> KernelBindings(
             LinqExpression value,
-            IReadOnlyList<PropertyInfo> fields)
+            IReadOnlyList<RecordMember> fields)
         {
             for (var i = 0; i < fields.Count; i++)
             {
@@ -98,16 +98,30 @@ public static partial class KernelRpcMarshaller
                     Type.EmptyTypes,
                     LinqExpression.Constant(i));
                 yield return LinqExpression.Bind(
-                    field,
-                    LinqExpression.Convert(ReadKernelRecordField(kernelField, field.PropertyType), field.PropertyType));
+                    field.Member,
+                    LinqExpression.Convert(ReadKernelRecordField(kernelField, field.Type), field.Type));
             }
         }
 
-        private static bool CanBindSetters(IReadOnlyList<PropertyInfo> fields)
+        private static bool CanBindSetters(IReadOnlyList<RecordMember> fields)
         {
             for (var i = 0; i < fields.Count; i++)
             {
-                if (fields[i].SetMethod is not { IsPublic: true })
+                if (fields[i].Member is PropertyInfo property)
+                {
+                    if (property.SetMethod is not { IsPublic: true })
+                    {
+                        return false;
+                    }
+                }
+                else if (fields[i].Member is FieldInfo field)
+                {
+                    if (field.IsInitOnly)
+                    {
+                        return false;
+                    }
+                }
+                else
                 {
                     return false;
                 }
@@ -146,6 +160,7 @@ public static partial class KernelRpcMarshaller
     private static readonly MethodInfo ReadInt32Method = ScalarReader(nameof(ReadInt32));
     private static readonly MethodInfo ReadInt64Method = ScalarReader(nameof(ReadInt64));
     private static readonly MethodInfo ReadDoubleMethod = ScalarReader(nameof(ReadDouble));
+    private static readonly MethodInfo ReadFloatMethod = ScalarReader(nameof(ReadFloat));
     private static readonly MethodInfo ReadStringMethod = ScalarReader(nameof(ReadString));
     private static readonly MethodInfo ReadGuidMethod = ScalarReader(nameof(ReadGuid));
 
@@ -159,6 +174,8 @@ public static partial class KernelRpcMarshaller
             return LinqExpression.Call(ReadInt64Method, sandboxField);
         if (fieldType == typeof(double))
             return LinqExpression.Call(ReadDoubleMethod, sandboxField);
+        if (fieldType == typeof(float))
+            return LinqExpression.Call(ReadFloatMethod, sandboxField);
         if (fieldType == typeof(string))
             return LinqExpression.Call(ReadStringMethod, sandboxField);
         if (fieldType == typeof(Guid))
@@ -178,6 +195,12 @@ public static partial class KernelRpcMarshaller
             return LinqExpression.Property(kernelField, nameof(KernelRpcValue.Int32Value));
         if (fieldType == typeof(long))
             return LinqExpression.Property(kernelField, nameof(KernelRpcValue.Int64Value));
+        if (fieldType == typeof(float))
+        {
+            return LinqExpression.Convert(
+                LinqExpression.Property(kernelField, nameof(KernelRpcValue.DoubleValue)),
+                typeof(float));
+        }
         if (fieldType == typeof(double))
             return LinqExpression.Property(kernelField, nameof(KernelRpcValue.DoubleValue));
         if (fieldType == typeof(string))
@@ -210,6 +233,9 @@ public static partial class KernelRpcMarshaller
 
     private static double ReadDouble(SandboxValue value)
         => value is F64Value typed ? typed.Value : throw CannotMarshalScalar(value, typeof(double));
+
+    private static float ReadFloat(SandboxValue value)
+        => value is F64Value typed ? (float)typed.Value : throw CannotMarshalScalar(value, typeof(float));
 
     private static string ReadString(SandboxValue value)
         => value is StringValue typed ? typed.Value : throw CannotMarshalScalar(value, typeof(string));

@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelPayloadDtoReaderBuilder
 {
-    public static string BuildReconstruction(INamedTypeSymbol type, IReadOnlyList<IPropertySymbol> fields)
+    public static string BuildReconstruction(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         if (TryResolveConstructor(type, fields) is { } constructor)
         {
@@ -35,7 +35,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
     }
 
     private static List<string> DtoConstructorArguments(
-        IReadOnlyList<IPropertySymbol> fields,
+        IReadOnlyList<RecordMember> fields,
         IMethodSymbol constructor)
     {
         var arguments = new List<string>(constructor.Parameters.Length);
@@ -48,7 +48,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         return arguments;
     }
 
-    private static IMethodSymbol? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<IPropertySymbol> fields)
+    private static IMethodSymbol? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         foreach (var constructor in type.InstanceConstructors)
         {
@@ -83,7 +83,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         return null;
     }
 
-    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<IPropertySymbol> fields)
+    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         if (fields.Count == 0 || (!type.IsValueType && !HasAccessibleParameterlessConstructor(type)))
         {
@@ -92,10 +92,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
 
         foreach (var field in fields)
         {
-            if (field.SetMethod is not
-                {
-                    DeclaredAccessibility: Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal
-                })
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
             {
                 return false;
             }

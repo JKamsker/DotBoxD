@@ -101,21 +101,56 @@ public static partial class KernelRpcMarshaller
     private static RecordShape GetRecordShape(Type type)
         => RecordShapeCache.GetOrAdd(type, static candidate =>
         {
-            var properties = new List<PropertyInfo>();
+            var members = new List<RecordMember>();
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
             foreach (var property in candidate.GetProperties(flags))
             {
                 if (property.CanRead && property.GetIndexParameters().Length == 0 &&
-                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal))
+                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
+                    !IsIgnoredMember(property))
                 {
-                    properties.Add(property);
+                    members.Add(RecordMember.FromProperty(property));
                 }
             }
 
-            properties.Sort(static (left, right) => left.MetadataToken.CompareTo(right.MetadataToken));
-            return new RecordShape(candidate, properties.ToArray());
+            // A value type that carries its data in public fields rather than properties (e.g. a math vector
+            // like System.Numerics.Vector3, whose X/Y/Z are float fields) has no readable properties; fall back
+            // to its public instance fields so it still marshals as a record. The fallback only runs when there
+            // are no properties, so property-based DTOs are unaffected and this stays strictly additive.
+            if (members.Count == 0)
+            {
+                foreach (var field in candidate.GetFields(flags))
+                {
+                    if (!IsIgnoredMember(field))
+                    {
+                        members.Add(RecordMember.FromField(field));
+                    }
+                }
+            }
+
+            members.Sort(static (left, right) => left.Member.MetadataToken.CompareTo(right.Member.MetadataToken));
+            return new RecordShape(candidate, members.ToArray());
         });
 
+    // A member marked [IgnoreDataMember] (System.Runtime.Serialization) is non-wire — a lazily-resolved or
+    // computed member, not serialized data — so it is excluded from the marshalled record shape, matching the
+    // analyzer (DotBoxDRpcTypeMapper.IsIgnoredDataMember) and the convention event adapter so all three readers
+    // agree on the wire field set. Matched by name via GetCustomAttributesData so the attribute need not load.
+    internal static bool IsIgnoredMember(MemberInfo member)
+    {
+        foreach (var attribute in member.GetCustomAttributesData())
+        {
+            if (string.Equals(
+                    attribute.AttributeType.FullName,
+                    "System.Runtime.Serialization.IgnoreDataMemberAttribute",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
     private readonly record struct OptionalType(Type? Value);
 
     private readonly record struct OptionalMapTypes((Type Key, Type Value)? Value);

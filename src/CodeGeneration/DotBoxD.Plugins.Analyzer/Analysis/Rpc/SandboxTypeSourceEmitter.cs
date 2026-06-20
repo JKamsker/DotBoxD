@@ -58,6 +58,8 @@ internal static class SandboxTypeSourceEmitter
                 return ManifestTypes.Long;
             case SpecialType.System_Double:
                 return ManifestTypes.Double;
+            case SpecialType.System_Single:
+                return ManifestTypes.Double;
             case SpecialType.System_String:
                 return ManifestTypes.String;
         }
@@ -96,6 +98,8 @@ internal static class SandboxTypeSourceEmitter
             case SpecialType.System_Int64:
                 return SandboxType + ".I64";
             case SpecialType.System_Double:
+                return SandboxType + ".F64";
+            case SpecialType.System_Single:
                 return SandboxType + ".F64";
             case SpecialType.System_String:
                 return SandboxType + ".String";
