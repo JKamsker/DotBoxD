@@ -113,7 +113,7 @@ internal static class RpcLocalDecoderEmitter
 
     private static void AppendAnonymousPayloadReader(
         StringBuilder builder,
-        IReadOnlyList<IPropertySymbol> fields,
+        IReadOnlyList<RecordMember> fields,
         IReadOnlyList<string> payloadArguments,
         RpcKernelPayloadReadEmitter payload)
     {

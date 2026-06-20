@@ -6,6 +6,30 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
+    private readonly record struct RecordMember(MemberInfo Member, Type Type)
+    {
+        public string Name => Member.Name;
+
+        public static RecordMember FromProperty(PropertyInfo property) => new(property, property.PropertyType);
+
+        public static RecordMember FromField(FieldInfo field) => new(field, field.FieldType);
+
+        public object? GetValue(object instance)
+            => Member is PropertyInfo property ? property.GetValue(instance) : ((FieldInfo)Member).GetValue(instance);
+
+        public void SetValue(object instance, object? value)
+        {
+            if (Member is PropertyInfo property)
+            {
+                property.SetValue(instance, value);
+            }
+            else
+            {
+                ((FieldInfo)Member).SetValue(instance, value);
+            }
+        }
+    }
+
     private sealed class RecordShape
     {
         private readonly ConstructorInfo? _constructor;
@@ -15,7 +39,7 @@ public static partial class KernelRpcMarshaller
         private readonly Func<RecordValue, object>? _recordFactory;
         private readonly Type _type;
 
-        public RecordShape(Type type, PropertyInfo[] fields)
+        public RecordShape(Type type, RecordMember[] fields)
         {
             _type = type;
             Fields = fields;
@@ -27,7 +51,7 @@ public static partial class KernelRpcMarshaller
                 RecordShapeSetterFactory.CreateKernel(type, fields);
         }
 
-        public IReadOnlyList<PropertyInfo> Fields { get; }
+        public IReadOnlyList<RecordMember> Fields { get; }
 
         public object? GetValue(object instance, int index)
             => _getters[index](instance);
@@ -42,7 +66,7 @@ public static partial class KernelRpcMarshaller
             var arguments = new object?[Fields.Count];
             for (var i = 0; i < Fields.Count; i++)
             {
-                arguments[i] = FromSandboxValue(record.Fields[i], Fields[i].PropertyType);
+                arguments[i] = FromSandboxValue(record.Fields[i], Fields[i].Type);
             }
 
             return ConstructFromArguments(arguments);
@@ -58,7 +82,7 @@ public static partial class KernelRpcMarshaller
             var arguments = new object?[Fields.Count];
             for (var i = 0; i < Fields.Count; i++)
             {
-                arguments[i] = FromKernelRpcValue(value.GetItem(i), Fields[i].PropertyType);
+                arguments[i] = FromKernelRpcValue(value.GetItem(i), Fields[i].Type);
             }
 
             return ConstructFromArguments(arguments);
@@ -79,7 +103,7 @@ public static partial class KernelRpcMarshaller
         private static Func<RecordValue, object>? CreateRecordFactory(
             ConstructorInfo? constructor,
             IReadOnlyList<int> constructorMap,
-            IReadOnlyList<PropertyInfo> fields)
+            IReadOnlyList<RecordMember> fields)
         {
             if (constructor is null)
             {
@@ -98,7 +122,7 @@ public static partial class KernelRpcMarshaller
                     "Item",
                     LinqExpression.Constant(fieldIndex));
                 arguments[i] = LinqExpression.Convert(
-                    ReadSandboxField(sandboxField, fields[fieldIndex].PropertyType),
+                    ReadSandboxField(sandboxField, fields[fieldIndex].Type),
                     parameters[i].ParameterType);
             }
 
@@ -109,7 +133,7 @@ public static partial class KernelRpcMarshaller
         private static LinqExpression ReadSandboxField(LinqExpression sandboxField, Type fieldType)
             => ReadSandboxRecordField(sandboxField, fieldType);
 
-        private static Func<object, object?>[] CreateGetters(IReadOnlyList<PropertyInfo> fields)
+        private static Func<object, object?>[] CreateGetters(IReadOnlyList<RecordMember> fields)
         {
             var getters = new Func<object, object?>[fields.Count];
             for (var i = 0; i < fields.Count; i++)
@@ -120,18 +144,14 @@ public static partial class KernelRpcMarshaller
             return getters;
         }
 
-        private static Func<object, object?> CreateGetter(PropertyInfo property)
+        private static Func<object, object?> CreateGetter(RecordMember member)
         {
-            var instance = LinqExpression.Parameter(typeof(object), "instance");
-            var typedInstance = LinqExpression.Convert(instance, property.DeclaringType!);
-            var value = LinqExpression.Property(typedInstance, property);
-            var boxed = LinqExpression.Convert(value, typeof(object));
-            return LinqExpression.Lambda<Func<object, object?>>(boxed, instance).Compile();
+            return member.GetValue;
         }
 
         private static (ConstructorInfo? Constructor, int[] Map) FindConstructor(
             Type type,
-            IReadOnlyList<PropertyInfo> fields)
+            IReadOnlyList<RecordMember> fields)
         {
             foreach (var constructor in type.GetConstructors())
             {
@@ -154,7 +174,7 @@ public static partial class KernelRpcMarshaller
 
         private static bool TryMapConstructor(
             IReadOnlyList<ParameterInfo> parameters,
-            IReadOnlyList<PropertyInfo> fields,
+            IReadOnlyList<RecordMember> fields,
             int[] map,
             bool[] assigned)
         {
@@ -163,7 +183,7 @@ public static partial class KernelRpcMarshaller
                 var fieldIndex = FieldIndex(fields, parameters[i].Name);
                 if (fieldIndex < 0 ||
                     assigned[fieldIndex] ||
-                    parameters[i].ParameterType != fields[fieldIndex].PropertyType)
+                    parameters[i].ParameterType != fields[fieldIndex].Type)
                 {
                     return false;
                 }
@@ -175,7 +195,7 @@ public static partial class KernelRpcMarshaller
             return true;
         }
 
-        private static int FieldIndex(IReadOnlyList<PropertyInfo> fields, string? name)
+        private static int FieldIndex(IReadOnlyList<RecordMember> fields, string? name)
         {
             for (var i = 0; i < fields.Count; i++)
             {

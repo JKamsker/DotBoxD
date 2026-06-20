@@ -56,6 +56,7 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(bool) => value.BoolValue,
             var t when t == typeof(int) => value.Int32Value,
             var t when t == typeof(long) => value.Int64Value,
+            var t when t == typeof(float) => (float)value.DoubleValue,
             var t when t == typeof(double) => value.DoubleValue,
             var t when t == typeof(string) => value.TextValue,
             var t when t == typeof(Guid) => value.GuidValue,

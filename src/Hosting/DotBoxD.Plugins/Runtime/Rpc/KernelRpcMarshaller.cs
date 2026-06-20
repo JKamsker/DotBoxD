@@ -100,7 +100,7 @@ public static partial class KernelRpcMarshaller
             var values = new SandboxValue[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                values[i] = MarshalChild(shape.GetValue(value, i), fields[i].PropertyType, $"DTO field '{fields[i].Name}'");
+                values[i] = MarshalChild(shape.GetValue(value, i), fields[i].Type, $"DTO field '{fields[i].Name}'");
             }
 
             return SandboxValue.FromOwnedRecord(values);
@@ -207,6 +207,8 @@ public static partial class KernelRpcMarshaller
         if (type == typeof(int)) return SandboxType.I32;
         if (type == typeof(long)) return SandboxType.I64;
         if (type == typeof(double)) return SandboxType.F64;
+        // float widens losslessly to the sandbox's only floating kind (F64); decode narrows back exactly.
+        if (type == typeof(float)) return SandboxType.F64;
         if (type == typeof(string)) return SandboxType.String;
         if (type == typeof(Guid)) return SandboxType.Guid;
         if (type.IsEnum) return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
@@ -239,7 +241,7 @@ public static partial class KernelRpcMarshaller
             var fieldTypes = new SandboxType[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                fieldTypes[i] = SandboxTypeOf(fields[i].PropertyType, depth + 1);
+                fieldTypes[i] = SandboxTypeOf(fields[i].Type, depth + 1);
             }
 
             return SandboxType.Record(fieldTypes);
@@ -255,6 +257,7 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(int) => SandboxValue.FromInt32((int)value!),
             var t when t == typeof(long) => SandboxValue.FromInt64((long)value!),
             var t when t == typeof(double) => SandboxValue.FromDouble((double)value!),
+            var t when t == typeof(float) => SandboxValue.FromDouble((float)value!),
             var t when t == typeof(string) => SandboxValue.FromString((string)value!),
             var t when t == typeof(Guid) => SandboxValue.FromGuid((Guid)value!),
             _ => null
@@ -268,6 +271,7 @@ public static partial class KernelRpcMarshaller
             (var t, I32Value i) when t == typeof(int) => i.Value,
             (var t, I64Value l) when t == typeof(long) => l.Value,
             (var t, F64Value d) when t == typeof(double) => d.Value,
+            (var t, F64Value d) when t == typeof(float) => (float)d.Value,
             (var t, StringValue s) when t == typeof(string) => s.Value,
             (var t, GuidValue g) when t == typeof(Guid) => g.Value,
             _ => null

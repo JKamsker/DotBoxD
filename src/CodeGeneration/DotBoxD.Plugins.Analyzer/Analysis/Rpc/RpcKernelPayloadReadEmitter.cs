@@ -24,6 +24,7 @@ internal sealed class RpcKernelPayloadReadEmitter
             SpecialType.System_Int32 => $"{reader}.ReadInt32()",
             SpecialType.System_Int64 => $"{reader}.ReadInt64()",
             SpecialType.System_Double => $"{reader}.ReadDouble()",
+            SpecialType.System_Single => $"(float){reader}.ReadDouble()",
             SpecialType.System_String => $"{reader}.ReadString()",
             _ => ReadComplexExpression(type, reader)
         };
