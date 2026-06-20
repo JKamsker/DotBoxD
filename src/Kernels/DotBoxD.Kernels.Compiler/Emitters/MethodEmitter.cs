@@ -19,14 +19,13 @@ internal sealed class MethodEmitter
     private readonly IBindingCatalog _bindings;
     private readonly Dictionary<string, (LocalBuilder Local, StackKind Kind)> _locals = new(StringComparer.Ordinal);
     private readonly HashSet<string> _nonNegativeF64Locals = new(StringComparer.Ordinal);
+
+    // Branch targets for the innermost enclosing generic loop: `continue` re-enters the loop (the
+    // forRange increment / while condition recheck), `break` exits it. The assignment-only loop fast
+    // paths reject loop-control bodies, so continue/break only flow through the generic paths below.
+    private readonly Stack<(Label Continue, Label Break)> _loops = new();
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
-
-    // Branch targets for the innermost enclosing generic loop: `continue` re-enters the loop
-    // (the increment/condition recheck), `break` exits it. Only the generic forRange/while paths
-    // push here; the assignment-only fast paths reject loop-control bodies, so they never appear
-    // inside a fast-path loop.
-    private readonly Stack<(Label Continue, Label Break)> _loops = new();
 
     public MethodEmitter(
         ILGenerator il,
@@ -118,28 +117,14 @@ internal sealed class MethodEmitter
                 EmitWhile(loop);
                 return false;
             case ContinueStatement:
-                EmitLoopControl(continueTarget: true);
+                _il.Emit(OpCodes.Br, _loops.Peek().Continue);
                 return true;
             case BreakStatement:
-                EmitLoopControl(continueTarget: false);
+                _il.Emit(OpCodes.Br, _loops.Peek().Break);
                 return true;
             default:
                 throw Unsupported("statement not supported");
         }
-    }
-
-    // Emits an unconditional branch to the innermost loop's continue/break target. Returns "true" from
-    // EmitStatement so the enclosing straight-line block stops emitting unreachable statements after it,
-    // exactly as a return does.
-    private void EmitLoopControl(bool continueTarget)
-    {
-        if (_loops.Count == 0)
-        {
-            throw Unsupported("loop control statement outside of a loop");
-        }
-
-        var loop = _loops.Peek();
-        _il.Emit(OpCodes.Br, continueTarget ? loop.Continue : loop.Break);
     }
 
     private bool EmitIf(IfStatement branch)
@@ -200,43 +185,13 @@ internal sealed class MethodEmitter
             return;
         }
 
-        if (MapGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (ListGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (ListCountLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (StringLengthLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _bindings, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, _bindings, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (BranchedI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, Declare))
-        {
-            _nonNegativeF64Locals.Clear();
-            return;
-        }
-
-        if (I64LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, Declare))
+        if (MapGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
+            ListGetI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
+            ListCountLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, Declare) ||
+            StringLengthLoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _bindings, Declare) ||
+            I32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, _bindings, Declare) ||
+            BranchedI32LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, _functionModels, Declare) ||
+            I64LoopFastPathEmitter.TryEmit(range, _il, _stackPlan, _expressions, Declare))
         {
             _nonNegativeF64Locals.Clear();
             return;
@@ -262,7 +217,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Ldloc, index);
         _expressions.Coerce(StackKind.I32, loopKind);
         _il.Emit(OpCodes.Stloc, loopVar);
-        // `continue` branches to the increment, not the condition check, so the loop still advances.
+        // `continue` branches to the increment (continueLabel), not the condition check, so it still advances.
         _loops.Push((continueLabel, finishLabel));
         EmitBlock(range.Body);
         _loops.Pop();
