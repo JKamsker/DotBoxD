@@ -213,6 +213,44 @@ dotnet_naming_style.underscore_camel_case_style.required_prefix = _
 dotnet_naming_style.underscore_camel_case_style.capitalization = camel_case
 
 # ---------------------------------------------------------------------------
+# Third-party analyzer severities (Roslynator + Meziantou)
+#
+# Adoption policy under warnings-as-errors: high-value correctness/security rules
+# are ENFORCED (warning => CI build error) and fixed tree-wide; opinionated or
+# high-churn rules are DISABLED with a rationale. Parenthetical counts are the
+# tree-wide hit counts measured at adoption time.
+# ---------------------------------------------------------------------------
+
+# -- Disabled: opinionated or not a fit for this codebase --
+dotnet_diagnostic.MA0006.severity = none        # `==` on strings is idiomatic here (2178)
+dotnet_diagnostic.MA0048.severity = none        # multi-type files are intentional; CodeEnforcer governs file org (790)
+dotnet_diagnostic.MA0074.severity = none        # implicit-culture Contains/StartsWith on internal ASCII strings (666)
+dotnet_diagnostic.MA0002.severity = none        # default-comparer dictionaries/sets are intentional (270)
+dotnet_diagnostic.MA0051.severity = none        # method length governed by review + CodeEnforcer file limits (206)
+dotnet_diagnostic.MA0008.severity = none        # StructLayout micro-tuning is not a blanket requirement (88)
+dotnet_diagnostic.RCS1194.severity = none       # domain exceptions carry required context (Diagnostics/Error/Kind/...) and intentionally omit the standard parameterless/(string) constructors (24)
+dotnet_diagnostic.RCS1210.severity = none       # methods intentionally return nullable Task<T>? as a "no work" sentinel; a completed task wrapping null is not equivalent (2)
+dotnet_diagnostic.MA0022.severity = none        # same nullable Task<T>? sentinel as RCS1210; a genuine null from a non-nullable Task<T> is already caught by CS8603 (2)
+dotnet_diagnostic.MA0012.severity = none        # all uses are deliberate BCL-parity throws: BadImageFormatException for malformed IL in the verifier, OutOfMemoryException for over-capacity buffer writers mirroring ArrayBufferWriter<T> (10)
+dotnet_diagnostic.MA0015.severity = none        # the codebase deliberately surfaces the validated property/field name as ParamName for precise diagnostics (verified by tests); MA0015 wants a literal method-parameter name (20)
+
+# -- Suggestion: valuable but high-churn or TFM-conditional; ratchet later --
+dotnet_diagnostic.MA0016.severity = suggestion  # return-type abstraction is case-by-case (20)
+dotnet_diagnostic.MA0099.severity = suggestion  # explicit enum-zero member (74)
+dotnet_diagnostic.MA0158.severity = suggestion  # System.Threading.Lock is net9+, repo multi-targets netstandard2.0/2.1 (62)
+
+# -- Enforced correctness / security (analyzers' default `warning`; all violations fixed) --
+# Listed for intent + auditability:
+#   MA0004 ConfigureAwait(false) on library awaits      MA0009 Regex DoS / match timeout
+#   MA0011 parse/TryParse with IFormatProvider          MA0023 Regex ExplicitCapture
+#   MA0025 raise NotSupportedException, not NotImplemented   MA0066 hash-table-friendly keys
+#   MA0084 local does not hide a field                  MA0092 null sender for static events
+#   MA0134 observe async results                        MA0163 UseShellExecute=false when redirecting
+#   RCS1075 no empty catch of System.Exception
+dotnet_diagnostic.MA0004.severity = warning
+dotnet_diagnostic.RCS1075.severity = warning
+
+# ---------------------------------------------------------------------------
 # Generated code — analyzers and style must not run here.
 # ---------------------------------------------------------------------------
 [*.{g,i,designer,generated}.cs]
@@ -226,15 +264,13 @@ generated_code = true
 # Tests / benchmarks / samples / tools — relax rules that do not apply outside
 # shipping library code (kept as the analyzer pass adds the package severities).
 # ---------------------------------------------------------------------------
+# Rules that only matter for shipping library code are silenced here; correctness
+# rules (MA0015, MA0084, MA0134, RCS1075, RCS1194, ...) stay enforced everywhere.
+[{tests,benchmarks,samples,tools}/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none        # underscores in test/sample identifiers
+dotnet_diagnostic.MA0004.severity = none        # ConfigureAwait: no SynchronizationContext to capture in tests/tools
+dotnet_diagnostic.MA0011.severity = none        # culture-invariant parsing of in-repo literals
+dotnet_diagnostic.MA0009.severity = none        # regexes here run on controlled, in-repo inputs
+
 [tests/**/*.cs]
-dotnet_diagnostic.CA1707.severity = none      # underscores in test method names
 dotnet_diagnostic.IDE1006.severity = none
-
-[benchmarks/**/*.cs]
-dotnet_diagnostic.CA1707.severity = none
-
-[samples/**/*.cs]
-dotnet_diagnostic.CA1707.severity = none
-
-[tools/**/*.cs]
-dotnet_diagnostic.CA1707.severity = none

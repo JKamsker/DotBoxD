@@ -37,4 +37,13 @@
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <!-- Static-analysis layer: Roslynator + Meziantou run on every project. Rule
+       severities live centrally in .editorconfig. Analyzer-only packages, so
+       PrivateAssets=all keeps them out of the published package graph. A project can
+       opt out with <DotBoxDDisableExtraAnalyzers>true</DotBoxDDisableExtraAnalyzers>. -->
+  <ItemGroup Condition=" '$(DotBoxDDisableExtraAnalyzers)' != 'true' ">
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
 </Project>

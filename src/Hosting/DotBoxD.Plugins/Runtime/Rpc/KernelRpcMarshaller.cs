@@ -30,7 +30,7 @@ public static partial class KernelRpcMarshaller
         {
             return EnumUsesI64(type)
                 ? SandboxValue.FromInt64(EnumToInt64(value, type))
-                : SandboxValue.FromInt32(Convert.ToInt32(value));
+                : SandboxValue.FromInt32(Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture));
         }
 
         if (ElementType(type) is { } elementType)
@@ -316,6 +316,6 @@ public static partial class KernelRpcMarshaller
     // bits instead so the value carries losslessly (decode uses Enum.ToObject, which is also bit-preserving).
     private static long EnumToInt64(object value, Type type)
         => Enum.GetUnderlyingType(type) == typeof(ulong)
-            ? unchecked((long)Convert.ToUInt64(value))
-            : Convert.ToInt64(value);
+            ? unchecked((long)Convert.ToUInt64(value, System.Globalization.CultureInfo.InvariantCulture))
+            : Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);
 }

@@ -32,7 +32,7 @@ public static class RpcDiagnostics
         var args = new RpcDiagnosticErrorEventArgs(operation, error);
         try
         {
-            handler.Invoke(typeof(RpcDiagnostics), args);
+            handler.Invoke(null, args);
         }
         catch (Exception firstEx)
         {
