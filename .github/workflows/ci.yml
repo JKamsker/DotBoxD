@@ -187,6 +187,12 @@ jobs:
       - name: Restore
         run: dotnet restore DotBoxD.slnx
 
+      # Enforce .editorconfig formatting. Whitespace-only so the gate stays decoupled
+      # from the analyzer layer (style/analyzer rules are enforced by the build itself
+      # via EnforceCodeStyleInBuild + warnings-as-errors).
+      - name: Formatting (dotnet format)
+        run: dotnet format whitespace DotBoxD.slnx --verify-no-changes --no-restore
+
       - name: Build
         run: dotnet build DotBoxD.slnx -c Release --no-restore
 

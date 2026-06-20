@@ -203,13 +203,20 @@ public static partial class KernelRpcMarshaller
     {
         RejectNullableValueType(type);
 
-        if (type == typeof(bool)) return SandboxType.Bool;
-        if (type == typeof(int)) return SandboxType.I32;
-        if (type == typeof(long)) return SandboxType.I64;
-        if (type == typeof(double)) return SandboxType.F64;
-        if (type == typeof(string)) return SandboxType.String;
-        if (type == typeof(Guid)) return SandboxType.Guid;
-        if (type.IsEnum) return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
+        if (type == typeof(bool))
+            return SandboxType.Bool;
+        if (type == typeof(int))
+            return SandboxType.I32;
+        if (type == typeof(long))
+            return SandboxType.I64;
+        if (type == typeof(double))
+            return SandboxType.F64;
+        if (type == typeof(string))
+            return SandboxType.String;
+        if (type == typeof(Guid))
+            return SandboxType.Guid;
+        if (type.IsEnum)
+            return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
         if (depth >= MaxTypeNestingDepth)
         {
@@ -217,7 +224,8 @@ public static partial class KernelRpcMarshaller
                 $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
         }
 
-        if (ElementType(type) is { } elementType) return SandboxType.List(SandboxTypeOf(elementType, depth + 1));
+        if (ElementType(type) is { } elementType)
+            return SandboxType.List(SandboxTypeOf(elementType, depth + 1));
         if (MapTypes(type) is { } mapTypes)
         {
             var keyType = SandboxTypeOf(mapTypes.Key, depth + 1);
