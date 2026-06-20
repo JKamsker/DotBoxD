@@ -10,6 +10,16 @@ public static partial class KernelRpcMarshaller
     {
         public string Name => Member.Name;
 
+        // A computed/get-only property (e.g. `Map => new(Channel, MapId)`) has no set accessor: it is derived
+        // from other members and cannot — and must not — be assigned when reconstructing the record. Init-only
+        // properties do expose a set accessor, so reflection can still assign them.
+        public bool IsSettable => Member switch
+        {
+            PropertyInfo property => property.SetMethod is not null,
+            FieldInfo fieldInfo => !fieldInfo.IsInitOnly,
+            _ => false,
+        };
+
         public static RecordMember FromProperty(PropertyInfo property) => new(property, property.PropertyType);
 
         public static RecordMember FromField(FieldInfo field) => new(field, field.FieldType);
@@ -94,7 +104,12 @@ public static partial class KernelRpcMarshaller
                 ?? throw new NotSupportedException($"Server extension could not construct '{_type}'.");
             for (var i = 0; i < Fields.Count; i++)
             {
-                Fields[i].SetValue(instance, arguments[i]);
+                // Skip derived/get-only members: they have no set accessor and are recomputed from the members
+                // that were assigned, so assigning them is both impossible and unnecessary.
+                if (Fields[i].IsSettable)
+                {
+                    Fields[i].SetValue(instance, arguments[i]);
+                }
             }
 
             return instance;
@@ -153,23 +168,32 @@ public static partial class KernelRpcMarshaller
             Type type,
             IReadOnlyList<RecordMember> fields)
         {
+            // A record's positional constructor sets only its declared members. Derived/get-only members
+            // (e.g. `Map => new(Channel, MapId)`) still appear as wire fields but have no constructor parameter,
+            // so the parameter count can be a strict subset of the field count. Accept any constructor whose
+            // parameters all map to distinct fields, and keep the richest one (the primary constructor) so the
+            // most members are assigned and only genuinely derived fields are left to recompute themselves.
+            ConstructorInfo? best = null;
+            int[] bestMap = [];
             foreach (var constructor in type.GetConstructors())
             {
                 var parameters = constructor.GetParameters();
-                if (parameters.Length != fields.Count || parameters.Length == 0)
+                if (parameters.Length == 0 || parameters.Length > fields.Count)
                 {
                     continue;
                 }
 
                 var map = new int[parameters.Length];
-                var assigned = new bool[parameters.Length];
-                if (TryMapConstructor(parameters, fields, map, assigned))
+                var assigned = new bool[fields.Count];
+                if (TryMapConstructor(parameters, fields, map, assigned) &&
+                    parameters.Length > (best?.GetParameters().Length ?? 0))
                 {
-                    return (constructor, map);
+                    best = constructor;
+                    bestMap = map;
                 }
             }
 
-            return (null, []);
+            return (best, bestMap);
         }
 
         private static bool TryMapConstructor(
