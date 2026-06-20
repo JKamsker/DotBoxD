@@ -42,6 +42,14 @@ public sealed class LoopControlParityTests
         => AssertParityAsync(WhileLoopControlJson(), IntList(5, -3, 7, 200, 9), expected: 12);
 
     [Fact]
+    public Task Both_if_branches_jumping_out_compiles_to_valid_il()
+        // Accumulate, then `if (v < 0) break; else continue;` — BOTH branches terminate the block, so
+        // EmitIf marks no fall-through label. This is the same IL shape as return-in-both-branches and
+        // must still produce valid IL on the compiled backend. [3, 4, -1, 9] -> sums up to and including
+        // the first negative: 3 + 4 + (-1) = 6, then breaks.
+        => AssertParityAsync(SumThroughFirstNegativeJson(), IntList(3, 4, -1, 9), expected: 6);
+
+    [Fact]
     public async Task Break_outside_a_loop_is_rejected_by_validation()
     {
         var host = SandboxTestHost.Create(compiler: true);
@@ -213,6 +221,28 @@ public sealed class LoopControlParityTests
                   "else": []
                 },
                 { "op": "set", "name": "total", "value": { "op": "add", "left": { "var": "total" }, "right": { "var": "v" } } }
+              ]
+            },
+            { "op": "return", "value": { "var": "total" } }
+            """);
+
+    private static string SumThroughFirstNegativeJson()
+        => ListParamModule("""
+            { "op": "set", "name": "total", "value": { "i32": 0 } },
+            {
+              "op": "forRange",
+              "local": "i",
+              "start": { "i32": 0 },
+              "end": { "call": "list.count", "args": [{ "var": "values" }] },
+              "body": [
+                { "op": "set", "name": "v", "value": { "call": "list.get", "args": [{ "var": "values" }, { "var": "i" }] } },
+                { "op": "set", "name": "total", "value": { "op": "add", "left": { "var": "total" }, "right": { "var": "v" } } },
+                {
+                  "op": "if",
+                  "condition": { "op": "lt", "left": { "var": "v" }, "right": { "i32": 0 } },
+                  "then": [{ "op": "break" }],
+                  "else": [{ "op": "continue" }]
+                }
               ]
             },
             { "op": "return", "value": { "var": "total" } }
