@@ -52,6 +52,18 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         AssertFieldStruct(DecodeGenerated<FieldStructEvent>(FieldStructWholeEventSource, payload));
     }
 
+    [Fact]
+    public void Float_field_struct_whole_event_emits_generated_payload_decoder()
+    {
+        var generated = GeneratedSource(FieldStructWholeEventSource);
+
+        Assert.Contains(
+            "ReadProjectedPayload(global::System.ReadOnlyMemory<byte> payload)",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains("(float)reader.ReadDouble()", generated, StringComparison.Ordinal);
+    }
+
     private static void AssertFieldStruct(FieldStructEvent received)
     {
         Assert.Equal(SampleId, received.Id);

@@ -160,6 +160,7 @@ public static partial class KernelRpcMarshaller
     private static readonly MethodInfo ReadInt32Method = ScalarReader(nameof(ReadInt32));
     private static readonly MethodInfo ReadInt64Method = ScalarReader(nameof(ReadInt64));
     private static readonly MethodInfo ReadDoubleMethod = ScalarReader(nameof(ReadDouble));
+    private static readonly MethodInfo ReadFloatMethod = ScalarReader(nameof(ReadFloat));
     private static readonly MethodInfo ReadStringMethod = ScalarReader(nameof(ReadString));
     private static readonly MethodInfo ReadGuidMethod = ScalarReader(nameof(ReadGuid));
 
@@ -169,6 +170,7 @@ public static partial class KernelRpcMarshaller
         if (fieldType == typeof(int)) return LinqExpression.Call(ReadInt32Method, sandboxField);
         if (fieldType == typeof(long)) return LinqExpression.Call(ReadInt64Method, sandboxField);
         if (fieldType == typeof(double)) return LinqExpression.Call(ReadDoubleMethod, sandboxField);
+        if (fieldType == typeof(float)) return LinqExpression.Call(ReadFloatMethod, sandboxField);
         if (fieldType == typeof(string)) return LinqExpression.Call(ReadStringMethod, sandboxField);
         if (fieldType == typeof(Guid)) return LinqExpression.Call(ReadGuidMethod, sandboxField);
 
@@ -218,6 +220,9 @@ public static partial class KernelRpcMarshaller
 
     private static double ReadDouble(SandboxValue value)
         => value is F64Value typed ? typed.Value : throw CannotMarshalScalar(value, typeof(double));
+
+    private static float ReadFloat(SandboxValue value)
+        => value is F64Value typed ? (float)typed.Value : throw CannotMarshalScalar(value, typeof(float));
 
     private static string ReadString(SandboxValue value)
         => value is StringValue typed ? typed.Value : throw CannotMarshalScalar(value, typeof(string));

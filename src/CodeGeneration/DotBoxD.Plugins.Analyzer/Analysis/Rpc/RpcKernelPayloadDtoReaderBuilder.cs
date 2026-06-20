@@ -92,25 +92,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
 
         foreach (var field in fields)
         {
-            if (field.Symbol is IPropertySymbol property)
-            {
-                if (property.SetMethod is
-                    {
-                        DeclaredAccessibility: Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal
-                    })
-                {
-                    continue;
-                }
-
-                return false;
-            }
-
-            if (field.Symbol is not IFieldSymbol
-                {
-                    IsReadOnly: false,
-                    IsConst: false,
-                    DeclaredAccessibility: Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal
-                })
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
             {
                 return false;
             }
