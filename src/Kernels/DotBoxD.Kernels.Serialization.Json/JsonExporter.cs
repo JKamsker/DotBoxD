@@ -161,6 +161,12 @@ public static class JsonExporter
                 writer.WritePropertyName("body");
                 WriteStatements(writer, range.Body);
                 break;
+            case ContinueStatement:
+                writer.WriteString("op", "continue");
+                break;
+            case BreakStatement:
+                writer.WriteString("op", "break");
+                break;
             default:
                 throw Error("E-JSON-EXPORT", $"statement type '{statement.GetType().Name}' cannot be exported");
         }

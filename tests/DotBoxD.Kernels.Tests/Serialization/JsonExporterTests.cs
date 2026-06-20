@@ -58,6 +58,47 @@ public sealed class JsonExporterTests
     }
 
     [Fact]
+    public void Export_round_trips_loop_control_statements()
+    {
+        var module = new SandboxModule(
+            "loop-control-exporter",
+            SemVersion.One,
+            SemVersion.One,
+            [],
+            [
+                new SandboxFunction(
+                    "Loops",
+                    true,
+                    [],
+                    SandboxType.I32,
+                    [
+                        new ForRangeStatement(
+                            "i",
+                            I32(0),
+                            I32(2),
+                            [
+                                new IfStatement(
+                                    new BinaryExpression(new VariableExpression("i", Span), "==", I32(0), Span),
+                                    [new ContinueStatement(Span)],
+                                    [new BreakStatement(Span)],
+                                    Span)
+                            ],
+                            Span),
+                        new ReturnStatement(I32(0), Span)
+                    ])
+            ],
+            new Dictionary<string, string>());
+
+        var roundTrip = JsonImporter.Import(JsonExporter.Export(module));
+
+        var function = Assert.Single(roundTrip.Functions);
+        var loop = Assert.IsType<ForRangeStatement>(function.Body[0]);
+        var branch = Assert.IsType<IfStatement>(Assert.Single(loop.Body));
+        Assert.IsType<ContinueStatement>(Assert.Single(branch.Then));
+        Assert.IsType<BreakStatement>(Assert.Single(branch.Else));
+    }
+
+    [Fact]
     public void Export_round_trips_all_supported_scalar_literal_shapes()
     {
         var module = new SandboxModule(
