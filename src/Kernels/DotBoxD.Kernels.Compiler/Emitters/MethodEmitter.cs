@@ -22,6 +22,12 @@ internal sealed class MethodEmitter
     private readonly LocalStackKindPlanner _stackPlan;
     private readonly ExpressionEmitter _expressions;
 
+    // Branch targets for the innermost enclosing generic loop: `continue` re-enters the loop
+    // (the increment/condition recheck), `break` exits it. Only the generic forRange/while paths
+    // push here; the assignment-only fast paths reject loop-control bodies, so they never appear
+    // inside a fast-path loop.
+    private readonly Stack<(Label Continue, Label Break)> _loops = new();
+
     public MethodEmitter(
         ILGenerator il,
         SandboxFunction function,
@@ -111,9 +117,29 @@ internal sealed class MethodEmitter
             case WhileStatement loop:
                 EmitWhile(loop);
                 return false;
+            case ContinueStatement:
+                EmitLoopControl(continueTarget: true);
+                return true;
+            case BreakStatement:
+                EmitLoopControl(continueTarget: false);
+                return true;
             default:
                 throw Unsupported("statement not supported");
         }
+    }
+
+    // Emits an unconditional branch to the innermost loop's continue/break target. Returns "true" from
+    // EmitStatement so the enclosing straight-line block stops emitting unreachable statements after it,
+    // exactly as a return does.
+    private void EmitLoopControl(bool continueTarget)
+    {
+        if (_loops.Count == 0)
+        {
+            throw Unsupported("loop control statement outside of a loop");
+        }
+
+        var loop = _loops.Peek();
+        _il.Emit(OpCodes.Br, continueTarget ? loop.Continue : loop.Break);
     }
 
     private bool EmitIf(IfStatement branch)
@@ -225,6 +251,7 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Stloc, end);
 
         var startLabel = _il.DefineLabel();
+        var continueLabel = _il.DefineLabel();
         var finishLabel = _il.DefineLabel();
         _il.MarkLabel(startLabel);
         _il.Emit(OpCodes.Ldloc, index);
@@ -235,7 +262,11 @@ internal sealed class MethodEmitter
         _il.Emit(OpCodes.Ldloc, index);
         _expressions.Coerce(StackKind.I32, loopKind);
         _il.Emit(OpCodes.Stloc, loopVar);
+        // `continue` branches to the increment, not the condition check, so the loop still advances.
+        _loops.Push((continueLabel, finishLabel));
         EmitBlock(range.Body);
+        _loops.Pop();
+        _il.MarkLabel(continueLabel);
         _il.Emit(OpCodes.Ldloc, index);
         EmitInt32(_il, 1);
         _il.Emit(OpCodes.Add);
@@ -260,7 +291,10 @@ internal sealed class MethodEmitter
         _expressions.EmitAs(loop.Condition, StackKind.Bool);
         _il.Emit(OpCodes.Brfalse, finishLabel);
         CompiledMeterEmitter.LoopIteration(_il, 5);
+        // `continue` re-evaluates the condition, so it targets the loop's start label.
+        _loops.Push((startLabel, finishLabel));
         EmitBlock(loop.Body);
+        _loops.Pop();
         _nonNegativeF64Locals.Clear();
         _il.Emit(OpCodes.Br, startLabel);
         _il.MarkLabel(finishLabel);

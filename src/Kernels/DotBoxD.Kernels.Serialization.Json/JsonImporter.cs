@@ -188,8 +188,22 @@ public static class JsonImporter
             "if" => ReadIfStatement(element, source),
             "while" => ReadWhileStatement(element, source),
             "forRange" => ReadForRangeStatement(element, source),
+            "continue" => ReadContinueStatement(element, source),
+            "break" => ReadBreakStatement(element, source),
             _ => throw Error("E-JSON-STATEMENT", $"unknown statement op '{op}'")
         };
+    }
+
+    private static ContinueStatement ReadContinueStatement(JsonElement element, JsonSourceMap source)
+    {
+        RequireAllowedProperties(element, "continue statement", ["op"]);
+        return new ContinueStatement(source.SpanFor(element));
+    }
+
+    private static BreakStatement ReadBreakStatement(JsonElement element, JsonSourceMap source)
+    {
+        RequireAllowedProperties(element, "break statement", ["op"]);
+        return new BreakStatement(source.SpanFor(element));
     }
 
     private static AssignmentStatement ReadSetStatement(JsonElement element, JsonSourceMap source)
