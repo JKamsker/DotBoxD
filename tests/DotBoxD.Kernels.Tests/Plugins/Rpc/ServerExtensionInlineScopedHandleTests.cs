@@ -114,12 +114,33 @@ public sealed class ServerExtensionInlineScopedHandleTests
     }
 
     [Fact]
+    public void Parenthesized_inline_scoped_handle_call_keeps_the_captured_scope()
+    {
+        // A natural inline variant: the scoped receiver wrapped in parentheses must strip to the same lowering.
+        var source = InlineKernel.Replace(
+            "_world.Monsters.Get(id).KillAsync()",
+            "(_world.Monsters.Get(id)).KillAsync()",
+            StringComparison.Ordinal);
+        Assert.Contains("(_world.Monsters.Get(id)).KillAsync()", source, StringComparison.Ordinal);
+
+        var call = HostCall(BuildPackage(source), "KillAsync");
+
+        var argument = Assert.IsType<VariableExpression>(Assert.Single(call.Arguments));
+        Assert.Equal("id", argument.Name);
+    }
+
+    [Fact]
     public void Inline_and_local_scoped_handle_kernels_require_the_same_capability()
     {
         var local = BuildPackage(LocalKernel);
         var inline = BuildPackage(InlineKernel);
 
+        // KillAsync's capability is required; the Get(...) handle capability is intentionally NOT collected —
+        // Get is a cheap local scope-capture, not a gated host call (see the GameServer sample's
+        // MonsterKillerKernel manifest, which likewise omits game.world.monster.read.handle). The two receiver
+        // forms must declare identical capabilities.
         Assert.Contains("game.world.monster.write.kill", local.Manifest.RequiredCapabilities);
+        Assert.DoesNotContain("game.world.monster.read.handle", local.Manifest.RequiredCapabilities);
         Assert.Equal(
             local.Manifest.RequiredCapabilities,
             inline.Manifest.RequiredCapabilities);
@@ -141,6 +162,9 @@ public sealed class ServerExtensionInlineScopedHandleTests
     private static IEnumerable<Expression> DescendantExpressions(IEnumerable<Statement> statements)
         => statements.SelectMany(DescendantExpressions);
 
+    // Walks every Statement/Expression node in the kernel IR. Kept in sync with the node kinds in
+    // DotBoxD.Kernels.ModuleModel — a new statement/expression kind must be added here or HostCall could miss
+    // a host call and the .Single() assertion would silently under-count.
     private static IEnumerable<Expression> DescendantExpressions(Statement statement)
         => statement switch
         {

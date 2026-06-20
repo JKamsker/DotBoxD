@@ -15,10 +15,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 {
     private string? TryLowerServiceHandleInvocation(InvocationExpressionSyntax invocation)
     {
+        // Confirm the call is a host binding (a pure attribute read) before resolving the scope handle, which
+        // lowers the captured key — so that lowering and its side effects run only for a real scoped host call.
         if (invocation.Expression is not MemberAccessExpressionSyntax member ||
-            TryResolveScopeHandle(member.Expression) is not { } handleId ||
             _model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
-            DotBoxDHostBindingExpressionLowerer.HostBinding(method) is not { } binding)
+            DotBoxDHostBindingExpressionLowerer.HostBinding(method) is not { } binding ||
+            TryResolveScopeHandle(member.Expression) is not { } handleId)
         {
             return null;
         }
@@ -53,12 +55,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     /// argument. Both the local-variable form (<c>var h = control.Get(key); h.Method(...)</c>, where
     /// <paramref name="receiver"/> is the handle local) and the inline form
     /// (<c>control.Get(key).Method(...)</c>, where <paramref name="receiver"/> is the <c>Get(key)</c> call)
-    /// capture the same key, so the two lower identically. Returns <see langword="null"/> when the receiver is
-    /// not a known scoped handle.
+    /// capture the same key, so the two lower identically. Parentheses are stripped so
+    /// <c>(control.Get(key)).Method(...)</c> behaves the same. Returns <see langword="null"/> when the receiver
+    /// is not a known scoped handle.
     /// </summary>
     private string? TryResolveScopeHandle(ExpressionSyntax receiver)
         => receiver switch
         {
+            ParenthesizedExpressionSyntax parenthesized => TryResolveScopeHandle(parenthesized.Expression),
             IdentifierNameSyntax identifier
                 when _serviceHandleLocals.TryGetValue(identifier.Identifier.ValueText, out var localHandleId)
                 => localHandleId,
