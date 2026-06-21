@@ -48,6 +48,10 @@ internal static class HostBindingSupport
 
     public static readonly string[] CryptTags = ["alpha", "beta", "gamma"];
 
+    private const SandboxEffect ScalarReadEffects = SandboxEffect.Cpu | SandboxEffect.HostStateRead;
+    private const SandboxEffect AllocatingReadEffects =
+        SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead;
+
     public static SandboxPolicy ProbeReadPolicy()
         => SandboxPolicyBuilder.Create()
             .GrantLogging()
@@ -68,11 +72,11 @@ internal static class HostBindingSupport
     private static BindingDescriptor ScalarBinding()
         => new(
             "host.probe.getValue", SemVersion.One, [SandboxType.String], SandboxType.I32,
-            SandboxEffect.Cpu | SandboxEffect.HostStateRead, "probe.read.value",
+            ScalarReadEffects, "probe.read.value",
             BindingCostModel.Fixed(2), AuditLevel.PerResource, BindingSafety.ReadOnlyExternal,
             (context, args, _) =>
             {
-                WriteAudit(context, "host.probe.getValue", "probe.read.value", args);
+                WriteAudit(context, "host.probe.getValue", "probe.read.value", ScalarReadEffects, args);
                 return ValueTask.FromResult(SandboxValue.FromInt32(ScalarValue));
             },
             CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"),
@@ -81,12 +85,12 @@ internal static class HostBindingSupport
     private static BindingDescriptor TagsBinding()
         => new(
             "host.probe.getTags", SemVersion.One, [SandboxType.String], SandboxType.List(SandboxType.String),
-            SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead, "probe.read.tags",
+            AllocatingReadEffects, "probe.read.tags",
             BindingCostModel.Fixed(3), AuditLevel.PerResource, BindingSafety.ReadOnlyExternal,
             (context, args, _) =>
             {
                 var id = ((StringValue)args[0]).Value;
-                WriteAudit(context, "host.probe.getTags", "probe.read.tags", args);
+                WriteAudit(context, "host.probe.getTags", "probe.read.tags", AllocatingReadEffects, args);
                 var tags = string.Equals(id, "crypt", StringComparison.Ordinal) ? CryptTags : ["solo"];
                 var values = new SandboxValue[tags.Length];
                 for (var i = 0; i < tags.Length; i++)
@@ -102,18 +106,22 @@ internal static class HostBindingSupport
     private static BindingDescriptor IdBinding()
         => new(
             "host.probe.generateId", SemVersion.One, [SandboxType.String], SandboxType.Guid,
-            SandboxEffect.Cpu | SandboxEffect.Alloc | SandboxEffect.HostStateRead, "probe.read.id",
+            AllocatingReadEffects, "probe.read.id",
             BindingCostModel.Fixed(2), AuditLevel.PerResource, BindingSafety.ReadOnlyExternal,
             (context, args, _) =>
             {
-                WriteAudit(context, "host.probe.generateId", "probe.read.id", args);
+                WriteAudit(context, "host.probe.generateId", "probe.read.id", AllocatingReadEffects, args);
                 return ValueTask.FromResult(SandboxValue.FromGuid(SampleEvents.SampleId));
             },
             CompiledBinding.RuntimeStub("DotBoxD.Kernels.Runtime.CompiledRuntime", "CallBinding"),
             GrantValidator: static (_, _) => { });
 
     private static void WriteAudit(
-        SandboxContext context, string bindingId, string capability, IReadOnlyList<SandboxValue> args)
+        SandboxContext context,
+        string bindingId,
+        string capability,
+        SandboxEffect effects,
+        IReadOnlyList<SandboxValue> args)
     {
         var startedAt = DateTimeOffset.UtcNow;
         var entityId = ((StringValue)args[0]).Value;
@@ -124,7 +132,7 @@ internal static class HostBindingSupport
             true,
             BindingId: bindingId,
             CapabilityId: capability,
-            Effect: SandboxEffect.HostStateRead,
+            Effect: effects,
             ResourceId: $"entity:{entityId}",
             Fields: context.BindingAuditFields("probe", startedAt)));
     }

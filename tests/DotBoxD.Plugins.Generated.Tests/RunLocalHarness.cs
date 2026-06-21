@@ -41,16 +41,16 @@ internal sealed class RunLocalHarness<TEvent> : IDisposable
         var sink = Sink;
         var localHandlers = LocalHandlers;
         Hooks = new RemoteHookRegistry(
-            package =>
+            async package =>
             {
-                var kernel = server.InstallAsync(package).AsTask().GetAwaiter().GetResult();
+                var kernel = await server.InstallAsync(package).ConfigureAwait(false);
                 var subscriptionId = package.Manifest.PluginId;
                 server.Hooks.On<TEvent>().UseProjecting(
                     kernel,
                     subscriptionId,
                     (id, payload, token) =>
                         localHandlers.DispatchAsync(id, payload.ToArray(), new HookContext(sink, token)));
-                return ValueTask.FromResult(subscriptionId);
+                return subscriptionId;
             },
             localHandlers);
     }
