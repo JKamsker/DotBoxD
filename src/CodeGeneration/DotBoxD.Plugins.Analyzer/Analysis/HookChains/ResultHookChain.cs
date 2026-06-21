@@ -49,13 +49,10 @@ internal static class ResultHookChain
             throw new NotSupportedException();
         }
 
-        // The handler's inferred TResult must be the context's associated result type.
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            method.TypeArguments.Length != 1 ||
-            !SymbolEqualityComparer.Default.Equals(method.TypeArguments[0], resultType))
-        {
-            throw new NotSupportedException();
-        }
+        // The handler's TResult is NOT read from the Register call symbol: when the handler body is a fluent
+        // builder (Result.Ok().With…()) its return type is generator-added and unresolved here, so the call's
+        // inferred type argument is unavailable. The result type comes from [Hook] instead, and the handler body's
+        // type is validated against it in LowerResultHandle (the seed type for a fluent chain).
 
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
@@ -110,7 +107,7 @@ internal static class ResultHookChain
             ProjectedType = projectedType,
         };
 
-        return new HookChainResult(kernelModel, Interception(invocation, receiver, model, kernelModel, method, resultType, isLocal, cancellationToken));
+        return new HookChainResult(kernelModel, Interception(invocation, receiver, model, kernelModel, contextType, resultType, isLocal, cancellationToken));
     }
 
     public static bool IsResultTerminal(string terminalMethod)
@@ -132,10 +129,23 @@ internal static class ResultHookChain
             throw new NotSupportedException();
         }
 
-        // The lowered body must construct the associated result record exactly (record.new of the result type).
+        // The lowered body must construct the associated result record exactly. For an object initializer
+        // (new Result { ... }) the body type resolves directly; for a fluent builder (Result.Ok().With…())
+        // the trailing builder method is generator-added and not visible while this chain is lowered, so the
+        // body type is null/error — fall back to the builder chain's seed type.
         var bodyType = model.GetTypeInfo(body, cancellationToken).ConvertedType
             ?? model.GetTypeInfo(body, cancellationToken).Type;
-        if (!SymbolEqualityComparer.Default.Equals(bodyType, resultType))
+        if (bodyType is { TypeKind: not TypeKind.Error })
+        {
+            if (!SymbolEqualityComparer.Default.Equals(bodyType, resultType))
+            {
+                throw new NotSupportedException();
+            }
+        }
+        else if (body is not InvocationExpressionSyntax builderChain ||
+            !SymbolEqualityComparer.Default.Equals(
+                DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
+                resultType))
         {
             throw new NotSupportedException();
         }
@@ -157,14 +167,17 @@ internal static class ResultHookChain
         ExpressionSyntax receiver,
         SemanticModel model,
         PluginKernelModel kernelModel,
-        IMethodSymbol method,
+        INamedTypeSymbol contextType,
         INamedTypeSymbol resultType,
         bool isLocal,
         CancellationToken cancellationToken)
     {
+        // The interceptor's receiver/handler/return types are built from the context and [Hook] result type
+        // rather than the Register call symbol: a fluent-builder handler leaves the call's type argument
+        // unresolved here, but both the pipeline receiver type and the result type are known. Roslyn binds the
+        // (now type-resolvable, post-generation) call site to the emitted interceptor.
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
         if (location is null ||
-            method.Parameters.Length < 1 ||
             model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType)
         {
             return null;
@@ -174,14 +187,21 @@ internal static class ResultHookChain
             ? TypeNames.GlobalPrefix + kernelModel.PackageName
             : TypeNames.GlobalPrefix + kernelModel.Namespace + "." + kernelModel.PackageName;
 
+        var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var resultFullName = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var handlerFullName = isLocal
+            ? $"{TypeNames.GlobalFunc}<{contextFullName}, {TypeNames.GlobalHookContext}, {resultFullName}>"
+            : $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>";
+
         return new HookChainInterception(
             location.GetInterceptsLocationAttributeSyntax(),
-            receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            receiverFullName,
+            handlerFullName,
+            receiverFullName,
             packageFullName,
             isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-            ResultTypeFullName: resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            ResultTypeFullName: resultFullName);
     }
 
     private static bool TryResolveHook(INamedTypeSymbol contextType, out INamedTypeSymbol resultType)

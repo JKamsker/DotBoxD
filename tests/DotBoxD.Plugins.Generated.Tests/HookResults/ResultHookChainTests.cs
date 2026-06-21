@@ -39,6 +39,37 @@ public sealed class ResultHookChainTests
     }
 
     [Fact]
+    public async Task Register_lowers_the_fluent_builder_chain()
+    {
+        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        server.Hooks.On<CombatDamageContext>()
+            .Where(ctx => ctx.Relation == CombatRelation.Pve)
+            .Register(ctx => CombatDamageResult.Ok().WithDamage(ctx.Damage * 2), priority: 10);
+
+        var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
+            new CombatDamageContext(CombatRelation.Pve, 25));
+
+        Assert.True(result!.Value.Success);
+        Assert.Equal(50, result.Value.Damage);
+    }
+
+    [Fact]
+    public async Task Register_reject_builder_abstains_to_the_next_handler()
+    {
+        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        server.Hooks.On<CombatDamageContext>()
+            .Register(ctx => CombatDamageResult.Reject("nope"), priority: 100);
+        server.Hooks.On<CombatDamageContext>()
+            .Register(ctx => CombatDamageResult.Ok().WithDamage(1), priority: 0);
+
+        var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
+            new CombatDamageContext(CombatRelation.Pve, 25));
+
+        Assert.True(result!.Value.Success);
+        Assert.Equal(1, result.Value.Damage);
+    }
+
+    [Fact]
     public async Task Register_filter_that_does_not_match_yields_no_result()
     {
         using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());

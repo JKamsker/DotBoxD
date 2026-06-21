@@ -95,11 +95,14 @@ internal static class DotBoxDRecordCreationExpressionLowerer
 
         context.Effects?.Add(DotBoxDGenerationNames.Effects.Alloc);
 
-        var source =
-            $"new {TypeNames.GlobalCallExpression}(\"record.new\", " +
-            $"[{string.Join(", ", fieldSources)}], {recordTypeSource}, Span)";
-        return new DotBoxDExpressionModel(source, ManifestTypes.Record, allocates);
+        return new DotBoxDExpressionModel(RecordNew(fieldSources, recordTypeSource), ManifestTypes.Record, allocates);
     }
+
+    // The record.new IR-construction source for the given (declaration-ordered) field sources. Shared by the
+    // positional, object-initializer, and fluent result-builder lowering paths.
+    internal static string RecordNew(IReadOnlyList<string> fieldSources, string recordTypeSource)
+        => $"new {TypeNames.GlobalCallExpression}(\"record.new\", " +
+            $"[{string.Join(", ", fieldSources)}], {recordTypeSource}, Span)";
 
     // Lowers an object-initializer construction to record.new: each `Field = value` assignment lowers the value
     // with the field's expected type (same exact-type + manifest-tag guards as positional), and every omitted
@@ -151,15 +154,15 @@ internal static class DotBoxDRecordCreationExpressionLowerer
 
         context.Effects?.Add(DotBoxDGenerationNames.Effects.Alloc);
 
-        var source =
-            $"new {TypeNames.GlobalCallExpression}(\"record.new\", " +
-            $"[{string.Join(", ", fieldSources)}], {recordTypeSource}, Span)";
-        return new DotBoxDExpressionModel(source, ManifestTypes.Record, allocates);
+        return new DotBoxDExpressionModel(
+            RecordNew(System.Array.ConvertAll(fieldSources, static s => s!), recordTypeSource),
+            ManifestTypes.Record,
+            allocates);
     }
 
     // The manifest-tag zero literal for an omitted field. Only scalar fields can be defaulted; a non-scalar
     // (Guid/list/map/record) omission fails safe because there is no single-expression zero for it.
-    private static string ZeroSource(ITypeSymbol fieldType)
+    internal static string ZeroSource(ITypeSymbol fieldType)
         => SandboxTypeSourceEmitter.ManifestTag(fieldType) switch
         {
             ManifestTypes.Bool => $"{Helpers.Bool}({DotBoxDGenerationNames.CSharpLiterals.False})",

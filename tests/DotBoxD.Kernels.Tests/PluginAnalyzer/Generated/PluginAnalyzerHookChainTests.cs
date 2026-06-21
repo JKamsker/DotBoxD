@@ -421,6 +421,36 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Lowers_a_Register_fluent_builder_chain_to_a_result_install()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage * 2), 100);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Register_on_a_context_without_Hook_reports_DBXK113()
     {
         var result = RunGenerator("""
