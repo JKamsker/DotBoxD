@@ -356,6 +356,96 @@ public sealed class PluginAnalyzerHookChainTests
                 diagnostic.Id is "CS0101" or "CS0111");
     }
 
+    [Fact]
+    public void Lowers_a_Register_result_chain_to_a_result_install()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public enum Relation { Pve = 0, Pvp = 1 }
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(Relation Relation, int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Relation == Relation.Pve)
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, 100);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_RegisterLocal_result_chain_to_a_local_result_install()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.death", typeof(DeathResult))]
+            public sealed record DeathCtx(int FatalDamage);
+
+            [HookResult]
+            public readonly partial record struct DeathResult(bool Success, string? Reason, int Mitigated);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DeathCtx>()
+                        .Where(ctx => ctx.FatalDamage > 0)
+                        .RegisterLocal((ctx, hookContext) => new DeathResult { Success = true }, 5);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Register_on_a_context_without_Hook_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record NoHookCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<NoHookCtx>()
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
+    }
+
     private static GeneratorDriverRunResult RunGenerator(string source)
         => RunGeneratorCore(source).Result;
 
