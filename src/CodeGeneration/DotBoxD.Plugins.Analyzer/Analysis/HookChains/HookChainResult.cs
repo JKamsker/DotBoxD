@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 /// <summary>
@@ -7,6 +9,26 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// the package still generates.
 /// </summary>
 internal sealed record HookChainResult(PluginKernelModel Model, HookChainInterception? Interception);
+
+/// <summary>
+/// The outcome of one hook-chain call site: either a lowered <see cref="HookChainResult"/>, or — for a recognized
+/// remote <c>RunLocal</c> chain that could not be lowered — a <see cref="HookChainNotLoweredDiagnostic"/> the
+/// generator reports so the otherwise-silent skip surfaces at build time. A null create result means the call site
+/// is not a recognized chain at all (nothing to report).
+/// </summary>
+internal sealed record HookChainCreateResult(HookChainResult? Chain, HookChainNotLoweredDiagnostic? Diagnostic);
+
+/// <summary>
+/// Equatable carrier for the DBXK111 diagnostic (location only; the message lives on the descriptor), kept equatable
+/// so the incremental generator's caching is preserved.
+/// </summary>
+internal sealed record HookChainNotLoweredDiagnostic(PluginDiagnosticLocation? Location)
+{
+    public Diagnostic ToDiagnostic()
+        => Diagnostic.Create(
+            PluginAnalyzerDiagnostics.RunLocalNotLoweredRule,
+            Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None);
+}
 
 internal enum HookChainInterceptorInstallKind
 {
