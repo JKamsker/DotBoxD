@@ -1,4 +1,6 @@
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Regression.BindingsAndKernel;
@@ -53,6 +55,31 @@ public sealed class Fix_PAL_0047_Tests
 
         Assert.Empty(messages.Messages);
         Assert.False(server.UninstallPool(pool));
+    }
+
+    [Fact]
+    public async Task Uninstall_pool_cancels_in_flight_child_execution()
+    {
+        var messages = new BlockingCountingSink();
+        using var server = PluginAddendumTestPolicies.CreateServer(messages);
+        var pool = await server.InstallPoolAsync(
+            FireDamagePluginPackage.Create(),
+            degreeOfParallelism: 2);
+        server.Hooks.On<DamageEvent>().Use(pool);
+
+        var publish = server.Hooks.PublishAsync(new DamageEvent("fire", 120, "player-1")).AsTask();
+        await messages.WaitForStartedCountAsync(1);
+        Assert.True(server.UninstallPool(pool));
+
+        var error = await Record.ExceptionAsync(
+            async () => await publish.WaitAsync(TimeSpan.FromSeconds(5)));
+        messages.ReleaseAll();
+
+        Assert.True(
+            error is OperationCanceledException ||
+            error is SandboxRuntimeException { Error.Code: SandboxErrorCode.PolicyDenied },
+            error?.ToString());
+        Assert.Empty(messages.Messages);
     }
 
     private sealed class BlockingCountingSink : IPluginMessageSink

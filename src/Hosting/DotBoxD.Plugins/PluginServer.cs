@@ -163,8 +163,8 @@ public sealed partial class PluginServer : IDisposable
             }
         }
 
-        RemovePoolReferences(pool);
         pool.Revoke();
+        RemovePoolReferences(pool);
         return true;
     }
 
