@@ -112,12 +112,10 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
             // adapter's parameter shape and per-event values match the SandboxTypes the analyzer now emits for the
             // kernel (see SandboxTypeSourceEmitter). This is what lets a whole-event RunLocal push the entire
             // record (Guid id, enum, nested DTO, …) rather than only scalar events.
-            _properties[i] = new ConventionEventProperty<TEvent>(
-                property.PropertyType,
-                CreateGetter(property));
+            _properties[i] = CreateEventProperty(property);
             parameters[i] = new Parameter(
                 EventParameterName(property.Name),
-                KernelRpcMarshaller.SandboxTypeOf(property.PropertyType));
+                KernelRpcMarshaller.SandboxTypeOf(_properties[i].ValueType));
         }
 
         Parameters = parameters;
@@ -217,12 +215,46 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
         return System.Linq.Expressions.Expression.Lambda<Func<TEvent, object?>>(convert, instance).Compile();
     }
 
+    private static ConventionEventProperty<TEvent> CreateEventProperty(PropertyInfo property)
+    {
+        if (PolymorphicHandleRuntimeMetadataReader.TryResolve(property.PropertyType, out var handle))
+        {
+            return new ConventionEventProperty<TEvent>(
+                handle.KeyType,
+                CreateHandleKeyGetter(property, handle));
+        }
+
+        return new ConventionEventProperty<TEvent>(property.PropertyType, CreateGetter(property));
+    }
+
+    private static Func<TEvent, object?> CreateHandleKeyGetter(
+        PropertyInfo property,
+        PolymorphicHandleRuntimeMetadata handle)
+    {
+        var instance = System.Linq.Expressions.Expression.Parameter(typeof(TEvent), "e");
+        var handleAccess = System.Linq.Expressions.Expression.Property(instance, property);
+        var typedHandle = System.Linq.Expressions.Expression.Convert(handleAccess, handle.HandleType);
+        var keyAccess = handle.KeyProperty is not null
+            ? System.Linq.Expressions.Expression.Property(typedHandle, handle.KeyProperty)
+            : System.Linq.Expressions.Expression.Field(typedHandle, handle.KeyField!);
+        var keyAsObject = System.Linq.Expressions.Expression.Convert(keyAccess, typeof(object));
+        System.Linq.Expressions.Expression body = property.PropertyType.IsValueType
+            ? keyAsObject
+            : System.Linq.Expressions.Expression.Condition(
+                System.Linq.Expressions.Expression.Equal(
+                    handleAccess,
+                    System.Linq.Expressions.Expression.Constant(null, property.PropertyType)),
+                System.Linq.Expressions.Expression.Constant(null, typeof(object)),
+                keyAsObject);
+        return System.Linq.Expressions.Expression.Lambda<Func<TEvent, object?>>(body, instance).Compile();
+    }
+
     private static string EventParameterName(string propertyName)
         => PluginManifestNames.EventParameters.Prefix + propertyName;
 }
 
 internal readonly record struct ConventionEventProperty<TEvent>(
-    Type PropertyType,
+    Type ValueType,
     Func<TEvent, object?> Getter)
 {
     public SandboxValue ToSandboxValue(TEvent e)
@@ -234,12 +266,12 @@ internal readonly record struct ConventionEventProperty<TEvent>(
         // marshaller's bare ArgumentNullException.
         if (value is null)
         {
-            return PropertyType == typeof(string)
+            return ValueType == typeof(string)
                 ? SandboxValue.FromString(string.Empty)
                 : throw new NotSupportedException(
-                    $"Event property of type '{PropertyType}' was null; the sandbox value model has no null.");
+                    $"Event property of type '{ValueType}' was null; the sandbox value model has no null.");
         }
 
-        return KernelRpcMarshaller.ToSandboxValue(value, PropertyType);
+        return KernelRpcMarshaller.ToSandboxValue(value, ValueType);
     }
 }

@@ -15,7 +15,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// <c>RequiredCapability</c> the policy must grant). Arguments are positional and both argument and
 /// return types must be supported scalars; anything else fails safe via <see cref="NotSupportedException"/>.
 /// </summary>
-internal static class DotBoxDHostBindingExpressionLowerer
+internal static partial class DotBoxDHostBindingExpressionLowerer
 {
     private const string HostCapabilityAttribute = "DotBoxD.Abstractions.HostCapabilityAttribute";
 
@@ -32,6 +32,16 @@ internal static class DotBoxDHostBindingExpressionLowerer
         }
 
         var (bindingId, capability, effects, _) = binding;
+        if (TryLowerPatternCaptureInvocation(
+                invocation,
+                method,
+                binding,
+                context,
+                lowerExpression) is { } patternCaptureCall)
+        {
+            return patternCaptureCall;
+        }
+
         // The return (and arguments) may be any marshaller-eligible type — scalar, Guid, enum, list, map, or a
         // DTO record — not just a scalar. The kernel verifier and runtime binding dispatch already accept these
         // return shapes; the analyzer's manifest tag drives the downstream chain's type tracking (so e.g.
@@ -72,18 +82,7 @@ internal static class DotBoxDHostBindingExpressionLowerer
             allocates |= lowered.Allocates;
         }
 
-        if (capability is { Length: > 0 } requiredCapability)
-        {
-            context.Capabilities?.Add(requiredCapability);
-        }
-
-        if (context.Effects is { } effectSink)
-        {
-            foreach (var effect in effects)
-            {
-                effectSink.Add(effect);
-            }
-        }
+        AddBindingRequirements(context, capability, effects);
 
         var source =
             $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(bindingId)}, " +
@@ -278,4 +277,5 @@ internal static class DotBoxDHostBindingExpressionLowerer
 
         return names;
     }
+
 }

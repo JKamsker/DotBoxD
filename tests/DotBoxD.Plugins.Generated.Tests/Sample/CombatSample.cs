@@ -1,4 +1,5 @@
 using DotBoxD.Abstractions;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Generated.Tests.Sample;
 
@@ -20,6 +21,8 @@ public enum CombatRelation
 
 [Hook("combat.damage", typeof(CombatDamageResult))]
 public sealed record CombatDamageContext(
+    Combatant Attacker,
+    Combatant Victim,
     CombatRelation Relation,
     int Damage,
     bool AttackerHasDivineSword,
@@ -41,9 +44,36 @@ public sealed record CombatDeathContext(
 [HookResult]
 public readonly partial record struct CombatDeathResult(bool Success, string? Reason, bool PreventDeath);
 
+[PolymorphicHandle(nameof(Id))]
+[HandleSubtype(typeof(PlayerCombatant), "player", "combatant.player", "combatant.player.read")]
+[HandleSubtype(typeof(MonsterCombatant), "monster", "combatant.monster", "combatant.monster.read")]
+public abstract record Combatant(long Id);
+
+public sealed record PlayerCombatant(long Id) : Combatant(Id)
+{
+    [HostBinding(
+        "combatant.player.hasEquippedItem",
+        "combatant.player.read",
+        SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    public bool HasEquippedItem(long itemRuntimeId)
+        => throw new NotSupportedException("Combatant host methods are lowering markers and are not called directly.");
+}
+
+public sealed record MonsterCombatant(long Id) : Combatant(Id)
+{
+    [HostBinding(
+        "combatant.monster.isBoss",
+        "combatant.monster.read",
+        SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+    public bool IsBoss()
+        => throw new NotSupportedException("Combatant host methods are lowering markers and are not called directly.");
+}
+
 /// <summary>A mutable combat entity. Traits drive the context fields the host populates before firing.</summary>
 public sealed class GameEntity
 {
+    public long Id { get; init; }
+
     public required string Name { get; init; }
 
     public int Hp { get; set; }
@@ -79,7 +109,13 @@ public sealed class DamageSystem
         CancellationToken cancellationToken = default)
     {
         var damageContext = new CombatDamageContext(
-            relation, amount, attacker.HasDivineSword, victim.IsBoss, victim.Hp);
+            ToCombatant(attacker),
+            ToCombatant(victim),
+            relation,
+            amount,
+            attacker.HasDivineSword,
+            victim.IsBoss,
+            victim.Hp);
         var damageResult = await _server.Hooks
             .FireAsync<CombatDamageContext, CombatDamageResult>(damageContext, cancellationToken)
             .ConfigureAwait(false);
@@ -106,4 +142,7 @@ public sealed class DamageSystem
         victim.Hp = Math.Max(0, victim.Hp - finalDamage);
         return new DamageOutcome(finalDamage, Died: victim.Hp == 0, DeathPrevented: false);
     }
+
+    private static Combatant ToCombatant(GameEntity entity)
+        => entity.IsPlayer ? new PlayerCombatant(entity.Id) : new MonsterCombatant(entity.Id);
 }

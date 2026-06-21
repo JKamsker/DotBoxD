@@ -65,6 +65,15 @@ internal static class PluginSymbolReader
         for (var i = 0; i < properties.Length; i++)
         {
             var property = properties[i];
+            if (PolymorphicHandleMetadataReader.TryResolve(property.Type, out var handle))
+            {
+                models[i] = new EventPropertyModel(
+                    property.Name,
+                    handle.KeyManifestTag,
+                    handle.KeySandboxTypeSource);
+                continue;
+            }
+
             // The full marshaller-eligible set (scalars + Guid + enum + list/array + Dictionary + DTO record) is
             // classified here, not just the 5 scalars: a non-scalar property becomes a real tag plus the C#
             // SandboxType the kernel parameter declares, so a thin event carrying a Guid id (or richer payload)

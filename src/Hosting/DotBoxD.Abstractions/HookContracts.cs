@@ -67,3 +67,35 @@ public interface IHookResult
 {
     bool Success { get; }
 }
+
+/// <summary>
+/// Marks a polymorphic host handle type whose sandbox representation is the scalar value stored in
+/// <paramref name="keyMember"/>. Hook contexts may expose the handle type, while generated verified IR receives
+/// only the key and calls host bindings to discriminate or query the concrete host-side entity.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+public sealed class PolymorphicHandleAttribute(string keyMember) : Attribute
+{
+    public string KeyMember { get; } = keyMember;
+}
+
+/// <summary>
+/// Declares one supported subtype for a <see cref="PolymorphicHandleAttribute"/> handle. The analyzer lowers
+/// <c>handle is T local</c> to <c>{BindingPrefix}.is(key)</c>, and instance host-binding calls on
+/// <paramref name="subtype"/> receive that key as their leading sandbox argument.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
+public sealed class HandleSubtypeAttribute(
+    Type subtype,
+    string discriminator,
+    string bindingPrefix,
+    string capability) : Attribute
+{
+    public Type Subtype { get; } = subtype;
+
+    public string Discriminator { get; } = discriminator;
+
+    public string BindingPrefix { get; } = bindingPrefix;
+
+    public string Capability { get; } = capability;
+}

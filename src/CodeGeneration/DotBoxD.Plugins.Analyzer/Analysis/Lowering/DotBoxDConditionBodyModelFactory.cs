@@ -6,7 +6,7 @@ using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNa
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
-internal static class DotBoxDConditionBodyModelFactory
+internal static partial class DotBoxDConditionBodyModelFactory
 {
     public static DotBoxDStatementBodyModel Create(
         ExpressionSyntax expression,
@@ -56,28 +56,6 @@ internal static class DotBoxDConditionBodyModelFactory
             _ => LowerLeafCondition(expression, whenTrue, whenFalse, context)
         };
     }
-
-    private static DotBoxDStatementBodyModel LowerAnd(
-        BinaryExpressionSyntax binary,
-        DotBoxDStatementBodyModel whenTrue,
-        DotBoxDStatementBodyModel whenFalse,
-        DotBoxDExpressionLoweringContext context)
-        => LowerCondition(
-            binary.Left,
-            LowerCondition(binary.Right, whenTrue, whenFalse, context),
-            whenFalse,
-            context);
-
-    private static DotBoxDStatementBodyModel LowerOr(
-        BinaryExpressionSyntax binary,
-        DotBoxDStatementBodyModel whenTrue,
-        DotBoxDStatementBodyModel whenFalse,
-        DotBoxDExpressionLoweringContext context)
-        => LowerCondition(
-            binary.Left,
-            whenTrue,
-            LowerCondition(binary.Right, whenTrue, whenFalse, context),
-            context);
 
     private static DotBoxDStatementBodyModel LowerConditional(
         ConditionalExpressionSyntax conditional,
