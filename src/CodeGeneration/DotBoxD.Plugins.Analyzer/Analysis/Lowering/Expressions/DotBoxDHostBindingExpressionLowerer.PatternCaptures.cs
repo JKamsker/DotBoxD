@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ManifestTypes = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.ManifestTypes;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
@@ -15,10 +16,8 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         DotBoxDExpressionLoweringContext context,
         Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax
-            {
-                Expression: IdentifierNameSyntax receiver
-            } ||
+        if (invocation.Expression is not MemberAccessExpressionSyntax member ||
+            Unwrap(member.Expression) is not IdentifierNameSyntax receiver ||
             !context.TryGetPatternCapture(receiver.Identifier.ValueText, out var capture))
         {
             return null;
@@ -48,10 +47,12 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         var allocates = capture.Key.Allocates || IsAllocatingTag(returnType);
         for (var i = 0; i < arguments.Count; i++)
         {
-            if (arguments[i].NameColon is not null)
+            if (arguments[i].NameColon is not null ||
+                !arguments[i].RefKindKeyword.IsKind(SyntaxKind.None) ||
+                method.Parameters[i].RefKind != RefKind.None)
             {
                 throw new NotSupportedException(
-                    $"Host binding '{binding.BindingId}' arguments must be positional.");
+                    $"Host binding '{binding.BindingId}' arguments must be positional value arguments.");
             }
 
             var lowered = lowerExpression(arguments[i].Expression);
@@ -66,7 +67,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             allocates |= lowered.Allocates;
         }
 
-        AddBindingRequirements(context, binding.Capability, binding.Effects);
+        AddBindingRequirements(context, binding.Capability, binding.Effects, binding.IsAsync);
         var source =
             $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(binding.BindingId)}, " +
             $"[{string.Join(", ", loweredSources)}], null, Span)";
@@ -86,14 +87,31 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return false;
     }
 
+    private static ExpressionSyntax Unwrap(ExpressionSyntax expression)
+    {
+        var current = expression;
+        while (current is ParenthesizedExpressionSyntax parenthesized)
+        {
+            current = parenthesized.Expression;
+        }
+
+        return current;
+    }
+
     private static void AddBindingRequirements(
         DotBoxDExpressionLoweringContext context,
         string? capability,
-        IReadOnlyList<string> effects)
+        IReadOnlyList<string> effects,
+        bool isAsync)
     {
         if (capability is { Length: > 0 } requiredCapability)
         {
             context.Capabilities?.Add(requiredCapability);
+        }
+
+        if (isAsync || effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+        {
+            context.Capabilities?.Add(DotBoxDGenerationNames.Capabilities.RuntimeAsync);
         }
 
         if (context.Effects is not { } effectSink)
@@ -104,6 +122,11 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         foreach (var effect in effects)
         {
             effectSink.Add(effect);
+        }
+
+        if (isAsync || effects.Contains(DotBoxDGenerationNames.Effects.Concurrency))
+        {
+            effectSink.Add(DotBoxDGenerationNames.Effects.Concurrency);
         }
     }
 }

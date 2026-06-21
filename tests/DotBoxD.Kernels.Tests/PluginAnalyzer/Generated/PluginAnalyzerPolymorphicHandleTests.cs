@@ -7,22 +7,26 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
     [Fact]
     public void Result_hook_polymorphic_filter_lowers_discriminator_and_scoped_host_call()
     {
-        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(Source("""
+        var source = Source("""
             public static class Usage
             {
                 public static void Configure(HookRegistry hooks)
                     => hooks.On<DamageCtx>()
                         .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
-                                      attacker.HasEquippedItem(9001L))
+                                      (attacker).HasEquippedItem(9001L))
                         .Where(ctx => ctx.Victim is MonsterCombatant)
                         .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage * 2 }, 100);
             }
-            """));
-        var generated = string.Join(Environment.NewLine, result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+            """);
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK113");
         Assert.Contains("combatant.player.is", generated);
         Assert.Contains("combatant.player.hasEquippedItem", generated);
+        Assert.Contains("\"combatant.player.hasEquippedItem\", [Var(\"e_Attacker\"), I64(9001L)]", generated);
         Assert.Contains("combatant.monster.is", generated);
         Assert.Contains("combatant.player.read", generated);
         Assert.Contains("combatant.monster.read", generated);
@@ -30,8 +34,7 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
 
     [Fact]
     public void Result_hook_polymorphic_filter_without_declared_subtype_fails_safe()
-    {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(Source("""
+        => AssertFailsSafe(Source("""
             public static class Usage
             {
                 public static void Configure(HookRegistry hooks)
@@ -41,13 +44,9 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
             }
             """, includeMonsterSubtype: false));
 
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK113");
-    }
-
     [Fact]
     public void Result_hook_declaration_pattern_inside_or_fails_safe()
-    {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(Source("""
+        => AssertFailsSafe(Source("""
             public static class Usage
             {
                 public static void Configure(HookRegistry hooks)
@@ -59,10 +58,100 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
             }
             """));
 
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DBXK113");
+    [Fact]
+    public void Result_hook_declaration_pattern_inside_conditional_fails_safe()
+        => AssertFailsSafe(Source("""
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker
+                            ? attacker.HasEquippedItem(9001L)
+                            : false)
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """));
+
+    [Fact]
+    public void Result_hook_polymorphic_filter_with_missing_key_member_fails_safe()
+        => AssertFailsSafe(Source("""
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
+                                      attacker.HasEquippedItem(9001L))
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """, keyMemberExpression: "\"Missing\""));
+
+    [Fact]
+    public void Result_hook_polymorphic_filter_with_unsupported_key_type_fails_safe()
+        => AssertFailsSafe(Source("""
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Victim is MonsterCombatant)
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """, keyType: "double"));
+
+    [Fact]
+    public void Result_hook_polymorphic_filter_with_blank_subtype_metadata_fails_safe()
+        => AssertFailsSafe(Source("""
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
+                                      attacker.HasEquippedItem(9001L))
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """, playerCapability: ""));
+
+    [Fact]
+    public void Result_hook_async_scoped_host_call_adds_runtime_async_requirements()
+    {
+        var source = Source("""
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
+                                      attacker.HasEquippedItem(9001L))
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """, playerHostBindingSuffix: ", IsAsync = true");
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK113");
+        Assert.Contains("dotboxd.runtime.async", generated);
+        Assert.Contains("Concurrency", generated);
     }
 
-    private static string Source(string usage, bool includeMonsterSubtype = true)
+    private static void AssertFailsSafe(string source)
+    {
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK113");
+        var generated = result.GeneratedTrees.Select(tree => tree.GetText().ToString()).ToArray();
+        Assert.DoesNotContain(generated, source =>
+            source.Contains("DamagePluginPackage", StringComparison.Ordinal)
+            || source.Contains("DotBoxDHookChainInterceptors", StringComparison.Ordinal)
+            || source.Contains("HookSubscriptionManifest", StringComparison.Ordinal));
+    }
+
+    private static string Source(
+        string usage,
+        bool includeMonsterSubtype = true,
+        string keyMemberExpression = "nameof(Id)",
+        string keyType = "long",
+        string playerCapability = "combatant.player.read",
+        string playerHostBindingSuffix = "")
     {
         var monsterSubtype = includeMonsterSubtype
             ? """[HandleSubtype(typeof(MonsterCombatant), "monster", "combatant.monster", "combatant.monster.read")]"""
@@ -76,21 +165,21 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
 
             namespace Sample;
 
-            [PolymorphicHandle(nameof(Id))]
-            [HandleSubtype(typeof(PlayerCombatant), "player", "combatant.player", "combatant.player.read")]
+            [PolymorphicHandle({{keyMemberExpression}})]
+            [HandleSubtype(typeof(PlayerCombatant), "player", "combatant.player", "{{playerCapability}}")]
             {{monsterSubtype}}
-            public abstract record Combatant(long Id);
+            public abstract record Combatant({{keyType}} Id);
 
-            public sealed record PlayerCombatant(long Id) : Combatant(Id)
+            public sealed record PlayerCombatant({{keyType}} Id) : Combatant(Id)
             {
                 [HostBinding(
                     "combatant.player.hasEquippedItem",
                     "combatant.player.read",
-                    SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+                    SandboxEffect.Cpu | SandboxEffect.HostStateRead{{playerHostBindingSuffix}})]
                 public bool HasEquippedItem(long itemRuntimeId) => throw new System.NotSupportedException();
             }
 
-            public sealed record MonsterCombatant(long Id) : Combatant(Id);
+            public sealed record MonsterCombatant({{keyType}} Id) : Combatant(Id);
 
             [Hook("combat.damage", typeof(DamageResult))]
             public sealed record DamageCtx(Combatant Attacker, Combatant Victim, int Damage);

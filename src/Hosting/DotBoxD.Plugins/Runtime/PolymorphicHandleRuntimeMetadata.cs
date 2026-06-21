@@ -20,11 +20,9 @@ internal static class PolymorphicHandleRuntimeMetadataReader
                 continue;
             }
 
-            if (KeyMember(current, attribute.KeyMember) is { } key)
-            {
-                metadata = key;
-                return true;
-            }
+            metadata = KeyMember(current, attribute.KeyMember) ??
+                throw InvalidHandleMetadata(current);
+            return true;
         }
 
         metadata = null!;
@@ -38,7 +36,9 @@ internal static class PolymorphicHandleRuntimeMetadataReader
             var property = current.GetProperty(
                 keyMember,
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            if (property is not null)
+            if (property is { GetMethod.IsPublic: true } &&
+                property.GetIndexParameters().Length == 0 &&
+                IsSupportedKey(property.PropertyType))
             {
                 return new PolymorphicHandleRuntimeMetadata(handleType, property.PropertyType, property, null);
             }
@@ -46,7 +46,7 @@ internal static class PolymorphicHandleRuntimeMetadataReader
             var field = current.GetField(
                 keyMember,
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            if (field is not null)
+            if (field is not null && IsSupportedKey(field.FieldType))
             {
                 return new PolymorphicHandleRuntimeMetadata(handleType, field.FieldType, null, field);
             }
@@ -54,4 +54,14 @@ internal static class PolymorphicHandleRuntimeMetadataReader
 
         return null;
     }
+
+    private static bool IsSupportedKey(Type type)
+        => type == typeof(int) ||
+           type == typeof(long) ||
+           type == typeof(Guid) ||
+           type == typeof(string);
+
+    private static NotSupportedException InvalidHandleMetadata(Type handleType)
+        => new(
+            $"Polymorphic handle '{handleType}' must declare a public readable non-indexer key member of type int, long, Guid, or string.");
 }

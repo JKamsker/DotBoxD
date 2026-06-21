@@ -20,6 +20,9 @@ internal sealed record PolymorphicHandleMetadata(
                 attribute.ConstructorArguments[1].Value is not string discriminator ||
                 attribute.ConstructorArguments[2].Value is not string bindingPrefix ||
                 attribute.ConstructorArguments[3].Value is not string capability ||
+                string.IsNullOrWhiteSpace(discriminator) ||
+                string.IsNullOrWhiteSpace(bindingPrefix) ||
+                string.IsNullOrWhiteSpace(capability) ||
                 !SymbolEqualityComparer.Default.Equals(declaredSubtype, subtype))
             {
                 continue;
@@ -56,13 +59,22 @@ internal static class PolymorphicHandleMetadataReader
             {
                 if (!PolymorphicHandleMetadata.IsAttribute(
                         attribute,
-                        DotBoxDGenerationNames.Metadata.PolymorphicHandleAttribute) ||
-                    attribute.ConstructorArguments.Length != 1 ||
-                    attribute.ConstructorArguments[0].Value is not string keyMember ||
-                    KeyType(current, keyMember) is not { } keyType ||
-                    !IsSupportedKey(keyType, out var tag, out var sandboxTypeSource))
+                        DotBoxDGenerationNames.Metadata.PolymorphicHandleAttribute))
                 {
                     continue;
+                }
+
+                if (attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not string keyMember ||
+                    string.IsNullOrWhiteSpace(keyMember))
+                {
+                    throw InvalidHandleMetadata(current);
+                }
+
+                if (KeyType(current, keyMember) is not { } keyType ||
+                    !IsSupportedKey(keyType, out var tag, out var sandboxTypeSource))
+                {
+                    throw InvalidHandleMetadata(current);
                 }
 
                 metadata = new PolymorphicHandleMetadata(current, keyType, tag, sandboxTypeSource);
@@ -80,12 +92,22 @@ internal static class PolymorphicHandleMetadataReader
         {
             foreach (var member in current.GetMembers(keyMember))
             {
-                if (member is IPropertySymbol { IsStatic: false } property)
+                if (member is IPropertySymbol
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false,
+                        Parameters.Length: 0,
+                        GetMethod.DeclaredAccessibility: Accessibility.Public
+                    } property)
                 {
                     return property.Type;
                 }
 
-                if (member is IFieldSymbol { IsStatic: false } field)
+                if (member is IFieldSymbol
+                    {
+                        DeclaredAccessibility: Accessibility.Public,
+                        IsStatic: false
+                    } field)
                 {
                     return field.Type;
                 }
@@ -99,9 +121,12 @@ internal static class PolymorphicHandleMetadataReader
     {
         tag = SandboxTypeSourceEmitter.ManifestTag(keyType);
         sandboxTypeSource = SandboxTypeSourceEmitter.TryEmit(keyType) ?? string.Empty;
-        return tag is DotBoxDGenerationNames.ManifestTypes.Int
-            or DotBoxDGenerationNames.ManifestTypes.Long
-            or DotBoxDGenerationNames.ManifestTypes.Guid
-            or DotBoxDGenerationNames.ManifestTypes.String;
+        return keyType.SpecialType is SpecialType.System_Int32
+                or SpecialType.System_Int64
+                or SpecialType.System_String ||
+            DotBoxDRpcTypeMapper.IsGuid(keyType);
     }
+
+    private static NotSupportedException InvalidHandleMetadata(INamedTypeSymbol handleType)
+        => new($"Polymorphic handle '{handleType.ToDisplayString()}' must declare a public readable non-indexer key member of type int, long, Guid, or string.");
 }

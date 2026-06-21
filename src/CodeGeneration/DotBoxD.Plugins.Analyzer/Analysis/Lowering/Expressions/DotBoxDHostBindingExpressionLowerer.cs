@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ManifestTypes = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.ManifestTypes;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
@@ -31,7 +32,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return null;
         }
 
-        var (bindingId, capability, effects, _) = binding;
+        var (bindingId, capability, effects, isAsync) = binding;
         if (TryLowerPatternCaptureInvocation(
                 invocation,
                 method,
@@ -64,10 +65,12 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         var allocates = IsAllocatingTag(returnType);
         for (var i = 0; i < arguments.Count; i++)
         {
-            if (arguments[i].NameColon is not null)
+            if (arguments[i].NameColon is not null ||
+                !arguments[i].RefKindKeyword.IsKind(SyntaxKind.None) ||
+                method.Parameters[i].RefKind != RefKind.None)
             {
                 throw new NotSupportedException(
-                    $"Host binding '{bindingId}' arguments must be positional.");
+                    $"Host binding '{bindingId}' arguments must be positional value arguments.");
             }
 
             var lowered = lowerExpression(arguments[i].Expression);
@@ -82,7 +85,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             allocates |= lowered.Allocates;
         }
 
-        AddBindingRequirements(context, capability, effects);
+        AddBindingRequirements(context, capability, effects, isAsync);
 
         var source =
             $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(bindingId)}, " +

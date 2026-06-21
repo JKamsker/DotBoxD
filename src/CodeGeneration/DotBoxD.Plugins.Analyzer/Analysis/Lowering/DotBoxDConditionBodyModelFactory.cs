@@ -62,11 +62,18 @@ internal static partial class DotBoxDConditionBodyModelFactory
         DotBoxDStatementBodyModel whenTrue,
         DotBoxDStatementBodyModel whenFalse,
         DotBoxDExpressionLoweringContext context)
-        => LowerCondition(
+    {
+        if (DotBoxDPatternExpressionLowerer.ContainsDeclarationPattern(conditional))
+        {
+            throw new NotSupportedException($"Unsupported declaration-pattern composition '{conditional}'.");
+        }
+
+        return LowerCondition(
             conditional.Condition,
             LowerCondition(conditional.WhenTrue, whenTrue, whenFalse, context),
             LowerCondition(conditional.WhenFalse, whenTrue, whenFalse, context),
             context);
+    }
 
     private static DotBoxDStatementBodyModel LowerEagerAnd(
         BinaryExpressionSyntax binary,

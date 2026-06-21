@@ -221,10 +221,14 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
         {
             return new ConventionEventProperty<TEvent>(
                 handle.KeyType,
-                CreateHandleKeyGetter(property, handle));
+                CreateHandleKeyGetter(property, handle),
+                CoerceNullStringToEmpty: false);
         }
 
-        return new ConventionEventProperty<TEvent>(property.PropertyType, CreateGetter(property));
+        return new ConventionEventProperty<TEvent>(
+            property.PropertyType,
+            CreateGetter(property),
+            CoerceNullStringToEmpty: true);
     }
 
     private static Func<TEvent, object?> CreateHandleKeyGetter(
@@ -255,7 +259,8 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
 
 internal readonly record struct ConventionEventProperty<TEvent>(
     Type ValueType,
-    Func<TEvent, object?> Getter)
+    Func<TEvent, object?> Getter,
+    bool CoerceNullStringToEmpty)
 {
     public SandboxValue ToSandboxValue(TEvent e)
     {
@@ -266,7 +271,7 @@ internal readonly record struct ConventionEventProperty<TEvent>(
         // marshaller's bare ArgumentNullException.
         if (value is null)
         {
-            return ValueType == typeof(string)
+            return CoerceNullStringToEmpty && ValueType == typeof(string)
                 ? SandboxValue.FromString(string.Empty)
                 : throw new NotSupportedException(
                     $"Event property of type '{ValueType}' was null; the sandbox value model has no null.");

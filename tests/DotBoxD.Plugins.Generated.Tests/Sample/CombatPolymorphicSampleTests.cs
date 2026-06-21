@@ -103,4 +103,44 @@ public sealed class CombatPolymorphicSampleTests
         Assert.Equal(50, outcome.Damage);
         Assert.Equal(450, victim.Hp);
     }
+
+    [Fact]
+    public async Task Polymorphic_DivineSword_skips_players_without_the_item()
+    {
+        var bindings = new CombatPolymorphicBindings();
+        using var server = PluginServer.Create(
+            configureHost: bindings.AddBindings,
+            defaultPolicy: CombatPolymorphicBindings.Policy());
+        RegisterPolymorphicDivineSword(server);
+
+        var attacker = Player(41, hp: 100, sword: false);
+        var victim = Monster(42, hp: 500);
+        bindings.Track(attacker, victim);
+
+        var outcome = await new DamageSystem(server)
+            .ApplyDamageAsync(attacker, victim, 50, CombatRelation.Pve);
+
+        Assert.Equal(50, outcome.Damage);
+        Assert.Equal(450, victim.Hp);
+    }
+
+    [Fact]
+    public async Task Polymorphic_BossShield_skips_non_boss_monsters()
+    {
+        var bindings = new CombatPolymorphicBindings();
+        using var server = PluginServer.Create(
+            configureHost: bindings.AddBindings,
+            defaultPolicy: CombatPolymorphicBindings.Policy());
+        RegisterPolymorphicBossShield(server);
+
+        var attacker = Monster(51, hp: 100);
+        var victim = Monster(52, hp: 500, boss: false);
+        bindings.Track(attacker, victim);
+
+        var outcome = await new DamageSystem(server)
+            .ApplyDamageAsync(attacker, victim, 80, CombatRelation.Environment);
+
+        Assert.Equal(80, outcome.Damage);
+        Assert.Equal(420, victim.Hp);
+    }
 }
