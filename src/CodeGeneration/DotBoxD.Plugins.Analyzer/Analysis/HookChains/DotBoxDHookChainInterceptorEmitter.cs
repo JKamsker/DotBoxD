@@ -51,6 +51,21 @@ internal static class DotBoxDHookChainInterceptorEmitter
 
             builder.AppendLine("(");
             builder.Append("            this ").Append(interception.ReceiverTypeFullName).AppendLine(" pipeline,");
+            if (IsResultChain(interception.InstallKind))
+            {
+                builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler,");
+                builder.AppendLine("            int priority = 0)");
+                builder.Append("            => pipeline.")
+                    .Append(interception.InstallKind == HookChainInterceptorInstallKind.ResultChain
+                        ? "UseGeneratedResultChain"
+                        : "UseGeneratedLocalResultChain")
+                    .Append('<').Append(interception.ResultTypeFullName).Append(">(")
+                    .Append(interception.PackageFullName)
+                    .Append(ResultInstallArguments(interception))
+                    .AppendLine(");");
+                continue;
+            }
+
             builder.Append("            ").Append(interception.HandlerTypeFullName).AppendLine(" handler)");
             builder.Append("            => pipeline.")
                 .Append(interception.InstallKind == HookChainInterceptorInstallKind.LocalCallback
@@ -87,4 +102,14 @@ internal static class DotBoxDHookChainInterceptorEmitter
             : interception.PackageFullName + ".ReadProjectedPayload";
         return ".Create(), handler, " + decoder;
     }
+
+    private static bool IsResultChain(HookChainInterceptorInstallKind kind)
+        => kind is HookChainInterceptorInstallKind.ResultChain or HookChainInterceptorInstallKind.LocalResultChain;
+
+    // A sandbox Register chain installs only the package (its handler body lowered to IR); a RegisterLocal chain
+    // also passes the native handler that produces the result. Both pass the install-time priority.
+    private static string ResultInstallArguments(HookChainInterception interception)
+        => interception.InstallKind == HookChainInterceptorInstallKind.ResultChain
+            ? ".Create(), priority"
+            : ".Create(), handler, priority";
 }

@@ -52,6 +52,8 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.ServerExtensionClientAttribute)] = TypeName(typeof(ServerExtensionClientAttribute)),
             [nameof(TypeNames.ServerExtensionMethodAttribute)] = TypeName(typeof(ServerExtensionMethodAttribute)),
             [nameof(TypeNames.GeneratePluginServerAttribute)] = TypeName(typeof(GeneratePluginServerAttribute)),
+            [nameof(TypeNames.HookAttribute)] = TypeName(typeof(HookAttribute)),
+            [nameof(TypeNames.HookResultAttribute)] = TypeName(typeof(HookResultAttribute)),
             [nameof(TypeNames.DotBoxDServiceAttribute)] = TypeName(typeof(DotBoxDServiceAttribute)),
             [nameof(TypeNames.HookContext)] = TypeName(typeof(HookContext)),
             [nameof(TypeNames.ServerInvocationDelegateType)] = RemoteServerInvocationTypeName(),

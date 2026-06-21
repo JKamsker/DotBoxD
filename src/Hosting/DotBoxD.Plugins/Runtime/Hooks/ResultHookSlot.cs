@@ -9,9 +9,11 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 /// <c>.RegisterLocal(...)</c>) installed on a single <see cref="HookPipeline{TEvent}"/>. Handlers are kept in
 /// a copy-on-write array sorted by descending priority, ties preserving install order. <see cref="FireAsync{TResult}"/>
 /// walks that order and returns the first <i>successful</i> result: a handler whose filter did not match, or
-/// that abstained (<c>Success == false</c>), falls through to the next. A handler that throws is isolated
-/// (logged-by-omission and skipped) so one faulty registration cannot break dispatch; cancellation stops the
-/// walk. No registered handler — or none successful — yields <see langword="null"/>.
+/// that abstained (<c>Success == false</c>), falls through to the next. A handler that throws is isolated —
+/// skipped so one faulty registration cannot break dispatch — and dispatch falls through to the next handler;
+/// cancellation of the dispatch token stops the walk. No registered handler — or none successful — yields
+/// <see langword="null"/>. Note: a swallowed handler fault is currently silent (no diagnostic channel), so a
+/// veto-bearing handler that faults fails open to the next handler / the host default.
 /// </summary>
 internal sealed class ResultHookSlot<TEvent>
 {
@@ -67,8 +69,11 @@ internal sealed class ResultHookSlot<TEvent>
             {
                 result = await entries[i].Invoke(e, context, cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                // Only a cancellation of the dispatch token stops the walk. An OperationCanceledException a native
+                // RegisterLocal handler raises for its own reason (an internal timeout/CTS) is an isolated fault,
+                // so it falls through to the general handler below.
                 throw;
             }
             catch (Exception)

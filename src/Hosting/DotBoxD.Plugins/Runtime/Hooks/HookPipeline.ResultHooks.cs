@@ -11,12 +11,18 @@ public sealed partial class HookPipeline<TEvent>
 {
     private readonly Hooks.ResultHookSlot<TEvent> _resultHooks;
 
+    // The authoring terminals constrain TResult to `struct` only — NOT IHookResult. IHookResult is added to
+    // [HookResult] records by the same generator pass, so it is not yet present on the pre-generation
+    // compilation the analyzer binds these calls against; constraining on it here would make the call fail to
+    // resolve during lowering. The generated interceptor's install entrypoints (below) carry the full
+    // `struct, IHookResult` constraint, checked against the post-generation compilation.
+
     /// <summary>
     /// The result-returning terminal the analyzer lowers to verified IR: the filter and the result-producing
     /// handler both run in the sandbox. Un-lowered it throws, so plugin logic never executes unsandboxed.
     /// </summary>
     public HookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
+        where TResult : struct
         => throw Hooks.HookLowering.ResultNotLowered();
 
     /// <summary>
@@ -24,13 +30,13 @@ public sealed partial class HookPipeline<TEvent>
     /// produced by the plugin-process delegate. Un-lowered it throws; the generated interceptor replaces it.
     /// </summary>
     public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
+        where TResult : struct
         => throw Hooks.HookLowering.ResultNotLowered();
 
     public HookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
+        where TResult : struct
         => throw Hooks.HookLowering.ResultNotLowered();
 
     /// <summary>

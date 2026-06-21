@@ -221,7 +221,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         {
             Expression: MemberAccessExpressionSyntax
             {
-                Name.Identifier.ValueText: "Run" or "RunLocal"
+                Name.Identifier.ValueText: "Run" or "RunLocal" or "Register" or "RegisterLocal"
             }
         };
 

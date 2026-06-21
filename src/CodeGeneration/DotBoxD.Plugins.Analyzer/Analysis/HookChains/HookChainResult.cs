@@ -22,18 +22,35 @@ internal sealed record HookChainCreateResult(HookChainResult? Chain, HookChainNo
 /// Equatable carrier for the DBXK111 diagnostic (location only; the message lives on the descriptor), kept equatable
 /// so the incremental generator's caching is preserved.
 /// </summary>
-internal sealed record HookChainNotLoweredDiagnostic(PluginDiagnosticLocation? Location)
+internal sealed record HookChainNotLoweredDiagnostic(PluginDiagnosticLocation? Location, bool ResultChain = false)
 {
     public Diagnostic ToDiagnostic()
-        => Diagnostic.Create(
-            PluginAnalyzerDiagnostics.RunLocalNotLoweredRule,
-            Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None);
+        => ResultChain
+            ? Diagnostic.Create(
+                PluginAnalyzerDiagnostics.ResultHookNotLoweredRule,
+                Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None,
+                "this On<TContext>().Register/RegisterLocal chain could not be lowered to verified IR (the "
+                + "context lacks [Hook], the handler returns the wrong result type, or the filter/handler shape "
+                + "is unsupported), so the runtime terminal throws")
+            : Diagnostic.Create(
+                PluginAnalyzerDiagnostics.RunLocalNotLoweredRule,
+                Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None);
 }
 
 internal enum HookChainInterceptorInstallKind
 {
     GeneratedChain,
-    LocalCallback
+    LocalCallback,
+
+    // A result-returning Register chain: the filter and the result-producing handler both lowered to verified IR,
+    // installed via UseGeneratedResultChain<TResult>(package, priority). The package reuses the projection package
+    // shape (LocalTerminal + ProjectedType = the result record), but the host decodes and returns the Handle
+    // result rather than pushing it to a delegate.
+    ResultChain,
+
+    // A result-returning RegisterLocal chain: only the filter lowered to verified IR; the result is produced by
+    // the plugin-process delegate. Installed via UseGeneratedLocalResultChain<TResult>(package, handler, priority).
+    LocalResultChain
 }
 
 /// <summary>
@@ -60,4 +77,7 @@ internal sealed record HookChainInterception(
     // naming the type arguments. Used when the terminal projection is an anonymous type: it has a real metadata
     // identity (a legal type ARGUMENT Roslyn infers at the call site) but no C#-source-nameable name. The arity
     // must match the interceptable method's generic context, so EVERY receiver type argument becomes a parameter.
-    string? InterceptorTypeParameters = null);
+    string? InterceptorTypeParameters = null,
+    // For a result chain (Register/RegisterLocal): the fully-qualified result type the install entrypoint is
+    // closed over (UseGeneratedResultChain<TResult> / UseGeneratedLocalResultChain<TResult>). Null otherwise.
+    string? ResultTypeFullName = null);

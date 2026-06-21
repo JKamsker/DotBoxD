@@ -93,4 +93,61 @@ public sealed class HookResultGeneratorTests
 
         Assert.DoesNotContain("NotPartial Ok()", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Reports_DBXK112_for_a_record_class_result()
+    {
+        // A positional record class has no parameterless constructor, so new() {} would not compile; reject it.
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public partial record ClassResult(bool Success, string? Reason, int Damage);
+            """;
+
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+
+        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Reports_DBXK112_for_a_nested_result_type()
+    {
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public static class Outer
+            {
+                [HookResult]
+                public readonly partial record struct Inner(bool Success, string? Reason, int Damage);
+            }
+            """;
+
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+
+        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Author_field_named_like_a_builder_does_not_produce_a_colliding_member()
+    {
+        // A positional field named Ok synthesizes a property Ok; the generator must not also emit a static Ok().
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public readonly partial record struct CollidingResult(bool Success, string? Reason, int Ok);
+            """;
+
+        // GeneratedSources asserts the generated code compiles (no CS0102), and Ok() must be skipped.
+        var generated = string.Join("\n", PluginAnalyzerGeneratedPackageFactory.GeneratedSources(source));
+
+        Assert.DoesNotContain("CollidingResult Ok()", generated, StringComparison.Ordinal);
+    }
 }

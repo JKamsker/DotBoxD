@@ -30,6 +30,19 @@ internal static class HookResultModelFactory
             return null;
         }
 
+        if (type.ContainingType is not null)
+        {
+            // A nested result would be emitted as a phantom top-level type; require a top-level declaration.
+            return Invalid(type, declaration, $"hook result '{type.Name}' must be a top-level type");
+        }
+
+        if (!type.IsValueType)
+        {
+            // Builders construct via `new() { ... }` and dispatch constrains TResult to a struct, so a reference
+            // (record class) result is not supported.
+            return Invalid(type, declaration, $"hook result '{type.Name}' must be a readonly record struct");
+        }
+
         var primary = PrimaryConstructor(type);
         if (primary is null)
         {
@@ -70,11 +83,24 @@ internal static class HookResultModelFactory
             type.Name,
             DeclarationKeywords(type),
             EquatableArray<HookResultField>.FromOwned([.. fields]),
-            EquatableArray<string>.FromOwned([.. ExistingMethodNames(type)]),
+            EquatableArray<string>.FromOwned([.. ExistingMemberNames(type)]),
             hasSuccess,
             hasReason,
             diagnostic);
     }
+
+    // A diagnostic-only model: builders are not emitted (HasSuccess/HasReason are false) and the generator
+    // reports the DBXK112 message for a malformed [HookResult] shape.
+    private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message)
+        => new(
+            type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString(),
+            type.Name,
+            string.Empty,
+            EquatableArray<HookResultField>.FromOwned([]),
+            EquatableArray<string>.FromOwned([]),
+            HasSuccess: false,
+            HasReason: false,
+            new HookResultDiagnostic(PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()), message));
 
     // The positional record's primary constructor: the instance constructor that is neither the implicit
     // parameterless struct constructor nor the synthesized single-parameter copy constructor.
@@ -99,13 +125,16 @@ internal static class HookResultModelFactory
         return null;
     }
 
-    private static IEnumerable<string> ExistingMethodNames(INamedTypeSymbol type)
+    // Author-declared member names that must not be shadowed by a generated builder. Includes methods,
+    // properties, and fields: a positional parameter named e.g. `Ok` synthesizes a property `Ok`, which would
+    // collide (CS0102) with a generated `Ok()` method, so all member kinds are collected.
+    private static IEnumerable<string> ExistingMemberNames(INamedTypeSymbol type)
     {
         foreach (var member in type.GetMembers())
         {
-            if (member is IMethodSymbol { IsImplicitlyDeclared: false } method)
+            if (member is (IMethodSymbol or IPropertySymbol or IFieldSymbol) and { IsImplicitlyDeclared: false })
             {
-                yield return method.Name;
+                yield return member.Name;
             }
         }
     }

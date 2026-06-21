@@ -42,13 +42,14 @@ internal static class PluginAnalyzerDiagnostics
     // missing contract instead of leaving Ok()/Reject() undefined.
     public static readonly DiagnosticDescriptor HookResultContractRule = new(
         "DBXK112",
-        "Hook result type is missing the Success/Reason contract",
+        "Hook result type does not satisfy the result contract",
         "{0}",
         "DotBoxD.Kernels.Generation",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "A [HookResult] record must declare a 'bool Success' field and a 'string? Reason' field so "
-            + "the generated Ok()/Reject() builders and the runtime abstain/fallthrough contract are well-defined.",
+        description: "A [HookResult] type must be a top-level readonly record struct that declares a 'bool Success' "
+            + "field and a 'string? Reason' field, so the generated Ok()/Reject() builders and the runtime "
+            + "abstain/fallthrough contract are well-defined.",
         helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK112");
 
     // A result-returning hook chain (On<TContext>().…​.Register/RegisterLocal) is only intercepted when its

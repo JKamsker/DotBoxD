@@ -21,6 +21,8 @@ internal static class HookChainModelFactory
 {
     private const string RunMethod = "Run";
     private const string RunLocalMethod = "RunLocal";
+    private const string RegisterMethod = "Register";
+    private const string RegisterLocalMethod = "RegisterLocal";
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
@@ -56,7 +58,35 @@ internal static class HookChainModelFactory
             return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(location));
         }
 
+        // A recognized in-process result hook (On<TContext>().Register/RegisterLocal) that produced no package
+        // leaves its native terminal to throw at runtime; surface DBXK113 so the cause shows at build time.
+        if (TryResultChainLocation(invocation, context.SemanticModel, cancellationToken, out var resultLocation))
+        {
+            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(resultLocation, ResultChain: true));
+        }
+
         return null;
+    }
+
+    // True when the call site is an in-process Register/RegisterLocal terminal on a known local hook pipeline —
+    // the surface whose native terminal throws when the generator does not intercept it.
+    private static bool TryResultChainLocation(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out PluginDiagnosticLocation location)
+    {
+        location = default;
+        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
+            (!string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterMethod, StringComparison.Ordinal) &&
+             !string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal)) ||
+            ReceiverKind(model, terminalAccess.Expression, cancellationToken) != HookChainReceiverKind.Local)
+        {
+            return false;
+        }
+
+        location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
+        return true;
     }
 
     // True when the call site is a remote RunLocal terminal: RunLocal whose receiver's static type is one of the
@@ -115,7 +145,11 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        if (!TryLambda(invocation, out var terminalLambda))
+        // Run/RunLocal take a single lambda; Register/RegisterLocal take (lambda, priority) — accept the leading
+        // lambda for the result terminals so the trailing priority argument does not reject the chain.
+        var isResultTerminal = installKind is HookChainInterceptorInstallKind.ResultChain
+            or HookChainInterceptorInstallKind.LocalResultChain;
+        if (!(isResultTerminal ? TryLeadingLambda(invocation, out var terminalLambda) : TryLambda(invocation, out terminalLambda)))
         {
             return null;
         }
@@ -137,6 +171,25 @@ internal static class HookChainModelFactory
         if (ContainsUnsupported(eventProperties))
         {
             return null;
+        }
+
+        // Result-returning hooks (Register/RegisterLocal) lower the filter the same way, but the Handle returns
+        // the result record (Register) or Unit with an in-process delegate (RegisterLocal); they install via the
+        // result-chain entrypoints. Delegated to keep the Send-terminal path below focused.
+        if (installKind is HookChainInterceptorInstallKind.ResultChain or HookChainInterceptorInstallKind.LocalResultChain)
+        {
+            return ResultHookChain.Build(
+                invocation,
+                terminalAccess.Expression,
+                model,
+                cancellationToken,
+                stages,
+                eventType,
+                eventProperties,
+                terminalLambda,
+                terminalElementParam,
+                terminalContextParam,
+                installKind == HookChainInterceptorInstallKind.LocalResultChain);
         }
 
         // Collectors for the whole chain: every Where/Select/terminal-Send deposits the capabilities its
@@ -309,6 +362,12 @@ internal static class HookChainModelFactory
             RunMethod => HookChainInterceptorInstallKind.GeneratedChain,
             RunLocalMethod when receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null =>
                 HookChainInterceptorInstallKind.LocalCallback,
+            // Result hooks lower only for the in-process (Local) Hooks surface in v1; the remote authoring
+            // surface has no Register/RegisterLocal yet, so a remote receiver is not recognized here.
+            RegisterMethod when receiverKind == HookChainReceiverKind.Local =>
+                HookChainInterceptorInstallKind.ResultChain,
+            RegisterLocalMethod when receiverKind == HookChainReceiverKind.Local =>
+                HookChainInterceptorInstallKind.LocalResultChain,
             _ => null
         };
 
@@ -630,6 +689,22 @@ internal static class HookChainModelFactory
         lambda = null!;
         var arguments = invocation.ArgumentList.Arguments;
         if (arguments.Count != 1 ||
+            arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
+        {
+            return false;
+        }
+
+        lambda = lambdaExpression;
+        return true;
+    }
+
+    // The leading lambda of a result terminal — Register(lambda, priority) / RegisterLocal(lambda, priority) —
+    // where the (optional) trailing priority argument must not reject the chain.
+    private static bool TryLeadingLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
+    {
+        lambda = null!;
+        var arguments = invocation.ArgumentList.Arguments;
+        if (arguments.Count < 1 ||
             arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
         {
             return false;
