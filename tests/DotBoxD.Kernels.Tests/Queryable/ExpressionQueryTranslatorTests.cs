@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Translation;
 
@@ -164,8 +163,9 @@ public sealed class ExpressionQueryTranslatorTests
     [Fact]
     public void TranslateFilter_rejects_non_finite_constant()
     {
+        var nonFinite = double.NaN;
         var ex = Assert.Throws<QueryTranslationException>(
-            () => ExpressionQueryTranslator.TranslateFilter<MetricTestEvent>(e => e.Score == double.NaN));
+            () => ExpressionQueryTranslator.TranslateFilter<MetricTestEvent>(e => e.Score == nonFinite));
         Assert.Contains("non-finite", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 

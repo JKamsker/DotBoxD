@@ -24,7 +24,7 @@ public enum QueryValueKind
     /// <summary>A <see cref="System.Guid"/> literal (equality only; no ordering).</summary>
     Guid = 5,
 
-    /// <summary>An exact <see cref="System.Decimal"/> literal carried losslessly (scale-insensitive equality).</summary>
+    /// <summary>An exact <see cref="decimal"/> literal carried losslessly (scale-insensitive equality).</summary>
     Decimal = 6,
 
     /// <summary>An unsigned 64-bit integral literal carried as an exact <c>ulong</c> (full range, no double collapse).</summary>
