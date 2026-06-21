@@ -123,8 +123,32 @@ public sealed class HookRegistry
             _pipelines.TryGetValue(typeof(TContext), out pipeline);
         }
 
-        return pipeline is null
-            ? new ValueTask<TResult?>((TResult?)null)
-            : ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
+        if (pipeline is null)
+        {
+            return new ValueTask<TResult?>((TResult?)null);
+        }
+
+        ValidateResultType<TContext, TResult>();
+        return ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
+    }
+
+    private static void ValidateResultType<TContext, TResult>()
+        where TResult : struct, IHookResult
+    {
+        var hook = (HookAttribute?)Attribute.GetCustomAttribute(
+            typeof(TContext),
+            typeof(HookAttribute),
+            inherit: false);
+        if (hook is null || hook.ResultType == typeof(TResult))
+        {
+            return;
+        }
+
+        throw new SandboxValidationException([
+            new SandboxDiagnostic(
+                "DBXK066",
+                $"Hook context '{typeof(TContext).Name}' declares result type '{hook.ResultType.Name}', " +
+                $"but FireAsync was called with '{typeof(TResult).Name}'.")
+        ]);
     }
 }

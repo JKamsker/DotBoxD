@@ -111,7 +111,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         {
             if (!string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.HostBindingAttribute,
+                    DotBoxDMetadataNames.HostBindingAttribute,
                     StringComparison.Ordinal) ||
                 attribute.ConstructorArguments.Length != 3)
             {
@@ -155,7 +155,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         {
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.DotBoxDServiceAttribute,
+                    DotBoxDMetadataNames.DotBoxDServiceAttribute,
                     StringComparison.Ordinal))
             {
                 return true;

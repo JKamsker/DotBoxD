@@ -22,6 +22,9 @@ public sealed class HookAttribute : Attribute
 {
     public HookAttribute(string name, Type resultType)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(resultType);
+
         Name = name;
         ResultType = resultType;
     }
@@ -49,7 +52,7 @@ public sealed class HookAttribute : Attribute
 /// <example>
 /// <code>
 /// [HookResult]
-/// public readonly partial record struct CombatDamageResult(bool Success, string? Reason, int? Damage = null);
+/// public readonly partial record struct CombatDamageResult(bool Success, string? Reason, int Damage);
 ///
 /// // generated: CombatDamageResult.Ok().WithDamage(999), CombatDamageResult.Reject("not applicable")
 /// </code>
@@ -70,32 +73,52 @@ public interface IHookResult
 
 /// <summary>
 /// Marks a polymorphic host handle type whose sandbox representation is the scalar value stored in
-/// <paramref name="keyMember"/>. Hook contexts may expose the handle type, while generated verified IR receives
+/// the configured key member. Hook contexts may expose the handle type, while generated verified IR receives
 /// only the key and calls host bindings to discriminate or query the concrete host-side entity.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
-public sealed class PolymorphicHandleAttribute(string keyMember) : Attribute
+public sealed class PolymorphicHandleAttribute : Attribute
 {
-    public string KeyMember { get; } = keyMember;
+    public PolymorphicHandleAttribute(string keyMember)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyMember);
+
+        KeyMember = keyMember;
+    }
+
+    public string KeyMember { get; }
 }
 
 /// <summary>
 /// Declares one supported subtype for a <see cref="PolymorphicHandleAttribute"/> handle. The analyzer lowers
 /// <c>handle is T local</c> to <c>{BindingPrefix}.is(key)</c>, and instance host-binding calls on
-/// <paramref name="subtype"/> receive that key as their leading sandbox argument.
+/// the declared subtype receive that key as their leading sandbox argument.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
-public sealed class HandleSubtypeAttribute(
-    Type subtype,
-    string discriminator,
-    string bindingPrefix,
-    string capability) : Attribute
+public sealed class HandleSubtypeAttribute : Attribute
 {
-    public Type Subtype { get; } = subtype;
+    public HandleSubtypeAttribute(
+        Type subtype,
+        string discriminator,
+        string bindingPrefix,
+        string capability)
+    {
+        ArgumentNullException.ThrowIfNull(subtype);
+        ArgumentException.ThrowIfNullOrWhiteSpace(discriminator);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bindingPrefix);
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
 
-    public string Discriminator { get; } = discriminator;
+        Subtype = subtype;
+        Discriminator = discriminator;
+        BindingPrefix = bindingPrefix;
+        Capability = capability;
+    }
 
-    public string BindingPrefix { get; } = bindingPrefix;
+    public Type Subtype { get; }
 
-    public string Capability { get; } = capability;
+    public string Discriminator { get; }
+
+    public string BindingPrefix { get; }
+
+    public string Capability { get; }
 }

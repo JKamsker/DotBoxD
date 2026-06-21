@@ -78,6 +78,24 @@ public sealed class HookResultGeneratorTests
     }
 
     [Fact]
+    public void Reports_DBXK112_when_reason_is_not_nullable_string()
+    {
+        const string source = """
+            #nullable enable
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public readonly partial record struct BadResult(bool Success, string Reason, int Damage);
+            """;
+
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+
+        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Non_partial_result_type_is_left_alone()
     {
         const string source = """

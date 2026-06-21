@@ -11,9 +11,35 @@ namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 /// </summary>
 public sealed class HookPipelineResultHooksTests
 {
+    [Hook("test.damage", typeof(DamageResult))]
     private sealed record DamageCtx(int Damage);
 
     private readonly record struct DamageResult(bool Success, string? Reason, int Damage) : IHookResult;
+
+    private readonly record struct OtherDamageResult(bool Success, string? Reason) : IHookResult;
+
+    [Fact]
+    public void Hook_attribute_rejects_invalid_constructor_arguments()
+    {
+        Assert.Throws<ArgumentException>(() => new HookAttribute("", typeof(DamageResult)));
+        Assert.Throws<ArgumentException>(() => new HookAttribute(" ", typeof(DamageResult)));
+        Assert.Throws<ArgumentNullException>(() => new HookAttribute("test.damage", null!));
+    }
+
+    [Fact]
+    public void Polymorphic_handle_attributes_reject_invalid_constructor_arguments()
+    {
+        Assert.Throws<ArgumentException>(() => new PolymorphicHandleAttribute(""));
+        Assert.Throws<ArgumentException>(() => new PolymorphicHandleAttribute(" "));
+        Assert.Throws<ArgumentNullException>(
+            () => new HandleSubtypeAttribute(null!, "player", "combatant.player", "combatant.player.read"));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(typeof(DamageCtx), "", "combatant.player", "combatant.player.read"));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "", "combatant.player.read"));
+        Assert.Throws<ArgumentException>(
+            () => new HandleSubtypeAttribute(typeof(DamageCtx), "player", "combatant.player", ""));
+    }
 
     [Fact]
     public void Register_throws_until_lowered()
@@ -53,6 +79,18 @@ public sealed class HookPipelineResultHooksTests
         var result = await server.Hooks.FireAsync<DamageCtx, DamageResult>(new DamageCtx(10));
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task FireAsync_rejects_result_type_that_does_not_match_hook_contract()
+    {
+        using var server = PluginServer.Create();
+        server.Hooks.On<DamageCtx>(new StubAdapter());
+
+        var exception = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.Hooks.FireAsync<DamageCtx, OtherDamageResult>(new DamageCtx(10)));
+
+        Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK066");
     }
 
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>

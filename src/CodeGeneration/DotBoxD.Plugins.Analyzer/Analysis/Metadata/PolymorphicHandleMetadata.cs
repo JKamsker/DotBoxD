@@ -14,7 +14,7 @@ internal sealed record PolymorphicHandleMetadata(
     {
         foreach (var attribute in HandleType.GetAttributes())
         {
-            if (!IsAttribute(attribute, DotBoxDGenerationNames.Metadata.HandleSubtypeAttribute) ||
+            if (!IsAttribute(attribute, DotBoxDMetadataNames.HandleSubtypeAttribute) ||
                 attribute.ConstructorArguments.Length != 4 ||
                 attribute.ConstructorArguments[0].Value is not INamedTypeSymbol declaredSubtype ||
                 attribute.ConstructorArguments[1].Value is not string discriminator ||
@@ -59,7 +59,7 @@ internal static class PolymorphicHandleMetadataReader
             {
                 if (!PolymorphicHandleMetadata.IsAttribute(
                         attribute,
-                        DotBoxDGenerationNames.Metadata.PolymorphicHandleAttribute))
+                        DotBoxDMetadataNames.PolymorphicHandleAttribute))
                 {
                     continue;
                 }

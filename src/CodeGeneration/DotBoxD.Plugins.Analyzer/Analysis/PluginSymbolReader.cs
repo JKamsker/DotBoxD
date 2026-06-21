@@ -15,11 +15,11 @@ internal static class PluginSymbolReader
             var attribute = attributes[i];
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.PluginAttribute,
+                    DotBoxDMetadataNames.PluginAttribute,
                     StringComparison.Ordinal) ||
                 string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.EventKernelAttribute,
+                    DotBoxDMetadataNames.EventKernelAttribute,
                     StringComparison.Ordinal))
             {
                 return attribute.ConstructorArguments.Length > 0
@@ -50,7 +50,7 @@ internal static class PluginSymbolReader
     private static bool IsEventKernelInterface(INamedTypeSymbol type)
         => string.Equals(
             type.OriginalDefinition.ToDisplayString(),
-            DotBoxDGenerationNames.Metadata.EventKernelInterface,
+            DotBoxDMetadataNames.EventKernelInterface,
             StringComparison.Ordinal);
 
     public static EquatableArray<EventPropertyModel> EventProperties(INamedTypeSymbol eventType)
@@ -149,7 +149,7 @@ internal static class PluginSymbolReader
         {
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.LiveSettingAttribute,
+                    DotBoxDMetadataNames.LiveSettingAttribute,
                     StringComparison.Ordinal))
             {
                 return true;
@@ -237,7 +237,7 @@ internal static class PluginSymbolReader
         {
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.RangeAttribute,
+                    DotBoxDMetadataNames.RangeAttribute,
                     StringComparison.Ordinal))
             {
                 return attribute;

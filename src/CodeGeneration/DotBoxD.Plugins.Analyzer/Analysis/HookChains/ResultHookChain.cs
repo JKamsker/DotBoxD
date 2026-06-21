@@ -209,7 +209,7 @@ internal static class ResultHookChain
         resultType = null!;
         foreach (var attribute in contextType.GetAttributes())
         {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDGenerationNames.Metadata.HookAttribute, StringComparison.Ordinal) &&
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDMetadataNames.HookAttribute, StringComparison.Ordinal) &&
                 attribute.ConstructorArguments.Length == 2 &&
                 attribute.ConstructorArguments[1].Value is INamedTypeSymbol declaredResult)
             {
@@ -230,7 +230,7 @@ internal static class ResultHookChain
 
         foreach (var attribute in resultType.GetAttributes())
         {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDGenerationNames.Metadata.HookResultAttribute, StringComparison.Ordinal))
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDMetadataNames.HookResultAttribute, StringComparison.Ordinal))
             {
                 return true;
             }

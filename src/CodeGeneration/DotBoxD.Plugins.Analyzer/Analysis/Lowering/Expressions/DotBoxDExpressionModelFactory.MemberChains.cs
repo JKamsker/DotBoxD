@@ -154,7 +154,7 @@ internal static partial class DotBoxDExpressionModelFactory
         {
             if (string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.CapabilityAttribute,
+                    DotBoxDMetadataNames.CapabilityAttribute,
                     StringComparison.Ordinal) &&
                 attribute.ConstructorArguments.Length == 1 &&
                 attribute.ConstructorArguments[0].Value is string id &&

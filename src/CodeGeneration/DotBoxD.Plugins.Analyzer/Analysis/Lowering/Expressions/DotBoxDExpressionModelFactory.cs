@@ -277,7 +277,7 @@ internal static partial class DotBoxDExpressionModelFactory
 
         if (member.Expression is ThisExpressionSyntax)
         {
-            return DotBoxDIdentifierExpressionLowerer.Lower(memberName, context);
+            return LowerThisMemberAccess(member, memberName, context);
         }
 
         // General member chain: a `.Count`/`.Length` read on a list-shaped receiver, or a field read on a record

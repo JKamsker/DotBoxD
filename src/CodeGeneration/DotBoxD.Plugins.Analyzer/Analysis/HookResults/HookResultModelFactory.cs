@@ -59,7 +59,8 @@ internal static class HookResultModelFactory
             var isSuccess = string.Equals(parameter.Name, SuccessField, StringComparison.Ordinal)
                 && parameter.Type.SpecialType == SpecialType.System_Boolean;
             var isReason = string.Equals(parameter.Name, ReasonField, StringComparison.Ordinal)
-                && parameter.Type.SpecialType == SpecialType.System_String;
+                && parameter.Type.SpecialType == SpecialType.System_String
+                && parameter.NullableAnnotation == NullableAnnotation.Annotated;
             hasSuccess |= isSuccess;
             hasReason |= isReason;
 

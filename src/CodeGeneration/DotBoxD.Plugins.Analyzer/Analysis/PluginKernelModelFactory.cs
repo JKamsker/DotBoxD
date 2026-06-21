@@ -210,7 +210,7 @@ internal static class PluginKernelModelFactory
         {
             if (!string.Equals(
                     @interface.OriginalDefinition.ToDisplayString(),
-                    DotBoxDGenerationNames.Metadata.EventKernelInterface,
+                    DotBoxDMetadataNames.EventKernelInterface,
                     StringComparison.Ordinal))
             {
                 continue;

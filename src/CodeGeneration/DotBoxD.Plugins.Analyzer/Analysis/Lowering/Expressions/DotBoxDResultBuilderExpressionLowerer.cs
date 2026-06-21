@@ -204,7 +204,7 @@ internal static class DotBoxDResultBuilderExpressionLowerer
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDGenerationNames.Metadata.HookResultAttribute, StringComparison.Ordinal))
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDMetadataNames.HookResultAttribute, StringComparison.Ordinal))
             {
                 return true;
             }

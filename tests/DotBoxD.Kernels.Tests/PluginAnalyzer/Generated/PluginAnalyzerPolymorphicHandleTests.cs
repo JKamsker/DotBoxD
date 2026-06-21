@@ -133,6 +133,47 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
         Assert.Contains("Concurrency", generated);
     }
 
+    [Fact]
+    public void Explicit_this_live_setting_is_not_shadowed_by_polymorphic_capture()
+    {
+        const string source = """
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            [PolymorphicHandle(nameof(Id))]
+            [HandleSubtype(typeof(PlayerCombatant), "player", "combatant.player", "combatant.player.read")]
+            public abstract record Combatant(long Id);
+
+            public sealed record PlayerCombatant(long Id) : Combatant(Id);
+
+            public sealed record DamageEvent(Combatant Target);
+
+            [Plugin("polymorphic-this-live-setting")]
+            public sealed partial class DamageKernel : IEventKernel<DamageEvent>
+            {
+                [LiveSetting]
+                public bool Disabled { get; set; }
+
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => e.Target is PlayerCombatant Disabled && this.Disabled;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send("damage", "hit");
+            }
+            """;
+
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("\"combatant.player.is\"", generated);
+        Assert.Contains("Var(\"Disabled\")", generated);
+    }
+
     private static void AssertFailsSafe(string source)
     {
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);

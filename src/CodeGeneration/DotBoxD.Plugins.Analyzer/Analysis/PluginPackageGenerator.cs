@@ -17,14 +17,14 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
     {
         var pluginAttributeResults = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDGenerationNames.Metadata.PluginAttribute,
+                DotBoxDMetadataNames.PluginAttribute,
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
             .Where(static result => result is not null)
             .Select(static (result, _) => result!);
         var eventKernelAttributeResults = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDGenerationNames.Metadata.EventKernelAttribute,
+                DotBoxDMetadataNames.EventKernelAttribute,
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
             .Where(static result => result is not null)
@@ -81,7 +81,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         // whose Create() imports the JSON. Unsupported shapes emit a diagnostic and no package.
         var rpcResults = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDGenerationNames.Metadata.ServerExtensionAttribute,
+                DotBoxDMetadataNames.ServerExtensionAttribute,
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => RpcKernelModelFactory.Create(ctx, ct))
             .Where(static result => result is not null)
@@ -111,7 +111,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         var pluginServerResults = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDGenerationNames.Metadata.GeneratePluginServerAttribute,
+                DotBoxDMetadataNames.GeneratePluginServerAttribute,
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) => PluginServerFacadeModelFactory.Create(ctx, ct))
             .Where(static result => result is not null)
@@ -193,7 +193,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         // DBXK112 diagnostic when the Success/Reason contract is missing.
         var hookResultModels = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                DotBoxDGenerationNames.Metadata.HookResultAttribute,
+                DotBoxDMetadataNames.HookResultAttribute,
                 static (node, _) => node is TypeDeclarationSyntax,
                 static (ctx, ct) => HookResultModelFactory.Create(ctx, ct))
             .Where(static model => model is not null)
