@@ -55,13 +55,26 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Collect();
 
         // Phase C: lower inline On<TEvent>().Where?(lambda).Select?(lambda).Run(lambda) chains
-        // to the same PluginKernelModel a kernel class produces. Unsupported shapes fail safe (null).
-        var chainResults = context.SyntaxProvider
+        // to the same PluginKernelModel a kernel class produces. Unsupported shapes fail safe (no package);
+        // a recognized remote RunLocal chain that fails to lower also carries a DBXK111 diagnostic.
+        var chainCreateResults = context.SyntaxProvider
             .CreateSyntaxProvider(
                 static (node, _) => IsHookChainTerminal(node),
                 static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
             .Where(static result => result is not null)
             .Select(static (result, _) => result!);
+
+        // Report DBXK111 for a recognized remote RunLocal chain whose stages could not be lowered, so the
+        // otherwise-silent skip (and the runtime NotSupportedException it leads to) is visible at build time.
+        context.RegisterSourceOutput(
+            chainCreateResults
+                .Where(static result => result.Diagnostic is not null)
+                .Select(static (result, _) => result.Diagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+
+        var chainResults = chainCreateResults
+            .Where(static result => result.Chain is not null)
+            .Select(static (result, _) => result.Chain!);
 
         // Server extensions: lower a [ServerExtension] class's batch method to a verified-IR package
         // whose Create() imports the JSON. Unsupported shapes emit a diagnostic and no package.

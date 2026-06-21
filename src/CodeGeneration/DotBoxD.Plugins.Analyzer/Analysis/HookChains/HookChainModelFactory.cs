@@ -25,7 +25,7 @@ internal static class HookChainModelFactory
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
 
-    public static HookChainResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
+    public static HookChainCreateResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (context.Node is not InvocationExpressionSyntax invocation)
@@ -33,14 +33,51 @@ internal static class HookChainModelFactory
             return null;
         }
 
+        HookChainResult? chain;
         try
         {
-            return TryCreate(invocation, context.SemanticModel, cancellationToken);
+            chain = TryCreate(invocation, context.SemanticModel, cancellationToken);
         }
         catch (NotSupportedException)
         {
-            return null;
+            chain = null;
         }
+
+        if (chain is not null)
+        {
+            return new HookChainCreateResult(chain, null);
+        }
+
+        // No package was emitted. Either the call site is not a recognized chain (nothing to do), or it IS a remote
+        // RunLocal chain whose Where/Select stages could not be lowered. Only the latter leaves the native terminal
+        // to throw NotSupportedException at runtime, so surface a build-time diagnostic for exactly that case.
+        if (TryRemoteRunLocalLocation(invocation, context.SemanticModel, cancellationToken, out var location))
+        {
+            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(location));
+        }
+
+        return null;
+    }
+
+    // True when the call site is a remote RunLocal terminal: RunLocal whose receiver's static type is one of the
+    // remote hook/subscription stage/pipeline types. Those (and only those) throw NotSupportedException when the
+    // generator does not intercept them, so a remote RunLocal that produced no package will throw at runtime.
+    private static bool TryRemoteRunLocalLocation(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out PluginDiagnosticLocation location)
+    {
+        location = default;
+        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
+            !string.Equals(terminalAccess.Name.Identifier.ValueText, RunLocalMethod, StringComparison.Ordinal) ||
+            ReceiverKind(model, terminalAccess.Expression, cancellationToken) != HookChainReceiverKind.Remote)
+        {
+            return false;
+        }
+
+        location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
+        return true;
     }
 
     private static HookChainResult? TryCreate(
