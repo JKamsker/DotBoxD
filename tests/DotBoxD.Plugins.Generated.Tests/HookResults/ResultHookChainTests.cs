@@ -1,4 +1,5 @@
 using DotBoxD.Abstractions;
+using DotBoxD.Plugins.Runtime;
 
 namespace DotBoxD.Plugins.Generated.Tests.HookResults;
 
@@ -139,14 +140,17 @@ public sealed class ResultHookChainTests
     }
 
     [Fact]
-    public async Task RegisterLocal_cancellation_aware_overload_is_intercepted()
+    public async Task RegisterLocal_cancellation_aware_overload_threads_the_dispatch_token()
     {
         using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
         var invoked = 0;
+        CancellationToken received = default;
+        using var cts = new CancellationTokenSource();
         server.Hooks.On<CombatDamageContext>()
             .Where(ctx => ctx.Relation == CombatRelation.Pve)
             .RegisterLocal((ctx, hookContext, cancellationToken) =>
             {
+                received = cancellationToken;
                 cancellationToken.ThrowIfCancellationRequested();
                 invoked++;
                 return new ValueTask<CombatDamageResult>(
@@ -154,9 +158,68 @@ public sealed class ResultHookChainTests
             }, priority: 50);
 
         var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
-            new CombatDamageContext(CombatRelation.Pve, 10));
+            new CombatDamageContext(CombatRelation.Pve, 10), cts.Token);
 
         Assert.Equal(12, result!.Value.Damage);
         Assert.Equal(1, invoked);
+        // The token the handler observed is the dispatch token, not CancellationToken.None: it threads through
+        // FireAsync -> HookContext -> the handler's 3rd parameter. (Previously fired with None, which left the
+        // handler's ThrowIfCancellationRequested dead and proved nothing about token threading.)
+        Assert.True(received.CanBeCanceled);
+        Assert.Equal(cts.Token, received);
     }
+
+    [Fact]
+    public void Register_install_entrypoint_carries_no_handler_delegate()
+    {
+        // Pins the sandbox-verified Register contract structurally: UseGeneratedResultChain (the entrypoint the
+        // generated Register interceptor calls) installs from the package + priority ONLY — it has no delegate
+        // parameter, so a Register handler body can never be captured and run in-process. UseGeneratedLocalResultChain
+        // is the deliberate exception: it threads the plugin-process handler. A regression that added a handler
+        // argument to the Register entrypoint (and ran it in-process) would fail here.
+        var pipeline = typeof(HookPipeline<>);
+
+        var register = pipeline.GetMethods().Where(m => m.Name == "UseGeneratedResultChain").ToArray();
+        Assert.NotEmpty(register);
+        Assert.All(register, m => Assert.DoesNotContain(m.GetParameters(), IsDelegateParameter));
+
+        var local = pipeline.GetMethods().Where(m => m.Name == "UseGeneratedLocalResultChain").ToArray();
+        Assert.NotEmpty(local);
+        Assert.All(local, m => Assert.Contains(m.GetParameters(), IsDelegateParameter));
+    }
+
+    [Fact]
+    public async Task Lowered_and_local_Ok_pin_the_omitted_reason_convention()
+    {
+        // Pins the documented Reason representation convention across the two transports. A successful result is
+        // the only place Reason is observable (dispatch drops abstain results), so Ok() is used to compare:
+        //   - sandbox-lowered Register fills the omitted Reason with the IR's non-null string zero ("")
+        //   - in-process RegisterLocal runs the generated builder, leaving Reason at its C# default (null)
+        // Reason is otherwise never surfaced, so this gap is benign today; the test guards against silent drift if
+        // a future change surfaces Reason.
+        using var lowered = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        lowered.Hooks.On<CombatDamageContext>()
+            .Where(ctx => ctx.Relation == CombatRelation.Pve)
+            .Register(ctx => CombatDamageResult.Ok().WithDamage(ctx.Damage), priority: 0);
+
+        var sandbox = await lowered.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
+            new CombatDamageContext(CombatRelation.Pve, 5));
+        Assert.True(sandbox!.Value.Success);
+        Assert.Equal(string.Empty, sandbox.Value.Reason);
+
+        using var local = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        local.Hooks.On<CombatDamageContext>()
+            .Where(ctx => ctx.Relation == CombatRelation.Pve)
+            .RegisterLocal((ctx, _) => CombatDamageResult.Ok().WithDamage(ctx.Damage), priority: 0);
+
+        var inProcess = await local.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
+            new CombatDamageContext(CombatRelation.Pve, 5));
+        Assert.True(inProcess!.Value.Success);
+        Assert.Null(inProcess.Value.Reason);
+    }
+
+    private static bool IsDelegateParameter(System.Reflection.ParameterInfo parameter)
+        => typeof(Delegate).IsAssignableFrom(parameter.ParameterType)
+            || parameter.ParameterType.Name.StartsWith("Func", StringComparison.Ordinal)
+            || parameter.ParameterType.Name.StartsWith("Action", StringComparison.Ordinal);
 }

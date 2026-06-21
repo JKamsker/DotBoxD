@@ -638,6 +638,64 @@ public sealed class PluginAnalyzerHookChainTests
         Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
     }
 
+    [Fact]
+    public void Unlowered_Register_reports_DBXK113_as_a_warning()
+    {
+        // A sandbox Register that fails to lower has no in-process fallback (it always throws at first dispatch),
+        // so it is raised to Warning so the author sees it rather than the default-suppressed Info.
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record NoHookCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<NoHookCtx>()
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK113"));
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+    }
+
+    [Fact]
+    public void Unlowered_RegisterLocal_reports_DBXK113_as_info()
+    {
+        // RegisterLocal is an escape hatch whose body need not lower; a not-lowered case stays Info, consistent
+        // with the remote RunLocal (DBXK111) not-lowered diagnostic.
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record NoHookCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<NoHookCtx>()
+                        .RegisterLocal((ctx, hookContext) => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK113"));
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+    }
+
     private static GeneratorDriverRunResult RunGenerator(string source)
         => RunGeneratorCore(source).Result;
 

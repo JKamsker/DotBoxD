@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
@@ -14,7 +15,7 @@ public sealed class ResultHookSlotTests
 
     private readonly record struct TestResult(bool Success, string? Reason, int Value = 0) : IHookResult;
 
-    private static ResultHookSlot<DamageCtx> NewSlot() => new(new StubAdapter());
+    private static ResultHookSlot<DamageCtx> NewSlot(Action<ResultHookFault>? onFault = null) => new(new StubAdapter(), onFault);
 
     private static HookContext Context() => new(new InMemoryPluginMessageSink(), CancellationToken.None);
 
@@ -93,15 +94,49 @@ public sealed class ResultHookSlotTests
     }
 
     [Fact]
-    public async Task Faulty_handler_is_isolated_and_dispatch_continues()
+    public async Task Faulty_handler_is_isolated_reported_and_dispatch_continues()
     {
-        var slot = NewSlot();
-        slot.AddDirect(100, (_, _, _) => throw new InvalidOperationException("boom"));
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        var boom = new InvalidOperationException("boom");
+        slot.AddDirect(100, (_, _, _) => throw boom);
         slot.AddDirect(0, (_, _, _) => Ok(9));
 
         var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
 
         Assert.Equal(9, result!.Value.Value);
+        var fault = Assert.Single(faults);
+        Assert.Same(boom, fault.Exception);
+        Assert.Equal(typeof(DamageCtx), fault.EventType);
+    }
+
+    [Fact]
+    public async Task Throwing_veto_handler_is_reported_and_fails_open()
+    {
+        // A veto-bearing handler (a successful result carrying a domain veto) that throws must be reported rather
+        // than silently swallowed; with no other handler dispatch returns null and the host applies its default.
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        slot.AddDirect(0, (_, _, _) => throw new InvalidOperationException("veto blew up"));
+
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Single(faults);
+    }
+
+    [Fact]
+    public async Task A_throwing_fault_observer_does_not_abort_dispatch()
+    {
+        // The fault channel must never escalate: a misbehaving observer is swallowed and dispatch still falls
+        // through to the next successful handler.
+        var slot = NewSlot(_ => throw new InvalidOperationException("observer blew up"));
+        slot.AddDirect(100, (_, _, _) => throw new InvalidOperationException("handler boom"));
+        slot.AddDirect(0, (_, _, _) => Ok(3));
+
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+
+        Assert.Equal(3, result!.Value.Value);
     }
 
     [Fact]

@@ -163,6 +163,7 @@ public PluginPackage Package { get; }
 public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
 public PluginSession CreateSession()
 public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
+public readonly record struct ResultHookFault(Type EventType, Exception Exception)
 public readonly record struct SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
 public readonly struct KernelRpcValue
 public ref struct KernelRpcPayloadReader
@@ -343,7 +344,7 @@ public static PluginPackage Create( PluginManifest manifest, SandboxModule modul
 public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
 public static PluginPackage Resolve<TKernel>() where TKernel : class => Resolve(typeof(TKernel))
-public static PluginServer Create( IPluginMessageSink? messages = null, Action<SandboxHostBuilder>? configureHost = null, SandboxPolicy? defaultPolicy = null, ExecutionMode executionMode = ExecutionMode.Auto, Action<SubscriptionDeliveryFault>? onSubscriptionFault = null)
+public static PluginServer Create( IPluginMessageSink? messages = null, Action<SandboxHostBuilder>? configureHost = null, SandboxPolicy? defaultPolicy = null, ExecutionMode executionMode = ExecutionMode.Auto, Action<SubscriptionDeliveryFault>? onSubscriptionFault = null, Action<ResultHookFault>? onResultHookFault = null)
 public static SandboxHostBuilder AddBindingsFrom<TService>( this SandboxHostBuilder builder, TService implementation) where TService : class
 public static SandboxHostBuilder AddPluginMessageBindings( this SandboxHostBuilder builder, IPluginMessageSink sink)
 public static SandboxPolicyBuilder GrantHostMessageWrite( this SandboxPolicyBuilder builder, IEnumerable<string>? allowedTargets = null, IEnumerable<string>? targetPrefixes = null, int? maxMessageLength = null)

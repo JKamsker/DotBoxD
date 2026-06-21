@@ -24,10 +24,24 @@ internal static class HookResultModelFactory
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (context.TargetSymbol is not INamedTypeSymbol type ||
-            context.TargetNode is not TypeDeclarationSyntax declaration ||
-            !declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
+            context.TargetNode is not TypeDeclarationSyntax declaration)
         {
             return null;
+        }
+
+        if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
+        {
+            // A non-partial [HookResult] can't have IHookResult or the Ok()/Reject() builders generated for it.
+            // If it doesn't already implement IHookResult, a later .Register/.RegisterLocal install (constrained
+            // `where TResult : struct, IHookResult`) fails with a cryptic CS0315; surface DBXK112 so the missing
+            // contract is explicit. A type that implements IHookResult by hand is valid and left alone.
+            return ImplementsHookResult(type, context.SemanticModel.Compilation)
+                ? null
+                : Invalid(
+                    type,
+                    declaration,
+                    $"hook result '{type.Name}' must be declared 'partial' so the generator can add IHookResult and "
+                    + "the Ok()/Reject() builders, or it must implement IHookResult and declare those builders manually");
         }
 
         if (type.ContainingType is not null)
@@ -106,6 +120,30 @@ internal static class HookResultModelFactory
             HasSuccess: false,
             HasReason: false,
             new HookResultDiagnostic(PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()), message));
+
+    // True when the type already implements the runtime IHookResult contract (declared by hand). Used to decide
+    // whether a NON-partial [HookResult] is a valid manual implementation (left alone) or a missing-contract case
+    // that should surface DBXK112 instead of a later cryptic CS0315 at its Register/RegisterLocal install site.
+    private static bool ImplementsHookResult(INamedTypeSymbol type, Compilation compilation)
+    {
+        var hookResult = compilation.GetTypeByMetadataName("DotBoxD.Abstractions.IHookResult");
+        if (hookResult is null)
+        {
+            // Can't resolve the contract interface (abstractions not referenced): preserve the prior
+            // leave-non-partial-alone behavior rather than emit a false-positive diagnostic.
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(@interface, hookResult))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     // The positional record's primary constructor: the instance constructor that is neither the implicit
     // parameterless struct constructor nor the synthesized single-parameter copy constructor.

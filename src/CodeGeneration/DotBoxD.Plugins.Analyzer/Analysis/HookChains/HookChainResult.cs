@@ -22,19 +22,41 @@ internal sealed record HookChainCreateResult(HookChainResult? Chain, HookChainNo
 /// Equatable carrier for the DBXK111 diagnostic (location only; the message lives on the descriptor), kept equatable
 /// so the incremental generator's caching is preserved.
 /// </summary>
-internal sealed record HookChainNotLoweredDiagnostic(PluginDiagnosticLocation? Location, bool ResultChain = false)
+internal sealed record HookChainNotLoweredDiagnostic(
+    PluginDiagnosticLocation? Location,
+    bool ResultChain = false,
+    bool LocalResultTerminal = false)
 {
+    private const string ResultMessage =
+        "this On<TContext>().Register/RegisterLocal chain could not be lowered to verified IR (the "
+        + "context lacks [Hook], the handler returns the wrong result type, or the filter/handler shape "
+        + "is unsupported), so the runtime terminal throws";
+
     public Diagnostic ToDiagnostic()
-        => ResultChain
-            ? Diagnostic.Create(
-                PluginAnalyzerDiagnostics.ResultHookNotLoweredRule,
-                Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None,
-                "this On<TContext>().Register/RegisterLocal chain could not be lowered to verified IR (the "
-                + "context lacks [Hook], the handler returns the wrong result type, or the filter/handler shape "
-                + "is unsupported), so the runtime terminal throws")
-            : Diagnostic.Create(
+    {
+        if (!ResultChain)
+        {
+            return Diagnostic.Create(
                 PluginAnalyzerDiagnostics.RunLocalNotLoweredRule,
                 Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None);
+        }
+
+        var location = Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None;
+
+        // A sandbox Register that fails to lower has no in-process fallback — it ALWAYS throws at first dispatch —
+        // so it is raised to Warning so the author sees it (the default Info severity is suppressed by default).
+        // A RegisterLocal whose filter could not lower stays Info, consistent with the remote RunLocal (DBXK111)
+        // not-lowered case.
+        return LocalResultTerminal
+            ? Diagnostic.Create(PluginAnalyzerDiagnostics.ResultHookNotLoweredRule, location, ResultMessage)
+            : Diagnostic.Create(
+                PluginAnalyzerDiagnostics.ResultHookNotLoweredRule,
+                location,
+                DiagnosticSeverity.Warning,
+                additionalLocations: null,
+                properties: null,
+                ResultMessage);
+    }
 }
 
 internal enum HookChainInterceptorInstallKind

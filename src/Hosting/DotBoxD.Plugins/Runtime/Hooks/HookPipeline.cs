@@ -25,14 +25,15 @@ public sealed partial class HookPipeline<TEvent> : IKernelHandlerPipeline
         IPluginEventAdapter<TEvent> adapter,
         IPluginMessageSink messages,
         KernelRegistry kernels,
-        Func<PluginPackage, InstalledKernel>? installer = null)
+        Func<PluginPackage, InstalledKernel>? installer = null,
+        Action<ResultHookFault>? onFault = null)
     {
         _adapter = adapter;
         _messages = messages;
         _defaultContext = new HookContext(messages, CancellationToken.None);
         _kernels = kernels;
         _installer = installer;
-        _resultHooks = new ResultHookSlot<TEvent>(adapter);
+        _resultHooks = new ResultHookSlot<TEvent>(adapter, onFault);
     }
 
     /// <summary>

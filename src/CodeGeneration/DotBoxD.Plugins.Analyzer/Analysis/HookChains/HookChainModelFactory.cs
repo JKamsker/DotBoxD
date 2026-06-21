@@ -60,9 +60,11 @@ internal static class HookChainModelFactory
 
         // A recognized in-process result hook (On<TContext>().Register/RegisterLocal) that produced no package
         // leaves its native terminal to throw at runtime; surface DBXK113 so the cause shows at build time.
-        if (TryResultChainLocation(invocation, context.SemanticModel, cancellationToken, out var resultLocation))
+        if (TryResultChainLocation(invocation, context.SemanticModel, cancellationToken, out var resultLocation, out var isLocalTerminal))
         {
-            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(resultLocation, ResultChain: true));
+            return new HookChainCreateResult(
+                null,
+                new HookChainNotLoweredDiagnostic(resultLocation, ResultChain: true, LocalResultTerminal: isLocalTerminal));
         }
 
         return null;
@@ -74,9 +76,11 @@ internal static class HookChainModelFactory
         InvocationExpressionSyntax invocation,
         SemanticModel model,
         CancellationToken cancellationToken,
-        out PluginDiagnosticLocation location)
+        out PluginDiagnosticLocation location,
+        out bool isLocalTerminal)
     {
         location = default;
+        isLocalTerminal = false;
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             (!string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterMethod, StringComparison.Ordinal) &&
              !string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal)) ||
@@ -85,6 +89,7 @@ internal static class HookChainModelFactory
             return false;
         }
 
+        isLocalTerminal = string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal);
         location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
         return true;
     }

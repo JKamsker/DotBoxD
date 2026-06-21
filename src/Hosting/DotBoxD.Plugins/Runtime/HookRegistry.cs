@@ -16,17 +16,20 @@ public sealed class HookRegistry
     private readonly PluginEventAdapterRegistry _events;
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
+    private readonly Action<ResultHookFault>? _onFault;
 
     internal HookRegistry(
         IPluginMessageSink messages,
         PluginEventAdapterRegistry events,
         KernelRegistry kernels,
-        Func<PluginPackage, InstalledKernel>? installer = null)
+        Func<PluginPackage, InstalledKernel>? installer = null,
+        Action<ResultHookFault>? onFault = null)
     {
         _messages = messages;
         _events = events;
         _kernels = kernels;
         _installer = installer;
+        _onFault = onFault;
     }
 
     public HookPipeline<TEvent> On<TEvent>()
@@ -54,7 +57,7 @@ public sealed class HookRegistry
                 return pipeline;
             }
 
-            var created = new HookPipeline<TEvent>(adapter, _messages, _kernels, _installer);
+            var created = new HookPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
             _pipelines[typeof(TEvent)] = created;
             return created;
         }

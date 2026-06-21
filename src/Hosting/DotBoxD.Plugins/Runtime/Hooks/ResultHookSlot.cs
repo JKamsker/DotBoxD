@@ -12,18 +12,23 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 /// that abstained (<c>Success == false</c>), falls through to the next. A handler that throws is isolated —
 /// skipped so one faulty registration cannot break dispatch — and dispatch falls through to the next handler;
 /// cancellation of the dispatch token stops the walk. No registered handler — or none successful — yields
-/// <see langword="null"/>. Note: a swallowed handler fault is currently silent (no diagnostic channel), so a
-/// veto-bearing handler that faults fails open to the next handler / the host default.
+/// <see langword="null"/>. A swallowed handler fault is reported to the optional <see cref="ResultHookFault"/>
+/// observer before dispatch falls through, so a veto-bearing handler that faults is diagnosable instead of
+/// silently failing open to the host default.
 /// </summary>
 internal sealed class ResultHookSlot<TEvent>
 {
     private readonly object _gate = new();
     private readonly IPluginEventAdapter<TEvent> _adapter;
+    private readonly Action<ResultHookFault>? _onFault;
     private volatile Entry[] _entries = [];
     private int _order;
 
-    public ResultHookSlot(IPluginEventAdapter<TEvent> adapter)
-        => _adapter = adapter;
+    public ResultHookSlot(IPluginEventAdapter<TEvent> adapter, Action<ResultHookFault>? onFault = null)
+    {
+        _adapter = adapter;
+        _onFault = onFault;
+    }
 
     public bool HasHandlers => _entries.Length > 0;
 
@@ -76,9 +81,12 @@ internal sealed class ResultHookSlot<TEvent>
                 // so it falls through to the general handler below.
                 throw;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // A faulty registration must not break the whole hook point: skip it and continue.
+                // A faulty registration must not break the whole hook point: report the isolated fault — so a
+                // veto-bearing handler that throws is diagnosable instead of silently failing open — then skip it
+                // and continue.
+                Report(ex);
                 continue;
             }
 
@@ -91,6 +99,23 @@ internal sealed class ResultHookSlot<TEvent>
         }
 
         return null;
+    }
+
+    private void Report(Exception exception)
+    {
+        if (_onFault is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _onFault(new ResultHookFault(typeof(TEvent), exception));
+        }
+        catch
+        {
+            // A faulty fault observer must never escalate into or abort dispatch.
+        }
     }
 
     public void RemoveKernel(InstalledKernel kernel)

@@ -45,6 +45,12 @@ internal static class DotBoxDResultBuilderExpressionLowerer
             return null;
         }
 
+        // Omitted fields take their manifest-tag zero. Deliberate, documented divergence for an omitted string
+        // `Reason` (e.g. `Ok()` / `Reject()` with no argument): kernel IR strings are non-null, so the zero is the
+        // empty string "", whereas the in-process generated builder (run by RegisterLocal / direct host calls)
+        // leaves `Reason` at its C# default of null. `Reason` is only meaningful paired with `Success == false`,
+        // which dispatch drops before returning, so the gap is unobservable in normal dispatch; a test pins the
+        // convention so a future change that surfaces `Reason` cannot let the two transports silently diverge.
         for (var i = 0; i < fields.Count; i++)
         {
             sources[i] ??= DotBoxDRecordCreationExpressionLowerer.ZeroSource(fields[i].Type);

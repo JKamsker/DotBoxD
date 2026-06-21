@@ -99,8 +99,11 @@ public sealed class HookResultGeneratorTests
     }
 
     [Fact]
-    public void Non_partial_result_type_is_left_alone()
+    public void Non_partial_result_type_without_IHookResult_reports_DBXK112()
     {
+        // A non-partial [HookResult] can't have IHookResult generated, so a later Register/RegisterLocal install
+        // (constrained `where TResult : struct, IHookResult`) would fail with a cryptic CS0315. DBXK112 surfaces
+        // the missing contract at the result declaration instead. No builder is emitted.
         const string source = """
             using DotBoxD.Abstractions;
 
@@ -110,9 +113,34 @@ public sealed class HookResultGeneratorTests
             public readonly record struct NotPartial(bool Success, string? Reason, int Damage);
             """;
 
-        var generated = string.Join("\n", PluginAnalyzerGeneratedPackageFactory.GeneratedSources(source));
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
 
-        Assert.DoesNotContain("NotPartial Ok()", generated, StringComparison.Ordinal);
+        Assert.Contains(result.Diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.GetText().ToString().Contains("NotPartial Ok()", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Non_partial_result_type_implementing_IHookResult_is_left_alone()
+    {
+        // A hand-written IHookResult value is a valid result type even without the generated builders: it already
+        // satisfies the install constraint, so the generator leaves it alone with no diagnostic.
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public readonly record struct ManualResult(bool Success, string? Reason, int Damage) : IHookResult;
+            """;
+
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+
+        Assert.DoesNotContain(result.Diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.GetText().ToString().Contains("ManualResult Ok()", StringComparison.Ordinal));
     }
 
     [Fact]
