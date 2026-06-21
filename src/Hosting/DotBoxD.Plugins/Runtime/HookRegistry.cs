@@ -123,12 +123,12 @@ public sealed class HookRegistry
             _pipelines.TryGetValue(typeof(TContext), out pipeline);
         }
 
+        ValidateResultType<TContext, TResult>();
         if (pipeline is null)
         {
             return new ValueTask<TResult?>((TResult?)null);
         }
 
-        ValidateResultType<TContext, TResult>();
         return ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
     }
 

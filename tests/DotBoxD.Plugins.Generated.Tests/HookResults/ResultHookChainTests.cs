@@ -137,4 +137,26 @@ public sealed class ResultHookChainTests
         Assert.Equal(11, hit!.Value.Damage);
         Assert.Equal(1, invoked);
     }
+
+    [Fact]
+    public async Task RegisterLocal_cancellation_aware_overload_is_intercepted()
+    {
+        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        var invoked = 0;
+        server.Hooks.On<CombatDamageContext>()
+            .Where(ctx => ctx.Relation == CombatRelation.Pve)
+            .RegisterLocal((ctx, hookContext, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                invoked++;
+                return new ValueTask<CombatDamageResult>(
+                    new CombatDamageResult { Success = true, Damage = ctx.Damage + 2 });
+            }, priority: 50);
+
+        var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
+            new CombatDamageContext(CombatRelation.Pve, 10));
+
+        Assert.Equal(12, result!.Value.Damage);
+        Assert.Equal(1, invoked);
+    }
 }

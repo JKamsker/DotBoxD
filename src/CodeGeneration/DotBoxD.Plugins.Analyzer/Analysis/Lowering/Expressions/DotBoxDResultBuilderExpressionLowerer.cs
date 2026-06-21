@@ -90,7 +90,11 @@ internal static class DotBoxDResultBuilderExpressionLowerer
             if (string.Equals(name, OkMethod, StringComparison.Ordinal) || string.Equals(name, RejectMethod, StringComparison.Ordinal))
             {
                 var resultType = semanticModel.GetSymbolInfo(member.Expression, cancellationToken).Symbol as INamedTypeSymbol;
-                return resultType is not null && HasHookResultAttribute(resultType) ? resultType : null;
+                return resultType is not null &&
+                    HasHookResultAttribute(resultType) &&
+                    !UsesAuthorDefinedBuilderMember(invocation, resultType)
+                    ? resultType
+                    : null;
             }
 
             if (name.Length > WithPrefix.Length && name.StartsWith(WithPrefix, StringComparison.Ordinal) &&
@@ -167,6 +171,42 @@ internal static class DotBoxDResultBuilderExpressionLowerer
 
             sources[index] = argument.Source;
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool UsesAuthorDefinedBuilderMember(
+        InvocationExpressionSyntax invocation,
+        INamedTypeSymbol resultType)
+    {
+        var current = invocation;
+        while (current.Expression is MemberAccessExpressionSyntax member)
+        {
+            if (HasAuthorDefinedMember(resultType, member.Name.Identifier.ValueText))
+            {
+                return true;
+            }
+
+            if (member.Expression is not InvocationExpressionSyntax inner)
+            {
+                return false;
+            }
+
+            current = inner;
+        }
+
+        return false;
+    }
+
+    private static bool HasAuthorDefinedMember(INamedTypeSymbol resultType, string name)
+    {
+        foreach (var member in resultType.GetMembers(name))
+        {
+            if (!member.IsImplicitlyDeclared)
+            {
+                return true;
+            }
         }
 
         return false;

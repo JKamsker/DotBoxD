@@ -6,9 +6,9 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 
 /// <summary>
 /// Reads a <c>[HookResult]</c>-annotated positional record into a <see cref="HookResultModel"/> for the
-/// builder generator. Supports a partial positional record/record-struct that declares a <c>bool Success</c>
-/// and a <c>string? Reason</c> field; anything else either yields no model (non-positional / non-partial — the
-/// builders simply are not generated) or a DBXK112 diagnostic (positional but missing the control fields).
+/// builder generator. Supports a top-level readonly partial positional record struct that declares a
+/// <c>bool Success</c> and a <c>string? Reason</c> field; anything else either yields no model (non-partial —
+/// the builders simply are not generated) or a DBXK112 diagnostic.
 /// </summary>
 internal static class HookResultModelFactory
 {
@@ -36,19 +36,23 @@ internal static class HookResultModelFactory
             return Invalid(type, declaration, $"hook result '{type.Name}' must be a top-level type");
         }
 
-        if (!type.IsValueType)
+        if (!type.IsValueType || !type.IsReadOnly)
         {
             // Builders construct via `new() { ... }` and dispatch constrains TResult to a struct, so a reference
-            // (record class) result is not supported.
+            // (record class) result is not supported. Require readonly so generated With<Field> copies preserve
+            // value-object semantics instead of exposing mutable result structs.
             return Invalid(type, declaration, $"hook result '{type.Name}' must be a readonly record struct");
         }
 
-        var primary = PrimaryConstructor(type);
+        if (declaration is not RecordDeclarationSyntax { ParameterList: { } parameters })
+        {
+            return Invalid(type, declaration, $"hook result '{type.Name}' must be a positional record struct");
+        }
+
+        var primary = PrimaryConstructor(type, parameters);
         if (primary is null)
         {
-            // A non-positional record has no constructor-shaped field list to build setters from; the builder
-            // surface only targets the positional records the plan describes, so generate nothing.
-            return null;
+            return Invalid(type, declaration, $"hook result '{type.Name}' must be a positional record struct");
         }
 
         var fields = new List<HookResultField>(primary.Parameters.Length);
@@ -105,22 +109,34 @@ internal static class HookResultModelFactory
 
     // The positional record's primary constructor: the instance constructor that is neither the implicit
     // parameterless struct constructor nor the synthesized single-parameter copy constructor.
-    private static IMethodSymbol? PrimaryConstructor(INamedTypeSymbol type)
+    private static IMethodSymbol? PrimaryConstructor(
+        INamedTypeSymbol type,
+        ParameterListSyntax parameters)
     {
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (constructor.Parameters.Length == 0)
+            if (constructor.Parameters.Length != parameters.Parameters.Count)
             {
                 continue;
             }
 
-            if (constructor.Parameters.Length == 1 &&
-                SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, type))
+            var matches = true;
+            for (var i = 0; i < parameters.Parameters.Count; i++)
             {
-                continue;
+                if (!string.Equals(
+                        constructor.Parameters[i].Name,
+                        parameters.Parameters[i].Identifier.ValueText,
+                        StringComparison.Ordinal))
+                {
+                    matches = false;
+                    break;
+                }
             }
 
-            return constructor;
+            if (matches)
+            {
+                return constructor;
+            }
         }
 
         return null;

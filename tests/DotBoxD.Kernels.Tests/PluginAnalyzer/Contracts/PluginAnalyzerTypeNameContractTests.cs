@@ -104,6 +104,7 @@ public sealed class PluginAnalyzerTypeNameContractTests
             [nameof(TypeNames.GlobalInvalidOperationException)] = GlobalTypeName(typeof(InvalidOperationException)),
             [nameof(TypeNames.GlobalReadOnlyList)] = GlobalTypeName(typeof(IReadOnlyList<>)),
             [nameof(TypeNames.GlobalValueTask)] = GlobalTypeName(typeof(ValueTask)),
+            [nameof(TypeNames.GlobalCancellationToken)] = GlobalTypeName(typeof(CancellationToken)),
 
             [nameof(TypeNames.GlobalHookContext)] = GlobalTypeName(typeof(HookContext)),
             [nameof(TypeNames.GlobalPluginPackage)] = GlobalTypeName(typeof(PluginPackage)),

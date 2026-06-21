@@ -121,11 +121,14 @@ internal sealed class ConventionEventAdapter<TEvent> : IPluginEventAdapter<TEven
         Parameters = parameters;
     }
 
-    public string EventName => typeof(TEvent).Name;
+    public string EventName => EventNameFor(typeof(TEvent));
 
     public IReadOnlyList<Parameter> Parameters { get; }
 
     public int EventValueCount => _properties.Length;
+
+    private static string EventNameFor(Type eventType)
+        => eventType.GetCustomAttribute<HookAttribute>(inherit: false)?.Name ?? eventType.Name;
 
     public static ConventionEventAdapter<TEvent> Create()
     {

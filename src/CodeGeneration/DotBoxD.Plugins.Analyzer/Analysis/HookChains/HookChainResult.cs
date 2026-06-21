@@ -80,4 +80,7 @@ internal sealed record HookChainInterception(
     string? InterceptorTypeParameters = null,
     // For a result chain (Register/RegisterLocal): the fully-qualified result type the install entrypoint is
     // closed over (UseGeneratedResultChain<TResult> / UseGeneratedLocalResultChain<TResult>). Null otherwise.
-    string? ResultTypeFullName = null);
+    string? ResultTypeFullName = null,
+    // True for the cancellation-aware RegisterLocal overload:
+    // Func<TContext, HookContext, CancellationToken, ValueTask<TResult>>.
+    bool IsAsyncLocalResult = false);

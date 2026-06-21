@@ -4,6 +4,7 @@
 
 protected static NotSupportedException ControlPlaneOnly()
 public bool IsAsync { get; set; }
+public bool Success { get; }
 public CancellationToken CancellationToken { get; }
 public delegate ValueTask<TReturn> RemoteServerInvocation<TWorld, TCaptures, TReturn>( TWorld world, TCaptures captures)
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)

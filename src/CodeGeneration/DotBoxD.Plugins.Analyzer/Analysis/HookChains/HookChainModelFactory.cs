@@ -154,8 +154,14 @@ internal static class HookChainModelFactory
             return null;
         }
 
-        var (terminalElementParam, terminalContextParam) = LambdaParameters(terminalLambda);
+        var (terminalElementParam, terminalContextParam, terminalCancellationParam) = LambdaParameters(terminalLambda);
         if (terminalElementParam is null)
+        {
+            return null;
+        }
+
+        if (terminalCancellationParam is not null &&
+            installKind != HookChainInterceptorInstallKind.LocalResultChain)
         {
             return null;
         }
@@ -189,6 +195,7 @@ internal static class HookChainModelFactory
                 terminalLambda,
                 terminalElementParam,
                 terminalContextParam,
+                terminalCancellationParam is not null,
                 installKind == HookChainInterceptorInstallKind.LocalResultChain);
         }
 
@@ -575,7 +582,7 @@ internal static class HookChainModelFactory
                 continue;
             }
 
-            var (elementParam, _) = LambdaParameters(stage.Lambda);
+            var (elementParam, _, _) = LambdaParameters(stage.Lambda);
             if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
             {
                 throw new NotSupportedException();
@@ -714,26 +721,30 @@ internal static class HookChainModelFactory
         return true;
     }
 
-    // Element-only lambdas (e =>, (e) =>) yield (element, null); element+context lambdas ((e, ctx) =>)
-    // yield (element, context). A null element means an unsupported shape (zero or 3+ parameters) — the
-    // caller fails safe. The context being null is fine for Where/Select (they never reference ctx); the
-    // terminal Send separately requires a non-null context, so an element-only terminal won't lower.
-    private static (string? ElementParam, string? ContextParam) LambdaParameters(LambdaExpressionSyntax lambda)
+    // Element-only lambdas (e =>, (e) =>) yield (element, null, null); element+context lambdas ((e, ctx) =>)
+    // yield (element, context, null). A cancellation parameter is accepted for RegisterLocal result terminals
+    // and rejected by ResultHookChain for other result shapes.
+    private static (string? ElementParam, string? ContextParam, string? CancellationParam) LambdaParameters(
+        LambdaExpressionSyntax lambda)
     {
         switch (lambda)
         {
             case SimpleLambdaExpressionSyntax simple:
-                return (simple.Parameter.Identifier.ValueText, null);
+                return (simple.Parameter.Identifier.ValueText, null, null);
             case ParenthesizedLambdaExpressionSyntax parenthesized:
                 var parameters = parenthesized.ParameterList.Parameters;
                 return parameters.Count switch
                 {
-                    1 => (parameters[0].Identifier.ValueText, null),
-                    2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText),
-                    _ => (null, null),
+                    1 => (parameters[0].Identifier.ValueText, null, null),
+                    2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText, null),
+                    3 => (
+                        parameters[0].Identifier.ValueText,
+                        parameters[1].Identifier.ValueText,
+                        parameters[2].Identifier.ValueText),
+                    _ => (null, null, null),
                 };
             default:
-                return (null, null);
+                return (null, null, null);
         }
     }
 

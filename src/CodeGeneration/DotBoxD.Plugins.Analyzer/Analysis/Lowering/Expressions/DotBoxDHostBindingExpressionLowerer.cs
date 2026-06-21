@@ -43,6 +43,13 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return patternCaptureCall;
         }
 
+        if (!method.IsStatic &&
+            PolymorphicHandleMetadataReader.TryResolve(method.ContainingType, out _))
+        {
+            throw new NotSupportedException(
+                $"Polymorphic handle binding '{bindingId}' must be called on a pattern-captured subtype.");
+        }
+
         // The return (and arguments) may be any marshaller-eligible type — scalar, Guid, enum, list, map, or a
         // DTO record — not just a scalar. The kernel verifier and runtime binding dispatch already accept these
         // return shapes; the analyzer's manifest tag drives the downstream chain's type tracking (so e.g.

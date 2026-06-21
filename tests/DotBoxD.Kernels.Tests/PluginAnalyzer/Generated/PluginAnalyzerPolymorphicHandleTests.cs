@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class PluginAnalyzerPolymorphicHandleTests
+public sealed partial class PluginAnalyzerPolymorphicHandleTests
 {
     [Fact]
     public void Result_hook_polymorphic_filter_lowers_discriminator_and_scoped_host_call()
@@ -73,44 +73,6 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
             """));
 
     [Fact]
-    public void Result_hook_polymorphic_filter_with_missing_key_member_fails_safe()
-        => AssertFailsSafe(Source("""
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<DamageCtx>()
-                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
-                                      attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
-            }
-            """, keyMemberExpression: "\"Missing\""));
-
-    [Fact]
-    public void Result_hook_polymorphic_filter_with_unsupported_key_type_fails_safe()
-        => AssertFailsSafe(Source("""
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<DamageCtx>()
-                        .Where(ctx => ctx.Victim is MonsterCombatant)
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
-            }
-            """, keyType: "double"));
-
-    [Fact]
-    public void Result_hook_polymorphic_filter_with_blank_subtype_metadata_fails_safe()
-        => AssertFailsSafe(Source("""
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<DamageCtx>()
-                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
-                                      attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
-            }
-            """, playerCapability: ""));
-
-    [Fact]
     public void Result_hook_async_scoped_host_call_adds_runtime_async_requirements()
     {
         var source = Source("""
@@ -174,6 +136,44 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
         Assert.Contains("Var(\"Disabled\")", generated);
     }
 
+    [Fact]
+    public void Explicit_this_hidden_non_live_member_is_not_lowered_as_live_setting()
+    {
+        const string source = """
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(int Damage);
+
+            public abstract class DamageKernelBase
+            {
+                [LiveSetting]
+                public bool Disabled { get; set; }
+            }
+
+            [Plugin("hidden-live-setting")]
+            public sealed partial class DamageKernel : DamageKernelBase, IEventKernel<DamageEvent>
+            {
+                public new bool Disabled => true;
+
+                public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                    => this.Disabled;
+
+                public void Handle(DamageEvent e, HookContext ctx)
+                    => ctx.Messages.Send("damage", "hit");
+            }
+            """;
+
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain("Var(\"Disabled\")", generated, StringComparison.Ordinal);
+    }
+
     private static void AssertFailsSafe(string source)
     {
         var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
@@ -191,6 +191,8 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
         bool includeMonsterSubtype = true,
         string keyMemberExpression = "nameof(Id)",
         string keyType = "long",
+        string playerDiscriminator = "player",
+        string playerBindingPrefix = "combatant.player",
         string playerCapability = "combatant.player.read",
         string playerHostBindingSuffix = "")
     {
@@ -207,7 +209,7 @@ public sealed class PluginAnalyzerPolymorphicHandleTests
             namespace Sample;
 
             [PolymorphicHandle({{keyMemberExpression}})]
-            [HandleSubtype(typeof(PlayerCombatant), "player", "combatant.player", "{{playerCapability}}")]
+            [HandleSubtype(typeof(PlayerCombatant), "{{playerDiscriminator}}", "{{playerBindingPrefix}}", "{{playerCapability}}")]
             {{monsterSubtype}}
             public abstract record Combatant({{keyType}} Id);
 

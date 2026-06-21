@@ -390,6 +390,39 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Result_hook_manifest_uses_the_declared_hook_name()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
+            }
+            """);
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains("\"combat.damage\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Lowers_a_RegisterLocal_result_chain_to_a_local_result_install()
     {
         var result = RunGenerator("""
@@ -421,6 +454,45 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Lowers_a_cancellation_aware_RegisterLocal_result_chain_to_a_local_result_install()
+    {
+        var result = RunGenerator("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.death", typeof(DeathResult))]
+            public sealed record DeathCtx(int FatalDamage);
+
+            [HookResult]
+            public readonly partial record struct DeathResult(bool Success, string? Reason, int Mitigated);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DeathCtx>()
+                        .Where(ctx => ctx.FatalDamage > 0)
+                        .RegisterLocal(
+                            (ctx, hookContext, cancellationToken) =>
+                                new ValueTask<DeathResult>(new DeathResult { Success = true }),
+                            5);
+            }
+            """);
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
+        Assert.Contains("global::System.Threading.CancellationToken", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Lowers_a_Register_fluent_builder_chain_to_a_result_install()
     {
         var result = RunGenerator("""
@@ -448,6 +520,96 @@ public sealed class PluginAnalyzerHookChainTests
         Assert.Contains(
             result.GeneratedTrees,
             tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Register_with_author_defined_result_builder_member_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage)
+            {
+                public static DamageResult Ok() => new() { Success = true, Damage = 999 };
+            }
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
+    }
+
+    [Fact]
+    public void Register_with_author_defined_with_member_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage)
+            {
+                public DamageResult WithDamage(int damage) => this with { Damage = 999 };
+            }
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
+    }
+
+    [Fact]
+    public void RegisterLocal_returning_the_wrong_result_type_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            [HookResult]
+            public readonly partial record struct OtherResult(bool Success, string? Reason);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .RegisterLocal((ctx, hookContext) => new OtherResult { Success = true }, 0);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
     }
 
     [Fact]

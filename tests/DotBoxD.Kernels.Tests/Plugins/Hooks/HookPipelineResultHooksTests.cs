@@ -93,6 +93,17 @@ public sealed class HookPipelineResultHooksTests
         Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK066");
     }
 
+    [Fact]
+    public async Task FireAsync_rejects_result_type_when_no_hook_point_exists()
+    {
+        using var server = PluginServer.Create();
+
+        var exception = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.Hooks.FireAsync<DamageCtx, OtherDamageResult>(new DamageCtx(10)));
+
+        Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK066");
+    }
+
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>
     {
         public string EventName => "test.damage";

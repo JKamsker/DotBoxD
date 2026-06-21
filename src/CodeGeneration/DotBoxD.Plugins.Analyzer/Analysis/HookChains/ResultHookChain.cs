@@ -32,6 +32,7 @@ internal static class ResultHookChain
         LambdaExpressionSyntax terminalLambda,
         string terminalElementParam,
         string? terminalContextParam,
+        bool terminalHasCancellationToken,
         bool isLocal)
     {
         // A Select before the result terminal would re-type the flowing element; v1 supports only Where filters.
@@ -43,8 +44,13 @@ internal static class ResultHookChain
             }
         }
 
-        if (!TryResolveHook(contextType, out var resultType) ||
+        if (!TryResolveHook(contextType, out var hookName, out var resultType) ||
             !IsHookResultType(resultType))
+        {
+            throw new NotSupportedException();
+        }
+
+        if (terminalHasCancellationToken && !isLocal)
         {
             throw new NotSupportedException();
         }
@@ -64,6 +70,12 @@ internal static class ResultHookChain
         string? projectedType;
         if (isLocal)
         {
+            ResultHookLocalHandlerValidator.EnsureReturnsHookResult(
+                terminalLambda,
+                resultType,
+                model,
+                cancellationToken);
+
             // RegisterLocal: only the filter is verified IR; the Handle returns Unit and the plugin delegate
             // produces the result. Whole-event shape (LocalTerminal, no ProjectedType).
             handleBody = DotBoxDHandleBodyModelFactory.ReturnUnit();
@@ -88,7 +100,7 @@ internal static class ResultHookChain
             Namespace: HookChainIdentity.Namespace(invocation),
             KernelName: kernelName,
             PackageName: kernelName + DotBoxDGenerationNames.PluginPackageSuffix,
-            EventName: EventTypeName.Qualified(contextType),
+            EventName: hookName,
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,
@@ -107,7 +119,16 @@ internal static class ResultHookChain
             ProjectedType = projectedType,
         };
 
-        return new HookChainResult(kernelModel, Interception(invocation, receiver, model, kernelModel, contextType, resultType, isLocal, cancellationToken));
+        return new HookChainResult(kernelModel, Interception(
+            invocation,
+            receiver,
+            model,
+            kernelModel,
+            contextType,
+            resultType,
+            isLocal,
+            terminalHasCancellationToken,
+            cancellationToken));
     }
 
     public static bool IsResultTerminal(string terminalMethod)
@@ -170,6 +191,7 @@ internal static class ResultHookChain
         INamedTypeSymbol contextType,
         INamedTypeSymbol resultType,
         bool isLocal,
+        bool isAsyncLocal,
         CancellationToken cancellationToken)
     {
         // The interceptor's receiver/handler/return types are built from the context and [Hook] result type
@@ -190,7 +212,11 @@ internal static class ResultHookChain
         var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var resultFullName = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var handlerFullName = isLocal
+        var handlerFullName = isLocal && isAsyncLocal
+            ? $"{TypeNames.GlobalFunc}<" +
+                $"{contextFullName}, {TypeNames.GlobalHookContext}, {TypeNames.GlobalCancellationToken}, " +
+                $"{TypeNames.GlobalValueTask}<{resultFullName}>>"
+            : isLocal
             ? $"{TypeNames.GlobalFunc}<{contextFullName}, {TypeNames.GlobalHookContext}, {resultFullName}>"
             : $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>";
 
@@ -201,18 +227,26 @@ internal static class ResultHookChain
             receiverFullName,
             packageFullName,
             isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-            ResultTypeFullName: resultFullName);
+            ResultTypeFullName: resultFullName,
+            IsAsyncLocalResult: isAsyncLocal);
     }
 
-    private static bool TryResolveHook(INamedTypeSymbol contextType, out INamedTypeSymbol resultType)
+    private static bool TryResolveHook(
+        INamedTypeSymbol contextType,
+        out string hookName,
+        out INamedTypeSymbol resultType)
     {
+        hookName = string.Empty;
         resultType = null!;
         foreach (var attribute in contextType.GetAttributes())
         {
             if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDMetadataNames.HookAttribute, StringComparison.Ordinal) &&
                 attribute.ConstructorArguments.Length == 2 &&
+                attribute.ConstructorArguments[0].Value is string declaredName &&
+                !string.IsNullOrWhiteSpace(declaredName) &&
                 attribute.ConstructorArguments[1].Value is INamedTypeSymbol declaredResult)
             {
+                hookName = declaredName;
                 resultType = declaredResult;
                 return true;
             }

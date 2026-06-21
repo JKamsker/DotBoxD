@@ -7,8 +7,9 @@ namespace DotBoxD.Abstractions;
 /// to validate that a <c>.Register(...)</c> / <c>.RegisterLocal(...)</c> terminal produces
 /// <see cref="ResultType"/>, and persists <see cref="Name"/> as the runtime hook-point identity.
 /// <para>
-/// The <see cref="ResultType"/> must be a record/DTO decorated with <see cref="HookResultAttribute"/> that
-/// declares a <c>bool Success</c> and a <c>string? Reason</c> field (see that attribute for the contract).
+/// The <see cref="ResultType"/> must be a readonly partial record struct decorated with
+/// <see cref="HookResultAttribute"/> that declares a <c>bool Success</c> and a <c>string? Reason</c>
+/// field (see that attribute for the contract).
 /// </para>
 /// </summary>
 /// <example>
@@ -37,13 +38,15 @@ public sealed class HookAttribute : Attribute
 }
 
 /// <summary>
-/// Marks a record/DTO as a hook <b>result</b>: a value a <c>.Register(...)</c> / <c>.RegisterLocal(...)</c>
-/// terminal returns and the host applies. The DotBoxD generator emits builder members the user did not
+/// Marks a readonly partial record struct as a hook <b>result</b>: a value a <c>.Register(...)</c> /
+/// <c>.RegisterLocal(...)</c> terminal returns and the host applies. The DotBoxD generator emits builder members
+/// the user did not
 /// declare manually — <c>Ok()</c>, <c>Reject(string? reason = null)</c>, and a <c>With&lt;Field&gt;(value)</c>
 /// per non-discriminator field — so result construction reads fluently and lowers to verified
 /// <c>record.new</c> IR.
 /// <para>
-/// A hook result must declare a <c>bool Success</c> field and a <c>string? Reason</c> field.
+/// A hook result must be a top-level readonly partial record struct that declares a <c>bool Success</c>
+/// field and a <c>string? Reason</c> field.
 /// <c>Success = false</c> means "abstain, fall through to the next matching registration"; a successful
 /// result may still carry a domain veto such as <c>CanDie = false</c>, so abstain and veto never overload
 /// the same field.
@@ -57,7 +60,7 @@ public sealed class HookAttribute : Attribute
 /// // generated: CombatDamageResult.Ok().WithDamage(999), CombatDamageResult.Reject("not applicable")
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+[AttributeUsage(AttributeTargets.Struct, Inherited = false)]
 public sealed class HookResultAttribute : Attribute;
 
 /// <summary>
@@ -68,7 +71,9 @@ public sealed class HookResultAttribute : Attribute;
 /// </summary>
 public interface IHookResult
 {
-    bool Success { get; }
+#pragma warning disable IDE0040 // Explicit public keeps the API baseline member visible.
+    public bool Success { get; }
+#pragma warning restore IDE0040
 }
 
 /// <summary>

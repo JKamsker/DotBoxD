@@ -186,10 +186,15 @@ internal static class PluginSymbolReader
         return new LiveSettingModel(
             property.Name,
             type,
+            LiveSettingSymbolKey(property),
             LiteralReader.DefaultValue(property.Type, syntax?.Initializer?.Value, semanticModel, cancellationToken),
             range.Min,
             range.Max);
     }
+
+    private static string LiveSettingSymbolKey(IPropertySymbol property)
+        => property.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+            "." + property.MetadataName;
 
     private static PropertyDeclarationSyntax? DeclaringPropertySyntax(
         IPropertySymbol property,

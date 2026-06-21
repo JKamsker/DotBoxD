@@ -70,6 +70,7 @@ internal sealed record IndexPredicateModel(
 internal sealed record LiveSettingModel(
     string Name,
     string Type,
+    string SymbolKey,
     string DefaultValue,
     string? Min,
     string? Max);

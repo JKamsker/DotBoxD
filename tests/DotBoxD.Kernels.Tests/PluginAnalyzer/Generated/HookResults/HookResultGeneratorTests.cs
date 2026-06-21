@@ -90,9 +90,12 @@ public sealed class HookResultGeneratorTests
             public readonly partial record struct BadResult(bool Success, string Reason, int Damage);
             """;
 
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
 
-        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.GetText().ToString().Contains("BadResult Ok()", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -113,9 +116,8 @@ public sealed class HookResultGeneratorTests
     }
 
     [Fact]
-    public void Reports_DBXK112_for_a_record_class_result()
+    public void Record_class_result_is_rejected_by_attribute_usage()
     {
-        // A positional record class has no parameterless constructor, so new() {} would not compile; reject it.
         const string source = """
             using DotBoxD.Abstractions;
 
@@ -127,7 +129,58 @@ public sealed class HookResultGeneratorTests
 
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
 
-        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, d => string.Equals(d.Id, "CS0592", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Reports_DBXK112_for_a_non_positional_result_type()
+    {
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public readonly partial record struct BadResult
+            {
+                public BadResult(bool success, string? reason)
+                {
+                    Success = success;
+                    Reason = reason;
+                }
+
+                public bool Success { get; }
+
+                public string? Reason { get; }
+            }
+            """;
+
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+
+        Assert.Contains(result.Diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.GetText().ToString().Contains("BadResult Ok()", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Reports_DBXK112_for_a_mutable_result_struct()
+    {
+        const string source = """
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public partial record struct BadResult(bool Success, string? Reason, int Damage);
+            """;
+
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
+
+        Assert.Contains(result.Diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.GetText().ToString().Contains("BadResult Ok()", StringComparison.Ordinal));
     }
 
     [Fact]
