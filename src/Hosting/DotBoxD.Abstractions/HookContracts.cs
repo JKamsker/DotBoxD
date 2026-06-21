@@ -1,0 +1,69 @@
+namespace DotBoxD.Abstractions;
+
+/// <summary>
+/// Associates a hook <b>context</b> type with a stable hook name and exactly one result type, so
+/// <c>context.Server.Hooks.On&lt;TContext&gt;()</c> can resolve the result type from the context alone
+/// (rather than requiring a second generic argument at the call site). The analyzer reads this attribute
+/// to validate that a <c>.Register(...)</c> / <c>.RegisterLocal(...)</c> terminal produces
+/// <see cref="ResultType"/>, and persists <see cref="Name"/> as the runtime hook-point identity.
+/// <para>
+/// The <see cref="ResultType"/> must be a record/DTO decorated with <see cref="HookResultAttribute"/> that
+/// declares a <c>bool Success</c> and a <c>string? Reason</c> field (see that attribute for the contract).
+/// </para>
+/// </summary>
+/// <example>
+/// <code>
+/// [Hook("combat.damage", typeof(CombatDamageResult))]
+/// public sealed record CombatDamageContext(Combatant? Attacker, Combatant Victim, int Damage);
+/// </code>
+/// </example>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+public sealed class HookAttribute : Attribute
+{
+    public HookAttribute(string name, Type resultType)
+    {
+        Name = name;
+        ResultType = resultType;
+    }
+
+    /// <summary>The stable hook-point name (e.g. <c>combat.damage</c>) persisted into the manifest.</summary>
+    public string Name { get; }
+
+    /// <summary>The single result type a hook on this context produces — a <see cref="HookResultAttribute"/> DTO.</summary>
+    public Type ResultType { get; }
+}
+
+/// <summary>
+/// Marks a record/DTO as a hook <b>result</b>: a value a <c>.Register(...)</c> / <c>.RegisterLocal(...)</c>
+/// terminal returns and the host applies. The DotBoxD generator emits builder members the user did not
+/// declare manually — <c>Ok()</c>, <c>Reject(string? reason = null)</c>, and a <c>With&lt;Field&gt;(value)</c>
+/// per non-discriminator field — so result construction reads fluently and lowers to verified
+/// <c>record.new</c> IR.
+/// <para>
+/// A hook result must declare a <c>bool Success</c> field and a <c>string? Reason</c> field.
+/// <c>Success = false</c> means "abstain, fall through to the next matching registration"; a successful
+/// result may still carry a domain veto such as <c>CanDie = false</c>, so abstain and veto never overload
+/// the same field.
+/// </para>
+/// </summary>
+/// <example>
+/// <code>
+/// [HookResult]
+/// public readonly partial record struct CombatDamageResult(bool Success, string? Reason, int? Damage = null);
+///
+/// // generated: CombatDamageResult.Ok().WithDamage(999), CombatDamageResult.Reject("not applicable")
+/// </code>
+/// </example>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+public sealed class HookResultAttribute : Attribute;
+
+/// <summary>
+/// The runtime contract every hook result satisfies so dispatch can apply the abstain/fallthrough rule
+/// without reflecting on the concrete type: <c>Success == false</c> means "abstain, fall through to the next
+/// matching registration". The DotBoxD generator adds this interface to every <see cref="HookResultAttribute"/>
+/// record (its <c>Success</c> field implements the member), so authors never write it by hand.
+/// </summary>
+public interface IHookResult
+{
+    bool Success { get; }
+}

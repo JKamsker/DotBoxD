@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
+using DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 using DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
@@ -188,6 +189,31 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         RegistrationAccumulatorGenerator.Register(context);
 
+        // [HookResult] builder surface: Ok()/Reject()/With<Field>() for each annotated result record, plus the
+        // DBXK112 diagnostic when the Success/Reason contract is missing.
+        var hookResultModels = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                DotBoxDGenerationNames.Metadata.HookResultAttribute,
+                static (node, _) => node is TypeDeclarationSyntax,
+                static (ctx, ct) => HookResultModelFactory.Create(ctx, ct))
+            .Where(static model => model is not null)
+            .Select(static (model, _) => model!);
+        context.RegisterSourceOutput(
+            hookResultModels
+                .Where(static model => model.Diagnostic is not null)
+                .Select(static (model, _) => model.Diagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            hookResultModels.Select(static (model, _) => HookResultBuilderEmitter.Emit(model)),
+            static (sourceContext, source) =>
+            {
+                if (source is not null)
+                {
+                    sourceContext.AddSource(
+                        source.HintName,
+                        Microsoft.CodeAnalysis.Text.SourceText.From(source.Source, System.Text.Encoding.UTF8));
+                }
+            });
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)

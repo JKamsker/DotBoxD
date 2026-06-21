@@ -105,4 +105,26 @@ public sealed class HookRegistry
             await ((HookPipeline<TEvent>)pipeline).PublishAsync(e, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Dispatches the result-returning hooks (<c>.Register(...)</c> / <c>.RegisterLocal(...)</c>) installed for
+    /// <typeparamref name="TContext"/> in descending priority order, returning the first successful
+    /// <typeparamref name="TResult"/> or <see langword="null"/> when none is registered or none succeeds. The
+    /// host applies the returned result to its live state. The result type is named explicitly here because the
+    /// host — unlike the plugin authoring side, where it is inferred from the <c>[Hook]</c> context — already
+    /// knows the type it will apply.
+    /// </summary>
+    public ValueTask<TResult?> FireAsync<TContext, TResult>(TContext context, CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult
+    {
+        object? pipeline;
+        lock (_gate)
+        {
+            _pipelines.TryGetValue(typeof(TContext), out pipeline);
+        }
+
+        return pipeline is null
+            ? new ValueTask<TResult?>((TResult?)null)
+            : ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
+    }
 }

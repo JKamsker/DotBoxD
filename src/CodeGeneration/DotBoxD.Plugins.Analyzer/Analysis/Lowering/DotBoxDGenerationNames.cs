@@ -32,6 +32,8 @@ internal static class DotBoxDGenerationNames
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
         public const string ServerExtensionMethodAttribute = "DotBoxD.Abstractions.ServerExtensionMethodAttribute";
         public const string GeneratePluginServerAttribute = "DotBoxD.Abstractions.GeneratePluginServerAttribute";
+        public const string HookAttribute = "DotBoxD.Abstractions.HookAttribute";
+        public const string HookResultAttribute = "DotBoxD.Abstractions.HookResultAttribute";
         public const string DotBoxDServiceAttribute = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
         public const string HookContext = "DotBoxD.Abstractions.HookContext";
         public const string ServerInvocationDelegateType = "DotBoxD.Abstractions.RemoteServerInvocation";
@@ -121,6 +123,8 @@ internal static class DotBoxDGenerationNames
         public const string ServerExtensionClientAttribute = TypeNames.ServerExtensionClientAttribute;
         public const string ServerExtensionMethodAttribute = TypeNames.ServerExtensionMethodAttribute;
         public const string GeneratePluginServerAttribute = TypeNames.GeneratePluginServerAttribute;
+        public const string HookAttribute = TypeNames.HookAttribute;
+        public const string HookResultAttribute = TypeNames.HookResultAttribute;
         public const string DotBoxDServiceAttribute = TypeNames.DotBoxDServiceAttribute;
         public const string HookContextType = TypeNames.HookContext;
         public const string ServerInvocationDelegateType = TypeNames.ServerInvocationDelegateType;
