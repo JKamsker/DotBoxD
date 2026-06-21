@@ -64,6 +64,14 @@ public sealed record HugeEnumEvent(int Distance, HugeEnum Big);
 /// <summary>An event with a <see cref="List{T}"/> property — a different encode/decode path than <c>int[]</c>.</summary>
 public sealed record ScoreEvent(int Threshold, List<int> Scores);
 
+/// <summary>An event carrying a <c>float</c> scalar, for a direct float projection (float widens to the F64 wire
+/// kind and narrows back exactly).</summary>
+public sealed record FloatEvent(int Distance, float Health);
+
+/// <summary>An event carrying a <see cref="Dictionary{TKey, TValue}"/> with scalar (string) keys, for a map
+/// projection.</summary>
+public sealed record TallyEvent(int Distance, Dictionary<string, int> Counts);
+
 /// <summary>
 /// A non-positional event class whose constructor parameter order (id, zone, distance) differs from its property
 /// declaration order (Distance, Id, Zone). Exercises that the whole-event wire field order is declaration order on

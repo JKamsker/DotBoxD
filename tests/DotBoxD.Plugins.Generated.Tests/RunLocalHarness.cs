@@ -1,4 +1,5 @@
 using DotBoxD.Abstractions;
+using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins.Policies;
@@ -31,9 +32,9 @@ internal sealed class RunLocalHarness<TEvent> : IDisposable
 
     public RemoteHookRegistry Hooks { get; }
 
-    public RunLocalHarness(SandboxPolicy? policy = null)
+    public RunLocalHarness(SandboxPolicy? policy = null, Action<SandboxHostBuilder>? configureHost = null)
     {
-        Server = PluginServer.Create(Sink, defaultPolicy: policy ?? TestPolicies.Chain());
+        Server = PluginServer.Create(Sink, configureHost: configureHost, defaultPolicy: policy ?? TestPolicies.Chain());
 
         // Capture locals so the install callback does not close over `this`.
         var server = Server;
