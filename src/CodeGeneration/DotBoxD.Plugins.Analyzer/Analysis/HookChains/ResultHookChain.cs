@@ -67,7 +67,6 @@ internal static class ResultHookChain
 
         DotBoxDStatementBodyModel handleBody;
         string handleReturnType;
-        string? projectedType;
         if (isLocal)
         {
             ResultHookLocalHandlerValidator.EnsureReturnsHookResult(
@@ -77,17 +76,15 @@ internal static class ResultHookChain
                 cancellationToken);
 
             // RegisterLocal: only the filter is verified IR; the Handle returns Unit and the plugin delegate
-            // produces the result. Whole-event shape (LocalTerminal, no ProjectedType).
+            // produces the result through the generated local result installation path.
             handleBody = DotBoxDHandleBodyModelFactory.ReturnUnit();
             handleReturnType = TypeNames.GlobalSandboxType + ".Unit";
-            projectedType = null;
         }
         else
         {
             handleBody = LowerResultHandle(terminalLambda, terminalElementParam, resultType, eventProperties, model, cancellationToken, capabilities, effects);
             handleReturnType = SandboxTypeSourceEmitter.TryEmit(resultType)
                 ?? throw new NotSupportedException();
-            projectedType = DotBoxDGenerationNames.ManifestTypes.Record;
         }
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
@@ -115,8 +112,8 @@ internal static class ResultHookChain
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate)
         {
-            LocalTerminal = true,
-            ProjectedType = projectedType,
+            ResultType = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            ResultLocalTerminal = isLocal,
         };
 
         return new HookChainResult(kernelModel, Interception(

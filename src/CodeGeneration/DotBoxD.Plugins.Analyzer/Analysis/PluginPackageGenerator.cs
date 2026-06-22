@@ -214,6 +214,18 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                         Microsoft.CodeAnalysis.Text.SourceText.From(source.Source, System.Text.Encoding.UTF8));
                 }
             });
+
+        var hookFireAsyncModels = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                DotBoxDMetadataNames.HookAttribute,
+                static (node, _) => node is TypeDeclarationSyntax,
+                static (ctx, ct) => HookFireAsyncModelFactory.Create(ctx, ct))
+            .Where(static model => model is not null)
+            .Select(static (model, _) => model!)
+            .Collect();
+        context.RegisterSourceOutput(
+            hookFireAsyncModels,
+            static (sourceContext, models) => HookFireAsyncExtensionEmitter.Emit(sourceContext, models));
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)

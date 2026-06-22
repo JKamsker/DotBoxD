@@ -44,6 +44,16 @@ public sealed class RemoteRunLocalIpcPremiseTests
                 new HookContext(new InMemoryPluginMessageSink(), ct),
                 ct);
         }
+
+        public ValueTask<byte[]> OnResultAsync(
+            string subscriptionId,
+            ReadOnlyMemory<byte> contextValue,
+            CancellationToken ct = default)
+            => registry.DispatchResultAsync(
+                subscriptionId,
+                contextValue,
+                new HookContext(new InMemoryPluginMessageSink(), ct),
+                ct);
     }
 
     [Fact]

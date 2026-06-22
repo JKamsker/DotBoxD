@@ -70,8 +70,8 @@ internal static class HookChainModelFactory
         return null;
     }
 
-    // True when the call site is an in-process Register/RegisterLocal terminal on a known local hook pipeline —
-    // the surface whose native terminal throws when the generator does not intercept it.
+    // True when the call site is a Register/RegisterLocal terminal on a known hook pipeline — the surface whose
+    // native terminal throws when the generator does not intercept it.
     private static bool TryResultChainLocation(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
@@ -84,7 +84,8 @@ internal static class HookChainModelFactory
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             (!string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterMethod, StringComparison.Ordinal) &&
              !string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal)) ||
-            ReceiverKind(model, terminalAccess.Expression, cancellationToken) != HookChainReceiverKind.Local)
+            ReceiverKind(model, terminalAccess.Expression, cancellationToken) is not
+                (HookChainReceiverKind.Local or HookChainReceiverKind.Remote))
         {
             return false;
         }
@@ -374,11 +375,9 @@ internal static class HookChainModelFactory
             RunMethod => HookChainInterceptorInstallKind.GeneratedChain,
             RunLocalMethod when receiverKind == HookChainReceiverKind.Remote || generatedRemoteKind is not null =>
                 HookChainInterceptorInstallKind.LocalCallback,
-            // Result hooks lower only for the in-process (Local) Hooks surface in v1; the remote authoring
-            // surface has no Register/RegisterLocal yet, so a remote receiver is not recognized here.
-            RegisterMethod when receiverKind == HookChainReceiverKind.Local =>
+            RegisterMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
                 HookChainInterceptorInstallKind.ResultChain,
-            RegisterLocalMethod when receiverKind == HookChainReceiverKind.Local =>
+            RegisterLocalMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
                 HookChainInterceptorInstallKind.LocalResultChain,
             _ => null
         };

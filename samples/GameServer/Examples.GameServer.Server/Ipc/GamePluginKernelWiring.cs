@@ -77,7 +77,25 @@ internal sealed class GamePluginKernelWiring
     private void WireHookFor<TEvent>(InstalledKernel kernel)
     {
         var pipeline = _server.Hooks.On<TEvent>();
-        if (IsLocalTerminal(kernel.Manifest))
+        if (IsResultHook(kernel.Manifest))
+        {
+            var priority = Priority(kernel.Manifest);
+            var resultType = HookResultTypeFor<TEvent>(kernel.Manifest);
+            if (IsResultLocalTerminal(kernel.Manifest))
+            {
+                pipeline.UseProjectingResult(
+                    kernel,
+                    kernel.Manifest.PluginId,
+                    resultType,
+                    LocalResultRequest(),
+                    priority);
+            }
+            else
+            {
+                pipeline.UseResult(kernel, resultType, priority);
+            }
+        }
+        else if (IsLocalTerminal(kernel.Manifest))
         {
             pipeline.UseProjecting(kernel, kernel.Manifest.PluginId, LocalPush());
         }
@@ -110,6 +128,13 @@ internal sealed class GamePluginKernelWiring
         return (subscriptionId, projectedValue, ct) => callback.OnEventAsync(subscriptionId, projectedValue, ct);
     }
 
+    private RemoteLocalResultRequest LocalResultRequest()
+    {
+        var callback = _eventCallback ?? throw new InvalidOperationException(
+            "the connected plugin did not provide an IPluginEventCallback; a remote RegisterLocal chain requires it.");
+        return (subscriptionId, contextValue, ct) => callback.OnResultAsync(subscriptionId, contextValue, ct);
+    }
+
     // Issue #49: indexed subscriptions are dispatched through the world's EventIndexRegistry so events are
     // prefiltered before verified IR runs. Returns false when no usable index metadata is present.
     private bool TryRouteThroughIndex<TEvent>(InstalledKernel kernel)
@@ -135,6 +160,25 @@ internal sealed class GamePluginKernelWiring
 
     private static bool IsLocalTerminal(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].LocalTerminal;
+
+    private static bool IsResultHook(PluginManifest manifest)
+        => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].ResultType is not null;
+
+    private static bool IsResultLocalTerminal(PluginManifest manifest)
+        => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].ResultLocalTerminal;
+
+    private static int Priority(PluginManifest manifest)
+        => manifest.Subscriptions.Count > 0 ? manifest.Subscriptions[0].Priority : 0;
+
+    private static Type HookResultTypeFor<TEvent>(PluginManifest manifest)
+    {
+        var hook = (DotBoxD.Abstractions.HookAttribute?)Attribute.GetCustomAttribute(
+            typeof(TEvent),
+            typeof(DotBoxD.Abstractions.HookAttribute),
+            inherit: false);
+        return hook?.ResultType ?? throw new InvalidOperationException(
+            $"Plugin '{manifest.PluginId}' installed a result hook for '{typeof(TEvent).FullName}', but the event type has no [Hook] result declaration.");
+    }
 
     private static string? SubscribedEvent(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 ? manifest.Subscriptions[0].Event : null;

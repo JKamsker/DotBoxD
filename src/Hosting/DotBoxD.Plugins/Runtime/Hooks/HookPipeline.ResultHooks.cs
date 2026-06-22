@@ -1,5 +1,7 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime.Hooks;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime;
 
@@ -11,18 +13,12 @@ public sealed partial class HookPipeline<TEvent>
 {
     private readonly Hooks.ResultHookSlot<TEvent> _resultHooks;
 
-    // The authoring terminals constrain TResult to `struct` only — NOT IHookResult. IHookResult is added to
-    // [HookResult] records by the same generator pass, so it is not yet present on the pre-generation
-    // compilation the analyzer binds these calls against; constraining on it here would make the call fail to
-    // resolve during lowering. The generated interceptor's install entrypoints (below) carry the full
-    // `struct, IHookResult` constraint, checked against the post-generation compilation.
-
     /// <summary>
     /// The result-returning terminal the analyzer lowers to verified IR: the filter and the result-producing
     /// handler both run in the sandbox. Un-lowered it throws, so plugin logic never executes unsandboxed.
     /// </summary>
     public HookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        where TResult : struct
+        where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
     /// <summary>
@@ -30,13 +26,13 @@ public sealed partial class HookPipeline<TEvent>
     /// produced by the plugin-process delegate. Un-lowered it throws; the generated interceptor replaces it.
     /// </summary>
     public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0)
-        where TResult : struct
+        where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
     public HookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct
+        where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
     /// <summary>
@@ -60,6 +56,16 @@ public sealed partial class HookPipeline<TEvent>
             throw;
         }
 
+        return this;
+    }
+
+    public HookPipeline<TEvent> UseResult(InstalledKernel kernel, Type resultType, int priority = 0)
+    {
+        ArgumentNullException.ThrowIfNull(kernel);
+        ArgumentNullException.ThrowIfNull(resultType);
+        EnsureHookResultType(resultType);
+        kernel.ValidateFor(_adapter);
+        _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent>.Decoder(resultType));
         return this;
     }
 
@@ -103,12 +109,57 @@ public sealed partial class HookPipeline<TEvent>
         return this;
     }
 
+    public HookPipeline<TEvent> UseProjectingResult(
+        InstalledKernel filterKernel,
+        string subscriptionId,
+        Type resultType,
+        RemoteLocalResultRequest request,
+        int priority = 0)
+    {
+        ArgumentNullException.ThrowIfNull(filterKernel);
+        ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
+        ArgumentNullException.ThrowIfNull(resultType);
+        ArgumentNullException.ThrowIfNull(request);
+        EnsureHookResultType(resultType);
+        LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
+        filterKernel.ValidateFor(_adapter);
+        _resultHooks.AddRemote(filterKernel, priority, async (e, context, ct) =>
+        {
+            var response = await LocalCallbackProjection.RequestResultAsync(
+                _adapter,
+                e,
+                context,
+                subscriptionId,
+                request,
+                ct).ConfigureAwait(false);
+            var value = KernelRpcBinaryCodec.DecodeValue(response);
+            return (IHookResult)KernelRpcMarshaller.FromKernelRpcValue(value, resultType)!;
+        });
+
+        return this;
+    }
+
+    public HookPipeline<TEvent> UseProjectingResult<TResult>(
+        InstalledKernel filterKernel,
+        string subscriptionId,
+        RemoteLocalResultRequest request,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => UseProjectingResult(filterKernel, subscriptionId, typeof(TResult), request, priority);
+
     /// <summary>
     /// Dispatches result hooks for <paramref name="e"/> in descending priority order and returns the first
     /// successful result, or <see langword="null"/> when none is registered or none succeeds. The host applies
     /// the returned result to its live state.
     /// </summary>
     public ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult
+        => FireResultAsync(e, ResultHookDispatchOptions<TResult>.Default, cancellationToken);
+
+    public ValueTask<TResult?> FireResultAsync<TResult>(
+        TEvent e,
+        ResultHookDispatchOptions<TResult> options,
+        CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult
     {
         if (!_resultHooks.HasHandlers)
@@ -119,7 +170,19 @@ public sealed partial class HookPipeline<TEvent>
         var context = cancellationToken.CanBeCanceled
             ? new HookContext(_messages, cancellationToken)
             : _defaultContext;
-        return _resultHooks.FireAsync<TResult>(e, context, cancellationToken);
+        return _resultHooks.FireAsync(e, context, options, cancellationToken);
+    }
+
+    private static void EnsureHookResultType(Type resultType)
+    {
+        if (typeof(IHookResult).IsAssignableFrom(resultType))
+        {
+            return;
+        }
+
+        throw new ArgumentException(
+            $"Result type '{resultType}' must implement {nameof(IHookResult)}.",
+            nameof(resultType));
     }
 
     private InstalledKernel MaterializeResultKernel(PluginPackage package)

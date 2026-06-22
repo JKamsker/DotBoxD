@@ -157,6 +157,33 @@ public sealed class ResultHookSlotTests
         Assert.False(invoked);
     }
 
+    [Fact]
+    public async Task Remote_timeout_returns_configured_fail_closed_result_and_reports_fault()
+    {
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        slot.AddDirect(
+            0,
+            async (_, _, cancellationToken) =>
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
+                return new TestResult(true, null, 999);
+            },
+            remote: true);
+        var options = ResultHookDispatchOptions<TestResult>.FailClosedAfter(
+            TimeSpan.FromMilliseconds(10),
+            new TestResult(true, "timeout", -1));
+
+        var result = await slot.FireAsync(
+            new DamageCtx(10),
+            Context(),
+            options,
+            CancellationToken.None);
+
+        Assert.Equal(-1, result!.Value.Value);
+        Assert.IsType<TimeoutException>(Assert.Single(faults).Exception);
+    }
+
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>
     {
         public string EventName => "test.damage";
