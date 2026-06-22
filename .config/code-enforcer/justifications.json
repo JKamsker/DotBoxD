@@ -78,10 +78,6 @@
       "justification": "Pre-existing time-binding parity fixture surfaced after correcting the line guard root. Keep listed until shared setup is extracted."
     },
     {
-      "path": "tests/DotBoxD.Kernels.Tests/Runtime/File/SafeFileSystemTests.cs",
-      "justification": "Pre-existing file-system runtime fixture surfaced after correcting the line guard root. Keep listed until read/write/path safety scenarios are split."
-    },
-    {
       "path": "tests/DotBoxD.Kernels.Tests/Workers/WorkerAuditValidationTests.cs",
       "justification": "Pre-existing worker-audit validation fixture surfaced after correcting the line guard root. Keep listed until audit event families are split."
     },
