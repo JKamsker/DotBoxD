@@ -58,10 +58,6 @@
       "justification": "Pre-existing source-generator behavior fixture surfaced after correcting the line guard root. Keep listed until async sibling scenarios are split."
     },
     {
-      "path": "tests/DotBoxD.Services.SourceGenerator.Tests/Behavior/BehavioralTests.cs",
-      "justification": "Pre-existing source-generator behavior fixture surfaced after correcting the line guard root. Keep listed until cases are split by service shape."
-    },
-    {
       "path": "tests/DotBoxD.Services.Tests/Coverage/Core/SerializationCoverageTests.cs",
       "justification": "Pre-existing serialization coverage fixture surfaced after correcting the line guard root. Keep listed until serialization cases are split."
     },
