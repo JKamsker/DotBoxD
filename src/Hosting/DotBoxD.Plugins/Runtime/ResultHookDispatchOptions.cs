@@ -7,6 +7,8 @@ namespace DotBoxD.Plugins.Runtime;
 public sealed class ResultHookDispatchOptions<TResult>
     where TResult : struct, IHookResult
 {
+    private static readonly TimeSpan MaxRemoteHandlerTimeout = TimeSpan.FromMilliseconds(int.MaxValue);
+
     public static ResultHookDispatchOptions<TResult> Default { get; } = new();
 
     public TimeSpan RemoteHandlerTimeout { get; init; } = Timeout.InfiniteTimeSpan;
@@ -22,7 +24,8 @@ public sealed class ResultHookDispatchOptions<TResult>
 
     internal void Validate()
     {
-        if (RemoteHandlerTimeout == Timeout.InfiniteTimeSpan || RemoteHandlerTimeout > TimeSpan.Zero)
+        if (RemoteHandlerTimeout == Timeout.InfiniteTimeSpan ||
+            (RemoteHandlerTimeout > TimeSpan.Zero && RemoteHandlerTimeout <= MaxRemoteHandlerTimeout))
         {
             return;
         }
@@ -30,6 +33,6 @@ public sealed class ResultHookDispatchOptions<TResult>
         throw new ArgumentOutOfRangeException(
             nameof(RemoteHandlerTimeout),
             RemoteHandlerTimeout,
-            "Remote handler timeout must be positive or Timeout.InfiniteTimeSpan.");
+            $"Remote handler timeout must be positive, no greater than {MaxRemoteHandlerTimeout}, or Timeout.InfiniteTimeSpan.");
     }
 }

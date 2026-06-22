@@ -15,6 +15,8 @@ public sealed class ResultHookSlotTests
 
     private readonly record struct TestResult(bool Success, string? Reason, int Value = 0) : IHookResult;
 
+    private readonly record struct OtherResult(bool Success, string? Reason) : IHookResult;
+
     private static ResultHookSlot<DamageCtx> NewSlot(Action<ResultHookFault>? onFault = null) => new(new StubAdapter(), onFault);
 
     private static HookContext Context() => new(new InMemoryPluginMessageSink(), CancellationToken.None);
@@ -182,6 +184,34 @@ public sealed class ResultHookSlotTests
 
         Assert.Equal(-1, result!.Value.Value);
         Assert.IsType<TimeoutException>(Assert.Single(faults).Exception);
+    }
+
+    [Fact]
+    public async Task Wrong_result_type_is_reported_and_dispatch_continues()
+    {
+        var faults = new List<ResultHookFault>();
+        var slot = NewSlot(faults.Add);
+        slot.AddDirect(100, (_, _, _) => new ValueTask<IHookResult?>((IHookResult)new OtherResult(true, null)));
+        slot.AddDirect(0, (_, _, _) => Ok(4));
+
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+
+        Assert.Equal(4, result!.Value.Value);
+        Assert.IsType<InvalidCastException>(Assert.Single(faults).Exception);
+    }
+
+    [Fact]
+    public async Task Oversized_remote_timeout_is_rejected_before_dispatch()
+    {
+        var slot = NewSlot();
+        slot.AddDirect(0, (_, _, _) => Ok(1), remote: true);
+        var options = new ResultHookDispatchOptions<TestResult>
+        {
+            RemoteHandlerTimeout = TimeSpan.FromMilliseconds((double)int.MaxValue + 1)
+        };
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await slot.FireAsync(new DamageCtx(10), Context(), options, CancellationToken.None));
     }
 
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>

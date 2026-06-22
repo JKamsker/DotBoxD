@@ -37,7 +37,7 @@ internal static class HookFireAsyncExtensionEmitter
         builder.AppendLine("#nullable enable");
         builder.AppendLine("namespace DotBoxD.Plugins.Runtime;");
         builder.AppendLine();
-        builder.AppendLine("public static class HookRegistryFireAsyncExtensions");
+        builder.AppendLine("internal static class HookRegistryFireAsyncExtensions");
         builder.AppendLine("{");
         foreach (var model in models)
         {
@@ -51,7 +51,7 @@ internal static class HookFireAsyncExtensionEmitter
 
     private static void EmitDefaultOverload(StringBuilder builder, HookFireAsyncModel model)
     {
-        builder.Append("    public static global::System.Threading.Tasks.ValueTask<")
+        builder.Append("    internal static global::System.Threading.Tasks.ValueTask<")
             .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
         builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");
         builder.Append("        ").Append(model.ContextTypeFullName).AppendLine(" context,");
@@ -67,7 +67,7 @@ internal static class HookFireAsyncExtensionEmitter
 
     private static void EmitOptionsOverload(StringBuilder builder, HookFireAsyncModel model)
     {
-        builder.Append("    public static global::System.Threading.Tasks.ValueTask<")
+        builder.Append("    internal static global::System.Threading.Tasks.ValueTask<")
             .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
         builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");
         builder.Append("        ").Append(model.ContextTypeFullName).AppendLine(" context,");

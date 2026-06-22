@@ -26,7 +26,7 @@ internal sealed class GamePluginKernelWiring
     public void ValidateSupportedEvent(PluginPackage package)
     {
         var subscription = SubscribedEvent(package.Manifest);
-        if (SimpleEventName(subscription) is "MonsterAggroEvent" or "AttackEvent")
+        if (SimpleEventName(subscription) is "MonsterAggroEvent" or "AttackEvent" or "RemoteDamageDecisionEvent")
         {
             return;
         }
@@ -48,6 +48,9 @@ internal sealed class GamePluginKernelWiring
                 break;
             case "AttackEvent":
                 WireHookFor<AttackEvent>(kernel);
+                break;
+            case "RemoteDamageDecisionEvent":
+                WireHookFor<RemoteDamageDecisionEvent>(kernel);
                 break;
             default:
                 throw new InvalidOperationException(

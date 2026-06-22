@@ -121,6 +121,39 @@ public sealed class RemoteLocalHandlerRegistryTests
     }
 
     [Fact]
+    public async Task DispatchResultAsync_encodes_null_reason_as_empty_string()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        registry.RegisterResult<DamageCtx, TextResult>(
+            "sub-result",
+            (ctx, _) => new TextResult(true, null, "label-" + ctx.Damage.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+        var response = await registry.DispatchResultAsync(
+            "sub-result",
+            EncodeProjected(new DamageCtx(3)),
+            Context());
+
+        var result = KernelRpcBinaryCodec.DecodeValue(response);
+        Assert.Equal(string.Empty, result.Items[1].TextValue);
+        Assert.Equal("label-3", result.Items[2].TextValue);
+    }
+
+    [Fact]
+    public async Task DispatchResultAsync_rejects_null_domain_string_fields()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        registry.RegisterResult<DamageCtx, TextResult>(
+            "sub-result",
+            (_, _) => new TextResult(true, null, null));
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            async () => await registry.DispatchResultAsync(
+                "sub-result",
+                EncodeProjected(new DamageCtx(3)),
+                Context()));
+    }
+
+    [Fact]
     public async Task DispatchResultAsync_threads_cancellation_to_the_delegate()
     {
         var registry = new RemoteLocalHandlerRegistry();
@@ -236,4 +269,6 @@ public sealed class RemoteLocalHandlerRegistryTests
     private sealed record DamageCtx(int Damage);
 
     private readonly record struct DamageResult(bool Success, string? Reason, int Damage) : IHookResult;
+
+    private readonly record struct TextResult(bool Success, string? Reason, string? Label) : IHookResult;
 }

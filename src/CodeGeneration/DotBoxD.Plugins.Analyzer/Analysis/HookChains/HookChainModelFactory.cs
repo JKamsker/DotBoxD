@@ -83,11 +83,20 @@ internal static class HookChainModelFactory
         isLocalTerminal = false;
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             (!string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterMethod, StringComparison.Ordinal) &&
-             !string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal)) ||
-            ReceiverKind(model, terminalAccess.Expression, cancellationToken) is not
-                (HookChainReceiverKind.Local or HookChainReceiverKind.Remote))
+             !string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal)))
         {
             return false;
+        }
+
+        var receiverKind = ReceiverKind(model, terminalAccess.Expression, cancellationToken);
+        if (receiverKind is not (HookChainReceiverKind.Local or HookChainReceiverKind.Remote))
+        {
+            var stages = new List<HookChainStage>();
+            var seed = WalkToSeed(terminalAccess.Expression, stages);
+            if (seed is null || GeneratedRemoteHookChainFallback.CandidateKind(seed) != GeneratedRemoteHookChainKind.Hook)
+            {
+                return false;
+            }
         }
 
         isLocalTerminal = string.Equals(terminalAccess.Name.Identifier.ValueText, RegisterLocalMethod, StringComparison.Ordinal);
@@ -202,7 +211,8 @@ internal static class HookChainModelFactory
                 terminalElementParam,
                 terminalContextParam,
                 terminalCancellationParam is not null,
-                installKind == HookChainInterceptorInstallKind.LocalResultChain);
+                installKind == HookChainInterceptorInstallKind.LocalResultChain,
+                generatedRemoteKind);
         }
 
         // Collectors for the whole chain: every Where/Select/terminal-Send deposits the capabilities its
@@ -377,7 +387,11 @@ internal static class HookChainModelFactory
                 HookChainInterceptorInstallKind.LocalCallback,
             RegisterMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
                 HookChainInterceptorInstallKind.ResultChain,
+            RegisterMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
+                HookChainInterceptorInstallKind.ResultChain,
             RegisterLocalMethod when receiverKind is HookChainReceiverKind.Local or HookChainReceiverKind.Remote =>
+                HookChainInterceptorInstallKind.LocalResultChain,
+            RegisterLocalMethod when generatedRemoteKind == GeneratedRemoteHookChainKind.Hook =>
                 HookChainInterceptorInstallKind.LocalResultChain,
             _ => null
         };

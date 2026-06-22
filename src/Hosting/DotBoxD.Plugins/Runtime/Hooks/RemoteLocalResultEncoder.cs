@@ -36,7 +36,7 @@ internal static class RemoteLocalResultEncoder
             return KernelRpcMarshaller.ToSandboxValue(value, type);
         }
 
-        return type == typeof(string)
+        return type == typeof(string) && string.Equals(name, "Reason", StringComparison.Ordinal)
             ? SandboxValue.FromString(string.Empty)
             : throw new NotSupportedException(
                 $"Hook result field '{name}' of type '{type}' was null; the sandbox value model has no null.");

@@ -147,6 +147,8 @@
         },
         "priority": {
           "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647,
           "description": "Dispatch priority for a lowered result-returning hook chain. Higher values run first. Optional; defaults to 0."
         },
         "resultType": {

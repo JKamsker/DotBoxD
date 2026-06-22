@@ -58,15 +58,12 @@ internal sealed class ResultHookSlot<TEvent>
         InstalledKernel filterKernel,
         int priority,
         Func<TEvent, HookContext, CancellationToken, ValueTask<IHookResult>> handler)
-        => Add(priority, filterKernel, remote: true, async (e, context, ct) =>
-        {
-            if (!await filterKernel.ShouldHandleAsync(_adapter, e, ct).ConfigureAwait(false))
-            {
-                return null;
-            }
-
-            return await handler(e, context, ct).ConfigureAwait(false);
-        });
+        => Add(
+            priority,
+            filterKernel,
+            remote: true,
+            async (e, context, ct) => await handler(e, context, ct).ConfigureAwait(false),
+            async (e, _, ct) => await filterKernel.ShouldHandleAsync(_adapter, e, ct).ConfigureAwait(false));
 
     /// <summary>Installs a handler from a raw invoke delegate. Used by tests to exercise dispatch semantics
     /// without materializing a sandbox kernel; a <see langword="null"/> result means "filter did not match".</summary>
@@ -95,9 +92,15 @@ internal sealed class ResultHookSlot<TEvent>
             cancellationToken.ThrowIfCancellationRequested();
 
             IHookResult? result;
+            var entry = entries[i];
             try
             {
-                var entry = entries[i];
+                if (entry.Filter is not null &&
+                    !await entry.Filter(e, context, cancellationToken).ConfigureAwait(false))
+                {
+                    continue;
+                }
+
                 result = entry.Remote
                     ? await InvokeRemoteAsync(entry, e, context, options, cancellationToken).ConfigureAwait(false)
                     : await entry.Invoke(e, context, cancellationToken).ConfigureAwait(false);
@@ -123,7 +126,14 @@ internal sealed class ResultHookSlot<TEvent>
                 continue;
             }
 
-            return (TResult)result;
+            if (result is TResult typed)
+            {
+                return typed;
+            }
+
+            Report(new InvalidCastException(
+                $"Result hook for '{typeof(TEvent).FullName}' returned '{result.GetType().FullName}', " +
+                $"but '{typeof(TResult).FullName}' was requested."));
         }
 
         return null;
@@ -139,15 +149,23 @@ internal sealed class ResultHookSlot<TEvent>
     {
         if (options.RemoteHandlerTimeout == Timeout.InfiniteTimeSpan)
         {
-            return await entry.Invoke(e, context, cancellationToken).ConfigureAwait(false);
+            var pending = entry.Invoke(e, context, cancellationToken);
+            return pending.IsCompletedSuccessfully
+                ? pending.Result
+                : await pending.ConfigureAwait(false);
         }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(options.RemoteHandlerTimeout);
         try
         {
-            return await entry.Invoke(e, context, timeoutCts.Token)
-                .AsTask()
+            var pending = entry.Invoke(e, context, timeoutCts.Token);
+            if (pending.IsCompletedSuccessfully)
+            {
+                return pending.Result;
+            }
+
+            return await pending.AsTask()
                 .WaitAsync(timeoutCts.Token)
                 .ConfigureAwait(false);
         }
@@ -200,11 +218,12 @@ internal sealed class ResultHookSlot<TEvent>
         int priority,
         InstalledKernel? kernel,
         bool remote,
-        Func<TEvent, HookContext, CancellationToken, ValueTask<IHookResult?>> invoke)
+        Func<TEvent, HookContext, CancellationToken, ValueTask<IHookResult?>> invoke,
+        Func<TEvent, HookContext, CancellationToken, ValueTask<bool>>? filter = null)
     {
         lock (_gate)
         {
-            var entry = new Entry(priority, _order++, kernel, remote, invoke);
+            var entry = new Entry(priority, _order++, kernel, remote, invoke, filter);
             var next = new List<Entry>(_entries.Length + 1);
             next.AddRange(_entries);
             next.Add(entry);
@@ -221,7 +240,8 @@ internal sealed class ResultHookSlot<TEvent>
         int Order,
         InstalledKernel? Kernel,
         bool Remote,
-        Func<TEvent, HookContext, CancellationToken, ValueTask<IHookResult?>> Invoke);
+        Func<TEvent, HookContext, CancellationToken, ValueTask<IHookResult?>> Invoke,
+        Func<TEvent, HookContext, CancellationToken, ValueTask<bool>>? Filter);
 
     internal static Func<SandboxValue, IHookResult> Decoder(Type resultType)
         => value => (IHookResult)KernelRpcMarshaller.FromSandboxValue(value, resultType)!;

@@ -57,9 +57,56 @@ public sealed class RemoteResultHookChainTests
         Assert.Equal(36, result.Value.Damage);
     }
 
+    [Fact]
+    public async Task Remote_RegisterLocal_timeout_options_return_fail_closed_result_when_request_hangs()
+    {
+        var faults = new List<ResultHookFault>();
+        using var server = PluginServer.Create(
+            defaultPolicy: TestPolicies.Chain(),
+            onResultHookFault: faults.Add);
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        var never = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registry = RemoteRegistry(server, localHandlers, (_, _, _) => new ValueTask<byte[]>(never.Task));
+
+        RemoteDamagePlugin.ConfigureLocal(registry);
+
+        var options = ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
+            TimeSpan.FromMilliseconds(25),
+            new RemoteDamageResult(true, "timeout", -1));
+        var result = await server.Hooks.FireAsync(new RemoteDamageContext(12), options);
+
+        Assert.Equal(-1, result!.Value.Damage);
+        Assert.IsType<TimeoutException>(Assert.Single(faults).Exception);
+    }
+
+    [Fact]
+    public async Task Remote_RegisterLocal_result_request_receives_the_fire_token()
+    {
+        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
+        var localHandlers = new RemoteLocalHandlerRegistry();
+        CancellationToken observed = default;
+        var registry = RemoteRegistry(server, localHandlers, (id, payload, token) =>
+        {
+            observed = token;
+            return localHandlers.DispatchResultAsync(
+                id,
+                payload.ToArray(),
+                new HookContext(new InMemoryPluginMessageSink(), token),
+                token);
+        });
+        using var cts = new CancellationTokenSource();
+
+        RemoteDamagePlugin.ConfigureLocal(registry);
+        var result = await server.Hooks.FireAsync(new RemoteDamageContext(12), cts.Token);
+
+        Assert.Equal(cts.Token, observed);
+        Assert.Equal(24, result!.Value.Damage);
+    }
+
     private static RemoteHookRegistry RemoteRegistry(
         PluginServer server,
-        RemoteLocalHandlerRegistry localHandlers)
+        RemoteLocalHandlerRegistry localHandlers,
+        RemoteLocalResultRequest? requestOverride = null)
         => new(
             async package =>
             {
@@ -73,11 +120,11 @@ public sealed class RemoteResultHookChainTests
                         kernel,
                         subscriptionId,
                         typeof(RemoteDamageResult),
-                        (id, payload, token) => localHandlers.DispatchResultAsync(
-                            id,
-                            payload.ToArray(),
-                            new HookContext(new InMemoryPluginMessageSink(), token),
-                            token),
+                        requestOverride ?? ((id, payload, token) => localHandlers.DispatchResultAsync(
+                                id,
+                                payload.ToArray(),
+                                new HookContext(new InMemoryPluginMessageSink(), token),
+                                token)),
                         subscription.Priority);
                 }
                 else

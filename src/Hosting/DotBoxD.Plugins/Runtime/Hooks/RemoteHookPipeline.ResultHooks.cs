@@ -54,8 +54,27 @@ public sealed partial class RemoteHookPipeline<TEvent>
             throw ResultLocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
-        _localHandlers.RegisterResult(subscriptionId, handler);
+        IDisposable? speculativeRegistration = null;
+        try
+        {
+            speculativeRegistration = _localHandlers.RegisterResult(package.Manifest.PluginId, handler);
+            var subscriptionId = _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
+            if (!string.Equals(subscriptionId, package.Manifest.PluginId, StringComparison.Ordinal))
+            {
+                _localHandlers.RegisterResult(subscriptionId, handler);
+                speculativeRegistration.Dispose();
+                speculativeRegistration = null;
+            }
+            else
+            {
+                speculativeRegistration = null;
+            }
+        }
+        finally
+        {
+            speculativeRegistration?.Dispose();
+        }
+
         return this;
     }
 

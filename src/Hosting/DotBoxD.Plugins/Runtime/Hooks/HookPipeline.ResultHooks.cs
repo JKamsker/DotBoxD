@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Plugins.Runtime.Rpc;
@@ -48,6 +49,7 @@ public sealed partial class HookPipeline<TEvent>
         var kernel = MaterializeResultKernel(package);
         try
         {
+            ValidateResultKernel(kernel, typeof(TResult), resultLocalTerminal: false);
             _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent>.Decoder<TResult>());
         }
         catch
@@ -65,6 +67,7 @@ public sealed partial class HookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(resultType);
         EnsureHookResultType(resultType);
         kernel.ValidateFor(_adapter);
+        ValidateResultKernel(kernel, resultType, resultLocalTerminal: false);
         _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent>.Decoder(resultType));
         return this;
     }
@@ -95,6 +98,7 @@ public sealed partial class HookPipeline<TEvent>
         var kernel = MaterializeResultKernel(package);
         try
         {
+            ValidateResultKernel(kernel, typeof(TResult), resultLocalTerminal: true);
             _resultHooks.AddLocal(
                 kernel,
                 priority,
@@ -123,6 +127,7 @@ public sealed partial class HookPipeline<TEvent>
         EnsureHookResultType(resultType);
         LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
         filterKernel.ValidateFor(_adapter);
+        ValidateResultKernel(filterKernel, resultType, resultLocalTerminal: true);
         _resultHooks.AddRemote(filterKernel, priority, async (e, context, ct) =>
         {
             var response = await LocalCallbackProjection.RequestResultAsync(
@@ -184,6 +189,88 @@ public sealed partial class HookPipeline<TEvent>
             $"Result type '{resultType}' must implement {nameof(IHookResult)}.",
             nameof(resultType));
     }
+
+    private static void ValidateResultKernel(InstalledKernel kernel, Type resultType, bool resultLocalTerminal)
+    {
+        ValidateResultManifest(kernel.Manifest, resultType, resultLocalTerminal);
+        ValidateHandleReturnType(kernel.Package, resultType, resultLocalTerminal);
+    }
+
+    private static void ValidateResultManifest(PluginManifest manifest, Type resultType, bool resultLocalTerminal)
+    {
+        var foundResultSubscription = false;
+        foreach (var subscription in manifest.Subscriptions)
+        {
+            if (subscription.ResultType is null)
+            {
+                continue;
+            }
+
+            foundResultSubscription = true;
+            if (subscription.ResultLocalTerminal != resultLocalTerminal)
+            {
+                throw ResultValidationError(
+                    $"Plugin '{manifest.PluginId}' result subscription declares resultLocalTerminal " +
+                    $"'{subscription.ResultLocalTerminal}', but the install path expected '{resultLocalTerminal}'.");
+            }
+
+            if (!ResultTypeMatches(subscription.ResultType, resultType))
+            {
+                throw ResultValidationError(
+                    $"Plugin '{manifest.PluginId}' result subscription declares result type " +
+                    $"'{subscription.ResultType}', but '{resultType.FullName}' was expected.");
+            }
+        }
+
+        if (!foundResultSubscription)
+        {
+            throw ResultValidationError(
+                $"Plugin '{manifest.PluginId}' does not declare result hook metadata.");
+        }
+    }
+
+    private static void ValidateHandleReturnType(
+        PluginPackage package,
+        Type resultType,
+        bool resultLocalTerminal)
+    {
+        var handle = package.Module.Functions.FirstOrDefault(f =>
+            string.Equals(f.Id, package.Entrypoints.Handle, StringComparison.Ordinal));
+        if (handle is null)
+        {
+            return;
+        }
+
+        var expected = resultLocalTerminal
+            ? SandboxType.Unit
+            : KernelRpcMarshaller.SandboxTypeOf(resultType);
+        if (handle.ReturnType.Equals(expected))
+        {
+            return;
+        }
+
+        throw ResultValidationError(
+            $"Plugin '{package.Manifest.PluginId}' result Handle returns '{handle.ReturnType}', " +
+            $"but '{expected}' was expected.");
+    }
+
+    private static bool ResultTypeMatches(string declared, Type expected)
+    {
+        var expectedName = expected.FullName ?? expected.Name;
+        return string.Equals(NormalizeResultTypeName(declared), NormalizeResultTypeName(expectedName), StringComparison.Ordinal);
+    }
+
+    private static string NormalizeResultTypeName(string name)
+    {
+        const string globalPrefix = "global::";
+        return (name.StartsWith(globalPrefix, StringComparison.Ordinal)
+                ? name[globalPrefix.Length..]
+                : name)
+            .Replace('+', '.');
+    }
+
+    private static SandboxValidationException ResultValidationError(string message)
+        => new([new SandboxDiagnostic("DBXK033", message)]);
 
     private InstalledKernel MaterializeResultKernel(PluginPackage package)
     {
