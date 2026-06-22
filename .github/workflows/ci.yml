@@ -91,16 +91,19 @@ jobs:
           - os: ubuntu-latest
             suite: kernels-allocation-regression
             projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
+            prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
           - os: ubuntu-latest
             suite: kernels-remainder
             projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
+            prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
           - os: ubuntu-latest
             suite: services
             projects: |
               tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj
               tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj
+            prebuild: ''
             filter: ''
           - os: ubuntu-latest
             suite: integration-smoke
@@ -109,20 +112,24 @@ jobs:
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
               tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj
+            prebuild: ''
             filter: ''
           - os: windows-latest
             suite: kernels-allocation-regression
             projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
+            prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
           - os: windows-latest
             suite: kernels-remainder
             projects: tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj
+            prebuild: samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
             filter: FullyQualifiedName!~DotBoxD.Kernels.Tests.Plugins.Regression.InterpreterValues.Fix_PAL_0043_Tests
           - os: windows-latest
             suite: services
             projects: |
               tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj
               tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj
+            prebuild: ''
             filter: ''
           - os: windows-latest
             suite: integration-smoke
@@ -131,6 +138,7 @@ jobs:
               tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj
               samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
               tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj
+            prebuild: ''
             filter: ''
 
     steps:
@@ -151,6 +159,21 @@ jobs:
 
       - name: Restore
         run: dotnet restore DotBoxD.slnx
+
+      - name: Build test prerequisites
+        if: ${{ matrix.prebuild != '' }}
+        shell: pwsh
+        run: |
+          $projectText = @"
+          ${{ matrix.prebuild }}
+          "@
+          $projects = $projectText -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_.Length -gt 0 }
+          foreach ($project in $projects) {
+            dotnet build $project -c Release --no-restore
+            if ($LASTEXITCODE -ne 0) {
+              throw "Prerequisite build failed for $project (exit $LASTEXITCODE)."
+            }
+          }
 
       - name: Test ${{ matrix.suite }}
         shell: pwsh
@@ -341,6 +364,9 @@ jobs:
 
       - name: Restore
         run: dotnet restore DotBoxD.slnx
+
+      - name: Build coverage prerequisites
+        run: dotnet build samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj -c Release --no-restore
 
       # Collect coverage from the two suites that exercise the bulk of the shipping
       # code, then enforce the line-coverage floor (.config/code-enforcer/coverage.json).
