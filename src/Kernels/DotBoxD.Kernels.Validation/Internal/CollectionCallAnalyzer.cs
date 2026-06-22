@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels.Validation.Internal;
+
 using DotBoxD.Kernels;
 internal delegate SandboxType ExpressionAnalyzer(
     Expression expression,
@@ -238,7 +239,6 @@ internal sealed partial class CollectionCallAnalyzer
         }
         return mapType ?? SandboxType.Map(keyType, SandboxType.Unit);
     }
-
     private SandboxType? RequireList(SandboxType actual, SourceSpan span)
     {
         if (actual.Name == "List" && actual.Arguments.Count == 1)

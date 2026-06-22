@@ -10,6 +10,7 @@ using DotBoxD.Services.Tests.Support;
 using DotBoxD.Services.Transport;
 using Xunit;
 namespace DotBoxD.Services.Tests.Peer;
+
 public sealed class RpcPeerInboundQueueBoundTests
 {
     private static MessagePackRpcSerializer NewSerializer() => new();
@@ -165,7 +166,6 @@ public sealed class RpcPeerInboundQueueBoundTests
                     RequestTimeout = TimeSpan.FromSeconds(5),
                 })
             .Start();
-
         using var requestFrame = CreateRequestFrame(serializer, 42);
         await client.SendAsync(requestFrame.Memory);
 

@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Hosting.Execution;
+
 internal static class CompiledExecutionRunner
 {
     public static ValueTask<SandboxExecutionResult> ExecuteAsync(
@@ -64,7 +65,6 @@ internal static class CompiledExecutionRunner
             plan.ModuleHash,
             plan.PolicyHash);
         var startedAt = AuditTime(plan);
-
         try
         {
             budget.CheckDeadline();

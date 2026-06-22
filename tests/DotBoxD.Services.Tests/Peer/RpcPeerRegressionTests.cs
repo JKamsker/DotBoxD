@@ -12,6 +12,7 @@ using DotBoxD.Services.Transport;
 using Shared;
 using Xunit;
 namespace DotBoxD.Services.Tests.Peer;
+
 public sealed class RpcPeerRegressionTests
 {
     private static MessagePackRpcSerializer NewSerializer() => new();
@@ -179,7 +180,6 @@ public sealed class RpcPeerRegressionTests
             out var envelope,
             out var payload));
         var response = serializer.Deserialize<RpcResponse>(envelope);
-
         Assert.Equal(42, messageId);
         Assert.Equal(MessageType.Error, messageType);
         Assert.Equal(0, payload.Length);

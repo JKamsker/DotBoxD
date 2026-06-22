@@ -8,6 +8,7 @@ using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Transport;
 using Xunit;
 namespace DotBoxD.Services.Tests.Coverage.Transport;
+
 public sealed class ValueTaskChannelCoverageTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
@@ -87,7 +88,6 @@ public sealed class ValueTaskChannelCoverageTests
                 RequestTimeout = System.Threading.Timeout.InfiniteTimeSpan,
             });
         var call = harness.Invoker.InvokeValueAsync<int>("Svc", "Op", 42);
-
         Assert.Equal(0, harness.SendTaskCalls);
         Assert.Equal(1, harness.SendFrameCalls);
         Assert.True(harness.Invoker.TryCompleteResponse(1, MessageFramer.FrameMessage(

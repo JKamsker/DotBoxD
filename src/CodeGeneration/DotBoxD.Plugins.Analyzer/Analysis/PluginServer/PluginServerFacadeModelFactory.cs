@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static DotBoxD.Plugins.Analyzer.Analysis.PluginServer.PluginServerFacadeNameFormatter;
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
+
 internal static class PluginServerFacadeModelFactory
 {
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
@@ -239,7 +240,6 @@ internal static class PluginServerFacadeModelFactory
         }
         wrapper.Methods.AddRange(ResolveMethods(serviceType, serviceWrappers, cancellationToken));
     }
-
     private static PluginServerParameter[] ResolveParameters(IMethodSymbol method)
     {
         var parameters = new PluginServerParameter[method.Parameters.Length];

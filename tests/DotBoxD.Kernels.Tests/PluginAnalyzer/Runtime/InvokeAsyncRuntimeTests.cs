@@ -6,6 +6,7 @@ using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
+
 public sealed class InvokeAsyncRuntimeTests
 {
     [Fact]
@@ -195,7 +196,6 @@ public sealed class InvokeAsyncRuntimeTests
             [GeneratePluginServer]
             public partial class RemotePluginServer : IGameWorldAccess;
         }
-
         namespace Sample
         {
             public static class Usage

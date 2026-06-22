@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Compiler.Emitters.Returns;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels.Compiler.Emitters;
+
 using System.Reflection;
 using System.Reflection.Emit;
 using DotBoxD.Kernels;
@@ -177,7 +178,6 @@ internal sealed class MethodEmitter
             _nonNegativeF64Locals.Clear();
             return;
         }
-
         _nonNegativeF64Locals.Clear();
         var index = _il.DeclareLocal(typeof(int));
         var end = _il.DeclareLocal(typeof(int));

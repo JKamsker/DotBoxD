@@ -6,6 +6,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Verifier.Generated;
 namespace DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
+
 internal static class PersistentCompiledArtifactCacheOrigin
 {
     public const string ProofFileName = "origin.json";
@@ -283,7 +284,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             return false;
         }
     }
-
     private static FileStream DurableCreate(string path)
         => new(
             path,

@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Verifier.Generated;
 namespace DotBoxD.Kernels.Compiler;
+
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DotBoxD.Kernels;
@@ -142,7 +143,6 @@ public sealed partial class PersistentCompiledArtifactCache
     {
         PersistentCompiledArtifactCacheValidator.ValidateManifest(cacheKey, plan, entrypoint, manifest, policy);
         PersistentCompiledArtifactCacheValidator.ValidateVerification(manifest, verification, policy);
-
         var finalPath = EntryPath(cacheKey);
         PersistentCompiledArtifactCachePathGuard.ValidateEntryPath(_rootDirectory, finalPath);
         var tempPath = Path.Combine(_rootDirectory, ".tmp-" + Guid.NewGuid().ToString("N"));

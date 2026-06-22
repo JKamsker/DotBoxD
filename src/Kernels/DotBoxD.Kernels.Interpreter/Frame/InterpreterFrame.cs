@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 namespace DotBoxD.Kernels.Interpreter.Frame;
+
 internal sealed partial class InterpreterFrame
 {
     private readonly FunctionFrameLayout _layout;
@@ -220,7 +221,6 @@ internal sealed partial class InterpreterFrame
             _slots[slot] = SandboxValue.FromInt32(value);
             return;
         }
-
         _i32Slots[slot] = value;
         _assigned[slot] = true;
     }

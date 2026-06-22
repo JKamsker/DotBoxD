@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Lifecycle;
 namespace DotBoxD.Kernels.Tests.Plugins;
+
 public sealed class PluginAddendumTests
 {
     [Fact]
@@ -96,7 +97,6 @@ public sealed class PluginAddendumTests
         Assert.Empty(messages.Messages);
         Assert.Equal(250, kernel.Kernel.Value.Get<int>("MinDamage"));
     }
-
     [Fact]
     public async Task ModifyAsync_ignores_update_mode_and_waits_for_batch_commit()
     {

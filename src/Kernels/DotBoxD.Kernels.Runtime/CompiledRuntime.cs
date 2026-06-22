@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 using SandboxContext = DotBoxD.Kernels.Sandbox.SandboxContext;
 namespace DotBoxD.Kernels.Runtime;
+
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using static System.Runtime.CompilerServices.MethodImplOptions;
@@ -135,7 +136,6 @@ public static partial class CompiledRuntime
     public static SandboxValue Rem(SandboxValue left, SandboxValue right) => SandboxNumericOperations.Remainder(left, right);
     public static SandboxValue NotBool(SandboxValue value) => Bool(!AsBool(value));
     public static SandboxValue Eq(SandboxValue left, SandboxValue right) => Bool(Equals(left, right));
-
     public static SandboxValue Ne(SandboxValue left, SandboxValue right) => Bool(!Equals(left, right));
 
     public static SandboxValue LtI32(SandboxValue left, SandboxValue right) => Bool(AsI32(left) < AsI32(right));

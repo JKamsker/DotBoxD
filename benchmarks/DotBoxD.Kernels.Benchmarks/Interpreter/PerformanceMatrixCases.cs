@@ -1,4 +1,5 @@
 namespace DotBoxD.Kernels.Benchmarks.Interpreter;
+
 internal sealed record PerformanceMatrixCase(
     string Name,
     int Iterations,
@@ -50,7 +51,6 @@ internal static class PerformanceMatrixCases
         }
         return total;
     }
-
     private static object HandwrittenSqrt(int iterations)
     {
         var total = 1.0;

@@ -11,6 +11,7 @@ using DotBoxD.Kernels.Verifier;
 using DotBoxD.Kernels.Verifier.Generated;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 namespace DotBoxD.Kernels.Tests.Compiled.Core;
+
 public sealed class CompiledCacheTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -50,7 +51,6 @@ public sealed class CompiledCacheTests
         Assert.True(Directory.Exists(CacheEntry(temp.Path, firstPlan)));
         Assert.True(Directory.Exists(CacheEntry(temp.Path, secondPlan)));
     }
-
     [Fact]
     public async Task Binding_manifest_change_uses_a_different_cache_key()
     {

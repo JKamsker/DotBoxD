@@ -6,6 +6,7 @@ using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime;
 namespace DotBoxD.Kernels.Tests.Plugins;
+
 public sealed class PluginHookSignatureTests
 {
     [Fact]
@@ -45,7 +46,6 @@ public sealed class PluginHookSignatureTests
         var messages = new InMemoryPluginMessageSink();
         var server = PluginAddendumTestPolicies.CreateServer(messages);
         var kernel = await server.InstallAsync(ConventionRecordPackage());
-
         server.Hooks.On<ConventionRecordEvent>().Use(kernel);
         await server.Hooks.PublishAsync(new ConventionRecordEvent(150, "player-1"));
 

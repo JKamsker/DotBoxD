@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using DiagnosticSeverity = DotBoxD.Kernels.Model.DiagnosticSeverity;
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+
 public sealed class PluginAnalyzerCompletenessTests
 {
     private static readonly CSharpParseOptions ParseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -76,7 +77,6 @@ public sealed class PluginAnalyzerCompletenessTests
             {
                 [LiveSetting]
                 public int MinDamage { get; set; } = 100;
-
                 public bool ShouldHandle(DamageEvent e, HookContext ctx) => true;
 
                 public void Handle(DamageEvent e, HookContext ctx)

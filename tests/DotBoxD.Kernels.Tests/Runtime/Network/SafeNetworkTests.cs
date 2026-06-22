@@ -6,6 +6,7 @@ using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 using static DotBoxD.Kernels.Tests._TestSupport.NetworkTestFixtures;
 namespace DotBoxD.Kernels.Tests.Runtime.Network;
+
 public sealed class SafeNetworkTests
 {
     [Fact]
@@ -260,7 +261,6 @@ public sealed class SafeNetworkTests
             .WithFuel(5_000)
             .Build();
         var plan = await host.PrepareAsync(module, policy);
-
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.False(result.Succeeded);

@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Interpreter.Internal.Loops;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Kernels.Interpreter.Internal;
+
 using DotBoxD.Kernels;
 /// <summary>
 /// Walks and executes statements, blocks, and loops for a single interpreter.
@@ -240,7 +241,6 @@ internal sealed class StatementExecutor
                     : new ValueTask<SandboxValue?>(value);
             }
         }
-
         return default;
     }
 

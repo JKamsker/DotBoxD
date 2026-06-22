@@ -3,6 +3,7 @@ using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Protocol;
 using Xunit;
 namespace DotBoxD.Services.Tests.Protocol;
+
 public class MessageFramerTests
 {
     [Fact]
@@ -127,7 +128,6 @@ public class MessageFramerTests
         Assert.True(sink >= 0);
         return after - before;
     }
-
     [Fact]
     public async Task ReadMessageAsync_ShouldReadValidMessage()
     {

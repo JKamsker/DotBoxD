@@ -11,6 +11,7 @@ using DotBoxD.Services.Streaming.Frames;
 using DotBoxD.Services.Streaming.Remote;
 using Xunit;
 namespace DotBoxD.Services.Tests.Streaming.Waves;
+
 public sealed class StreamingWave4RegressionTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
@@ -168,7 +169,6 @@ public sealed class StreamingWave4RegressionTests
                 {
                     sentError.TrySetResult(serializer.Deserialize<RpcResponse>(envelope));
                 }
-
                 return Task.CompletedTask;
             },
             protocolError: static (_, _, _, _) => { },

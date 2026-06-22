@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 namespace DotBoxD.Kernels.Model;
+
 public sealed partial class ResourceMeter
 {
     private const int FuelDeadlineCheckInterval = 64;
@@ -90,7 +91,6 @@ public sealed partial class ResourceMeter
     public void ChargeCollection(SandboxValue value, CancellationToken cancellationToken)
         => ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
     public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None);
-
     public void ChargeValue(SandboxValue value, CancellationToken cancellationToken)
     {
         if (TryChargeFlatScalarValue(value, cancellationToken))

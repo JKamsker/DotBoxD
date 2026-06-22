@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+
 internal static partial class DotBoxDExpressionModelFactory
 {
     public static DotBoxDExpressionModel Create(
@@ -174,7 +175,6 @@ internal static partial class DotBoxDExpressionModelFactory
             _ => Unsupported(binary)
         };
     }
-
     private static DotBoxDExpressionModel AddBinary(
         DotBoxDExpressionModel left,
         DotBoxDExpressionModel right,

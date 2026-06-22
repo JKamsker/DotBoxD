@@ -4,6 +4,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 namespace DotBoxD.Kernels.Tests.Collections;
+
 public sealed class SafeMapCollectionTests
 {
     [Fact]
@@ -65,7 +66,6 @@ public sealed class SafeMapCollectionTests
         Assert.Equal(41, ((I32Value)result.Value!).Value);
         Assert.True(result.ResourceUsage.AllocatedBytes > 0);
     }
-
     [Fact]
     public async Task Map_remove_returns_map_without_key()
     {

@@ -2,6 +2,7 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Hosting.Execution;
+
 using DotBoxD.Kernels;
 public sealed partial class SandboxHost
 {
@@ -292,7 +293,6 @@ public sealed partial class SandboxHost
                      $"bindings={plan.BindingManifestHash} fuel={budget.FuelUsed}/{budget.Limits.MaxFuel}",
             Fields: fields));
     }
-
     private static DateTimeOffset AuditTime(ExecutionPlan plan)
         => plan.Policy.Deterministic
             ? plan.Policy.LogicalNow ?? DateTimeOffset.UnixEpoch
