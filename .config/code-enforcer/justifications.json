@@ -143,10 +143,6 @@
     }
   ],
   "folders": [
-    {
-      "path": "tests/DotBoxD.Kernels.Tests/Plugins/Rpc",
-      "justification": "Pre-existing RPC plugin regression folder groups service, generator, runtime, and IPC tests. Keep listed until RPC tests are split into subfolders."
-    }
   ],
   "rootFolders": []
 }
