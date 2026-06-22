@@ -30,10 +30,6 @@
       "justification": "Pre-existing peer orchestration file surfaced after correcting the line guard root. Keep listed until connection lifecycle and dispatch are split."
     },
     {
-      "path": "src/Services/DotBoxD.Services/Protocol/MessageFramer.cs",
-      "justification": "Pre-existing protocol framing implementation surfaced after correcting the line guard root. Keep listed until read/write frame paths are split."
-    },
-    {
       "path": "src/Services/DotBoxD.Services/Server/RpcHost.cs",
       "justification": "Pre-existing host orchestration file surfaced after correcting the line guard root. Keep listed until listener and peer lifecycle code are split."
     },
