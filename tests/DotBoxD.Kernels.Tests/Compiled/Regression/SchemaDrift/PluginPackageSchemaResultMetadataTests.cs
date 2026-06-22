@@ -44,9 +44,7 @@ public sealed class PluginPackageSchemaResultMetadataTests
         var rule = Assert.Single(rules.EnumerateArray(), RuleRequiresResultType);
         var invalidCombinations = rule.GetProperty("then").GetProperty("not").GetProperty("anyOf");
 
-        Assert.Contains(invalidCombinations.EnumerateArray(), item =>
-            item.TryGetProperty("required", out var required) &&
-            required.EnumerateArray().Any(value => value.GetString() == "localTerminal"));
+        Assert.Contains(invalidCombinations.EnumerateArray(), RequiresLocalTerminalConstTrue);
         Assert.Contains(invalidCombinations.EnumerateArray(), item =>
             item.TryGetProperty("required", out var required) &&
             required.EnumerateArray().Any(value => value.GetString() == "projectedType"));
@@ -79,4 +77,12 @@ public sealed class PluginPackageSchemaResultMetadataTests
     private static bool RuleRequiresResultType(JsonElement rule)
         => rule.GetProperty("if").TryGetProperty("required", out var required) &&
            required.EnumerateArray().Any(value => value.GetString() == "resultType");
+
+    private static bool RequiresLocalTerminalConstTrue(JsonElement item)
+        => item.TryGetProperty("required", out var required) &&
+           required.EnumerateArray().Any(value => value.GetString() == "localTerminal") &&
+           item.TryGetProperty("properties", out var properties) &&
+           properties.TryGetProperty("localTerminal", out var localTerminal) &&
+           localTerminal.TryGetProperty("const", out var constValue) &&
+           constValue.ValueKind == JsonValueKind.True;
 }

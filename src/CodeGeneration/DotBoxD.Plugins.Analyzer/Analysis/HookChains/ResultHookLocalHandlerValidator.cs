@@ -19,27 +19,38 @@ internal static class ResultHookLocalHandlerValidator
             return;
         }
 
-        foreach (var returnExpression in ReturnExpressions(terminalLambda))
+        var returnExpressions = ReturnExpressions(terminalLambda).ToArray();
+        if (returnExpressions.Length > 0 &&
+            returnExpressions.All(returnExpression =>
+                ReturnsHookResultExpression(returnExpression, resultType, model, cancellationToken)))
         {
-            if (returnExpression is InvocationExpressionSyntax builderChain &&
-                SymbolEqualityComparer.Default.Equals(
-                    DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
-                    resultType))
-            {
-                return;
-            }
-
-            if (returnExpression is ObjectCreationExpressionSyntax creation &&
-                SymbolEqualityComparer.Default.Equals(
-                    model.GetTypeInfo(creation, cancellationToken).ConvertedType ??
-                    model.GetTypeInfo(creation, cancellationToken).Type,
-                    resultType))
-            {
-                return;
-            }
+            return;
         }
 
         throw new NotSupportedException();
+    }
+
+    private static bool ReturnsHookResultExpression(
+        ExpressionSyntax returnExpression,
+        INamedTypeSymbol resultType,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (returnExpression is InvocationExpressionSyntax builderChain &&
+            SymbolEqualityComparer.Default.Equals(
+                DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
+                resultType))
+        {
+            return true;
+        }
+
+        if (returnExpression is ObjectCreationExpressionSyntax creation)
+        {
+            var typeInfo = model.GetTypeInfo(creation, cancellationToken);
+            return SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType ?? typeInfo.Type, resultType);
+        }
+
+        return false;
     }
 
     private static IEnumerable<ExpressionSyntax> ReturnExpressions(LambdaExpressionSyntax lambda)
@@ -55,7 +66,8 @@ internal static class ResultHookLocalHandlerValidator
             yield break;
         }
 
-        foreach (var statement in lambda.Block.Statements)
+        foreach (var statement in lambda.Block.DescendantNodes(static node =>
+            node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax))
         {
             if (statement is ReturnStatementSyntax { Expression: { } expression })
             {
