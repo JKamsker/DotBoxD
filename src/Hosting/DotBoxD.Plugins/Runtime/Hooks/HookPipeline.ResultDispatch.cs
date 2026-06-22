@@ -1,0 +1,54 @@
+namespace DotBoxD.Plugins.Runtime;
+
+public sealed partial class HookPipeline<TEvent>
+{
+    public HookPipeline<TEvent> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
+        lock (_gate)
+        {
+            _resultDispatchOptions[typeof(TResult)] = options;
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Dispatches result hooks for <paramref name="e"/> in descending priority order and returns the first
+    /// successful result, or <see langword="null"/> when none is registered or none succeeds. The host applies
+    /// the returned result to its live state.
+    /// </summary>
+    public ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult
+        => FireResultAsync(e, ResultDispatchOptions<TResult>(), cancellationToken);
+
+    public ValueTask<TResult?> FireResultAsync<TResult>(
+        TEvent e,
+        ResultHookDispatchOptions<TResult> options,
+        CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult
+    {
+        if (!_resultHooks.HasHandlers)
+        {
+            return new ValueTask<TResult?>((TResult?)null);
+        }
+
+        var context = cancellationToken.CanBeCanceled
+            ? new HookContext(_messages, cancellationToken)
+            : _defaultContext;
+        return _resultHooks.FireAsync(e, context, options, cancellationToken);
+    }
+
+    private ResultHookDispatchOptions<TResult> ResultDispatchOptions<TResult>()
+        where TResult : struct, IHookResult
+    {
+        lock (_gate)
+        {
+            return _resultDispatchOptions.TryGetValue(typeof(TResult), out var options)
+                ? (ResultHookDispatchOptions<TResult>)options
+                : ResultHookDispatchOptions<TResult>.Default;
+        }
+    }
+}

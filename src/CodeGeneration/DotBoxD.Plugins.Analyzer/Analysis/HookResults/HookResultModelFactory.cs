@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -29,13 +30,18 @@ internal static class HookResultModelFactory
             return null;
         }
 
+        if (type.TypeParameters.Length > 0)
+        {
+            return Invalid(type, declaration, $"hook result '{type.Name}' must not be generic");
+        }
+
         if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
         {
             // A non-partial [HookResult] can't have IHookResult or the Ok()/Reject() builders generated for it.
             // If it doesn't already implement IHookResult, a later .Register/.RegisterLocal install (constrained
             // `where TResult : struct, IHookResult`) fails with a cryptic CS0315; surface DBXK112 so the missing
             // contract is explicit. A type that implements IHookResult by hand is valid and left alone.
-            return ImplementsHookResult(type, context.SemanticModel.Compilation)
+            return IsValueTypeImplementingHookResult(type, context.SemanticModel.Compilation)
                 ? null
                 : Invalid(
                     type,
@@ -108,8 +114,6 @@ internal static class HookResultModelFactory
             diagnostic);
     }
 
-    // A diagnostic-only model: builders are not emitted (HasSuccess/HasReason are false) and the generator
-    // reports the DBXK112 message for a malformed [HookResult] shape.
     private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message)
         => new(
             type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString(),
@@ -121,17 +125,31 @@ internal static class HookResultModelFactory
             HasReason: false,
             new HookResultDiagnostic(PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()), message));
 
-    // True when the type already implements the runtime IHookResult contract (declared by hand). Used to decide
-    // whether a NON-partial [HookResult] is a valid manual implementation (left alone) or a missing-contract case
-    // that should surface DBXK112 instead of a later cryptic CS0315 at its Register/RegisterLocal install site.
-    private static bool ImplementsHookResult(INamedTypeSymbol type, Compilation compilation)
+    internal static bool CanSatisfyHookResult(
+        INamedTypeSymbol type,
+        Compilation compilation,
+        CancellationToken cancellationToken)
     {
+        if (type.TypeParameters.Length > 0)
+        {
+            return false;
+        }
+
+        return IsValueTypeImplementingHookResult(type, compilation) ||
+            IsValidGeneratedHookResult(type, cancellationToken);
+    }
+
+    private static bool IsValueTypeImplementingHookResult(INamedTypeSymbol type, Compilation compilation)
+    {
+        if (!type.IsValueType)
+        {
+            return false;
+        }
+
         var hookResult = compilation.GetTypeByMetadataName("DotBoxD.Abstractions.IHookResult");
         if (hookResult is null)
         {
-            // Can't resolve the contract interface (abstractions not referenced): preserve the prior
-            // leave-non-partial-alone behavior rather than emit a false-positive diagnostic.
-            return true;
+            return false;
         }
 
         foreach (var @interface in type.AllInterfaces)
@@ -143,6 +161,68 @@ internal static class HookResultModelFactory
         }
 
         return false;
+    }
+
+    private static bool IsValidGeneratedHookResult(INamedTypeSymbol type, CancellationToken cancellationToken)
+    {
+        if (type is not { IsValueType: true, IsReadOnly: true, IsRecord: true, ContainingType: null } ||
+            type.TypeParameters.Length > 0 ||
+            !HasHookResultAttribute(type))
+        {
+            return false;
+        }
+
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not RecordDeclarationSyntax
+                {
+                    ParameterList: { } parameters
+                } declaration ||
+                !declaration.Modifiers.Any(SyntaxKind.PartialKeyword) ||
+                PrimaryConstructor(type, parameters) is not { } primary)
+            {
+                continue;
+            }
+
+            if (HasControlConstructorParameters(primary))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasHookResultAttribute(INamedTypeSymbol type)
+    {
+        foreach (var attribute in type.GetAttributes())
+        {
+            if (string.Equals(
+                    attribute.AttributeClass?.ToDisplayString(),
+                    DotBoxDMetadataNames.HookResultAttribute,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasControlConstructorParameters(IMethodSymbol primary)
+    {
+        var hasSuccess = false;
+        var hasReason = false;
+        foreach (var parameter in primary.Parameters)
+        {
+            hasSuccess |= string.Equals(parameter.Name, SuccessField, StringComparison.Ordinal)
+                && parameter.Type.SpecialType == SpecialType.System_Boolean;
+            hasReason |= string.Equals(parameter.Name, ReasonField, StringComparison.Ordinal)
+                && parameter.Type.SpecialType == SpecialType.System_String
+                && parameter.NullableAnnotation == NullableAnnotation.Annotated;
+        }
+
+        return hasSuccess && hasReason;
     }
 
     // The positional record's primary constructor: the instance constructor that is neither the implicit

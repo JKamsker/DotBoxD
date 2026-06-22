@@ -16,6 +16,12 @@ public sealed record RemoteOtherDamageContext(int Damage);
 [HookResult]
 public readonly partial record struct RemoteOtherDamageResult(bool Success, string? Reason, int Damage);
 
+[Hook("remote.optional", typeof(RemoteOptionalResult))]
+public sealed record RemoteOptionalContext(int Damage);
+
+[HookResult]
+public readonly partial record struct RemoteOptionalResult(bool Success, string? Reason, int? Damage);
+
 public static class RemoteDamagePlugin
 {
     public static void ConfigureLocal(RemoteHookRegistry hooks)
@@ -29,7 +35,15 @@ public static class RemoteDamagePlugin
             .Register(ctx => RemoteDamageResult.Ok().WithDamage(ctx.Damage * 3), priority: 11);
 }
 
-public sealed class RemoteResultHookChainTests
+public static class RemoteOptionalPlugin
+{
+    public static void ConfigureLocal(RemoteHookRegistry hooks)
+        => hooks.On<RemoteOptionalContext>()
+            .RegisterLocal((ctx, _) => RemoteOptionalResult.Ok().WithDamage(
+                ctx.Damage > 0 ? ctx.Damage : null), priority: 3);
+}
+
+public sealed partial class RemoteResultHookChainTests
 {
     [Fact]
     public async Task Remote_RegisterLocal_filters_server_side_and_requests_result_from_plugin_side_delegate()
@@ -181,34 +195,12 @@ public sealed class RemoteResultHookChainTests
         var options = ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
             TimeSpan.FromMilliseconds(100),
             new RemoteDamageResult(true, "timeout", -1));
-        var result = await server.Hooks.FireAsync(new RemoteDamageContext(12), options);
+        var result = await server.Hooks.FireAsync<RemoteDamageContext, RemoteDamageResult>(
+            new RemoteDamageContext(12),
+            options);
 
         Assert.Equal(-1, result!.Value.Damage);
         Assert.IsType<TimeoutException>(Assert.Single(faults).Exception);
-    }
-
-    [Fact]
-    public async Task Remote_RegisterLocal_result_request_receives_the_fire_token()
-    {
-        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
-        var localHandlers = new RemoteLocalHandlerRegistry();
-        CancellationToken observed = default;
-        var registry = RemoteRegistry(server, localHandlers, (id, payload, token) =>
-        {
-            observed = token;
-            return localHandlers.DispatchResultAsync(
-                id,
-                payload.ToArray(),
-                new HookContext(new InMemoryPluginMessageSink(), token),
-                token);
-        });
-        using var cts = new CancellationTokenSource();
-
-        RemoteDamagePlugin.ConfigureLocal(registry);
-        var result = await server.Hooks.FireAsync(new RemoteDamageContext(12), cts.Token);
-
-        Assert.Equal(cts.Token, observed);
-        Assert.Equal(24, result!.Value.Damage);
     }
 
     private static RemoteHookRegistry RemoteRegistry(

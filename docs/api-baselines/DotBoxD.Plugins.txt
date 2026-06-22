@@ -74,6 +74,7 @@ public EventIndexStats Stats => new(
 public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError
 public Exception? LastAsyncUpdateError => Kernel.LastAsyncUpdateError
 public Guid ReadGuid()
+public HookPipeline<TEvent> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options) where TResult : struct, IHookResult
 public HookPipeline<TEvent> InvokeHostHandler(Action<TEvent, HookContext> handler)
 public HookPipeline<TEvent> InvokeHostHandler(Action<TEvent> handler)
 public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTask> handler)
@@ -370,6 +371,7 @@ public static PluginPackage Import(string json)
 public static PluginPackage Resolve(Type kernelType)
 public static PluginPackage Resolve<TKernel>() where TKernel : class => Resolve(typeof(TKernel))
 public static PluginServer Create( IPluginMessageSink? messages = null, Action<SandboxHostBuilder>? configureHost = null, SandboxPolicy? defaultPolicy = null, ExecutionMode executionMode = ExecutionMode.Auto, Action<SubscriptionDeliveryFault>? onSubscriptionFault = null, Action<ResultHookFault>? onResultHookFault = null)
+public static PluginServer Create( IPluginMessageSink? messages, Action<SandboxHostBuilder>? configureHost, SandboxPolicy? defaultPolicy, ExecutionMode executionMode, Action<SubscriptionDeliveryFault>? onSubscriptionFault)
 public static ResultHookDispatchOptions<TResult> Default { get; } = new()
 public static ResultHookDispatchOptions<TResult> FailClosedAfter(TimeSpan timeout, TResult result)
 public static SandboxHostBuilder AddBindingsFrom<TService>( this SandboxHostBuilder builder, TService implementation) where TService : class

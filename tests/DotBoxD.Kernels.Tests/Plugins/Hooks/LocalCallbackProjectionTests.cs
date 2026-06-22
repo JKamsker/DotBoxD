@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Hooks;
 
@@ -28,6 +29,15 @@ public sealed class LocalCallbackProjectionTests
         Assert.Contains("conflicting local-terminal projected type", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void EnsureWholeEventSupported_rejects_polymorphic_handle_properties()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => LocalCallbackProjection.EnsureWholeEventSupported(new PolymorphicEventAdapter()));
+
+        Assert.Contains("cannot carry polymorphic handle properties", ex.Message, StringComparison.Ordinal);
+    }
+
     private static PluginManifest Manifest(params HookSubscriptionManifest[] subscriptions)
         => new(
             "local-projection-test",
@@ -36,4 +46,27 @@ public sealed class LocalCallbackProjectionTests
             [],
             [],
             subscriptions);
+
+    private sealed record PolymorphicEvent(PolymorphicHandle Handle);
+
+    [PolymorphicHandle(nameof(Id))]
+    private sealed record PolymorphicHandle(int Id);
+
+    private sealed class PolymorphicEventAdapter : IPluginEventValueWriter<PolymorphicEvent>
+    {
+        public string EventName => "polymorphic.event";
+
+        public IReadOnlyList<Parameter> Parameters => [];
+
+        public int EventValueCount => 0;
+
+        public IReadOnlyList<SandboxValue> ToSandboxValues(PolymorphicEvent e) => [];
+
+        public SandboxValue ToSandboxValue(PolymorphicEvent e, int index)
+            => throw new ArgumentOutOfRangeException(nameof(index));
+
+        public void CopySandboxValues(PolymorphicEvent e, SandboxValue[] destination, int destinationIndex)
+        {
+        }
+    }
 }

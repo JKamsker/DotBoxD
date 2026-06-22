@@ -145,13 +145,14 @@ internal static class PluginServerSetupEmitter
 
     private static void AppendRecordSetup(StringBuilder builder, PluginServerFacadeModel model)
     {
-        builder.Append("    private static global::System.Collections.Generic.List<RecordedInstall> RecordSetup(global::System.Action<")
+        builder.Append("    private global::System.Collections.Generic.List<RecordedInstall> RecordSetup(global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
         builder.AppendLine("    {");
         builder.AppendLine("        var installs = new global::System.Collections.Generic.List<RecordedInstall>();");
         builder.AppendLine("        if (setup is not null)");
         builder.AppendLine("        {");
-        builder.AppendLine("            setup(new SetupRecorder(installs));");
+        var localHandlersArg = model.EventCallbackType is not null ? "_localHandlers" : "null";
+        builder.Append("            setup(new SetupRecorder(installs, ").Append(localHandlersArg).AppendLine("));");
         builder.AppendLine("        }");
         builder.AppendLine("        return installs;");
         builder.AppendLine("    }");
@@ -197,14 +198,16 @@ internal static class PluginServerSetupEmitter
                 .Append(FieldName(control.Name)).AppendLine(";");
         }
 
-        builder.AppendLine("        public SetupRecorder(global::System.Collections.Generic.List<RecordedInstall> installs)");
+        builder.AppendLine("        public SetupRecorder(");
+        builder.AppendLine("            global::System.Collections.Generic.List<RecordedInstall> installs,");
+        builder.AppendLine("            global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry? localHandlers)");
         builder.AppendLine("        {");
         builder.AppendLine("            _installs = installs;");
         builder.AppendLine("            _hooks = new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Plugin(package));");
         builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
-        builder.AppendLine("            });");
+        builder.AppendLine("            }, localHandlers);");
         builder.AppendLine("            _subscriptions = new global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Subscription(package));");

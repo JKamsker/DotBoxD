@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -46,7 +47,7 @@ internal static class ResultHookChain
         }
 
         if (!TryResolveHook(contextType, out var hookName, out var resultType) ||
-            !IsHookResultType(resultType))
+            !HookResultModelFactory.CanSatisfyHookResult(resultType, model.Compilation, cancellationToken))
         {
             throw new NotSupportedException();
         }
@@ -272,21 +273,4 @@ internal static class ResultHookChain
         return false;
     }
 
-    private static bool IsHookResultType(INamedTypeSymbol resultType)
-    {
-        if (!resultType.IsValueType)
-        {
-            return false;
-        }
-
-        foreach (var attribute in resultType.GetAttributes())
-        {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), DotBoxDMetadataNames.HookResultAttribute, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

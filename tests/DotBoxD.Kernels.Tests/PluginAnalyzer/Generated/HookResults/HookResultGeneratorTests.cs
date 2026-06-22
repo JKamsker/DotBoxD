@@ -62,21 +62,37 @@ public sealed class HookResultGeneratorTests
     }
 
     [Fact]
-    public void Reports_DBXK112_when_success_or_reason_is_missing()
-    {
-        const string source = """
+    public void Reports_DBXK112_when_reason_is_missing()
+        => AssertReportsContractDiagnostic("""
             using DotBoxD.Abstractions;
 
             namespace Sample;
 
             [HookResult]
             public readonly partial record struct BadResult(bool Success, int Damage);
-            """;
+            """);
 
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+    [Fact]
+    public void Reports_DBXK112_when_success_is_missing()
+        => AssertReportsContractDiagnostic("""
+            using DotBoxD.Abstractions;
 
-        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
-    }
+            namespace Sample;
+
+            [HookResult]
+            public readonly partial record struct BadResult(string? Reason, int Damage);
+            """);
+
+    [Fact]
+    public void Reports_DBXK112_when_success_is_not_bool()
+        => AssertReportsContractDiagnostic("""
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [HookResult]
+            public readonly partial record struct BadResult(int Success, string? Reason, int Damage);
+            """);
 
     [Fact]
     public void Reports_DBXK112_when_reason_is_not_nullable_string()
@@ -97,6 +113,13 @@ public sealed class HookResultGeneratorTests
         Assert.DoesNotContain(
             result.GeneratedTrees,
             tree => tree.GetText().ToString().Contains("BadResult Ok()", StringComparison.Ordinal));
+    }
+
+    private static void AssertReportsContractDiagnostic(string source)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+
+        Assert.Contains(diagnostics, d => string.Equals(d.Id, "DBXK112", StringComparison.Ordinal));
     }
 
     [Fact]

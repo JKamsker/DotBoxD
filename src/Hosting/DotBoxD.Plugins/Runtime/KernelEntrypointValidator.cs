@@ -11,17 +11,30 @@ internal static class KernelEntrypointValidator
         ExecutionPlan plan,
         KernelEntrypoints entrypoints,
         IPluginEventAdapter<TEvent> adapter)
-    {
-        Validate(manifest, plan, entrypoints, PluginEventShape.From(adapter));
-    }
+        => Validate<TEvent>(manifest, plan, entrypoints, PluginEventShape.From(adapter));
+
+    public static void Validate<TEvent>(
+        PluginManifest manifest,
+        ExecutionPlan plan,
+        KernelEntrypoints entrypoints,
+        PluginEventShape adapterShape)
+        => Validate(manifest, plan, entrypoints, adapterShape, EventAliases<TEvent>(adapterShape.EventName));
 
     public static void Validate(
         PluginManifest manifest,
         ExecutionPlan plan,
         KernelEntrypoints entrypoints,
         PluginEventShape adapterShape)
+        => Validate(manifest, plan, entrypoints, adapterShape, [adapterShape.EventName]);
+
+    private static void Validate(
+        PluginManifest manifest,
+        ExecutionPlan plan,
+        KernelEntrypoints entrypoints,
+        PluginEventShape adapterShape,
+        IReadOnlyList<string> eventAliases)
     {
-        if (!manifest.Subscriptions.Any(s => EventNameMatch.Matches(s.Event, adapterShape.EventName)))
+        if (!manifest.Subscriptions.Any(s => MatchesAnyAlias(s.Event, eventAliases)))
         {
             throw new SandboxValidationException([
                 new SandboxDiagnostic("DBXK031", $"Plugin '{manifest.PluginId}' is not subscribed to event '{adapterShape.EventName}'.")
@@ -43,6 +56,49 @@ internal static class KernelEntrypointValidator
             handleReturnsValue ? null : SandboxType.Unit,
             requireNonUnit: handleReturnsValue,
             expected);
+    }
+
+    private static string[] EventAliases<TEvent>(string adapterEventName)
+    {
+        var aliases = new HashSet<string>(StringComparer.Ordinal) { adapterEventName };
+        var typeName = typeof(TEvent).Name;
+        var fullName = typeof(TEvent).FullName;
+        var hook = Attribute.GetCustomAttribute(typeof(TEvent), typeof(HookAttribute), inherit: false) as HookAttribute;
+        var isConventionName =
+            EventNameMatch.Matches(adapterEventName, typeName) ||
+            (fullName is not null && EventNameMatch.Matches(adapterEventName, fullName)) ||
+            (hook is not null && string.Equals(adapterEventName, hook.Name, StringComparison.Ordinal));
+
+        if (!isConventionName)
+        {
+            return [.. aliases];
+        }
+
+        aliases.Add(typeName);
+        if (fullName is not null)
+        {
+            aliases.Add(fullName);
+        }
+
+        if (hook is not null)
+        {
+            aliases.Add(hook.Name);
+        }
+
+        return [.. aliases];
+    }
+
+    private static bool MatchesAnyAlias(string? actual, IReadOnlyList<string> eventAliases)
+    {
+        foreach (var alias in eventAliases)
+        {
+            if (EventNameMatch.Matches(actual, alias))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool ReturnsValue(PluginManifest manifest)
