@@ -245,6 +245,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         {
             if (eventMatches &&
                 hook is not null &&
+                hook.ResultType is not null &&
                 ResultTypeMatches(resultType, hook.ResultType))
             {
                 return;
@@ -253,7 +254,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
             throw new InvalidOperationException(
                 $"Hook package '{package.Manifest.PluginId}' subscribes to '{actual ?? "<none>"}' " +
                 $"with result type '{resultType}', not '{expected}' with result type " +
-                $"'{hook?.ResultType.FullName ?? "<none>"}'.");
+                $"'{hook?.ResultType?.FullName ?? "<none>"}'.");
         }
 
         if (eventMatches)
