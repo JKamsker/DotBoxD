@@ -62,10 +62,6 @@
       "justification": "Pre-existing source-generator behavior fixture surfaced after correcting the line guard root. Keep listed until cases are split by service shape."
     },
     {
-      "path": "tests/DotBoxD.Services.SourceGenerator.Tests/Generation/GeneratedFactoryRegistryTests.cs",
-      "justification": "Pre-existing generated factory registry fixture surfaced after correcting the line guard root. Keep listed until registration scenarios are split."
-    },
-    {
       "path": "tests/DotBoxD.Services.Tests/Coverage/Core/SerializationCoverageTests.cs",
       "justification": "Pre-existing serialization coverage fixture surfaced after correcting the line guard root. Keep listed until serialization cases are split."
     },
