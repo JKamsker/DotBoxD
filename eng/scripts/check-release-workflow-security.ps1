@@ -168,8 +168,8 @@ if ($ciGatesJob -notmatch "check-release-readiness\.ps1\s+-RequireComplete") {
 }
 
 # 7. Main-branch CI publishing must consume pack artifacts and stay tightly gated.
-if ($ciPackJob -notmatch "(?m)^\s{4}needs:\s+\[build-test,\s*gates\]\s*$") {
-    throw "CI pack job must depend on build-test and gates before producing publishable packages."
+if ($ciPackJob -notmatch "(?m)^\s{4}needs:\s+\[build-test,\s*gates,\s*coverage\]\s*$") {
+    throw "CI pack job must depend on build-test, gates, and coverage before producing publishable packages."
 }
 
 if ($ciPackJob -match "bitwarden/sm-action@" -or $ciPackJob -match "dotnet\s+nuget\s+push") {
