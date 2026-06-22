@@ -159,7 +159,30 @@
           "type": "boolean",
           "description": "True for a remote RegisterLocal result hook whose result is produced by the plugin process through request/response callback. Optional; defaults to false."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "resultLocalTerminal": { "const": true } },
+            "required": ["resultLocalTerminal"]
+          },
+          "then": { "required": ["resultType"] }
+        },
+        {
+          "if": { "required": ["resultType"] },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "properties": { "localTerminal": { "const": true } },
+                  "required": ["localTerminal"]
+                },
+                { "required": ["projectedType"] }
+              ]
+            }
+          }
+        }
+      ]
     },
     "indexedPredicate": {
       "type": "object",

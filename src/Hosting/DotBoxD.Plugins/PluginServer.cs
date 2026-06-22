@@ -48,6 +48,14 @@ public sealed partial class PluginServer : IDisposable
     public PluginEventAdapterRegistry Events { get; }
 
     public static PluginServer Create(
+        IPluginMessageSink? messages,
+        Action<SandboxHostBuilder>? configureHost,
+        SandboxPolicy? defaultPolicy,
+        ExecutionMode executionMode,
+        Action<SubscriptionDeliveryFault>? onSubscriptionFault)
+        => Create(messages, configureHost, defaultPolicy, executionMode, onSubscriptionFault, onResultHookFault: null);
+
+    public static PluginServer Create(
         IPluginMessageSink? messages = null,
         Action<SandboxHostBuilder>? configureHost = null,
         SandboxPolicy? defaultPolicy = null,

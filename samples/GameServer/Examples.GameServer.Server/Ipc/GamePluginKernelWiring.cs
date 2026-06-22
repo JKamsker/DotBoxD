@@ -26,7 +26,9 @@ internal sealed class GamePluginKernelWiring
     public void ValidateSupportedEvent(PluginPackage package)
     {
         var subscription = SubscribedEvent(package.Manifest);
-        if (SimpleEventName(subscription) is "MonsterAggroEvent" or "AttackEvent" or "RemoteDamageDecisionEvent")
+        if (MatchesEvent<MonsterAggroEvent>(subscription) ||
+            MatchesEvent<AttackEvent>(subscription) ||
+            MatchesEvent<RemoteDamageDecisionEvent>(subscription))
         {
             return;
         }
@@ -41,38 +43,45 @@ internal sealed class GamePluginKernelWiring
         // carry the fully-qualified event name; match on the simple-name tail so qualified and legacy
         // simple-name manifests both wire correctly.
         var subscription = SubscribedEvent(kernel.Manifest);
-        switch (SimpleEventName(subscription))
+        if (MatchesEvent<MonsterAggroEvent>(subscription))
         {
-            case "MonsterAggroEvent":
-                WireHookFor<MonsterAggroEvent>(kernel);
-                break;
-            case "AttackEvent":
-                WireHookFor<AttackEvent>(kernel);
-                break;
-            case "RemoteDamageDecisionEvent":
-                WireHookFor<RemoteDamageDecisionEvent>(kernel);
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
+            WireHookFor<MonsterAggroEvent>(kernel);
+            return;
         }
+
+        if (MatchesEvent<AttackEvent>(subscription))
+        {
+            WireHookFor<AttackEvent>(kernel);
+            return;
+        }
+
+        if (MatchesEvent<RemoteDamageDecisionEvent>(subscription))
+        {
+            WireHookFor<RemoteDamageDecisionEvent>(kernel);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
     }
 
     public void WireSubscription(InstalledKernel kernel)
     {
         var subscription = SubscribedEvent(kernel.Manifest);
-        switch (SimpleEventName(subscription))
+        if (MatchesEvent<MonsterAggroEvent>(subscription))
         {
-            case "MonsterAggroEvent":
-                WireSubscriptionFor<MonsterAggroEvent>(kernel);
-                break;
-            case "AttackEvent":
-                WireSubscriptionFor<AttackEvent>(kernel);
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
+            WireSubscriptionFor<MonsterAggroEvent>(kernel);
+            return;
         }
+
+        if (MatchesEvent<AttackEvent>(subscription))
+        {
+            WireSubscriptionFor<AttackEvent>(kernel);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Plugin '{kernel.Manifest.PluginId}' subscribes to unsupported event '{subscription}'.");
     }
 
     // A local-terminal (RunLocal) chain projects server-side and pushes the projected value back to the
@@ -185,6 +194,27 @@ internal sealed class GamePluginKernelWiring
 
     private static string? SubscribedEvent(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 ? manifest.Subscriptions[0].Event : null;
+
+    private static bool MatchesEvent<TEvent>(string? eventName)
+    {
+        if (string.IsNullOrEmpty(eventName))
+        {
+            return false;
+        }
+
+        if (string.Equals(eventName, typeof(TEvent).FullName, StringComparison.Ordinal) ||
+            string.Equals(SimpleEventName(eventName), typeof(TEvent).Name, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var hook = (DotBoxD.Abstractions.HookAttribute?)Attribute.GetCustomAttribute(
+            typeof(TEvent),
+            typeof(DotBoxD.Abstractions.HookAttribute),
+            inherit: false);
+        return hook is not null &&
+            string.Equals(eventName, hook.Name, StringComparison.Ordinal);
+    }
 
     private static string? SimpleEventName(string? eventName)
     {

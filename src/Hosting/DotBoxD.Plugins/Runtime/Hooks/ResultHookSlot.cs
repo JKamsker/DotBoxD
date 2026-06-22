@@ -169,7 +169,9 @@ internal sealed class ResultHookSlot<TEvent>
                 .WaitAsync(timeoutCts.Token)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (
+            timeoutCts.IsCancellationRequested &&
+            !cancellationToken.IsCancellationRequested)
         {
             Report(new TimeoutException(
                 $"Remote result hook for '{typeof(TEvent).Name}' timed out after {options.RemoteHandlerTimeout}."));

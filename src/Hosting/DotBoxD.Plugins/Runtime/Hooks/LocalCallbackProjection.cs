@@ -56,6 +56,14 @@ internal static class LocalCallbackProjection
                 $"A whole-event RunLocal chain for '{typeof(TEvent).Name}' requires an event value-writer adapter " +
                 "(the framework generates one for event records).");
         }
+
+        if (ContainsPolymorphicHandle(typeof(TEvent)))
+        {
+            throw new InvalidOperationException(
+                $"A whole-event local callback for '{typeof(TEvent).Name}' cannot carry polymorphic handle " +
+                "properties because the wire payload contains sandbox keys, not host handle instances. " +
+                "Project scalar values before RunLocal/RegisterLocal.");
+        }
     }
 
     /// <summary>
@@ -128,5 +136,19 @@ internal static class LocalCallbackProjection
         var values = new SandboxValue[writer.EventValueCount];
         writer.CopySandboxValues(e, values, 0);
         return SandboxValue.FromOwnedRecord(values);
+    }
+
+    private static bool ContainsPolymorphicHandle(Type eventType)
+    {
+        foreach (var property in eventType.GetProperties())
+        {
+            if (property.GetIndexParameters().Length == 0 &&
+                PolymorphicHandleRuntimeMetadataReader.TryResolve(property.PropertyType, out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

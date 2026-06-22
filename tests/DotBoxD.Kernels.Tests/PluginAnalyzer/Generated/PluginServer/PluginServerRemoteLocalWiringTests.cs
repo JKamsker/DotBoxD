@@ -96,6 +96,17 @@ public sealed class PluginServerRemoteLocalWiringTests
             "new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package => InstallPluginPackageAsync(package), _localHandlers)",
             generated,
             StringComparison.Ordinal);
+        Assert.Contains("setup(new SetupRecorder(installs, _localHandlers));", generated, StringComparison.Ordinal);
+        Assert.Contains("public SetupRecorder(", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::System.Collections.Generic.List<RecordedInstall> installs,",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry? localHandlers)",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains("}, localHandlers);", generated, StringComparison.Ordinal);
         Assert.Contains(
             "new global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry(package => InstallSubscriptionPackageAsync(package), _localHandlers)",
             generated,

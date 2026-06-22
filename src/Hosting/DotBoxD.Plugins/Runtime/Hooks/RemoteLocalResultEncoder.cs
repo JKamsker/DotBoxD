@@ -36,6 +36,11 @@ internal static class RemoteLocalResultEncoder
             return KernelRpcMarshaller.ToSandboxValue(value, type);
         }
 
+        if (Nullable.GetUnderlyingType(type) is not null)
+        {
+            return KernelRpcMarshaller.ToSandboxValue(null, type);
+        }
+
         return type == typeof(string) && string.Equals(name, "Reason", StringComparison.Ordinal)
             ? SandboxValue.FromString(string.Empty)
             : throw new NotSupportedException(

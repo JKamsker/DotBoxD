@@ -134,10 +134,21 @@ public sealed class HookRegistry
     /// </summary>
     public ValueTask<TResult?> FireAsync<TContext, TResult>(TContext context, CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult
-        => FireAsync<TContext, TResult>(
-            context,
-            ResultHookDispatchOptions<TResult>.Default,
-            cancellationToken);
+    {
+        object? pipeline;
+        lock (_gate)
+        {
+            _pipelines.TryGetValue(typeof(TContext), out pipeline);
+        }
+
+        ValidateResultType<TContext, TResult>();
+        if (pipeline is null)
+        {
+            return new ValueTask<TResult?>((TResult?)null);
+        }
+
+        return ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
+    }
 
     public ValueTask<TResult?> FireAsync<TContext, TResult>(
         TContext context,

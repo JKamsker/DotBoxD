@@ -37,12 +37,14 @@ internal static class HookFireAsyncExtensionEmitter
         builder.AppendLine("#nullable enable");
         builder.AppendLine("namespace DotBoxD.Plugins.Runtime;");
         builder.AppendLine();
-        builder.AppendLine("internal static class HookRegistryFireAsyncExtensions");
+        var classAccessibility = models.Any(static model => string.Equals(model.Accessibility, "public", StringComparison.Ordinal))
+            ? "public"
+            : "internal";
+        builder.Append(classAccessibility).AppendLine(" static class HookRegistryFireAsyncExtensions");
         builder.AppendLine("{");
         foreach (var model in models)
         {
             EmitDefaultOverload(builder, model);
-            EmitOptionsOverload(builder, model);
         }
 
         builder.AppendLine("}");
@@ -51,7 +53,7 @@ internal static class HookFireAsyncExtensionEmitter
 
     private static void EmitDefaultOverload(StringBuilder builder, HookFireAsyncModel model)
     {
-        builder.Append("    internal static global::System.Threading.Tasks.ValueTask<")
+        builder.Append("    ").Append(model.Accessibility).Append(" static global::System.Threading.Tasks.ValueTask<")
             .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
         builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");
         builder.Append("        ").Append(model.ContextTypeFullName).AppendLine(" context,");
@@ -61,24 +63,6 @@ internal static class HookFireAsyncExtensionEmitter
         builder.Append("        return hooks.FireAsync<")
             .Append(model.ContextTypeFullName).Append(", ")
             .Append(model.ResultTypeFullName).AppendLine(">(context, cancellationToken);");
-        builder.AppendLine("    }");
-        builder.AppendLine();
-    }
-
-    private static void EmitOptionsOverload(StringBuilder builder, HookFireAsyncModel model)
-    {
-        builder.Append("    internal static global::System.Threading.Tasks.ValueTask<")
-            .Append(model.ResultTypeFullName).AppendLine("?> FireAsync(");
-        builder.AppendLine("        this global::DotBoxD.Plugins.Runtime.HookRegistry hooks,");
-        builder.Append("        ").Append(model.ContextTypeFullName).AppendLine(" context,");
-        builder.Append("        global::DotBoxD.Plugins.Runtime.ResultHookDispatchOptions<")
-            .Append(model.ResultTypeFullName).AppendLine("> options,");
-        builder.AppendLine("        global::System.Threading.CancellationToken cancellationToken = default)");
-        builder.AppendLine("    {");
-        builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(hooks);");
-        builder.Append("        return hooks.FireAsync<")
-            .Append(model.ContextTypeFullName).Append(", ")
-            .Append(model.ResultTypeFullName).AppendLine(">(context, options, cancellationToken);");
         builder.AppendLine("    }");
         builder.AppendLine();
     }

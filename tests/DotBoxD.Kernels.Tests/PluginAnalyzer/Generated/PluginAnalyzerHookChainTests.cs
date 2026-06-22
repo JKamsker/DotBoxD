@@ -784,6 +784,41 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Lowers_a_RegisterLocal_block_body_with_local_logic_returning_a_result_builder_chain()
+    {
+        var result = RunGenerator("""
+            using System;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .RegisterLocal((ctx, hookContext) =>
+                        {
+                            var capped = Math.Min(ctx.Damage, 10);
+                            return DamageResult.Ok().WithDamage(capped);
+                        }, 100);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Lowers_a_Register_builder_constant_to_the_result_field_type()
     {
         var result = RunGenerator("""

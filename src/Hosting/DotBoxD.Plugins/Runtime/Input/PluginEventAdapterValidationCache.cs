@@ -25,7 +25,7 @@ internal sealed class PluginEventAdapterValidationCache
         }
 
         var shape = new PluginEventShape(eventName, parameters);
-        KernelEntrypointValidator.Validate(manifest, plan, entrypoints, shape);
+        KernelEntrypointValidator.Validate<TEvent>(manifest, plan, entrypoints, shape);
         _validatedAdapters.AddOrUpdate(adapter, new StrongBox<PluginEventShape>(shape));
     }
 }

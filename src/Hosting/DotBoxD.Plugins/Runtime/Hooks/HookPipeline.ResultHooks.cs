@@ -13,6 +13,7 @@ namespace DotBoxD.Plugins.Runtime;
 public sealed partial class HookPipeline<TEvent>
 {
     private readonly Hooks.ResultHookSlot<TEvent> _resultHooks;
+    private readonly Dictionary<Type, object> _resultDispatchOptions = [];
 
     /// <summary>
     /// The result-returning terminal the analyzer lowers to verified IR: the filter and the result-producing
@@ -151,32 +152,6 @@ public sealed partial class HookPipeline<TEvent>
         int priority = 0)
         where TResult : struct, IHookResult
         => UseProjectingResult(filterKernel, subscriptionId, typeof(TResult), request, priority);
-
-    /// <summary>
-    /// Dispatches result hooks for <paramref name="e"/> in descending priority order and returns the first
-    /// successful result, or <see langword="null"/> when none is registered or none succeeds. The host applies
-    /// the returned result to its live state.
-    /// </summary>
-    public ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
-        where TResult : struct, IHookResult
-        => FireResultAsync(e, ResultHookDispatchOptions<TResult>.Default, cancellationToken);
-
-    public ValueTask<TResult?> FireResultAsync<TResult>(
-        TEvent e,
-        ResultHookDispatchOptions<TResult> options,
-        CancellationToken cancellationToken = default)
-        where TResult : struct, IHookResult
-    {
-        if (!_resultHooks.HasHandlers)
-        {
-            return new ValueTask<TResult?>((TResult?)null);
-        }
-
-        var context = cancellationToken.CanBeCanceled
-            ? new HookContext(_messages, cancellationToken)
-            : _defaultContext;
-        return _resultHooks.FireAsync(e, context, options, cancellationToken);
-    }
 
     private static void EnsureHookResultType(Type resultType)
     {

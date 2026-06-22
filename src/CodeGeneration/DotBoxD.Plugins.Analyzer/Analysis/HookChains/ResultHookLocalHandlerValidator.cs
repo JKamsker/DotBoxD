@@ -19,20 +19,10 @@ internal static class ResultHookLocalHandlerValidator
             return;
         }
 
-        var returnExpression = ReturnExpression(terminalLambda);
-        if (returnExpression is InvocationExpressionSyntax builderChain &&
-            SymbolEqualityComparer.Default.Equals(
-                DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
-                resultType))
-        {
-            return;
-        }
-
-        if (returnExpression is ObjectCreationExpressionSyntax creation &&
-            SymbolEqualityComparer.Default.Equals(
-                model.GetTypeInfo(creation, cancellationToken).ConvertedType ??
-                model.GetTypeInfo(creation, cancellationToken).Type,
-                resultType))
+        var returnExpressions = ReturnExpressions(terminalLambda).ToArray();
+        if (returnExpressions.Length > 0 &&
+            returnExpressions.All(returnExpression =>
+                ReturnsHookResultExpression(returnExpression, resultType, model, cancellationToken)))
         {
             return;
         }
@@ -40,17 +30,50 @@ internal static class ResultHookLocalHandlerValidator
         throw new NotSupportedException();
     }
 
-    private static ExpressionSyntax? ReturnExpression(LambdaExpressionSyntax lambda)
+    private static bool ReturnsHookResultExpression(
+        ExpressionSyntax returnExpression,
+        INamedTypeSymbol resultType,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (returnExpression is InvocationExpressionSyntax builderChain &&
+            SymbolEqualityComparer.Default.Equals(
+                DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
+                resultType))
+        {
+            return true;
+        }
+
+        if (returnExpression is ObjectCreationExpressionSyntax creation)
+        {
+            var typeInfo = model.GetTypeInfo(creation, cancellationToken);
+            return SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType ?? typeInfo.Type, resultType);
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<ExpressionSyntax> ReturnExpressions(LambdaExpressionSyntax lambda)
     {
         if (lambda.ExpressionBody is { } expressionBody)
         {
-            return expressionBody;
+            yield return expressionBody;
+            yield break;
         }
 
-        return lambda.Block is { Statements.Count: 1 } block &&
-            block.Statements[0] is ReturnStatementSyntax { Expression: { } expression }
-            ? expression
-            : null;
+        if (lambda.Block is null)
+        {
+            yield break;
+        }
+
+        foreach (var statement in lambda.Block.DescendantNodes(static node =>
+            node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax))
+        {
+            if (statement is ReturnStatementSyntax { Expression: { } expression })
+            {
+                yield return expression;
+            }
+        }
     }
 
     private static bool ReturnsHookResult(ITypeSymbol returnType, INamedTypeSymbol resultType)
