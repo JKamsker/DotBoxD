@@ -27,7 +27,7 @@ public readonly partial record struct OptionalDamageResult(bool Success, string?
 /// and intercepted into the live server. A passing FireAsync also proves interception ran — un-lowered, the
 /// Register/RegisterLocal terminals throw.
 /// </summary>
-public sealed class ResultHookChainTests
+public sealed partial class ResultHookChainTests
 {
     [Fact]
     public async Task Register_lowers_the_handler_and_returns_the_constructed_result()
@@ -58,40 +58,6 @@ public sealed class ResultHookChainTests
 
         Assert.True(result!.Value.Success);
         Assert.Equal(50, result.Value.Damage);
-    }
-
-    [Fact]
-    public async Task Register_round_trips_nullable_scalar_result_fields()
-    {
-        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
-        server.Hooks.On<OptionalDamageContext>()
-            .Register(
-                ctx => OptionalDamageResult.Ok()
-                    .WithDamage(ctx.Damage)
-                    .WithCanDie(null),
-                priority: 10);
-
-        var result = await server.Hooks.FireAsync<OptionalDamageContext, OptionalDamageResult>(
-            new OptionalDamageContext(15, true));
-
-        Assert.True(result!.Value.Success);
-        Assert.Equal(15, result.Value.Damage);
-        Assert.Null(result.Value.CanDie);
-    }
-
-    [Fact]
-    public async Task Register_defaults_omitted_nullable_scalar_result_fields_to_null()
-    {
-        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
-        server.Hooks.On<OptionalDamageContext>()
-            .Register(ctx => new OptionalDamageResult { Success = true }, priority: 10);
-
-        var result = await server.Hooks.FireAsync<OptionalDamageContext, OptionalDamageResult>(
-            new OptionalDamageContext(15, true));
-
-        Assert.True(result!.Value.Success);
-        Assert.Null(result.Value.Damage);
-        Assert.Null(result.Value.CanDie);
     }
 
     [Fact]

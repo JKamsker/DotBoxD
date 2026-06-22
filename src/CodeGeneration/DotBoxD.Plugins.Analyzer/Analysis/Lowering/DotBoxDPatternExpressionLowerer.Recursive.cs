@@ -21,6 +21,11 @@ internal static partial class DotBoxDPatternExpressionLowerer
             throw new NotSupportedException($"Unsupported plugin pattern '{pattern}'.");
         }
 
+        if (pattern.PositionalPatternClause is not null)
+        {
+            throw new NotSupportedException($"Unsupported plugin pattern '{pattern}'.");
+        }
+
         var lowered = LowerSubtypeTest(value, valueSyntax, pattern.Type, pattern, context, out var subtype);
         var handle = ResolveHandle(value, valueSyntax, pattern.Type, pattern, context);
         lowered = LowerPropertySubpatterns(value, valueSyntax, pattern, handle, context, lowerExpression, lowered);
@@ -56,7 +61,7 @@ internal static partial class DotBoxDPatternExpressionLowerer
 
         foreach (var subpattern in propertyClause.Subpatterns)
         {
-            if (!string.Equals(SubpatternName(subpattern), handle.KeyMember, StringComparison.Ordinal))
+            if (!IsKeyMemberSubpattern(subpattern, handle, context))
             {
                 throw new NotSupportedException($"Unsupported plugin pattern '{pattern}'.");
             }
@@ -78,8 +83,20 @@ internal static partial class DotBoxDPatternExpressionLowerer
             left.Allocates || right.Allocates);
     }
 
-    private static string? SubpatternName(SubpatternSyntax subpattern)
-        => subpattern.NameColon?.Name.Identifier.ValueText;
+    private static bool IsKeyMemberSubpattern(
+        SubpatternSyntax subpattern,
+        PolymorphicHandleMetadata handle,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (subpattern.NameColon?.Name is not { } name)
+        {
+            return false;
+        }
+
+        var symbol = context.SemanticModel.GetSymbolInfo(name, context.CancellationToken).Symbol;
+        return symbol is not null &&
+               SymbolEqualityComparer.Default.Equals(symbol.OriginalDefinition, handle.KeyMemberSymbol.OriginalDefinition);
+    }
 
     private static PolymorphicHandleMetadata ResolveHandle(
         DotBoxDExpressionModel value,

@@ -40,6 +40,15 @@ public sealed class KernelRpcMarshallerDtoOrderTests
 
         var absent = Assert.IsType<RecordValue>(KernelRpcMarshaller.ToSandboxValue(null, typeof(int?)));
         Assert.Equal([SandboxValue.FromBool(false), SandboxValue.FromInt32(0)], absent.Fields);
+
+        var falseBool = Assert.IsType<RecordValue>(KernelRpcMarshaller.ToSandboxValue(false, typeof(bool?)));
+        Assert.Equal([SandboxValue.FromBool(true), SandboxValue.FromBool(false)], falseBool.Fields);
+
+        var trueBool = Assert.IsType<RecordValue>(KernelRpcMarshaller.ToSandboxValue(true, typeof(bool?)));
+        Assert.Equal([SandboxValue.FromBool(true), SandboxValue.FromBool(true)], trueBool.Fields);
+
+        var absentBool = Assert.IsType<RecordValue>(KernelRpcMarshaller.ToSandboxValue(null, typeof(bool?)));
+        Assert.Equal([SandboxValue.FromBool(false), SandboxValue.FromBool(false)], absentBool.Fields);
     }
 
     [Fact]
@@ -47,9 +56,13 @@ public sealed class KernelRpcMarshallerDtoOrderTests
     {
         var present = SandboxValue.FromRecord([SandboxValue.FromBool(true), SandboxValue.FromInt32(8)]);
         var absent = SandboxValue.FromRecord([SandboxValue.FromBool(false), SandboxValue.FromInt32(0)]);
+        var falseBool = SandboxValue.FromRecord([SandboxValue.FromBool(true), SandboxValue.FromBool(false)]);
+        var trueBool = SandboxValue.FromRecord([SandboxValue.FromBool(true), SandboxValue.FromBool(true)]);
 
         Assert.Equal(8, KernelRpcMarshaller.FromSandboxValue(present, typeof(int?)));
         Assert.Null(KernelRpcMarshaller.FromSandboxValue(absent, typeof(int?)));
+        Assert.Equal(false, KernelRpcMarshaller.FromSandboxValue(falseBool, typeof(bool?)));
+        Assert.Equal(true, KernelRpcMarshaller.FromSandboxValue(trueBool, typeof(bool?)));
     }
 
     [Fact]
@@ -62,6 +75,11 @@ public sealed class KernelRpcMarshallerDtoOrderTests
     public void SandboxTypeOf_rejects_unsupported_nullable_value_types()
         => Assert.Throws<NotSupportedException>(
             () => KernelRpcMarshaller.SandboxTypeOf(typeof(DateTime?)));
+
+    [Fact]
+    public void SandboxTypeOf_rejects_nullable_scalar_types_past_composite_depth()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(typeof(int?[][][][][][][][])));
 
     [Fact]
     public void SandboxTypeOf_rejects_a_self_referential_dto_instead_of_stack_overflowing()

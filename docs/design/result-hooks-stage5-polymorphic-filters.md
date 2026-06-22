@@ -1,6 +1,6 @@
 # Follow-up: Stage 5 — polymorphic combatant filters for result hooks
 
-> Status: **shipped / implemented** in this PR (commits `6b74df20`, `85424c2b`). Stages 0–4 of the
+> Status: **shipped / implemented**. Stages 0–4 of the
 > result-returning hooks plan (`Hooks.On<TContext>()` with `Register`/`RegisterLocal`, the `[HookResult]`
 > builder generator, object-initializer and fluent-builder lowering, runtime dispatch) and the game-server
 > combat sample shipped first; this document specced Stage 5 and the **v1 scope it describes is what landed** —
@@ -46,7 +46,8 @@ un-lowered diagnostic (DBXK110/111/113) fires.
 
 ## Why this was a from-scratch subsystem
 
-When this document was written there was **no** supporting infrastructure (all of the following were since added by this PR):
+When this document was written there was **no** supporting infrastructure (all of the following was added as the
+stage shipped):
 
 - no `[PolymorphicHandle]` / `[HandleSubtype]` attributes;
 - no notion of an event property that is a **handle** (a host-resolved key) rather than a marshalled value —
@@ -107,8 +108,9 @@ The `discriminator: "player"` + `bindingPrefix: "combatant.player"` give the bin
 
 6. **Binding the pattern variable — `…/Analysis/Lowering/Expressions/DotBoxDExpressionLoweringContext.cs`**
    - Add a small map `name -> (DotBoxDExpressionModel key, INamedTypeSymbol subtype)` for in-scope pattern
-     captures, threaded into the `&&` right-hand side only (mirror how `InlinedBindings` already substitutes
-     identifiers). `LowerIdentifier(a)` returns the bound key IR.
+     captures. Captures are threaded only into branches where C# definite pattern scope keeps the discriminator
+     guard in force: later operands in the same `&&` chain, the containing `||` branch, and a simple `?:` true
+     branch. `LowerIdentifier(a)` returns the bound key IR.
 
 7. **Scoped instance host-call — `…/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs`**
    - Recognize `local.Method(args)` where `local` is a bound pattern capture and `Method` is an instance
@@ -117,7 +119,8 @@ The `discriminator: "player"` + `bindingPrefix: "combatant.player"` give the bin
 
 8. **`&&` short-circuit shape — `DotBoxDExpressionModelFactory.LowerBinary`**
    - Ensure `(x is T a) && rhs` lowers `x is T a` first (introducing the capture), then `rhs` with `a` in scope.
-     The capture must NOT escape the `&&` (fail safe if `a` is used elsewhere).
+     Multiple declaration captures in one `&&` chain are threaded left-to-right. Captures must not escape their
+     guarded C# branch or lambda (fail safe if `a` is used elsewhere).
 
 9. **Runtime host bindings (sample/host) — sample or host registration**
    - Register `combatant.player.is`, `combatant.player.hasEquippedItem`, `combatant.monster.is`,

@@ -28,6 +28,16 @@ internal static class DotBoxDNullableScalarExpressionLowerer
             return true;
         }
 
+        if (DotBoxDConstantExpressionLowerer.TryLower(
+                expression,
+                context.SemanticModel,
+                context.CancellationToken,
+                SandboxTypeSourceEmitter.ManifestTag(underlying)) is { } constant)
+        {
+            lowered = Present(targetType, underlying, constant);
+            return true;
+        }
+
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         if (typeInfo.Type is { } expressionType &&
             DotBoxDNullableScalarType.TryGetSupportedUnderlying(expressionType, out var expressionUnderlying) &&

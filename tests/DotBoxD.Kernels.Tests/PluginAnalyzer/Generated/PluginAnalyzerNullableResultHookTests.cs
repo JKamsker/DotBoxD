@@ -33,4 +33,31 @@ public sealed class PluginAnalyzerNullableResultHookTests
             result.GeneratedTrees,
             tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Lowers_nullable_scalar_literal_fields_in_object_initializers()
+    {
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int? Damage, bool? CanDie);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => new DamageResult { Success = true, Damage = 1, CanDie = false }, 100);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+    }
 }

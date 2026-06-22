@@ -93,31 +93,6 @@ public sealed partial class PluginAnalyzerPolymorphicHandleTests
     }
 
     [Fact]
-    public void Result_hook_multiple_declaration_captures_in_one_filter_lower()
-    {
-        var source = Source("""
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<DamageCtx>()
-                        .Where(ctx => ctx.Attacker is PlayerCombatant attacker &&
-                                      ctx.Victim is MonsterCombatant victim &&
-                                      attacker.HasEquippedItem(9001L))
-                        .Register(ctx => new DamageResult { Success = true, Damage = ctx.Damage }, 0);
-            }
-            """);
-        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator(source);
-        var generated = string.Join(
-            Environment.NewLine,
-            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
-
-        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK113");
-        Assert.Contains("combatant.player.is", generated);
-        Assert.Contains("combatant.monster.is", generated);
-        Assert.Contains("combatant.player.hasEquippedItem", generated);
-    }
-
-    [Fact]
     public void Result_hook_recursive_key_property_pattern_lowers()
     {
         var source = Source("""

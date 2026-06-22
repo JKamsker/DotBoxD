@@ -112,6 +112,11 @@ internal static class SandboxTypeSourceEmitter
 
         if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
         {
+            if (depth >= MaxDepth)
+            {
+                throw new NotSupportedException();
+            }
+
             return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.Bool, {Emit(nullableUnderlying, depth + 1)} }})";
         }
 
