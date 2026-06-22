@@ -54,10 +54,6 @@
       "justification": "Pre-existing large streaming coordinator surfaced after correcting the line guard root. Keep listed until stream lifecycle and flow-control code are split."
     },
     {
-      "path": "tests/DotBoxD.Kernels.Tests/Compiled/SideEffectParity/CompiledRandomBindingParityTests.cs",
-      "justification": "Pre-existing parity fixture surfaced after correcting the line guard root. Keep listed until shared setup is extracted across binding parity tests."
-    },
-    {
       "path": "tests/DotBoxD.Kernels.Tests/Compiled/SideEffectParity/CompiledSideEffectCapabilityParityTests.cs",
       "justification": "Pre-existing capability parity fixture surfaced after correcting the line guard root. Keep listed until shared setup is extracted."
     },
