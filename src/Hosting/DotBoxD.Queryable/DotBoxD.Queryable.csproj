@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Opt-in DotBoxD dynamic event-query surface: captures LINQ Where/Select expressions into a portable, serializable filter/projection AST with index planning and in-process dispatch.</Description>
+    <PackageTags>dotboxd;queryable;events;expressions;ast</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotBoxD.Plugins\DotBoxD.Plugins.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- HookContext / IPluginMessageSink live in DotBoxD.Abstractions; the authoring surface uses them
+         throughout, so make them available without a per-file using. -->
+    <Using Include="DotBoxD.Abstractions" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string] $PackageDirectory = "artifacts/packages",
     [switch] $AllowPrereleaseVersions,
     [string[]] $AllowedPrereleasePackageIds = @(),
@@ -64,6 +64,10 @@ $expectedPackageMetadata = @{
     "DotBoxD.Abstractions" = @{
         Description = "DotBoxD.Kernels plugin-to-host contracts: plugin marker attribute, event kernel, hook context, message sink, and event adapter abstractions."
         Tags = @("dotboxd", "plugins", "contracts", "abstractions")
+    }
+    "DotBoxD.Queryable" = @{
+        Description = "Opt-in DotBoxD dynamic event-query surface: captures LINQ Where/Select expressions into a portable, serializable filter/projection AST with index planning and in-process dispatch."
+        Tags = @("dotboxd", "queryable", "events")
     }
     "DotBoxD.Hosting.Http" = @{
         Description = "DotBoxD.Kernels HTTP GET transport bindings, grant helpers, and pinned HTTP policy validation."
@@ -369,6 +373,7 @@ $expectedIds = [string[]] @(
     "DotBoxD.Plugins.Analyzer",
     "DotBoxD.Plugins",
     "DotBoxD.Abstractions",
+    "DotBoxD.Queryable",
     "DotBoxD",
     "DotBoxD.Services.All",
     "DotBoxD.Services",
