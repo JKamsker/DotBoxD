@@ -292,7 +292,7 @@ internal static class HookChainModelFactory
             Namespace: HookChainIdentity.Namespace(invocation),
             KernelName: kernelName,
             PackageName: kernelName + "PluginPackage",
-            EventName: EventTypeName.Qualified(eventType),
+            EventName: EventTypeName.HookOrQualified(eventType),
             EventParameterName: DotBoxDGenerationNames.DefaultEventParameterName,
             ContextParameterName: terminalContextParam ?? DotBoxDGenerationNames.DefaultContextParameterName,
             HandleEventParameterName: terminalElementParam,
@@ -723,19 +723,40 @@ internal static class HookChainModelFactory
         return true;
     }
 
-    // The leading lambda of a result terminal — Register(lambda, priority) / RegisterLocal(lambda, priority) —
-    // where the (optional) trailing priority argument must not reject the chain.
+    // The handler lambda of a result terminal — Register(lambda, priority) / RegisterLocal(lambda, priority) —
+    // allowing a named/reordered handler argument such as Register(priority: 10, handler: ctx => ...).
     private static bool TryLeadingLambda(InvocationExpressionSyntax invocation, out LambdaExpressionSyntax lambda)
     {
         lambda = null!;
         var arguments = invocation.ArgumentList.Arguments;
-        if (arguments.Count < 1 ||
-            arguments[0].Expression is not LambdaExpressionSyntax lambdaExpression)
+        LambdaExpressionSyntax? firstUnnamedLambda = null;
+        foreach (var argument in arguments)
+        {
+            if (argument.NameColon is { Name.Identifier.ValueText: "handler" })
+            {
+                if (argument.Expression is not LambdaExpressionSyntax namedHandler)
+                {
+                    return false;
+                }
+
+                lambda = namedHandler;
+                return true;
+            }
+
+            if (argument.NameColon is null &&
+                firstUnnamedLambda is null &&
+                argument.Expression is LambdaExpressionSyntax unnamedHandler)
+            {
+                firstUnnamedLambda = unnamedHandler;
+            }
+        }
+
+        if (firstUnnamedLambda is null)
         {
             return false;
         }
 
-        lambda = lambdaExpression;
+        lambda = firstUnnamedLambda;
         return true;
     }
 

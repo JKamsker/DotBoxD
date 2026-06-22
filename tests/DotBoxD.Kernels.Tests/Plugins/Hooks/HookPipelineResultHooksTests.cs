@@ -1,6 +1,9 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Hooks;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
@@ -17,6 +20,8 @@ public sealed class HookPipelineResultHooksTests
     private readonly record struct DamageResult(bool Success, string? Reason, int Damage) : IHookResult;
 
     private readonly record struct OtherDamageResult(bool Success, string? Reason) : IHookResult;
+
+    private sealed record ReferenceDamageResult(bool Success, string? Reason) : IHookResult;
 
     [Fact]
     public void Hook_attribute_rejects_invalid_constructor_arguments()
@@ -103,6 +108,42 @@ public sealed class HookPipelineResultHooksTests
 
         Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK066");
     }
+
+    [Fact]
+    public async Task Type_based_result_installs_reject_reference_hook_results()
+    {
+        using var server = PluginAddendumTestPolicies.CreateServer();
+        var kernel = await server.InstallAsync(ReferenceValidationPackage());
+        var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
+        RemoteLocalResultRequest request = (_, _, _) => new ValueTask<byte[]>([]);
+
+        var useResult = Assert.Throws<ArgumentException>(
+            () => pipeline.UseResult(kernel, typeof(ReferenceDamageResult)));
+        var useProjecting = Assert.Throws<ArgumentException>(
+            () => pipeline.UseProjectingResult(kernel, "subscription-id", typeof(ReferenceDamageResult), request));
+
+        Assert.Contains("value type", useResult.Message, StringComparison.Ordinal);
+        Assert.Contains("value type", useProjecting.Message, StringComparison.Ordinal);
+    }
+
+    private static PluginPackage ReferenceValidationPackage()
+        => PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record KernelEvent(string TargetId, string Message);
+
+            [Plugin("reference-result-validation")]
+            public sealed partial class DamageKernel : IEventKernel<KernelEvent>
+            {
+                public bool ShouldHandle(KernelEvent e, HookContext ctx) => true;
+
+                public void Handle(KernelEvent e, HookContext ctx)
+                    => ctx.Messages.Send(e.TargetId, e.Message);
+            }
+            """);
 
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>
     {

@@ -126,7 +126,7 @@ internal static class ResultHookChain
             resultType,
             isLocal,
             terminalHasCancellationToken,
-            stages.Count > 0,
+            receiverIsStage: false,
             generatedRemoteKind,
             cancellationToken));
     }
@@ -220,7 +220,8 @@ internal static class ResultHookChain
             ? $"{TypeNames.GlobalFunc}<{contextFullName}, {TypeNames.GlobalHookContext}, {resultFullName}>"
             : $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>";
 
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType)
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
+            receiverType.TypeKind == TypeKind.Error)
         {
             return generatedRemoteKind is null
                 ? null

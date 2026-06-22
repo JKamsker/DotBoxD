@@ -196,9 +196,15 @@ internal static class HookResultModelFactory
 
     private static string DeclarationKeywords(INamedTypeSymbol type)
     {
+        var accessibilityPrefix = type.DeclaredAccessibility switch
+        {
+            Accessibility.Public => "public ",
+            Accessibility.Internal => "internal ",
+            _ => string.Empty
+        };
         var readOnlyPrefix = type.IsValueType && type.IsReadOnly ? "readonly " : string.Empty;
         var structSuffix = type.IsValueType ? " struct" : string.Empty;
-        return readOnlyPrefix + "partial record" + structSuffix;
+        return accessibilityPrefix + readOnlyPrefix + "partial record" + structSuffix;
     }
 
     private static string ParameterName(string fieldName)

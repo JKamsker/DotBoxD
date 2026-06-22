@@ -97,13 +97,25 @@ public sealed class GeneratedRemoteHookChainFallbackTests
 
     [Fact]
     public void Fallback_lowers_remote_Register_result_chains_when_the_server_type_is_generated_later()
-        => AssertFallbackLowers(ResultSource, "DotBoxDGeneratedRemoteResultFallbackTest", "UseGeneratedResultChain");
+        => AssertFallbackLowers(
+            ResultSource,
+            "DotBoxDGeneratedRemoteResultFallbackTest",
+            "UseGeneratedResultChain",
+            "RemoteHookPipeline<global::ChainSample.ChainDamageContext>");
 
     [Fact]
     public void Fallback_lowers_remote_RegisterLocal_result_chains_when_the_server_type_is_generated_later()
-        => AssertFallbackLowers(LocalResultSource, "DotBoxDGeneratedRemoteLocalResultFallbackTest", "UseGeneratedLocalResultChain");
+        => AssertFallbackLowers(
+            LocalResultSource,
+            "DotBoxDGeneratedRemoteLocalResultFallbackTest",
+            "UseGeneratedLocalResultChain",
+            "RemoteHookPipeline<global::ChainSample.ChainDamageContext>");
 
-    private static void AssertFallbackLowers(string source, string assemblyName, string? expectedInstall = null)
+    private static void AssertFallbackLowers(
+        string source,
+        string assemblyName,
+        string? expectedInstall = null,
+        string? expectedReceiver = null)
     {
         var parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Preview)
@@ -131,6 +143,18 @@ public sealed class GeneratedRemoteHookChainFallbackTests
         if (expectedInstall is not null)
         {
             Assert.Contains(generatedSources, source => source.Contains(expectedInstall, StringComparison.Ordinal));
+        }
+
+        if (expectedReceiver is not null)
+        {
+            var interceptorSource = Assert.Single(
+                generatedSources,
+                source => source.Contains("HookChainInterceptors", StringComparison.Ordinal));
+            Assert.Contains(expectedReceiver, interceptorSource, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "RemoteHookStage<global::ChainSample.ChainDamageContext",
+                interceptorSource,
+                StringComparison.Ordinal);
         }
     }
 

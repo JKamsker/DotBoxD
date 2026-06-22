@@ -330,7 +330,7 @@ public sealed class PluginAnalyzerHookChainTests
             namespace System.Runtime.CompilerServices
             {
                 [global::System.AttributeUsage(global::System.AttributeTargets.Method, AllowMultiple = true)]
-                internal sealed class InterceptsLocationAttribute : global::System.Attribute
+                file sealed class InterceptsLocationAttribute : global::System.Attribute
                 {
                     public InterceptsLocationAttribute(int version, string data) { }
                 }
@@ -418,6 +418,39 @@ public sealed class PluginAnalyzerHookChainTests
             result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains("\"combat.damage\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ordinary_hook_chain_manifest_uses_the_declared_hook_name()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(string TargetId);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Run((ctx, hookContext) => hookContext.Messages.Send(ctx.TargetId, "hit"));
+            }
+            """);
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK100");
         Assert.Contains("\"combat.damage\"", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Sample.DamageCtx\"", generated, StringComparison.Ordinal);
     }
@@ -525,6 +558,68 @@ public sealed class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Remote_RegisterLocal_result_chain_after_Select_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Select(ctx => ctx.Damage)
+                        .RegisterLocal((damage, hookContext) => DamageResult.Ok().WithDamage(damage), 25);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
+    }
+
+    [Fact]
+    public void Generated_remote_Register_result_chain_after_Where_uses_pipeline_receiver()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Where(ctx => ctx.Damage > 0)
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 25);
+            }
+            """);
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains("RemoteHookPipeline<global::Sample.DamageCtx>", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("RemoteHookStage<global::Sample.DamageCtx", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Lowers_a_cancellation_aware_RegisterLocal_result_chain_to_a_local_result_install()
     {
         var result = RunGenerator("""
@@ -591,6 +686,160 @@ public sealed class PluginAnalyzerHookChainTests
         Assert.Contains(
             result.GeneratedTrees,
             tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_Register_result_chain_with_named_reordered_arguments()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(priority: 100, handler: ctx => DamageResult.Ok().WithDamage(ctx.Damage));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_RegisterLocal_result_chain_with_named_reordered_arguments()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .RegisterLocal(
+                            priority: 100,
+                            handler: (ctx, hookContext) => DamageResult.Ok().WithDamage(ctx.Damage));
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_RegisterLocal_block_body_returning_a_result_builder_chain()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, int Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .RegisterLocal((ctx, hookContext) =>
+                        {
+                            return DamageResult.Ok().WithDamage(ctx.Damage);
+                        }, 100);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("UseGeneratedLocalResultChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lowers_a_Register_builder_constant_to_the_result_field_type()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, long Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => DamageResult.Ok().WithDamage(1), 100);
+            }
+            """);
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
+        Assert.Contains("I64(1L)", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Register_builder_non_constant_numeric_mismatch_reports_DBXK113()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [Hook("combat.damage", typeof(DamageResult))]
+            public sealed record DamageCtx(int Damage);
+
+            [HookResult]
+            public readonly partial record struct DamageResult(bool Success, string? Reason, long Damage);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageCtx>()
+                        .Register(ctx => DamageResult.Ok().WithDamage(ctx.Damage), 100);
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Id == "DBXK113");
     }
 
     [Fact]

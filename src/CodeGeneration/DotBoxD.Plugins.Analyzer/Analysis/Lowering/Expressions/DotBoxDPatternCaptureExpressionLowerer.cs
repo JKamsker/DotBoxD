@@ -18,12 +18,6 @@ internal static class DotBoxDPatternCaptureExpressionLowerer
                 part => lowerExpression(part, context));
         }
 
-        if (binary.Kind() == SyntaxKind.LogicalAndExpression &&
-            TryLowerDeclarationAnd(binary, context, lowerExpression) is { } declarationAnd)
-        {
-            return declarationAnd;
-        }
-
         if (binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression &&
             DotBoxDPatternExpressionLowerer.ContainsDeclarationPattern(binary))
         {
@@ -46,44 +40,5 @@ internal static class DotBoxDPatternCaptureExpressionLowerer
 
         lowered = null!;
         return false;
-    }
-
-    private static DotBoxDExpressionModel? TryLowerDeclarationAnd(
-        BinaryExpressionSyntax binary,
-        DotBoxDExpressionLoweringContext context,
-        Func<ExpressionSyntax, DotBoxDExpressionLoweringContext, DotBoxDExpressionModel> lowerExpression)
-    {
-        if (!DotBoxDPatternExpressionLowerer.TryLowerDeclarationPattern(
-                binary.Left,
-                context,
-                part => lowerExpression(part, context),
-                out var left,
-                out var captureName,
-                out var capture))
-        {
-            return null;
-        }
-
-        if (DotBoxDPatternExpressionLowerer.ContainsDeclarationPattern(binary.Right))
-        {
-            throw new NotSupportedException($"Unsupported declaration-pattern composition '{binary}'.");
-        }
-
-        var rightContext = context.WithPatternCapture(captureName, capture);
-        var right = lowerExpression(binary.Right, rightContext);
-        RequireBool(left, DotBoxDGenerationNames.Operators.LogicalAnd);
-        RequireBool(right, DotBoxDGenerationNames.Operators.LogicalAnd);
-        return new DotBoxDExpressionModel(
-            $"{DotBoxDGenerationNames.Helpers.And}({left.Source}, {right.Source})",
-            DotBoxDGenerationNames.ManifestTypes.Bool,
-            left.Allocates || right.Allocates);
-    }
-
-    private static void RequireBool(DotBoxDExpressionModel expression, string symbol)
-    {
-        if (!string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.Bool, StringComparison.Ordinal))
-        {
-            throw new NotSupportedException($"Operator '{symbol}' requires bool operands.");
-        }
     }
 }

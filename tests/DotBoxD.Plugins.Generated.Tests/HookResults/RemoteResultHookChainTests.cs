@@ -10,6 +10,12 @@ public sealed record RemoteDamageContext(int Damage);
 [HookResult]
 public readonly partial record struct RemoteDamageResult(bool Success, string? Reason, int Damage);
 
+[Hook("remote.damage", typeof(RemoteOtherDamageResult))]
+public sealed record RemoteOtherDamageContext(int Damage);
+
+[HookResult]
+public readonly partial record struct RemoteOtherDamageResult(bool Success, string? Reason, int Damage);
+
 public static class RemoteDamagePlugin
 {
     public static void ConfigureLocal(RemoteHookRegistry hooks)
@@ -58,6 +64,108 @@ public sealed class RemoteResultHookChainTests
     }
 
     [Fact]
+    public void Remote_result_install_rejects_matching_hook_name_with_wrong_result_type()
+    {
+        var package = CaptureSandboxPackage();
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<RemoteOtherDamageContext>().UseGeneratedResultChain<RemoteOtherDamageResult>(package));
+
+        Assert.False(installed);
+        Assert.Contains("remote.damage", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Remote_result_install_rejects_full_event_name_match_with_wrong_result_type()
+    {
+        var package = WithSubscription(
+            CaptureSandboxPackage(),
+            subscription => subscription with
+            {
+                Event = typeof(RemoteDamageContext).FullName!,
+                ResultType = "global::DotBoxD.Plugins.Generated.Tests.HookResults.RemoteOtherDamageResult"
+            });
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<RemoteDamageContext>().UseGeneratedResultChain<RemoteDamageResult>(package));
+
+        Assert.False(installed);
+        Assert.Contains("RemoteOtherDamageResult", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Remote_Register_rejects_generic_result_type_that_does_not_match_manifest()
+    {
+        var package = CaptureSandboxPackage();
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<RemoteDamageContext>().UseGeneratedResultChain<RemoteOtherDamageResult>(package));
+
+        Assert.False(installed);
+        Assert.Contains(nameof(RemoteOtherDamageResult), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Remote_RegisterLocal_rejects_non_local_result_manifest_before_registering_callback()
+    {
+        var package = WithSubscription(
+            CaptureLocalPackage(),
+            subscription => subscription with { ResultLocalTerminal = false });
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        }, new RemoteLocalHandlerRegistry());
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<RemoteDamageContext>().UseGeneratedLocalResultChain(
+                package,
+                (RemoteDamageContext context, HookContext _) => RemoteDamageResult.Ok().WithDamage(context.Damage)));
+
+        Assert.False(installed);
+        Assert.Contains("resultLocalTerminal", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Remote_RegisterLocal_rejects_handler_result_type_that_does_not_match_manifest()
+    {
+        var package = CaptureLocalPackage();
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        }, new RemoteLocalHandlerRegistry());
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<RemoteDamageContext>().UseGeneratedLocalResultChain(
+                package,
+                (RemoteDamageContext _, HookContext _) => RemoteOtherDamageResult.Ok().WithDamage(1)));
+
+        Assert.False(installed);
+        Assert.Contains(nameof(RemoteOtherDamageResult), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Remote_RegisterLocal_timeout_options_return_fail_closed_result_when_request_hangs()
     {
         var faults = new List<ResultHookFault>();
@@ -71,7 +179,7 @@ public sealed class RemoteResultHookChainTests
         RemoteDamagePlugin.ConfigureLocal(registry);
 
         var options = ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
-            TimeSpan.FromMilliseconds(25),
+            TimeSpan.FromMilliseconds(100),
             new RemoteDamageResult(true, "timeout", -1));
         var result = await server.Hooks.FireAsync(new RemoteDamageContext(12), options);
 
@@ -135,4 +243,43 @@ public sealed class RemoteResultHookChainTests
                 return subscriptionId;
             },
             localHandlers);
+
+    private static PluginPackage CaptureSandboxPackage()
+    {
+        PluginPackage? captured = null;
+        var registry = new RemoteHookRegistry(package =>
+        {
+            captured = package;
+            return ValueTask.FromResult(package.Manifest.PluginId);
+        });
+
+        RemoteDamagePlugin.ConfigureSandbox(registry);
+        return captured ?? throw new InvalidOperationException("Remote damage package was not captured.");
+    }
+
+    private static PluginPackage CaptureLocalPackage()
+    {
+        PluginPackage? captured = null;
+        var registry = new RemoteHookRegistry(
+            package =>
+            {
+                captured = package;
+                return ValueTask.FromResult(package.Manifest.PluginId);
+            },
+            new RemoteLocalHandlerRegistry());
+
+        RemoteDamagePlugin.ConfigureLocal(registry);
+        return captured ?? throw new InvalidOperationException("Remote local damage package was not captured.");
+    }
+
+    private static PluginPackage WithSubscription(
+        PluginPackage package,
+        Func<HookSubscriptionManifest, HookSubscriptionManifest> transform)
+        => package with
+        {
+            Manifest = package.Manifest with
+            {
+                Subscriptions = [transform(Assert.Single(package.Manifest.Subscriptions))]
+            }
+        };
 }

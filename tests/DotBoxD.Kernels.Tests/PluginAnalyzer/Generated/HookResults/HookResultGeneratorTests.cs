@@ -24,6 +24,7 @@ public sealed class HookResultGeneratorTests
         var generated = string.Join("\n", PluginAnalyzerGeneratedPackageFactory.GeneratedSources(ValidResult));
 
         Assert.Contains(": global::DotBoxD.Abstractions.IHookResult", generated, StringComparison.Ordinal);
+        Assert.Contains("public readonly partial record struct CombatDamageResult", generated, StringComparison.Ordinal);
         Assert.Contains("public static CombatDamageResult Ok()", generated, StringComparison.Ordinal);
         Assert.Contains("public static CombatDamageResult Reject(string? reason = null)", generated, StringComparison.Ordinal);
         Assert.Contains("public CombatDamageResult WithDamage(int damage)", generated, StringComparison.Ordinal);

@@ -234,11 +234,29 @@ public sealed partial class RemoteHookPipeline<TEvent>
 
     private static void ValidateSubscription(PluginPackage package)
     {
-        var actual = package.Manifest.Subscriptions.Count > 0 ? package.Manifest.Subscriptions[0].Event : null;
+        var subscription = package.Manifest.Subscriptions.Count > 0 ? package.Manifest.Subscriptions[0] : null;
+        var actual = subscription?.Event;
         // Manifests now carry the fully-qualified event name; compare against typeof(TEvent).FullName but
         // accept the legacy simple-name form via EventNameMatch for back-compat.
         var expected = typeof(TEvent).FullName ?? typeof(TEvent).Name;
-        if (EventNameMatch.Matches(actual, expected) || ResultHookNameMatches(package, actual))
+        var hook = HookAttribute();
+        var eventMatches = EventNameMatch.Matches(actual, expected) || HookNameMatches(hook, actual);
+        if (subscription?.ResultType is { } resultType)
+        {
+            if (eventMatches &&
+                hook is not null &&
+                ResultTypeMatches(resultType, hook.ResultType))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Hook package '{package.Manifest.PluginId}' subscribes to '{actual ?? "<none>"}' " +
+                $"with result type '{resultType}', not '{expected}' with result type " +
+                $"'{hook?.ResultType.FullName ?? "<none>"}'.");
+        }
+
+        if (eventMatches)
         {
             return;
         }
@@ -247,20 +265,32 @@ public sealed partial class RemoteHookPipeline<TEvent>
             $"Hook package '{package.Manifest.PluginId}' subscribes to '{actual ?? "<none>"}', not '{expected}'.");
     }
 
-    private static bool ResultHookNameMatches(PluginPackage package, string? actual)
-    {
-        if (package.Manifest.Subscriptions.Count == 0 ||
-            package.Manifest.Subscriptions[0].ResultType is null ||
-            string.IsNullOrEmpty(actual))
-        {
-            return false;
-        }
-
-        var hook = (HookAttribute?)Attribute.GetCustomAttribute(
+    private static HookAttribute? HookAttribute()
+        => (HookAttribute?)Attribute.GetCustomAttribute(
             typeof(TEvent),
             typeof(HookAttribute),
             inherit: false);
-        return hook is not null && string.Equals(hook.Name, actual, StringComparison.Ordinal);
+
+    private static bool HookNameMatches(HookAttribute? hook, string? actual)
+    {
+        return hook is not null &&
+            !string.IsNullOrEmpty(actual) &&
+            string.Equals(hook.Name, actual, StringComparison.Ordinal);
+    }
+
+    private static bool ResultTypeMatches(string declared, Type expected)
+    {
+        var expectedName = expected.FullName ?? expected.Name;
+        return string.Equals(NormalizeTypeName(declared), NormalizeTypeName(expectedName), StringComparison.Ordinal);
+    }
+
+    private static string NormalizeTypeName(string name)
+    {
+        const string globalPrefix = "global::";
+        return (name.StartsWith(globalPrefix, StringComparison.Ordinal)
+                ? name[globalPrefix.Length..]
+                : name)
+            .Replace('+', '.');
     }
 
 }

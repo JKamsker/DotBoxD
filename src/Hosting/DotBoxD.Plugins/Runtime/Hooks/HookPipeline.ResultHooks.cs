@@ -180,13 +180,13 @@ public sealed partial class HookPipeline<TEvent>
 
     private static void EnsureHookResultType(Type resultType)
     {
-        if (typeof(IHookResult).IsAssignableFrom(resultType))
+        if (resultType.IsValueType && typeof(IHookResult).IsAssignableFrom(resultType))
         {
             return;
         }
 
         throw new ArgumentException(
-            $"Result type '{resultType}' must implement {nameof(IHookResult)}.",
+            $"Result type '{resultType}' must be a value type implementing {nameof(IHookResult)}.",
             nameof(resultType));
     }
 

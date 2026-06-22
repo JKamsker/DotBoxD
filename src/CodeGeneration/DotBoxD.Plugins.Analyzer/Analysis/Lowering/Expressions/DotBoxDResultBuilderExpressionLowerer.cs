@@ -169,6 +169,7 @@ internal static class DotBoxDResultBuilderExpressionLowerer
                 return false;
             }
 
+            var expectedType = SandboxTypeSourceEmitter.ManifestTag(fields[index].Type);
             var argument = DotBoxDNullableScalarExpressionLowerer.TryLower(
                 arguments[0].Expression,
                 fields[index].Type,
@@ -177,9 +178,15 @@ internal static class DotBoxDResultBuilderExpressionLowerer
                 out var nullable)
                 ? nullable
                 : lowerExpression(arguments[0].Expression);
-            if (!string.Equals(argument.Type, SandboxTypeSourceEmitter.ManifestTag(fields[index].Type), StringComparison.Ordinal))
+            if (!string.Equals(argument.Type, expectedType, StringComparison.Ordinal))
             {
-                return false;
+                if (!DotBoxDGenerationNames.ManifestTypes.IsNumeric(expectedType) ||
+                    DotBoxDNumericConstantPromoter.TryPromoteConstant(arguments[0].Expression, context, expectedType) is not { } promoted)
+                {
+                    return false;
+                }
+
+                argument = promoted;
             }
 
             sources[index] = argument.Source;

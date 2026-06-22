@@ -19,7 +19,8 @@ internal static class ResultHookLocalHandlerValidator
             return;
         }
 
-        if (terminalLambda.ExpressionBody is InvocationExpressionSyntax builderChain &&
+        var returnExpression = ReturnExpression(terminalLambda);
+        if (returnExpression is InvocationExpressionSyntax builderChain &&
             SymbolEqualityComparer.Default.Equals(
                 DotBoxDResultBuilderExpressionLowerer.ResolveSeedResultType(builderChain, model, cancellationToken),
                 resultType))
@@ -27,7 +28,7 @@ internal static class ResultHookLocalHandlerValidator
             return;
         }
 
-        if (terminalLambda.ExpressionBody is ObjectCreationExpressionSyntax creation &&
+        if (returnExpression is ObjectCreationExpressionSyntax creation &&
             SymbolEqualityComparer.Default.Equals(
                 model.GetTypeInfo(creation, cancellationToken).ConvertedType ??
                 model.GetTypeInfo(creation, cancellationToken).Type,
@@ -37,6 +38,19 @@ internal static class ResultHookLocalHandlerValidator
         }
 
         throw new NotSupportedException();
+    }
+
+    private static ExpressionSyntax? ReturnExpression(LambdaExpressionSyntax lambda)
+    {
+        if (lambda.ExpressionBody is { } expressionBody)
+        {
+            return expressionBody;
+        }
+
+        return lambda.Block is { Statements.Count: 1 } block &&
+            block.Statements[0] is ReturnStatementSyntax { Expression: { } expression }
+            ? expression
+            : null;
     }
 
     private static bool ReturnsHookResult(ITypeSymbol returnType, INamedTypeSymbol resultType)

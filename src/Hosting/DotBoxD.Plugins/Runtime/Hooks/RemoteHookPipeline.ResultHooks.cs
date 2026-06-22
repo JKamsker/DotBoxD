@@ -23,6 +23,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
     {
         ArgumentNullException.ThrowIfNull(package);
         ValidateSubscription(package);
+        ValidateResultSubscription<TResult>(package, resultLocalTerminal: false);
         _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
         return this;
     }
@@ -49,6 +50,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(handler);
         ValidateSubscription(package);
+        ValidateResultSubscription<TResult>(package, resultLocalTerminal: true);
         if (_localHandlers is null)
         {
             throw ResultLocalHandlersNotSupported();
@@ -76,6 +78,31 @@ public sealed partial class RemoteHookPipeline<TEvent>
         }
 
         return this;
+    }
+
+    private static void ValidateResultSubscription<TResult>(PluginPackage package, bool resultLocalTerminal)
+        where TResult : struct, IHookResult
+    {
+        if (package.Manifest.Subscriptions.Count == 0 ||
+            package.Manifest.Subscriptions[0] is not { ResultType: { } resultType } subscription)
+        {
+            throw new InvalidOperationException(
+                $"Hook package '{package.Manifest.PluginId}' does not declare result hook metadata.");
+        }
+
+        if (subscription.ResultLocalTerminal != resultLocalTerminal)
+        {
+            throw new InvalidOperationException(
+                $"Hook package '{package.Manifest.PluginId}' result subscription declares resultLocalTerminal " +
+                $"'{subscription.ResultLocalTerminal}', but the install path expected '{resultLocalTerminal}'.");
+        }
+
+        if (!ResultTypeMatches(resultType, typeof(TResult)))
+        {
+            throw new InvalidOperationException(
+                $"Hook package '{package.Manifest.PluginId}' result subscription declares result type " +
+                $"'{resultType}', but '{typeof(TResult).FullName}' was expected.");
+        }
     }
 
     private static InvalidOperationException ResultNotLowered()

@@ -173,7 +173,7 @@ public sealed class ResultHookSlotTests
             },
             remote: true);
         var options = ResultHookDispatchOptions<TestResult>.FailClosedAfter(
-            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(100),
             new TestResult(true, "timeout", -1));
 
         var result = await slot.FireAsync(

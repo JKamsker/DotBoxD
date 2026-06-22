@@ -38,7 +38,14 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
 
         if (type is IArrayTypeSymbol array)
         {
-            return array.Rank == 1 && ContainsNullableValueType(array.ElementType, visited);
+            if (array.Rank != 1)
+            {
+                // Multi-dimensional arrays are rejected by ManifestTag; this helper only detects nullable
+                // value types inside otherwise marshaller-eligible shapes.
+                return false;
+            }
+
+            return ContainsNullableValueType(array.ElementType, visited);
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is { } elementType &&
