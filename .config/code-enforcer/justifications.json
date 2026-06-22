@@ -98,10 +98,6 @@
       "justification": "Pre-existing generated factory registry fixture surfaced after correcting the line guard root. Keep listed until registration scenarios are split."
     },
     {
-      "path": "tests/DotBoxD.Services.SourceGenerator.Tests/SubServices/NestedServiceTests.cs",
-      "justification": "Pre-existing nested-service fixture surfaced after correcting the line guard root. Keep listed until nested service scenarios are split."
-    },
-    {
       "path": "tests/DotBoxD.Services.Tests/Coverage/Core/SerializationCoverageTests.cs",
       "justification": "Pre-existing serialization coverage fixture surfaced after correcting the line guard root. Keep listed until serialization cases are split."
     },
