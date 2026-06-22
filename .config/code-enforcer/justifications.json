@@ -2,10 +2,6 @@
   "version": 1,
   "files": [
     {
-      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainModelFactory.cs",
-      "justification": "True-async hook-chain lowering shares projection, terminal, and remote-fallback model construction in one pass. Keep listed until hook-chain model construction is split by stage family."
-    },
-    {
       "path": "src/CodeGeneration/DotBoxD.Services.SourceGenerator/Generation/ProxyGenerator.cs",
       "justification": "Pre-existing generator emission file surfaced after correcting the line guard root. Keep listed until proxy method emission is split into focused helpers."
     },
