@@ -1,0 +1,191 @@
+# DotBoxD.Kernels public API baseline
+# Package: DotBoxD.Queryable
+# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.
+
+public bool Boolean { get; }
+public bool Equals(QueryValue? other) =>
+public bool HasSubscriptions<TEvent>() => TryGetDispatcher<TEvent>() is not null
+public bool IgnoreCase { get; init; }
+public bool IsCompiled => _isCompiled()
+public bool IsEquality => Operator == QueryComparisonOperator.Equal
+public bool IsRoutable => RoutingKeys.Count > 0
+public const int MaxDepth = 32
+public const int MaxInValues = 256
+public const int MaxNodes = 256
+public DateTimeOffset Timestamp { get; }
+public decimal Decimal { get; }
+public double Number { get; }
+public enum IndexCoverage
+public enum IndexCoverage.Full = 2
+public enum IndexCoverage.None = 0
+public enum IndexCoverage.Partial = 1
+public enum QueryComparisonOperator
+public enum QueryComparisonOperator.Equal = 0
+public enum QueryComparisonOperator.GreaterThan = 2
+public enum QueryComparisonOperator.GreaterThanOrEqual = 3
+public enum QueryComparisonOperator.LessThan = 4
+public enum QueryComparisonOperator.LessThanOrEqual = 5
+public enum QueryComparisonOperator.NotEqual = 1
+public enum QueryComparisonOperator.StringContains = 6
+public enum QueryComparisonOperator.StringEndsWith = 8
+public enum QueryComparisonOperator.StringStartsWith = 7
+public enum QueryFilterKind
+public enum QueryFilterKind.And = 1
+public enum QueryFilterKind.Compare = 4
+public enum QueryFilterKind.In = 5
+public enum QueryFilterKind.MatchAll = 0
+public enum QueryFilterKind.Not = 3
+public enum QueryFilterKind.Or = 2
+public enum QueryProjectionKind
+public enum QueryProjectionKind.Construct = 2
+public enum QueryProjectionKind.Identity = 0
+public enum QueryProjectionKind.Member = 1
+public enum QueryValueKind
+public enum QueryValueKind.Boolean = 1
+public enum QueryValueKind.Decimal = 6
+public enum QueryValueKind.Guid = 5
+public enum QueryValueKind.Integer = 2
+public enum QueryValueKind.Null = 0
+public enum QueryValueKind.Number = 3
+public enum QueryValueKind.String = 4
+public enum QueryValueKind.Timestamp = 8
+public enum QueryValueKind.UnsignedInteger = 7
+public EventQuery<TEvent> Query<TEvent>() => new(this)
+public EventQuery<TEvent> Where(Expression<Func<TEvent, bool>> predicate)
+public EventQueryDocument Document { get; }
+public EventQueryPlan Plan { get; }
+public EventQuerySubscription<TEvent, TProjection> Select<TProjection>( Expression<Func<TEvent, TProjection>> projection)
+public Guid Guid { get; }
+public interface IEventQuerySource
+public IReadOnlyList<QueryFilter> Children { get; init; } = NoChildren
+public IReadOnlyList<QueryProjectionField> Fields { get; init; } = NoFields
+public IReadOnlyList<QueryValue> Values { get; init; } = NoValues
+public IReadOnlyList<string> Describe() => EventQueryDiagnostics.Describe(this)
+public long Dispatches => Interlocked.Read(ref _dispatches)
+public long EventsObserved => _eventsObserved()
+public long FilterEvaluations => Interlocked.Read(ref _filterEvaluations)
+public long Integer { get; }
+public long Matches => Interlocked.Read(ref _matches)
+public object? Read(object target, string path)
+public override EventQueryDocument Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+public override int GetHashCode()
+public override QueryFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+public override QueryProjection Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+public override QueryValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+public override void Write(Utf8JsonWriter writer, EventQueryDocument value, JsonSerializerOptions options)
+public override void Write(Utf8JsonWriter writer, QueryFilter value, JsonSerializerOptions options)
+public override void Write(Utf8JsonWriter writer, QueryProjection value, JsonSerializerOptions options)
+public override void Write(Utf8JsonWriter writer, QueryValue value, JsonSerializerOptions options)
+public QueryComparisonOperator Operator { get; init; }
+public QueryFilter? ResidualFilter { get; init; }
+public QueryTranslationException(string message, Exception innerException)
+public QueryTranslationException(string message)
+public QueryValue? Constant { get; init; }
+public QueryValue? Value { get; init; }
+public QueryValueKind Kind { get; }
+public required IndexCoverage Coverage { get; init; }
+public required IReadOnlyList<IndexedPredicate> IndexedPredicates { get; init; }
+public required IReadOnlyList<IndexedPredicate> RoutingKeys { get; init; }
+public required QueryComparisonOperator Operator { get; init; }
+public required QueryFilter Filter { get; init; }
+public required QueryFilterKind Kind { get; init; }
+public required QueryProjection Projection { get; init; }
+public required QueryProjectionKind Kind { get; init; }
+public required QueryValue Value { get; init; }
+public required string EventName { get; init; }
+public required string Name { get; init; }
+public required string Path { get; init; }
+public sealed class EventQuery<TEvent>
+public sealed class EventQueryDocumentJsonConverter : JsonConverter<EventQueryDocument>
+public sealed class EventQueryHost : IEventQuerySource
+public sealed class EventQuerySubscription<TEvent, TProjection>
+public sealed class EventQuerySubscriptionHandle : IDisposable
+public sealed class MemberValueReader
+public sealed class QueryFilterJsonConverter : JsonConverter<QueryFilter>
+public sealed class QueryProjectionJsonConverter : JsonConverter<QueryProjection>
+public sealed class QueryTranslationException : Exception
+public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
+public sealed record EventQueryDocument
+public sealed record EventQueryPlan
+public sealed record IndexedPredicate
+public sealed record QueryFilter
+public sealed record QueryProjection
+public sealed record QueryProjectionField
+public sealed record QueryValue
+public static bool AreEqual(object? actual, QueryValue expected, bool ignoreCase)
+public static bool Compare(object? actual, QueryComparisonOperator op, QueryValue expected, bool ignoreCase) => op switch
+public static bool Evaluate(QueryFilter filter, object target, MemberValueReader reader)
+public static bool IsAnyEqual(object? actual, IReadOnlyList<QueryValue> candidates, bool ignoreCase)
+public static bool IsSatisfiable(QueryFilter filter)
+public static bool TryFromObject(object? value, out QueryValue result)
+public static class EventQueryCanonicalizer
+public static class EventQueryDiagnostics
+public static class EventQueryIndexAdapter
+public static class EventQueryJson
+public static class EventQueryPlanner
+public static class ExpressionQueryTranslator
+public static class QueryEvaluationLimits
+public static class QueryFilterCompiler
+public static class QueryFilterEvaluator
+public static class QueryFingerprint
+public static class QuerySatisfiability
+public static class QueryText
+public static class QueryValueComparer
+public static class SubscriptionRegistryQueryExtensions
+public static EventQuery<TEvent> Query<TEvent>(this SubscriptionRegistry subscriptions)
+public static EventQueryDocument Canonicalize(EventQueryDocument document)
+public static EventQueryDocument Create( string eventName, QueryFilter? filter, QueryProjection projection)
+public static EventQueryDocument Deserialize(string json)
+public static EventQueryPlan Plan(EventQueryDocument document)
+public static EventQueryPlan Plan(QueryFilter filter)
+public static Func<object, bool> Compile(QueryFilter filter, MemberValueReader reader)
+public static HostIndexedPredicate ToIndexedPredicate(IndexedPredicate source)
+public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(EventQueryPlan plan)
+public static IReadOnlyList<HostIndexedPredicate> ToIndexedPredicates(IReadOnlyList<IndexedPredicate> predicates)
+public static IReadOnlyList<string> Describe(EventQuerySubscriptionHandle handle)
+public static JsonSerializerOptions Options { get; } = CreateOptions(indented: false)
+public static QueryFilter And(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.And, children)
+public static QueryFilter Canonicalize(QueryFilter filter)
+public static QueryFilter Compare( string field, QueryComparisonOperator op, QueryValue value, bool ignoreCase = false)
+public static QueryFilter In(string field, IReadOnlyList<QueryValue> values, bool ignoreCase = false)
+public static QueryFilter MatchAll { get; } = new() { Kind = QueryFilterKind.MatchAll }
+public static QueryFilter Not(QueryFilter child)
+public static QueryFilter Or(IReadOnlyList<QueryFilter> children) => Connective(QueryFilterKind.Or, children)
+public static QueryFilter Parse(string text)
+public static QueryFilter TranslateFilter<TEvent>(Expression<Func<TEvent, bool>> predicate)
+public static QueryProjection Construct(string typeName, IReadOnlyList<QueryProjectionField> fields)
+public static QueryProjection Identity { get; } = new() { Kind = QueryProjectionKind.Identity }
+public static QueryProjection Member(string path)
+public static QueryProjection TranslateProjection<TEvent, TProjection>( Expression<Func<TEvent, TProjection>> projection)
+public static QueryProjectionField FromConstant(string name, QueryValue constant)
+public static QueryProjectionField FromMember(string name, string path)
+public static QueryTranslationException Unsupported(Expression expression, string? reason = null)
+public static QueryValue FromBoolean(bool value) => new(QueryValueKind.Boolean, value, 0, 0, null)
+public static QueryValue FromDecimal(decimal value) => new(QueryValueKind.Decimal, value)
+public static QueryValue FromGuid(Guid value) => new(QueryValueKind.Guid, value)
+public static QueryValue FromInteger(long value) => new(QueryValueKind.Integer, false, value, 0, null)
+public static QueryValue FromNumber(double value)
+public static QueryValue FromString(string? value) =>
+public static QueryValue FromTimestamp(DateTimeOffset value) => new(QueryValueKind.Timestamp, value.ToUniversalTime())
+public static QueryValue FromUnsignedInteger(ulong value) => new(QueryValueKind.UnsignedInteger, value)
+public static QueryValue Null { get; } = new(QueryValueKind.Null, false, 0, 0, null)
+public static string Compute(EventQueryDocument document)
+public static string ComputeShort(EventQueryDocument document)
+public static string DescribeText(EventQuerySubscriptionHandle handle)
+public static string EventName<TEvent>() => typeof(TEvent).FullName ?? typeof(TEvent).Name
+public static string Format(QueryFilter filter)
+public static string Serialize(EventQueryDocument document, bool indented = false)
+public static void EnsureSatisfiable(QueryFilter filter)
+public static void EnsureWithinLimits(QueryFilter filter)
+public string Field { get; init; } = string.Empty
+public string Fingerprint { get; }
+public string ToCanonicalText() => Kind switch
+public string? ParameterKey { get; init; }
+public string? Path { get; init; }
+public string? String { get; }
+public string? TypeName { get; init; }
+public ulong UnsignedInteger { get; }
+public ValueTask PublishAsync<TEvent>(TEvent e, HookContext context)
+public ValueTask<EventQuerySubscriptionHandle> SubscribeAsync(Func<TEvent, HookContext, ValueTask> handler)
+public ValueTask<EventQuerySubscriptionHandle> SubscribeAsync(Func<TProjection, HookContext, ValueTask> handler)
+public void Dispose() => Interlocked.Exchange(ref _unsubscribe, null)?.Invoke()

@@ -1,11 +1,4 @@
 <Solution>
-  <Folder Name="/samples/GameServer/">
-    <Project Path="samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj" />
-    <Project Path="samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj" />
-    <Project Path="samples/GameServer/Examples.GameServer.Server.Abstractions/Examples.GameServer.Server.Abstractions.csproj" />
-    <Project Path="samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj" />
-  </Folder>
-
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
@@ -44,7 +37,6 @@
     <Project Path="src/Hosting/DotBoxD.Abstractions/DotBoxD.Abstractions.csproj" />
     <Project Path="src/Hosting/DotBoxD.Plugins/DotBoxD.Plugins.csproj" />
     <Project Path="src/Hosting/DotBoxD.Hosting.Http/DotBoxD.Hosting.Http.csproj" />
-    <Project Path="src/Hosting/DotBoxD.Queryable/DotBoxD.Queryable.csproj" />
   </Folder>
 
   <Folder Name="/src/Pushdown/">
@@ -56,33 +48,4 @@
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Analyzer/DotBoxD.Plugins.Analyzer.csproj" />
     <Project Path="src/CodeGeneration/DotBoxD.Plugins.Fody/DotBoxD.Plugins.Fody.csproj" />
   </Folder>
-
-  <Folder Name="/tests/">
-    <Project Path="tests/DotBoxD.Architecture.Tests/DotBoxD.Architecture.Tests.csproj" />
-    <Project Path="tests/DotBoxD.Kernels.Tests/DotBoxD.Kernels.Tests.csproj" />
-    <Project Path="tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj" />
-    <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginAbstractions/DotBoxD.Kernels.TestFixtures.PluginAbstractions.csproj" />
-    <Project Path="tests/DotBoxD.Kernels.TestFixtures.PluginLocal/DotBoxD.Kernels.TestFixtures.PluginLocal.csproj" />
-    <Project Path="tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj" />
-    <Project Path="tests/DotBoxD.Services.TestContracts/DotBoxD.Services.TestContracts.csproj" />
-    <Project Path="tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj" />
-    <Project Path="tests/DotBoxD.Services.Tests.GeneratedFixtures/DotBoxD.Services.Tests.GeneratedFixtures.csproj" />
-  </Folder>
-
-  <Folder Name="/benchmarks/">
-    <Project Path="benchmarks/DotBoxD.Kernels.Benchmarks/DotBoxD.Kernels.Benchmarks.csproj" />
-    <Project Path="benchmarks/DotBoxD.Services.Benchmarks/DotBoxD.Services.Benchmarks.csproj" />
-  </Folder>
-
-  <Folder Name="/samples/" />
-
-  <Folder Name="/tools/">
-    <Project Path="tools/AgentQueue/src/AgentQueue/AgentQueue.csproj" />
-    <Project Path="tools/AgentQueue/tests/AgentQueue.Tests/AgentQueue.Tests.csproj" />
-  </Folder>
-
-  <Properties Name="Visual Studio">
-    <Property Name="OpenWith" Value="17" />
-  </Properties>
-
 </Solution>

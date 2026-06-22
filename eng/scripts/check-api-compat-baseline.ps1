@@ -31,6 +31,7 @@ $packages = @(
     @{ Id = "DotBoxD.Plugins.Analyzer"; Path = "src/CodeGeneration/DotBoxD.Plugins.Analyzer" },
     @{ Id = "DotBoxD.Plugins"; Path = "src/Hosting/DotBoxD.Plugins" },
     @{ Id = "DotBoxD.Abstractions"; Path = "src/Hosting/DotBoxD.Abstractions" },
+    @{ Id = "DotBoxD.Queryable"; Path = "src/Hosting/DotBoxD.Queryable" },
     @{ Id = "DotBoxD"; Path = "src/Meta/DotBoxD" },
     @{ Id = "DotBoxD.Services.All"; Path = "src/Meta/DotBoxD.Services.All" }
 )
