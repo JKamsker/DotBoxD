@@ -2,10 +2,6 @@
   "version": 1,
   "files": [
     {
-      "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginSymbolReader.cs",
-      "justification": "Crossed the 350-line hard cap after repo-wide Allman brace normalization (dotnet format). Split symbol-reading helpers in a focused follow-up."
-    },
-    {
       "path": "src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainModelFactory.cs",
       "justification": "True-async hook-chain lowering shares projection, terminal, and remote-fallback model construction in one pass. Keep listed until hook-chain model construction is split by stage family."
     },
