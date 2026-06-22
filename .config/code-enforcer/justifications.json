@@ -58,10 +58,6 @@
       "justification": "Pre-existing peer inbound queue coverage surfaced after correcting the line guard root. Keep listed until queue scenarios are split."
     },
     {
-      "path": "tests/DotBoxD.Services.Tests/Coverage/Transport/StreamConnectionCoverageTests.cs",
-      "justification": "Pre-existing stream connection coverage surfaced after correcting the line guard root. Keep listed until connection scenarios are split."
-    },
-    {
       "path": "tests/DotBoxD.Services.Tests/Peer/PeerTests.cs",
       "justification": "Pre-existing peer behavior fixture surfaced after correcting the line guard root. Keep listed until peer lifecycle scenarios are split."
     },
