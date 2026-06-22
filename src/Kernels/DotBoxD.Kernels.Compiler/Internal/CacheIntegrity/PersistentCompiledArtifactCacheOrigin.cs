@@ -5,24 +5,19 @@ using System.Text.Json;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Verifier.Generated;
-
 namespace DotBoxD.Kernels.Compiler.Internal.CacheIntegrity;
 
 internal static class PersistentCompiledArtifactCacheOrigin
 {
     public const string ProofFileName = "origin.json";
-
     private const int ProofVersion = 1;
     private const int OriginKeyByteLength = 32;
     private const string ProofAlgorithm = "HMAC-SHA256";
-
     private static readonly SemaphoreSlim OriginKeyGate = new(1, 1);
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
-
     public static async ValueTask WriteProofAsync(
         string entryPath,
         string cacheKey,
@@ -52,7 +47,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             stream.Flush(flushToDisk: true);
         }
     }
-
     public static async ValueTask ValidateProofAsync(
         string entryPath,
         string cacheKey,
@@ -72,14 +66,12 @@ internal static class PersistentCompiledArtifactCacheOrigin
                     .ConfigureAwait(false) ??
                 throw CacheInvalid("cached artifact origin proof is empty");
         }
-
         if (proof.Version != ProofVersion ||
             !StringComparer.Ordinal.Equals(proof.Algorithm, ProofAlgorithm) ||
             string.IsNullOrWhiteSpace(proof.Signature))
         {
             throw CacheInvalid("cached artifact origin proof is invalid");
         }
-
         var expected = await SignAsync(
                 cacheKey,
                 plan,
@@ -94,7 +86,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             throw CacheInvalid("cached artifact origin proof does not match current host");
         }
     }
-
     private static async ValueTask<string> SignAsync(
         string cacheKey,
         ExecutionPlan plan,
@@ -107,7 +98,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
         var key = await ReadOrCreateOriginKeyAsync(cancellationToken).ConfigureAwait(false);
         return ComputeSignature(key, cacheKey, plan, entrypoint, manifest, verification, assemblyBytes);
     }
-
     private static string ComputeSignature(
         byte[] key,
         string cacheKey,
@@ -132,7 +122,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
         hmac.TransformFinalBlock(assemblyBytes, 0, assemblyBytes.Length);
         return Convert.ToHexString(hmac.Hash!).ToLowerInvariant();
     }
-
     private static void AddManifest(HMAC hmac, ArtifactManifest manifest)
     {
         AddInt32(hmac, manifest.ArtifactVersion);
@@ -152,7 +141,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
         AddString(hmac, manifest.AssemblyHash);
         AddInt64(hmac, manifest.CreatedAt.UtcTicks);
     }
-
     private static void AddVerification(HMAC hmac, VerificationResult verification)
     {
         AddInt32(hmac, verification.Succeeded ? 1 : 0);
@@ -160,7 +148,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
         AddString(hmac, verification.VerifierVersion);
         AddInt64(hmac, verification.VerifiedAt.UtcTicks);
     }
-
     private static void AddStrings(HMAC hmac, IReadOnlyList<string> values)
     {
         AddInt32(hmac, values.Count);
@@ -169,7 +156,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             AddString(hmac, values[i]);
         }
     }
-
     private static void AddString(HMAC hmac, string value)
     {
         var bytes = Encoding.UTF8.GetBytes(value);
@@ -179,21 +165,18 @@ internal static class PersistentCompiledArtifactCacheOrigin
             hmac.TransformBlock(bytes, 0, bytes.Length, null, 0);
         }
     }
-
     private static void AddInt32(HMAC hmac, int value)
     {
         var bytes = new byte[sizeof(int)];
         BinaryPrimitives.WriteInt32BigEndian(bytes, value);
         hmac.TransformBlock(bytes, 0, bytes.Length, null, 0);
     }
-
     private static void AddInt64(HMAC hmac, long value)
     {
         var bytes = new byte[sizeof(long)];
         BinaryPrimitives.WriteInt64BigEndian(bytes, value);
         hmac.TransformBlock(bytes, 0, bytes.Length, null, 0);
     }
-
     private static async ValueTask<byte[]> ReadOrCreateOriginKeyAsync(CancellationToken cancellationToken)
     {
         await OriginKeyGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -204,12 +187,10 @@ internal static class PersistentCompiledArtifactCacheOrigin
             Directory.CreateDirectory(keyDirectory);
             PersistentCompiledArtifactCacheOriginKeyGuard.HardenDirectory(keyDirectory);
             PersistentCompiledArtifactCacheOriginKeyGuard.ValidateDirectory(keyDirectory);
-
             if (await TryAdoptExistingKeyAsync(keyPath, cancellationToken).ConfigureAwait(false) is { } existingKey)
             {
                 return existingKey;
             }
-
             return await CreateOriginKeyAsync(keyPath, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -217,14 +198,12 @@ internal static class PersistentCompiledArtifactCacheOrigin
             OriginKeyGate.Release();
         }
     }
-
     private static async ValueTask<byte[]?> TryAdoptExistingKeyAsync(string keyPath, CancellationToken cancellationToken)
     {
         if (!File.Exists(keyPath))
         {
             return null;
         }
-
         try
         {
             // Fail closed before trusting the key: a key file readable or replaceable by a
@@ -243,18 +222,15 @@ internal static class PersistentCompiledArtifactCacheOrigin
         {
             // Untrusted or unreadable key: fall through to scrub and recreate.
         }
-
         TryScrubFile(keyPath);
         return null;
     }
-
     private static async ValueTask<byte[]> CreateOriginKeyAsync(string keyPath, CancellationToken cancellationToken)
     {
         // A pre-existing file may linger if adoption left it in place (for example a key with
         // an ACL that locked out the current principal). DurableCreate uses FileMode.CreateNew
         // and would throw, so scrub any residue first.
         TryScrubFile(keyPath);
-
         var key = RandomNumberGenerator.GetBytes(OriginKeyByteLength);
         var stream = DurableCreate(keyPath);
         await using (stream.ConfigureAwait(false))
@@ -263,19 +239,16 @@ internal static class PersistentCompiledArtifactCacheOrigin
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             stream.Flush(flushToDisk: true);
         }
-
         PersistentCompiledArtifactCacheOriginKeyGuard.HardenFile(keyPath);
         PersistentCompiledArtifactCacheOriginKeyGuard.ValidateFile(keyPath);
         return key;
     }
-
     private static void TryScrubFile(string path)
     {
         if (!File.Exists(path))
         {
             return;
         }
-
         try
         {
             File.Delete(path);
@@ -286,7 +259,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             // The file's ACL may have locked out the current principal. Restore owner access
             // before retrying the delete so a previously corrupted key can be replaced.
         }
-
         try
         {
             PersistentCompiledArtifactCacheOriginKeyGuard.RestoreOwnerAccess(path);
@@ -298,7 +270,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             // failure to the caller, which fails the compiled-cache write closed.
         }
     }
-
     private static bool FixedTimeHexEquals(string expected, string actual)
     {
         try
@@ -313,7 +284,6 @@ internal static class PersistentCompiledArtifactCacheOrigin
             return false;
         }
     }
-
     private static FileStream DurableCreate(string path)
         => new(
             path,

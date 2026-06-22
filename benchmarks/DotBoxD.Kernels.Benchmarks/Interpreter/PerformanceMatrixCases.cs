@@ -6,7 +6,6 @@ internal sealed record PerformanceMatrixCase(
     int Warmup,
     Func<int, object> Handwritten,
     string ModuleJson);
-
 internal static class PerformanceMatrixCases
 {
     public static IReadOnlyList<PerformanceMatrixCase> All()
@@ -27,7 +26,6 @@ internal static class PerformanceMatrixCases
             new("i64 arithmetic loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenI64Arithmetic, PerformanceMatrixControlFlowCases.I64ArithmeticJson()),
             new("branched f64 loop", 1_000_000, 50_000, PerformanceMatrixControlFlowCases.HandwrittenBranchedF64Loop, PerformanceMatrixControlFlowCases.BranchedF64LoopJson())
         ];
-
     private static string TrivialJson()
         => """
         {
@@ -44,7 +42,6 @@ internal static class PerformanceMatrixCases
           ]
         }
         """;
-
     private static object HandwrittenI32Modulo(int iterations)
     {
         var total = 0;
@@ -52,10 +49,8 @@ internal static class PerformanceMatrixCases
         {
             total = (total + i) % 1_000_003;
         }
-
         return total;
     }
-
     private static object HandwrittenSqrt(int iterations)
     {
         var total = 1.0;

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-
 namespace DotBoxD.Services.Client;
 
 internal sealed class PendingRequests : IDisposable
@@ -20,7 +19,6 @@ internal sealed class PendingRequests : IDisposable
 
     public bool TryAdd(int messageId, out PendingReceivedResponse pending) =>
         TryAddCore(messageId, new PendingReceivedResponse(this, messageId), out pending);
-
     public bool TryAddUnary<TResponse>(
         int messageId,
         bool captureCallerCancellation,

@@ -2,14 +2,12 @@ using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static DotBoxD.Plugins.Analyzer.Analysis.PluginServer.PluginServerFacadeNameFormatter;
-
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static class PluginServerFacadeModelFactory
 {
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
     private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
-
     public static PluginServerFacadeResult? Create(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken)
@@ -20,7 +18,6 @@ internal static class PluginServerFacadeModelFactory
         {
             return null;
         }
-
         try
         {
             var model = CreateModel(type, context.SemanticModel.Compilation, cancellationToken);
@@ -31,7 +28,6 @@ internal static class PluginServerFacadeModelFactory
             return new PluginServerFacadeResult(null, PluginKernelDiagnostic.Create(declaration.Identifier, ex.Message));
         }
     }
-
     private static PluginServerFacadeModel CreateModel(
         INamedTypeSymbol type,
         Compilation compilation,
@@ -69,7 +65,6 @@ internal static class PluginServerFacadeModelFactory
             eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
             eventCallback?.ReturnHasValue ?? false);
     }
-
     private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)
     {
         foreach (var candidate in type.Interfaces)
@@ -79,10 +74,8 @@ internal static class PluginServerFacadeModelFactory
                 return candidate;
             }
         }
-
         return null;
     }
-
     private static INamedTypeSymbol? ResolveControlService(
         Compilation compilation,
         INamedTypeSymbol worldType)
@@ -90,7 +83,6 @@ internal static class PluginServerFacadeModelFactory
         var worldNamespace = worldType.ContainingNamespace.ToDisplayString();
         return compilation.GetTypeByMetadataName(worldNamespace + ".Ipc.IGamePluginControlService");
     }
-
     private static PluginServerControlProperty[] ResolveControls(
         INamedTypeSymbol worldType,
         CancellationToken cancellationToken)
@@ -112,7 +104,6 @@ internal static class PluginServerFacadeModelFactory
             {
                 continue;
             }
-
             controls.Add(new PluginServerControlProperty(
                 property.Name,
                 TypeName(propertyType),
@@ -126,10 +117,8 @@ internal static class PluginServerFacadeModelFactory
                     ResolveMethods(propertyType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
                 new EquatableArray<PluginServerServiceWrapper>(ResolveServiceWrappers(propertyType, cancellationToken))));
         }
-
         return controls.ToArray();
     }
-
     private static PluginServerForwardedMethod[] ResolveMethods(
         INamedTypeSymbol controlType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
@@ -163,10 +152,8 @@ internal static class PluginServerFacadeModelFactory
                     new EquatableArray<PluginServerParameter>(ResolveParameters(method))));
             }
         }
-
         return methods.ToArray();
     }
-
     private static PluginServerServiceWrapper[] ResolveServiceWrappers(
         INamedTypeSymbol controlType,
         CancellationToken cancellationToken)
@@ -182,7 +169,6 @@ internal static class PluginServerFacadeModelFactory
                 new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
             .ToArray();
     }
-
     private static string EnsureServiceWrapper(
         INamedTypeSymbol serviceType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
@@ -193,7 +179,6 @@ internal static class PluginServerFacadeModelFactory
         {
             return existing.WrapperName;
         }
-
         var wrapper = new ServiceWrapperBuilder(
             typeName,
             ServiceWrapperName(serviceType),
@@ -205,7 +190,6 @@ internal static class PluginServerFacadeModelFactory
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
     }
-
     private static (string? Name, PluginServerReturnWrapperKind Kind) ResolveReturnWrapper(
         ITypeSymbol returnType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
@@ -220,16 +204,13 @@ internal static class PluginServerFacadeModelFactory
                 ? PluginServerReturnWrapperKind.Task
                 : PluginServerReturnWrapperKind.ValueTask;
         }
-
         if (serviceType is not INamedTypeSymbol namedServiceType ||
             !HasAttribute(namedServiceType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
         {
             return (null, PluginServerReturnWrapperKind.None);
         }
-
         return (EnsureServiceWrapper(namedServiceType, serviceWrappers, cancellationToken), wrapperKind);
     }
-
     private static void PopulateServiceWrapper(
         INamedTypeSymbol serviceType,
         ServiceWrapperBuilder wrapper,
@@ -257,10 +238,8 @@ internal static class PluginServerFacadeModelFactory
                         cancellationToken)));
             }
         }
-
         wrapper.Methods.AddRange(ResolveMethods(serviceType, serviceWrappers, cancellationToken));
     }
-
     private static PluginServerParameter[] ResolveParameters(IMethodSymbol method)
     {
         var parameters = new PluginServerParameter[method.Parameters.Length];

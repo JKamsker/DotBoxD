@@ -1,29 +1,24 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
-
 namespace DotBoxD.Kernels.Validation.Internal;
 
 using DotBoxD.Kernels;
-
 internal delegate SandboxType ExpressionAnalyzer(
     Expression expression,
     FunctionScope scope,
     ref SandboxEffect effects,
     ref bool canReorder);
-
 internal sealed partial class CollectionCallAnalyzer
 {
     private readonly List<SandboxDiagnostic> _diagnostics;
     private readonly ExpressionAnalyzer _analyzeExpression;
     private readonly IReadOnlySet<string> _declaredOpaqueIdTypes;
-
     public CollectionCallAnalyzer(List<SandboxDiagnostic> diagnostics, ExpressionAnalyzer analyzeExpression, IReadOnlySet<string> declaredOpaqueIdTypes)
     {
         _diagnostics = diagnostics;
         _analyzeExpression = analyzeExpression;
         _declaredOpaqueIdTypes = declaredOpaqueIdTypes;
     }
-
     public bool TryAnalyze(
         CallExpression call,
         FunctionScope scope,
@@ -36,7 +31,6 @@ internal sealed partial class CollectionCallAnalyzer
             type = SandboxType.Unit;
             return false;
         }
-
         type = call.Name switch
         {
             "list.empty" => AnalyzeListEmpty(call, ref effects),
@@ -55,7 +49,6 @@ internal sealed partial class CollectionCallAnalyzer
         };
         return true;
     }
-
     private SandboxType AnalyzeListEmpty(CallExpression call, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
@@ -63,17 +56,14 @@ internal sealed partial class CollectionCallAnalyzer
         {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-ARITY", "list.empty expects 0 arguments", Span: call.Span));
         }
-
         if (call.GenericType is null)
         {
             _diagnostics.Add(new SandboxDiagnostic("E-CALL-GENERIC", "list.empty requires genericType", Span: call.Span));
             return SandboxType.List(SandboxType.Unit);
         }
-
         CheckKnownType(call.GenericType, call.Span);
         return SandboxType.List(call.GenericType);
     }
-
     private SandboxType AnalyzeListOf(
         CallExpression call,
         FunctionScope scope,
@@ -88,10 +78,8 @@ internal sealed partial class CollectionCallAnalyzer
             itemType ??= current;
             Require(current, itemType, arg.Span);
         }
-
         return SandboxType.List(itemType ?? SandboxType.Unit);
     }
-
     private SandboxType AnalyzeListCount(
         CallExpression call,
         FunctionScope scope,
@@ -103,13 +91,11 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 1);
             return SandboxType.I32;
         }
-
         RequireList(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
         return SandboxType.I32;
     }
-
     private SandboxType AnalyzeListGet(
         CallExpression call,
         FunctionScope scope,
@@ -121,7 +107,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 2);
             return SandboxType.Unit;
         }
-
         var listType = RequireList(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -131,7 +116,6 @@ internal sealed partial class CollectionCallAnalyzer
             call.Arguments[1].Span);
         return listType?.Arguments[0] ?? SandboxType.Unit;
     }
-
     private SandboxType AnalyzeListAdd(
         CallExpression call,
         FunctionScope scope,
@@ -144,7 +128,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 2);
             return SandboxType.List(SandboxType.Unit);
         }
-
         var listType = RequireList(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -153,11 +136,9 @@ internal sealed partial class CollectionCallAnalyzer
         {
             return SandboxType.List(itemType);
         }
-
         Require(itemType, listType.Arguments[0], call.Arguments[1].Span);
         return listType;
     }
-
     private SandboxType AnalyzeMapEmpty(CallExpression call, ref SandboxEffect effects)
     {
         effects |= SandboxEffect.Alloc;
@@ -165,11 +146,9 @@ internal sealed partial class CollectionCallAnalyzer
         {
             Arity(call, 0);
         }
-
         var mapType = RequireMapGeneric(call);
         return mapType ?? SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
     }
-
     private SandboxType AnalyzeMapContainsKey(
         CallExpression call,
         FunctionScope scope,
@@ -181,7 +160,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 2);
             return SandboxType.Bool;
         }
-
         var mapType = RequireMap(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -190,10 +168,8 @@ internal sealed partial class CollectionCallAnalyzer
         {
             Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         }
-
         return SandboxType.Bool;
     }
-
     private SandboxType AnalyzeMapGet(
         CallExpression call,
         FunctionScope scope,
@@ -205,7 +181,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 2);
             return SandboxType.Unit;
         }
-
         var mapType = RequireMap(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -214,11 +189,9 @@ internal sealed partial class CollectionCallAnalyzer
         {
             return SandboxType.Unit;
         }
-
         Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         return mapType.Arguments[1];
     }
-
     private SandboxType AnalyzeMapSet(
         CallExpression call,
         FunctionScope scope,
@@ -231,7 +204,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 3);
             return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
         }
-
         var mapType = RequireMap(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -241,12 +213,10 @@ internal sealed partial class CollectionCallAnalyzer
         {
             return SandboxType.Map(keyType, valueType);
         }
-
         Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         Require(valueType, mapType.Arguments[1], call.Arguments[2].Span);
         return mapType;
     }
-
     private SandboxType AnalyzeMapRemove(
         CallExpression call,
         FunctionScope scope,
@@ -259,7 +229,6 @@ internal sealed partial class CollectionCallAnalyzer
             Arity(call, 2);
             return SandboxType.Map(SandboxType.Unit, SandboxType.Unit);
         }
-
         var mapType = RequireMap(
             _analyzeExpression(call.Arguments[0], scope, ref effects, ref canReorder),
             call.Arguments[0].Span);
@@ -268,10 +237,8 @@ internal sealed partial class CollectionCallAnalyzer
         {
             Require(keyType, mapType.Arguments[0], call.Arguments[1].Span);
         }
-
         return mapType ?? SandboxType.Map(keyType, SandboxType.Unit);
     }
-
     private SandboxType? RequireList(SandboxType actual, SourceSpan span)
     {
         if (actual.Name == "List" && actual.Arguments.Count == 1)

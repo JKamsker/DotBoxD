@@ -1,10 +1,8 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
-
 namespace DotBoxD.Kernels.Policies;
 
 using DotBoxD.Kernels;
-
 public sealed class SandboxPolicyBuilder
 {
     private readonly List<CapabilityGrant> _grants = [];
@@ -15,24 +13,19 @@ public sealed class SandboxPolicyBuilder
     private DateTimeOffset? _logicalNow;
     private ulong? _randomSeed;
     private string _policyId = "default";
-
     public static SandboxPolicyBuilder Create() => new();
-
     public SandboxPolicyBuilder WithPolicyId(string policyId)
     {
         _policyId = policyId;
         return this;
     }
-
     public SandboxPolicyBuilder AllowPureComputation()
     {
         _allowedEffects |= SandboxEffects.Pure;
         return this;
     }
-
     public SandboxPolicyBuilder Grant(string capabilityId, object parameters)
         => Grant(capabilityId, parameters, SandboxEffect.None);
-
     public SandboxPolicyBuilder Grant(
         string capabilityId,
         object parameters,
@@ -45,10 +38,8 @@ public sealed class SandboxPolicyBuilder
         {
             _limits = configureLimits(_limits);
         }
-
         return this;
     }
-
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
@@ -62,7 +53,6 @@ public sealed class SandboxPolicyBuilder
         _limits = _limits with { MaxFileBytesRead = maxBytesPerRun };
         return this;
     }
-
     public SandboxPolicyBuilder GrantFileWrite(
         string root,
         long maxBytesPerRun,
@@ -82,31 +72,26 @@ public sealed class SandboxPolicyBuilder
         _limits = _limits with { MaxFileBytesWritten = Math.Max(_limits.MaxFileBytesWritten, maxBytesPerRun) };
         return this;
     }
-
     public SandboxPolicyBuilder GrantTimeNow()
     {
         _allowedEffects |= SandboxEffect.Time;
         _grants.Add(new CapabilityGrant("time.now", new Dictionary<string, string>()));
         return this;
     }
-
     public SandboxPolicyBuilder GrantRandom()
     {
         _allowedEffects |= SandboxEffect.Random;
         _grants.Add(new CapabilityGrant("random", new Dictionary<string, string>()));
         return this;
     }
-
     public SandboxPolicyBuilder GrantLogging()
     {
         _allowedEffects |= SandboxEffect.Audit;
         _grants.Add(new CapabilityGrant("log.write", new Dictionary<string, string>()));
         return this;
     }
-
     public SandboxPolicyBuilder AllowRuntimeAsync()
         => GrantRuntimeAsyncIfMissing();
-
     public SandboxPolicyBuilder AllowIntraKernelReentrancy()
     {
         _allowedEffects |= SandboxEffect.Concurrency;

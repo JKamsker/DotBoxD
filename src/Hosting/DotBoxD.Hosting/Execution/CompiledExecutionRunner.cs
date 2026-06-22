@@ -2,7 +2,6 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
-
 namespace DotBoxD.Hosting.Execution;
 
 internal static class CompiledExecutionRunner
@@ -28,13 +27,11 @@ internal static class CompiledExecutionRunner
                 noAuditBindings,
                 cancellationToken);
         }
-
         var result = useInlineAwaitPump
             ? CompiledAsyncWorker.RunInline(() => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken))
             : ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken);
         return ValueTask.FromResult(result);
     }
-
     public static ValueTask<SandboxExecutionResult> ExecuteOnWorkerAsync(
         CompiledExecutable executable,
         ExecutionPlan plan,
@@ -44,7 +41,6 @@ internal static class CompiledExecutionRunner
         CancellationToken cancellationToken)
         => CompiledAsyncWorker.RunAsync(
             () => ExecuteCore(executable, plan, entrypoint, input, options, cancellationToken));
-
     private static SandboxExecutionResult ExecuteCore(
         CompiledExecutable executable,
         ExecutionPlan plan,
@@ -69,7 +65,6 @@ internal static class CompiledExecutionRunner
             plan.ModuleHash,
             plan.PolicyHash);
         var startedAt = AuditTime(plan);
-
         try
         {
             budget.CheckDeadline();
