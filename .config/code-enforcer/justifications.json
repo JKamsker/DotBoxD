@@ -54,10 +54,6 @@
       "justification": "Pre-existing large streaming coordinator surfaced after correcting the line guard root. Keep listed until stream lifecycle and flow-control code are split."
     },
     {
-      "path": "tests/DotBoxD.Kernels.Tests/Workers/WorkerAuditValidationTests.cs",
-      "justification": "Pre-existing worker-audit validation fixture surfaced after correcting the line guard root. Keep listed until audit event families are split."
-    },
-    {
       "path": "tests/DotBoxD.Services.SourceGenerator.Tests/Behavior/AsyncSiblingTests.cs",
       "justification": "Pre-existing source-generator behavior fixture surfaced after correcting the line guard root. Keep listed until async sibling scenarios are split."
     },
