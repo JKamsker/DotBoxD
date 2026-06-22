@@ -4,10 +4,6 @@
     {
       "path": "src/CodeGeneration/DotBoxD.Services.SourceGenerator/Generation/ProxyGenerator.cs",
       "justification": "Pre-existing generator emission file surfaced after correcting the line guard root. Keep listed until proxy method emission is split into focused helpers."
-    },
-    {
-      "path": "src/CodeGeneration/DotBoxD.Services.SourceGenerator/Models/MethodModelFactory.cs",
-      "justification": "Pre-existing source-generator model factory surfaced after correcting the line guard root. Keep listed until parsing and validation are split."
     }
   ],
   "folders": [
