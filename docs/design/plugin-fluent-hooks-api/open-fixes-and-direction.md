@@ -279,7 +279,7 @@ place. The convention-named `{Root}Context` partial is **removed**, not kept as 
     in the SDK cannot be extended by a `partial` across assemblies. Whole new operations are
     `[ServerExtension]`, not context members (see
     [The two audiences](#the-two-audiences-and-the-plugin-dev-extension-surface)).
-  - **Host-binding metadata** (P2.6): the analyzer cannot inspect the host's concrete implementation from a
+  - **Host-binding metadata** (P2.6 — **corrected** from the earlier "implementation-first" resolution): the analyzer cannot inspect the host's concrete implementation from a
     plugin assembly, and factory-returned handle implementations are not known when handle descriptors are
     created. Therefore the analyzer-visible SDK contract remains authoritative for plugin-visible
     auto-bindings and handles unless a future generated descriptor projection makes implementation metadata
@@ -419,7 +419,7 @@ Both resolve by name/scan today; they are different seams with different fixes.
   SDK**, the generated `On<TEvent>()` return type is visible, so read `{Context}` from
   `RemoteHookPipeline<TEvent, TContext>` / `RemoteSubscriptionPipeline<TEvent, TContext>`. For a
   **same-compilation generated facade**, the generator cannot see its own generated `On<TEvent>()` members
-  yet. Step 2 is dual-mode: if the new `Context` attribute is already present, derive the context from it;
+  yet. Part 5 Step 2 is dual-mode: if the new `Context` attribute is already present, derive the context from it;
   otherwise derive the current convention context from the receiver server symbol without doing a
   whole-compilation scan. Once §3.1 lands, the convention branch is deleted. Both paths must carry a context
   FQN internally, not a guessed unqualified name.
@@ -493,7 +493,7 @@ Every item verified against head `41ec9172`.
 
 ### P1 — blockers (correctness/security; independent of the §3 redesign)
 
-1. **Factory collapse.** `On<TEvent, TContext>(createContext)` validates `createContext`
+**P1.1 — Factory collapse.** `On<TEvent, TContext>(createContext)` validates `createContext`
    ([HookRegistry.cs:82](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs)), keys the pipeline
    cache on `PipelineKey(typeof(TEvent), typeof(TContext))` (:86), and on a cache hit (:87) returns the
    existing pipeline — **discarding the just-passed `createContext`**. Two call sites with the same
@@ -505,7 +505,7 @@ Every item verified against head `41ec9172`.
    fix must canonicalize the default/explicit `HookContext` path. Same patterns exist in
    [SubscriptionRegistry.cs:69,73-74](../../../src/Hosting/DotBoxD.Plugins/Runtime/Subscriptions/SubscriptionRegistry.cs).
 
-2. **Result-hook priority is no longer global** once an event has >1 context pipeline. `FireManyAsync`
+**P1.2 — Result-hook priority is no longer global** once an event has >1 context pipeline. `FireManyAsync`
    ([HookRegistry.Pipelines.cs:59](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.Pipelines.cs))
    iterates pipelines in `Dictionary` order and returns the **first non-null** result (:70-72); priority is
    sorted **only within one slot** — `_order` is an instance field
@@ -523,7 +523,7 @@ Every item verified against head `41ec9172`.
    one pipeline per event — so `FireManyAsync` did not exist; this PR rekeys to `(EventType, ContextType)`
    and adds the multi-pipeline walk, introducing the regression.)
 
-3. **Reusable `RunLocal`/`RegisterLocal` helpers do not compose.** Chain identity is the **call-site source
+**P1.3 — Reusable `RunLocal`/`RegisterLocal` helpers do not compose.** Chain identity is the **call-site source
    location**: `HookChainIdentity.Compute` returns `FNV1a(path + ":" + SpanStart)`
    ([HookChainIdentity.cs:14-19](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainIdentity.cs)),
    and that id is reused as the **plugin/package id** and callback **subscription id**, whose registry is
@@ -546,7 +546,7 @@ Every item verified against head `41ec9172`.
    install/kernel instance identity so disposing or replacing one instance of a same-principal helper removes
    only that instance's hook/subscription/result-local callbacks and indexed registrations.
 
-4. **CI red — investigated; the effect-drift hypothesis is refuted.** The Windows `Build` job's GameServer
+**P1.4 — CI red — investigated; the effect-drift hypothesis is refuted.** The Windows `Build` job's GameServer
    **smoke run** threw `RemoteServiceException: Internal error` from generated `BlinkBehindAsync`
    (`…/BlinkPluginPackage.g.cs:23`). Diagnosed by capturing the real install effect/capability sets
    in-process (bypassing the opaque wrapper): `BlinkBehindAsync`'s `[ServerExtension]` manifest declares
@@ -566,7 +566,7 @@ Every item verified against head `41ec9172`.
    [BlinkServerExtensionRegressionTests.cs](../../../samples/GameServer/Examples.GameServer.Plugin.Tests/Regression/BlinkServerExtensionRegressionTests.cs)
    (installs + invokes under Auto/Compiled/Interpreted; asserts the effect set, no `DBXK041`, result `== 3`).
 
-5. **Index coverage is trusted across the manifest boundary.** `IndexCoversPredicate` is shape-validated from
+**P1.5 — Index coverage is trusted across the manifest boundary.** `IndexCoversPredicate` is shape-validated from
    the package manifest, then the event index can skip `ShouldHandleAsync` when the manifest claims full
    coverage. A tampered package can claim a partial index fully covers the predicate and bypass verified IR.
    *Fix:* recompute index predicates/coverage from verified function bodies or install-path-owned expected
@@ -576,7 +576,7 @@ Every item verified against head `41ec9172`.
    regression tests for both exported JSON import and direct in-memory packages. If a new trusted
    expected-metadata source is added, forge/mutate it too and prove it is authenticated or cross-checked.
 
-6. **Capability-request policy mixing weakens the install gate.** The plan describes `DBXK044` as parity for
+**P1.6 — Capability-request policy mixing weakens the install gate.** The plan describes `DBXK044` as parity for
    host-derived entrypoint capabilities, but current required-capability helpers also include plugin-declared
    module capability requests; the GameServer sample then grants that aggregate set automatically. *Fix:*
    split **host-derived required capabilities** from **plugin-requested capabilities**. `DBXK044` compares the
@@ -585,7 +585,7 @@ Every item verified against head `41ec9172`.
    `CapabilityRequests`; generated hook/chain modules should have empty requests unless the plugin explicitly
    declares a separate request.
 
-7. **Native-terminal routing is manifest-authoritative.** `RunLocal`/`RegisterLocal` are the trust-boundary
+**P1.7 — Native-terminal routing is manifest-authoritative.** `RunLocal`/`RegisterLocal` are the trust-boundary
    exit, but manifest flags such as `LocalTerminal`, `ProjectedType`, `ResultType`, and `ResultLocalTerminal`
    can route an ordinary package into plugin-process native callbacks. Whole-event `RunLocal` is especially
    sensitive because its verified IR shape is the same unit-returning handle shape as an ordinary `Run`.
@@ -594,7 +594,7 @@ Every item verified against head `41ec9172`.
    projection type, result type, and result-localness before routing. Add tamper tests for all four fields and
    for any new trusted metadata source.
 
-8. **Indexed subscriptions are not unregistered on disconnect/reinstall.** Indexed subscriptions can be
+**P1.8 — Indexed subscriptions are not unregistered on disconnect/reinstall.** Indexed subscriptions can be
    registered into the event index, but normal session/kernel cleanup removes only hook/subscription registry
    references. Stale indexed kernels can survive disconnect or replacement. *Fix:* wire indexed registrations
    into the same kernel/session removal path (or make index registrations disposable and owned by the
@@ -602,13 +602,13 @@ Every item verified against head `41ec9172`.
 
 ### P2 — design hazards (fix before baselining)
 
-5. **Generated-remote fallback recognition is name-based** with no ownership check (P2.4), and
+**P2.5 — Generated-remote fallback recognition is name-based** with no ownership check (P2.4), and
    default-context inference is a whole-compilation scan that bails on a 2nd server (P2.5). See §3.3 for
    exact lines and fixes. Impact: breaks multi-server projects, aliased generated registries
    (`var hooks = server.Hooks; hooks.On<T>()`), cross-assembly SDKs, and any third-party fluent API whose
    members are named `Hooks`/`Subscriptions` or whose types end in `HookRegistry`/`SubscriptionRegistry`.
 
-6. **Host-binding rule duplicated across the analyzer↔runtime trust seam** — single-source the rule, keep
+**P2.6 — Host-binding rule duplicated across the analyzer↔runtime trust seam** — single-source the rule, keep
    the check (§3.4). Scope is broader than `id` + `effects`: the `IsWriteMethod` name heuristic is duplicated
    ([lowerer:226](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs),
    [runtime:218-227](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingFactory.cs)).
@@ -624,7 +624,7 @@ Every item verified against head `41ec9172`.
    handle interface methods. §3.4 must define an analyzer-visible, server-owned metadata source per binding
    kind before implementation metadata can override interface metadata.
 
-7. **Delete the runtime back-compat surface; do not just hide it.** The `new`-shadowing `<TEvent>` shims
+**P2.7 — Delete the runtime back-compat surface; do not just hide it.** The `new`-shadowing `<TEvent>` shims
    ([HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs))
    exist only to keep the un-parameterized form compiling alongside `<TEvent, TContext>` — a compatibility
    artifact this project does not want. **Remove the runtime compatibility `<TEvent>` family entirely; keep
@@ -638,7 +638,7 @@ Every item verified against head `41ec9172`.
    generator contract and baseline it, or redesign generated calls so the implementation can become
    non-public. Then regenerate all affected api-baselines in one breaking commit.
 
-8. **Typed hook/subscription overload drift is a latent codegen build break, not polish.**
+**P2.8 — Typed hook/subscription overload drift is a latent codegen build break, not polish.**
    `RemoteHookPipeline.Typed` exposes **12** `UseGeneratedLocalChain` overloads
    ([RemoteHookPipeline.Typed.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/Remote/RemoteHookPipeline.Typed.cs):77,82,94,102,112,118,131,140,153,159,172,181);
    `RemoteSubscriptionPipeline.Typed` exposes **10**
@@ -649,7 +649,7 @@ Every item verified against head `41ec9172`.
    regression. *Fix:* restore parity (collapse onto a `kind`-parameterized base), **or** prove the generator
    never emits the element-only subscription local-chain shape (gap unreachable) — and state which.
 
-9. **`DBXK110` is stale and misleading.** The generator now lowers fluent `Run` chains, but the analyzer
+**P2.9 — `DBXK110` is stale and misleading.** The generator now lowers fluent `Run` chains, but the analyzer
    still **unconditionally** reports `DBXK110` (`Info`) on every `Run(lambda)` terminal: descriptor
    `RunNotLoweredRule` at [PluginAnalyzer.cs:36-44](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs)
    (message: *"Run(lambda) is not yet lowered to verified IR and will throw at runtime"*), reported with no
@@ -667,7 +667,7 @@ Every item verified against head `41ec9172`.
    generator diagnostic for recognized but unlowerable `Run(lambda)` chains; removing blanket `DBXK110`
    must not leave those chains silent.
 
-10. **Subscription cancellation policy is undefined and currently noisy.** `SubscriptionPipeline.Publish`
+**P2.10 — Subscription cancellation policy is undefined and currently noisy.** `SubscriptionPipeline.Publish`
     creates a canceled `HookContext` but still queues work, and `SubscriptionDelivery` reports
     `OperationCanceledException` from caller-token cancellation as a plugin fault. *Fix:* define cancellation
     semantics explicitly. At minimum, pre-canceled publish should not run local handlers, and caller-token
@@ -675,19 +675,19 @@ Every item verified against head `41ec9172`.
     subscription dispatch; the index path must not silently catch and drop cancellation/faults under a
     different contract.
 
-11. **Generated graft collision handling is missing.** `[ServerExtension]` discoverability depends on
+**P2.11 — Generated graft collision handling is missing.** `[ServerExtension]` discoverability depends on
     generated extension methods in the plugin author's namespace, but two kernels can target the same
     receiver with the same extension signature. Existing checks cover conflicts with receiver members, not
     duplicate generated extension signatures. *Fix:* add a diagnostic for duplicate grafted method
     name/signature/receiver/namespace combinations.
 
-12. **Generated-context server-extension parameters are promised but not implemented.** The design target is
+**P2.12 — Generated-context server-extension parameters are promised but not implemented.** The design target is
     `[ServerExtensionMethod]` with a trailing `GameContext ctx` parameter and raw `HookContext` as an escape
     hatch, while current
     discovery accepts raw `HookContext`. *Fix:* implement generated-context resolution/lowering for server
     extensions and test it cross-assembly; raw `HookContext` remains the escape hatch.
 
-13. **Server-extension receiver authority is not one contract.** The design calls `[ServerExtension(typeof(T))]`
+**P2.13 — Server-extension receiver authority is not one contract.** The design calls `[ServerExtension(typeof(T))]`
     a graft onto a server-owned type, while current generation can accept any receiver shape exposing
     extension-client access, and receiver-id injection is derived differently on client and package sides.
     *Fix:* make receiver ownership and receiver-id injection one server-owned contract. For the safe extension
@@ -695,11 +695,11 @@ Every item verified against head `41ec9172`.
     designed later under a different name. Derive client receiver-id argument shape from the same server-owned
     graft metadata used to build the package.
 
-14. **Post-install GameServer wiring can leave installed-but-unwired kernels.** The IPC control service
+**P2.14 — Post-install GameServer wiring can leave installed-but-unwired kernels.** The IPC control service
     installs a package, then wires hooks/subscriptions/results/index routing afterward. If wiring throws, the
     session/server can retain an installed kernel that is not reachable through the intended routing path.
-    ([GamePluginControlService.cs:76](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs),
-    [:90](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs); failure
+    ([GamePluginControlService.cs:80](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs),
+    [:94](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs); failure
     examples in [GamePluginKernelWiring.cs:136](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginKernelWiring.cs)
     and [:150](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginKernelWiring.cs)).
     *Fix:* validate routing before install or roll back the install on wiring failure. Add a concrete
@@ -709,7 +709,7 @@ Every item verified against head `41ec9172`.
 
 ### P3 — polish
 
-15. **Stale doc-term sweep** across `server-walkthrough.md`, `plugin-walkthrough.md`, and
+**P3.15 — Stale doc-term sweep** across `server-walkthrough.md`, `plugin-walkthrough.md`, and
     `kernel-binding-model.md`: replace stale `server.Events.On` / fire-and-forget mirror prose with
     `server.Subscriptions`; separately update event-adapter registry examples to the current
     `server.Events.Resolve<TEvent>()` surface. Also update `server.Kernels.Register`, `server.Kernels.Get`,
@@ -720,17 +720,17 @@ Every item verified against head `41ec9172`.
     171-202/235/302/318-319 plus live-settings examples around 148-149/341-342; `kernel-binding-model.md`
     opening table, links around 20/48/175/176/190, and examples around 147/181-199/214-226; and
     `interface-driven-plugin-server.md` capability/effect sections around 124-147 and 242-265.
-16. **`[KernelMethod]` public docs drift.** The public XML docs still teach that `[KernelMethod]` must be
+**P3.16 — `[KernelMethod]` public docs drift.** The public XML docs still teach that `[KernelMethod]` must be
     static, while §3.1 requires server-context instance helpers. Update the docs, generated context XML docs,
     and user-facing diagnostics that still teach "plugin-owned context" / context `[HostBinding]` guidance
     when the context design lands.
-17. **Dead code** — `IPluginEventPipelineRegistry` has a single declaration repo-wide and no implementor or
+**P3.17 — Dead code** — `IPluginEventPipelineRegistry` has a single declaration repo-wide and no implementor or
     caller ([ServerContextFactory.cs:17](../../../src/Hosting/DotBoxD.Plugins/Runtime/ServerContextFactory.cs)).
     Delete.
-18. **Sample teaches noise** — `(e, _) =>` for filters/projections that ignore `ctx`
+**P3.18 — Sample teaches noise** — `(e, _) =>` for filters/projections that ignore `ctx`
     ([Program.cs:91](../../../samples/GameServer/Examples.GameServer.Plugin/Program.cs)); use `e =>` unless the
     body references `ctx`. Promote the rule ("arity names intent") into the §3.2 tier table.
-19. **`RegisterLocal` has three authoring shapes** — value-only, `(e, ctx)`, and the legacy cancellation
+**P3.19 — `RegisterLocal` has three authoring shapes** — value-only, `(e, ctx)`, and the legacy cancellation
     `(e, ctx, ct) => ValueTask<TResult>` — against the "exactly two" rule. **Drop the cancellation form**
     (`ctx.CancellationToken` is already exposed); no need to keep it for compatibility.
 
@@ -964,4 +964,4 @@ reviewer's proposed fix was itself wrong, the corrected version is what appears 
 the P1.2 "merge-sort by `(priority, order)`" fix (rejected: `_order` is per-`ResultHookSlot`, not global —
 [ResultHookSlot.cs:25,235](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/ResultHookSlot.cs)), and the
 §3.4 "remove the `DBXK041` drift class entirely" framing (rejected: `DBXK041`/`DBXK044` are the
-trust-boundary cross-check — [PluginPreparedPackageValidator.cs:23-27](../../../src/Hosting/DotBoxD.Plugins/Runtime/Validation/PluginPreparedPackageValidator.cs)).
+trust-boundary cross-check — [PluginPreparedPackageValidator.cs:23-27](../../../src/Hosting/DotBoxD.Plugins/Runtime/Validation/PluginPreparedPackageValidator.cs)); and the **P2.6** host-binding precedence — previously resolved as "implementation-first, fall back to interface," now corrected to "analyzer-visible SDK/interface contract authoritative" because the analyzer cannot observe the host implementation cross-assembly.
