@@ -72,11 +72,14 @@ server-side, with **no authority escalation**:
 | `[ServerExtension(typeof(T))]` + `[ServerExtensionMethod]` | grafts a whole server-side operation onto an existing server-owned type `T` (handle/control/world) as an **extension method in the plugin dev's own namespace** — e.g. `world.Monsters.Get(id).BlinkBehindAsync(player)` | verified sandboxed IR; capability set = union of the host bindings the body calls, **policy-gated at install** (`DBXK044`/deny); cannot exceed granted authority |
 | `[KernelMethod]` | a pure scalar **inline helper** (predicate / derived value) used inside a lowered `Where`/`Select`/`Run` | scalar-only; calls only granted host bindings |
 
-`[ServerExtension]` is the primary lever and is reachable both in-process and over IPC (Part 2). The
-reference example is `BlinkKernel`
+`[ServerExtension]` is the primary lever. A grafted method **composes both ways** — callable inside a lowered
+hook chain (it lowers and runs server-side, no extra roundtrip) **and** standalone over IPC (Part 2). Its
+trailing context parameter is the **generated context** (`GameContext`), not raw `HookContext`; `HookContext`
+stays accepted as an escape hatch since the generated context already exposes `.Raw`. The reference example
+is `BlinkKernel`
 ([Kernels/BlinkKernel.cs](../../../samples/GameServer/Examples.GameServer.Plugin/Kernels/BlinkKernel.cs)):
 `[ServerExtension(typeof(IMonster))]` injects the addressed monster + the root world, and
-`[ServerExtensionMethod] BlinkBehindAsync(string playerId, HookContext ctx)` does a root-world read + a
+`[ServerExtensionMethod] BlinkBehindAsync(string playerId, GameContext ctx)` does a root-world read + a
 scoped read, computes, then performs a host write (`TeleportToAsync`). Its capabilities —
 `game.world.combat.threat`, `game.world.entity.read.position`, `game.world.monster.write.position` — are
 exactly the host bindings it touches, gated at install, so the plugin extends the API **only within its
@@ -255,21 +258,26 @@ place. The convention-named `{Root}Context` partial is **removed**, not kept as 
   - **Authority** (what a capability-bearing call may do) is **host-owned, always** — enforced by the
     verifier (unknown-binding rejection + `DBXK041`/`DBXK044`), independent of where anything is declared.
     Not a design choice.
-  - **Declaration:** the context carries **only plugin-owned members** — native and `[KernelMethod]`. Host
-    capabilities are reached by **re-exposing the server-owned `[DotBoxDService]` host-service contracts as
-    members on the context** (e.g. `ctx.World.Damage.GetAdjustment(id)`, which auto-lowers to a host
-    binding) — **never** by declaring `[HostBinding]` members on the plugin context. The capability surface
-    stays defined once, server-side, and is discovered by typing `ctx.World.`. (`ctx.Messages.Send(...)`
-    already works this way — a re-exposed `IPluginMessageSink`, not a plugin-declared binding.)
-  - **Host-binding metadata** (interface vs implementation owns it) is a **separate open decision — P2.6.**
-    Option (a) routes *every* plugin-facing host call through the auto-binding path, so resolving P2.6 and
-    single-sourcing that rule (§3.4) become the load-bearing follow-ups.
+  - **Declaration:** the context is **server-authored and ships in the SDK** — it carries the re-exposed
+    server-owned `[DotBoxDService]` services (`ctx.World.Damage.GetAdjustment(id)`, auto-lowering to a host
+    binding) plus any server-authored helpers, and **never** `[HostBinding]` members. (`ctx.Messages.Send(...)`
+    already works this way — a re-exposed `IPluginMessageSink`, not a plugin-declared binding.) A **plugin
+    dev's** own `[KernelMethod]` helpers are **static methods in the plugin's own assembly** (inlined into
+    their chains), **not** members on the context — a context compiled in the SDK cannot be extended by a
+    `partial` across assemblies. Whole new operations are `[ServerExtension]`, not context members (see
+    [The two audiences](#the-two-audiences-and-the-plugin-dev-extension-surface)).
+  - **Host-binding metadata** (P2.6, **resolved**): the **implementation** is authoritative; fall back to the
+    **interface** when the implementation declares nothing. Both the analyzer and the runtime apply that one
+    precedence (impl → interface), defined once in the shared rule (§3.4). Option (a) routes *every*
+    plugin-facing host call through the auto-binding path, so single-sourcing that rule is the load-bearing
+    follow-up.
 - **Shape: a `partial` class, not an interface.** Interface members have no body to inline for
   `[KernelMethod]` (the limit above). Sealed or not is the author's call; `partial` so the generator can
   augment the type the author named.
-- **Lifetime/construction.** Today the context is constructed per publish from a `HookContext` via
-  `ServerContextFactory<TContext>` ([HookRegistry.cs:95](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs));
-  an author-declared type needs an explicit constructor/factory story — state it.
+- **Lifetime/construction: decided.** The generator emits the context constructor (wrapping a `HookContext`)
+  into the author's partial **by default**, built per publish as today
+  ([HookRegistry.cs:95](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs)); an author who needs
+  custom construction may **supply a factory** that the generator wires instead.
 
 **No migration.** Per the Project stance, the convention-named partial, the old samples, and the
 api-baseline are **broken outright** and regenerated — no overlay, deprecation window, or "keep old code
@@ -293,7 +301,7 @@ A context member runs in exactly one of three places. The current signal — an 
 |---|---|---|---|---|
 | Inlined pure helper | `[KernelMethod]` on the context | server-side sandbox (verified IR) | scalars; other `[KernelMethod]` members; re-exposed host-service calls; **no** native services | "pure computation over event fields" |
 | Host capability | a re-exposed `[DotBoxDService]` member (`ctx.World.X()`; auto-lowers) — **not** a `[HostBinding]` on the context | server-side host | the host call, gated by its `[HostCapability]` | "reads/writes host/game state" |
-| Native | **explicit local marker (proposed; today it is the absence of a marker)** | plugin process, post-IPC | arbitrary in-process code | "calls your plugin's own services" |
+| Native | **`[Local]`** (decided; today it is the absence of a marker) | plugin process, post-IPC | arbitrary in-process code | "calls your plugin's own services" |
 
 This table is about **context members** used inside a chain. A whole grafted operation is the separate (and
 primary) plugin-extension mechanism — `[ServerExtension]`/`[ServerExtensionMethod]`, see
@@ -306,11 +314,13 @@ Two precise corrections:
   `RunLocal`/`RegisterLocal` run arbitrary native code. A `RunLocal` body that calls a plugin service does
   **not** become a valid `Run` by dropping the suffix — it fails to lower. Do **not** claim "the same
   expression, the suffix chooses where it runs."
-- **Make native opt-in.** Introduce an explicit local-only marker (or split the context into a *lowerable
-  facet* and a *native facet*) so execution site is never inferred from a missing attribute. The native
-  terminal is the trust-boundary exit, so its selection must be deliberate and visible, and the generator
-  must route tiers by **owned symbol identity** (§3.3), never by string name (§3.3 / P2.4), so a typo or a
-  foreign API cannot route a body to the wrong tier.
+- **Native is opt-in via `[Local]` (decided — option A).** A native (in-process) context member carries
+  `[Local]`; execution site is never inferred from a *missing* attribute. The analyzer raises a **build
+  error** if a `[Local]` member is used in a lowered stage (`Where`/`Select`/`Run`/`Register`) — a new
+  diagnostic alongside the `DBXK111`/`DBXK113`/`DBXK062` family. (Rejected: splitting the context into a
+  *lowerable facet* + a *native facet* — more types, less minimal.) The native terminal is the
+  trust-boundary exit, so the generator must still route tiers by **owned symbol identity** (§3.3), never by
+  string name (P2.4), so a typo or a foreign API cannot route a body to the wrong tier.
 
 **Failure mode (exact).** A non-lowerable member used in a lowered stage compiles, then throws **`DBXK062`**
 via `SandboxValidationException` **synchronously at chain construction** — `HookStage.NotLowered()` at
@@ -437,8 +447,9 @@ Every item verified against head `41ec9172`.
    method and throws if absent
    ([HostServiceBindingExtensions.cs:52,55-56](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingExtensions.cs)).
    The GameServer abstractions carry `[HostCapability]` **without** `[HostBinding]` (the auto-binding path).
-   **Decide whether the interface or the implementation is the authoritative owner of binding metadata, then
-   enforce a single source.**
+   **Resolved:** the **implementation** is authoritative; fall back to the **interface** when the
+   implementation declares nothing. Apply that one precedence (impl → interface) identically on both sides,
+   defined once in the shared rule (§3.4).
 
 7. **Delete the back-compat surface; do not just hide it.** The `new`-shadowing `<TEvent>` shims
    ([HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs))
@@ -552,6 +563,9 @@ Acceptance gates, not afterthoughts. Existing homes: `ResultHookSlotTests`, `Typ
   `[ServerExtensionMethod]`, and it lowers, emits the grafted extension in the plugin's own namespace,
   installs under policy, and invokes — in-process **and** over IPC. (The single-assembly sample does not
   cover this.)
+- **Grafted extension composes inside a chain.** A `[ServerExtension]` method called inside a lowered
+  `.Run`/`.Where` lowers and runs server-side (no extra roundtrip); the same method called standalone goes
+  over IPC. Both paths return the same result (proves Q4).
 - **Context extension is locally discoverable.** Assert the author reaches the context's extension point
   from something they wrote — an author-declared context type attached via
   `[GeneratePluginServer(Context = typeof(...))]`, or a generated extension in the author's namespace — with
