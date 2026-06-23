@@ -183,14 +183,11 @@ This is **not** "enumerate an interface like the world surface does," for two ve
   ([DotBoxDKernelMethodInliner.cs:132](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)),
   requires an expression body (:139) or a single `return` (:146), and throws
   `NotSupportedException("[KernelMethod] '…' must be declared in source.")` at :155 when no body exists. An
-  **interface** member has no body ⇒ a pure-interface context **silently fails every `[KernelMethod]`**. A
-  `[HostBinding]` member *can* live on a declared contract (`TryLower` reads only the attribute,
-  [:23](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs);
-  no body is read). The design intends `[KernelMethod]` helpers to be **instance methods on the context**
-  (`IsServerContextReceiver`, [:36,:70](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)).
-  **Conclusion:** if one declared type is wanted it must be an **abstract class with concrete bodies**, not
-  an interface; otherwise split the surface (declared contract carries `[HostBinding]`; `[KernelMethod]`
-  helpers stay concrete-bodied).
+  **interface** member has no body ⇒ a pure-interface context **silently fails every `[KernelMethod]`**. The
+  design intends `[KernelMethod]` helpers to be **instance methods on the context**
+  (`IsServerContextReceiver`, [:36,:70](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)),
+  which an interface cannot carry. **Conclusion:** the declared context is a `partial` **class**, not an
+  interface. (Host capabilities are *not* declared on the context — see Ownership below.)
 
 **Discoverability requirement (this is the actual fix).** Make the context type **author-declared and
 explicitly attached**, so the place you add members is a type *you* named — not a `{Root}Context` you must
@@ -209,9 +206,19 @@ place. The convention-named `{Root}Context` partial is **removed**, not kept as 
 
 **Remaining decisions (small):**
 
-- **Ownership: split.** A capability-bearing `[HostBinding]` member must resolve to a host-registered
-  binding (see security note), so it is **server-owned**; native and `[KernelMethod]` helpers stay
-  plugin-authored. This is about where each member legitimately lives, not compatibility.
+- **Ownership: decided — option (a).** Three distinct senses, kept separate:
+  - **Authority** (what a capability-bearing call may do) is **host-owned, always** — enforced by the
+    verifier (unknown-binding rejection + `DBXK041`/`DBXK044`), independent of where anything is declared.
+    Not a design choice.
+  - **Declaration:** the context carries **only plugin-owned members** — native and `[KernelMethod]`. Host
+    capabilities are reached by **re-exposing the server-owned `[DotBoxDService]` host-service contracts as
+    members on the context** (e.g. `ctx.World.Damage.GetAdjustment(id)`, which auto-lowers to a host
+    binding) — **never** by declaring `[HostBinding]` members on the plugin context. The capability surface
+    stays defined once, server-side, and is discovered by typing `ctx.World.`. (`ctx.Messages.Send(...)`
+    already works this way — a re-exposed `IPluginMessageSink`, not a plugin-declared binding.)
+  - **Host-binding metadata** (interface vs implementation owns it) is a **separate open decision — P2.6.**
+    Option (a) routes *every* plugin-facing host call through the auto-binding path, so resolving P2.6 and
+    single-sourcing that rule (§3.4) become the load-bearing follow-ups.
 - **Shape: a `partial` class, not an interface.** Interface members have no body to inline for
   `[KernelMethod]` (the limit above). Sealed or not is the author's call; `partial` so the generator can
   augment the type the author named.
@@ -224,13 +231,13 @@ api-baseline are **broken outright** and regenerated — no overlay, deprecation
 compiling" path. The extra keystrokes of declaring the context type are **the point**: they make the
 extension surface discoverable.
 
-**Security (capability surface — non-negotiable).** Only host-registered bindings grant anything. A
-`[HostBinding]` on a plugin-authored context with **no matching host binding fails closed**: the lowered
-`CallExpression`'s id is absent from the host catalog, so it is rejected at validation (unknown-binding)
-and cannot reach exec ([ExpressionEvaluator.Calls.cs:155](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs)),
-and any effect mismatch is rejected by `DBXK041` at install. The design **must** keep capability-bearing
-members **server-owned**; a plugin must not be able to *assert* a host capability the server never
-registered.
+**Security (capability surface — non-negotiable).** Only host-registered bindings grant anything. Under
+option (a) the plugin context declares **no** `[HostBinding]` members, so a plugin cannot even *name* a
+capability the server did not expose — the assertion vector is closed by construction. The verifier
+enforces this regardless of declaration site: any binding id absent from the host catalog is rejected at
+validation (unknown-binding) and cannot reach exec
+([ExpressionEvaluator.Calls.cs:155](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs)),
+and any effect/capability mismatch is rejected at install (`DBXK041`/`DBXK044`).
 
 ### 3.2 Make execution location *explicit*
 
@@ -239,8 +246,8 @@ A context member runs in exactly one of three places. The current signal — an 
 
 | Tier | Marker | Runs where | Body may reference | Author rule |
 |---|---|---|---|---|
-| Inlined pure helper | `[KernelMethod]` | server-side sandbox (verified IR) | scalars; other `[KernelMethod]`/`[HostBinding]` members; **no** native services | "pure computation over event fields" |
-| Host capability | `[HostBinding(id, capability, effects)]` | server-side host | the one declared host call, capability-gated | "reads/writes host/game state" |
+| Inlined pure helper | `[KernelMethod]` on the context | server-side sandbox (verified IR) | scalars; other `[KernelMethod]` members; re-exposed host-service calls; **no** native services | "pure computation over event fields" |
+| Host capability | a re-exposed `[DotBoxDService]` member (`ctx.World.X()`; auto-lowers) — **not** a `[HostBinding]` on the context | server-side host | the host call, gated by its `[HostCapability]` | "reads/writes host/game state" |
 | Native | **explicit local marker (proposed; today it is the absence of a marker)** | plugin process, post-IPC | arbitrary in-process code | "calls your plugin's own services" |
 
 Two precise corrections:
