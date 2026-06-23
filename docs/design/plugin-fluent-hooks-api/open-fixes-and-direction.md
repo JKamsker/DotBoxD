@@ -12,32 +12,39 @@ revised after a multi-lens review (see [How this doc was reviewed](#how-this-doc
 Design guide this doc is measured against: **Simple · Obvious · Discoverable · Consistent · Minimal ·
 Composable** — plus **Explicit · Stable · Testable** as working corollaries.
 
+**Citation convention:** every code reference names a file and an exact line or line range as of head
+`41ec9172`. A bare line (`:86`) is the precise statement; a range (`:23-27`) spans the full construct. If a
+line has drifted when you read this, search the named symbol in the same file.
+
 ---
 
 ## TL;DR
 
-There are **two independent problems** here; the doc keeps them apart on purpose.
+There are **two independent problems**; this doc keeps them apart on purpose.
 
-1. **Correctness (blocks merge).** PR #88 has **three** runtime/codegen bugs and **red CI** that have
-   nothing to do with the context's *shape*: a factory-collapse, a result-hook priority regression, a
-   `RunLocal`-helper composition bug, and a Windows smoke failure. These gate merge on their own.
+1. **Correctness — blocks merge.** PR #88 has **three** correctness bugs (P1.1 factory-collapse, P1.2
+   result-hook priority regression, P1.3 `RunLocal`-helper composition) **plus** a red CI smoke failure
+   (P1.4). None of the four depends on the context's *shape*; each gates merge on its own.
 
-2. **Shape (a separate, larger thesis).** The plugin context is the only facade surface the author
-   **hand-extends with an undeclared member set** — so "what's generated vs hand-written" is invisible.
-   Making that surface *declarable* is worth doing, but it is a design with real open decisions (ownership,
-   lifetime, feasibility limits), not a mechanical "do what the world surface does." It should land as its
-   own PR(s), after those decisions are answered.
+2. **Shape — a separate, larger thesis.** The generated plugin context
+   ([PluginServerContextSurfaceEmitter.cs:16](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerContextSurfaceEmitter.cs))
+   is the **only generated type whose member surface the author extends by hand**
+   ([GamePluginContext.cs:3-10](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)),
+   so "generated vs hand-written" is invisible. Making that surface *declarable* is worth doing, but it has
+   real open decisions (§3.1) and at least one hard feasibility limit (`[KernelMethod]` cannot live on an
+   interface — §3.1), so it is **not** a mechanical "do what the world surface does." It lands as its own
+   PR(s) **after** §3.1's open decisions are answered.
 
-Direction in one line: **fix the correctness bugs first; make the context surface declarable carefully;
-fix chain/context identity by ownership; and single-source the host-capability rule without removing the
-host's independent install-time verification.**
+One-line direction: **fix P1.1–P1.4 first; make the context surface declarable only after answering §3.1;
+fix chain/context identity by ownership (§3.3); single-source the host-capability derivation rule without
+removing the host's independent install-time recomputation (§3.4).**
 
 ---
 
 ## Part 1 — Where we already are (the good news)
 
-The "server declares how it wants to be talked to; the client writes one line; codegen fills the rest"
-model **already exists and is genuinely contract-driven** for the RPC-forwarding surface:
+The "server declares the contract; the client writes one line; codegen fills the rest" model **already
+exists and is interface-driven** for the RPC-forwarding surface:
 
 ```csharp
 [GeneratePluginServer]
@@ -48,354 +55,431 @@ From the `[DotBoxDService]` interface graph the generator **enumerates members**
 forwarders, the `IPluginServer<IGameWorldAccess>` lifecycle, the `Setup` accumulator, live-settings `Get`,
 `IGameWorldServer`, and `GamePluginServerBuilder`:
 
-| Generated artifact | Driven by | Where |
+| Generated artifact | Driven by | Exact location |
 |---|---|---|
-| World resolution | the interface carrying `[DotBoxDService]` (not the class name) | [PluginServerFacadeModelFactory.cs:71](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs) `ResolveWorldType` |
-| Controls / forwarders / scoped clients | walking the interface's members + nested `[DotBoxDService]` returns | [PluginServerFacadeModelFactory.cs](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs) `ResolveControls` (:89), `ResolveMethods` (:125), `ResolveReturnWrapper` (:196) |
-| `I{World}Server`, lifecycle, builder | the world **type symbol** | [PluginServerFacadeEmitter.cs:20](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeEmitter.cs), [PluginServerFacadeNameFormatter.cs:30](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs) |
-| **Context + hook/sub registries** | **the class-name string** (`FacadeRootName(name) + "Context"`) | [PluginServerContextSurfaceEmitter.cs:16](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerContextSurfaceEmitter.cs), [PluginServerFacadeNameFormatter.cs:21](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs) |
+| World resolution | the directly-implemented interface carrying `[DotBoxDService]` (not the class name) | [PluginServerFacadeModelFactory.cs:71](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs) `ResolveWorldType` |
+| Controls / forwarders / scoped clients | walking the interface's members + nested `[DotBoxDService]` returns | same file: `ResolveControls` :89, `ResolveMethods` :125, `ResolveReturnWrapper` :196 |
+| `I{World}Server`, lifecycle, builder | the world **type symbol** | [PluginServerFacadeEmitter.cs:20](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeEmitter.cs); `ServerInterfaceName` at [PluginServerFacadeNameFormatter.cs:30](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs) |
+| **Context + hook/sub registries** | **the class-name string** `FacadeRootName(name) + "Context"` | [PluginServerContextSurfaceEmitter.cs:16](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerContextSurfaceEmitter.cs); `ContextName` at [PluginServerFacadeNameFormatter.cs:21](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs) |
 
-**The honest framing.** The context is **not** the only string-derived generated *name* — `HookRegistryName`,
-`SubscriptionRegistryName`, and `SetupInterfaceName` are all class-name-derived too
-([PluginServerFacadeNameFormatter.cs:13-28](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs)),
-and `ResolveControlService` hardcodes the literal `.Ipc.IGamePluginControlService`
-([PluginServerFacadeModelFactory.cs:87](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs))
-inside the path the table calls contract-driven. The difference that matters: the registries and `Setup`
-are string-*named* but their member surfaces are **fully generated fixed shells the author never edits**.
-The context is the **only generated type whose member surface the author extends by hand, with no declared
-contract** ([GamePluginContext.cs:3](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)).
-That is the real gap — invisible generated-vs-handwritten, not "the one string name."
+**Precise framing of the gap.** The context is **not** the only string-derived generated *name*:
+`SetupInterfaceName` ([:13](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeNameFormatter.cs)),
+`ContextName` (:21), `HookRegistryName` (:24), and `SubscriptionRegistryName` (:27) are all
+`FacadeRootName(className) + suffix`, and `ResolveControlService` hardcodes the literal metadata name
+`{worldNamespace}.Ipc.IGamePluginControlService`
+([PluginServerFacadeModelFactory.cs:87](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs),
+inside `ResolveControlService` declared at :82) — a baked-in convention literal in the path the table calls
+contract-driven. The distinction that actually matters: the registries and `Setup` are string-**named**,
+but their member surfaces are **fully generated shells the author never edits**. The context is the **only
+generated type whose member surface the author extends by hand**, with **no declared contract** stating its
+intended members ([GamePluginContext.cs:5,7,9](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)
+add `DamageDecisionReason`, `FormatCalmTarget`, `ScaleDamageDecision` into the partial). That — invisible
+generated-vs-handwritten member surface — is the gap, not "one string name."
 
 ---
 
 ## Part 2 — Is the "RPC pipeline" one thing or two?
 
-**Structurally it is two dispatch concepts that already share the lowering front-end and converge for
-server extensions — plus one deliberately separate native terminal.** Treat the seam between them as a
-*trust boundary*, not just duplication.
+**It is two dispatch concepts that share the lowering front-end and converge for server extensions, plus
+one deliberately separate native terminal.** Treat the analyzer↔runtime seam as a *trust boundary*.
 
-1. **Host call inside lowered IR** — a `Where`/`Select`/`Run` (or a server-extension body) that touches a
-   host member is lowered to a sandbox `CallExpression(bindingId, args)`. For explicit `[HostBinding]`
-   members, `bindingId` is the attribute value; for auto host-service bindings, it is derived as
-   `host.{ns}.{Type}.{Method}`
-   ([DotBoxDHostBindingExpressionLowerer.cs:89](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs)).
-   At **exec** time the interpreter resolves the id **per call** against the host-curated `BindingRegistry`
-   and runs the host's descriptor under its effects + `RequiredCapability` + grant check
-   ([ExpressionEvaluator.Calls.cs:149](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs),
-   [BindingRegistry.cs:44](../../../src/Kernels/DotBoxD.Kernels/Bindings/BindingRegistry.cs)). An unknown id
-   throws; the plugin's IR id is only a *lookup key into a host table*.
+1. **Host call inside lowered IR.** A `Where`/`Select`/`Run` (or a server-extension body) that touches a
+   host member lowers to a sandbox `CallExpression(bindingId, args)`
+   ([DotBoxDHostBindingExpressionLowerer.cs:89](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs)
+   for method form, `:95` `TryLowerProperty` for property form). For an **explicit** `[HostBinding(...)]`
+   the `bindingId` is the attribute's first constructor argument (`ExplicitHostBinding` at :126); for an
+   **auto** host-service binding (a `[DotBoxDService]` interface method with no `[HostBinding]`) it is
+   derived by `HostBindingRoute` as `"host." + ns + type.MetadataName + "." + method.Name`
+   (`TryAutoHostBinding` :152 → `HostBindingRoute` :187, formula :192). At **exec** time the interpreter
+   resolves the id **per call** against the host-curated `BindingRegistry`
+   ([ExpressionEvaluator.Calls.cs:149](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs)
+   `TryGetDescriptor`; unknown id throws at :155) and runs the host's descriptor under its effects,
+   `RequiredCapability`, and grant check ([BindingRegistry.cs:44](../../../src/Kernels/DotBoxD.Kernels/Bindings/BindingRegistry.cs)
+   `GetDescriptor`). The plugin's IR id is **only a lookup key into a host-owned table**.
 
-2. **Server-extension / `InvokeAsync` request-response** — a whole verified function dispatched **by
+2. **Server-extension / `InvokeAsync` request-response.** A whole verified function dispatched **by
    `pluginId`** through `InvokeServerExtensionAsync`, whose internal host calls were effect/capability-checked
-   at install. Two codegen factories feed this one runtime concept — `InvokeAsyncModelFactory` synthesizes
-   the anonymous `"rpcEntrypoint":"Invoke"`
-   ([InvokeAsyncModelFactory.cs:122](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/InvokeAsync/InvokeAsyncModelFactory.cs))
+   at install. Two codegen factories feed this one runtime concept: `InvokeAsyncModelFactory` synthesizes
+   the anonymous entrypoint `"rpcEntrypoint":"Invoke"`
+   ([InvokeAsyncModelFactory.cs:122](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/InvokeAsync/InvokeAsyncModelFactory.cs)),
    and `RpcKernelModelFactory` emits named `[ServerExtension]` entrypoints — both via `DotBoxDRpcJsonLowerer`,
-   both terminating at `InvokeServerExtensionAsync`. In-process (`ServerExtensionProxy`) and over-IPC (a
+   both terminating at `InvokeServerExtensionAsync`. In-process (`ServerExtensionProxy`) and over-IPC (the
    generated client proxy,
    [RpcKernelClientProxyEmitter.cs](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Rpc/Client/RpcKernelClientProxyEmitter.cs))
-   differ only in transport.
+   differ **only** in transport.
 
-3. **`RunLocal` / `RegisterLocal` IPC terminal** — push-only, keyed by `subscriptionId`, running a **native
+3. **`RunLocal` / `RegisterLocal` IPC terminal.** Push-only, keyed by `subscriptionId`, running a **native
    delegate in the plugin process**; it shares the value marshaller but never reaches the binding registry
-   ([RemoteLocalHandlerRegistry.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteLocalHandlerRegistry.cs)).
-   This is the **trust-boundary exit** — the one place a plugin runs unverified native code — and must stay
-   a distinct, non-substitutable path.
+   ([RemoteLocalHandlerRegistry.cs:41](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteLocalHandlerRegistry.cs)).
+   This is the **trust-boundary exit** — the one place a plugin runs unverified native code — and must
+   remain a distinct, non-substitutable path.
 
-**The seam (and why it is not "just duplication").** The auto-binding id and the effect/allocation
-classification are re-derived in **both** the analyzer and the runtime — `HostBindingRoute` uses
-`type.MetadataName` in the analyzer
-([DotBoxDHostBindingExpressionLowerer.cs:192](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs))
-vs `type.Name` in the runtime
-([HostServiceBindingFactory.cs:239](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingFactory.cs)),
-and there is a literal "Must match HostServiceBindingFactory.ReturnAllocates" comment
-([:112](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs)).
+**The seam, and why it is a cross-check rather than redundancy.** The **auto-binding route** and the
+**effect/allocation classification** are derived in **both** assemblies:
 
-> **This is a claim-vs-ground-truth cross-check, not redundancy.** The analyzer output ships **inside the
-> plugin package** (the manifest's self-declared effects/capabilities). The runtime is the host's own
-> truth: it re-derives entrypoint effects from its **own** registry at install (`FunctionAnalyzer`) and
-> raises `DBXK041` (effects) / `DBXK044` (capabilities) when the plugin's *claim* ≠ the host's
-> *recomputation*. `DBXK041` firing on drift is the **security control working**, not a bug to engineer
-> away. The system premise — *host frozen at release; plugins ship later; verify what ships* — depends on
-> the host recomputing rather than trusting the manifest.
+- route: `type.MetadataName` in the analyzer
+  ([DotBoxDHostBindingExpressionLowerer.cs:192](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs))
+  vs `type.Name` in the runtime
+  ([HostServiceBindingFactory.cs:239](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingFactory.cs));
+- allocation: `ReturnAllocates`/`IsWriteMethod` reimplemented in the analyzer (:238/:226) and the runtime
+  (:229/:218), with a literal "Must match HostServiceBindingFactory.ReturnAllocates" comment at
+  [DotBoxDHostBindingExpressionLowerer.cs:112](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs).
 
-**Unification target (corrected).** Collapse the **two hand-written copies of the derivation rule** into
-one **server-owned definition** that both sides read; keep the host's independent install-time
-recomputation and the `DBXK041`/`DBXK044` comparison. The win is that the check becomes *un-driftable*, not
-that it disappears. **Non-goal:** never merge the two *authorization layers* — a binding-id call must
-always resolve through the host-curated registry, never through plugin-supplied descriptor metadata. (See
-§3.4 for why this is "one definition, two projections," not "one shared object.")
+(An **explicit** `[HostBinding("id", …)]` is exempt from route drift: both sides read the same literal id.)
+
+> **This duplication is a claim-vs-ground-truth cross-check, not pure redundancy.** The analyzer output
+> ships **inside the plugin package** as the manifest's self-declared effects/capabilities. The runtime is
+> the host's own truth: it recomputes the entrypoint's effects from its **own** registry at install
+> (`planEffects` at [PluginPreparedPackageValidator.cs:22](../../../src/Hosting/DotBoxD.Plugins/Runtime/Validation/PluginPreparedPackageValidator.cs))
+> and raises **`DBXK041`** when `manifestEffects != planEffects` (:23-27 for event kernels;
+> [RpcKernelPackageValidator.cs:84-88](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)
+> for server-extension / RPC kernels) and **`DBXK044`** when required capabilities diverge
+> ([PluginManifestCapabilityValidator.cs:43-48](../../../src/Hosting/DotBoxD.Plugins/Runtime/Validation/PluginManifestCapabilityValidator.cs)).
+> `DBXK041`/`DBXK044` firing on drift is the **security control working**. The system premise — *host frozen
+> at release; plugins ship later and independently; the host verifies what ships* — requires the host to
+> **recompute**, never to trust the manifest's labels.
+
+**Unification target (precise).** Collapse the **two hand-written copies of the derivation rule** (route +
+allocation/effect classification) into **one server-owned definition both sides read**; keep the host's
+independent install-time recomputation and the `DBXK041`/`DBXK044` comparison. The win is the check becomes
+**un-driftable**, not that it disappears. **Non-goal:** do not merge the two *authorization layers* — a
+binding-id call must always resolve through the host-curated `BindingRegistry`
+([ExpressionEvaluator.Calls.cs:149](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs)),
+never through plugin-supplied descriptor metadata. (§3.4 explains why this is "one definition, two
+projections," not "one shared object.")
 
 ---
 
 ## Part 3 — The design direction
 
-### 3.1 Make the context surface *declarable* — with open decisions
+### 3.1 Make the context surface *declarable* — open decisions first
 
-The goal is to make the context's surface visible and checkable rather than grafted onto a magic partial.
-But this is **not** simply "enumerate an interface like the world surface does," for two reasons:
+Goal: make the context's member surface visible and checkable instead of grafted onto a magic partial.
+This is **not** "enumerate an interface like the world surface does," for two verified reasons:
 
-- **Different job.** The world surface *enumerates + forwards* (signatures → RPC forwarders). The context
-  *wraps an ambient `HookContext` + carries members that lower into IR*. They are not the same kind of
-  artifact, so the world's `ResolveControls`/`ResolveMethods` resolvers do **not** transfer — they read
-  signatures for forwarding and have no notion of lowering.
-- **Feasibility limit (load-bearing).** `[KernelMethod]` lowering **inlines the method body**
-  ([DotBoxDKernelMethodInliner.cs](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)
-  requires a source body, throwing "must be declared in source" otherwise). An **interface** member has no
-  body, so a pure-interface context **silently breaks every `[KernelMethod]`**. A `[HostBinding]` member
-  *can* live on a declared contract (it lowers from the attribute, no body needed). ⇒ if a single declared
-  type is wanted it must be an **abstract class with concrete bodies**, not an interface; otherwise split
-  the surface (contract carries `[HostBinding]`; `[KernelMethod]` helpers stay concrete).
+- **Different job.** The world surface *enumerates signatures → emits RPC forwarders*
+  (`ResolveMethods` builds `PluginServerForwardedMethod` records,
+  [PluginServerFacadeModelFactory.cs:125](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs)).
+  The context *wraps an ambient `HookContext` and carries members that lower into IR*. `ResolveControls`/
+  `ResolveMethods` read only signatures and have no notion of lowering — they do not transfer.
+- **Hard feasibility limit.** `[KernelMethod]` lowering **inlines the method body**: the inliner walks
+  `method.DeclaringSyntaxReferences`
+  ([DotBoxDKernelMethodInliner.cs:132](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)),
+  requires an expression body (:139) or a single `return` (:146), and throws
+  `NotSupportedException("[KernelMethod] '…' must be declared in source.")` at :155 when no body exists. An
+  **interface** member has no body ⇒ a pure-interface context **silently fails every `[KernelMethod]`**. A
+  `[HostBinding]` member *can* live on a declared contract (`TryLower` reads only the attribute,
+  [:23](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs);
+  no body is read). The design intends `[KernelMethod]` helpers to be **instance methods on the context**
+  (`IsServerContextReceiver`, [:36,:70](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDKernelMethodInliner.cs)).
+  **Conclusion:** if one declared type is wanted it must be an **abstract class with concrete bodies**, not
+  an interface; otherwise split the surface (declared contract carries `[HostBinding]`; `[KernelMethod]`
+  helpers stay concrete-bodied).
 
-**Open decisions the doc must answer before this is actionable** (none are decided yet):
+**Open decisions — none are decided; pick before implementing:**
 
-| Decision | Options | Notes |
+| Decision | Options | Constraint forcing the choice |
 |---|---|---|
-| **Ownership** | server-owned vs plugin-owned contract | Plugin-owned preserves today's autonomy (author adds ad-hoc helpers with no SDK round-trip). Server-owned is required for any **capability-bearing** member (see security note). Likely answer: **split** — plugin owns native/`[KernelMethod]`; server owns `[HostBinding]`. |
-| **Attachment** | `[GeneratePluginServer(Context = typeof(IGameContext))]` opt-in vs convention default | Keep the convention-named partial as the **zero-config default** so existing plugins/the sample keep compiling. |
-| **Lifetime & construction** | per-event (today) vs cached; who calls the factory | Today the context is built per publish from `HookContext`; a declared contract needs a stated construction story. |
-| **Versioning** | how a contract evolves without breaking shipped plugins | The host is frozen at release; contract changes are a compat event. |
-| **Native-only members** | stay on the partial vs move to the contract | Pure native helpers (e.g. sample `FormatCalmTarget`) are `RunLocal`-only and need no contract. |
+| **Ownership** | server-owned vs plugin-owned vs split | A capability-bearing `[HostBinding]` member must resolve to a host-registered binding (§3.1 security), so it must be **server-owned**; ad-hoc native/`[KernelMethod]` helpers are written by the plugin today with no SDK round-trip ([GamePluginContext.cs:5-9](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)). The only choice that keeps both is **split**: plugin owns native + `[KernelMethod]`; server owns `[HostBinding]`. |
+| **Attachment** | `[GeneratePluginServer(Context = typeof(IGameContext))]` opt-in vs convention default | Keep `partial class {Root}Context` as the **zero-config default** so existing plugins and the sample compile unchanged. |
+| **Lifetime & construction** | per-event (today) vs cached; who invokes the factory | Today the context is constructed per publish from a `HookContext` via `ServerContextFactory<TContext>` ([HookRegistry.cs:95](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs)). A declared contract needs an explicit construction story. |
+| **Versioning** | how a contract evolves without breaking shipped plugins | The host is frozen at release; a contract change is a binary-compat event for already-shipped plugins. |
+| **Native-only members** | stay on the partial vs move to the contract | Pure native helpers (the sample's `FormatCalmTarget`) are `RunLocal`-only and need no contract. |
 
-**Migration (must be stated, not implied).** Keep `partial class {Root}Context` as the default; make the
-declared contract an **opt-in overlay** enumerated *in addition to* the partial. Plain native members stay
-on the partial; `[HostBinding]` members may move to the contract; `[KernelMethod]` helpers stay concrete.
-Ship a regression test that the convention default still binds when no contract is declared, and migrate
-the GameServer sample both ways before calling this "the library shape."
+**Migration (state it explicitly, do not imply).** Keep `partial class {Root}Context` as the default;
+make the declared contract an **opt-in overlay** the generator enumerates *in addition to* the partial.
+Native members stay on the partial; `[HostBinding]` members may move to the contract; `[KernelMethod]`
+helpers stay concrete-bodied. Ship a regression test asserting the convention default still binds when no
+contract is declared, and migrate `GamePluginContext` both ways, **before** calling this "the library
+shape." Note the api-baseline cost: this churns
+[docs/api-baselines/DotBoxD.Plugins.txt](../../../docs/api-baselines/DotBoxD.Plugins.txt) (already +268/−60
+on this branch; the check is set-based, so commit deliberately).
 
-**Honest cost.** This keeps the call-site one-liner but **adds an authoring-side declaration** (net author
-burden goes up: declare shape + implement it). A lighter alternative that buys most of the "visible +
-checkable" benefit with **no new declaration**: an **analyzer diagnostic** on the existing partial that
-flags a member used in a lowered stage that the analyzer cannot lower. Weigh the two before committing.
+**Honest cost.** The call-site one-liner is preserved, but an **authoring-side declaration is added** (net
+author burden rises: declare the shape *and* implement it). A lighter alternative that delivers the
+"visible + checkable" benefit with **no new declaration**: an **analyzer diagnostic** on the existing
+partial that flags a member used in a lowered stage which the analyzer cannot lower (the lowering failure
+is already detectable — see §3.2). Decide between "declared contract" and "diagnostic on the partial"
+before writing the generator change.
 
-**Security (capability surface).** Only host-registered bindings grant anything. A `[HostBinding]` on a
-plugin-authored context with **no matching host binding fails closed** (unknown-binding at validation /
-`DBXK041` at install) — it does not self-grant. The design must keep capability-bearing members
-**server-owned**; a plugin must not be able to *assert* a host capability the server never registered.
+**Security (capability surface — non-negotiable).** Only host-registered bindings grant anything. A
+`[HostBinding]` on a plugin-authored context with **no matching host binding fails closed**: the lowered
+`CallExpression`'s id is absent from the host catalog, so it is rejected at validation (unknown-binding)
+and cannot reach exec ([ExpressionEvaluator.Calls.cs:155](../../../src/Kernels/DotBoxD.Kernels.Interpreter/Internal/Expressions/ExpressionEvaluator.Calls.cs)),
+and any effect mismatch is rejected by `DBXK041` at install. The design **must** keep capability-bearing
+members **server-owned**; a plugin must not be able to *assert* a host capability the server never
+registered.
 
 ### 3.2 Make execution location *explicit*
 
-A context member runs in one of three places. The current signal — an attribute (or its absence) on a
-free-form partial — is too implicit; **"no marker ⇒ native" is a footgun.**
+A context member runs in exactly one of three places. The current signal — an attribute, or its **absence**
+— is too implicit; **"no marker ⇒ native" is a footgun.**
 
-| Tier | Marker | Runs | Body may reference | Author rule of thumb |
+| Tier | Marker | Runs where | Body may reference | Author rule |
 |---|---|---|---|---|
-| Pure helper, inlined | `[KernelMethod]` | server-side sandbox | scalars, other `[KernelMethod]`/`[HostBinding]` | "pure math on event fields" |
-| Host capability | `[HostBinding(id, capability, effects)]` | server-side host | declared host call, gated by capability | "reads/writes host/game state" |
-| Native | **(explicit local marker — see below)** | plugin process, post-IPC | arbitrary in-process code | "touches your plugin's own services" |
+| Inlined pure helper | `[KernelMethod]` | server-side sandbox (verified IR) | scalars; other `[KernelMethod]`/`[HostBinding]` members; **no** native services | "pure computation over event fields" |
+| Host capability | `[HostBinding(id, capability, effects)]` | server-side host | the one declared host call, capability-gated | "reads/writes host/game state" |
+| Native | **explicit local marker (proposed; today it is the absence of a marker)** | plugin process, post-IPC | arbitrary in-process code | "calls your plugin's own services" |
 
-Two corrections to the previous draft:
+Two precise corrections:
 
-- **The verbs are not interchangeable.** `Run`/`Register` are lowered (sandbox subset only);
+- **The verbs are not interchangeable.** `Run`/`Register` lower to verified IR (sandbox subset only);
   `RunLocal`/`RegisterLocal` run arbitrary native code. A `RunLocal` body that calls a plugin service does
   **not** become a valid `Run` by dropping the suffix — it fails to lower. Do **not** claim "the same
   expression, the suffix chooses where it runs."
-- **Make native opt-in, not default.** Prefer an **explicit local-only marker** (or split the context type
-  into a *lowerable facet* and a *native facet*) so a member's execution site is never inferred from the
-  *absence* of an attribute. The native terminal is the trust-boundary exit; selecting it should be a
-  deliberate, visible choice, and the generator must route tiers by **owned symbol identity** (§3.3), never
-  by string name (§ P2.5/P2.6 below), so a typo or a foreign API cannot send a body to the wrong tier.
+- **Make native opt-in.** Introduce an explicit local-only marker (or split the context into a *lowerable
+  facet* and a *native facet*) so execution site is never inferred from a missing attribute. The native
+  terminal is the trust-boundary exit, so its selection must be deliberate and visible, and the generator
+  must route tiers by **owned symbol identity** (§3.3), never by string name (§3.3 / P2.4), so a typo or a
+  foreign API cannot route a body to the wrong tier.
 
-**Failure mode (state it).** A non-lowerable member used in a lowered stage compiles, then throws `DBXK062`
-**synchronously at chain construction** (first run), not at a distant install step. Build-time author
-diagnostics largely exist (`DBXK111`/`DBXK113`) but are `Info` severity and easy to miss — **raise them to
-`Warning`.**
+**Failure mode (exact).** A non-lowerable member used in a lowered stage compiles, then throws **`DBXK062`**
+via `SandboxValidationException` **synchronously at chain construction** — `HookStage.NotLowered()` at
+[HookStage.cs:119](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookStage.cs) and
+`ResultNotLowered()` at :126 — i.e. on first run, not at install. Build-time author detection exists but is
+under-leveled: **`DBXK111`** (Remote `RunLocal` not lowered) is `Info`
+([AnalyzerReleases.Unshipped.md:10](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md));
+**`DBXK113`** (result `Register`/`RegisterLocal` not lowered) is `Info` **except** the un-lowered sandbox
+`Register` case, which is already `Warning` at the call site (:12). *Recommendation:* raise `DBXK111` and
+the non-`Register` `DBXK113` cases from `Info` to `Warning`. (`DBXK110` is a separate, **stale** diagnostic
+— see P2.9; do not conflate the two.)
 
-### 3.3 Fix identity — two *distinct* seams (not one)
+### 3.3 Fix identity — two *distinct* seams
 
-Both today resolve by name/scan instead of by ownership, but they are different seams and need different
-fixes:
+Both resolve by name/scan today; they are different seams with different fixes.
 
-- **P2.5 — which context type to inject.** `InferredGeneratedContextTypeFullName` scans **every** syntax
-  tree and `return null`s on a second `[GeneratePluginServer]`
-  ([GeneratedRemoteHookChainFallback.GeneratedContexts.cs:34](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.GeneratedContexts.cs)).
-  *Fix:* resolve from the owning server. The generated `On<TEvent>()` already returns
-  `RemoteHookPipeline<TEvent, {Context}>`, so the context is recoverable as the receiver's return-type
-  argument — no scan, no `[GeneratePluginServer]` symbol needed at the call site.
-- **P2.4 — is this even a DotBoxD chain.** `CandidateKind`'s fast path matches a receiver member **named**
-  `Hooks`/`Subscriptions` with no ownership check, and the "semantic" fallback `RegistryKind` is itself
-  only a `Name.EndsWith("HookRegistry")` suffix match
-  ([GeneratedRemoteHookChainFallback.cs:23](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.cs)).
-  A foreign fluent API with those names is mis-claimed. *Fix:* gate both paths on the receiver's **type
-  owned by a `[GeneratePluginServer]` class**, not on member/type-name strings.
+- **P2.5 — which context type to inject.** `InferredGeneratedContextTypeFullName` scans **every**
+  `compilation.SyntaxTrees` ([GeneratedRemoteHookChainFallback.GeneratedContexts.cs:15](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.GeneratedContexts.cs))
+  and `return null`s on the second distinct `[GeneratePluginServer]` (:34) — so a 2-server project silently
+  loses default-context inference. *Fix:* the generated `On<TEvent>()` already returns
+  `RemoteHookPipeline<TEvent, {Context}>`
+  ([PluginServerContextSurfaceEmitter.cs:57](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerContextSurfaceEmitter.cs)),
+  so read the context as `TypeArguments[1]` of the receiver's return type — no scan, no
+  `[GeneratePluginServer]` symbol at the call site.
+- **P2.4 — is this even a DotBoxD chain.** `CandidateKind`'s fast path
+  ([GeneratedRemoteHookChainFallback.cs:23](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.cs))
+  switches purely on the receiver member's identifier text `Hooks`/`Subscriptions` (:31), with **no**
+  semantic check, and the "semantic" fallback `RegistryKind` (:42) is itself only a
+  `Name.EndsWith("HookRegistry")`/`"SubscriptionRegistry"` suffix match (:45-46). A foreign fluent API named
+  `Hooks`/`Subscriptions` is mis-claimed. *Fix:* gate **both** paths on the receiver's type being **owned by
+  a `[GeneratePluginServer]` class**, not on member or type-name strings.
 
 ### 3.4 Single-source the host-capability rule — without weakening the check
 
-`§3.4` is "**one server-owned definition, two projections**," **not** "one descriptor object consumed by
-both." A shared runtime object is not even buildable: the analyzer is `netstandard2.0` with zero project
-references (packed to `analyzers/dotnet/cs`) and the runtime is `net10.0`; the analyzer works on
-`IMethodSymbol`, the runtime on `MethodInfo`. So:
+"§3.4" means **one server-owned definition, two projections**, **not** "one descriptor object consumed by
+both." A shared runtime object is not buildable: the analyzer is `netstandard2.0` with zero `ProjectReference`
+(packed to `analyzers/dotnet/cs`) and operates on `IMethodSymbol`; the runtime is `net10.0` and operates on
+`System.Reflection.MethodInfo`. Therefore:
 
-- Put the binding-id formula and the effect/allocation/classification rules in **one dependency-free
-  source file**, linked into both projects (`<Compile Include Link>`), and have both sides call it.
-- The descriptor the rule produces must carry **more than id + effects**: **version, capability, async
-  flag, parameter/return shapes, cost, audit, and safety** — these also drift and affect stability today.
-- Replace the **method-name-prefix heuristic** (`IsWriteMethod`: names starting `Kill/Set/Update/…` ⇒
-  `HostStateWrite`, duplicated verbatim in both assemblies) with an **explicit effect declaration**, so
-  effects stop being inferred from method names on two sides (a method named `Patch`/`Spawn` is silently
-  read-only today).
-- **Keep** the host's independent install-time recomputation and `DBXK041`/`DBXK044` (Part 2). Both sides
-  reading one server-owned definition makes the check *un-driftable*; it does not remove it.
+- Put the binding-id formula and the effect/allocation/classification rules in **one dependency-free source
+  file**, linked into both projects via `<Compile Include Link>`, and have both `HostBindingRoute`
+  implementations and both `ReturnAllocates`/`IsWriteMethod` implementations call it.
+- The shared descriptor must carry, beyond `id` + `effects`: **version, capability, async flag,
+  parameter/return shapes, cost, audit, and safety** — these affect stability and drift independently today.
+- Replace the **method-name-prefix heuristic** `IsWriteMethod` (names starting `Kill/Set/Update/Delete/Add/
+  Remove/Move/Teleport` ⇒ `HostStateWrite`, duplicated at
+  [DotBoxDHostBindingExpressionLowerer.cs:226](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs)
+  and [HostServiceBindingFactory.cs:218-227](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingFactory.cs))
+  with an **explicit effect declaration**, so effects are no longer inferred from method names on two sides
+  (a method named `Patch` or `Spawn` is silently read-only today on both).
+- **Keep** the host's install-time recomputation and `DBXK041`/`DBXK044` (Part 2). One server-owned
+  definition makes the check **un-driftable**; it does not remove it.
 
 ---
 
 ## Part 4 — Open fixes (review backlog)
 
-Each is verified against PR head `41ec9172`.
+Every item verified against head `41ec9172`.
 
 ### P1 — blockers (correctness; independent of the §3 redesign)
 
-1. **Factory collapse.** On a cache hit `On<TEvent, TContext>` returns the existing pipeline and **discards
-   the new `createContext`**. *Fix:* do **not** key on raw delegate identity — keep one
-   `(event, context)` pipeline and **fail fast on a conflicting factory**. (The generated convention path
-   binds a static `FromHookContext` method group and is immune; this bites **hand-written** explicit
-   factories.)
-   [HookRegistry.cs:86](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs),
-   [SubscriptionRegistry.cs:73](../../../src/Hosting/DotBoxD.Plugins/Runtime/Subscriptions/SubscriptionRegistry.cs).
+1. **Factory collapse.** `On<TEvent, TContext>(createContext)` validates `createContext`
+   ([HookRegistry.cs:82](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs)), keys the pipeline
+   cache on `PipelineKey(typeof(TEvent), typeof(TContext))` (:86), and on a cache hit (:87) returns the
+   existing pipeline — **discarding the just-passed `createContext`**. Two call sites with the same
+   `(TEvent, TContext)` but different factories silently share the first factory. *Fix:* do **not** key on
+   delegate identity — keep one pipeline per `(event, context)` and **throw on a conflicting factory**. The
+   generated convention path binds the static `{Context}.FromHookContext` method group (delegate-equal
+   across calls), so it is immune; this bites **hand-written** explicit factories.
+   Same pattern in [SubscriptionRegistry.cs:69,73-74](../../../src/Hosting/DotBoxD.Plugins/Runtime/Subscriptions/SubscriptionRegistry.cs).
 
-2. **Result-hook priority is no longer global** once an event has multiple context pipelines.
-   `FireManyAsync` returns the first non-null result in dictionary order; priority is sorted only *within*
-   a slot. **The naive fix does not work:** `order` is **per-`ResultHookSlot`, not global**, so "merge-sort
-   by `(priority, order)`" cannot order across pipelines. *Fix:* introduce a **registry-level sequence** or
-   an **event-level result table**. (On `main`, `_pipelines` was keyed by event type alone, so this path
-   did not exist — the PR introduces the regression.)
-   [HookRegistry.Pipelines.cs:59](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.Pipelines.cs),
-   [ResultHookSlot.cs:235](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/ResultHookSlot.cs).
+2. **Result-hook priority is no longer global** once an event has >1 context pipeline. `FireManyAsync`
+   ([HookRegistry.Pipelines.cs:59](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.Pipelines.cs))
+   iterates pipelines in `Dictionary` order and returns the **first non-null** result (:70-72); priority is
+   sorted **only within one slot** — `_order` is an instance field
+   ([ResultHookSlot.cs:25](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/ResultHookSlot.cs)),
+   incremented per-slot in `Add` (:235), and the sort is per-slot (:240). **So the naive fix fails:**
+   merge-sorting by `(priority, order)` cannot order across pipelines because `order` is not comparable
+   across slots. *Fix:* introduce a **registry-level monotonic sequence** or an **event-level result table**
+   so priority is total across context pipelines. (On `main`, `_pipelines` was keyed by event type alone —
+   one pipeline per event — so `FireManyAsync` did not exist; this PR rekeys to `(EventType, ContextType)`
+   and adds the multi-pipeline walk, introducing the regression.)
 
-3. **Reusable `RunLocal`/`RegisterLocal` helpers don't compose.** Chain identity is the **call-site source
-   location** ("each chain emits a distinct package"), and that id is reused as the **subscription id**,
-   whose registry is **idempotent — "re-registering the same subscriptionId replaces the previous
-   handler."** So a chain factored into a helper and invoked twice silently **drops the first handler**.
-   *Fix:* split **package identity** (source-location-stable, for generator incrementality) from
-   **registration/subscription identity** (unique per call/instance).
-   [HookChainIdentity.cs:14](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainIdentity.cs),
-   [RemoteLocalHandlerRegistry.cs:41](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteLocalHandlerRegistry.cs).
+3. **Reusable `RunLocal`/`RegisterLocal` helpers do not compose.** Chain identity is the **call-site source
+   location**: `HookChainIdentity.Compute` returns `FNV1a(path + ":" + SpanStart)`
+   ([HookChainIdentity.cs:14-19](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/HookChainIdentity.cs)),
+   and that id is reused as the **subscription id**, whose registry is **idempotent**: re-registering the
+   same `subscriptionId` **replaces the previous handler**
+   ([RemoteLocalHandlerRegistry.cs:41](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteLocalHandlerRegistry.cs)).
+   A chain factored into a helper method and invoked twice therefore shares one source location → one id →
+   the second registration **silently drops the first handler**. *Fix:* split **package identity**
+   (source-location-stable, required for generator incrementality) from **registration/subscription
+   identity** (unique per call/instance).
 
-4. **CI is red — diagnose to a code path, don't rerun.** The Windows `Build` job's GameServer **smoke run**
-   throws `RemoteServiceException: Internal error` from `BlinkBehindAsync`; the `Build & Test` summary jobs
-   fail downstream off it. **Leading hypothesis:** this PR rewrote the analyzer side of the `DBXK041` seam
-   (`DotBoxDManifestEffectModel`; [DotBoxDHandleModelFactory.cs:68](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/DotBoxDHandleModelFactory.cs)
-   now always adds `HostStateWrite/Concurrency/Audit`) while the runtime side was untouched —
-   `RemoteServiceException` is a generic wrapper, so a `DBXK041` install-reject and a dispatch throw look
-   identical. **Capture the inner server-side diagnostic before attributing to environment/timing.** Closed
-   only when the inner error is tied to a code path. Pin observations to head `41ec9172`.
+4. **CI is red — diagnose to a code path before rerunning.** The Windows `Build` job's GameServer **smoke
+   run** throws `RemoteServiceException: Internal error` from generated `BlinkBehindAsync`
+   (`…/BlinkPluginPackage.g.cs:23`); the `Build & Test (windows-latest)` and `(ubuntu-latest)` summary jobs
+   fail downstream of it. **Leading hypothesis (effect drift):** this PR rewrote the analyzer side of the
+   `DBXK041` seam — `DotBoxDHandleModelFactory.CreateFromSend`
+   ([:57](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/DotBoxDHandleModelFactory.cs))
+   now **unconditionally** adds `HostStateWrite`/`Concurrency`/`Audit` (:68-70) — while the runtime side
+   (`HostServiceBindingFactory`) was untouched. `BlinkBehindAsync` is a `[ServerExtension]`/RPC kernel, so an
+   effect mismatch is rejected at install by **`DBXK041`** via
+   [RpcKernelPackageValidator.cs:84-88](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs);
+   `RemoteServiceException` is the opaque transport wrapper, so a `DBXK041` install reject and a dispatch
+   throw are indistinguishable at the surface. **Capture the inner server-side diagnostic/error before
+   attributing to environment or timing.** Closed only when the inner error is tied to a specific code path.
 
 ### P2 — design hazards (fix before baselining)
 
-5. **Generated-remote fallback is too broad** — recognition by member/type **name** with no ownership
-   check (two seams; see §3.3). Breaks multi-server and third-party fluent APIs.
-   [GeneratedRemoteHookChainFallback.cs:23](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.cs),
-   [GeneratedRemoteHookChainFallback.GeneratedContexts.cs:34](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/HookChains/Support/GeneratedRemoteHookChainFallback.GeneratedContexts.cs).
+5. **Generated-remote fallback recognition is name-based** with no ownership check (P2.4), and
+   default-context inference is a whole-compilation scan that bails on a 2nd server (P2.5). See §3.3 for
+   exact lines and fixes. Impact: breaks multi-server projects and any third-party fluent API whose members
+   are named `Hooks`/`Subscriptions` or whose types end in `HookRegistry`/`SubscriptionRegistry`.
 
 6. **Host-binding rule duplicated across the analyzer↔runtime trust seam** — single-source the rule, keep
-   the check (§3.4). Scope is broader than id/effects (also the `IsWriteMethod` heuristic, and the
-   descriptor should carry version/capability/async/shapes/cost/audit/safety). Also: the contract story is
-   **overstated** — analyzer and runtime can read capability metadata from different places, and the
-   GameServer abstractions use `[HostCapability]` *without* `[HostBinding]`; **decide whether the interface
-   or the implementation owns binding metadata, then enforce it.**
-   [DotBoxDHostBindingExpressionLowerer.cs:163](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs),
-   [HostServiceBindingExtensions.cs:50](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingExtensions.cs).
+   the check (§3.4). Scope is broader than `id` + `effects`: the `IsWriteMethod` name heuristic is duplicated
+   ([lowerer:226](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs),
+   [runtime:218-227](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingFactory.cs)).
+   Also: capability metadata is read from **different declarations** on the two sides — the analyzer's
+   auto-binding reads `[HostCapability]` off the **interface** method
+   ([DotBoxDHostBindingExpressionLowerer.cs:163](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs),
+   `HostCapability` helper at :195), while the runtime reads `[HostCapability]` off the **implementation**
+   method and throws if absent
+   ([HostServiceBindingExtensions.cs:52,55-56](../../../src/Hosting/DotBoxD.Plugins/Runtime/Bindings/HostServiceBindingExtensions.cs)).
+   The GameServer abstractions carry `[HostCapability]` **without** `[HostBinding]` (the auto-binding path).
+   **Decide whether the interface or the implementation is the authoritative owner of binding metadata, then
+   enforce a single source.**
 
 7. **Public API expansion is too large to baseline as "polish."** The typed-context surface, the
-   `new`-shadowing `<TEvent>` shims, and the `UseGenerated*` / `UseProjecting*` plumbing should be
-   **shrunk or hidden** (`[EditorBrowsable(EditorBrowsableState.Never)]` + generator-only docs) **before**
-   the api-baseline is updated, not after. (api-baseline is already +268/−60; a redesign churns it again,
-   and the check is set-based — commit deliberately.)
-   [RemoteHookPipeline.cs:36](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteHookPipeline.cs),
-   [HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs).
+   `new`-shadowing `<TEvent>` shims
+   ([HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs)),
+   and the `UseGenerated*` / `UseProjecting*` plumbing
+   ([RemoteHookPipeline.cs:36](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteHookPipeline.cs))
+   must be **shrunk or hidden** (`[EditorBrowsable(EditorBrowsableState.Never)]` + generator-only XML docs)
+   **before** the api-baseline is updated (already +268/−60; set-based check).
 
 8. **Typed hook/subscription overload drift is a latent codegen build break, not polish.**
-   `RemoteSubscriptionPipeline.Typed` is missing the two element-only `UseGeneratedLocalChain` overloads
-   `RemoteHookPipeline.Typed` has (parity regression vs `main`), and `RemoteSubscriptionStage.Typed` is
-   missing the same stage-level shape. Either restore parity (collapse onto a `kind`-parameterized base)
-   **or** prove the generator never emits the element-only subscription local-chain shape (so the gap is
-   unreachable) — and say which.
+   `RemoteHookPipeline.Typed` exposes **12** `UseGeneratedLocalChain` overloads
+   ([RemoteHookPipeline.Typed.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/Remote/RemoteHookPipeline.Typed.cs):77,82,94,102,112,118,131,140,153,159,172,181);
+   `RemoteSubscriptionPipeline.Typed` exposes **10**
+   ([RemoteSubscriptionPipeline.Typed.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Subscriptions/RemoteSubscriptionPipeline.Typed.cs):79,84,96,102,115,124,137,143,156,165)
+   — **missing the two element-only no-decoder forms** present on the hook pipeline at :94
+   (`Func<TEvent, ValueTask>`) and :102 (`Action<TEvent>`). The same stage-level gap exists between
+   `RemoteHookStage.Typed` and `RemoteSubscriptionStage.Typed`. On `main` both sides had parity, so this is a
+   regression. *Fix:* restore parity (collapse onto a `kind`-parameterized base), **or** prove the generator
+   never emits the element-only subscription local-chain shape (gap unreachable) — and state which.
 
-9. **Analyzer/generator disagreement on `Run(lambda)` is stale and misleading.** The generator now lowers
-   fluent `Run` chains, but the analyzer still reports `DBXK110` saying `Run(lambda)` is "not yet lowered"
-   and "will throw at runtime"; the unshipped release note still says `InvokeKernel(lambda)`. Unsupported
-   chains should be diagnosed by the generator path that actually failed to lower, not by a blanket stale
-   analyzer warning.
-   [PluginAnalyzer.cs:33](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs),
-   [AnalyzerReleases.Unshipped.md:9](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md).
+9. **`DBXK110` is stale and misleading.** The generator now lowers fluent `Run` chains, but the analyzer
+   still **unconditionally** reports `DBXK110` (`Info`) on every `Run(lambda)` terminal: descriptor
+   `RunNotLoweredRule` at [PluginAnalyzer.cs:36-44](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs)
+   (message: *"Run(lambda) is not yet lowered to verified IR and will throw at runtime"*), reported with no
+   lowering check in `AnalyzeHookChainTerminal` at :82. The unshipped release note is doubly stale — it
+   still describes `DBXK110` as *"InvokeKernel(lambda) chain is not yet lowered"*
+   ([AnalyzerReleases.Unshipped.md:9](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md)).
+   So the rule **title** ("Run chain"), the rule **message** ("Run(lambda)"), and the **release note**
+   ("InvokeKernel(lambda)") disagree with each other and with the shipped lowering. *Fix:* a `Run(lambda)`
+   the generator lowered must not emit `DBXK110`; genuinely un-lowerable chains should surface the specific
+   generator-side diagnostic (the `DBXK111`/`DBXK113`/`DBXK062` family, §3.2), not a blanket terminal flag.
+   This is distinct from §3.2: `DBXK110` (`Run`) is **stale and should be removed/scoped**, whereas
+   `DBXK111`/`DBXK113` are **valid but under-leveled**.
 
 ### P3 — polish
 
-10. **Stale doc-term sweep** (broaden beyond `server-walkthrough.md`): also `plugin-walkthrough.md` and
-    `kernel-binding-model.md`; terms `server.Events` → `server.Subscriptions`, `server.Kernels.Register`,
-    `InvokeKernel`, and other old naming. [server-walkthrough.md:263](server-walkthrough.md), [:269](server-walkthrough.md).
-11. **Dead code** — `IPluginEventPipelineRegistry` (sole declaration repo-wide).
-    [ServerContextFactory.cs:17](../../../src/Hosting/DotBoxD.Plugins/Runtime/ServerContextFactory.cs). Delete.
-12. **Sample teaches noise** — `(e, _) =>` for filters that ignore `ctx`; use `e =>` unless the body
-    touches `ctx`. Promote the rule ("arity names intent") next to the §3.2 tier table.
-    [Program.cs:91](../../../samples/GameServer/Examples.GameServer.Plugin/Program.cs).
-13. **`RegisterLocal` has three authoring shapes** (the legacy cancellation `(e, ctx, ct) =>
-    ValueTask<TResult>`) vs the "exactly two" rule. Drop it (`ctx.CancellationToken` exists) or document it
-    as the deliberate async exception.
+10. **Stale doc-term sweep** across `server-walkthrough.md`, `plugin-walkthrough.md`, and
+    `kernel-binding-model.md`: replace `server.Events` → `server.Subscriptions`
+    ([server-walkthrough.md:269](server-walkthrough.md)), and update `server.Kernels.Register`
+    ([:263](server-walkthrough.md)) and any remaining `InvokeKernel` references to the current surface.
+11. **Dead code** — `IPluginEventPipelineRegistry` has a single declaration repo-wide and no implementor or
+    caller ([ServerContextFactory.cs:17](../../../src/Hosting/DotBoxD.Plugins/Runtime/ServerContextFactory.cs)).
+    Delete.
+12. **Sample teaches noise** — `(e, _) =>` for filters/projections that ignore `ctx`
+    ([Program.cs:91](../../../samples/GameServer/Examples.GameServer.Plugin/Program.cs)); use `e =>` unless the
+    body references `ctx`. Promote the rule ("arity names intent") into the §3.2 tier table.
+13. **`RegisterLocal` has three authoring shapes** — the value-only, the `(e, ctx)`, and the legacy
+    cancellation `(e, ctx, ct) => ValueTask<TResult>` — against the "exactly two" rule. Drop the cancellation
+    form (`ctx.CancellationToken` is already exposed) or document it as the deliberate async exception.
 
 ---
 
 ## Part 5 — Sequencing
 
-**Step 1 — unblock merge (split the surgical from the open-ended).**
-- **1a.** Land the localized correctness fixes: P1.1 (factory), P1.2 (priority — with the registry-level
-  sequence, *not* the naive merge-sort), P1.3 (helper composition). Each is a single-subsystem change.
-- **1b.** **Diagnose P1.4 (CI) to a code path before estimating it.** If the root cause is the
-  analyzer↔runtime effect drift (P2.6), the minimal unblock is a targeted effect-token fix, with §3.4 as
-  the durable fix — but do not let CI force the redesign early.
+**Step 1 — unblock merge; separate the surgical from the open-ended.**
+- **1a.** Land the three localized correctness fixes: P1.1 (factory, fail-fast), P1.2 (priority — via the
+  **registry-level sequence**, not the naive merge-sort), P1.3 (split package vs subscription identity).
+  Each is a single-subsystem change.
+- **1b.** **Diagnose P1.4 to a code path before estimating it.** If the root cause is the analyzer↔runtime
+  effect drift (P2.6), the minimal unblock is a targeted effect-token fix; §3.4 is the durable fix. Do not
+  let CI force the §3 redesign early.
 
-**Step 2 — de-risk identity.** §3.3: resolve context by ownership (closes P2.5) and add the receiver-type
-ownership check (closes P2.4). Convention-named context stays; only *identity resolution* changes.
+**Step 2 — de-risk identity (§3.3).** Resolve the context from the receiver return-type argument (closes
+P2.5) and gate `CandidateKind` on `[GeneratePluginServer]`-owned types (closes P2.4). The convention-named
+context stays; only *identity resolution* changes.
 
-**Step 3 — the larger moves, as their own PRs.** §3.1 (declarable context surface — **after** the §3.1 open
-decisions are answered) and §3.4 (single-sourced host-capability rule). Not bolted onto #88.
+**Step 3 — the larger moves, as their own PRs.** §3.1 (declarable context surface — **only after** the §3.1
+open-decisions table is answered) and §3.4 (single-sourced host-capability rule). Not bolted onto #88.
 
-> **Half-state risk (decide consciously).** Merging #88 + Step 2 but never landing Step 3 leaves a
-> convention-named context with ownership-based identity — better than today, but the "undeclared surface"
-> gap persists indefinitely. Either accept that intermediate state and add a visible guardrail (an analyzer
-> info/warning on convention-named contexts so the debt is tracked), or gate Step 2 on an RFC-approved
-> Step 3. Do not leave it implicit.
+> **Half-state risk — decide consciously.** Merging #88 + Step 2 without Step 3 leaves a convention-named
+> context with ownership-based identity: strictly better than today on identity, unchanged on the
+> "undeclared surface" gap, which then persists indefinitely. Either (a) accept that intermediate state and
+> add a visible guardrail — an analyzer `Info`/`Warning` on convention-named contexts so the debt is tracked
+> — or (b) gate Step 2's merge on an RFC-approved Step 3. Do not leave it implicit.
 
-**Step 4 — polish + surface shrink** (P2.7 + P3), ideally with the duplication collapse so the
-hook/subscription axis can't drift again.
+**Step 4 — polish + surface shrink** (P2.7 + P3.10–13), ideally alongside the §3.4 duplication collapse so
+the hook/subscription axis cannot drift again.
 
 ---
 
 ## Part 6 — Tests to add before accepting the direction
 
-These are acceptance gates, not afterthoughts (the PR already has `ResultHookSlotTests` /
-`TypedServerContextTests` as homes):
+Acceptance gates, not afterthoughts. Existing homes: `ResultHookSlotTests`, `TypedServerContextTests`,
+`HookPipelineFluentTests`.
 
-- **Cross-context result priority** — a priority-`0` handler in an earlier context pipeline must lose to a
-  priority-`100` handler in a later one (proves P1.2).
-- **Conflicting context factories** — two `On<E, Ctx>(factoryA/ factoryB)` calls (hooks **and**
-  subscriptions) either throw or keep distinct factories (proves P1.1).
-- **Reusable-helper composition** — the same `RunLocal` helper invoked twice keeps **both** handlers
-  (proves P1.3).
-- **Foreign `.Hooks.On` negative analyzer fixture** — a non-DotBoxD fluent API named `Hooks`/`Subscriptions`
-  is **not** intercepted (proves P2.4).
-- **Multi-server context ownership** — two `[GeneratePluginServer]` types in one compilation each resolve
-  their own context (proves P2.5).
-- **Host-binding descriptor parity** — analyzer-derived vs runtime-derived id/effects agree (guards P2.6 /
-  §3.4).
-- **Typed hook/subscription overload parity** — the `Typed` pipelines expose the same `UseGeneratedLocalChain`
-  set, including the stage-level typed subscription shape (guards P2.8).
-- **Deterministic `BlinkBehindAsync` path** — a local, non-flaky test exercising the real server-extension
-  dispatch the smoke run covers (guards P1.4).
-- **Analyzer stale-warning guard** — `Run(lambda)` sites that are lowered by the generator must not also emit
-  `DBXK110`; genuinely unsupported chains should produce the specific generator diagnostic (guards P2.9).
-- **Generated context discovery docs** — generated context/registry XML docs name the default context type,
-  distinguish generated members from authored members, and document the explicit-context escape hatch.
-- **Plugin-fluent docs smoke** — include these design docs in docs smoke or add a targeted stale-term /
-  compiled-snippet check so `server.Events`, `server.Kernels.Register`, and old `Invoke*` names cannot drift
-  back in unnoticed.
+- **Cross-context result priority (P1.2).** Register a priority-`0` result handler in an earlier-created
+  context pipeline and a priority-`100` handler in a later one for the same event; assert the `100` handler
+  wins.
+- **Conflicting context factories (P1.1).** Two `On<E, Ctx>(factoryA)` / `On<E, Ctx>(factoryB)` calls — for
+  **both** hooks and subscriptions — either throw or yield distinct pipelines; never silently share
+  `factoryA`.
+- **Reusable-helper composition (P1.3).** Invoke one `RunLocal` helper twice (two event sources); assert
+  **both** native handlers remain registered and fire.
+- **Foreign `.Hooks.On` negative analyzer fixture (P2.4).** A non-DotBoxD fluent API exposing
+  `Hooks.On<T>()` / `Subscriptions.On<T>()` (and a type named `…HookRegistry`) is **not** intercepted.
+- **Multi-server context ownership (P2.5).** Two `[GeneratePluginServer]` types in one compilation each
+  resolve their own generated context for parameterless `On<TEvent>()`.
+- **Host-binding descriptor parity (P2.6 / §3.4).** Analyzer-derived route + effects equal runtime-derived
+  route + effects for the same `[DotBoxDService]` method (guards the `DBXK041` seam at compile time).
+- **Typed hook/subscription overload parity (P2.8).** `RemoteHookPipeline.Typed` and
+  `RemoteSubscriptionPipeline.Typed` (and the `…Stage.Typed` pair) expose the same `UseGeneratedLocalChain`
+  set, including the two element-only forms.
+- **`DBXK110` non-emission (P2.9).** A `Run(lambda)` site the generator lowers does **not** emit `DBXK110`;
+  an un-lowerable chain emits the specific generator diagnostic instead.
+- **Deterministic `BlinkBehindAsync` (P1.4).** A local, non-flaky test exercising the real
+  `[ServerExtension]` dispatch the smoke run covers, asserting install succeeds (no `DBXK041`) and the
+  result is correct.
+- **Generated-context discovery docs.** The generated context/registry XML docs name the default context
+  type, distinguish generated members from authored members, and document the explicit-context escape hatch.
+- **Plugin-fluent docs smoke.** Add these design docs to a stale-term / compiled-snippet check so
+  `server.Events`, `server.Kernels.Register`, and old `Invoke*` names cannot regress unnoticed.
 
 ---
 
 ## How this doc was reviewed
 
-The findings here were cross-checked through independent review lenses — *Simple, Obvious, Discoverable,
-Consistent, Minimal, Composable, Explicit, Stable, Testable, Boring* — plus two correctness audits against
-PR head `41ec9172`. Where a reviewer's proposed fix was itself wrong (e.g. the P1.2 "merge-sort by
-`(priority, order)`" that ignores per-slot `order`, or the §3.4 "remove the `DBXK041` drift class" that
-would delete a trust-boundary check), the corrected version is what appears above.
+Cross-checked through independent review lenses — *Simple, Obvious, Discoverable, Consistent, Minimal,
+Composable, Explicit, Stable, Testable, Boring* — plus correctness audits against head `41ec9172`. Where a
+reviewer's proposed fix was itself wrong, the corrected version is what appears above — specifically:
+the P1.2 "merge-sort by `(priority, order)`" fix (rejected: `_order` is per-`ResultHookSlot`, not global —
+[ResultHookSlot.cs:25,235](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/ResultHookSlot.cs)), and the
+§3.4 "remove the `DBXK041` drift class entirely" framing (rejected: `DBXK041`/`DBXK044` are the
+trust-boundary cross-check — [PluginPreparedPackageValidator.cs:23-27](../../../src/Hosting/DotBoxD.Plugins/Runtime/Validation/PluginPreparedPackageValidator.cs)).
