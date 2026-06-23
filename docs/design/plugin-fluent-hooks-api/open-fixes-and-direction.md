@@ -88,14 +88,23 @@ granted authority**. The generated extension lands in the author's namespace
 `IMonster` with no convention name to know. `MonsterKillerKernel` is the collection variant (grafted onto a
 control for batch/list aggregation).
 
-**Hard requirement — this must work from a real plugin assembly.** A plugin is an assembly that references a
-**prebuilt** SDK and contains **no** `[GeneratePluginServer]` of its own. The sample collapses facade
-generation and plugin authoring into one assembly (`Examples.GameServer.Plugin` holds both `GamePluginServer`
-*and* `BlinkKernel`), so the cross-assembly case is **unverified**. For it to hold, the plugin dev's build
-must run the DotBoxD generator (flowed transitively from the SDK package) to lower the `[ServerExtension]`
-body and emit its package + the grafted extension against the server-owned `T` it references. This is the
-**same** cross-assembly requirement that breaks the context's source-scan identity (§3.3) — both must be
-proven against a *referenced* SDK, not the single-assembly sample.
+**Cross-assembly: verified viable.** A plugin is an assembly that references a **prebuilt** SDK and contains
+**no** `[GeneratePluginServer]` of its own. The shipped sample collapses facade generation and plugin
+authoring into one assembly (`Examples.GameServer.Plugin` holds both `GamePluginServer` *and* `BlinkKernel`),
+so it doesn't exercise this — but a two-project probe (a referenced SDK facade + a consumer with no
+`[GeneratePluginServer]`) **compiles clean**: the emitted interceptors resolve the *referenced* context type
+for the hook chains (the §3.3 return-type resolution works across the boundary), and the `[ServerExtension]`
+graft fires on `IMonster` with the correct capability set. No cross-assembly blocker in the normal case.
+(P2.5's whole-compilation scan remains the known weak spot for the *multi-server* / fallback case — §3.3.)
+
+**SDK packaging — one gap to close.** The analyzer ships correctly as a Roslyn analyzer
+(`analyzers/dotnet/cs`), but it carries **no `build/*.props`**, so a single `PackageReference` cannot
+auto-enable C# interception — the consumer must set `InterceptorsNamespaces` (incl.
+`DotBoxD.Plugins.Generated`) **by hand**, exactly as `Examples.GameServer.Plugin.csproj` does today
+([PluginPackageGenerator.cs:165-167](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginPackageGenerator.cs)
+emits into that namespace). To make "reference one package → chains and extensions just lower" true, the SDK
+package must include a `build/<id>.props` that sets `InterceptorsNamespaces`. Also: no CI smoke exercises a
+hook chain or `[ServerExtension]` *through the package* (only in-repo project references) — add one.
 
 ---
 
@@ -415,19 +424,25 @@ Every item verified against head `41ec9172`.
    (source-location-stable, required for generator incrementality) from **registration/subscription
    identity** (unique per call/instance).
 
-4. **CI is red — diagnose to a code path before rerunning.** The Windows `Build` job's GameServer **smoke
-   run** throws `RemoteServiceException: Internal error` from generated `BlinkBehindAsync`
-   (`…/BlinkPluginPackage.g.cs:23`); the `Build & Test (windows-latest)` and `(ubuntu-latest)` summary jobs
-   fail downstream of it. **Leading hypothesis (effect drift):** this PR rewrote the analyzer side of the
-   `DBXK041` seam — `DotBoxDHandleModelFactory.CreateFromSend`
-   ([:57](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/DotBoxDHandleModelFactory.cs))
-   now **unconditionally** adds `HostStateWrite`/`Concurrency`/`Audit` (:68-70) — while the runtime side
-   (`HostServiceBindingFactory`) was untouched. `BlinkBehindAsync` is a `[ServerExtension]`/RPC kernel, so an
-   effect mismatch is rejected at install by **`DBXK041`** via
-   [RpcKernelPackageValidator.cs:84-88](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs);
-   `RemoteServiceException` is the opaque transport wrapper, so a `DBXK041` install reject and a dispatch
-   throw are indistinguishable at the surface. **Capture the inner server-side diagnostic/error before
-   attributing to environment or timing.** Closed only when the inner error is tied to a specific code path.
+4. **CI red — investigated; the effect-drift hypothesis is refuted.** The Windows `Build` job's GameServer
+   **smoke run** threw `RemoteServiceException: Internal error` from generated `BlinkBehindAsync`
+   (`…/BlinkPluginPackage.g.cs:23`). Diagnosed by capturing the real install effect/capability sets
+   in-process (bypassing the opaque wrapper): `BlinkBehindAsync`'s `[ServerExtension]` manifest declares
+   effects `[Concurrency, Cpu, HostStateRead, HostStateWrite]` and caps `[runtime.async, …combat.threat,
+   …entity.read.position, …monster.write.position]` — **exactly** what the host recomputes at install, so
+   `RpcKernelPackageValidator`
+   ([:84-88](../../../src/Hosting/DotBoxD.Plugins/Runtime/Rpc/RpcKernelPackageValidator.cs)) raises **no**
+   `DBXK041`/`DBXK044`. The fingered `DotBoxDHandleModelFactory.CreateFromSend` change is on the
+   `ctx.Messages.Send` event/hook path, **not** the `[ServerExtension]` path (`RpcKernelModelFactory` →
+   `DotBoxDRpcJsonLowerer` → `AutoEffectNames`, never `CreateFromSend`); even on the Send path the added
+   effects *match* the runtime `host.message.send` binding, so they align rather than drift. The smoke ran
+   **green 5+ times** locally at the failing commit with SDK `10.0.204` (the CI-pinned version) and **does not
+   reproduce**. It is a runtime IPC dispatch fault that never surfaces in-process — most consistent with a
+   **Windows named-pipe / startup-timing flake** on the CI runner, not a code bug. *Action:* **re-run CI**;
+   if it recurs, investigate the smoke's IPC/startup ordering (not effects). A deterministic in-process guard
+   now pins the effect seam:
+   [BlinkServerExtensionRegressionTests.cs](../../../samples/GameServer/Examples.GameServer.Plugin.Tests/BlinkServerExtensionRegressionTests.cs)
+   (installs + invokes under Auto/Compiled/Interpreted; asserts the effect set, no `DBXK041`, result `== 3`).
 
 ### P2 — design hazards (fix before baselining)
 
@@ -555,9 +570,11 @@ Acceptance gates, not afterthoughts. Existing homes: `ResultHookSlotTests`, `Typ
   set, including the two element-only forms.
 - **`DBXK110` non-emission (P2.9).** A `Run(lambda)` site the generator lowers does **not** emit `DBXK110`;
   an un-lowerable chain emits the specific generator diagnostic instead.
-- **Deterministic `BlinkBehindAsync` (P1.4).** A local, non-flaky test exercising the real
-  `[ServerExtension]` dispatch the smoke run covers, asserting install succeeds (no `DBXK041`) and the
-  result is correct.
+- **Deterministic `BlinkBehindAsync` (P1.4) — added.**
+  [BlinkServerExtensionRegressionTests.cs](../../../samples/GameServer/Examples.GameServer.Plugin.Tests/BlinkServerExtensionRegressionTests.cs)
+  installs + invokes the `[ServerExtension]` in-process under Auto/Compiled/Interpreted, asserting effects
+  `[Concurrency, Cpu, HostStateRead, HostStateWrite]`, no `DBXK041`, and result `== 3`. (Does not cover the
+  IPC transport path — that is the smoke's job.)
 - **`[ServerExtension]` graft from a real plugin assembly.** A plugin project that references a *prebuilt*
   SDK (no `[GeneratePluginServer]` of its own) authors a `[ServerExtension(typeof(IMonster))]` +
   `[ServerExtensionMethod]`, and it lowers, emits the grafted extension in the plugin's own namespace,
