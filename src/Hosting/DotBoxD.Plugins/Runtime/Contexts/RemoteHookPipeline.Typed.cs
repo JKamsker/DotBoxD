@@ -1,0 +1,261 @@
+using DotBoxD.Plugins.Runtime.Hooks;
+
+namespace DotBoxD.Plugins.Runtime;
+
+public sealed class RemoteHookPipeline<TEvent, TContext>
+{
+    private readonly RemoteHookPipeline<TEvent> _inner;
+    private readonly Func<HookContext, TContext> _contextFactory;
+
+    internal RemoteHookPipeline(RemoteHookPipeline<TEvent> inner, Func<HookContext, TContext> contextFactory)
+    {
+        _inner = inner;
+        _contextFactory = contextFactory;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> Use<TKernel>() where TKernel : class
+    {
+        _inner.Use<TKernel>();
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
+    {
+        _inner.UseGeneratedChain(package);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        _inner.Where((e, ctx) => filter(e, _contextFactory(ctx)));
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+    {
+        _inner.Where(filter);
+        return this;
+    }
+
+    public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(
+        Func<TEvent, TContext, TNext> projection)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        return new RemoteHookStage<TEvent, TNext, TContext>(
+            _inner.Select((e, ctx) => projection(e, _contextFactory(ctx))),
+            _contextFactory);
+    }
+
+    public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
+        => new(_inner.Select(projection), _contextFactory);
+
+    public RemoteHookPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
+        => throw NotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
+        => throw NotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
+        => throw NotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> Run(Action<TEvent> handler)
+        => throw NotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
+        => throw LocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
+        => throw LocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
+        => throw LocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
+        => throw LocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, TContext, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _inner.UseGeneratedLocalChain(package, (e, ctx) => handler(e, _contextFactory(ctx)));
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent, TContext> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalChain(package, (e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, ValueTask> handler)
+    {
+        _inner.UseGeneratedLocalChain(package, handler);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent> handler)
+    {
+        _inner.UseGeneratedLocalChain(package, handler);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, TContext, ValueTask> handler,
+        Func<KernelRpcValue, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _inner.UseGeneratedLocalChain(package, (e, ctx) => handler(e, _contextFactory(ctx)), decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent, TContext> handler,
+        Func<KernelRpcValue, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalChain(package, (e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, ValueTask> handler,
+        Func<KernelRpcValue, TEvent> decoder)
+    {
+        _inner.UseGeneratedLocalChain(package, handler, decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent> handler,
+        Func<KernelRpcValue, TEvent> decoder)
+    {
+        _inner.UseGeneratedLocalChain(package, handler, decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, TContext, ValueTask> handler,
+        Func<ReadOnlyMemory<byte>, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _inner.UseGeneratedLocalChain(package, (e, ctx) => handler(e, _contextFactory(ctx)), decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent, TContext> handler,
+        Func<ReadOnlyMemory<byte>, TEvent> decoder)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalChain(package, (e, ctx) =>
+        {
+            handler(e, ctx);
+            return ValueTask.CompletedTask;
+        }, decoder);
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Func<TEvent, ValueTask> handler,
+        Func<ReadOnlyMemory<byte>, TEvent> decoder)
+    {
+        _inner.UseGeneratedLocalChain(package, handler, decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent> handler,
+        Func<ReadOnlyMemory<byte>, TEvent> decoder)
+    {
+        _inner.UseGeneratedLocalChain(package, handler, decoder);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> Register<TResult>(
+        Func<TEvent, TContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultNotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultNotLowered();
+
+    public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
+        Func<TEvent, TContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>(
+        PluginPackage package,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        _inner.UseGeneratedResultChain<TResult>(package, priority);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, TContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _inner.UseGeneratedLocalResultChain<TResult>(
+            package,
+            (e, ctx) => handler(e, _contextFactory(ctx)),
+            priority);
+        return this;
+    }
+
+    public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _inner.UseGeneratedLocalResultChain<TResult>(package, handler, priority);
+        return this;
+    }
+
+    private static InvalidOperationException NotLowered()
+        => new("Remote hook Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
+
+    private static InvalidOperationException ResultNotLowered()
+        => new("Remote hook Register(lambda) calls must be intercepted by the DotBoxD plugin generator.");
+
+    private static NotSupportedException LocalHandlersNotSupported()
+        => new("Remote hook RunLocal requires an event callback transport; use PluginServer.Hooks for local handlers.");
+
+    private static NotSupportedException ResultLocalHandlersNotSupported()
+        => new("Remote hook RegisterLocal requires a result callback transport; use PluginServer.Hooks for local result handlers.");
+}

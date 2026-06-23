@@ -23,6 +23,10 @@ public sealed partial class HookPipeline<TEvent>
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
+    public HookPipeline<TEvent> Register<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0)
+        where TResult : struct, IHookResult
+        => throw Hooks.HookLowering.ResultNotLowered();
+
     /// <summary>
     /// The result-returning local terminal: the analyzer lowers the filter to verified IR, but the result is
     /// produced by the plugin-process delegate. Un-lowered it throws; the generated interceptor replaces it.
@@ -31,9 +35,7 @@ public sealed partial class HookPipeline<TEvent>
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
-    public HookPipeline<TEvent> RegisterLocal<TResult>(
-        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
+    public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0)
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
@@ -112,6 +114,16 @@ public sealed partial class HookPipeline<TEvent>
         }
 
         return this;
+    }
+
+    public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(package, (e, _) => handler(e), priority);
     }
 
     public HookPipeline<TEvent> UseProjectingResult(

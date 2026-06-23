@@ -27,10 +27,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
                 $"Pattern capture host call '{invocation}' must target an instance [HostBinding] on the captured subtype.");
         }
 
-        var returnType = HostBindingManifestTag(
-            DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType),
-            binding.BindingId,
-            "return");
+        var returnType = HostBindingReturnTag(method.ReturnType, binding.BindingId);
 
         var arguments = invocation.ArgumentList.Arguments;
         if (arguments.Count != method.Parameters.Length)

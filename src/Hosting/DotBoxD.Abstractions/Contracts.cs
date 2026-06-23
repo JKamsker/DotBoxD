@@ -22,7 +22,7 @@ public sealed class EventKernelAttribute(string? id = null) : Attribute
 public sealed class LiveSettingAttribute : Attribute;
 
 /// <summary>
-/// Marks a host-service method as a sandbox binding the DotBoxD.Kernels generator may call from verified kernel
+/// Marks a host-service method or context property as a sandbox binding the DotBoxD.Kernels generator may call from verified kernel
 /// IR. A kernel reaches the service through <see cref="HookContext.Host{THost}"/> or through a
 /// constructor-injected service field (e.g. <c>_world.GetHealth(id)</c>); the generator lowers that call to a
 /// <c>CallExpression(<paramref name="bindingId"/>, …)</c>, records <paramref name="capability"/> in the
@@ -31,7 +31,7 @@ public sealed class LiveSettingAttribute : Attribute;
 /// effect validation gate the call. Set <see cref="IsAsync"/> when that registered binding declares
 /// asynchronous host work.
 /// </summary>
-[AttributeUsage(AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
 public sealed class HostBindingAttribute(string bindingId, string capability, SandboxEffect effects) : Attribute
 {
     /// <summary>The sandbox binding id the call lowers to (e.g. <c>host.world.getHealth</c>).</summary>

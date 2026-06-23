@@ -174,15 +174,19 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
         where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
+    public RemoteHookPipeline<TEvent> Register<TResult>(
+        Func<TCurrent, HookContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultNotLowered();
+
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, TResult> handler,
         int priority = 0)
         where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
-    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
-        Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(Func<TCurrent, TResult> handler, int priority = 0)
         where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 

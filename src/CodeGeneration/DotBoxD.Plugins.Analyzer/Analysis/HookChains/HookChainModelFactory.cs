@@ -188,11 +188,14 @@ internal static partial class HookChainModelFactory
             : null;
         var handleBody = installKind == HookChainInterceptorInstallKind.LocalCallback
             ? LocalCallbackHandleBody(localCallbackProjection)
-            : LowerSendHandle(
+            : LowerRunHandle(
                 stages,
                 terminalLambda,
                 terminalElementParam,
                 terminalContextParam,
+                terminalContextParam is null
+                    ? null
+                    : LambdaParameterType(terminalLambda, terminalContextParam, model, cancellationToken),
                 eventProperties,
                 model,
                 cancellationToken,

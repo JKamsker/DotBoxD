@@ -69,6 +69,10 @@ internal static class ResultHookChain
 
         DotBoxDStatementBodyModel handleBody;
         string handleReturnType;
+        var terminalServerContextType = terminalContextParam is null
+            ? null
+            : LambdaParameterType(terminalLambda, terminalContextParam, model, cancellationToken);
+
         if (isLocal)
         {
             ResultHookLocalHandlerValidator.EnsureReturnsHookResult(
@@ -84,7 +88,17 @@ internal static class ResultHookChain
         }
         else
         {
-            handleBody = LowerResultHandle(terminalLambda, terminalElementParam, resultType, eventProperties, model, cancellationToken, capabilities, effects);
+            handleBody = LowerResultHandle(
+                terminalLambda,
+                terminalElementParam,
+                terminalContextParam,
+                terminalServerContextType,
+                resultType,
+                eventProperties,
+                model,
+                cancellationToken,
+                capabilities,
+                effects);
             handleReturnType = SandboxTypeSourceEmitter.TryEmit(resultType)
                 ?? throw new NotSupportedException();
         }
@@ -127,6 +141,8 @@ internal static class ResultHookChain
             resultType,
             isLocal,
             terminalHasCancellationToken,
+            terminalContextParam,
+            terminalServerContextType,
             receiverIsStage: false,
             generatedRemoteKind,
             cancellationToken));
@@ -139,6 +155,8 @@ internal static class ResultHookChain
     private static DotBoxDStatementBodyModel LowerResultHandle(
         LambdaExpressionSyntax terminalLambda,
         string terminalElementParam,
+        string? terminalContextParam,
+        ITypeSymbol? terminalContextType,
         INamedTypeSymbol resultType,
         EquatableArray<EventPropertyModel> eventProperties,
         SemanticModel model,
@@ -174,6 +192,8 @@ internal static class ResultHookChain
 
         var context = new DotBoxDExpressionLoweringContext(
             terminalElementParam, eventProperties, default, model, cancellationToken,
+            serverContextParameterName: terminalContextParam,
+            serverContextType: terminalContextType,
             capabilities: capabilities, effects: effects);
         var lowered = DotBoxDExpressionModelFactory.Create(body, context);
         if (!string.Equals(lowered.Type, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal))
@@ -193,6 +213,8 @@ internal static class ResultHookChain
         INamedTypeSymbol resultType,
         bool isLocal,
         bool isAsyncLocal,
+        string? terminalContextParam,
+        ITypeSymbol? terminalContextType,
         bool receiverIsStage,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         CancellationToken cancellationToken)
@@ -213,13 +235,15 @@ internal static class ResultHookChain
 
         var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var resultFullName = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var handlerFullName = isLocal && isAsyncLocal
+        var serverContextFullName = terminalContextType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            ?? TypeNames.GlobalHookContext;
+        var handlerFullName = terminalContextParam is null
+            ? $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>"
+            : isLocal && isAsyncLocal
             ? $"{TypeNames.GlobalFunc}<" +
-                $"{contextFullName}, {TypeNames.GlobalHookContext}, {TypeNames.GlobalCancellationToken}, " +
+                $"{contextFullName}, {serverContextFullName}, {TypeNames.GlobalCancellationToken}, " +
                 $"{TypeNames.GlobalValueTask}<{resultFullName}>>"
-            : isLocal
-            ? $"{TypeNames.GlobalFunc}<{contextFullName}, {TypeNames.GlobalHookContext}, {resultFullName}>"
-            : $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>";
+            : $"{TypeNames.GlobalFunc}<{contextFullName}, {serverContextFullName}, {resultFullName}>";
 
         if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
             receiverType.TypeKind == TypeKind.Error)
@@ -273,4 +297,25 @@ internal static class ResultHookChain
         return false;
     }
 
+    private static ITypeSymbol? LambdaParameterType(
+        LambdaExpressionSyntax lambda,
+        string parameterName,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (lambda is not ParenthesizedLambdaExpressionSyntax parenthesized)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parenthesized.ParameterList.Parameters)
+        {
+            if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
+            {
+                return model.GetDeclaredSymbol(parameter, cancellationToken)?.Type;
+            }
+        }
+
+        return null;
+    }
 }

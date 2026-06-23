@@ -28,6 +28,8 @@ internal static class HookChainStageLowerer
     public static DotBoxDHandleModel CreateHandle(
         IReadOnlyList<HookChainStage> stages,
         string terminalElementParam,
+        string? terminalContextParam,
+        ITypeSymbol? terminalContextType,
         InvocationExpressionSyntax sendInvocation,
         EquatableArray<EventPropertyModel> eventProperties,
         SemanticModel model,
@@ -63,6 +65,8 @@ internal static class HookChainStageLowerer
 
         var context = Context(
             terminalElementParam,
+            terminalContextParam,
+            terminalContextType,
             eventProperties,
             current,
             currentType,
@@ -110,7 +114,7 @@ internal static class HookChainStageLowerer
 
         return current is null
             ? null
-            : new HookChainProjection(prefix, current);
+            : new HookChainProjection(prefix, current, currentType);
     }
 
     private static DotBoxDStatementBodyModel BuildShouldHandle(
@@ -151,13 +155,23 @@ internal static class HookChainStageLowerer
             return DotBoxDStatementBodyModelFactory.Concat(projection.Assignment, next);
         }
 
-        var (elementParam, _) = LambdaParameters(stage.Lambda);
+        var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
         if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
         {
             throw new NotSupportedException();
         }
 
-        var context = Context(elementParam, eventProperties, current, currentType, model, cancellationToken, capabilities, effects);
+        var context = Context(
+            elementParam,
+            contextParam,
+            LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+            eventProperties,
+            current,
+            currentType,
+            model,
+            cancellationToken,
+            capabilities,
+            effects);
         var whenTrue = BuildShouldHandle(
             stages,
             index + 1,
@@ -185,13 +199,23 @@ internal static class HookChainStageLowerer
         ICollection<string> capabilities,
         ICollection<string> effects)
     {
-        var (elementParam, _) = LambdaParameters(stage.Lambda);
+        var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
         if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
         {
             throw new NotSupportedException();
         }
 
-        var context = Context(elementParam, eventProperties, current, currentType, model, cancellationToken, capabilities, effects);
+        var context = Context(
+            elementParam,
+            contextParam,
+            LambdaParameterType(stage.Lambda, contextParam, model, cancellationToken),
+            eventProperties,
+            current,
+            currentType,
+            model,
+            cancellationToken,
+            capabilities,
+            effects);
         var value = DotBoxDExpressionModelFactory.Create(body, context);
         var name = SelectTemp(stage.Lambda);
 
@@ -207,6 +231,8 @@ internal static class HookChainStageLowerer
 
     private static DotBoxDExpressionLoweringContext Context(
         string elementParam,
+        string? contextParam,
+        ITypeSymbol? contextType,
         EquatableArray<EventPropertyModel> eventProperties,
         DotBoxDExpressionModel? current,
         ITypeSymbol? currentType,
@@ -223,6 +249,8 @@ internal static class HookChainStageLowerer
             projectedElementName: current is null ? null : elementParam,
             projectedElement: current,
             projectedElementType: current is null ? null : currentType,
+            serverContextParameterName: contextParam,
+            serverContextType: contextType,
             capabilities: capabilities,
             effects: effects);
 
@@ -261,6 +289,29 @@ internal static class HookChainStageLowerer
         }
     }
 
+    private static ITypeSymbol? LambdaParameterType(
+        LambdaExpressionSyntax lambda,
+        string? parameterName,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (parameterName is null ||
+            lambda is not ParenthesizedLambdaExpressionSyntax parenthesized)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parenthesized.ParameterList.Parameters)
+        {
+            if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
+            {
+                return (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
+            }
+        }
+
+        return null;
+    }
+
     private sealed record Projection(
         DotBoxDStatementBodyModel Assignment,
         DotBoxDExpressionModel Current,
@@ -269,4 +320,5 @@ internal static class HookChainStageLowerer
 
 internal sealed record HookChainProjection(
     DotBoxDStatementBodyModel? Prefix,
-    DotBoxDExpressionModel Value);
+    DotBoxDExpressionModel Value,
+    ITypeSymbol? ValueType);

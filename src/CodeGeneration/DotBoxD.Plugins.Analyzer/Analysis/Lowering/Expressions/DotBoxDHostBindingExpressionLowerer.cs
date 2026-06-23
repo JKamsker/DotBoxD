@@ -53,10 +53,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         // The return (and arguments) may be any host-binding-eligible marshaller type: scalar, Guid, enum,
         // list, map, or DTO record. Nullable value types are deliberately excluded here even though result-hook
         // fields use the same RPC marshaller support; HostServiceBindingFactory rejects them before registration.
-        var returnType = HostBindingManifestTag(
-            DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType),
-            bindingId,
-            "return");
+        var returnType = HostBindingReturnTag(method.ReturnType, bindingId);
 
         var arguments = invocation.ArgumentList.Arguments;
         if (arguments.Count != method.Parameters.Length)
@@ -97,6 +94,23 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }
 
+    public static DotBoxDExpressionModel? TryLowerProperty(
+        IPropertySymbol property,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (ExplicitHostBinding(property) is not { } binding)
+        {
+            return null;
+        }
+
+        var returnType = HostBindingManifestTag(property.Type, binding.BindingId, "return");
+        AddBindingRequirements(context, binding.Capability, binding.Effects, binding.IsAsync);
+        var source =
+            $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(binding.BindingId)}, " +
+            "[], null, Span)";
+        return new DotBoxDExpressionModel(source, returnType, IsAllocatingTag(returnType));
+    }
+
     // Which host-call return shapes the runtime binding factory counts as allocating. This MUST match
     // HostServiceBindingFactory.ReturnAllocates, which treats anything that is not Unit/Bool/I32/I64/F64 as
     // allocating — so string, Guid, list, map, and record all allocate (Guid included: the manifest effect must
@@ -111,7 +125,13 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     internal static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
         IMethodSymbol method)
     {
-        foreach (var attribute in method.GetAttributes())
+        return ExplicitHostBinding(method) ?? TryAutoHostBinding(method);
+    }
+
+    private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? ExplicitHostBinding(
+        ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
         {
             if (!string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
@@ -131,7 +151,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             }
         }
 
-        return TryAutoHostBinding(method);
+        return null;
     }
 
     private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? TryAutoHostBinding(

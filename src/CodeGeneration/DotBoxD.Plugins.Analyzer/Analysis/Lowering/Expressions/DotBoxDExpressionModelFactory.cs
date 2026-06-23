@@ -270,6 +270,11 @@ internal static partial class DotBoxDExpressionModelFactory
             return LowerThisMemberAccess(member, memberName, context);
         }
 
+        if (TryLowerContextMember(member, memberName, context) is { } contextMember)
+        {
+            return contextMember;
+        }
+
         // General member chain: a `.Count`/`.Length` read on a list-shaped receiver, or a field read on a record
         // receiver. The receiver may itself be a projected element, an event property, a host-call result, or a
         // further chain hop — it is lowered recursively and dispatched on its sandbox shape, so e.g.
