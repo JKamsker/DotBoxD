@@ -30,7 +30,7 @@ public sealed class RemoteTypedServerContextTests
 
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "hook"))
             .UseGeneratedLocalChain(
-                PackageFor<RemoteEvent>(),
+                PackageFor<RemoteEvent>(projectedType: null),
                 (RemoteEvent e, RemoteContext ctx) =>
                 {
                     observed = ctx.Source + ":" + e.Id;
@@ -57,7 +57,7 @@ public sealed class RemoteTypedServerContextTests
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "subscription"))
             .Select(e => e.Id)
             .UseGeneratedLocalChain(
-                PackageFor<RemoteEvent>(),
+                PackageFor<RemoteEvent>(projectedType: "string"),
                 (string id, RemoteContext ctx) =>
                 {
                     observed = ctx.Source + ":" + id;
@@ -111,14 +111,21 @@ public sealed class RemoteTypedServerContextTests
         return KernelRpcBinaryCodec.EncodeValue(sandboxValue);
     }
 
-    private static PluginPackage PackageFor<TEvent>()
+    private static PluginPackage PackageFor<TEvent>(string? projectedType)
     {
         var package = FireDamagePluginPackage.Create();
         return package with
         {
             Manifest = package.Manifest with
             {
-                Subscriptions = [new HookSubscriptionManifest(typeof(TEvent).FullName!, "FireDamageKernel")]
+                Subscriptions =
+                [
+                    new HookSubscriptionManifest(typeof(TEvent).FullName!, "FireDamageKernel")
+                    {
+                        LocalTerminal = true,
+                        ProjectedType = projectedType
+                    }
+                ]
             }
         };
     }

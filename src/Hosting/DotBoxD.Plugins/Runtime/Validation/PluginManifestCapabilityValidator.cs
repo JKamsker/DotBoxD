@@ -52,7 +52,7 @@ internal static class PluginManifestCapabilityValidator
     private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)
     {
         var required = new HashSet<string>(
-            plan.Module.CapabilityRequests.Select(request => request.Id),
+            PluginRequiredCapabilityMetadata.Read(plan.Module),
             StringComparer.Ordinal);
         foreach (var entrypoint in entrypoints)
         {

@@ -80,8 +80,9 @@ internal static class PluginPackageValidator
     public static void ValidatePrepared(
         PluginPackage package,
         ExecutionPlan plan,
-        PluginEventAdapterRegistry events)
-        => PluginPreparedPackageValidator.Validate(package, plan, events, PluginManifestEffectValidator.Validate);
+        PluginEventAdapterRegistry events,
+        SandboxPolicy installPolicy)
+        => PluginPreparedPackageValidator.Validate(package, plan, events, installPolicy, PluginManifestEffectValidator.Validate);
 
     private static string? ValidateModuleKernelMetadata(PluginPackage package, List<SandboxDiagnostic> diagnostics)
     {

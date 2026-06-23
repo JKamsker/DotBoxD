@@ -93,7 +93,7 @@ internal sealed class GamePluginKernelWiring
         {
             var priority = Priority(kernel.Manifest);
             var resultType = HookResultTypeFor<TEvent>(kernel.Manifest);
-            if (IsResultLocalTerminal(kernel.Manifest))
+            if (IsResultLocalTerminal(kernel))
             {
                 pipeline.UseProjectingResult(
                     kernel,
@@ -107,7 +107,7 @@ internal sealed class GamePluginKernelWiring
                 pipeline.UseResult(kernel, resultType, priority);
             }
         }
-        else if (IsLocalTerminal(kernel.Manifest))
+        else if (IsLocalTerminal(kernel))
         {
             pipeline.UseProjecting(kernel, CallbackSubscriptionId(kernel), LocalPush());
         }
@@ -121,7 +121,7 @@ internal sealed class GamePluginKernelWiring
     {
         // A local-terminal (RunLocal) chain must keep the projection on the broad pipeline so the host can
         // capture the projected value and push it back; index routing would run the kernel and discard it.
-        if (IsLocalTerminal(kernel.Manifest))
+        if (IsLocalTerminal(kernel))
         {
             _server.Subscriptions.On<TEvent>().UseProjecting(kernel, CallbackSubscriptionId(kernel), LocalPush());
             return;
@@ -170,17 +170,22 @@ internal sealed class GamePluginKernelWiring
             subscription.IndexCoversPredicate);
     }
 
-    private static bool IsLocalTerminal(PluginManifest manifest)
-        => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].LocalTerminal;
+    private static bool IsLocalTerminal(InstalledKernel kernel)
+        => kernel.CallbackSubscriptionId is not null &&
+           kernel.Manifest.Subscriptions.Count > 0 &&
+           kernel.Manifest.Subscriptions[0].LocalTerminal;
 
     private static string CallbackSubscriptionId(InstalledKernel kernel)
-        => kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
+        => kernel.CallbackSubscriptionId ?? throw new InvalidOperationException(
+            $"Plugin '{kernel.Manifest.PluginId}' requested local-terminal routing without a callback route id.");
 
     private static bool IsResultHook(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].ResultType is not null;
 
-    private static bool IsResultLocalTerminal(PluginManifest manifest)
-        => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].ResultLocalTerminal;
+    private static bool IsResultLocalTerminal(InstalledKernel kernel)
+        => kernel.CallbackSubscriptionId is not null &&
+           kernel.Manifest.Subscriptions.Count > 0 &&
+           kernel.Manifest.Subscriptions[0].ResultLocalTerminal;
 
     private static int Priority(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 ? manifest.Subscriptions[0].Priority : 0;

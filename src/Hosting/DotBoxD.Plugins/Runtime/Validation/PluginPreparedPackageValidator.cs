@@ -15,6 +15,7 @@ internal static class PluginPreparedPackageValidator
         PluginPackage package,
         ExecutionPlan plan,
         PluginEventAdapterRegistry events,
+        SandboxPolicy installPolicy,
         ManifestEffectsValidator validateManifestEffects)
     {
         var diagnostics = new List<SandboxDiagnostic>();
@@ -33,6 +34,7 @@ internal static class PluginPreparedPackageValidator
             plan,
             [package.Entrypoints.ShouldHandle, package.Entrypoints.Handle],
             diagnostics);
+        ValidateRequiredCapabilityGrants(package.Manifest, installPolicy, diagnostics);
         var contractEvent = ValidateContract(package, diagnostics);
         ValidatePreparedEntrypoints(package, plan, events, contractEvent, diagnostics);
         ThrowIfErrors(diagnostics);
@@ -78,6 +80,26 @@ internal static class PluginPreparedPackageValidator
     private static bool EntrypointRequiresAsync(string entrypoint, ExecutionPlan plan)
         => plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis) &&
            (analysis.Effects & SandboxEffect.Concurrency) != 0;
+
+    private static void ValidateRequiredCapabilityGrants(
+        PluginManifest manifest,
+        SandboxPolicy installPolicy,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var now = installPolicy.GrantClock;
+        foreach (var capability in manifest.RequiredCapabilities.Distinct(StringComparer.Ordinal))
+        {
+            if (string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
+                installPolicy.GrantsCapability(capability, now))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-CAP",
+                $"required capability '{capability}' is not granted"));
+        }
+    }
 
     private static string? ValidateContract(PluginPackage package, List<SandboxDiagnostic> diagnostics)
     {

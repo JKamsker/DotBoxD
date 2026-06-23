@@ -8,8 +8,8 @@ namespace DotBoxD.Plugins.Indexing;
 /// <see cref="EventIndexMatcher{TEvent}"/> (precompiled getters, no per-event reflection) and, when the host
 /// publishes an event, runs the cheap index check <i>before</i> entering the sandbox. Events the index
 /// rejects never reach the verified IR; survivors are dispatched to <see cref="InstalledKernel"/> as the
-/// correctness authority — the verified <c>ShouldHandle</c> still runs unless the index fully covers the
-/// predicate (<see cref="IndexedPredicate"/> set == the whole predicate and every path is an index key).
+/// correctness authority — the verified <c>ShouldHandle</c> still runs after a matching index check because
+/// package-supplied coverage metadata is not trusted across the manifest boundary.
 /// <para>
 /// This is the "register a subscription and get index-based prefiltering without writing your own matcher"
 /// surface. Subscriptions whose predicates touch no indexed field are rejected by <see cref="Register"/>
@@ -53,14 +53,11 @@ public sealed class EventIndexRegistry
             return false;
         }
 
-        // The host may skip the verified IR only when the index serves the *entire* predicate: the manifest
-        // reported full coverage AND every predicate path is one this host indexes (so nothing was dropped or
-        // left to the IR). Double-typed predicates are excluded from the skip — the verified IR rejects
-        // non-finite doubles (NaN/Infinity) at marshalling, which the cheap index does not replicate, so a
-        // double index key stays prefilter-only and the IR remains the authority for those events.
-        var fullyCovered = indexCoversPredicate &&
-            matcher.HonoredPredicates.Count == predicates.Count &&
-            !AnyDoubleTyped(matcher.HonoredPredicates);
+        _ = indexCoversPredicate;
+        // Index metadata travels in the mutable package manifest, so coverage claims are prefilter hints only.
+        // The verified ShouldHandle entrypoint remains the authority until coverage is recomputed or
+        // authenticated for this install path.
+        const bool fullyCovered = false;
         lock (_gate)
         {
             if (!_channels.TryGetValue(typeof(TEvent), out var existing))
@@ -72,6 +69,7 @@ public sealed class EventIndexRegistry
             ((EventIndexChannel<TEvent>)existing).Add(new EventIndexEntry<TEvent>(matcher, kernel, fullyCovered));
         }
 
+        kernel.RegisterRevocationCallback(Unregister);
         return true;
     }
 
@@ -135,19 +133,6 @@ public sealed class EventIndexRegistry
         }
     }
 
-    private static bool AnyDoubleTyped(IReadOnlyList<IndexedPredicate> predicates)
-    {
-        for (var i = 0; i < predicates.Count; i++)
-        {
-            if (string.Equals(predicates[i].ValueType, "double", StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /// <summary>Awaits every in-flight dispatch launched by <see cref="Publish"/> (e.g. on host shutdown).</summary>
     public async Task DrainAsync()
     {
@@ -176,8 +161,7 @@ public sealed class EventIndexRegistry
     {
         try
         {
-            // Full coverage: the index already proved the predicate, so the verified ShouldHandle is
-            // redundant and may be skipped. Otherwise the verified IR predicate remains the authority.
+            // The verified IR predicate remains the authority; manifest coverage claims are not trusted.
             if (entry.FullyCovered || await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false))
             {
                 await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);

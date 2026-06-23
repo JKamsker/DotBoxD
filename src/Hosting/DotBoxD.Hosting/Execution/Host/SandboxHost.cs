@@ -83,13 +83,7 @@ public sealed partial class SandboxHost : IDisposable
             throw new SandboxValidationException(validation.Diagnostics);
         }
 
-        var required = new SortedSet<string>(validation.RequiredCapabilities, StringComparer.Ordinal);
-        foreach (var request in module.CapabilityRequests)
-        {
-            required.Add(request.Id);
-        }
-
-        return required.ToArray();
+        return validation.RequiredCapabilities.Order(StringComparer.Ordinal).ToArray();
     }
 
     public async ValueTask<SandboxExecutionResult> ExecuteAsync(

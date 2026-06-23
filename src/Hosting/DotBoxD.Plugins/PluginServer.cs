@@ -2,6 +2,7 @@ using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Validation;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins;
@@ -95,7 +96,11 @@ public sealed partial class PluginServer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(package);
         ThrowIfDisposed();
-        return _host.GetRequiredCapabilities(package.Module);
+        return _host.GetRequiredCapabilities(package.Module)
+            .Concat(PluginRequiredCapabilityMetadata.Read(package.Module))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
     }
 
     public LiveValue<T> BindValue<T>(string name, T initialValue)
@@ -219,9 +224,13 @@ public sealed partial class PluginServer : IDisposable
     {
         ThrowIfDisposed();
         PluginPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
+        var installPolicy = policy ?? _defaultPolicy;
+        var plan = await _host.PrepareAsync(
+                package.Module,
+                PreparePolicyForModule(package, installPolicy),
+                cancellationToken)
             .ConfigureAwait(false);
-        PluginPackageValidator.ValidatePrepared(package, plan, Events);
+        PluginPackageValidator.ValidatePrepared(package, plan, Events, installPolicy);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
         var replaced = AddKernel(kernel);
         if (replaced is not null)

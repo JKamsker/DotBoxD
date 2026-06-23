@@ -276,8 +276,8 @@ internal static class DotBoxDGenerationNames
 
     public static class ModuleMetadata
     {
-        public const string PluginId = "pluginId";
-        public const string Kernel = "kernel";
+        public const string PluginId = "pluginId", Kernel = "kernel";
+        public const string RequiredCapabilities = "requiredCapabilities";
     }
 
     public static class Operators

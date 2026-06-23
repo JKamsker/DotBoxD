@@ -73,13 +73,17 @@ public sealed partial class InstalledKernel
 
     public void Revoke()
     {
+        Action<InstalledKernel>[] callbacks = [];
         lock (_lifecycleGate)
         {
             if (Interlocked.Exchange(ref _revoked, 1) == 0)
             {
                 _revocation.Cancel();
+                callbacks = DrainRevocationCallbacks();
             }
         }
+
+        InvokeRevocationCallbacks(callbacks);
     }
 
     internal void RegisterStateSynchronizer(Type stateType, Action synchronize)

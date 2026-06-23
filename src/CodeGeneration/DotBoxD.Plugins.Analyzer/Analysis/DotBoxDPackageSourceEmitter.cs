@@ -234,16 +234,30 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
-        DotBoxDCapabilityRequestSourceEmitter.Emit(builder, model.RequiredCapabilities);
+        builder.AppendLine("            [],");
         builder.Append("            [")
             .Append(DotBoxDGenerationNames.Entrypoints.ShouldHandle)
             .Append("(parameters), ")
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
             .AppendLine("(parameters)],");
-        builder.AppendLine($"            new {Generic(TypeNames.GlobalDictionary, "string", "string")} {{ [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId)}] = {LiteralReader.StringLiteral(model.PluginId)}, [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel)}] = {LiteralReader.StringLiteral(model.KernelName)} }});");
+        builder.Append("            new ").Append(Generic(TypeNames.GlobalDictionary, "string", "string"))
+            .Append(" { [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId))
+            .Append("] = ").Append(LiteralReader.StringLiteral(model.PluginId))
+            .Append(", [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel))
+            .Append("] = ").Append(LiteralReader.StringLiteral(model.KernelName));
+        if (model.RequiredCapabilities.Count > 0)
+        {
+            builder.Append(", [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.RequiredCapabilities))
+                .Append("] = ").Append(LiteralReader.StringLiteral(RequiredCapabilityMetadata(model.RequiredCapabilities)));
+        }
+
+        builder.AppendLine(" });");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
+
+    private static string RequiredCapabilityMetadata(EquatableArray<string> capabilities)
+        => string.Join(";", capabilities);
 
     private static void EmitFunctions(StringBuilder builder, PluginKernelModel model)
     {

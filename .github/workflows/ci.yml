@@ -331,6 +331,9 @@ jobs:
               "JsonApiSurfaceTests",
               "PublicModelImmutabilityTests",
               "PluginPackageValidationTests",
+              "EventIndexTrustBoundaryTests",
+              "CapabilityPolicySplitTests",
+              "RemoteRunLocalChainRuntimeTests",
               "PluginRevocationTests",
               "PinnedHttpTransportTests",
               "DifferentialFuzzTests"
