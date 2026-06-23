@@ -272,7 +272,7 @@ public sealed partial class ResultHookChainTests
     {
         const System.Reflection.BindingFlags flags =
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-        var slotField = typeof(HookPipeline<TEvent>).GetField("_resultHooks", flags);
+        var slotField = typeof(HookPipeline<TEvent>).BaseType!.GetField("_resultHooks", flags);
         Assert.NotNull(slotField);
         var slot = slotField!.GetValue(pipeline)!;
         var entriesField = slot.GetType().GetField("_entries", flags);

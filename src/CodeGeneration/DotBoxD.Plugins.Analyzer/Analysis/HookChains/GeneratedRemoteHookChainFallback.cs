@@ -35,7 +35,7 @@ internal static class GeneratedRemoteHookChainFallback
         CancellationToken cancellationToken)
     {
         if (seed.Expression is not MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } ||
-            onName.TypeArgumentList.Arguments.Count != 1)
+            onName.TypeArgumentList.Arguments.Count < 1)
         {
             return null;
         }
@@ -50,7 +50,7 @@ internal static class GeneratedRemoteHookChainFallback
         out INamedTypeSymbol eventType)
     {
         if (model.GetTypeInfo(seed, cancellationToken).Type is INamedTypeSymbol pipelineType &&
-            pipelineType.TypeArguments.Length == 1 &&
+            pipelineType.TypeArguments.Length >= 1 &&
             pipelineType.TypeArguments[0] is INamedTypeSymbol semanticEventType)
         {
             eventType = semanticEventType;
@@ -67,11 +67,29 @@ internal static class GeneratedRemoteHookChainFallback
         return false;
     }
 
+    public static string? ServerContextTypeFullName(
+        SemanticModel model,
+        InvocationExpressionSyntax seed,
+        CancellationToken cancellationToken)
+    {
+        if (seed.Expression is not MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } ||
+            onName.TypeArgumentList.Arguments.Count < 2)
+        {
+            return null;
+        }
+
+        return model.GetTypeInfo(onName.TypeArgumentList.Arguments[1], cancellationToken)
+            .Type?
+            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    }
+
     public static HookChainInterception CreateInterception(
         string attributeSyntax,
         string eventTypeFullName,
         bool receiverIsStage,
         string terminalElementTypeFullName,
+        string? serverContextTypeFullName,
+        bool terminalHasServerContext,
         string packageFullName,
         HookChainInterceptorInstallKind installKind,
         GeneratedRemoteHookChainKind kind,
@@ -83,18 +101,23 @@ internal static class GeneratedRemoteHookChainFallback
         var stageName = kind == GeneratedRemoteHookChainKind.Hook
             ? "DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage"
             : "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage";
+        var hasServerContextType = !string.IsNullOrEmpty(serverContextTypeFullName);
+        var pipelineArguments = hasServerContextType
+            ? eventTypeFullName + ", " + serverContextTypeFullName
+            : eventTypeFullName;
         var pipelineType = DotBoxDGenerationNames.TypeNames.GlobalPrefix +
-            pipelineName + "<" + eventTypeFullName + ">";
+            pipelineName + "<" + pipelineArguments + ">";
         var receiverType = receiverIsStage
             ? DotBoxDGenerationNames.TypeNames.GlobalPrefix +
-              stageName + "<" + eventTypeFullName + ", " + terminalElementTypeFullName + ">"
+              stageName + "<" + eventTypeFullName + ", " + terminalElementTypeFullName +
+              (hasServerContextType ? ", " + serverContextTypeFullName : string.Empty) + ">"
             : pipelineType;
-        var handlerType = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
-              terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalHookContext + ", " +
-              DotBoxDGenerationNames.TypeNames.GlobalValueTask + ">"
-            : DotBoxDGenerationNames.TypeNames.GlobalAction + "<" +
-              terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalHookContext + ">";
+        var handlerType = HandlerType(
+            terminalElementTypeFullName,
+            terminalHasServerContext
+                ? serverContextTypeFullName ?? DotBoxDGenerationNames.TypeNames.GlobalHookContext
+                : null,
+            installKind);
 
         return new HookChainInterception(
             attributeSyntax,
@@ -104,6 +127,28 @@ internal static class GeneratedRemoteHookChainFallback
             packageFullName,
             installKind,
             hasLocalDecoder);
+    }
+
+    private static string HandlerType(
+        string terminalElementTypeFullName,
+        string? serverContextTypeFullName,
+        HookChainInterceptorInstallKind installKind)
+    {
+        var hasServerContext = !string.IsNullOrEmpty(serverContextTypeFullName);
+        if (installKind == HookChainInterceptorInstallKind.LocalCallback)
+        {
+            return hasServerContext
+                ? DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
+                  terminalElementTypeFullName + ", " + serverContextTypeFullName + ", " +
+                  DotBoxDGenerationNames.TypeNames.GlobalValueTask + ">"
+                : DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
+                  terminalElementTypeFullName + ", " + DotBoxDGenerationNames.TypeNames.GlobalValueTask + ">";
+        }
+
+        return hasServerContext
+            ? DotBoxDGenerationNames.TypeNames.GlobalAction + "<" +
+              terminalElementTypeFullName + ", " + serverContextTypeFullName + ">"
+            : DotBoxDGenerationNames.TypeNames.GlobalAction + "<" + terminalElementTypeFullName + ">";
     }
 
     public static HookChainInterception CreateResultInterception(

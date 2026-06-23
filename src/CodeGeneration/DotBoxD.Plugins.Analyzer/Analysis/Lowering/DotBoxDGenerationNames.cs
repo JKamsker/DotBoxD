@@ -41,13 +41,21 @@ internal static class DotBoxDGenerationNames
         public const string GameWorldAccessType = "DotBoxD.Kernels.Game.Server.Abstractions.IGameWorldAccess";
         public const string GameWorldMonsterSnapshotType = "DotBoxD.Kernels.Game.Server.Abstractions.MonsterSnapshot";
         public const string HookPipelineOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent>";
+        public const string HookPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent, TContext>";
         public const string HookStageOriginal = "DotBoxD.Plugins.Runtime.Hooks.HookStage<TEvent, TCurrent>";
+        public const string HookStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Hooks.HookStage<TEvent, TCurrent, TContext>";
         public const string RemoteHookPipelineOriginal = "DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent>";
+        public const string RemoteHookPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent, TContext>";
         public const string RemoteHookStageOriginal = "DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage<TEvent, TCurrent>";
+        public const string RemoteHookStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage<TEvent, TCurrent, TContext>";
         public const string SubscriptionPipelineOriginal = "DotBoxD.Plugins.Runtime.SubscriptionPipeline<TEvent>";
+        public const string SubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.SubscriptionPipeline<TEvent, TContext>";
         public const string SubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.SubscriptionStage<TEvent, TCurrent>";
+        public const string SubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.SubscriptionStage<TEvent, TCurrent, TContext>";
         public const string RemoteSubscriptionPipelineOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent>";
+        public const string RemoteSubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, TContext>";
         public const string RemoteSubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent>";
+        public const string RemoteSubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent, TContext>";
 
         public const string ListOriginal = "System.Collections.Generic.List<T>";
         public const string ReadOnlyListOriginal = "System.Collections.Generic.IReadOnlyList<T>";
@@ -115,8 +123,7 @@ internal static class DotBoxDGenerationNames
         public const string EventKernelPrefix = "IEventKernel<";
         public const string EventKernelSuffix = ">";
 
-        public static string EventKernel(string eventName)
-            => EventKernelPrefix + eventName + EventKernelSuffix;
+        public static string EventKernel(string eventName) => EventKernelPrefix + eventName + EventKernelSuffix;
     }
 
     public static class CSharpTypes
@@ -167,8 +174,7 @@ internal static class DotBoxDGenerationNames
 
         public const string Unsupported = "unsupported";
 
-        public static bool IsNumeric(string type)
-            => type is Int or Long or Double;
+        public static bool IsNumeric(string type) => type is Int or Long or Double;
     }
 
     public static class RangeAttributeArguments
@@ -250,8 +256,7 @@ internal static class DotBoxDGenerationNames
 
     public static class IrTypes
     {
-        public const string IfStatement = TypeNames.GlobalIfStatement;
-        public const string ReturnStatement = TypeNames.GlobalReturnStatement;
+        public const string IfStatement = TypeNames.GlobalIfStatement, ReturnStatement = TypeNames.GlobalReturnStatement;
     }
 
     public static class BindingIds

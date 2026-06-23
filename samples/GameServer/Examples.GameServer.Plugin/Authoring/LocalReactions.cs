@@ -22,6 +22,20 @@ public static class LocalReactions
             .RunLocal(monsterId => onCalmedMonster(monsterId));
     }
 
+    public static void ConfigureServerContextReaction(
+        RemoteHookRegistry hooks,
+        Action<string, bool> onCalmedMonster)
+    {
+        ArgumentNullException.ThrowIfNull(hooks);
+        ArgumentNullException.ThrowIfNull(onCalmedMonster);
+
+        hooks.On<MonsterAggroEvent, GamePluginContext>(GamePluginContext.FromHookContext)
+            .Where((e, _) => e.Distance <= 4)
+            .Select((e, _) => e.MonsterId)
+            .RunLocal((monsterId, context) =>
+                onCalmedMonster(context.FormatCalmTarget(monsterId), context.HasCancelableDispatch));
+    }
+
     /// <summary>
     /// Authors a remote whole-event <c>RunLocal</c> reaction (no <c>Select</c>). The <c>Where</c> filter lowers
     /// to server-side verified IR; for each matching event the WHOLE event record crosses the IPC boundary and
@@ -41,10 +55,13 @@ public static class LocalReactions
     {
         ArgumentNullException.ThrowIfNull(hooks);
 
-        hooks.On<RemoteDamageDecisionEvent>()
-            .Where(e => e.Damage > 10)
+        hooks.On<RemoteDamageDecisionEvent, GamePluginContext>(GamePluginContext.FromHookContext)
+            .Where((e, _) => e.Damage > 10)
             .RegisterLocal(
-                (e, _) => new RemoteDamageDecisionResult(true, "remote", e.Damage * 2),
+                (e, context) => new RemoteDamageDecisionResult(
+                    true,
+                    context.DamageDecisionReason,
+                    context.ScaleDamageDecision(e.Damage)),
                 priority: 7);
     }
 }

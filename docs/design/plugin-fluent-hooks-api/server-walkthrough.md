@@ -159,9 +159,11 @@ internal static class Program
 
 ## 3. The server-side fluent API is the *same shape* the plugin uses
 
-The plugin's shim mirrors what the server itself exposes via `server.Hooks` / `server.Events`. On the
-server, `On<TEvent>()` returns a `HookPipeline<TEvent>` that supports the full chain. The world drives
-it by publishing:
+The plugin's shim mirrors what the server itself exposes via `server.Hooks` /
+`server.Subscriptions`. On the server, `On<TEvent>()` returns a default
+`HookPipeline<TEvent>` whose context parameter is `HookContext`. A host that wants a richer
+context shape uses `On<TEvent, TServerContext>(raw => ...)`; hooks and subscriptions choose their
+server-context type independently.
 
 ```csharp
 // Inside the simulation (server side), publishing an event runs the installed pipeline:
@@ -170,30 +172,62 @@ await server.Hooks.PublishAsync(
     cancellationToken);
 ```
 
-After Phase B, the pipeline gains `Select` (re-typing the flowing element), `InvokeLocal` /
-`InvokeKernel` terminals, and auto-install. Pre-kernel gating is a fluent `Where` (no `filter:`
-parameter) — see [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §1:
+The ordinary fluent authoring shape is consistent across hooks, subscriptions, and stages:
+one-parameter lambdas receive only the current event/value; two-parameter lambdas receive the
+current event/value first and the server context second. The same rule applies to `Where`,
+`Select`, `Run`, `RunLocal`, `Register`, and `RegisterLocal` wherever those terminals exist.
 
 ```csharp
-public sealed class HookPipeline<TEvent>
+public sealed class HookPipeline<TEvent, TServerContext>
 {
-    // Gate. Before a UseKernel terminal these Where(s) are lowered and AND-composed into the
-    // kernel's gate at compile time; the kernel's own ShouldHandle still runs after.
-    public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, TServerContext, bool> filter);
 
-    // NEW: project the flowing element to a different type for downstream stages.
-    public HookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(Func<TEvent, TNext> projection);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
+        Func<TEvent, TServerContext, TNext> projection);
 
-    // Native host code (was InvokeHostHandler; that name becomes an [Obsolete] forwarder).
-    public HookPipeline<TEvent> InvokeLocal(Func<TEvent, HookContext, ValueTask> handler);
+    // Lowered by the analyzer to verified IR. Un-lowered, it throws.
+    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, ValueTask> handler);
+    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, TServerContext, ValueTask> handler);
 
-    // The API the analyzer lowers. Un-lowered, its body throws DBXK040 so it never runs unsandboxed.
-    public HookPipeline<TEvent> InvokeKernel(Func<TEvent, HookContext, ValueTask> handler);
+    // Native host/plugin process code.
+    public HookPipeline<TEvent, TServerContext> RunLocal(Func<TEvent, ValueTask> handler);
+    public HookPipeline<TEvent, TServerContext> RunLocal(
+        Func<TEvent, TServerContext, ValueTask> handler);
 
-    // Internal wiring primitive only — binds an already-installed kernel. The public way to bind a
-    // kernel class is server.Kernels.Register<TService, TKernel>() (see kernel-binding-model.md §1).
-    internal HookPipeline<TEvent> UseKernel(InstalledKernel kernel);
+    public HookPipeline<TEvent, TServerContext> Register<TResult>(Func<TEvent, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> Register<TResult>(
+        Func<TEvent, TServerContext, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(
+        Func<TEvent, TServerContext, TResult> handler);
 }
+```
+
+Sandbox-lowered terminals such as `Run` and `Register` can only use context members the analyzer
+knows how to lower into verified IR. Use `RunLocal` / `RegisterLocal` when the handler needs
+arbitrary in-process services from the server context.
+
+The default shorthand remains:
+
+```csharp
+server.Hooks.On<MonsterAggroEvent>()
+    .Where(e => e.Distance <= 5)
+    .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+```
+
+A host-defined server context wraps the raw `HookContext` when it needs domain services or a
+narrower facade:
+
+```csharp
+server.Hooks.On<MonsterAggroEvent, CombatHookContext>(ctx => new CombatHookContext(ctx, world))
+    .Where((e, ctx) => ctx.CanReact(e.MonsterId))
+    .RunLocal((e, ctx) => ctx.Telemetry.Count("aggro"));
+
+server.Subscriptions.On<MonsterAggroEvent, TelemetrySubscriptionContext>(
+        ctx => new TelemetrySubscriptionContext(ctx, metrics))
+    .RunLocal((e, ctx) => ctx.Record(e.MonsterId));
 ```
 
 Binding a kernel **class** is no longer a hook-chain terminal — it moved to

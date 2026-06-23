@@ -20,7 +20,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// produces the result. Any unsupported shape throws <see cref="NotSupportedException"/> so the chain fails
 /// safe (no package, DBXK113).
 /// </summary>
-internal static class ResultHookChain
+internal static partial class ResultHookChain
 {
     public static HookChainResult? Build(
         InvocationExpressionSyntax invocation,
@@ -127,6 +127,7 @@ internal static class ResultHookChain
             resultType,
             isLocal,
             terminalHasCancellationToken,
+            terminalContextParam is not null,
             receiverIsStage: false,
             generatedRemoteKind,
             cancellationToken));
@@ -182,71 +183,6 @@ internal static class ResultHookChain
         }
 
         return DotBoxDHandleBodyModelFactory.ReturnExpression(lowered);
-    }
-
-    private static HookChainInterception? Interception(
-        InvocationExpressionSyntax invocation,
-        ExpressionSyntax receiver,
-        SemanticModel model,
-        PluginKernelModel kernelModel,
-        INamedTypeSymbol contextType,
-        INamedTypeSymbol resultType,
-        bool isLocal,
-        bool isAsyncLocal,
-        bool receiverIsStage,
-        GeneratedRemoteHookChainKind? generatedRemoteKind,
-        CancellationToken cancellationToken)
-    {
-        // The interceptor's receiver/handler/return types are built from the context and [Hook] result type
-        // rather than the Register call symbol: a fluent-builder handler leaves the call's type argument
-        // unresolved here, but both the pipeline receiver type and the result type are known. Roslyn binds the
-        // (now type-resolvable, post-generation) call site to the emitted interceptor.
-        var location = model.GetInterceptableLocation(invocation, cancellationToken);
-        if (location is null)
-        {
-            return null;
-        }
-
-        var packageFullName = string.IsNullOrEmpty(kernelModel.Namespace)
-            ? TypeNames.GlobalPrefix + kernelModel.PackageName
-            : TypeNames.GlobalPrefix + kernelModel.Namespace + "." + kernelModel.PackageName;
-
-        var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var resultFullName = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var handlerFullName = isLocal && isAsyncLocal
-            ? $"{TypeNames.GlobalFunc}<" +
-                $"{contextFullName}, {TypeNames.GlobalHookContext}, {TypeNames.GlobalCancellationToken}, " +
-                $"{TypeNames.GlobalValueTask}<{resultFullName}>>"
-            : isLocal
-            ? $"{TypeNames.GlobalFunc}<{contextFullName}, {TypeNames.GlobalHookContext}, {resultFullName}>"
-            : $"{TypeNames.GlobalFunc}<{contextFullName}, {resultFullName}>";
-
-        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
-            receiverType.TypeKind == TypeKind.Error)
-        {
-            return generatedRemoteKind is null
-                ? null
-                : GeneratedRemoteHookChainFallback.CreateResultInterception(
-                    location.GetInterceptsLocationAttributeSyntax(),
-                    contextFullName,
-                    receiverIsStage,
-                    resultFullName,
-                    packageFullName,
-                    isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-                    generatedRemoteKind.Value,
-                    isAsyncLocal);
-        }
-
-        var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        return new HookChainInterception(
-            location.GetInterceptsLocationAttributeSyntax(),
-            receiverFullName,
-            handlerFullName,
-            receiverFullName,
-            packageFullName,
-            isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-            ResultTypeFullName: resultFullName,
-            IsAsyncLocalResult: isAsyncLocal);
     }
 
     private static bool TryResolveHook(

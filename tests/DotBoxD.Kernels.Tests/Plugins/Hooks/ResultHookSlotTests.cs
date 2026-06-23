@@ -6,7 +6,7 @@ namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
 /// <summary>
 /// Result-hook dispatch semantics: descending-priority ordering, abstain/fallthrough, install-order tie-breaks,
-/// first-success-wins, fault isolation, and cancellation — exercised against <see cref="ResultHookSlot{TEvent}"/>
+/// first-success-wins, fault isolation, and cancellation — exercised against <see cref="ResultHookSlot{TEvent, TContext}"/>
 /// directly with pure delegate handlers (no sandbox kernel needed).
 /// </summary>
 public sealed class ResultHookSlotTests
@@ -17,7 +17,8 @@ public sealed class ResultHookSlotTests
 
     private readonly record struct OtherResult(bool Success, string? Reason) : IHookResult;
 
-    private static ResultHookSlot<DamageCtx> NewSlot(Action<ResultHookFault>? onFault = null) => new(new StubAdapter(), onFault);
+    private static ResultHookSlot<DamageCtx, HookContext> NewSlot(Action<ResultHookFault>? onFault = null)
+        => new(new StubAdapter(), onFault);
 
     private static HookContext Context() => new(new InMemoryPluginMessageSink(), CancellationToken.None);
 
@@ -32,7 +33,8 @@ public sealed class ResultHookSlotTests
     {
         var slot = NewSlot();
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -43,7 +45,8 @@ public sealed class ResultHookSlotTests
         var slot = NewSlot();
         slot.AddDirect(0, (_, _, _) => Ok(42));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(42, result!.Value.Value);
     }
@@ -54,7 +57,8 @@ public sealed class ResultHookSlotTests
         var slot = NewSlot();
         slot.AddDirect(0, (_, _, _) => FilterMiss());
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -66,7 +70,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(100, (_, _, _) => Abstain());
         slot.AddDirect(0, (_, _, _) => Ok(7));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(7, result!.Value.Value);
     }
@@ -78,7 +83,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(0, (_, _, _) => Ok(1));
         slot.AddDirect(100, (_, _, _) => Ok(2));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(2, result!.Value.Value);
     }
@@ -90,7 +96,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(5, (_, _, _) => Ok(1));
         slot.AddDirect(5, (_, _, _) => Ok(2));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(1, result!.Value.Value);
     }
@@ -104,7 +111,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(100, (_, _, _) => throw boom);
         slot.AddDirect(0, (_, _, _) => Ok(9));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(9, result!.Value.Value);
         var fault = Assert.Single(faults);
@@ -121,7 +129,8 @@ public sealed class ResultHookSlotTests
         var slot = NewSlot(faults.Add);
         slot.AddDirect(0, (_, _, _) => throw new InvalidOperationException("veto blew up"));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Null(result);
         Assert.Single(faults);
@@ -136,7 +145,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(100, (_, _, _) => throw new InvalidOperationException("handler boom"));
         slot.AddDirect(0, (_, _, _) => Ok(3));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(3, result!.Value.Value);
     }
@@ -155,7 +165,11 @@ public sealed class ResultHookSlotTests
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), cts.Token));
+            async () =>
+            {
+                var context = Context();
+                await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, cts.Token);
+            });
         Assert.False(invoked);
     }
 
@@ -176,9 +190,11 @@ public sealed class ResultHookSlotTests
             TimeSpan.FromMilliseconds(100),
             new TestResult(true, "timeout", -1));
 
+        var context = Context();
         var result = await slot.FireAsync(
             new DamageCtx(10),
-            Context(),
+            context,
+            context,
             options,
             CancellationToken.None);
 
@@ -194,7 +210,8 @@ public sealed class ResultHookSlotTests
         slot.AddDirect(100, (_, _, _) => new ValueTask<IHookResult?>((IHookResult)new OtherResult(true, null)));
         slot.AddDirect(0, (_, _, _) => Ok(4));
 
-        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), Context(), CancellationToken.None);
+        var context = Context();
+        var result = await slot.FireAsync<TestResult>(new DamageCtx(10), context, context, CancellationToken.None);
 
         Assert.Equal(4, result!.Value.Value);
         Assert.IsType<InvalidCastException>(Assert.Single(faults).Exception);
@@ -211,7 +228,11 @@ public sealed class ResultHookSlotTests
         };
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            async () => await slot.FireAsync(new DamageCtx(10), Context(), options, CancellationToken.None));
+            async () =>
+            {
+                var context = Context();
+                await slot.FireAsync(new DamageCtx(10), context, context, options, CancellationToken.None);
+            });
     }
 
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>

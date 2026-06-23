@@ -86,9 +86,9 @@ internal static class Program
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        server.Hooks.On<MonsterAggroEvent>()
-            .Where(e => e.Distance <= 4)
-            .Select(e => e.MonsterId)
+        server.Hooks.On<MonsterAggroEvent, GamePluginContext>(GamePluginContext.FromHookContext)
+            .Where((e, _) => e.Distance <= 4)
+            .Select((e, _) => e.MonsterId)
             .Run((monsterId, ctx) => ctx.Messages.Send(monsterId, "calm:inline"));
 
         server.Subscriptions.On<AttackEvent>()

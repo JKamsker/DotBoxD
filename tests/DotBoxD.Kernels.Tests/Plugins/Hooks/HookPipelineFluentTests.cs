@@ -11,6 +11,10 @@ public sealed class HookPipelineFluentTests
 {
     private sealed record Ping(string Target, int Value);
 
+    private sealed record HookServerContext(HookContext Raw, string Prefix);
+
+    private sealed record SubscriptionServerContext(HookContext Raw, int Multiplier);
+
     [Fact]
     public async Task Select_then_RunLocal_runs_the_native_terminal_with_the_projected_value()
     {
@@ -101,6 +105,41 @@ public sealed class HookPipelineFluentTests
 
         Assert.False(handled);
     }
+
+    [Fact]
+    public async Task Hook_and_subscription_pipelines_can_use_different_server_context_types()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create();
+        string? hookObserved = null;
+        var subscriptionObserved = new TaskCompletionSource<int>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        server.Hooks.On<Ping, HookServerContext>(ctx => new HookServerContext(ctx, "hook"))
+            .Where((_, ctx) => ctx.Prefix == "hook")
+            .Select((p, ctx) => ctx.Prefix + ":" + p.Target)
+            .RunLocal((value, ctx) =>
+            {
+                Assert.Equal("hook", ctx.Prefix);
+                hookObserved = value;
+            });
+
+        server.Subscriptions.On<Ping, SubscriptionServerContext>(
+                ctx => new SubscriptionServerContext(ctx, Multiplier: 3))
+            .Where((_, ctx) => ctx.Multiplier == 3)
+            .Select((p, ctx) => p.Value * ctx.Multiplier)
+            .RunLocal((value, ctx) =>
+            {
+                Assert.Equal(3, ctx.Multiplier);
+                subscriptionObserved.SetResult(value);
+            });
+
+        await server.Hooks.PublishAsync(new Ping("monster-1", 7));
+        server.Subscriptions.Publish(new Ping("monster-1", 7));
+
+        Assert.Equal("hook:monster-1", hookObserved);
+        Assert.Equal(21, await subscriptionObserved.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
 
     [Fact]
     public void Run_lambda_throws_until_lowered()

@@ -7,11 +7,12 @@ internal static class SubscriptionDelivery
     // RunLocal subscription look like "it just does nothing", so every caught fault is reported to the optional
     // observer before delivery is abandoned. Control flow is unchanged: a failed filter still drops the event, a
     // failed handler still lets the remaining handlers run.
-    internal static async ValueTask PublishSafelyAsync<TEvent>(
-        Func<TEvent, HookContext, ValueTask<bool>>[] filters,
-        Func<TEvent, HookContext, ValueTask>[] handlers,
+    internal static async ValueTask PublishSafelyAsync<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
-        HookContext context,
+        HookContext rawContext,
+        TContext context,
         Action<SubscriptionDeliveryFault>? onFault)
     {
         try
@@ -34,7 +35,7 @@ internal static class SubscriptionDelivery
         {
             try
             {
-                await handlers[i](e, context).ConfigureAwait(false);
+                await handlers[i](e, rawContext, context).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -7,6 +7,12 @@ public sealed partial class RemoteHookPipeline<TEvent>
         => throw ResultNotLowered();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, TResult> handler,
         int priority = 0)
         where TResult : struct, IHookResult
@@ -26,6 +32,19 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ValidateResultSubscription<TResult>(package, resultLocalTerminal: false);
         _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
         return this;
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChain<TResult>(
+            package,
+            (e, _) => handler(e),
+            priority);
     }
 
     public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(

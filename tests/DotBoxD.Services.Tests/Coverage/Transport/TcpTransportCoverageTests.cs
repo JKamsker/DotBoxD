@@ -4,8 +4,8 @@ using System.Net.Sockets;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Transports.Tcp;
-using static DotBoxD.Services.Tests.Coverage.Transport.TcpTransportCoverageTestHelpers;
 using Xunit;
+using static DotBoxD.Services.Tests.Coverage.Transport.TcpTransportCoverageTestHelpers;
 
 namespace DotBoxD.Services.Tests.Coverage.Transport;
 

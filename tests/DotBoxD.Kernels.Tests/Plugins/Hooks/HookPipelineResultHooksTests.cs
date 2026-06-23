@@ -23,6 +23,8 @@ public sealed class HookPipelineResultHooksTests
 
     private sealed record ReferenceDamageResult(bool Success, string? Reason) : IHookResult;
 
+    private sealed record DamageServerContext(HookContext Raw);
+
     [Fact]
     public void Hook_attribute_rejects_invalid_constructor_arguments()
     {
@@ -61,6 +63,20 @@ public sealed class HookPipelineResultHooksTests
         using var server = PluginServer.Create();
         var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
 
+        Assert.Throws<SandboxValidationException>(
+            () => pipeline.RegisterLocal<DamageResult>((c, ctx) => default, priority: 0));
+    }
+
+    [Fact]
+    public void Typed_context_Register_and_RegisterLocal_overloads_throw_until_lowered()
+    {
+        using var server = PluginServer.Create();
+        var pipeline = server.Hooks.On<DamageCtx, DamageServerContext>(
+            new StubAdapter(),
+            ctx => new DamageServerContext(ctx));
+
+        Assert.Throws<SandboxValidationException>(
+            () => pipeline.Register<DamageResult>((c, ctx) => default, priority: 0));
         Assert.Throws<SandboxValidationException>(
             () => pipeline.RegisterLocal<DamageResult>((c, ctx) => default, priority: 0));
     }

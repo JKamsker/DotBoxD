@@ -3,10 +3,16 @@ using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Plugins.Runtime;
 
+internal interface ISubscriptionPipeline<TEvent> : IKernelHandlerPipeline
+{
+    bool UsesAdapter(IPluginEventAdapter<TEvent> adapter);
+    void Publish(TEvent e, CancellationToken cancellationToken);
+}
+
 public sealed class SubscriptionRegistry
 {
     private readonly object _gate = new();
-    private readonly Dictionary<Type, object> _pipelines = [];
+    private readonly Dictionary<PipelineKey, object> _pipelines = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
     private readonly KernelRegistry _kernels;
@@ -37,23 +43,47 @@ public sealed class SubscriptionRegistry
     {
         lock (_gate)
         {
-            if (_pipelines.TryGetValue(typeof(TEvent), out var existing))
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
             {
-                var pipeline = (SubscriptionPipeline<TEvent>)existing;
-                if (!pipeline.UsesAdapter(adapter))
-                {
-                    throw new SandboxValidationException([
-                        new SandboxDiagnostic(
-                            "DBXK064",
-                            $"Subscription pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
-                    ]);
-                }
-
-                return pipeline;
+                return (SubscriptionPipeline<TEvent>)existing;
             }
 
             var created = new SubscriptionPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
-            _pipelines[typeof(TEvent)] = created;
+            _pipelines[key] = created;
+            return created;
+        }
+    }
+
+    public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
+    {
+        var adapter = _events.Resolve<TEvent>();
+        return On(adapter, createContext);
+    }
+
+    public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, TContext> createContext)
+    {
+        ArgumentNullException.ThrowIfNull(createContext);
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(TContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                return (SubscriptionPipeline<TEvent, TContext>)existing;
+            }
+
+            var created = new SubscriptionPipeline<TEvent, TContext>(
+                adapter,
+                _messages,
+                new ServerContextFactory<TContext>(createContext),
+                _kernels,
+                _installer,
+                _onFault);
+            _pipelines[key] = created;
             return created;
         }
     }
@@ -62,17 +92,7 @@ public sealed class SubscriptionRegistry
     {
         lock (_gate)
         {
-            if (!_pipelines.TryGetValue(typeof(TEvent), out var existing) ||
-                ((SubscriptionPipeline<TEvent>)existing).UsesAdapter(adapter))
-            {
-                return;
-            }
-
-            throw new SandboxValidationException([
-                new SandboxDiagnostic(
-                    "DBXK064",
-                    $"Subscription pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
-            ]);
+            EnsureCanRegisterLocked(adapter);
         }
     }
 
@@ -106,13 +126,16 @@ public sealed class SubscriptionRegistry
 
     public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
-        object? pipeline;
+        object[] pipelines;
         lock (_gate)
         {
-            _pipelines.TryGetValue(typeof(TEvent), out pipeline);
+            pipelines = PipelinesForEventLocked<TEvent>();
         }
 
-        ((SubscriptionPipeline<TEvent>?)pipeline)?.Publish(e, cancellationToken);
+        foreach (var pipeline in pipelines)
+        {
+            ((ISubscriptionPipeline<TEvent>)pipeline).Publish(e, cancellationToken);
+        }
     }
 
     public ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
@@ -120,4 +143,36 @@ public sealed class SubscriptionRegistry
         Publish(e, cancellationToken);
         return ValueTask.CompletedTask;
     }
+
+    private void EnsureCanRegisterLocked<TEvent>(IPluginEventAdapter<TEvent> adapter)
+    {
+        foreach (var (key, existing) in _pipelines)
+        {
+            if (key.EventType == typeof(TEvent) &&
+                !((ISubscriptionPipeline<TEvent>)existing).UsesAdapter(adapter))
+            {
+                throw new SandboxValidationException([
+                    new SandboxDiagnostic(
+                        "DBXK064",
+                        $"Subscription pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
+                ]);
+            }
+        }
+    }
+
+    private object[] PipelinesForEventLocked<TEvent>()
+    {
+        var pipelines = new List<object>();
+        foreach (var (key, pipeline) in _pipelines)
+        {
+            if (key.EventType == typeof(TEvent))
+            {
+                pipelines.Add(pipeline);
+            }
+        }
+
+        return [.. pipelines];
+    }
+
+    private readonly record struct PipelineKey(Type EventType, Type ContextType);
 }

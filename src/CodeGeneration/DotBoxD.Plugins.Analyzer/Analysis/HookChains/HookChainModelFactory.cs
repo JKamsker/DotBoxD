@@ -270,6 +270,10 @@ internal static partial class HookChainModelFactory
                 terminalElementTypeFullName,
                 generatedRemoteKind,
                 installKind.Value,
+                generatedRemoteKind is null
+                    ? null
+                    : GeneratedRemoteHookChainFallback.ServerContextTypeFullName(model, seed, cancellationToken),
+                terminalContextParam is not null,
                 localDecoderSource is not null,
                 projectedTypeSymbol,
                 cancellationToken));

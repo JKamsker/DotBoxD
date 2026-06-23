@@ -219,7 +219,7 @@ public sealed class PluginRevocationTests
 
     private static int HandlerCount<TEvent>(HookPipeline<TEvent> pipeline)
     {
-        var handlerSetField = typeof(HookPipeline<TEvent>).GetField(
+        var handlerSetField = typeof(HookPipeline<TEvent>).BaseType!.GetField(
             "_handlerSet",
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(handlerSetField);

@@ -1,8 +1,8 @@
 namespace DotBoxD.Plugins.Runtime;
 
-public sealed partial class HookPipeline<TEvent>
+public partial class HookPipeline<TEvent, TContext>
 {
-    public HookPipeline<TEvent> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options)
+    public HookPipeline<TEvent, TContext> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options)
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -35,10 +35,11 @@ public sealed partial class HookPipeline<TEvent>
             return new ValueTask<TResult?>((TResult?)null);
         }
 
-        var context = cancellationToken.CanBeCanceled
+        var rawContext = cancellationToken.CanBeCanceled
             ? new HookContext(_messages, cancellationToken)
-            : _defaultContext;
-        return _resultHooks.FireAsync(e, context, options, cancellationToken);
+            : _defaultRawContext;
+        var context = _contextFactory.Create(rawContext);
+        return _resultHooks.FireAsync(e, rawContext, context, options, cancellationToken);
     }
 
     private ResultHookDispatchOptions<TResult> ResultDispatchOptions<TResult>()

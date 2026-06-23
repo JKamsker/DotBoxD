@@ -1,0 +1,132 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
+
+namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
+
+internal static partial class ResultHookChain
+{
+    private static HookChainInterception? Interception(
+        InvocationExpressionSyntax invocation,
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        PluginKernelModel kernelModel,
+        INamedTypeSymbol contextType,
+        INamedTypeSymbol resultType,
+        bool isLocal,
+        bool isAsyncLocal,
+        bool hasServerContextParameter,
+        bool receiverIsStage,
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        CancellationToken cancellationToken)
+    {
+        var location = model.GetInterceptableLocation(invocation, cancellationToken);
+        if (location is null)
+        {
+            return null;
+        }
+
+        var packageFullName = string.IsNullOrEmpty(kernelModel.Namespace)
+            ? TypeNames.GlobalPrefix + kernelModel.PackageName
+            : TypeNames.GlobalPrefix + kernelModel.Namespace + "." + kernelModel.PackageName;
+
+        var contextFullName = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var resultFullName = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var serverContextFullName = ServerContextFullName(receiver, model, cancellationToken);
+        var handlerFullName = ResultHandlerFullName(
+            contextFullName,
+            serverContextFullName,
+            resultFullName,
+            hasServerContextParameter,
+            isAsyncLocal);
+
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
+            method.Parameters.Length >= 1 &&
+            method.Parameters[0].Type is INamedTypeSymbol handlerType &&
+            ResolvedReceiverType(method, model.GetTypeInfo(receiver, cancellationToken).Type) is { } resolvedReceiverType)
+        {
+            var resolvedReceiverFullName = resolvedReceiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            return new HookChainInterception(
+                location.GetInterceptsLocationAttributeSyntax(),
+                resolvedReceiverFullName,
+                handlerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                packageFullName,
+                isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
+                ResultTypeFullName: resultFullName,
+                IsAsyncLocalResult: isAsyncLocal);
+        }
+
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
+            receiverType.TypeKind == TypeKind.Error)
+        {
+            return generatedRemoteKind is null
+                ? null
+                : GeneratedRemoteHookChainFallback.CreateResultInterception(
+                    location.GetInterceptsLocationAttributeSyntax(),
+                    contextFullName,
+                    receiverIsStage,
+                    resultFullName,
+                    packageFullName,
+                    isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
+                    generatedRemoteKind.Value,
+                    isAsyncLocal);
+        }
+
+        var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return new HookChainInterception(
+            location.GetInterceptsLocationAttributeSyntax(),
+            receiverFullName,
+            handlerFullName,
+            receiverFullName,
+            packageFullName,
+            isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
+            ResultTypeFullName: resultFullName,
+            IsAsyncLocalResult: isAsyncLocal);
+    }
+
+    private static INamedTypeSymbol? ResolvedReceiverType(IMethodSymbol method, ITypeSymbol? expressionReceiverType)
+        => method.ReceiverType is INamedTypeSymbol { TypeKind: not TypeKind.Error } receiverType
+            ? receiverType
+            : expressionReceiverType as INamedTypeSymbol;
+
+    private static string ResultHandlerFullName(
+        string eventFullName,
+        string serverContextFullName,
+        string resultFullName,
+        bool hasServerContextParameter,
+        bool hasCancellationToken)
+    {
+        if (!hasServerContextParameter)
+        {
+            return $"{TypeNames.GlobalFunc}<{eventFullName}, {resultFullName}>";
+        }
+
+        return hasCancellationToken
+            ? $"{TypeNames.GlobalFunc}<" +
+                $"{eventFullName}, {serverContextFullName}, {TypeNames.GlobalCancellationToken}, " +
+                $"{TypeNames.GlobalValueTask}<{resultFullName}>>"
+            : $"{TypeNames.GlobalFunc}<{eventFullName}, {serverContextFullName}, {resultFullName}>";
+    }
+
+    private static string ServerContextFullName(
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType)
+        {
+            return TypeNames.GlobalHookContext;
+        }
+
+        var original = receiverType.OriginalDefinition.ToDisplayString();
+        return original is DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal
+            or DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal
+            or DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal
+            or DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal
+            ? receiverType.TypeArguments[receiverType.TypeArguments.Length - 1].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            : TypeNames.GlobalHookContext;
+    }
+}
