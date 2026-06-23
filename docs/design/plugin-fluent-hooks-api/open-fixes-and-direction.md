@@ -75,8 +75,9 @@ server extensions — plus one deliberately separate native terminal.** Treat th
 *trust boundary*, not just duplication.
 
 1. **Host call inside lowered IR** — a `Where`/`Select`/`Run` (or a server-extension body) that touches a
-   host member is lowered to a sandbox `CallExpression(bindingId, args)`,
-   `bindingId = host.{ns}.{Type}.{Method}`
+   host member is lowered to a sandbox `CallExpression(bindingId, args)`. For explicit `[HostBinding]`
+   members, `bindingId` is the attribute value; for auto host-service bindings, it is derived as
+   `host.{ns}.{Type}.{Method}`
    ([DotBoxDHostBindingExpressionLowerer.cs:89](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs)).
    At **exec** time the interpreter resolves the id **per call** against the host-curated `BindingRegistry`
    and runs the host's descriptor under its effects + `RequiredCapability` + grant check
@@ -101,7 +102,7 @@ server extensions — plus one deliberately separate native terminal.** Treat th
    This is the **trust-boundary exit** — the one place a plugin runs unverified native code — and must stay
    a distinct, non-substitutable path.
 
-**The seam (and why it is not "just duplication").** The binding id and the effect/allocation
+**The seam (and why it is not "just duplication").** The auto-binding id and the effect/allocation
 classification are re-derived in **both** the analyzer and the runtime — `HostBindingRoute` uses
 `type.MetadataName` in the analyzer
 ([DotBoxDHostBindingExpressionLowerer.cs:192](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/Lowering/Expressions/DotBoxDHostBindingExpressionLowerer.cs))
@@ -305,21 +306,30 @@ Each is verified against PR head `41ec9172`.
 
 8. **Typed hook/subscription overload drift is a latent codegen build break, not polish.**
    `RemoteSubscriptionPipeline.Typed` is missing the two element-only `UseGeneratedLocalChain` overloads
-   `RemoteHookPipeline.Typed` has (parity regression vs `main`). Either restore parity (collapse onto a
-   `kind`-parameterized base) **or** prove the generator never emits the element-only subscription
-   local-chain shape (so the gap is unreachable) — and say which.
+   `RemoteHookPipeline.Typed` has (parity regression vs `main`), and `RemoteSubscriptionStage.Typed` is
+   missing the same stage-level shape. Either restore parity (collapse onto a `kind`-parameterized base)
+   **or** prove the generator never emits the element-only subscription local-chain shape (so the gap is
+   unreachable) — and say which.
+
+9. **Analyzer/generator disagreement on `Run(lambda)` is stale and misleading.** The generator now lowers
+   fluent `Run` chains, but the analyzer still reports `DBXK110` saying `Run(lambda)` is "not yet lowered"
+   and "will throw at runtime"; the unshipped release note still says `InvokeKernel(lambda)`. Unsupported
+   chains should be diagnosed by the generator path that actually failed to lower, not by a blanket stale
+   analyzer warning.
+   [PluginAnalyzer.cs:33](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginAnalyzer.cs),
+   [AnalyzerReleases.Unshipped.md:9](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md).
 
 ### P3 — polish
 
-9. **Stale doc-term sweep** (broaden beyond `server-walkthrough.md`): also `plugin-walkthrough.md` and
-   `kernel-binding-model.md`; terms `server.Events` → `server.Subscriptions`, `server.Kernels.Register`,
-   `InvokeKernel`, and other old naming. [server-walkthrough.md:263](server-walkthrough.md), [:269](server-walkthrough.md).
-10. **Dead code** — `IPluginEventPipelineRegistry` (sole declaration repo-wide).
+10. **Stale doc-term sweep** (broaden beyond `server-walkthrough.md`): also `plugin-walkthrough.md` and
+    `kernel-binding-model.md`; terms `server.Events` → `server.Subscriptions`, `server.Kernels.Register`,
+    `InvokeKernel`, and other old naming. [server-walkthrough.md:263](server-walkthrough.md), [:269](server-walkthrough.md).
+11. **Dead code** — `IPluginEventPipelineRegistry` (sole declaration repo-wide).
     [ServerContextFactory.cs:17](../../../src/Hosting/DotBoxD.Plugins/Runtime/ServerContextFactory.cs). Delete.
-11. **Sample teaches noise** — `(e, _) =>` for filters that ignore `ctx`; use `e =>` unless the body
+12. **Sample teaches noise** — `(e, _) =>` for filters that ignore `ctx`; use `e =>` unless the body
     touches `ctx`. Promote the rule ("arity names intent") next to the §3.2 tier table.
     [Program.cs:91](../../../samples/GameServer/Examples.GameServer.Plugin/Program.cs).
-12. **`RegisterLocal` has three authoring shapes** (the legacy cancellation `(e, ctx, ct) =>
+13. **`RegisterLocal` has three authoring shapes** (the legacy cancellation `(e, ctx, ct) =>
     ValueTask<TResult>`) vs the "exactly two" rule. Drop it (`ctx.CancellationToken` exists) or document it
     as the deliberate async exception.
 
@@ -369,9 +379,16 @@ These are acceptance gates, not afterthoughts (the PR already has `ResultHookSlo
 - **Host-binding descriptor parity** — analyzer-derived vs runtime-derived id/effects agree (guards P2.6 /
   §3.4).
 - **Typed hook/subscription overload parity** — the `Typed` pipelines expose the same `UseGeneratedLocalChain`
-  set (guards P2.8).
+  set, including the stage-level typed subscription shape (guards P2.8).
 - **Deterministic `BlinkBehindAsync` path** — a local, non-flaky test exercising the real server-extension
   dispatch the smoke run covers (guards P1.4).
+- **Analyzer stale-warning guard** — `Run(lambda)` sites that are lowered by the generator must not also emit
+  `DBXK110`; genuinely unsupported chains should produce the specific generator diagnostic (guards P2.9).
+- **Generated context discovery docs** — generated context/registry XML docs name the default context type,
+  distinguish generated members from authored members, and document the explicit-context escape hatch.
+- **Plugin-fluent docs smoke** — include these design docs in docs smoke or add a targeted stale-term /
+  compiled-snippet check so `server.Events`, `server.Kernels.Register`, and old `Invoke*` names cannot drift
+  back in unnoticed.
 
 ---
 
