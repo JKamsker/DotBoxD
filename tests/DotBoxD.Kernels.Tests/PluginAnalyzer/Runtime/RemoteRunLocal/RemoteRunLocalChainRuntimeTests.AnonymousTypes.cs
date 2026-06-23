@@ -103,7 +103,11 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         PluginPackage? installed = null;
         var localHandlers = new RemoteLocalHandlerRegistry();
         var registry = new RemoteHookRegistry(
-            package => { installed = package; return ValueTask.FromResult(package.Manifest.PluginId); },
+            package =>
+            {
+                installed = package;
+                return ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);
+            },
             localHandlers);
 
         var usage = assembly.GetType("ChainSample.AnonTerminalRoundTripUsage")!;
@@ -111,7 +115,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         Assert.NotNull(installed);   // the generic interceptor ran UseGeneratedLocalChain (did not throw)
 
         await localHandlers.DispatchAsync(
-            installed!.Manifest.PluginId,
+            installed!.CallbackSubscriptionId ?? installed.Manifest.PluginId,
             payload,
             new HookContext(new InMemoryPluginMessageSink(), System.Threading.CancellationToken.None));
 
@@ -144,7 +148,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             package =>
             {
                 var kernel = server.InstallAsync(package).AsTask().GetAwaiter().GetResult();
-                var subscriptionId = package.Manifest.PluginId;
+                var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                 server.Hooks.On<EncounterEvent>().UseProjecting(
                     kernel,
                     subscriptionId,

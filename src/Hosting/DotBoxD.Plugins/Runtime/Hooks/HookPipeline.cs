@@ -26,7 +26,8 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         ServerContextFactory<TContext> contextFactory,
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
-        Action<ResultHookFault>? onFault = null)
+        Action<ResultHookFault>? onFault = null,
+        Func<long>? nextResultOrder = null)
     {
         _adapter = adapter;
         _messages = messages;
@@ -34,7 +35,7 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         _contextFactory = contextFactory;
         _kernels = kernels;
         _installer = installer;
-        _resultHooks = new ResultHookSlot<TEvent, TContext>(adapter, onFault);
+        _resultHooks = new ResultHookSlot<TEvent, TContext>(adapter, onFault, nextResultOrder);
     }
 
     public HookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
@@ -153,6 +154,9 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
 
     internal bool UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => ReferenceEquals(_adapter, adapter);
+
+    internal bool UsesContextFactory(Func<HookContext, TContext> createContext)
+        => _contextFactory.Uses(createContext);
 
     bool IHookPipeline<TEvent>.UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => UsesAdapter(adapter);

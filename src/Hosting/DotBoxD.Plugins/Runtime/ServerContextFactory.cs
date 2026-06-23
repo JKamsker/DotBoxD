@@ -11,7 +11,12 @@ internal sealed class ServerContextFactory<TContext>
 
     public TContext Create(HookContext context) => _create(context);
 
-    public static ServerContextFactory<HookContext> Default { get; } = new(static context => context);
+    public bool Uses(Func<HookContext, TContext> create)
+        => _create == create;
+
+    internal static HookContext Identity(HookContext context) => context;
+
+    public static ServerContextFactory<HookContext> Default { get; } = new(Identity);
 }
 
 internal interface IPluginEventPipelineRegistry

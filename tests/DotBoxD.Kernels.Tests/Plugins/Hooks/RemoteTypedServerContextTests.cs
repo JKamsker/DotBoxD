@@ -20,7 +20,12 @@ public sealed class RemoteTypedServerContextTests
     public async Task Remote_hook_RunLocal_invokes_the_configured_context_type()
     {
         var localHandlers = new RemoteLocalHandlerRegistry();
-        var registry = new RemoteHookRegistry(_ => ValueTask.FromResult("sub-hook"), localHandlers);
+        string? subscriptionId = null;
+        var registry = new RemoteHookRegistry(package =>
+        {
+            subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            return ValueTask.FromResult(subscriptionId);
+        }, localHandlers);
         string? observed = null;
 
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "hook"))
@@ -32,7 +37,7 @@ public sealed class RemoteTypedServerContextTests
                     return ValueTask.CompletedTask;
                 });
 
-        await localHandlers.DispatchAsync("sub-hook", Encode(new RemoteEvent("evt")), RawContext());
+        await localHandlers.DispatchAsync(subscriptionId!, Encode(new RemoteEvent("evt")), RawContext());
 
         Assert.Equal("hook:evt", observed);
     }
@@ -41,7 +46,12 @@ public sealed class RemoteTypedServerContextTests
     public async Task Remote_subscription_RunLocal_stage_invokes_the_configured_context_type()
     {
         var localHandlers = new RemoteLocalHandlerRegistry();
-        var registry = new RemoteSubscriptionRegistry(_ => ValueTask.FromResult("sub-subscription"), localHandlers);
+        string? subscriptionId = null;
+        var registry = new RemoteSubscriptionRegistry(package =>
+        {
+            subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            return ValueTask.FromResult(subscriptionId);
+        }, localHandlers);
         string? observed = null;
 
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "subscription"))
@@ -54,7 +64,7 @@ public sealed class RemoteTypedServerContextTests
                     return ValueTask.CompletedTask;
                 });
 
-        await localHandlers.DispatchAsync("sub-subscription", Encode("projected"), RawContext());
+        await localHandlers.DispatchAsync(subscriptionId!, Encode("projected"), RawContext());
 
         Assert.Equal("subscription:projected", observed);
     }
@@ -63,7 +73,12 @@ public sealed class RemoteTypedServerContextTests
     public async Task Remote_hook_RegisterLocal_invokes_the_configured_context_type()
     {
         var localHandlers = new RemoteLocalHandlerRegistry();
-        var registry = new RemoteHookRegistry(_ => ValueTask.FromResult("sub-result"), localHandlers);
+        string? subscriptionId = null;
+        var registry = new RemoteHookRegistry(package =>
+        {
+            subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            return ValueTask.FromResult(subscriptionId);
+        }, localHandlers);
         string? observed = null;
 
         registry.On<RemoteResultEvent, RemoteContext>(ctx => new RemoteContext(ctx, "result"))
@@ -76,7 +91,7 @@ public sealed class RemoteTypedServerContextTests
                 });
 
         var response = await localHandlers.DispatchResultAsync(
-            "sub-result",
+            subscriptionId!,
             Encode(new RemoteResultEvent("abc")),
             RawContext());
 

@@ -44,7 +44,7 @@ internal sealed class RunLocalHarness<TEvent> : IDisposable
             async package =>
             {
                 var kernel = await server.InstallAsync(package).ConfigureAwait(false);
-                var subscriptionId = package.Manifest.PluginId;
+                var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                 server.Hooks.On<TEvent>().UseProjecting(
                     kernel,
                     subscriptionId,

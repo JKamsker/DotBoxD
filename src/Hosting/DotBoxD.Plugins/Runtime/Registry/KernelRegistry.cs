@@ -9,13 +9,15 @@ namespace DotBoxD.Plugins;
 public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, InstalledKernel> _kernels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, InstalledKernel> _currentByPluginId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, InstalledKernel> _kernelsByInstallId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<InstalledKernel>> _kernelsByPluginId = new(StringComparer.Ordinal);
 
     public InstalledKernel Get(string pluginId)
     {
         lock (_gate)
         {
-            return _kernels[pluginId];
+            return _currentByPluginId[pluginId];
         }
     }
 
@@ -32,7 +34,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         ArgumentNullException.ThrowIfNull(pluginId);
         lock (_gate)
         {
-            return _kernels.TryGetValue(pluginId, out kernel);
+            return _currentByPluginId.TryGetValue(pluginId, out kernel);
         }
     }
 
@@ -45,7 +47,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
     {
         lock (_gate)
         {
-            return _kernels.Values.ToArray();
+            return _kernelsByInstallId.Values.ToArray();
         }
     }
 
@@ -70,39 +72,40 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         InstalledKernel? revoke = null;
         lock (_gate)
         {
-            if (_kernels.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
+            EnsureOwnerCanUsePrincipal(kernel);
+            if (_currentByPluginId.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
                 !ReferenceEquals(existing, kernel))
             {
-                if (!ReferenceEquals(existing.OwnerId, kernel.OwnerId) &&
-                    (existing.OwnerId is not null || kernel.OwnerId is not null))
-                {
-                    throw new SandboxValidationException([
-                        new SandboxDiagnostic(
-                            "DBXK060",
-                            $"plugin id '{kernel.Manifest.PluginId}' is owned by another session and cannot be replaced.")
-                    ]);
-                }
-
                 revoke = existing;
+                RemoveCore(existing);
             }
 
-            _kernels[kernel.Manifest.PluginId] = kernel;
+            AddCore(kernel, makeCurrent: true);
         }
 
         revoke?.Revoke();
         return revoke;
     }
 
+    internal void AddInstance(InstalledKernel kernel)
+    {
+        lock (_gate)
+        {
+            EnsureOwnerCanUsePrincipal(kernel);
+            AddCore(kernel, makeCurrent: false);
+        }
+    }
+
     /// <summary>
-    /// Removes and revokes a kernel only if it is owned by <paramref name="owner"/> (or has no owner),
-    /// so a session disposal never tears down another session's kernel that may have replaced this id.
+    /// Removes and revokes a kernel instance only if it is owned by <paramref name="owner"/> (or has no owner),
+    /// so a session disposal never tears down another session's same-principal kernel.
     /// </summary>
-    internal InstalledKernel? RemoveOwned(PluginSession owner, string pluginId)
+    internal InstalledKernel? RemoveOwned(PluginSession owner, string installId)
     {
         InstalledKernel? kernel;
         lock (_gate)
         {
-            if (!_kernels.TryGetValue(pluginId, out kernel))
+            if (!_kernelsByInstallId.TryGetValue(installId, out kernel))
             {
                 return null;
             }
@@ -112,7 +115,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
                 return null;
             }
 
-            _kernels.Remove(pluginId);
+            RemoveCore(kernel);
         }
 
         kernel.Revoke();
@@ -124,10 +127,12 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         InstalledKernel? kernel;
         lock (_gate)
         {
-            if (!_kernels.Remove(pluginId, out kernel))
+            if (!_currentByPluginId.TryGetValue(pluginId, out kernel))
             {
                 return null;
             }
+
+            RemoveCore(kernel);
         }
 
         if (kernel is null)
@@ -143,16 +148,80 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
     {
         lock (_gate)
         {
-            if (!_kernels.TryGetValue(kernel.Manifest.PluginId, out var current) ||
+            if (!_kernelsByInstallId.TryGetValue(kernel.InstallId, out var current) ||
                 !ReferenceEquals(current, kernel))
             {
                 return null;
             }
 
-            _kernels.Remove(kernel.Manifest.PluginId);
+            RemoveCore(kernel);
         }
 
         kernel.Revoke();
         return kernel;
+    }
+
+    private void AddCore(InstalledKernel kernel, bool makeCurrent)
+    {
+        if (_kernelsByInstallId.ContainsKey(kernel.InstallId))
+        {
+            throw new InvalidOperationException($"kernel install id '{kernel.InstallId}' is already registered.");
+        }
+
+        _kernelsByInstallId[kernel.InstallId] = kernel;
+        if (!_kernelsByPluginId.TryGetValue(kernel.Manifest.PluginId, out var principals))
+        {
+            principals = [];
+            _kernelsByPluginId[kernel.Manifest.PluginId] = principals;
+        }
+
+        principals.Add(kernel);
+        if (makeCurrent)
+        {
+            _currentByPluginId[kernel.Manifest.PluginId] = kernel;
+        }
+    }
+
+    private void RemoveCore(InstalledKernel kernel)
+    {
+        _kernelsByInstallId.Remove(kernel.InstallId);
+        if (_currentByPluginId.TryGetValue(kernel.Manifest.PluginId, out var current) &&
+            ReferenceEquals(current, kernel))
+        {
+            _currentByPluginId.Remove(kernel.Manifest.PluginId);
+        }
+
+        if (_kernelsByPluginId.TryGetValue(kernel.Manifest.PluginId, out var principals))
+        {
+            principals.Remove(kernel);
+            if (principals.Count == 0)
+            {
+                _kernelsByPluginId.Remove(kernel.Manifest.PluginId);
+            }
+        }
+    }
+
+    private void EnsureOwnerCanUsePrincipal(InstalledKernel kernel)
+    {
+        if (!_kernelsByPluginId.TryGetValue(kernel.Manifest.PluginId, out var existingKernels))
+        {
+            return;
+        }
+
+        foreach (var existing in existingKernels)
+        {
+            if (ReferenceEquals(existing, kernel) ||
+                ReferenceEquals(existing.OwnerId, kernel.OwnerId) ||
+                (existing.OwnerId is null && kernel.OwnerId is null))
+            {
+                continue;
+            }
+
+            throw new SandboxValidationException([
+                new SandboxDiagnostic(
+                    "DBXK060",
+                    $"plugin id '{kernel.Manifest.PluginId}' is owned by another session and cannot be replaced.")
+            ]);
+        }
     }
 }

@@ -206,12 +206,12 @@ internal static class PluginServerSetupEmitter
         builder.Append("            _hooks = new ").Append(model.HookRegistryName).AppendLine("(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Plugin(package));");
-        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
+        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);");
         builder.AppendLine("            }, localHandlers);");
         builder.Append("            _subscriptions = new ").Append(model.SubscriptionRegistryName).AppendLine("(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Subscription(package));");
-        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
+        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);");
         builder.AppendLine("            }, localHandlers);");
         foreach (var control in model.Controls)
         {

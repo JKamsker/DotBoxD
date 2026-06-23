@@ -14,7 +14,7 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
 {
     private readonly PluginServer _server;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly HashSet<string> _owned = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _ownedInstallIds = new(StringComparer.Ordinal);
     private int _disposed;
 
     internal PluginSession(PluginServer server) => _server = server;
@@ -35,7 +35,7 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             var kernel = await _server.InstallOwnedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
-            _owned.Add(package.Manifest.PluginId);
+            _ownedInstallIds.Add(kernel.InstallId);
             return kernel;
         }
         finally
@@ -61,7 +61,7 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             var kernel = await _server.InstallOwnedServerExtensionAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
-            _owned.Add(package.Manifest.PluginId);
+            _ownedInstallIds.Add(kernel.InstallId);
             return kernel;
         }
         finally
@@ -88,19 +88,10 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            if (!_owned.Contains(pluginId))
-            {
-                throw new SandboxValidationException([
-                    new SandboxDiagnostic(
-                        "DBXK061",
-                        $"plugin id '{pluginId}' is not owned by this session.")
-                ]);
-            }
-
             if (!_server.Kernels.TryGet(pluginId, out var ownedKernel) ||
-                !ReferenceEquals(ownedKernel.OwnerId, this))
+                !ReferenceEquals(ownedKernel.OwnerId, this) ||
+                !_ownedInstallIds.Contains(ownedKernel.InstallId))
             {
-                _owned.Remove(pluginId);
                 throw new SandboxValidationException([
                     new SandboxDiagnostic(
                         "DBXK061",
@@ -125,19 +116,14 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
-            if (Volatile.Read(ref _disposed) != 0 || !_owned.Contains(pluginId))
+            if (Volatile.Read(ref _disposed) != 0 ||
+                !_server.Kernels.TryGet(pluginId, out var kernel) ||
+                !ReferenceEquals(kernel.OwnerId, this))
             {
                 return false;
             }
 
-            if (_server.Kernels.TryGet(pluginId, out var kernel) &&
-                ReferenceEquals(kernel.OwnerId, this))
-            {
-                return true;
-            }
-
-            _owned.Remove(pluginId);
-            return false;
+            return _ownedInstallIds.Contains(kernel.InstallId);
         }
         finally
         {
@@ -148,21 +134,26 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
     public bool Uninstall(string pluginId)
     {
         ArgumentNullException.ThrowIfNull(pluginId);
+        string installId;
         _gate.Wait();
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            if (!_owned.Remove(pluginId))
+            if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
+                !ReferenceEquals(kernel.OwnerId, this) ||
+                !_ownedInstallIds.Remove(kernel.InstallId))
             {
                 return false;
             }
+
+            installId = kernel.InstallId;
         }
         finally
         {
             _gate.Release();
         }
 
-        return _server.UninstallOwned(this, pluginId);
+        return _server.UninstallOwned(this, installId);
     }
 
     public void Dispose()
@@ -178,17 +169,17 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
-            owned = [.. _owned];
-            _owned.Clear();
+            owned = [.. _ownedInstallIds];
+            _ownedInstallIds.Clear();
         }
         finally
         {
             _gate.Release();
         }
 
-        foreach (var pluginId in owned)
+        foreach (var installId in owned)
         {
-            _server.UninstallOwned(this, pluginId);
+            _server.UninstallOwned(this, installId);
         }
     }
 

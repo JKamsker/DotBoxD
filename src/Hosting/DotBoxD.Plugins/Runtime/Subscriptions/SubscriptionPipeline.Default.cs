@@ -15,6 +15,17 @@ public sealed class SubscriptionPipeline<TEvent> : SubscriptionPipeline<TEvent, 
     {
     }
 
+    internal SubscriptionPipeline(
+        IPluginEventAdapter<TEvent> adapter,
+        IPluginMessageSink messages,
+        ServerContextFactory<HookContext> contextFactory,
+        KernelRegistry kernels,
+        Func<PluginPackage, InstalledKernel>? installer = null,
+        Action<SubscriptionDeliveryFault>? onFault = null)
+        : base(adapter, messages, contextFactory, kernels, installer, onFault)
+    {
+    }
+
     public new SubscriptionPipeline<TEvent> UseGeneratedChain(PluginPackage package)
     {
         base.UseGeneratedChain(package);

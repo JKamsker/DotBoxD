@@ -234,9 +234,10 @@ public sealed class TypedServerContextTests
                 if (subscription.ResultLocalTerminal)
                 {
                     var handlers = localHandlers ?? throw new InvalidOperationException("Local handlers required.");
+                    var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                     pipeline.UseProjectingResult(
                         kernel,
-                        package.Manifest.PluginId,
+                        subscriptionId,
                         typeof(TResult),
                         (id, payload, token) => handlers.DispatchResultAsync(
                             id,
@@ -250,7 +251,7 @@ public sealed class TypedServerContextTests
                     pipeline.UseResult(kernel, typeof(TResult), subscription.Priority);
                 }
 
-                return package.Manifest.PluginId;
+                return kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
             },
             localHandlers);
 

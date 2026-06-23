@@ -75,8 +75,20 @@ public sealed partial class RemoteHookPipeline<TEvent>
             throw ResultLocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
-        _localHandlers.RegisterResult(subscriptionId, handler);
+        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
+        var registration = _localHandlers.RegisterResult(subscriptionId, handler);
+        try
+        {
+            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(WithPriority(package, priority), subscriptionId))
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            registration.Dispose();
+            throw;
+        }
 
         return this;
     }

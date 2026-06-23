@@ -132,8 +132,21 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             throw LocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(package).AsTask().GetAwaiter().GetResult();
-        _localHandlers.Register(subscriptionId, handler);
+        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
+        var registration = _localHandlers.Register(subscriptionId, handler);
+        try
+        {
+            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            registration.Dispose();
+            throw;
+        }
+
         return this;
     }
 
@@ -148,8 +161,21 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             throw LocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(package).AsTask().GetAwaiter().GetResult();
-        _localHandlers.Register(subscriptionId, handler, decoder);
+        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
+        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
+        try
+        {
+            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            registration.Dispose();
+            throw;
+        }
+
         return this;
     }
 
@@ -164,8 +190,21 @@ public sealed class RemoteSubscriptionPipeline<TEvent>
             throw LocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(package).AsTask().GetAwaiter().GetResult();
-        _localHandlers.Register(subscriptionId, handler, decoder);
+        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
+        var registration = _localHandlers.Register(subscriptionId, handler, decoder);
+        try
+        {
+            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(package, subscriptionId))
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            registration.Dispose();
+            throw;
+        }
+
         return this;
     }
 

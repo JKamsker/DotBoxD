@@ -144,6 +144,12 @@ public sealed record PluginPackage(
     SandboxModule Module,
     KernelEntrypoints Entrypoints)
 {
+    /// <summary>
+    /// Opaque callback route id for lowered <c>RunLocal</c>/<c>RegisterLocal</c> packages, when the
+    /// installing client preallocated one. This is distinct from the stable plugin/package id.
+    /// </summary>
+    public string? CallbackSubscriptionId => LocalTerminalIdentity.CallbackSubscriptionId(this);
+
     public static PluginPackage Create(
         PluginManifest manifest,
         SandboxModule module,

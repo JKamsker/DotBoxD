@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Kernels.Game.Server.Simulation;
 using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Kernel;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
 namespace DotBoxD.Kernels.Game.Server.Ipc;
@@ -80,7 +81,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
         _kernelWiring.WireHook(kernel);
         Console.WriteLine($"[server] installed plugin kernel '{kernel.Manifest.PluginId}'.");
-        return kernel.Manifest.PluginId;
+        return InstallRouteId(kernel);
     }
 
     public async ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default)
@@ -95,7 +96,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         _kernelWiring.WireSubscription(kernel);
         EventIndexDiagnostics.Report(kernel);
         Console.WriteLine($"[server] installed subscription kernel '{kernel.Manifest.PluginId}'.");
-        return kernel.Manifest.PluginId;
+        return InstallRouteId(kernel);
     }
 
     public async ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
@@ -160,6 +161,9 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ct.ThrowIfCancellationRequested();
         return ValueTask.FromResult(_sink.DrainEffects());
     }
+
+    private static string InstallRouteId(InstalledKernel kernel)
+        => kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
 
     // The per-entity domain calls (KillMonster / IsMonster / GetEntity*) moved to GameWorldAccess, which
     // implements IGameWorldAccess directly. This control service is now control-plane only. (GetWorldAsync

@@ -81,16 +81,18 @@ public sealed class RemoteRunLocalFacadeIpcTests
 
         public ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default)
         {
-            var pluginId = PluginPackageJsonSerializer.Import(packageJson).Manifest.PluginId;
-            Installed.TrySetResult(pluginId);
-            return ValueTask.FromResult(pluginId);
+            var package = PluginPackageJsonSerializer.Import(packageJson);
+            var routeId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            Installed.TrySetResult(routeId);
+            return ValueTask.FromResult(routeId);
         }
 
         public ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default)
         {
-            var pluginId = PluginPackageJsonSerializer.Import(packageJson).Manifest.PluginId;
-            Installed.TrySetResult(pluginId);
-            return ValueTask.FromResult(pluginId);
+            var package = PluginPackageJsonSerializer.Import(packageJson);
+            var routeId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+            Installed.TrySetResult(routeId);
+            return ValueTask.FromResult(routeId);
         }
 
         public ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)

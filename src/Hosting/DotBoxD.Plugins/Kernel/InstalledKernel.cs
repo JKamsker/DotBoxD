@@ -43,6 +43,7 @@ public sealed partial class InstalledKernel
         _ownerId = ownerId;
         Package = package;
         Manifest = package.Manifest;
+        InstallId = LocalTerminalIdentity.CreateInstallId();
         Value = LiveSettingStore.FromDefinitions(Manifest.LiveSettings);
         _entrypoints = package.Entrypoints;
         _liveStateSync = new LiveStateSyncRegistry(GetUpdateMode);
@@ -55,6 +56,8 @@ public sealed partial class InstalledKernel
 
     public PluginPackage Package { get; }
     public PluginManifest Manifest { get; }
+    public string InstallId { get; }
+    public string? CallbackSubscriptionId => Package.CallbackSubscriptionId;
     public LiveSettingStore Value { get; }
     public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError;
     public PluginExecutionObservation? LastExecution => _executionObserver.Last;

@@ -194,6 +194,9 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     internal bool UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => ReferenceEquals(_adapter, adapter);
 
+    internal bool UsesContextFactory(Func<HookContext, TContext> createContext)
+        => _contextFactory.Uses(createContext);
+
     bool ISubscriptionPipeline<TEvent>.UsesAdapter(IPluginEventAdapter<TEvent> adapter)
         => UsesAdapter(adapter);
 

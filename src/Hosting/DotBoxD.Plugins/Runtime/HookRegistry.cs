@@ -12,6 +12,7 @@ internal interface IKernelHandlerPipeline
 internal interface IHookPipeline<TEvent> : IKernelHandlerPipeline
 {
     bool UsesAdapter(IPluginEventAdapter<TEvent> adapter);
+    Hooks.IResultHookRegistration<TEvent>[] ResultRegistrations();
     ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken);
     ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult;
@@ -31,6 +32,7 @@ public sealed partial class HookRegistry
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<ResultHookFault>? _onFault;
+    private long _resultOrder;
 
     internal HookRegistry(
         IPluginMessageSink messages,
@@ -60,10 +62,21 @@ public sealed partial class HookRegistry
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                return (HookPipeline<TEvent>)existing;
+                var pipeline = (HookPipeline<TEvent>)existing;
+                EnsureContextFactoryMatches(
+                    pipeline.UsesContextFactory,
+                    ServerContextFactory<HookContext>.Identity,
+                    "hook");
+                return pipeline;
             }
 
-            var created = new HookPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
+            var created = new HookPipeline<TEvent>(
+                adapter,
+                _messages,
+                _kernels,
+                _installer,
+                _onFault,
+                NextResultOrder);
             _pipelines[key] = created;
             return created;
         }
@@ -80,13 +93,20 @@ public sealed partial class HookRegistry
         Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);
+        if (typeof(TContext) == typeof(HookContext))
+        {
+            return (HookPipeline<TEvent, TContext>)(object)OnHookContext(adapter, (Func<HookContext, HookContext>)(object)createContext);
+        }
+
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
             var key = new PipelineKey(typeof(TEvent), typeof(TContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                return (HookPipeline<TEvent, TContext>)existing;
+                var pipeline = (HookPipeline<TEvent, TContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
+                return pipeline;
             }
 
             var created = new HookPipeline<TEvent, TContext>(
@@ -95,11 +115,43 @@ public sealed partial class HookRegistry
                 new ServerContextFactory<TContext>(createContext),
                 _kernels,
                 _installer,
-                _onFault);
+                _onFault,
+                NextResultOrder);
             _pipelines[key] = created;
             return created;
         }
     }
+
+    private HookPipeline<TEvent> OnHookContext<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, HookContext> createContext)
+    {
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                var pipeline = (HookPipeline<TEvent>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
+                return pipeline;
+            }
+
+            var created = new HookPipeline<TEvent>(
+                adapter,
+                _messages,
+                new ServerContextFactory<HookContext>(createContext),
+                _kernels,
+                _installer,
+                _onFault,
+                NextResultOrder);
+            _pipelines[key] = created;
+            return created;
+        }
+    }
+
+    private long NextResultOrder()
+        => Interlocked.Increment(ref _resultOrder) - 1;
 
     internal void EnsureCanRegister<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {

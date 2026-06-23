@@ -10,8 +10,21 @@ public sealed class HookPipeline<TEvent> : HookPipeline<TEvent, HookContext>
         IPluginMessageSink messages,
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
-        Action<ResultHookFault>? onFault = null)
-        : base(adapter, messages, ServerContextFactory<HookContext>.Default, kernels, installer, onFault)
+        Action<ResultHookFault>? onFault = null,
+        Func<long>? nextResultOrder = null)
+        : base(adapter, messages, ServerContextFactory<HookContext>.Default, kernels, installer, onFault, nextResultOrder)
+    {
+    }
+
+    internal HookPipeline(
+        IPluginEventAdapter<TEvent> adapter,
+        IPluginMessageSink messages,
+        ServerContextFactory<HookContext> contextFactory,
+        KernelRegistry kernels,
+        Func<PluginPackage, InstalledKernel>? installer = null,
+        Action<ResultHookFault>? onFault = null,
+        Func<long>? nextResultOrder = null)
+        : base(adapter, messages, contextFactory, kernels, installer, onFault, nextResultOrder)
     {
     }
 

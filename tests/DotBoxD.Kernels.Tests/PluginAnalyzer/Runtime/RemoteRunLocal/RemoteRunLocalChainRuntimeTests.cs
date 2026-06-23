@@ -83,8 +83,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             package =>
             {
                 installed = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 

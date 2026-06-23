@@ -97,7 +97,7 @@ internal sealed class GamePluginKernelWiring
             {
                 pipeline.UseProjectingResult(
                     kernel,
-                    kernel.Manifest.PluginId,
+                    CallbackSubscriptionId(kernel),
                     resultType,
                     LocalResultRequest(),
                     priority);
@@ -109,7 +109,7 @@ internal sealed class GamePluginKernelWiring
         }
         else if (IsLocalTerminal(kernel.Manifest))
         {
-            pipeline.UseProjecting(kernel, kernel.Manifest.PluginId, LocalPush());
+            pipeline.UseProjecting(kernel, CallbackSubscriptionId(kernel), LocalPush());
         }
         else
         {
@@ -123,7 +123,7 @@ internal sealed class GamePluginKernelWiring
         // capture the projected value and push it back; index routing would run the kernel and discard it.
         if (IsLocalTerminal(kernel.Manifest))
         {
-            _server.Subscriptions.On<TEvent>().UseProjecting(kernel, kernel.Manifest.PluginId, LocalPush());
+            _server.Subscriptions.On<TEvent>().UseProjecting(kernel, CallbackSubscriptionId(kernel), LocalPush());
             return;
         }
 
@@ -172,6 +172,9 @@ internal sealed class GamePluginKernelWiring
 
     private static bool IsLocalTerminal(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].LocalTerminal;
+
+    private static string CallbackSubscriptionId(InstalledKernel kernel)
+        => kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
 
     private static bool IsResultHook(PluginManifest manifest)
         => manifest.Subscriptions.Count > 0 && manifest.Subscriptions[0].ResultType is not null;

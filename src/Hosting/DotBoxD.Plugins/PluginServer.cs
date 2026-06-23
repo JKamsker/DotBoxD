@@ -192,7 +192,7 @@ public sealed partial class PluginServer : IDisposable
         CancellationToken cancellationToken)
         => InstallServerExtensionCoreAsync(package, policy, owner, cancellationToken);
 
-    internal bool UninstallOwned(PluginSession owner, string pluginId)
+    internal bool UninstallOwned(PluginSession owner, string installId)
     {
         // The owning server may have been disposed first (it revokes all kernels in Dispose); a
         // session disposing afterward is a no-op rather than an ObjectDisposedException.
@@ -201,11 +201,11 @@ public sealed partial class PluginServer : IDisposable
             return false;
         }
 
-        var removed = Kernels.RemoveOwned(owner, pluginId);
+        var removed = Kernels.RemoveOwned(owner, installId);
         if (removed is not null)
         {
             RemoveKernelReferences(removed);
-            ClearServerExtensionRegistrations(pluginId);
+            ClearServerExtensionRegistrations(removed.Manifest.PluginId);
         }
 
         return removed is not null;
@@ -223,70 +223,12 @@ public sealed partial class PluginServer : IDisposable
             .ConfigureAwait(false);
         PluginPackageValidator.ValidatePrepared(package, plan, Events);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        var replaced = Kernels.Add(kernel);
+        var replaced = AddKernel(kernel);
         if (replaced is not null)
         {
             RemoveKernelReferences(replaced);
         }
 
-        return kernel;
-    }
-
-    private async ValueTask<InstalledKernelPool> InstallPoolCoreAsync(
-        PluginPackage package,
-        int degreeOfParallelism,
-        SandboxPolicy? policy,
-        CancellationToken cancellationToken)
-    {
-        if (degreeOfParallelism <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(degreeOfParallelism),
-                degreeOfParallelism,
-                "kernel pool degree of parallelism must be positive.");
-        }
-
-        ThrowIfDisposed();
-        PluginPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
-            .ConfigureAwait(false);
-        PluginPackageValidator.ValidatePrepared(package, plan, Events);
-        var kernels = new InstalledKernel[degreeOfParallelism];
-        for (var i = 0; i < kernels.Length; i++)
-        {
-            kernels[i] = new InstalledKernel(_host, plan, package, _executionMode);
-        }
-
-        var pool = new InstalledKernelPool(kernels);
-        lock (_poolGate)
-        {
-            _kernelPools.Add(pool);
-        }
-
-        return pool;
-    }
-
-    private async ValueTask<InstalledKernel> InstallServerExtensionCoreAsync(
-        PluginPackage package,
-        SandboxPolicy? policy,
-        object? owner,
-        CancellationToken cancellationToken)
-    {
-        ThrowIfDisposed();
-        RpcKernelPackageValidator.Validate(package);
-        var plan = await _host.PrepareAsync(package.Module, policy ?? _defaultPolicy, cancellationToken)
-            .ConfigureAwait(false);
-        RpcKernelPackageValidator.ValidatePrepared(package, plan);
-        // Server-extension kernels honor the server's execution mode like event kernels; their
-        // record/list IR compiles to verified IL (record.new/record.get), so Auto/Compiled produces fast code.
-        var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
-        var replaced = Kernels.Add(kernel);
-        if (replaced is not null)
-        {
-            RemoveKernelReferences(replaced);
-        }
-
-        ClearServerExtensionRegistrations(package.Manifest.PluginId);
         return kernel;
     }
 

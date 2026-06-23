@@ -29,17 +29,19 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
     public ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var pluginId = PluginId(packageJson);
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        var pluginId = package.Manifest.PluginId;
         Calls.Add("kernel:" + pluginId);
-        return ValueTask.FromResult(pluginId);
+        return ValueTask.FromResult(RouteId(package));
     }
 
     public ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var pluginId = PluginId(packageJson);
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        var pluginId = package.Manifest.PluginId;
         Calls.Add("subscription:" + pluginId);
-        return ValueTask.FromResult(pluginId);
+        return ValueTask.FromResult(RouteId(package));
     }
 
     public ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
@@ -103,6 +105,9 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
 
     private static string PluginId(string packageJson)
         => PluginPackageJsonSerializer.Import(packageJson).Manifest.PluginId;
+
+    private static string RouteId(PluginPackage package)
+        => package.CallbackSubscriptionId ?? package.Manifest.PluginId;
 
     private static byte[] DefaultKillResultsResponse()
         => KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.List(

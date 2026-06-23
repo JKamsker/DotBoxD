@@ -20,6 +20,23 @@ public sealed partial class HookRegistry
         }
     }
 
+    private static void EnsureContextFactoryMatches<TContext>(
+        Func<Func<HookContext, TContext>, bool> usesContextFactory,
+        Func<HookContext, TContext> createContext,
+        string surface)
+    {
+        if (usesContextFactory(createContext))
+        {
+            return;
+        }
+
+        throw new SandboxValidationException([
+            new SandboxDiagnostic(
+                "DBXK067",
+                $"A {surface} pipeline for context '{typeof(TContext).Name}' is already registered with a different context factory.")
+        ]);
+    }
+
     private (object? Single, object[]? Multiple) PipelinesForEventLocked<TEvent>()
     {
         object? single = null;
@@ -62,10 +79,11 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        foreach (var pipeline in pipelines)
+        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        foreach (var registration in registrations)
         {
-            var result = await ((IHookPipeline<TEvent>)pipeline)
-                .FireResultAsync<TResult>(e, cancellationToken)
+            var result = await registration
+                .InvokeAsync<TResult>(e, options: null, cancellationToken)
                 .ConfigureAwait(false);
             if (result is not null)
             {
@@ -83,10 +101,11 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
     {
-        foreach (var pipeline in pipelines)
+        var registrations = OrderedResultRegistrations<TEvent>(pipelines);
+        foreach (var registration in registrations)
         {
-            var result = await ((IHookPipeline<TEvent>)pipeline)
-                .FireResultAsync(e, options, cancellationToken)
+            var result = await registration
+                .InvokeAsync(e, options, cancellationToken)
                 .ConfigureAwait(false);
             if (result is not null)
             {
@@ -95,5 +114,19 @@ public sealed partial class HookRegistry
         }
 
         return null;
+    }
+
+    private static Hooks.IResultHookRegistration<TEvent>[] OrderedResultRegistrations<TEvent>(object[] pipelines)
+    {
+        var registrations = new List<Hooks.IResultHookRegistration<TEvent>>();
+        foreach (var pipeline in pipelines)
+        {
+            registrations.AddRange(((IHookPipeline<TEvent>)pipeline).ResultRegistrations());
+        }
+
+        registrations.Sort(static (left, right) => left.Priority != right.Priority
+            ? right.Priority.CompareTo(left.Priority)
+            : left.Order.CompareTo(right.Order));
+        return [.. registrations];
     }
 }

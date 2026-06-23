@@ -47,7 +47,12 @@ public sealed class SubscriptionRegistry
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                return (SubscriptionPipeline<TEvent>)existing;
+                var pipeline = (SubscriptionPipeline<TEvent>)existing;
+                EnsureContextFactoryMatches(
+                    pipeline.UsesContextFactory,
+                    ServerContextFactory<HookContext>.Identity,
+                    "subscription");
+                return pipeline;
             }
 
             var created = new SubscriptionPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
@@ -67,19 +72,55 @@ public sealed class SubscriptionRegistry
         Func<HookContext, TContext> createContext)
     {
         ArgumentNullException.ThrowIfNull(createContext);
+        if (typeof(TContext) == typeof(HookContext))
+        {
+            return (SubscriptionPipeline<TEvent, TContext>)(object)OnHookContext(
+                adapter,
+                (Func<HookContext, HookContext>)(object)createContext);
+        }
+
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
             var key = new PipelineKey(typeof(TEvent), typeof(TContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                return (SubscriptionPipeline<TEvent, TContext>)existing;
+                var pipeline = (SubscriptionPipeline<TEvent, TContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
+                return pipeline;
             }
 
             var created = new SubscriptionPipeline<TEvent, TContext>(
                 adapter,
                 _messages,
                 new ServerContextFactory<TContext>(createContext),
+                _kernels,
+                _installer,
+                _onFault);
+            _pipelines[key] = created;
+            return created;
+        }
+    }
+
+    private SubscriptionPipeline<TEvent> OnHookContext<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, HookContext> createContext)
+    {
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                var pipeline = (SubscriptionPipeline<TEvent>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
+                return pipeline;
+            }
+
+            var created = new SubscriptionPipeline<TEvent>(
+                adapter,
+                _messages,
+                new ServerContextFactory<HookContext>(createContext),
                 _kernels,
                 _installer,
                 _onFault);
@@ -158,6 +199,23 @@ public sealed class SubscriptionRegistry
                 ]);
             }
         }
+    }
+
+    private static void EnsureContextFactoryMatches<TContext>(
+        Func<Func<HookContext, TContext>, bool> usesContextFactory,
+        Func<HookContext, TContext> createContext,
+        string surface)
+    {
+        if (usesContextFactory(createContext))
+        {
+            return;
+        }
+
+        throw new SandboxValidationException([
+            new SandboxDiagnostic(
+                "DBXK067",
+                $"A {surface} pipeline for context '{typeof(TContext).Name}' is already registered with a different context factory.")
+        ]);
     }
 
     private object[] PipelinesForEventLocked<TEvent>()

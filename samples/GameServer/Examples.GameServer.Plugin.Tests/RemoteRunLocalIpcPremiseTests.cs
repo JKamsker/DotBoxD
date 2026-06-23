@@ -73,8 +73,8 @@ public sealed class RemoteRunLocalIpcPremiseTests
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -140,8 +140,8 @@ public sealed class RemoteRunLocalIpcPremiseTests
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -202,8 +202,8 @@ public sealed class RemoteRunLocalIpcPremiseTests
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
