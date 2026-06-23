@@ -102,11 +102,9 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
-    public void Lowers_a_cancellation_aware_RegisterLocal_result_chain_to_a_local_result_install()
+    public void Lowers_a_two_parameter_RegisterLocal_result_chain_to_a_local_result_install()
     {
         var result = RunGenerator("""
-            using System.Threading;
-            using System.Threading.Tasks;
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
@@ -125,8 +123,8 @@ public sealed partial class PluginAnalyzerHookChainTests
                     => hooks.On<DeathCtx>()
                         .Where(ctx => ctx.FatalDamage > 0)
                         .RegisterLocal(
-                            (ctx, hookContext, cancellationToken) =>
-                                new ValueTask<DeathResult>(new DeathResult { Success = true }),
+                            (ctx, hookContext) =>
+                                new DeathResult { Success = true },
                             5);
             }
             """);
@@ -137,7 +135,6 @@ public sealed partial class PluginAnalyzerHookChainTests
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
         Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
-        Assert.Contains("global::System.Threading.CancellationToken", generated, StringComparison.Ordinal);
     }
 
     [Fact]

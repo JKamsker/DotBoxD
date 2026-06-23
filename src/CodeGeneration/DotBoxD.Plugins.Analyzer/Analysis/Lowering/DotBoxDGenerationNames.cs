@@ -256,13 +256,11 @@ internal static class DotBoxDGenerationNames
         public const string Div = "Div";
         public const string Mod = "Mod";
     }
-
     public static class IrTypes
     {
         public const string IfStatement = TypeNames.GlobalIfStatement;
         public const string ReturnStatement = TypeNames.GlobalReturnStatement;
     }
-
     public static class BindingIds
     {
         public const string Int32ToStringInvariant = "int32.toStringInvariant";
@@ -271,18 +269,15 @@ internal static class DotBoxDGenerationNames
         public const string StringConcatBudgeted = "string.concatBudgeted";
         public const string StringEquals = "string.equals";
     }
-
     public static class GeneratedVariables
     {
         public const string EventPrefix = "e_";
     }
-
     public static class ModuleMetadata
     {
         public const string PluginId = "pluginId";
         public const string Kernel = "kernel";
     }
-
     public static class Operators
     {
         public const string LogicalNot = "!";

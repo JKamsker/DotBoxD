@@ -50,9 +50,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
                 $"Polymorphic handle binding '{bindingId}' must be called on a pattern-captured subtype.");
         }
 
-        // The return (and arguments) may be any host-binding-eligible marshaller type: scalar, Guid, enum,
-        // list, map, or DTO record. Nullable value types are deliberately excluded here even though result-hook
-        // fields use the same RPC marshaller support; HostServiceBindingFactory rejects them before registration.
+        // Host bindings use the same non-nullable marshaller shapes the runtime binding factory accepts.
         var returnType = HostBindingReturnTag(method.ReturnType, bindingId);
 
         var arguments = invocation.ArgumentList.Arguments;
@@ -111,10 +109,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return new DotBoxDExpressionModel(source, returnType, IsAllocatingTag(returnType));
     }
 
-    // Which host-call return shapes the runtime binding factory counts as allocating. This MUST match
-    // HostServiceBindingFactory.ReturnAllocates, which treats anything that is not Unit/Bool/I32/I64/F64 as
-    // allocating — so string, Guid, list, map, and record all allocate (Guid included: the manifest effect must
-    // match the registered binding's, or install fails DBXK041). The bool/int/long/double scalar tags do not.
+    // Must match HostServiceBindingFactory.ReturnAllocates.
     private static bool IsAllocatingTag(string tag)
         => string.Equals(tag, ManifestTypes.String, StringComparison.Ordinal) ||
            string.Equals(tag, ManifestTypes.Guid, StringComparison.Ordinal) ||
@@ -239,9 +234,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
            method.Name.StartsWith("Move", StringComparison.Ordinal) ||
            method.Name.StartsWith("Teleport", StringComparison.Ordinal);
 
-    // The auto-binding's Alloc effect must use the SAME allocation classification as the model-flag path
-    // (IsAllocatingTag) and the runtime binding factory — otherwise a Guid/map return adds Alloc on one side only
-    // and install fails DBXK041. Delegate to the shared tag classifier (string/Guid/list/map/record allocate).
+    // Keep auto-binding Alloc classification in sync with runtime binding registration.
     private static bool ReturnAllocates(ITypeSymbol type)
         => !IsUnitTaskLike(type) && IsAllocatingTag(SandboxTypeSourceEmitter.ManifestTag(type));
 
@@ -276,11 +269,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return false;
     }
 
-    /// <summary>
-    /// The single-bit flag names set in a <c>SandboxEffect</c> attribute argument (e.g. "Cpu",
-    /// "HostStateRead"). Read from the enum's own members so the names match the manifest's effect
-    /// tokens (parsed back via <c>Enum.TryParse&lt;SandboxEffect&gt;</c> at install).
-    /// </summary>
+    /// <summary>Single-bit <c>SandboxEffect</c> flag names used as manifest effect tokens.</summary>
     private static IReadOnlyList<string> EffectNames(TypedConstant effects)
     {
         if (effects.Value is null || effects.Type is not INamedTypeSymbol enumType)

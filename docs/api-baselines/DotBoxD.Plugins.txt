@@ -29,7 +29,9 @@ public bool Register<TEvent>( IPluginEventAdapter<TEvent> adapter, InstalledKern
 public bool ResultLocalTerminal { get; init; }
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
 public bool Uninstall(string pluginId)
+public bool Uninstall(string pluginId) => _inner.Uninstall(pluginId)
 public bool UninstallPool(InstalledKernelPool pool)
+public bool UninstallPool(InstalledKernelPool pool) => _inner.UninstallPool(pool)
 public bool Unregister(string subscriptionId)
 public class ServerExtensionProxy : DispatchProxy
 public const string CapabilityId = "host.message.write"
@@ -74,6 +76,41 @@ public EventIndexStats Stats => new(
 public Exception? LastAsyncUpdateError => _pendingLiveUpdates.LastError
 public Exception? LastAsyncUpdateError => Kernel.LastAsyncUpdateError
 public Guid ReadGuid()
+public HookPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent, TContext> handler)
+public HookPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent> handler)
+public HookPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, TContext, ValueTask> handler)
+public HookPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, ValueTask> handler)
+public HookPipeline<TEvent, TContext> On<TEvent>()
+public HookPipeline<TEvent, TContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+public HookPipeline<TEvent, TContext> Register<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
+public HookPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
+public HookPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
+public HookPipeline<TEvent, TContext> Run(Action<TEvent> handler)
+public HookPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
+public HookPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
+public HookPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
+public HookPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
+public HookPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
+public HookPipeline<TEvent, TContext> Use(InstalledKernel kernel)
+public HookPipeline<TEvent, TContext> Use(InstalledKernelPool pool)
+public HookPipeline<TEvent, TContext> Use<TKernel>() where TKernel : class
+public HookPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
+public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>( PluginPackage package, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public HookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public HookPipeline<TEvent> ConfigureResultDispatch<TResult>(ResultHookDispatchOptions<TResult> options) where TResult : struct, IHookResult
 public HookPipeline<TEvent> InvokeHostHandler(Action<TEvent, HookContext> handler)
 public HookPipeline<TEvent> InvokeHostHandler(Action<TEvent> handler)
@@ -81,9 +118,10 @@ public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTas
 public HookPipeline<TEvent> InvokeHostHandler(Func<TEvent, ValueTask> handler)
 public HookPipeline<TEvent> On<TEvent>()
 public HookPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+public HookPipeline<TEvent> Register<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public HookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)
 public HookPipeline<TEvent> Run(Action<TCurrent> handler)
 public HookPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
@@ -106,6 +144,7 @@ public HookPipeline<TEvent> Use<TKernel>() where TKernel : class
 public HookPipeline<TEvent> UseGeneratedChain(PluginPackage package)
 public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent> UseProjecting(InstalledKernel kernel, string subscriptionId, RemoteLocalPush push)
 public HookPipeline<TEvent> UseProjectingResult( InstalledKernel filterKernel, string subscriptionId, Type resultType, RemoteLocalResultRequest request, int priority = 0)
@@ -116,8 +155,15 @@ public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
 public HookPipeline<TEvent> Where(Func<TEvent, HookContext, ValueTask<bool>> filter)
 public HookPipeline<TEvent> Where(Func<TEvent, ValueTask<bool>> filter)
 public HookRegistry Hooks { get; }
+public HookRegistry<THookContext> Hooks { get; }
+public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public HookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
 public HookStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
 public HookStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+public HookStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TContext, TNext> projection)
+public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
+public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TContext, TNext> projection)
+public HookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public HookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
 public HookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public HookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
@@ -154,6 +200,7 @@ public IReadOnlyList<string> Effects { get => _effects; init => _effects = Plugi
 public IReadOnlyList<string> GetRequiredCapabilities(PluginPackage package)
 public IReadOnlyList<string> RequiredCapabilities
 public KernelRegistry Kernels { get; }
+public KernelRegistry Kernels => _inner.Kernels
 public KernelRpcPayloadReader(ReadOnlySpan<byte> payload)
 public KernelRpcValue GetItem(int index) => (_items ?? EmptyItems)[index]
 public KernelRpcValue[] Items => CopyItems(_items ?? EmptyItems)
@@ -172,23 +219,89 @@ public object? CurrentValue => Value
 public object? GetObject(string name)
 public object? OwnerId => _ownerId
 public PluginEventAdapterRegistry Events { get; }
+public PluginEventAdapterRegistry Events => _inner.Events
 public PluginExecutionObservation? LastExecution => _executionObserver.Last
 public PluginManifest Manifest { get; }
 public PluginPackage Package { get; }
 public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
+public PluginServer Untyped => _inner
+public PluginServer<HookContext, TSubscriptionContext> WithSubscriptionContext<TSubscriptionContext>( Func<HookContext, TSubscriptionContext> contextFactory)
+public PluginServer<THookContext, HookContext> WithHookContext<THookContext>( Func<HookContext, THookContext> contextFactory)
+public PluginServer<THookContext, TNextSubscriptionContext> WithSubscriptionContext<TNextSubscriptionContext>( Func<HookContext, TNextSubscriptionContext> contextFactory)
+public PluginServer<THookContext, TSubscriptionContext> RegisterEventAdapter<TEvent>( IPluginEventAdapter<TEvent> adapter)
+public PluginServer<TNextHookContext, TSubscriptionContext> WithHookContext<TNextHookContext>( Func<HookContext, TNextHookContext> contextFactory)
 public PluginSession CreateSession()
+public PluginSession CreateSession() => _inner.CreateSession()
 public readonly record struct EventIndexStats(long Considered, long Prefiltered, long Dispatched)
 public readonly record struct ResultHookFault(Type EventType, Exception Exception)
 public readonly record struct SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
 public readonly struct KernelRpcValue
 public ref struct KernelRpcPayloadReader
+public RemoteHookPipeline<TEvent, TContext> On<TEvent>()
+public RemoteHookPipeline<TEvent, TContext> Register<TResult>( Func<TCurrent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> Register<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TCurrent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TCurrent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Action<TEvent> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> Use<TKernel>() where TKernel : class
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler)
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>( PluginPackage package, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers)
+public RemoteHookPipeline<TEvent> Register<TResult>( Func<TCurrent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent> Register<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TCurrent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(Func<TCurrent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)
 public RemoteHookPipeline<TEvent> Run(Action<TCurrent> handler)
 public RemoteHookPipeline<TEvent> Run(Action<TEvent, HookContext> handler)
@@ -233,16 +346,68 @@ public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, 
 public RemoteHookPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler)
 public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
+public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>( PluginPackage package, Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Where(Func<TEvent, bool> filter)
 public RemoteHookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
+public RemoteHookRegistry( Func<PluginPackage, ValueTask<string>> install, Func<HookContext, TContext> contextFactory, Hooks.RemoteLocalHandlerRegistry? localHandlers = null)
 public RemoteHookRegistry( Func<PluginPackage, ValueTask<string>> install, RemoteLocalHandlerRegistry? localHandlers = null)
+public RemoteHookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public RemoteHookStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
 public RemoteHookStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
 public RemoteHookStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TContext, TNext> projection)
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TContext, TNext> projection)
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
+public RemoteHookStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
 public RemoteHookStage<TEvent, TNext> Select<TNext>(Func<TEvent, TNext> projection)
+public RemoteSubscriptionPipeline<TEvent, TContext> On<TEvent>()
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Action<TEvent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TCurrent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent, TContext> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Action<TEvent> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler, Func<KernelRpcValue, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TCurrent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TCurrent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, TContext, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<KernelRpcValue, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler, Func<ReadOnlyMemory<byte>, TEvent> decoder)
+public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain( PluginPackage package, Func<TEvent, ValueTask> handler)
+public RemoteSubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public RemoteSubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public RemoteSubscriptionPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers)
 public RemoteSubscriptionPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)
 public RemoteSubscriptionPipeline<TEvent> Run(Action<TCurrent> handler)
@@ -288,9 +453,16 @@ public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage p
 public RemoteSubscriptionPipeline<TEvent> UseGeneratedLocalChain(PluginPackage package, Func<TEvent, ValueTask> handler)
 public RemoteSubscriptionPipeline<TEvent> Where(Func<TEvent, bool> filter)
 public RemoteSubscriptionPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter)
+public RemoteSubscriptionRegistry( Func<PluginPackage, ValueTask<string>> install, Func<HookContext, TContext> contextFactory, Hooks.RemoteLocalHandlerRegistry? localHandlers = null)
 public RemoteSubscriptionRegistry( Func<PluginPackage, ValueTask<string>> install, RemoteLocalHandlerRegistry? localHandlers = null)
+public RemoteSubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public RemoteSubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
 public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
 public RemoteSubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TContext, TNext> projection)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TNext> projection)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TContext, TNext> projection)
+public RemoteSubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public RemoteSubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
@@ -299,7 +471,10 @@ public SandboxValue ToSandboxValue()
 public sealed class EventIndexKeyAttribute : Attribute
 public sealed class EventIndexMatcher<TEvent>
 public sealed class EventIndexRegistry
+public sealed class HookPipeline<TEvent, TContext>
 public sealed class HookRegistry
+public sealed class HookRegistry<TContext>
+public sealed class HookStage<TEvent, TCurrent, TContext>
 public sealed class HookStage<TEvent, TCurrent>
 public sealed class InstalledKernelPool
 public sealed class KernelRegistry : IEnumerable<InstalledKernel>
@@ -307,16 +482,26 @@ public sealed class LiveContext<T> where T : class
 public sealed class LiveSettingStore
 public sealed class LiveValue<T> : ICoercibleLiveSetting
 public sealed class PluginEventAdapterRegistry
+public sealed class PluginServer<THookContext, TSubscriptionContext> : IDisposable
 public sealed class PluginSession : IDisposable, IAsyncDisposable
+public sealed class RemoteHookPipeline<TEvent, TContext>
 public sealed class RemoteHookRegistry
+public sealed class RemoteHookRegistry<TContext>
+public sealed class RemoteHookStage<TEvent, TCurrent, TContext>
 public sealed class RemoteHookStage<TEvent, TCurrent>
 public sealed class RemoteLocalHandlerRegistry
+public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
 public sealed class RemoteSubscriptionPipeline<TEvent>
 public sealed class RemoteSubscriptionRegistry
+public sealed class RemoteSubscriptionRegistry<TContext>
+public sealed class RemoteSubscriptionStage<TEvent, TCurrent, TContext>
 public sealed class RemoteSubscriptionStage<TEvent, TCurrent>
 public sealed class ResultHookDispatchOptions<TResult> where TResult : struct, IHookResult
+public sealed class SubscriptionPipeline<TEvent, TContext>
 public sealed class SubscriptionPipeline<TEvent> : IKernelHandlerPipeline
 public sealed class SubscriptionRegistry
+public sealed class SubscriptionRegistry<TContext>
+public sealed class SubscriptionStage<TEvent, TCurrent, TContext>
 public sealed class SubscriptionStage<TEvent, TCurrent>
 public sealed class TypedInstalledKernel<TSettings> where TSettings : class
 public sealed partial class HookPipeline<TEvent>
@@ -345,8 +530,10 @@ public static class KernelRpcValueConverter
 public static class PluginDiagnosticCodes
 public static class PluginMessageBindings
 public static class PluginPackageJsonSchemas
+public static class PluginRegistryContextExtensions
 public static class PluginServerJsonExtensions
 public static EventIndexMatcher<TEvent> Create(IReadOnlyList<IndexedPredicate> predicates)
+public static HookRegistry<TContext> WithContext<TContext>( this HookRegistry registry, Func<HookContext, TContext> contextFactory)
 public static IReadOnlyCollection<string> IndexKeyNames => (IReadOnlyCollection<string>)IndexKeys.Keys
 public static IReadOnlyList<PluginDiagnosticReference> All => References
 public static KernelRpcValue Bool(bool value)
@@ -372,6 +559,8 @@ public static PluginPackage Resolve(Type kernelType)
 public static PluginPackage Resolve<TKernel>() where TKernel : class => Resolve(typeof(TKernel))
 public static PluginServer Create( IPluginMessageSink? messages = null, Action<SandboxHostBuilder>? configureHost = null, SandboxPolicy? defaultPolicy = null, ExecutionMode executionMode = ExecutionMode.Auto, Action<SubscriptionDeliveryFault>? onSubscriptionFault = null, Action<ResultHookFault>? onResultHookFault = null)
 public static PluginServer Create( IPluginMessageSink? messages, Action<SandboxHostBuilder>? configureHost, SandboxPolicy? defaultPolicy, ExecutionMode executionMode, Action<SubscriptionDeliveryFault>? onSubscriptionFault)
+public static RemoteHookRegistry<TContext> WithContext<TContext>( this RemoteHookRegistry registry, Func<HookContext, TContext> contextFactory)
+public static RemoteSubscriptionRegistry<TContext> WithContext<TContext>( this RemoteSubscriptionRegistry registry, Func<HookContext, TContext> contextFactory)
 public static ResultHookDispatchOptions<TResult> Default { get; } = new()
 public static ResultHookDispatchOptions<TResult> FailClosedAfter(TimeSpan timeout, TResult result)
 public static SandboxHostBuilder AddBindingsFrom<TService>( this SandboxHostBuilder builder, TService implementation) where TService : class
@@ -384,6 +573,7 @@ public static SandboxValue ToSandboxValue(object? value, Type type)
 public static string Export(PluginPackage package, bool indented = false)
 public static string PackageEnvelope => ReadResource(PluginPackageResourceName)
 public static string SchemaVersion => JsonSchemas.SchemaVersion
+public static SubscriptionRegistry<TContext> WithContext<TContext>( this SubscriptionRegistry registry, Func<HookContext, TContext> contextFactory)
 public static TService Create<TService>(InstalledKernel kernel) where TService : class
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginServer server, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public static ValueTask<InstalledKernel> InstallJsonAsync( this PluginSession session, string json, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
@@ -399,6 +589,30 @@ public string TextValue
 public string? ProjectedType { get; init; }
 public string? ResultType { get; init; }
 public string? RpcEntrypoint { get; init; }
+public SubscriptionPipeline<TEvent, TContext> On<TEvent>()
+public SubscriptionPipeline<TEvent, TContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+public SubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Action<TCurrent> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Action<TEvent, TContext> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Action<TEvent> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, TContext, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> Run(Func<TEvent, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent, TContext> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TCurrent> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent, TContext> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Action<TEvent> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, TContext, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TCurrent, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, TContext, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> RunLocal(Func<TEvent, ValueTask> handler)
+public SubscriptionPipeline<TEvent, TContext> Use(InstalledKernel kernel)
+public SubscriptionPipeline<TEvent, TContext> Use(InstalledKernelPool pool)
+public SubscriptionPipeline<TEvent, TContext> Use<TKernel>() where TKernel : class
+public SubscriptionPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
+public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, bool> filter)
+public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
 public SubscriptionPipeline<TEvent> InvokeHostHandler(Action<TEvent, HookContext> handler)
 public SubscriptionPipeline<TEvent> InvokeHostHandler(Action<TEvent> handler)
 public SubscriptionPipeline<TEvent> InvokeHostHandler(Func<TEvent, HookContext, ValueTask> handler)
@@ -431,8 +645,15 @@ public SubscriptionPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter
 public SubscriptionPipeline<TEvent> Where(Func<TEvent, HookContext, ValueTask<bool>> filter)
 public SubscriptionPipeline<TEvent> Where(Func<TEvent, ValueTask<bool>> filter)
 public SubscriptionRegistry Subscriptions { get; }
+public SubscriptionRegistry<TSubscriptionContext> Subscriptions { get; }
+public SubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, bool> filter)
+public SubscriptionStage<TEvent, TCurrent, TContext> Where(Func<TCurrent, TContext, bool> filter)
 public SubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, bool> filter)
 public SubscriptionStage<TEvent, TCurrent> Where(Func<TCurrent, HookContext, bool> filter)
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TCurrent, TContext, TNext> projection)
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>( Func<TEvent, TContext, TNext> projection)
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TCurrent, TNext> projection)
+public SubscriptionStage<TEvent, TNext, TContext> Select<TNext>(Func<TEvent, TNext> projection)
 public SubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, HookContext, TNext> projection)
 public SubscriptionStage<TEvent, TNext> Select<TNext>(Func<TCurrent, TNext> projection)
 public SubscriptionStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection)
@@ -456,10 +677,13 @@ public ValueTask<InstalledKernel> InstallServerExtensionAsync( PluginPackage pac
 public ValueTask<InstalledKernelPool> InstallPoolAsync( PluginPackage package, int degreeOfParallelism, SandboxPolicy? policy = null, CancellationToken cancellationToken = default)
 public ValueTask<TResult?> FireAsync<TContext, TResult>( TContext context, ResultHookDispatchOptions<TResult> options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public ValueTask<TResult?> FireAsync<TContext, TResult>(TContext context, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
+public ValueTask<TResult?> FireAsync<TEvent, TResult>( TEvent context, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
+public ValueTask<TResult?> FireAsync<TEvent, TResult>( TEvent context, ResultHookDispatchOptions<TResult> options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public ValueTask<TResult?> FireResultAsync<TResult>( TEvent e, ResultHookDispatchOptions<TResult> options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default) where TResult : struct, IHookResult
 public void Clear()
 public void Dispose()
+public void Dispose() => _inner.Dispose()
 public void EnsureConsumed()
 public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
 public void Publish<TEvent>(TEvent value, CancellationToken cancellationToken = default)

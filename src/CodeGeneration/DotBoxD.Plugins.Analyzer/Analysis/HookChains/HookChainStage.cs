@@ -1,3 +1,5 @@
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -14,3 +16,8 @@ internal readonly struct HookChainStage
 
     public LambdaExpressionSyntax Lambda { get; }
 }
+
+internal sealed record HookChainProjection(
+    DotBoxDStatementBodyModel? Prefix,
+    DotBoxDExpressionModel Value,
+    ITypeSymbol? ValueType);

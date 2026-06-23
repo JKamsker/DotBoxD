@@ -15,6 +15,14 @@ internal static class DotBoxDManifestEffectModel
             DotBoxDGenerationNames.Effects.Alloc
         });
 
+    private static readonly string[] CanonicalExtraEffects =
+    [
+        DotBoxDGenerationNames.Effects.HostStateRead,
+        DotBoxDGenerationNames.Effects.HostStateWrite,
+        DotBoxDGenerationNames.Effects.Concurrency,
+        DotBoxDGenerationNames.Effects.Audit
+    ];
+
     public static EquatableArray<string> Create(
         DotBoxDStatementBodyModel shouldHandle,
         DotBoxDStatementBodyModel handleBody,
@@ -53,7 +61,15 @@ internal static class DotBoxDManifestEffectModel
             }
         }
 
-        foreach (var effect in extraEffects)
+        foreach (var effect in CanonicalExtraEffects)
+        {
+            if (extraEffects.Contains(effect) && seen.Add(effect))
+            {
+                result.Add(effect);
+            }
+        }
+
+        foreach (var effect in extraEffects.OrderBy(static effect => effect, StringComparer.Ordinal))
         {
             if (seen.Add(effect))
             {

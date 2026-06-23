@@ -9,17 +9,7 @@ using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNa
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
-/// <summary>
-/// Lowers a result-returning hook chain — <c>On&lt;TContext&gt;().Where*(lambda).Register(lambda, priority)</c>
-/// or <c>.RegisterLocal(lambda, priority)</c> — to a <see cref="PluginKernelModel"/>. The result type is taken
-/// from <c>[Hook]</c> on the context. A <c>Register</c> chain reuses the projection package shape: the
-/// <c>Where</c> filter lowers to <c>ShouldHandle</c> and the result-producing lambda body lowers to a
-/// <c>Handle</c> that returns the result record (so the validator's projection-Handle path applies); the host
-/// installs it via <c>UseGeneratedResultChain</c> and decodes the result rather than pushing it. A
-/// <c>RegisterLocal</c> chain lowers only the filter (whole-event shape, Unit Handle); the plugin delegate
-/// produces the result. Any unsupported shape throws <see cref="NotSupportedException"/> so the chain fails
-/// safe (no package, DBXK113).
-/// </summary>
+/// <summary>Lowers Register/RegisterLocal chains to verified result-hook packages.</summary>
 internal static class ResultHookChain
 {
     public static HookChainResult? Build(
@@ -57,11 +47,6 @@ internal static class ResultHookChain
             throw new NotSupportedException();
         }
 
-        // The handler's TResult is NOT read from the Register call symbol: when the handler body is a fluent
-        // builder (Result.Ok().With…()) its return type is generator-added and unresolved here, so the call's
-        // inferred type argument is unavailable. The result type comes from [Hook] instead, and the handler body's
-        // type is validated against it in LowerResultHandle (the seed type for a fluent chain).
-
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
@@ -81,8 +66,7 @@ internal static class ResultHookChain
                 model,
                 cancellationToken);
 
-            // RegisterLocal: only the filter is verified IR; the Handle returns Unit and the plugin delegate
-            // produces the result through the generated local result installation path.
+            // RegisterLocal verifies the filter, then asks the native delegate for the result.
             handleBody = DotBoxDHandleBodyModelFactory.ReturnUnit();
             handleReturnType = TypeNames.GlobalSandboxType + ".Unit";
         }
@@ -169,10 +153,7 @@ internal static class ResultHookChain
             throw new NotSupportedException();
         }
 
-        // The lowered body must construct the associated result record exactly. For an object initializer
-        // (new Result { ... }) the body type resolves directly; for a fluent builder (Result.Ok().With…())
-        // the trailing builder method is generator-added and not visible while this chain is lowered, so the
-        // body type is null/error — fall back to the builder chain's seed type.
+        // Fluent result builders are generated later, so unresolved builder-chain bodies fall back to their seed.
         var bodyType = model.GetTypeInfo(body, cancellationToken).ConvertedType
             ?? model.GetTypeInfo(body, cancellationToken).Type;
         if (bodyType is { TypeKind: not TypeKind.Error })
@@ -219,10 +200,6 @@ internal static class ResultHookChain
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         CancellationToken cancellationToken)
     {
-        // The interceptor's receiver/handler/return types are built from the context and [Hook] result type
-        // rather than the Register call symbol: a fluent-builder handler leaves the call's type argument
-        // unresolved here, but both the pipeline receiver type and the result type are known. Roslyn binds the
-        // (now type-resolvable, post-generation) call site to the emitted interceptor.
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
         if (location is null)
         {
