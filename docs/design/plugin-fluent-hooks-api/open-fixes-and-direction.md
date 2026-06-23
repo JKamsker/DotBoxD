@@ -16,6 +16,15 @@ Composable** — plus **Explicit · Stable · Testable** as working corollaries.
 `41ec9172`. A bare line (`:86`) is the precise statement; a range (`:23-27`) spans the full construct. If a
 line has drifted when you read this, search the named symbol in the same file.
 
+**Project stance (read first).** This is a single-maintainer project with no external consumers.
+**Backward compatibility is a non-goal:** existing plugins, samples, and API baselines are broken outright
+to reach the cleanest end shape and to avoid confusing future readers — there is no migration, deprecation,
+or shim burden anywhere in this doc. **Discoverability must be local, not name-derived:** a generated symbol
+is acceptable only when it is reachable from something the author already wrote — a member on a type they
+declared, or an extension method generated into their namespace (so IntelliSense surfaces it in place). A
+separately-named generated type the author must *know exists* by a naming rule (`{Server}` ⇒
+`{Server}Context`) is the anti-pattern this doc removes.
+
 ---
 
 ## TL;DR
@@ -28,12 +37,13 @@ There are **two independent problems**; this doc keeps them apart on purpose.
 
 2. **Shape — a separate, larger thesis.** The generated plugin context
    ([PluginServerContextSurfaceEmitter.cs:16](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerContextSurfaceEmitter.cs))
-   is the **only generated type whose member surface the author extends by hand**
-   ([GamePluginContext.cs:3-10](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)),
-   so "generated vs hand-written" is invisible. Making that surface *declarable* is worth doing, but it has
-   real open decisions (§3.1) and at least one hard feasibility limit (`[KernelMethod]` cannot live on an
-   interface — §3.1), so it is **not** a mechanical "do what the world surface does." It lands as its own
-   PR(s) **after** §3.1's open decisions are answered.
+   is the **only generated type the author extends by hand at a name they must already know** —
+   `{Root}Context`, derived from the server class name, with nothing they wrote pointing to it
+   ([GamePluginContext.cs:3-10](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)).
+   The fix is to make the context **author-declared** (you name the type; you extend the type you named —
+   §3.1), removing the convention-named partial. One hard constraint: `[KernelMethod]` cannot live on an
+   interface (its body must be inlined), so the declared context is a `partial` **class** (§3.1). Lands as
+   its own PR(s) after §3.1's (now small) decisions are settled.
 
 One-line direction: **fix P1.1–P1.4 first; make the context surface declarable only after answering §3.1;
 fix chain/context identity by ownership (§3.3); single-source the host-capability derivation rule without
@@ -69,12 +79,18 @@ forwarders, the `IPluginServer<IGameWorldAccess>` lifecycle, the `Setup` accumul
 `{worldNamespace}.Ipc.IGamePluginControlService`
 ([PluginServerFacadeModelFactory.cs:87](../../../src/CodeGeneration/DotBoxD.Plugins.Analyzer/Analysis/PluginServer/PluginServerFacadeModelFactory.cs),
 inside `ResolveControlService` declared at :82) — a baked-in convention literal in the path the table calls
-contract-driven. The distinction that actually matters: the registries and `Setup` are string-**named**,
-but their member surfaces are **fully generated shells the author never edits**. The context is the **only
-generated type whose member surface the author extends by hand**, with **no declared contract** stating its
-intended members ([GamePluginContext.cs:5,7,9](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)
-add `DamageDecisionReason`, `FormatCalmTarget`, `ScaleDamageDecision` into the partial). That — invisible
-generated-vs-handwritten member surface — is the gap, not "one string name."
+contract-driven. The distinction that actually matters is **discoverability of where you write code**, not whether a name is
+string-derived. `server.Hooks` (a member on `server`) and the `ctx` lambda parameter (a type IntelliSense
+shows you) are *locally discoverable* — fine. The registries and `Setup` are string-**named** but their
+member surfaces are **fully generated shells the author never edits**, so the name is never typed by hand —
+also fine. The context is the **one** place this breaks: to extend it the author must hand-write
+`partial class {Root}Context`
+([GamePluginContext.cs:5,7,9](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)
+add `DamageDecisionReason`, `FormatCalmTarget`, `ScaleDamageDecision`), which requires *knowing* the
+convention-derived type name with **nothing they wrote pointing to it**. That "separate symbol whose name
+you must already know" is the discoverability anti-pattern; a generated member on a type the author
+declared, or an extension generated into the author's namespace, would not be. §3.1 fixes it by making the
+context author-declared.
 
 ---
 
@@ -152,7 +168,7 @@ projections," not "one shared object.")
 
 ## Part 3 — The design direction
 
-### 3.1 Make the context surface *declarable* — open decisions first
+### 3.1 Make the context surface *author-declared*
 
 Goal: make the context's member surface visible and checkable instead of grafted onto a magic partial.
 This is **not** "enumerate an interface like the world surface does," for two verified reasons:
@@ -176,31 +192,37 @@ This is **not** "enumerate an interface like the world surface does," for two ve
   an interface; otherwise split the surface (declared contract carries `[HostBinding]`; `[KernelMethod]`
   helpers stay concrete-bodied).
 
-**Open decisions — none are decided; pick before implementing:**
+**Discoverability requirement (this is the actual fix).** Make the context type **author-declared and
+explicitly attached**, so the place you add members is a type *you* named — not a `{Root}Context` you must
+infer:
 
-| Decision | Options | Constraint forcing the choice |
-|---|---|---|
-| **Ownership** | server-owned vs plugin-owned vs split | A capability-bearing `[HostBinding]` member must resolve to a host-registered binding (§3.1 security), so it must be **server-owned**; ad-hoc native/`[KernelMethod]` helpers are written by the plugin today with no SDK round-trip ([GamePluginContext.cs:5-9](../../../samples/GameServer/Examples.GameServer.Plugin/GamePluginContext.cs)). The only choice that keeps both is **split**: plugin owns native + `[KernelMethod]`; server owns `[HostBinding]`. |
-| **Attachment** | `[GeneratePluginServer(Context = typeof(IGameContext))]` opt-in vs convention default | Keep `partial class {Root}Context` as the **zero-config default** so existing plugins and the sample compile unchanged. |
-| **Lifetime & construction** | per-event (today) vs cached; who invokes the factory | Today the context is constructed per publish from a `HookContext` via `ServerContextFactory<TContext>` ([HookRegistry.cs:95](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs)). A declared contract needs an explicit construction story. |
-| **Versioning** | how a contract evolves without breaking shipped plugins | The host is frozen at release; a contract change is a binary-compat event for already-shipped plugins. |
-| **Native-only members** | stay on the partial vs move to the contract | Pure native helpers (the sample's `FormatCalmTarget`) are `RunLocal`-only and need no contract. |
+```csharp
+[GeneratePluginServer(Context = typeof(GameContext))]   // proposed attribute arg; explicit, greppable
+public partial class GamePluginServer : IGameWorldAccess;
 
-**Migration (state it explicitly, do not imply).** Keep `partial class {Root}Context` as the default;
-make the declared contract an **opt-in overlay** the generator enumerates *in addition to* the partial.
-Native members stay on the partial; `[HostBinding]` members may move to the contract; `[KernelMethod]`
-helpers stay concrete-bodied. Ship a regression test asserting the convention default still binds when no
-contract is declared, and migrate `GamePluginContext` both ways, **before** calling this "the library
-shape." Note the api-baseline cost: this churns
-[docs/api-baselines/DotBoxD.Plugins.txt](../../../docs/api-baselines/DotBoxD.Plugins.txt) (already +268/−60
-on this branch; the check is set-based, so commit deliberately).
+public sealed partial class GameContext { /* your members; obvious where to extend */ }
+```
 
-**Honest cost.** The call-site one-liner is preserved, but an **authoring-side declaration is added** (net
-author burden rises: declare the shape *and* implement it). A lighter alternative that delivers the
-"visible + checkable" benefit with **no new declaration**: an **analyzer diagnostic** on the existing
-partial that flags a member used in a lowered stage which the analyzer cannot lower (the lowering failure
-is already detectable — see §3.2). Decide between "declared contract" and "diagnostic on the partial"
-before writing the generator change.
+The generator augments `GameContext` (the ambient-`HookContext` wrapping + conveniences) as a partial of
+*your* type, and any generated extension methods land **in your namespace** so IntelliSense surfaces them in
+place. The convention-named `{Root}Context` partial is **removed**, not kept as a default.
+
+**Remaining decisions (small):**
+
+- **Ownership: split.** A capability-bearing `[HostBinding]` member must resolve to a host-registered
+  binding (see security note), so it is **server-owned**; native and `[KernelMethod]` helpers stay
+  plugin-authored. This is about where each member legitimately lives, not compatibility.
+- **Shape: a `partial` class, not an interface.** Interface members have no body to inline for
+  `[KernelMethod]` (the limit above). Sealed or not is the author's call; `partial` so the generator can
+  augment the type the author named.
+- **Lifetime/construction.** Today the context is constructed per publish from a `HookContext` via
+  `ServerContextFactory<TContext>` ([HookRegistry.cs:95](../../../src/Hosting/DotBoxD.Plugins/Runtime/HookRegistry.cs));
+  an author-declared type needs an explicit constructor/factory story — state it.
+
+**No migration.** Per the Project stance, the convention-named partial, the old samples, and the
+api-baseline are **broken outright** and regenerated — no overlay, deprecation window, or "keep old code
+compiling" path. The extra keystrokes of declaring the context type are **the point**: they make the
+extension surface discoverable.
 
 **Security (capability surface — non-negotiable).** Only host-registered bindings grant anything. A
 `[HostBinding]` on a plugin-authored context with **no matching host binding fails closed**: the lowered
@@ -361,13 +383,14 @@ Every item verified against head `41ec9172`.
    **Decide whether the interface or the implementation is the authoritative owner of binding metadata, then
    enforce a single source.**
 
-7. **Public API expansion is too large to baseline as "polish."** The typed-context surface, the
-   `new`-shadowing `<TEvent>` shims
-   ([HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs)),
-   and the `UseGenerated*` / `UseProjecting*` plumbing
+7. **Delete the back-compat surface; do not just hide it.** The `new`-shadowing `<TEvent>` shims
+   ([HookPipeline.Default.cs](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/HookPipeline.Default.cs))
+   exist only to keep the un-parameterized form compiling alongside `<TEvent, TContext>` — a compatibility
+   artifact this project does not want. **Remove the `<TEvent>` family entirely; keep one
+   `<TEvent, TContext>` form.** Separately, the generator-only `UseGenerated*` / `UseProjecting*` plumbing
    ([RemoteHookPipeline.cs:36](../../../src/Hosting/DotBoxD.Plugins/Runtime/Hooks/RemoteHookPipeline.cs))
-   must be **shrunk or hidden** (`[EditorBrowsable(EditorBrowsableState.Never)]` + generator-only XML docs)
-   **before** the api-baseline is updated (already +268/−60; set-based check).
+   should be `[EditorBrowsable(EditorBrowsableState.Never)]` or moved to an internal surface. Then
+   regenerate the api-baseline in one breaking commit.
 
 8. **Typed hook/subscription overload drift is a latent codegen build break, not polish.**
    `RemoteHookPipeline.Typed` exposes **12** `UseGeneratedLocalChain` overloads
@@ -406,9 +429,9 @@ Every item verified against head `41ec9172`.
 12. **Sample teaches noise** — `(e, _) =>` for filters/projections that ignore `ctx`
     ([Program.cs:91](../../../samples/GameServer/Examples.GameServer.Plugin/Program.cs)); use `e =>` unless the
     body references `ctx`. Promote the rule ("arity names intent") into the §3.2 tier table.
-13. **`RegisterLocal` has three authoring shapes** — the value-only, the `(e, ctx)`, and the legacy
-    cancellation `(e, ctx, ct) => ValueTask<TResult>` — against the "exactly two" rule. Drop the cancellation
-    form (`ctx.CancellationToken` is already exposed) or document it as the deliberate async exception.
+13. **`RegisterLocal` has three authoring shapes** — value-only, `(e, ctx)`, and the legacy cancellation
+    `(e, ctx, ct) => ValueTask<TResult>` — against the "exactly two" rule. **Drop the cancellation form**
+    (`ctx.CancellationToken` is already exposed); no need to keep it for compatibility.
 
 ---
 
@@ -426,14 +449,14 @@ Every item verified against head `41ec9172`.
 P2.5) and gate `CandidateKind` on `[GeneratePluginServer]`-owned types (closes P2.4). The convention-named
 context stays; only *identity resolution* changes.
 
-**Step 3 — the larger moves, as their own PRs.** §3.1 (declarable context surface — **only after** the §3.1
-open-decisions table is answered) and §3.4 (single-sourced host-capability rule). Not bolted onto #88.
+**Step 3 — the larger moves, as their own PRs.** §3.1 (author-declared context surface — **only after** the
+§3.1 remaining decisions are settled) and §3.4 (single-sourced host-capability rule). Not bolted onto #88.
 
-> **Half-state risk — decide consciously.** Merging #88 + Step 2 without Step 3 leaves a convention-named
-> context with ownership-based identity: strictly better than today on identity, unchanged on the
-> "undeclared surface" gap, which then persists indefinitely. Either (a) accept that intermediate state and
-> add a visible guardrail — an analyzer `Info`/`Warning` on convention-named contexts so the debt is tracked
-> — or (b) gate Step 2's merge on an RFC-approved Step 3. Do not leave it implicit.
+> **Half-state note.** Merging #88 + Step 2 without Step 3 leaves the context still convention-named (its
+> extension surface still undiscoverable) but with correct ownership-based identity. There is **no
+> compatibility debt** — nothing ships to external users — so the only cost is the discoverability gap
+> staying open until Step 3 lands. Acceptable as an interim state; just don't call the context "done" until
+> the author-declared form (§3.1) replaces the convention partial.
 
 **Step 4 — polish + surface shrink** (P2.7 + P3.10–13), ideally alongside the §3.4 duplication collapse so
 the hook/subscription axis cannot drift again.
@@ -467,8 +490,10 @@ Acceptance gates, not afterthoughts. Existing homes: `ResultHookSlotTests`, `Typ
 - **Deterministic `BlinkBehindAsync` (P1.4).** A local, non-flaky test exercising the real
   `[ServerExtension]` dispatch the smoke run covers, asserting install succeeds (no `DBXK041`) and the
   result is correct.
-- **Generated-context discovery docs.** The generated context/registry XML docs name the default context
-  type, distinguish generated members from authored members, and document the explicit-context escape hatch.
+- **Context extension is locally discoverable.** Assert the author reaches the context's extension point
+  from something they wrote — an author-declared context type attached via
+  `[GeneratePluginServer(Context = typeof(...))]`, or a generated extension in the author's namespace — with
+  no reference to a name-derived `{Root}Context` type.
 - **Plugin-fluent docs smoke.** Add these design docs to a stale-term / compiled-snippet check so
   `server.Events`, `server.Kernels.Register`, and old `Invoke*` names cannot regress unnoticed.
 
