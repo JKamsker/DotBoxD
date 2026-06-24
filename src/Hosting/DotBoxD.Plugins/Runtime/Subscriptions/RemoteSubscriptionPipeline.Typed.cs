@@ -95,6 +95,26 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
 
     public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain(
         PluginPackage package,
+        Func<TEvent, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) => handler(e));
+    }
+
+    public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
+        Action<TEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InstallLocal<TEvent>(package, (e, _) =>
+        {
+            handler(e);
+            return ValueTask.CompletedTask;
+        });
+    }
+
+    public RemoteSubscriptionPipeline<TEvent, TContext> UseGeneratedLocalChain(
+        PluginPackage package,
         Func<TEvent, TContext, ValueTask> handler,
         Func<KernelRpcValue, TEvent> decoder)
         => InstallLocal(package, handler, decoder);
