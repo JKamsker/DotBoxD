@@ -70,7 +70,7 @@ internal sealed class GameMonster : IMonster
     // convention could not infer, which is why the capability is stated explicitly here.
     [HostCapability("game.world.combat.threat", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetThreatAsync()
-        => ValueTask.FromResult(_world().GetLevel(Id));
+        => ValueTask.FromResult(_world().GetThreat(Id));
 
     [HostCapability("game.world.monster.write.position", HostBindingEffect.HostStateWrite)]
     public ValueTask TeleportToAsync(int position)

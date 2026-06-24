@@ -23,6 +23,12 @@ internal static partial class DotBoxDKernelMethodInliner
             .Select(static identifier => identifier.Identifier.Span));
 
         var occurrences = new List<DescriptorPlaceholderOccurrence>();
+        if (descriptor.Parameters.Count != method.Parameters.Length)
+        {
+            throw new NotSupportedException(
+                $"Generated descriptor for context [KernelMethod] '{method.Name}' has stale parameter metadata.");
+        }
+
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var expectedType = DotBoxDTypeNameReader.SandboxTypeName(method.Parameters[i].Type);

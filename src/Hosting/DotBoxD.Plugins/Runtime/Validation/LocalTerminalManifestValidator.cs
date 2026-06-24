@@ -35,6 +35,7 @@ internal static class LocalTerminalManifestValidator
             "string" => expected == typeof(string),
             "guid" => expected == typeof(Guid),
             "list" => expected != typeof(string) &&
+                !IsMap(expected) &&
                 typeof(System.Collections.IEnumerable).IsAssignableFrom(expected),
             "map" => IsMap(expected),
             "record" => !IsKnownProjectedScalar(expected) &&
@@ -58,9 +59,12 @@ internal static class LocalTerminalManifestValidator
 
     private static bool IsMap(Type type)
         => typeof(System.Collections.IDictionary).IsAssignableFrom(type) ||
-           type.GetInterfaces().Any(static candidate =>
-               candidate.IsGenericType &&
-               candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+           IsGenericMap(type) ||
+           type.GetInterfaces().Any(IsGenericMap);
+
+    private static bool IsGenericMap(Type type)
+        => type.IsGenericType &&
+           type.GetGenericTypeDefinition() == typeof(IDictionary<,>);
 
     private static bool TypeNameMatches(string declared, Type expected)
     {

@@ -52,6 +52,22 @@ public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
                 StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Prebuilt_sdk_descriptor_accepts_host_binding_from_inherited_service_interface()
+    {
+        var sdkReference = CompilePlainReference(
+            InheritedServiceDescriptorSdkSource(),
+            "InheritedServiceDescriptorSdk");
+        var diagnostics = GeneratorDiagnostics(SecretConsumerSource(), sdkReference);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DBXK113");
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.GetMessage().Contains(
+                "contains an untrusted host call 'host.Sdk.IGameWorld.Read'",
+                StringComparison.Ordinal));
+    }
+
     private static string SecretConsumerSource()
         => PluginAnalyzerKernelMethodDescriptorTestSources.DescriptorlessConsumer.Replace(
             "using Descriptorless;",
@@ -120,6 +136,73 @@ public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
                     public GamePluginContext(HookContext raw) => _raw = raw;
                     public HookContext Raw => _raw;
                     public IPluginMessageSink Messages => _raw.Messages;
+                    public static GamePluginContext FromHookContext(HookContext raw) => new(raw);
+
+                    [KernelMethod]
+                    public bool IsAllowed(string id, int threshold)
+                        => throw new System.NotSupportedException("metadata-only descriptor");
+                }
+            }
+            """;
+    }
+
+    private static string InheritedServiceDescriptorSdkSource()
+    {
+        var payload = new KernelMethodDescriptorPayload(
+            KernelMethodDescriptorPayload.CurrentVersion,
+            "global::Sdk.GamePluginContext",
+            "IsAllowed",
+            "bool IsAllowed(string,int)",
+            DotBoxDGenerationNames.ManifestTypes.Bool,
+            false,
+            new EquatableArray<string>(["sample.read.value"]),
+            new EquatableArray<string>([DotBoxDGenerationNames.Effects.HostStateRead]),
+            new EquatableArray<KernelMethodDescriptorParameter>(
+            [
+                new("__dotboxd_kernel_method_arg_0__", DotBoxDGenerationNames.ManifestTypes.String),
+                new("__dotboxd_kernel_method_arg_1__", DotBoxDGenerationNames.ManifestTypes.Int)
+            ]),
+            "Ge(new global::DotBoxD.Kernels.CallExpression(\"host.Sdk.IGameWorld.Read\", " +
+                "[__dotboxd_kernel_method_arg_0__], null, Span), __dotboxd_kernel_method_arg_1__)");
+        var json = payload.ToJson();
+        var hash = KernelMethodDescriptorPayload.Hash(json);
+        return $$"""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
+
+            [assembly: global::DotBoxD.Abstractions.GeneratedKernelMethodDescriptorAttribute(
+                {{KernelMethodDescriptorPayload.CurrentVersion}},
+                typeof(global::Sdk.GamePluginContext),
+                "IsAllowed",
+                "bool IsAllowed(string,int)",
+                {{KernelMethodDescriptorPayload.JsonString(hash)}},
+                {{KernelMethodDescriptorPayload.JsonString(json)}})]
+
+            namespace Sdk
+            {
+                [DotBoxDService]
+                public interface IGameWorld
+                {
+                    [HostCapability("sample.read.value", HostBindingEffect.HostStateRead)]
+                    int Read(string id) => throw new System.NotSupportedException("metadata-only world");
+                }
+
+                public abstract class GamePluginServerBase : IGameWorld
+                {
+                }
+
+                [GeneratePluginServer(Context = typeof(GamePluginContext))]
+                public abstract class GamePluginServer : GamePluginServerBase
+                {
+                }
+
+                public sealed class GamePluginContext
+                {
+                    private readonly HookContext _raw;
+                    public GamePluginContext(HookContext raw) => _raw = raw;
+                    public HookContext Raw => _raw;
+                    public IPluginMessageSink Messages => _raw.Messages;
+                    public IGameWorld World => _raw.Host<IGameWorld>();
                     public static GamePluginContext FromHookContext(HookContext raw) => new(raw);
 
                     [KernelMethod]

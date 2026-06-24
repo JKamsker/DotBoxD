@@ -189,7 +189,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     {
         try
         {
-            _session.Uninstall(kernel.Manifest.PluginId);
+            _session.Uninstall(InstallRouteId(kernel));
         }
         catch (Exception rollbackError)
         {

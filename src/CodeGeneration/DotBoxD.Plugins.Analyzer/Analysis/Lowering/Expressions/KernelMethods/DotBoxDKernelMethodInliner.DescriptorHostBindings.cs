@@ -83,7 +83,7 @@ internal static partial class DotBoxDKernelMethodInliner
             yield break;
         }
 
-        foreach (var iface in matchedServer.Interfaces)
+        foreach (var iface in matchedServer.AllInterfaces)
         {
             if (HasAttribute(iface, DotBoxDMetadataNames.DotBoxDServiceAttribute, compilation))
             {

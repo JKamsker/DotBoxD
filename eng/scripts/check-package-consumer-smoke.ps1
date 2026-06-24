@@ -509,7 +509,9 @@ namespace SplitSdk
     public sealed record SplitEvent(string TargetId, int Amount);
 
     [GeneratePluginServer(Context = typeof(GamePluginContext))]
-    public partial class GamePluginServer : IGameWorld;
+    public partial class GamePluginServer : IGameWorld
+    {
+    }
 
     public sealed partial class GamePluginContext
     {

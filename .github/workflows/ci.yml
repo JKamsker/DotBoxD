@@ -337,7 +337,7 @@ jobs:
               "RemoteRunLocalValidationTests",
               "GeneratedRemoteHookChainFallbackTests",
               "ServerExtensionGeneratedContextParameterTests",
-              "PluginAnalyzerKernelMethodDescriptorTests",
+              "PluginAnalyzerKernelMethodDescriptor",
               "PluginRevocationTests",
               "PinnedHttpTransportTests",
               "DifferentialFuzzTests"

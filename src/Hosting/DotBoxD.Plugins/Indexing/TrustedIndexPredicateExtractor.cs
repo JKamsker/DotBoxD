@@ -66,7 +66,7 @@ internal static class TrustedIndexPredicateExtractor
         {
             switch (statement)
             {
-                case AssignmentStatement:
+                case AssignmentStatement assignment when !eventPaths.ContainsKey(assignment.Name):
                     continue;
                 case ReturnStatement returned:
                     CollectNecessaryPredicates(returned.Value, eventPaths, predicates);

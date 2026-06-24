@@ -59,10 +59,14 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
     }
 
     public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> filter)
-        => Where((e, context) => ValueTask.FromResult(filter(e, context)));
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return Where((e, context) => ValueTask.FromResult(filter(e, context)));
+    }
 
     public SubscriptionPipeline<TEvent, TContext> Where(Func<TEvent, TContext, ValueTask<bool>> filter)
     {
+        ArgumentNullException.ThrowIfNull(filter);
         lock (_gate)
         {
             _filters = [.. _filters, filter];
@@ -85,16 +89,20 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
 
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, TContext, ValueTask> handler)
     {
+        ArgumentNullException.ThrowIfNull(handler);
         _handlerSet.Add((e, _, context) => handler(e, context));
         return this;
     }
 
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Action<TEvent, TContext> handler)
-        => InvokeHostHandler((e, context) =>
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return InvokeHostHandler((e, context) =>
         {
             handler(e, context);
             return ValueTask.CompletedTask;
         });
+    }
 
     public SubscriptionPipeline<TEvent, TContext> InvokeHostHandler(Func<TEvent, ValueTask> handler)
     {
