@@ -37,6 +37,22 @@ internal static class PluginAnalyzerDiagnostics
             + "by the generator; without interception its native terminal throws at runtime.",
         helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK111");
 
+    // A normal Run terminal has no native fallback: if a recognized chain cannot be lowered, the runtime terminal
+    // throws DBXK062 when the authoring chain is configured. Report that specific generator skip instead of the
+    // old blanket analyzer-only DBXK110 diagnostic.
+    public static readonly DiagnosticDescriptor RunChainNotLoweredRule = new(
+        "DBXK114",
+        "Run chain is not lowered and will throw at runtime",
+        "This Run chain could not be lowered to verified IR (an unsupported Where/Select projection, predicate, "
+            + "or terminal body), so the generator does not intercept it and the runtime terminal throws DBXK062; "
+            + "use a supported hook-chain shape or bind a kernel class with Use/Register",
+        "DotBoxD.Kernels.Generation",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A recognized Run hook chain that cannot be lowered is skipped by the generator; without "
+            + "interception its native terminal throws DBXK062 when the chain is configured.",
+        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK114");
+
     // A [HookResult] record must declare the control fields the generated builders (and the runtime
     // abstain/fallthrough contract) depend on. Without them the builders cannot be emitted, so surface the
     // missing contract instead of leaving Ok()/Reject() undefined.

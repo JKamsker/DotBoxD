@@ -30,28 +30,14 @@ public sealed class PluginAnalyzer : DiagnosticAnalyzer
         description: "Live settings must use supported scalar types.",
         helpLinkUri: PluginAnalyzerDiagnostics.ShippedRulesHelpLinkBase + "DBXK020");
 
-    // Phase C-0 (detection only): flag an inline Run(lambda) hook chain. Lowering these
-    // lambdas to verified DotBoxD.Kernels is a later analyzer phase; until then the runtime terminal throws,
-    // so this informational diagnostic warns the author at compile time.
-    public static readonly DiagnosticDescriptor RunNotLoweredRule = new(
-        "DBXK110",
-        "Run chain is not yet lowered to verified IR",
-        "Run(lambda) is not yet lowered to verified IR and will throw at runtime; bind a kernel class with Use/Register, or use RunLocal for native host code",
-        "DotBoxD.Kernels.Generation",
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Detection only: lowering inline Where/Select/Run chains to verified DotBoxD.Kernels is a future analyzer phase.",
-        helpLinkUri: PluginAnalyzerDiagnostics.UnshippedRulesHelpLinkBase + "DBXK110");
-
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        => ImmutableArray.Create(ForbiddenHostApiRule, LiveSettingTypeRule, RunNotLoweredRule);
+        => ImmutableArray.Create(ForbiddenHostApiRule, LiveSettingTypeRule);
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
-        context.RegisterOperationAction(AnalyzeHookChainTerminal, OperationKind.Invocation);
         context.RegisterCompilationStartAction(startContext =>
         {
             var helperGraph = new ForbiddenHelperCallGraph();
@@ -62,37 +48,6 @@ public sealed class PluginAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeTypeOf(c, helperGraph), OperationKind.TypeOf);
             startContext.RegisterCompilationEndAction(helperGraph.ReportDiagnostics);
         });
-    }
-
-    private static void AnalyzeHookChainTerminal(OperationAnalysisContext context)
-    {
-        var invocation = (IInvocationOperation)context.Operation;
-        if (!string.Equals(invocation.TargetMethod.Name, "Run", StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        var containing = invocation.TargetMethod.ContainingType;
-        if (containing is null ||
-            !IsHookChainType(containing))
-        {
-            return;
-        }
-
-        context.ReportDiagnostic(Diagnostic.Create(RunNotLoweredRule, invocation.Syntax.GetLocation()));
-    }
-
-    private static bool IsHookChainType(INamedTypeSymbol type)
-    {
-        var original = type.OriginalDefinition.ToDisplayString();
-        return string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-               string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal);
     }
 
     private static void AnalyzeProperty(SymbolAnalysisContext context)

@@ -13,7 +13,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// lowering context's projected-element binding); the <c>Run</c> terminal's single
 /// <c>ctx.Messages.Send(targetId, message)</c> becomes <c>Handle</c>. Supported subset: expression-body
 /// lambdas and a single Send terminal. Any other shape fails safe (returns <c>null</c>, no package),
-/// leaving the runtime terminal to throw DBXK062 / the analyzer to flag DBXK110.
+/// leaving the runtime terminal to throw DBXK062 / the generator to report DBXK114.
 /// </summary>
 internal static partial class HookChainModelFactory
 {
@@ -48,24 +48,7 @@ internal static partial class HookChainModelFactory
             return new HookChainCreateResult(chain, null);
         }
 
-        // No package was emitted. Either the call site is not a recognized chain (nothing to do), or it IS a remote
-        // RunLocal chain whose Where/Select stages could not be lowered. Only the latter leaves the native terminal
-        // to throw NotSupportedException at runtime, so surface a build-time diagnostic for exactly that case.
-        if (TryRemoteRunLocalLocation(invocation, context.SemanticModel, cancellationToken, out var location))
-        {
-            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(location));
-        }
-
-        // A recognized in-process result hook (On<TContext>().Register/RegisterLocal) that produced no package
-        // leaves its native terminal to throw at runtime; surface DBXK113 so the cause shows at build time.
-        if (TryResultChainLocation(invocation, context.SemanticModel, cancellationToken, out var resultLocation, out var isLocalTerminal))
-        {
-            return new HookChainCreateResult(
-                null,
-                new HookChainNotLoweredDiagnostic(resultLocation, ResultChain: true, LocalResultTerminal: isLocalTerminal));
-        }
-
-        return null;
+        return NotLoweredDiagnostic(invocation, context.SemanticModel, cancellationToken);
     }
 
     private static HookChainResult? TryCreate(
