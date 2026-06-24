@@ -10,7 +10,7 @@ public sealed partial class PluginServer
         PluginPackage package,
         SandboxPolicy installPolicy)
     {
-        var requiredCapabilities = _host.GetRequiredCapabilities(package.Module)
+        var requiredCapabilities = _host.GetRequiredCapabilities(package.Module, installPolicy)
             .ToHashSet(StringComparer.Ordinal);
         var grants = installPolicy.Grants
             .Where(grant => MatchesRequiredCapability(grant.Id, requiredCapabilities))

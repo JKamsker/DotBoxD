@@ -20,7 +20,7 @@ namespace DotBoxD.Kernels.Tests.Samples.GameServer;
 /// <c>AttackerId == "player-1"</c> bucket, and we prove the lowered handler ran exactly 3 times — the
 /// other 97 never entered the sandbox.
 /// </summary>
-public sealed class EventIndexFanoutTests
+public sealed partial class EventIndexFanoutTests
 {
     [Fact]
     public async Task Host_index_prefilter_runs_the_lowered_predicate_only_for_matching_events()

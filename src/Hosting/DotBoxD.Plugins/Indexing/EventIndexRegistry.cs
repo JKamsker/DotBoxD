@@ -76,7 +76,17 @@ public sealed partial class EventIndexRegistry
                 _channels[typeof(TEvent)] = existing;
             }
 
-            ((EventIndexChannel<TEvent>)existing).Add(new EventIndexEntry<TEvent>(matcher, kernel, fullyCovered));
+            var channel = (EventIndexChannel<TEvent>)existing;
+            if (!ReferenceEquals(channel.Adapter, adapter))
+            {
+                throw new SandboxValidationException([
+                    new SandboxDiagnostic(
+                        "DBXK034",
+                        $"Event index for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
+                ]);
+            }
+
+            channel.Add(new EventIndexEntry<TEvent>(matcher, kernel, fullyCovered));
         }
 
         kernel.RegisterRevocationCallback(Unregister);

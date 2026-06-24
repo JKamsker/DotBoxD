@@ -73,11 +73,20 @@ public sealed partial class SandboxHost : IDisposable
     }
 
     internal IReadOnlyList<string> GetRequiredCapabilities(SandboxModule module)
+        => GetRequiredCapabilities(module, policy: null);
+
+    internal IReadOnlyList<string> GetRequiredCapabilities(
+        SandboxModule module,
+        SandboxPolicy? policy)
     {
         ArgumentNullException.ThrowIfNull(module);
         ThrowIfDisposed();
 
-        var validation = new ModuleValidator().Validate(module, _bindings);
+        var declaredOpaqueIdTypes = policy?.DeclaredOpaqueIdTypes ?? new HashSet<string>(StringComparer.Ordinal);
+        var validation = new ModuleValidator().ValidateForCapabilityDiscovery(
+            module,
+            _bindings,
+            declaredOpaqueIdTypes);
         if (!validation.Succeeded)
         {
             throw new SandboxValidationException(validation.Diagnostics);

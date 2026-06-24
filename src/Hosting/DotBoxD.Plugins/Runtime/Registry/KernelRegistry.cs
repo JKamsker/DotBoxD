@@ -34,7 +34,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         ArgumentNullException.ThrowIfNull(pluginId);
         lock (_gate)
         {
-            return _currentByPluginId.TryGetValue(pluginId, out kernel);
+            return TryFindByPluginOrInstallIdLocked(pluginId, out kernel);
         }
     }
 
@@ -127,7 +127,7 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
         InstalledKernel? kernel;
         lock (_gate)
         {
-            if (!_currentByPluginId.TryGetValue(pluginId, out kernel))
+            if (!TryFindByPluginOrInstallIdLocked(pluginId, out kernel))
             {
                 return null;
             }
@@ -142,6 +142,27 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
 
         kernel.Revoke();
         return kernel;
+    }
+
+    private bool TryFindByPluginOrInstallIdLocked(
+        string id,
+        [MaybeNullWhen(false)] out InstalledKernel kernel)
+    {
+        if (_currentByPluginId.TryGetValue(id, out kernel) ||
+            _kernelsByInstallId.TryGetValue(id, out kernel))
+        {
+            return true;
+        }
+
+        if (!_kernelsByPluginId.TryGetValue(id, out var principals) ||
+            principals.Count != 1)
+        {
+            kernel = null;
+            return false;
+        }
+
+        kernel = principals[0];
+        return true;
     }
 
     internal InstalledKernel? Remove(InstalledKernel kernel)

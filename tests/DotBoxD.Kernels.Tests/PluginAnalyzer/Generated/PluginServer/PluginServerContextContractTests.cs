@@ -125,6 +125,8 @@ public sealed partial class PluginServerContextContractTests
     public async Task Local_context_member_used_in_lowered_stage_reports_DBXK116()
     {
         var diagnostics = await AnalyzerDiagnosticsAsync(MinimalServer("""
+            using System.Linq;
+
             [GeneratePluginServer(Context = typeof(GameContext))]
             public partial class RemotePluginServer : Sample.Game.IGameWorld;
 
@@ -148,6 +150,31 @@ public sealed partial class PluginServerContextContractTests
             """));
 
         Assert.Contains(diagnostics, d => d.Id == "DBXK116");
+    }
+
+    [Fact]
+    public async Task Local_context_member_used_in_native_linq_does_not_report_DBXK116()
+    {
+        var diagnostics = await AnalyzerDiagnosticsAsync(MinimalServer("""
+            [GeneratePluginServer(Context = typeof(GameContext))]
+            public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+            public sealed partial class GameContext
+            {
+                public GameContext(HookContext raw) { }
+
+                [Local]
+                public string NativeName => "local";
+            }
+
+            public static class Usage
+            {
+                public static bool Check(GameContext ctx)
+                    => new[] { "local" }.Where(value => value == ctx.NativeName).Any();
+            }
+            """));
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK116");
     }
 
     [Fact]

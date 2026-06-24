@@ -79,8 +79,10 @@ public sealed partial class PluginAnalyzer
 
     private static void ReportLocalUseIfInvalid(OperationAnalysisContext context, ISymbol target)
     {
+        var model = context.Operation.SemanticModel;
         if (!HasAttribute(target, DotBoxDMetadataNames.LocalAttribute) ||
-            !IsLocalUseForbidden(context.Operation.Syntax, context.ContainingSymbol))
+            model is null ||
+            !IsLocalUseForbidden(context.Operation.Syntax, context.ContainingSymbol, model, context.CancellationToken))
         {
             return;
         }
@@ -91,7 +93,11 @@ public sealed partial class PluginAnalyzer
             "[Local] context members run natively and cannot be used in lowered hook chains or server-extension bodies."));
     }
 
-    private static bool IsLocalUseForbidden(SyntaxNode syntax, ISymbol? containingSymbol)
+    private static bool IsLocalUseForbidden(
+        SyntaxNode syntax,
+        ISymbol? containingSymbol,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
         if (containingSymbol is IMethodSymbol method &&
             HasAttribute(method, DotBoxDMetadataNames.ServerExtensionMethodAttribute))
@@ -106,10 +112,31 @@ public sealed partial class PluginAnalyzer
                 argumentList.Parent is InvocationExpressionSyntax invocation &&
                 invocation.Expression is MemberAccessExpressionSyntax member)
             {
-                return member.Name.Identifier.ValueText is "Where" or "Select" or "Run" or "Register";
+                return member.Name.Identifier.ValueText is "Where" or "Select" or "Run" or "Register" &&
+                    IsHookChainReceiver(member.Expression, model, cancellationToken);
             }
         }
 
         return false;
     }
+
+    private static bool IsHookChainReceiver(
+        ExpressionSyntax receiver,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
+           IsHookChainType(receiverType);
+
+    private static bool IsHookChainType(INamedTypeSymbol type)
+        => type.ContainingNamespace.ToDisplayString() switch
+        {
+            "DotBoxD.Plugins.Runtime" => type.Name is
+                "HookPipeline" or
+                "SubscriptionPipeline" or
+                "RemoteHookPipeline" or
+                "RemoteSubscriptionPipeline",
+            "DotBoxD.Plugins.Runtime.Hooks" => type.Name is "HookStage" or "RemoteHookStage",
+            "DotBoxD.Plugins.Runtime.Subscriptions" => type.Name is "SubscriptionStage" or "RemoteSubscriptionStage",
+            _ => false,
+        };
 }

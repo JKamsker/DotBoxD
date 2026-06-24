@@ -13,9 +13,25 @@ public sealed class ModuleValidator
         new HashSet<string>(StringComparer.Ordinal);
 
     public ModuleValidationResult Validate(SandboxModule module, IBindingCatalog bindings, SandboxPolicy? policy = null)
+        => ValidateCore(
+            module,
+            bindings,
+            policy?.DeclaredOpaqueIdTypes ?? NoDeclaredOpaqueIdTypes,
+            policy);
+
+    internal ModuleValidationResult ValidateForCapabilityDiscovery(
+        SandboxModule module,
+        IBindingCatalog bindings,
+        IReadOnlySet<string> declaredOpaqueIdTypes)
+        => ValidateCore(module, bindings, declaredOpaqueIdTypes, policy: null);
+
+    private static ModuleValidationResult ValidateCore(
+        SandboxModule module,
+        IBindingCatalog bindings,
+        IReadOnlySet<string> declaredOpaqueIdTypes,
+        SandboxPolicy? policy)
     {
         var diagnostics = new List<SandboxDiagnostic>();
-        var declaredOpaqueIdTypes = policy?.DeclaredOpaqueIdTypes ?? NoDeclaredOpaqueIdTypes;
         StructuralValidator.Validate(module, diagnostics, declaredOpaqueIdTypes);
         if (diagnostics.Count > 0)
         {
