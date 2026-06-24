@@ -29,8 +29,8 @@ public static class LocalReactions
         ArgumentNullException.ThrowIfNull(onCalmedMonster);
 
         hooks.On<MonsterAggroEvent>()
-            .Where((e, _) => e.Distance <= 4)
-            .Select((e, _) => e.MonsterId)
+            .Where(e => e.Distance <= 4)
+            .Select(e => e.MonsterId)
             .RunLocal((monsterId, context) =>
                 onCalmedMonster(context.FormatCalmTarget(monsterId), context.HasCancelableDispatch));
     }
@@ -55,7 +55,7 @@ public static class LocalReactions
         ArgumentNullException.ThrowIfNull(hooks);
 
         hooks.On<RemoteDamageDecisionEvent>()
-            .Where((e, _) => e.Damage > 10)
+            .Where(e => e.Damage > 10)
             .RegisterLocal(
                 (e, context) => new RemoteDamageDecisionResult(
                     true,

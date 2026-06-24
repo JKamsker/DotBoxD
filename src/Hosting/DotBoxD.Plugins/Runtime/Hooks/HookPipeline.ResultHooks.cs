@@ -45,12 +45,6 @@ public partial class HookPipeline<TEvent, TContext>
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
-    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
-        Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
-        where TResult : struct, IHookResult
-        => throw Hooks.HookLowering.ResultNotLowered();
-
     /// <summary>
     /// Installs a lowered <c>Register</c> chain: the package's verified <c>ShouldHandle</c> filter and
     /// result-producing <c>Handle</c> run in the sandbox, and the returned value is decoded to

@@ -14,12 +14,12 @@ Phases A–C land. It is illustrative, not a diff — focus on *how the project 
 │                              │                                  │                              │
 │  • Kernels (plain C#)        │                                  │  • Owns the SandboxPolicy    │
 │  • server.Hooks.On<>()...    │                                  │  • Runs IR in the sandbox    │
-│  • server.Events.On<>()...   │                                  │  • Drives the simulation     │
+│  • server.Subscriptions.On<>()... │                              │  • Drives the simulation     │
 └─────────────────────────────┘                                  └──────────────────────────────┘
         │                                                                    ▲
         │ source generator (DotBoxD.Plugins.Analyzer)                          │
         ▼                                                                    │
-   lowers kernels + Where/Select/InvokeKernel lambdas  ────────────────────▶ opaque verified IR
+   lowers kernels + Where/Select/Run lambdas  ─────────────────────────────▶ opaque verified IR
 ```
 
 The server's responsibilities: it **owns the policy**, receives verified IR (never source), runs that
@@ -207,11 +207,11 @@ public sealed class HookPipeline<TEvent, TServerContext>
 ```
 
 Sandbox-lowered stages and terminals such as `Where`, `Select`, `Run`, and `Register` can only use
-context members the analyzer knows how to lower into verified IR. The supported contract is explicit:
+members the analyzer knows how to lower into verified IR. The supported contract is explicit:
 extend the generated partial context with pure helper methods marked `[KernelMethod]` so their bodies
-inline into the chain, and mark host-backed context properties or methods with `[HostBinding]` so the
-analyzer emits a sandbox host call and records the required capability/effects. Use `RunLocal` /
-`RegisterLocal` when the handler needs arbitrary in-process services from the plugin-owned context.
+inline into the chain. Host calls flow through analyzer-visible host-service contracts annotated with
+`[HostCapability]`; use `RunLocal` / `RegisterLocal` when the handler needs arbitrary in-process
+services from the generated server context.
 
 For example, the generated context supplies the raw hook plumbing, while the plugin adds domain
 members in a partial:
@@ -222,12 +222,8 @@ public sealed partial class GamePluginContext
     [KernelMethod]
     public bool CanInspect(int distance) => distance <= 4;
 
-    [HostBinding(
-        "game.damage.adjustment",
-        "game.damage.read.adjustment",
-        SandboxEffect.Cpu | SandboxEffect.HostStateRead | SandboxEffect.Audit)]
-    public int DamageAdjustment
-        => throw new NotSupportedException("Lowering marker; implemented by a host binding.");
+    [KernelMethod]
+    public int ScaleDamage(int amount) => amount * 2;
 }
 
 server.Hooks.On<DamageContext>()
@@ -235,7 +231,7 @@ server.Hooks.On<DamageContext>()
     .Register((damage, ctx) => new DamageResult
     {
         Success = true,
-        Damage = damage.Amount + ctx.DamageAdjustment,
+        Damage = ctx.ScaleDamage(damage.Amount),
     });
 ```
 
@@ -259,13 +255,14 @@ server.Subscriptions.On<MonsterAggroEvent, TelemetrySubscriptionContext>(
     .RunLocal((e, ctx) => ctx.Record(e.MonsterId));
 ```
 
-Binding a kernel **class** is no longer a hook-chain terminal — it moved to
-`server.Kernels.Register<TService, TKernel>()`. That call resolves the kernel package, installs it
-through the owning session under the resolved per-plugin policy, and wires it **generically** —
-resolving the adapter by the manifest's event name instead of the old hardcoded `WireHook` switch
+Binding a kernel **class** is no longer a hook-chain terminal: the generated facade records it in
+`Setup(s => s.Hooks.On<TEvent>().Use<TKernel>())` or
+`Setup(s => s.Subscriptions.On<TEvent>().Use<TKernel>())`, and the host wires the installed package with
+`server.Hooks.On<TEvent>().Use(kernel)` / `server.Subscriptions.On<TEvent>().Use(kernel)`. The host
+resolves the adapter through `server.Events.Resolve<TEvent>()` instead of the old hardcoded `WireHook` switch
 ([GamePluginControlService.cs](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)
 is deleted). See [kernel-binding-model.md](kernel-binding-model.md) §4.
 
-`server.Events` is the fire-and-forget mirror of `server.Hooks` (same chain surface; isolates handler
-exceptions and does not await decisions). See the plugin walkthrough for the Hooks-vs-Events
+`server.Subscriptions` is the notification mirror of `server.Hooks` (same chain surface; isolates handler
+exceptions and does not await decisions). See the plugin walkthrough for the Hooks-vs-Subscriptions
 contrast from the author's side.

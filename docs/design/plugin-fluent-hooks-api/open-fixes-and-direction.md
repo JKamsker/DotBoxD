@@ -344,6 +344,9 @@ the pure inline helper, not the main way to extend the API.
 
 Two precise corrections:
 
+- **Arity names intent.** Use one-parameter lambdas (`e =>`, `value =>`) when a stage does not need the
+  context; use two-parameter lambdas (`(e, ctx) =>`) only when the body reads `ctx`. Do not write `(e, _) =>`
+  as noise in filters/projections just to match a neighboring handler's arity.
 - **The verbs are not interchangeable.** `Run`/`Register` lower to verified IR (sandbox subset only);
   `RunLocal`/`RegisterLocal` run arbitrary native code. A `RunLocal` body that calls a plugin service does
   **not** become a valid `Run` by dropping the suffix — it fails to lower. Do **not** claim "the same

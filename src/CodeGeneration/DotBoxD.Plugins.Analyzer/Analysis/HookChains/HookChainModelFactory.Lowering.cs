@@ -215,7 +215,7 @@ internal static partial class HookChainModelFactory
                 continue;
             }
 
-            var (elementParam, contextParam, _) = LambdaParameters(stage.Lambda);
+            var (elementParam, contextParam) = LambdaParameters(stage.Lambda);
             if (elementParam is null || stage.Lambda.ExpressionBody is not { } body)
             {
                 throw new NotSupportedException();

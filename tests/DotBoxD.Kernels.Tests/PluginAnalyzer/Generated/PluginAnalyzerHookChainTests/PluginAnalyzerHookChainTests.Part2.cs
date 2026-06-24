@@ -102,45 +102,6 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
-    public void Lowers_a_cancellation_aware_RegisterLocal_result_chain_to_a_local_result_install()
-    {
-        var result = RunGenerator("""
-            using System.Threading;
-            using System.Threading.Tasks;
-            using DotBoxD.Plugins;
-            using DotBoxD.Plugins.Runtime;
-            using DotBoxD.Abstractions;
-
-            namespace Sample;
-
-            [Hook("combat.death", typeof(DeathResult))]
-            public sealed record DeathCtx(int FatalDamage);
-
-            [HookResult]
-            public readonly partial record struct DeathResult(bool Success, string? Reason, int Mitigated);
-
-            public static class Usage
-            {
-                public static void Configure(HookRegistry hooks)
-                    => hooks.On<DeathCtx>()
-                        .Where(ctx => ctx.FatalDamage > 0)
-                        .RegisterLocal(
-                            (ctx, hookContext, cancellationToken) =>
-                                new ValueTask<DeathResult>(new DeathResult { Success = true }),
-                            5);
-            }
-            """);
-
-        var generated = string.Join(
-            Environment.NewLine,
-            result.GeneratedTrees.Select(tree => tree.GetText().ToString()));
-
-        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK113");
-        Assert.Contains("UseGeneratedLocalResultChain", generated, StringComparison.Ordinal);
-        Assert.Contains("global::System.Threading.CancellationToken", generated, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Lowers_a_Register_fluent_builder_chain_to_a_result_install()
     {
         var result = RunGenerator("""

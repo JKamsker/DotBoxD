@@ -18,12 +18,6 @@ public sealed partial class RemoteHookPipeline<TEvent>
         where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
-    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
-        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
-        where TResult : struct, IHookResult
-        => throw ResultLocalHandlersNotSupported();
-
     public RemoteHookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
         where TResult : struct, IHookResult
     {

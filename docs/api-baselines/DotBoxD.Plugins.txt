@@ -88,7 +88,6 @@ public HookPipeline<TEvent, TContext> On<TEvent, TContext>( IPluginEventAdapter<
 public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
 public HookPipeline<TEvent, TContext> Register<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public HookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public HookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
@@ -195,7 +194,6 @@ public ref struct KernelRpcPayloadReader
 public RemoteHookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
 public RemoteHookPipeline<TEvent, TContext> Register<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>( Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent, TContext> Run(Action<TCurrent, TContext> handler)
@@ -249,9 +247,7 @@ public RemoteHookPipeline<TEvent, TContext> Where(Func<TEvent, TContext, bool> f
 public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers)
 public RemoteHookPipeline<TEvent> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TCurrent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
-public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, HookContext, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> RegisterLocal<TResult>( Func<TEvent, TResult> handler, int priority = 0) where TResult : struct, IHookResult
 public RemoteHookPipeline<TEvent> Run(Action<TCurrent, HookContext> handler)

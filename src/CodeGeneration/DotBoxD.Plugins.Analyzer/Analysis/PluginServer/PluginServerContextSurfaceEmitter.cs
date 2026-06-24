@@ -18,7 +18,7 @@ internal static class PluginServerContextSurfaceEmitter
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             string.Empty,
-            "Generated plugin-owned hook context. Extend this partial type with plugin-specific members; [KernelMethod] and [HostBinding] members can be consumed by lowered hook chains.");
+            "Generated server hook context. Extend this partial type with helper members; [KernelMethod] instance members can be consumed by lowered hook chains.");
         builder.Append(model.Accessibility).Append(" sealed partial class ").Append(model.ContextName).AppendLine();
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::DotBoxD.Abstractions.HookContext _raw;");
@@ -47,7 +47,7 @@ internal static class PluginServerContextSurfaceEmitter
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             string.Empty,
-            "Generated hook registry whose parameterless On<TEvent>() uses the plugin-owned server context by default.");
+            "Generated hook registry whose parameterless On<TEvent>() uses the generated server context by default.");
         AppendRegistryAttribute(builder, model, "Hook");
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.HookRegistryName).AppendLine();
         builder.AppendLine("{");
@@ -71,7 +71,7 @@ internal static class PluginServerContextSurfaceEmitter
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             string.Empty,
-            "Generated subscription registry whose parameterless On<TEvent>() uses the plugin-owned server context by default.");
+            "Generated subscription registry whose parameterless On<TEvent>() uses the generated server context by default.");
         AppendRegistryAttribute(builder, model, "Subscription");
         builder.Append(model.Accessibility).Append(" sealed class ").Append(model.SubscriptionRegistryName).AppendLine();
         builder.AppendLine("{");

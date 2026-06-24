@@ -180,12 +180,6 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
         where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
-    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
-        Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
-        where TResult : struct, IHookResult
-        => throw ResultLocalHandlersNotSupported();
-
     private static InvalidOperationException NotLowered()
         => new("Remote hook Run(lambda) calls must be intercepted by the DotBoxD plugin generator.");
 

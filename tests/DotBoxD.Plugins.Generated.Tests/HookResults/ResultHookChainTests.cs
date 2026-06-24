@@ -159,36 +159,6 @@ public sealed partial class ResultHookChainTests
     }
 
     [Fact]
-    public async Task RegisterLocal_cancellation_aware_overload_threads_the_dispatch_token()
-    {
-        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
-        var invoked = 0;
-        CancellationToken received = default;
-        using var cts = new CancellationTokenSource();
-        server.Hooks.On<CombatDamageContext>()
-            .Where(ctx => ctx.Relation == CombatRelation.Pve)
-            .RegisterLocal((ctx, hookContext, cancellationToken) =>
-            {
-                received = cancellationToken;
-                cancellationToken.ThrowIfCancellationRequested();
-                invoked++;
-                return new ValueTask<CombatDamageResult>(
-                    new CombatDamageResult { Success = true, Damage = ctx.Damage + 2 });
-            }, priority: 50);
-
-        var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
-            new CombatDamageContext(CombatRelation.Pve, 10), cts.Token);
-
-        Assert.Equal(12, result!.Value.Damage);
-        Assert.Equal(1, invoked);
-        // The token the handler observed is the dispatch token, not CancellationToken.None: it threads through
-        // FireAsync -> HookContext -> the handler's 3rd parameter. (Previously fired with None, which left the
-        // handler's ThrowIfCancellationRequested dead and proved nothing about token threading.)
-        Assert.True(received.CanBeCanceled);
-        Assert.Equal(cts.Token, received);
-    }
-
-    [Fact]
     public void Register_install_entrypoint_carries_no_handler_delegate()
     {
         // Pins the sandbox-verified Register contract structurally: UseGeneratedResultChain (the entrypoint the

@@ -33,7 +33,6 @@ internal static partial class ResultHookChain
         LambdaExpressionSyntax terminalLambda,
         string terminalElementParam,
         string? terminalContextParam,
-        bool terminalHasCancellationToken,
         bool isLocal,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         string? generatedRemoteServerContextTypeFullName)
@@ -49,11 +48,6 @@ internal static partial class ResultHookChain
 
         if (!TryResolveHook(contextType, out var hookName, out var resultType) ||
             !HookResultModelFactory.CanSatisfyHookResult(resultType, model.Compilation, cancellationToken))
-        {
-            throw new NotSupportedException();
-        }
-
-        if (terminalHasCancellationToken && !isLocal)
         {
             throw new NotSupportedException();
         }
@@ -140,7 +134,6 @@ internal static partial class ResultHookChain
             contextType,
             resultType,
             isLocal,
-            terminalHasCancellationToken,
             terminalContextParam is not null,
             receiverIsStage: false,
             generatedRemoteKind,

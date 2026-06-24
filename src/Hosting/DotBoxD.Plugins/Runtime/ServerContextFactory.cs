@@ -1,5 +1,3 @@
-using DotBoxD.Plugins.Kernel;
-
 namespace DotBoxD.Plugins.Runtime;
 
 internal sealed class ServerContextFactory<TContext>
@@ -17,11 +15,4 @@ internal sealed class ServerContextFactory<TContext>
     internal static HookContext Identity(HookContext context) => context;
 
     public static ServerContextFactory<HookContext> Default { get; } = new(Identity);
-}
-
-internal interface IPluginEventPipelineRegistry
-{
-    void EnsureCanRegister<TEvent>(IPluginEventAdapter<TEvent> adapter);
-    void RemoveKernel(InstalledKernel kernel);
-    void RemoveKernelPool(InstalledKernelPool pool);
 }

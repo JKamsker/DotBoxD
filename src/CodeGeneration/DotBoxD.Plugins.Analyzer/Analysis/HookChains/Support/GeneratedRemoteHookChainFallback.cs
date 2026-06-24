@@ -137,8 +137,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         bool terminalHasServerContext,
         string packageFullName,
         HookChainInterceptorInstallKind installKind,
-        GeneratedRemoteHookChainKind kind,
-        bool isAsyncLocal)
+        GeneratedRemoteHookChainKind kind)
     {
         if (kind != GeneratedRemoteHookChainKind.Hook)
         {
@@ -160,7 +159,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         var handlerContextType = terminalHasServerContext
             ? serverContextTypeFullName ?? DotBoxDGenerationNames.TypeNames.GlobalHookContext
             : null;
-        var handlerType = ResultHandlerType(eventTypeFullName, handlerContextType, resultTypeFullName, isAsyncLocal);
+        var handlerType = ResultHandlerType(eventTypeFullName, handlerContextType, resultTypeFullName);
 
         return new HookChainInterception(
             attributeSyntax,
@@ -169,15 +168,13 @@ internal static partial class GeneratedRemoteHookChainFallback
             pipelineType,
             packageFullName,
             installKind,
-            ResultTypeFullName: resultTypeFullName,
-            IsAsyncLocalResult: isAsyncLocal);
+            ResultTypeFullName: resultTypeFullName);
     }
 
     private static string ResultHandlerType(
         string eventTypeFullName,
         string? serverContextTypeFullName,
-        string resultTypeFullName,
-        bool isAsyncLocal)
+        string resultTypeFullName)
     {
         if (serverContextTypeFullName is null)
         {
@@ -185,14 +182,9 @@ internal static partial class GeneratedRemoteHookChainFallback
                 resultTypeFullName + ">";
         }
 
-        return isAsyncLocal
-            ? DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
-              eventTypeFullName + ", " + serverContextTypeFullName + ", " +
-              DotBoxDGenerationNames.TypeNames.GlobalCancellationToken + ", " +
-              DotBoxDGenerationNames.TypeNames.GlobalValueTask + "<" + resultTypeFullName + ">>"
-            : DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
-              eventTypeFullName + ", " + serverContextTypeFullName + ", " +
-              resultTypeFullName + ">";
+        return DotBoxDGenerationNames.TypeNames.GlobalFunc + "<" +
+            eventTypeFullName + ", " + serverContextTypeFullName + ", " +
+            resultTypeFullName + ">";
     }
 
     public static string TypeFullName(

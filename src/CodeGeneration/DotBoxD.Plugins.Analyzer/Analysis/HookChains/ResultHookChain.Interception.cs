@@ -16,7 +16,6 @@ internal static partial class ResultHookChain
         INamedTypeSymbol contextType,
         INamedTypeSymbol resultType,
         bool isLocal,
-        bool isAsyncLocal,
         bool hasServerContextParameter,
         bool receiverIsStage,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
@@ -44,8 +43,7 @@ internal static partial class ResultHookChain
             contextFullName,
             serverContextFullName,
             resultFullName,
-            hasServerContextParameter,
-            isAsyncLocal);
+            hasServerContextParameter);
 
         if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
             method.Parameters.Length >= 1 &&
@@ -60,8 +58,7 @@ internal static partial class ResultHookChain
                 method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 packageFullName,
                 isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-                ResultTypeFullName: resultFullName,
-                IsAsyncLocalResult: isAsyncLocal);
+                ResultTypeFullName: resultFullName);
         }
 
         if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol receiverType ||
@@ -78,8 +75,7 @@ internal static partial class ResultHookChain
                     hasServerContextParameter,
                     packageFullName,
                     isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-                    generatedRemoteKind.Value,
-                    isAsyncLocal);
+                    generatedRemoteKind.Value);
         }
 
         var receiverFullName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -90,8 +86,7 @@ internal static partial class ResultHookChain
             receiverFullName,
             packageFullName,
             isLocal ? HookChainInterceptorInstallKind.LocalResultChain : HookChainInterceptorInstallKind.ResultChain,
-            ResultTypeFullName: resultFullName,
-            IsAsyncLocalResult: isAsyncLocal);
+            ResultTypeFullName: resultFullName);
     }
 
     private static INamedTypeSymbol? ResolvedReceiverType(IMethodSymbol method, ITypeSymbol? expressionReceiverType)
@@ -103,19 +98,14 @@ internal static partial class ResultHookChain
         string eventFullName,
         string serverContextFullName,
         string resultFullName,
-        bool hasServerContextParameter,
-        bool hasCancellationToken)
+        bool hasServerContextParameter)
     {
         if (!hasServerContextParameter)
         {
             return $"{TypeNames.GlobalFunc}<{eventFullName}, {resultFullName}>";
         }
 
-        return hasCancellationToken
-            ? $"{TypeNames.GlobalFunc}<" +
-                $"{eventFullName}, {serverContextFullName}, {TypeNames.GlobalCancellationToken}, " +
-                $"{TypeNames.GlobalValueTask}<{resultFullName}>>"
-            : $"{TypeNames.GlobalFunc}<{eventFullName}, {serverContextFullName}, {resultFullName}>";
+        return $"{TypeNames.GlobalFunc}<{eventFullName}, {serverContextFullName}, {resultFullName}>";
     }
 
     private static string ServerContextFullName(
