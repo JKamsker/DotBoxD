@@ -78,7 +78,13 @@ internal static partial class RpcKernelModelFactory
                 clientExtensions,
                 graftType,
                 hasReceiverId);
-            return new RpcKernelModelResult(source, null);
+            var grafts = RpcKernelGraftSignatureFactory.Create(
+                type,
+                method,
+                serviceMethod,
+                clientExtensions,
+                graftType);
+            return new RpcKernelModelResult(source, null, grafts);
         }
         catch (NotSupportedException ex)
         {
@@ -278,7 +284,10 @@ internal static partial class RpcKernelModelFactory
         => type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
 
     private static RpcKernelModelResult Fail(ClassDeclarationSyntax declaration, string message)
-        => new(null, PluginKernelDiagnostic.Create(declaration.Identifier, message));
+        => new(null, PluginKernelDiagnostic.Create(declaration.Identifier, message), default);
 }
 
-internal sealed record RpcKernelModelResult(GeneratedPluginPackage? Package, PluginKernelDiagnostic? Diagnostic);
+internal sealed record RpcKernelModelResult(
+    GeneratedPluginPackage? Package,
+    PluginKernelDiagnostic? Diagnostic,
+    EquatableArray<RpcKernelGraftSignature> Grafts);
