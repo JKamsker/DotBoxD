@@ -9,8 +9,14 @@ namespace DotBoxD.Plugins.Runtime;
 /// captured once at registration time (when the event type is statically known), so the host-side router
 /// (<see cref="PluginServer.WireHook"/> / <see cref="PluginServer.WireSubscription"/>) can wire an installed
 /// kernel to the correct typed pipeline terminal <b>by event name</b> — with no reflection at wire time.
+/// <para>
+/// Public as a composability seam: resolve one via <see cref="PluginEventAdapterRegistry.TryResolveErased"/>
+/// and wire a kernel your own way when the <see cref="PluginServer.WireHook"/> /
+/// <see cref="PluginServer.WireSubscription"/> defaults don't fit — without dropping all the way back to a
+/// hand-written event-name → typed-<c>On&lt;TEvent&gt;()</c> dispatch.
+/// </para>
 /// </summary>
-internal interface IErasedPluginEventAdapter
+public interface IErasedPluginEventAdapter
 {
     /// <summary>The CLR event type this adapter handles.</summary>
     Type EventType { get; }

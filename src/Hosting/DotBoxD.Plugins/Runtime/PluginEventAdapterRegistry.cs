@@ -54,9 +54,11 @@ public sealed class PluginEventAdapterRegistry
     /// Resolves the type-erased, wire-capable adapter for <paramref name="eventName"/> (a manifest event name,
     /// possibly fully qualified) so the host-side router can wire an installed kernel to the right typed
     /// pipeline terminal with no reflection. Mirrors <see cref="TryResolveShape"/>'s by-name matching. Returns
-    /// <c>false</c> when no registered adapter matches.
+    /// <c>false</c> when no registered adapter matches. Public as a composability seam — build custom by-name
+    /// wiring on top of it when <see cref="PluginServer.WireHook"/>/<see cref="PluginServer.WireSubscription"/>
+    /// don't fit; the adapter must be registered first (the router does not auto-register by name).
     /// </summary>
-    internal bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
+    public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
         foreach (var registered in _adapters.Values)
         {

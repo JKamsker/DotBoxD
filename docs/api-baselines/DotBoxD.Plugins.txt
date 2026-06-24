@@ -29,6 +29,7 @@ public bool ReadBool()
 public bool Register<TEvent>( IPluginEventAdapter<TEvent> adapter, InstalledKernel kernel, IReadOnlyList<IndexedPredicate> predicates, bool indexCoversPredicate)
 public bool ResultLocalTerminal { get; init; }
 public bool TryGet(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
+public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
 public bool Uninstall(string pluginId)
 public bool UninstallPool(InstalledKernelPool pool)
 public bool Unregister(string subscriptionId)
@@ -162,6 +163,7 @@ public int ReadInt32()
 public int ReadListHeader()
 public int ReadMapHeader()
 public int ReadRecordHeader()
+public interface IErasedPluginEventAdapter
 public interface ILiveSetting
 public interface IServerExtensionClientRegistry :
 public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtensionWireClient
@@ -207,6 +209,7 @@ public readonly record struct EventIndexStats(long Considered, long Prefiltered,
 public readonly record struct KernelWireTerminal( KernelWireKind Kind, string? CallbackSubscriptionId, Type? ResultType, int Priority)
 public readonly record struct ResultHookFault(Type EventType, Exception Exception)
 public readonly record struct SubscriptionDeliveryFault( Type EventType, SubscriptionDeliveryStage Stage, Exception Exception)
+public readonly record struct WireCallbacks(RemoteLocalPush? LocalPush, RemoteLocalResultRequest? LocalResult)
 public readonly struct KernelRpcValue
 public ref struct KernelRpcPayloadReader
 public RemoteHookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
