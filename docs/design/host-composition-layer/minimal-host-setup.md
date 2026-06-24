@@ -126,6 +126,12 @@ index survivor (index is prefilter only). One audited implementation replaces N 
 
 ### Piece 2 — Generated connection host (deletes `GamePluginHost`, ~73 lines)
 
+> **Superseded — see the [As-built](#as-built-deltas-from-the-design-below) note.** This section is the
+> *original* source-generator proposal. It shipped instead as a **runtime helper** (`PluginConnectionHost<T>`
+> in `DotBoxD.Pushdown.Services`) — same per-connection lifecycle (session-per-peer, dispose-on-disconnect,
+> `Connected`/`Disconnected`/`PipeName`), no generator, lower risk. The host keeps the `(peer, session) =>`
+> provide-services callback. The generator design below is retained for the record / a future iteration.
+
 Extend the `[GeneratePluginServer]` / `[DotBoxDService]` codegen to also emit a **host-side** accept helper
 that mints a session per peer, resolves+provides every `[DotBoxDService]` impl from a host-supplied factory,
 wires reverse callbacks, and disposes the session on disconnect:

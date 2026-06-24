@@ -10,7 +10,7 @@ namespace DotBoxD.Plugins.Runtime;
 /// (<see cref="PluginServer.WireHook"/> / <see cref="PluginServer.WireSubscription"/>) can wire an installed
 /// kernel to the correct typed pipeline terminal <b>by event name</b> — with no reflection at wire time.
 /// </summary>
-public interface IErasedPluginEventAdapter
+internal interface IErasedPluginEventAdapter
 {
     /// <summary>The CLR event type this adapter handles.</summary>
     Type EventType { get; }

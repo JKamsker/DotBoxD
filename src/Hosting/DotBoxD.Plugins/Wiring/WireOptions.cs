@@ -9,7 +9,7 @@ namespace DotBoxD.Plugins;
 /// <c>null</c> for a connection that uses no remote-local terminal; the router only requires the one a kernel's
 /// classified terminal actually uses.
 /// </summary>
-public readonly record struct WireCallbacks(RemoteLocalPush? LocalPush, RemoteLocalResultRequest? LocalResult);
+internal readonly record struct WireCallbacks(RemoteLocalPush? LocalPush, RemoteLocalResultRequest? LocalResult);
 
 /// <summary>
 /// The host's wiring seam for <see cref="PluginServer.WireHook"/> / <see cref="PluginServer.WireSubscription"/>.

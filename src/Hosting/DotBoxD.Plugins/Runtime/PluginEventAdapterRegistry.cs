@@ -56,7 +56,7 @@ public sealed class PluginEventAdapterRegistry
     /// pipeline terminal with no reflection. Mirrors <see cref="TryResolveShape"/>'s by-name matching. Returns
     /// <c>false</c> when no registered adapter matches.
     /// </summary>
-    public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
+    internal bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
         foreach (var registered in _adapters.Values)
         {
