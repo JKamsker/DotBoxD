@@ -6,7 +6,7 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 
 /// <summary>
 /// Per-hook-point store and dispatcher for result-returning hooks (<c>.Register(...)</c> /
-/// <c>.RegisterLocal(...)</c>) installed on a single <see cref="HookPipeline{TEvent}"/>. Handlers are kept in
+/// <c>.RegisterLocal(...)</c>) installed on a single <see cref="HookPipeline{TEvent, TContext}"/>. Handlers are kept in
 /// a copy-on-write array sorted by descending priority, ties preserving install order. <c>FireAsync</c>
 /// walks that order and returns the first <i>successful</i> result: a handler whose filter did not match, or
 /// that abstained (<c>Success == false</c>), falls through to the next. A handler that throws is isolated —

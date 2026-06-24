@@ -6,7 +6,7 @@ using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime;
 
-// The result-returning hook surface of HookPipeline<TEvent>: the .Register(...) / .RegisterLocal(...) terminals
+// The result-returning hook surface of HookPipeline<TEvent, TContext>: the .Register(...) / .RegisterLocal(...) terminals
 // (lowered by the analyzer), the generated install entrypoints the interceptors call, and FireResultAsync the
 // host calls to dispatch. The actual ordered dispatch + abstain/fallthrough logic lives in ResultHookSlot; this
 // partial is the thin pipeline facade over it, kept separate so the notification surface stays focused.

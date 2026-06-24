@@ -12,7 +12,7 @@ public sealed record ChainAggroEvent(string MonsterId, int Distance);
 /// End-to-end runtime proof of the Phase C lowering + interceptor hook-up: a real inline chain is
 /// lowered by the generator, compiled, loaded, and the lowered verified IR executes correctly — its
 /// <c>Where</c> gates and its <c>Send</c> runs. One test installs the package directly via
-/// <see cref="HookPipeline{TEvent}.UseGeneratedChain"/>; the other proves the generated C# interceptor
+/// <see cref="HookPipeline{TEvent, TContext}.UseGeneratedChain"/>; the other proves the generated C# interceptor
 /// does it automatically at the <c>Run</c> call site (no manual wiring).
 /// </summary>
 public sealed class HookChainRuntimeTests

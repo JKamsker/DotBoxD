@@ -196,7 +196,7 @@ public sealed partial class ResultHookChainTests
         // parameter, so a Register handler body can never be captured and run in-process. UseGeneratedLocalResultChain
         // is the deliberate exception: it threads the plugin-process handler. A regression that added a handler
         // argument to the Register entrypoint (and ran it in-process) would fail here.
-        var pipeline = typeof(HookPipeline<>);
+        var pipeline = typeof(HookPipeline<,>);
 
         var register = pipeline.GetMethods().Where(m => m.Name == "UseGeneratedResultChain").ToArray();
         Assert.NotEmpty(register);
@@ -268,11 +268,11 @@ public sealed partial class ResultHookChainTests
             || parameter.ParameterType.Name.StartsWith("Func", StringComparison.Ordinal)
             || parameter.ParameterType.Name.StartsWith("Action", StringComparison.Ordinal);
 
-    private static int ResultEntryCount<TEvent>(HookPipeline<TEvent> pipeline)
+    private static int ResultEntryCount<TEvent>(HookPipeline<TEvent, HookContext> pipeline)
     {
         const System.Reflection.BindingFlags flags =
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-        var slotField = typeof(HookPipeline<TEvent>).BaseType!.GetField("_resultHooks", flags);
+        var slotField = typeof(HookPipeline<TEvent, HookContext>).GetField("_resultHooks", flags);
         Assert.NotNull(slotField);
         var slot = slotField!.GetValue(pipeline)!;
         var entriesField = slot.GetType().GetField("_entries", flags);

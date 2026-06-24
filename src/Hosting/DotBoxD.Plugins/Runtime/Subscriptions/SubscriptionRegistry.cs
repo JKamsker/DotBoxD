@@ -33,33 +33,14 @@ public sealed class SubscriptionRegistry
         _onFault = onFault;
     }
 
-    public SubscriptionPipeline<TEvent> On<TEvent>()
+    public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
 
-    public SubscriptionPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-    {
-        lock (_gate)
-        {
-            EnsureCanRegisterLocked(adapter);
-            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (_pipelines.TryGetValue(key, out var existing))
-            {
-                var pipeline = (SubscriptionPipeline<TEvent>)existing;
-                EnsureContextFactoryMatches(
-                    pipeline.UsesContextFactory,
-                    ServerContextFactory<HookContext>.Identity,
-                    "subscription");
-                return pipeline;
-            }
-
-            var created = new SubscriptionPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
-            _pipelines[key] = created;
-            return created;
-        }
-    }
+    public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
 
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
@@ -102,7 +83,7 @@ public sealed class SubscriptionRegistry
         }
     }
 
-    private SubscriptionPipeline<TEvent> OnHookContext<TEvent>(
+    private SubscriptionPipeline<TEvent, HookContext> OnHookContext<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, HookContext> createContext)
     {
@@ -112,12 +93,12 @@ public sealed class SubscriptionRegistry
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                var pipeline = (SubscriptionPipeline<TEvent>)existing;
+                var pipeline = (SubscriptionPipeline<TEvent, HookContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "subscription");
                 return pipeline;
             }
 
-            var created = new SubscriptionPipeline<TEvent>(
+            var created = new SubscriptionPipeline<TEvent, HookContext>(
                 adapter,
                 _messages,
                 new ServerContextFactory<HookContext>(createContext),

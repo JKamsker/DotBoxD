@@ -48,39 +48,14 @@ public sealed partial class HookRegistry
         _onFault = onFault;
     }
 
-    public HookPipeline<TEvent> On<TEvent>()
+    public HookPipeline<TEvent, HookContext> On<TEvent>()
     {
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
 
-    public HookPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-    {
-        lock (_gate)
-        {
-            EnsureCanRegisterLocked(adapter);
-            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
-            if (_pipelines.TryGetValue(key, out var existing))
-            {
-                var pipeline = (HookPipeline<TEvent>)existing;
-                EnsureContextFactoryMatches(
-                    pipeline.UsesContextFactory,
-                    ServerContextFactory<HookContext>.Identity,
-                    "hook");
-                return pipeline;
-            }
-
-            var created = new HookPipeline<TEvent>(
-                adapter,
-                _messages,
-                _kernels,
-                _installer,
-                _onFault,
-                NextResultOrder);
-            _pipelines[key] = created;
-            return created;
-        }
-    }
+    public HookPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
 
     public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
@@ -122,7 +97,7 @@ public sealed partial class HookRegistry
         }
     }
 
-    private HookPipeline<TEvent> OnHookContext<TEvent>(
+    private HookPipeline<TEvent, HookContext> OnHookContext<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, HookContext> createContext)
     {
@@ -132,12 +107,12 @@ public sealed partial class HookRegistry
             var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
             if (_pipelines.TryGetValue(key, out var existing))
             {
-                var pipeline = (HookPipeline<TEvent>)existing;
+                var pipeline = (HookPipeline<TEvent, HookContext>)existing;
                 EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
                 return pipeline;
             }
 
-            var created = new HookPipeline<TEvent>(
+            var created = new HookPipeline<TEvent, HookContext>(
                 adapter,
                 _messages,
                 new ServerContextFactory<HookContext>(createContext),
