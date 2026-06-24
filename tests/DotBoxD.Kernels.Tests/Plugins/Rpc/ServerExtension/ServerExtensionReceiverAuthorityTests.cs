@@ -19,7 +19,7 @@ public sealed class ServerExtensionReceiverAuthorityTests
         {
             string Id { get; }
 
-            [HostCapability("game.world.monster.read.threat")]
+            [HostCapability("game.world.monster.read.threat", HostBindingEffect.HostStateRead)]
             int Threat();
         }
 

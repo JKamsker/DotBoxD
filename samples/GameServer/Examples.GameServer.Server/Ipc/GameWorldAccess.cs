@@ -9,8 +9,8 @@ namespace DotBoxD.Kernels.Game.Server.Ipc;
 /// async shape only exists so the remote proxy and in-sandbox kernels share one contract.
 /// <para>Because <see cref="IGameWorldAccess"/> is a pure domain contract (the install verbs live on the
 /// generated plugin facade), this impl has <b>zero throwers</b>. <c>Get(id)</c> returns a scoped handle
-/// (<see cref="GameMonster"/>/<see cref="GameEntity"/>) that captures the id; each handle method carries its
-/// <see cref="HostCapabilityAttribute"/> — the single server-side source of capability metadata.</para>
+/// (<see cref="GameMonster"/>/<see cref="GameEntity"/>) that captures the id; the SDK contract carries the
+/// <see cref="HostCapabilityAttribute"/> metadata consumed by analyzer and runtime.</para>
 /// </summary>
 internal sealed class GameWorldAccess : IGameWorldAccess
 {
@@ -37,10 +37,10 @@ internal sealed class GameMonsterControl : IMonsterControl
     public GameMonsterControl(Func<GameWorld> world)
         => _world = world ?? throw new ArgumentNullException(nameof(world));
 
-    [HostCapability("game.world.monster.read.handle")]
+    [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
     public IMonster Get(string entityId) => new GameMonster(_world, entityId);
 
-    [HostCapability("game.world.monster.read.kind")]
+    [HostCapability("game.world.monster.read.kind", HostBindingEffect.HostStateRead)]
     public ValueTask<bool> IsMonsterAsync(string entityId)
         => ValueTask.FromResult(_world().IsMonster(entityId));
 }
@@ -58,34 +58,34 @@ internal sealed class GameMonster : IMonster
 
     public string Id { get; }
 
-    [HostCapability("game.world.monster.read.snapshot")]
+    [HostCapability("game.world.monster.read.snapshot", HostBindingEffect.HostStateRead | HostBindingEffect.Allocates)]
     public ValueTask<MonsterSnapshot> SnapshotAsync()
         => ValueTask.FromResult(_world().GetMonsterSnapshot(Id));
 
-    [HostCapability("game.world.monster.write.kill")]   // effect (HostStateWrite) inferred from the impl
+    [HostCapability("game.world.monster.write.kill", HostBindingEffect.HostStateWrite)]
     public ValueTask<bool> KillAsync()
         => ValueTask.FromResult(_world().KillMonster(Id));
 
     // Deliberately a different capability subtree (combat.*, not monster.*) — the kind of exception a naming
     // convention could not infer, which is why the capability is stated explicitly here.
-    [HostCapability("game.world.combat.threat")]
+    [HostCapability("game.world.combat.threat", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetThreatAsync()
         => ValueTask.FromResult(_world().GetLevel(Id));
 
-    [HostCapability("game.world.monster.write.position")]
+    [HostCapability("game.world.monster.write.position", HostBindingEffect.HostStateWrite)]
     public ValueTask TeleportToAsync(int position)
     {
         _world().SetPosition(Id, position);
         return ValueTask.CompletedTask;
     }
 
-    [HostCapability("game.world.entity.read.health")]
+    [HostCapability("game.world.entity.read.health", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetHealthAsync() => ValueTask.FromResult(_world().GetHealth(Id));
 
-    [HostCapability("game.world.entity.read.level")]
+    [HostCapability("game.world.entity.read.level", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetLevelAsync() => ValueTask.FromResult(_world().GetLevel(Id));
 
-    [HostCapability("game.world.entity.read.position")]
+    [HostCapability("game.world.entity.read.position", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetPositionAsync() => ValueTask.FromResult(_world().GetPosition(Id));
 }
 
@@ -96,7 +96,7 @@ internal sealed class GameEntityControl : IEntityControl
     public GameEntityControl(Func<GameWorld> world)
         => _world = world ?? throw new ArgumentNullException(nameof(world));
 
-    [HostCapability("game.world.entity.read.handle")]
+    [HostCapability("game.world.entity.read.handle", HostBindingEffect.HostStateRead)]
     public IEntity Get(string entityId) => new GameEntity(_world, entityId);
 }
 
@@ -114,12 +114,12 @@ internal sealed class GameEntity : IEntity
 
     public string Id { get; }
 
-    [HostCapability("game.world.entity.read.health")]
+    [HostCapability("game.world.entity.read.health", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetHealthAsync() => ValueTask.FromResult(_world().GetHealth(Id));
 
-    [HostCapability("game.world.entity.read.level")]
+    [HostCapability("game.world.entity.read.level", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetLevelAsync() => ValueTask.FromResult(_world().GetLevel(Id));
 
-    [HostCapability("game.world.entity.read.position")]
+    [HostCapability("game.world.entity.read.position", HostBindingEffect.HostStateRead)]
     public ValueTask<int> GetPositionAsync() => ValueTask.FromResult(_world().GetPosition(Id));
 }

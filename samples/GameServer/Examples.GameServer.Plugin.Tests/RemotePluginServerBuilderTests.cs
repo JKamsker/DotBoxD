@@ -253,7 +253,7 @@ public sealed class RemotePluginServerBuilderTests
     {
         public IMonster Get(string entityId) => new FakeMonster(entityId);
 
-        [HostCapability("game.world.monster.read.kind")]
+        [HostCapability("game.world.monster.read.kind", HostBindingEffect.HostStateRead)]
         public ValueTask<bool> IsMonsterAsync(string entityId)
             => ValueTask.FromResult(true);
     }

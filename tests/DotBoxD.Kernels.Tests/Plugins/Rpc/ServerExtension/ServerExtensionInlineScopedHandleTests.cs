@@ -31,14 +31,14 @@ public sealed class ServerExtensionInlineScopedHandleTests
         [DotBoxDService]
         public interface IMonsterControl
         {
-            [HostCapability("game.world.monster.read.handle")]
+            [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
             IMonster Get(string entityId);
         }
 
         [DotBoxDService]
         public interface IMonster
         {
-            [HostCapability("game.world.monster.write.kill")]
+            [HostCapability("game.world.monster.write.kill", HostBindingEffect.HostStateWrite)]
             ValueTask<bool> KillAsync();
         }
 
@@ -72,14 +72,14 @@ public sealed class ServerExtensionInlineScopedHandleTests
         [DotBoxDService]
         public interface IMonsterControl
         {
-            [HostCapability("game.world.monster.read.handle")]
+            [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
             IMonster Get(string entityId);
         }
 
         [DotBoxDService]
         public interface IMonster
         {
-            [HostCapability("game.world.monster.write.kill")]
+            [HostCapability("game.world.monster.write.kill", HostBindingEffect.HostStateWrite)]
             ValueTask<bool> KillAsync();
         }
 

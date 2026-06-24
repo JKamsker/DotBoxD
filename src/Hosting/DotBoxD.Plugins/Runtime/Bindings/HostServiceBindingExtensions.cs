@@ -49,17 +49,17 @@ public static class HostServiceBindingExtensions
 
             var declaringType = method.DeclaringType ?? serviceType;
             var target = ResolveTargetMethod(declaringType, implementation.GetType(), method);
-            var capability = target.GetCustomAttribute<HostCapabilityAttribute>();
+            var capability = method.GetCustomAttribute<HostCapabilityAttribute>();
             if (capability is null)
             {
                 throw new InvalidOperationException(
-                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostCapability] on its implementation.");
+                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostCapability] on its service contract.");
             }
 
             AddBinding(
                 builder,
                 registeredBindings,
-                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability.Capability));
+                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability));
         }
 
         foreach (var property in ServiceProperties(serviceType))
@@ -117,7 +117,7 @@ public static class HostServiceBindingExtensions
                     targetFactory,
                     parentImplementation,
                     handleMethod,
-                    capability.Capability));
+                    capability));
         }
 
         return true;

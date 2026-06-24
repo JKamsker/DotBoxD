@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+using DotBoxD.Shared.HostBindings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -160,11 +161,18 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             return null;
         }
 
-        var capability = HostCapability(method);
+        var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
+        var capability = HostCapability(method, ReturnAllocates(returnType));
+        if (capability is null)
+        {
+            throw new NotSupportedException(
+                $"Auto host binding '{HostBindingRoute(method.ContainingType, method)}' must declare [HostCapability] with explicit effects.");
+        }
+
         return (
             HostBindingRoute(method.ContainingType, method),
-            capability,
-            AutoEffectNames(method, capability),
+            capability.Value.Capability,
+            capability.Value.Effects,
             IsTaskLike(method.ReturnType));
     }
 
@@ -187,52 +195,29 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     private static string HostBindingRoute(INamedTypeSymbol type, IMethodSymbol method)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace
-            ? string.Empty
-            : type.ContainingNamespace.ToDisplayString() + ".";
-        return "host." + ns + type.MetadataName + "." + method.Name;
+            ? null
+            : type.ContainingNamespace.ToDisplayString();
+        return HostBindingMetadataRules.BindingId(ns, type.MetadataName, method.Name);
     }
 
-    private static string? HostCapability(IMethodSymbol method)
+    private static (string Capability, IReadOnlyList<string> Effects)? HostCapability(
+        IMethodSymbol method,
+        bool returnAllocates)
     {
         foreach (var attribute in method.GetAttributes())
         {
             if (string.Equals(attribute.AttributeClass?.ToDisplayString(), HostCapabilityAttribute, StringComparison.Ordinal) &&
-                attribute.ConstructorArguments.Length == 1 &&
+                attribute.ConstructorArguments.Length == 2 &&
                 attribute.ConstructorArguments[0].Value is string capability &&
                 !string.IsNullOrWhiteSpace(capability))
             {
-                return capability;
+                var effects = HostCapabilityEffects(attribute.ConstructorArguments[1], returnAllocates, method);
+                return (capability, effects);
             }
         }
 
         return null;
     }
-
-    private static IReadOnlyList<string> AutoEffectNames(IMethodSymbol method, string? capability)
-    {
-        var effects = new List<string> { DotBoxDGenerationNames.Effects.Cpu };
-        var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
-        if (ReturnAllocates(returnType))
-        {
-            effects.Add(DotBoxDGenerationNames.Effects.Alloc);
-        }
-
-        effects.Add(IsWriteMethod(method, capability)
-            ? DotBoxDGenerationNames.Effects.HostStateWrite
-            : DotBoxDGenerationNames.Effects.HostStateRead);
-        return effects;
-    }
-
-    private static bool IsWriteMethod(IMethodSymbol method, string? capability)
-        => capability?.Contains(".write.", StringComparison.Ordinal) == true ||
-           method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Set", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Update", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Add", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Remove", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Move", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Teleport", StringComparison.Ordinal);
 
     // Keep auto-binding Alloc classification in sync with runtime binding registration.
     private static bool ReturnAllocates(ITypeSymbol type)
