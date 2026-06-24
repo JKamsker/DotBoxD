@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
@@ -6,6 +7,11 @@ namespace DotBoxD.Kernels.Runtime.Bindings;
 
 public static partial class SafeFileSystem
 {
+    // Hoisted out of EnsureNoReparsePoint, which runs per read and 4+ times per write: a fresh separator
+    // array literal was allocated on every call. Split only reads it, so the shared instance is safe.
+    private static readonly char[] PathSeparators =
+        { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+
     public static async ValueTask<string> ReadTextAsync(
         SandboxContext context,
         SandboxPath path,
@@ -191,9 +197,12 @@ public static partial class SafeFileSystem
         {
             EnsureNoReparsePoint(resolved.RootFull, resolved.FullPath);
             var memory = new MemoryStream();
+            // Rent the scratch buffer instead of allocating a fresh 4KB array per read (matches the HTTP
+            // binding path). The buffer never escapes — bytes are copied into the MemoryStream — so it is
+            // returned in finally with clearArray:true since file contents may be secret.
+            var buffer = ArrayPool<byte>.Shared.Rent(4096);
             try
             {
-                var buffer = new byte[4096];
                 while (true)
                 {
                     context.Budget.CheckDeadline();
@@ -218,6 +227,10 @@ public static partial class SafeFileSystem
             {
                 memory.Dispose();
                 throw;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
             }
         }
     }
@@ -244,9 +257,7 @@ public static partial class SafeFileSystem
         }
 
         var current = root;
-        foreach (var part in relative.Split(
-            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-            StringSplitOptions.RemoveEmptyEntries))
+        foreach (var part in relative.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries))
         {
             current = Path.Combine(current, part);
             if (Directory.Exists(current) || File.Exists(current))
