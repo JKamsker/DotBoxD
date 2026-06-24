@@ -193,4 +193,82 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             }
         }
         """;
+
+    private const string SameSimpleNameForeignRegistrySource = """
+        using System.Threading;
+        using System.Threading.Tasks;
+        using DotBoxD.Abstractions;
+        using DotBoxD.Services.Attributes;
+
+        namespace ChainSample.Game
+        {
+            [DotBoxDService]
+            public interface IAlphaWorld;
+        }
+
+        namespace ChainSample.Game.Ipc
+        {
+            public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+            {
+                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                ValueTask UpdateSettingsAsync(
+                    string pluginId,
+                    LiveSettingUpdate[] updates,
+                    bool atomic = false,
+                    CancellationToken ct = default);
+                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+            }
+        }
+
+        namespace DotBoxD.Services.Generated
+        {
+            public static class DotBoxDGeneratedExtensions
+            {
+                public static ChainSample.Game.IAlphaWorld GetAlphaWorld(DotBoxD.Services.Peer.RpcPeer peer)
+                    => throw new System.InvalidOperationException("not used");
+            }
+        }
+
+        namespace ChainSample.Plugin
+        {
+            [GeneratePluginServer(Context = typeof(AlphaPluginContext))]
+            public partial class AlphaPluginServer : ChainSample.Game.IAlphaWorld;
+
+            public sealed partial class AlphaPluginContext;
+        }
+
+        namespace Foreign
+        {
+            public sealed class AlphaPluginServerHookRegistry
+            {
+                public ForeignHookPipeline<TEvent> On<TEvent>() => new();
+            }
+
+            public sealed class ForeignHookPipeline<TEvent>
+            {
+                public ForeignHookPipeline<TEvent> Where(global::System.Func<TEvent, bool> predicate) => this;
+                public void Run(global::System.Action<TEvent> handler) { }
+            }
+        }
+
+        namespace Consumer
+        {
+            using Foreign;
+
+            public static class Usage
+            {
+                public static void Configure()
+                {
+                    AlphaPluginServerHookRegistry hooks = new();
+                    hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run(e => { });
+                }
+            }
+        }
+        """;
 }

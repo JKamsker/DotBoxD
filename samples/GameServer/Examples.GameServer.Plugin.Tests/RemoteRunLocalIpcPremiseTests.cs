@@ -6,7 +6,6 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Pushdown.Services;
-using DotBoxD.Services.Generated;
 using DotBoxD.Services.Peer;
 using DotBoxD.Transports.NamedPipes;
 
@@ -102,10 +101,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         // --- Server side: install the lowered package and wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -157,7 +159,7 @@ public sealed class RemoteRunLocalIpcPremiseTests
         Assert.NotNull(subscriptionId);
         var subscription = Assert.Single(lowered!.Manifest.Subscriptions);
         Assert.True(subscription.LocalTerminal);
-        Assert.Null(subscription.ProjectedType);   // no Select => whole-event push
+        Assert.Equal("record", subscription.ProjectedType);   // no Select => explicit whole-event projection
 
         // --- Live named-pipe IPC: plugin PROVIDES the callback; server GETS the proxy. ---
         var pipeName = "dotboxd-runlocal-we-e2e-" + Guid.NewGuid().ToString("N");
@@ -168,10 +170,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         // --- Server side: install + wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -227,10 +232,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         using var server = PluginServer.Create(defaultPolicy: ProjectionPolicy());
         var kernel = await server.InstallAsync(lowered!);

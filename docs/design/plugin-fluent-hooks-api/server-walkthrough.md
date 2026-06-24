@@ -125,7 +125,7 @@ internal static class Program
         using var server = PluginServer.Create(sink, policyCeiling: ServerPolicy.CreateCeiling());
 
         // (b) The world publishes events through the hook pipeline.
-        var world = GameWorld.CreateDefault(server.Hooks);
+        var world = GameWorld.CreateDefault(server.Hooks, server.Subscriptions);
         sink.Bind(world);
 
         // (c) Baseline phase: no plugins yet -> monsters bully the weak players.

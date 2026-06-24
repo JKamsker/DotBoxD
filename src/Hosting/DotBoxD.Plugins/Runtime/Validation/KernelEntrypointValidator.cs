@@ -45,8 +45,8 @@ internal static class KernelEntrypointValidator
         ValidateFunction(plan, entrypoints.ShouldHandle, SandboxType.Bool, requireNonUnit: false, expected);
 
         // Handle return contract by chain shape:
-        //  - ordinary chain, whole-event RunLocal, and result RegisterLocal return Unit.
-        //  - projection RunLocal and sandbox result Register return a non-Unit value.
+        //  - ordinary chains and result RegisterLocal return Unit.
+        //  - RunLocal and sandbox result Register return a non-Unit value.
         //    Projection exact type is enforced by the push decoder; result exact type is enforced when FireAsync
         //    decodes to the hook's declared TResult.
         var handleReturnsValue = ReturnsValue(manifest);

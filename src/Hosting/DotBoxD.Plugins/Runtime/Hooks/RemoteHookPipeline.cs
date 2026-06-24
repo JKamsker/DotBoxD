@@ -132,9 +132,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(handler);
         ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(
-            package,
-            expectedWholeEvent: typeof(TProjected) == typeof(TEvent));
+        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
         if (_localHandlers is null)
         {
             throw LocalHandlersNotSupported();
@@ -168,9 +166,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(decoder);
         ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(
-            package,
-            expectedWholeEvent: typeof(TProjected) == typeof(TEvent));
+        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
         if (_localHandlers is null)
         {
             throw LocalHandlersNotSupported();
@@ -200,9 +196,7 @@ public sealed partial class RemoteHookPipeline<TEvent>
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(decoder);
         ValidateSubscription(package);
-        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(
-            package,
-            expectedWholeEvent: typeof(TProjected) == typeof(TEvent));
+        LocalTerminalManifestValidator.ValidateRunLocal<TProjected>(package);
         if (_localHandlers is null)
         {
             throw LocalHandlersNotSupported();

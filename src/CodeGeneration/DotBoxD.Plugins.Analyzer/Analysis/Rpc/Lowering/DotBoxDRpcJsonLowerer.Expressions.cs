@@ -72,7 +72,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return mapCall;
         }
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is IMethodSymbol method &&
-            DotBoxDHostBindingExpressionLowerer.HostBinding(method) is { } binding)
+            DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is { } binding)
         {
             AddBindingMetadata(binding);
             var args = LowerArgumentsInParameterOrder(

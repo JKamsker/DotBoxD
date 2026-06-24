@@ -18,7 +18,7 @@ internal static partial class DotBoxDKernelMethodInliner
         var signature = KernelMethodSignature.Create(method);
         foreach (var attribute in method.ContainingAssembly.GetAttributes())
         {
-            if (!DescriptorAttribute(attribute, method, signature, out var descriptor))
+            if (!DescriptorAttribute(attribute, method, signature, context.SemanticModel.Compilation, out var descriptor))
             {
                 continue;
             }
@@ -48,8 +48,11 @@ internal static partial class DotBoxDKernelMethodInliner
                 $"Generated descriptor for context [KernelMethod] '{method.Name}' does not match the referenced method.");
         }
 
-        var source = descriptor.Source;
-        var allocates = descriptor.Allocates;
+        var occurrences = ValidateDescriptorParameters(method, descriptor);
+        var recomputed = RecomputeDescriptorRequirements(method, context, descriptor);
+        var shape = RevalidateDescriptorShape(method, context, descriptor);
+        var replacements = new List<DescriptorPlaceholderReplacement>();
+        var allocates = shape.Allocates;
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var parameter = method.Parameters[i];
@@ -62,12 +65,20 @@ internal static partial class DotBoxDKernelMethodInliner
                     $"Generated descriptor for context [KernelMethod] '{method.Name}' has stale parameter metadata.");
             }
 
-            source = source.Replace(descriptorParameter.Placeholder, lowered.Source);
+            foreach (var occurrence in occurrences)
+            {
+                if (occurrence.ParameterIndex == i)
+                {
+                    replacements.Add(new DescriptorPlaceholderReplacement(occurrence.Span, lowered.Source));
+                }
+            }
+
             allocates |= lowered.Allocates;
         }
 
-        AddAll(context.Capabilities, descriptor.Capabilities);
-        AddAll(context.Effects, descriptor.Effects);
+        AddAll(context.Capabilities, recomputed.Capabilities);
+        AddAll(context.Effects, recomputed.Effects);
+        var source = ReplaceDescriptorPlaceholders(descriptor.Source, replacements);
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }
 
@@ -75,13 +86,11 @@ internal static partial class DotBoxDKernelMethodInliner
         AttributeData attribute,
         IMethodSymbol method,
         string signature,
+        Compilation compilation,
         out KernelMethodDescriptorPayload descriptor)
     {
         descriptor = null!;
-        if (!string.Equals(
-                attribute.AttributeClass?.ToDisplayString(),
-                DotBoxDMetadataNames.GeneratedKernelMethodDescriptorAttribute,
-                StringComparison.Ordinal) ||
+        if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.GeneratedKernelMethodDescriptorAttribute) ||
             attribute.ConstructorArguments.Length != 6 ||
             attribute.ConstructorArguments[0].Value is not int version ||
             attribute.ConstructorArguments[1].Value is not INamedTypeSymbol contextType ||
@@ -112,7 +121,7 @@ internal static partial class DotBoxDKernelMethodInliner
         return true;
     }
 
-    private static void AddAll(ICollection<string>? target, EquatableArray<string> values)
+    private static void AddAll(ICollection<string>? target, IEnumerable<string> values)
     {
         if (target is null)
         {
@@ -127,4 +136,5 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
 }

@@ -100,7 +100,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
         => DeclaredTypeSyntax(expression, model, cancellationToken) is { } typeSyntax
-            ? TargetFromOwnedGeneratedRegistryType(typeSyntax, model.Compilation, cancellationToken)
+            ? TargetFromOwnedGeneratedRegistryType(typeSyntax, model, cancellationToken)
             : null;
 
     private static GeneratedRemoteHookChainTarget? TargetFromLocalAlias(
@@ -134,7 +134,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
         => DeclaredTypeSyntax(expression, model, cancellationToken) is { } typeSyntax
-            ? ContextFromOwnedGeneratedServerType(typeSyntax, model.Compilation, cancellationToken)
+            ? ContextFromOwnedGeneratedServerType(typeSyntax, model, cancellationToken)
             : null;
 
     private static TypeSyntax? DeclaredTypeSyntax(
@@ -187,10 +187,18 @@ internal static partial class GeneratedRemoteHookChainFallback
 
     private static GeneratedRemoteHookChainTarget? TargetFromOwnedGeneratedRegistryType(
         TypeSyntax typeSyntax,
-        Compilation compilation,
+        SemanticModel model,
         CancellationToken cancellationToken)
     {
-        foreach (var surface in OwnedGeneratedSurfaces(compilation, cancellationToken))
+        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        if (resolvedType is { TypeKind: not TypeKind.Error })
+        {
+            return resolvedType is INamedTypeSymbol registryType
+                ? TargetFromRegistryMarker(registryType, model.Compilation)
+                : null;
+        }
+
+        foreach (var surface in OwnedGeneratedSurfaces(model.Compilation, cancellationToken))
         {
             if (TypeMatches(typeSyntax, surface.HookRegistryName, surface.HookRegistryFullName))
             {
@@ -212,10 +220,18 @@ internal static partial class GeneratedRemoteHookChainFallback
 
     private static string? ContextFromOwnedGeneratedServerType(
         TypeSyntax typeSyntax,
-        Compilation compilation,
+        SemanticModel model,
         CancellationToken cancellationToken)
     {
-        foreach (var surface in OwnedGeneratedSurfaces(compilation, cancellationToken))
+        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        if (resolvedType is { TypeKind: not TypeKind.Error })
+        {
+            return resolvedType is INamedTypeSymbol serverType
+                ? GeneratedContextTypeFullName(serverType, model.Compilation)
+                : null;
+        }
+
+        foreach (var surface in OwnedGeneratedSurfaces(model.Compilation, cancellationToken))
         {
             if (TypeMatches(typeSyntax, surface.ServerInterfaceName, surface.ServerInterfaceFullName))
             {
@@ -238,4 +254,5 @@ internal static partial class GeneratedRemoteHookChainFallback
         return string.Equals(text, simpleName, StringComparison.Ordinal) ||
             string.Equals(text, fullName, StringComparison.Ordinal);
     }
+
 }

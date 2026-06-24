@@ -142,8 +142,8 @@ internal static partial class PluginPreparedPackageValidator
             return;
         }
 
-        // Projection RunLocal and sandbox result Register return a non-Unit Handle. Whole-event RunLocal,
-        // ordinary chains, and result RegisterLocal keep a Unit-returning Handle.
+        // RunLocal and sandbox result Register return a non-Unit Handle. Ordinary chains and result
+        // RegisterLocal keep a Unit-returning Handle.
         var handleReturnsValue = false;
         foreach (var subscription in package.Manifest.Subscriptions)
         {
@@ -156,7 +156,7 @@ internal static partial class PluginPreparedPackageValidator
         }
 
         ValidateReturnTypes(plan, shouldHandle, handle, handleReturnsValue, diagnostics);
-        ValidateLocalTerminalEffects(package.Manifest.Subscriptions, plan, handle.Id, diagnostics);
+        ValidateLocalTerminalRouting(package.Manifest.Subscriptions, plan, handle.Id, diagnostics);
         if (!ParametersMatch(shouldHandle.Parameters, handle.Parameters))
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK034", "Kernel entrypoints must use the same parameter shape."));

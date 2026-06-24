@@ -55,6 +55,16 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     }
 
     [Fact]
+    public void Same_simple_name_foreign_registry_alias_is_not_intercepted()
+    {
+        var result = RunGenerator(SameSimpleNameForeignRegistrySource);
+
+        Assert.DoesNotContain(GeneratedSources(result), source => source.Contains("HookChain_", StringComparison.Ordinal));
+        Assert.DoesNotContain(GeneratedSources(result), source =>
+            source.Contains("HookChainInterceptors", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Generated_plugin_server_registries_emit_marker_metadata()
     {
         var result = RunGenerator(GeneratedServerSource);

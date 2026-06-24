@@ -95,7 +95,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         IPropertySymbol property,
         DotBoxDExpressionLoweringContext context)
     {
-        if (ExplicitHostBinding(property) is not { } binding)
+        if (ExplicitHostBinding(property, context.SemanticModel.Compilation) is not { } binding)
         {
             return null;
         }
@@ -112,20 +112,17 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         => HostBindingMetadataRules.ReturnAllocatesManifestTag(tag);
 
     internal static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
-        IMethodSymbol method)
-    {
-        return ExplicitHostBinding(method) ?? TryAutoHostBinding(method);
-    }
+        IMethodSymbol method,
+        Compilation compilation)
+        => ExplicitHostBinding(method, compilation) ?? TryAutoHostBinding(method, compilation);
 
     private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? ExplicitHostBinding(
-        ISymbol symbol)
+        ISymbol symbol,
+        Compilation compilation)
     {
         foreach (var attribute in symbol.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HostBindingAttribute,
-                    StringComparison.Ordinal) ||
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute) ||
                 attribute.ConstructorArguments.Length != 3)
             {
                 continue;
@@ -144,18 +141,19 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     }
 
     private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? TryAutoHostBinding(
-        IMethodSymbol method)
+        IMethodSymbol method,
+        Compilation compilation)
     {
         if (method.MethodKind != MethodKind.Ordinary ||
             method.IsStatic ||
             method.IsGenericMethod ||
-            !HasDotBoxDServiceAttribute(method.ContainingType))
+            !HasDotBoxDServiceAttribute(method.ContainingType, compilation))
         {
             return null;
         }
 
         var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
-        var capability = HostCapability(method, ReturnAllocates(returnType));
+        var capability = HostCapability(method, ReturnAllocates(returnType), compilation);
         if (capability is null)
         {
             throw new NotSupportedException(
@@ -169,14 +167,11 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             IsTaskLike(method.ReturnType));
     }
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type, Compilation compilation)
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.DotBoxDServiceAttribute,
-                    StringComparison.Ordinal))
+            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.DotBoxDServiceAttribute))
             {
                 return true;
             }
@@ -195,11 +190,12 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
 
     private static (string Capability, IReadOnlyList<string> Effects)? HostCapability(
         IMethodSymbol method,
-        bool returnAllocates)
+        bool returnAllocates,
+        Compilation compilation)
     {
         foreach (var attribute in method.GetAttributes())
         {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), HostCapabilityAttribute, StringComparison.Ordinal) &&
+            if (IsDotBoxDAttribute(attribute, compilation, HostCapabilityAttribute) &&
                 attribute.ConstructorArguments.Length == 2 &&
                 attribute.ConstructorArguments[0].Value is string capability &&
                 !string.IsNullOrWhiteSpace(capability))
@@ -211,6 +207,10 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
 
         return null;
     }
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
     // Keep auto-binding Alloc classification in sync with runtime binding registration.
     private static bool ReturnAllocates(ITypeSymbol type)

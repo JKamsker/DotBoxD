@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class ServerExtensionGeneratedContextParameterTests
+public sealed partial class ServerExtensionGeneratedContextParameterTests
 {
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);

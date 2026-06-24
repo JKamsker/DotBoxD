@@ -81,17 +81,16 @@ internal sealed class DotBoxDExpressionLoweringContext
             return null;
         }
 
-        foreach (var symbol in compilation.GetSymbolsWithName(static _ => true, SymbolFilter.Type))
+        foreach (var candidate in TypesInNamespace(contextType.ContainingAssembly.GlobalNamespace))
         {
-            if (symbol is not INamedTypeSymbol candidate ||
-                !GeneratedContextMatches(candidate, contextType))
+            if (!GeneratedContextMatches(candidate, contextType, compilation))
             {
                 continue;
             }
 
             foreach (var iface in candidate.Interfaces)
             {
-                if (HasAttribute(iface, DotBoxDMetadataNames.DotBoxDServiceAttribute))
+                if (HasAttribute(iface, DotBoxDMetadataNames.DotBoxDServiceAttribute, compilation))
                 {
                     return iface;
                 }
@@ -101,14 +100,14 @@ internal sealed class DotBoxDExpressionLoweringContext
         return null;
     }
 
-    private static bool GeneratedContextMatches(INamedTypeSymbol serverType, ITypeSymbol contextType)
+    private static bool GeneratedContextMatches(
+        INamedTypeSymbol serverType,
+        ITypeSymbol contextType,
+        Compilation compilation)
     {
         foreach (var attribute in serverType.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.GeneratePluginServerAttribute,
-                    StringComparison.Ordinal))
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.GeneratePluginServerAttribute))
             {
                 continue;
             }
@@ -127,11 +126,44 @@ internal sealed class DotBoxDExpressionLoweringContext
         return false;
     }
 
-    private static bool HasAttribute(INamedTypeSymbol type, string metadataName)
-        => type.GetAttributes().Any(attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            metadataName,
-            StringComparison.Ordinal));
+    private static bool HasAttribute(INamedTypeSymbol type, string metadataName, Compilation compilation)
+        => type.GetAttributes().Any(attribute => IsDotBoxDAttribute(attribute, compilation, metadataName));
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
+
+    private static IEnumerable<INamedTypeSymbol> TypesInNamespace(INamespaceSymbol ns)
+    {
+        foreach (var type in ns.GetTypeMembers())
+        {
+            yield return type;
+            foreach (var nested in NestedTypes(type))
+            {
+                yield return nested;
+            }
+        }
+
+        foreach (var child in ns.GetNamespaceMembers())
+        {
+            foreach (var type in TypesInNamespace(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> NestedTypes(INamedTypeSymbol type)
+    {
+        foreach (var nested in type.GetTypeMembers())
+        {
+            yield return nested;
+            foreach (var descendant in NestedTypes(nested))
+            {
+                yield return descendant;
+            }
+        }
+    }
 
     /// <summary>
     /// Sink for capabilities the lowered IR requires (a <c>ctx.Messages.Send</c>, a

@@ -28,7 +28,7 @@ internal static partial class DotBoxDKernelMethodInliner
     {
         if (context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol
                 is not IMethodSymbol method ||
-            !HasKernelMethodAttribute(method))
+            !HasKernelMethodAttribute(method, context.SemanticModel.Compilation))
         {
             return null;
         }
@@ -159,14 +159,11 @@ internal static partial class DotBoxDKernelMethodInliner
         return null;
     }
 
-    private static bool HasKernelMethodAttribute(IMethodSymbol method)
+    private static bool HasKernelMethodAttribute(IMethodSymbol method, Compilation compilation)
     {
         foreach (var attribute in method.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.KernelMethodAttribute,
-                    StringComparison.Ordinal))
+            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.KernelMethodAttribute))
             {
                 return true;
             }
@@ -174,4 +171,8 @@ internal static partial class DotBoxDKernelMethodInliner
 
         return false;
     }
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 }

@@ -103,10 +103,13 @@ public partial class HookPipeline<TEvent, TContext>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return UseGeneratedLocalResultChain<TResult>(package, (e, context, _) => new ValueTask<TResult>(handler(e, context)), priority);
+        return UseGeneratedLocalResultChainCore<TResult>(
+            package,
+            (e, context, _) => new ValueTask<TResult>(handler(e, context)),
+            priority);
     }
 
-    public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
+    private HookPipeline<TEvent, TContext> UseGeneratedLocalResultChainCore<TResult>(
         PluginPackage package,
         Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)

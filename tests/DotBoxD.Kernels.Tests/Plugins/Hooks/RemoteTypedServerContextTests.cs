@@ -30,7 +30,7 @@ public sealed class RemoteTypedServerContextTests
 
         registry.On<RemoteEvent, RemoteContext>(ctx => new RemoteContext(ctx, "hook"))
             .UseGeneratedLocalChain(
-                PackageFor<RemoteEvent>(projectedType: null),
+                PackageFor<RemoteEvent>(projectedType: "record"),
                 (RemoteEvent e, RemoteContext ctx) =>
                 {
                     observed = ctx.Source + ":" + e.Id;

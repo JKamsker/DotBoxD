@@ -60,48 +60,6 @@ internal static partial class HookChainModelFactory
             ? DotBoxDManifestEffectModel.CreateLocalCallback(shouldHandle, handleBody, effects)
             : DotBoxDManifestEffectModel.Create(shouldHandle, handleBody, effects);
 
-    private static DotBoxDStatementBodyModel LocalCallbackHandleBody(HookChainProjection? projection)
-        => projection is null
-            ? DotBoxDHandleBodyModelFactory.ReturnUnit()
-            : DotBoxDHandleBodyModelFactory.ReturnExpression(projection.Value, projection.Prefix);
-
-    private static string LocalCallbackHandleReturnType(
-        HookChainProjection? projection,
-        ITypeSymbol? projectedTypeSymbol)
-    {
-        if (projection is null)
-        {
-            // Whole-event push: the Handle returns Unit and the host pushes the event record itself.
-            return DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Unit";
-        }
-
-        // A projection chain's Handle returns the projected value, so its return type is the full SandboxType the
-        // projected CLR type maps to (scalar, Guid, enum, list, map, or DTO record). A projection whose type is
-        // not marshaller-eligible yields no source and the chain fails safe (TryCreate returns null, no package).
-        if (projectedTypeSymbol is not null && Rpc.SandboxTypeSourceEmitter.TryEmit(projectedTypeSymbol) is { } source)
-        {
-            return source;
-        }
-
-        if (ScalarSandboxTypeSource(projection.Value.Type) is { } scalarSource)
-        {
-            return scalarSource;
-        }
-
-        throw new NotSupportedException();
-    }
-
-    private static string? ScalarSandboxTypeSource(string manifestTag)
-        => manifestTag switch
-        {
-            DotBoxDGenerationNames.ManifestTypes.Bool => DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".Bool",
-            DotBoxDGenerationNames.ManifestTypes.Int => DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".I32",
-            DotBoxDGenerationNames.ManifestTypes.Long => DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".I64",
-            DotBoxDGenerationNames.ManifestTypes.Double => DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".F64",
-            DotBoxDGenerationNames.ManifestTypes.String => DotBoxDGenerationNames.TypeNames.GlobalSandboxType + ".String",
-            _ => null
-        };
-
     private static DotBoxDStatementBodyModel LowerSendHandle(
         IReadOnlyList<HookChainStage> stages,
         LambdaExpressionSyntax terminalLambda,

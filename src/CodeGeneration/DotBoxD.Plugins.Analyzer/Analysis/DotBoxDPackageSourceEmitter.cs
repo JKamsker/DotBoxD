@@ -171,8 +171,8 @@ internal static class DotBoxDPackageSourceEmitter
         }
 
         // Host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes rather than
-        // re-deriving from IR. A null ProjectedType (no Select) marks a whole-event push; a non-null one
-        // marks a projection push — so the payload kind is derivable and needs no separate field.
+        // re-deriving from IR. No-Select RunLocal chains are emitted as explicit event-record projections, so
+        // every generated local terminal declares a non-null projected type.
         if (model.LocalTerminal)
         {
             builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")

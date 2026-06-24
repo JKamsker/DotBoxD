@@ -17,7 +17,7 @@ internal static class GeneratedKernelMethodDescriptorFactory
         foreach (var method in contextType.GetMembers().OfType<IMethodSymbol>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!HasKernelMethodAttribute(method))
+            if (!HasKernelMethodAttribute(method, compilation))
             {
                 continue;
             }
@@ -150,11 +150,10 @@ internal static class GeneratedKernelMethodDescriptorFactory
             $"Context [KernelMethod] helper '{method.Name}' must be declared in source to emit its descriptor.");
     }
 
-    private static bool HasKernelMethodAttribute(IMethodSymbol method)
-        => method.GetAttributes().Any(attribute => string.Equals(
-            attribute.AttributeClass?.ToDisplayString(),
-            DotBoxDMetadataNames.KernelMethodAttribute,
-            StringComparison.Ordinal));
+    private static bool HasKernelMethodAttribute(IMethodSymbol method, Compilation compilation)
+        => method.GetAttributes().Any(attribute =>
+            compilation.GetTypeByMetadataName(DotBoxDMetadataNames.KernelMethodAttribute) is { } expected &&
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected));
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);

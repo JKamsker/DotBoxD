@@ -163,9 +163,10 @@ internal static partial class HookChainModelFactory
             capabilities,
             effects);
         var localCallbackProjection = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? HookChainStageLowerer.CreateProjection(
+            ? LocalCallbackProjection(
                 stages,
                 eventProperties,
+                eventType,
                 model,
                 cancellationToken,
                 capabilities,
@@ -236,9 +237,9 @@ internal static partial class HookChainModelFactory
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate)
         {
-            // Persist the local-terminal nature in the manifest (mine's host-readable mark) so the runtime
-            // knows to push rather than run; a null ProjectedType (no Select) is a whole-event push, a
-            // non-null one is a projection push — so the payload kind needs no separate persisted field.
+            // Persist the local-terminal nature in the manifest (a host-readable mark) so the runtime knows to
+            // push rather than run. Even no-Select RunLocal chains are emitted as an explicit event-record
+            // projection, so ordinary Unit-returning Run packages cannot be relabeled into native callbacks.
             LocalTerminal = installKind == HookChainInterceptorInstallKind.LocalCallback,
             ProjectedType = localCallbackProjection?.Value.Type,
             LocalDecoderSource = localDecoderSource,

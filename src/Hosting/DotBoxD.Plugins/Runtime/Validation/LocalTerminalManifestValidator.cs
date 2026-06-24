@@ -2,7 +2,7 @@ namespace DotBoxD.Plugins.Runtime;
 
 internal static class LocalTerminalManifestValidator
 {
-    public static void ValidateRunLocal<TProjected>(PluginPackage package, bool expectedWholeEvent)
+    public static void ValidateRunLocal<TProjected>(PluginPackage package)
     {
         var subscription = package.Manifest.Subscriptions.Count > 0 ? package.Manifest.Subscriptions[0] : null;
         if (subscription is not { LocalTerminal: true })
@@ -11,15 +11,13 @@ internal static class LocalTerminalManifestValidator
                 $"Hook package '{package.Manifest.PluginId}' does not declare localTerminal metadata.");
         }
 
-        var actualWholeEvent = subscription.ProjectedType is null;
-        if (actualWholeEvent != expectedWholeEvent)
+        if (subscription.ProjectedType is null)
         {
             throw new InvalidOperationException(
-                $"Hook package '{package.Manifest.PluginId}' projectedType does not match the RunLocal install path.");
+                $"Hook package '{package.Manifest.PluginId}' does not declare projectedType metadata.");
         }
 
-        if (!actualWholeEvent &&
-            !ProjectedTypeMatches(subscription.ProjectedType!, typeof(TProjected)))
+        if (!ProjectedTypeMatches(subscription.ProjectedType, typeof(TProjected)))
         {
             throw new InvalidOperationException(
                 $"Hook package '{package.Manifest.PluginId}' projectedType '{subscription.ProjectedType}' does not match " +

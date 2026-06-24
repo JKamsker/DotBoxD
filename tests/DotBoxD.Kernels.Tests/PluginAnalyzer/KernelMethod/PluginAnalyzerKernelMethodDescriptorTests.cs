@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod;
 
-public sealed class PluginAnalyzerKernelMethodDescriptorTests
+public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
 {
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)
@@ -93,9 +93,9 @@ public sealed class PluginAnalyzerKernelMethodDescriptorTests
         return EmitReference(compilation);
     }
 
-    private static IReadOnlyList<Diagnostic> GeneratorDiagnostics(string source, MetadataReference reference)
+    private static IReadOnlyList<Diagnostic> GeneratorDiagnostics(string source, params MetadataReference[] references)
     {
-        var compilation = CreateCompilation(source, "DescriptorlessConsumer", reference);
+        var compilation = CreateCompilation(source, "DescriptorlessConsumer", references);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);

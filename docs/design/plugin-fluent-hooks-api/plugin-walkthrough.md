@@ -237,7 +237,7 @@ internal static class GuardianPluginPackage
 - `Select` → compile-time substitution into downstream lambdas (no new runtime protocol).
 - `Run` terminal → the module's `Handle` (must be a single `ctx.Messages.Send`).
 - `RunLocal` → left as native host code, lowered to nothing.
-- Anything outside the lowerable subset → a diagnostic (`DBXK110`–`DBXK114`), so unsafe code fails the
+- Anything outside the lowerable subset → a diagnostic (`DBXK111`–`DBXK116`), so unsafe code fails the
   build instead of silently running native.
 
 ## 6. Side-by-side: the request in one diff

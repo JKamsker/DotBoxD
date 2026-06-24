@@ -48,13 +48,13 @@ public sealed partial class RemoteHookPipeline<TEvent>
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return UseGeneratedLocalResultChain<TResult>(
+        return UseGeneratedLocalResultChainCore<TResult>(
             package,
             (e, context, _) => new ValueTask<TResult>(handler(e, context)),
             priority);
     }
 
-    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+    internal RemoteHookPipeline<TEvent> UseGeneratedLocalResultChainCore<TResult>(
         PluginPackage package,
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)

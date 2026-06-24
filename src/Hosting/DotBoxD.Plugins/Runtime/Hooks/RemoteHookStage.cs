@@ -45,13 +45,6 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
         where TResult : struct, IHookResult
         => _root.UseGeneratedLocalResultChain(package, handler, priority);
 
-    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
-        PluginPackage package,
-        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
-        int priority = 0)
-        where TResult : struct, IHookResult
-        => _root.UseGeneratedLocalResultChain(package, handler, priority);
-
     /// <summary>
     /// Installs a lowered <c>RunLocal</c> chain whose projected type is <typeparamref name="TCurrent"/> (the
     /// type produced by the preceding <c>Select</c>). The lowered filter+projection installs server-side and

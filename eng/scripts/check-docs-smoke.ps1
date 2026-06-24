@@ -41,7 +41,11 @@ function Test-DocumentCommands([string] $Path) {
 }
 
 function Assert-DocsDoNotContain([string] $Pattern, [string] $Description) {
-    $documents = Get-ChildItem -LiteralPath (Join-Path $root "docs/Specs") -Recurse -File -Filter "*.md"
+    Assert-DocumentsDoNotContain (Get-ChildItem -LiteralPath (Join-Path $root "docs/Specs") -Recurse -File -Filter "*.md") $Pattern $Description
+}
+
+function Assert-DocumentsDoNotContain([System.IO.FileInfo[]] $Documents, [string] $Pattern, [string] $Description) {
+    $documents = @($Documents | Where-Object { $_ -ne $null })
     $matches = @($documents | Select-String -Pattern $Pattern)
     if ($matches.Count -gt 0) {
         $first = $matches[0]
@@ -138,6 +142,24 @@ Assert-DocsDoNotContain "tenant://123/config" "file grants use canonical filesys
 Assert-DocsDoNotContain "Proposed Public C# API" "public API document is no longer proposed"
 Assert-DocsDoNotContain "Proposed C# API surface" "public API index is no longer proposed"
 Assert-DocsDoNotContain "Add compiler/cache after the core model is proven" "compiled mode is implemented"
+
+$pluginFluentDocs = @(
+    "docs/design/plugin-fluent-hooks-api/server-walkthrough.md",
+    "docs/design/plugin-fluent-hooks-api/plugin-walkthrough.md",
+    "docs/design/plugin-fluent-hooks-api/kernel-binding-model.md",
+    "docs/design/remote-plugin-server-builder/interface-driven-plugin-server.md"
+) | ForEach-Object { Get-Item -LiteralPath (Resolve-RepoPath $_) }
+
+foreach ($document in $pluginFluentDocs) {
+    Test-DocumentCommands $document.FullName
+}
+
+Assert-DocumentsDoNotContain $pluginFluentDocs "GameWorld\.CreateDefault\(server\.Hooks\)" "GameWorld.CreateDefault now receives hooks and subscriptions"
+Assert-DocumentsDoNotContain $pluginFluentDocs "DBXK110.*DBXK114" "unsupported hook-chain diagnostics are DBXK111-DBXK116"
+Assert-DocumentsDoNotContain $pluginFluentDocs "server\.Events\.On" "server hook surface is server.Hooks"
+Assert-DocumentsDoNotContain $pluginFluentDocs "server\.Kernels\.(Register|Get)" "generated server surface no longer uses server.Kernels"
+Assert-DocumentsDoNotContain $pluginFluentDocs "InvokeKernel|InvokeLocal" "old kernel invocation terminology is stale"
+Assert-DocumentsDoNotContain $pluginFluentDocs "SetValuesAsync" "live-settings API uses generated update flow"
 
 if (-not $IsWindows) {
     Write-Host "Skipping GameServer runtime smoke on non-Windows runners."

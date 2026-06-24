@@ -11,7 +11,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     {
         if (context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol
                 is IMethodSymbol method &&
-            HostBinding(method) is { } binding)
+            HostBinding(method, context.SemanticModel.Compilation) is { } binding)
         {
             return new HostBindingInvocation(method, binding);
         }
@@ -44,7 +44,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
                 $"Generated context World call '{access.Name.Identifier.ValueText}' must resolve to one non-overloaded host service method.");
         }
 
-        return HostBinding(candidates[0]) is { } binding
+        return HostBinding(candidates[0], context.SemanticModel.Compilation) is { } binding
             ? new HostBindingInvocation(candidates[0], binding)
             : null;
     }

@@ -44,7 +44,8 @@ internal sealed class GamePluginHost : IAsyncDisposable
 
                 // Reverse-direction proxy: the plugin PROVIDES IPluginEventCallback, the server GETS it to push
                 // filtered+projected values back for remote RunLocal chains over the same bidirectional pipe.
-                var eventCallback = peer.GetPluginEventCallback();
+                var eventCallback =
+                    global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(peer);
                 var service = new GamePluginControlService(server, session, sink, world, eventCallback);
                 peer.Disconnected += (_, _) =>
                 {
@@ -54,8 +55,12 @@ internal sealed class GamePluginHost : IAsyncDisposable
 
                 // Two services per connection: the control-plane (install IR, settings, hold) and the domain
                 // world surface. ProvideGameWorldAccess is generated from [DotBoxDService] on the interface.
-                peer.ProvideGamePluginControlService(service);
-                peer.ProvideGameWorldAccess(new GameWorldAccess(world));
+                global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGamePluginControlService(
+                    peer,
+                    service);
+                global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvideGameWorldAccess(
+                    peer,
+                    new GameWorldAccess(world));
                 self._connected.TrySetResult(service);
             });
         await self._host.StartAsync().ConfigureAwait(false);

@@ -12,10 +12,10 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
 /// <summary>
 /// Convergence phase 3: the runtime validators must accept the shapes the lifted analyzer caps now produce —
-/// a whole-event RunLocal (no Select, Unit Handle) and a non-scalar projection RunLocal (non-Unit Handle of a
-/// type outside the old 5-scalar set) — while still requiring Unit for ordinary chains. Installing a package
-/// runs <c>PluginPreparedPackageValidator</c>; these tests assert install succeeds (no validation throw) and
-/// the manifest mark is correct.
+/// a whole-event RunLocal (no Select, explicit event-record Handle) and a non-scalar projection RunLocal
+/// (non-Unit Handle of a type outside the old 5-scalar set) — while still requiring Unit for ordinary chains.
+/// Installing a package runs <c>PluginPreparedPackageValidator</c>; these tests assert install succeeds
+/// (no validation throw) and the manifest mark is correct.
 /// </summary>
 public sealed class RemoteRunLocalValidationTests
 {
@@ -87,17 +87,17 @@ public sealed class RemoteRunLocalValidationTests
         """;
 
     [Fact]
-    public async Task Whole_event_RunLocal_no_select_lowers_to_a_unit_handle_and_installs()
+    public async Task Whole_event_RunLocal_no_select_lowers_to_an_event_projection_and_installs()
     {
         var package = LowerToPackage(WholeEventSource);
 
         var subscription = Assert.Single(package.Manifest.Subscriptions);
         Assert.True(subscription.LocalTerminal);        // marked local-terminal
-        Assert.Null(subscription.ProjectedType);        // whole-event => no projected type
+        Assert.Equal("record", subscription.ProjectedType); // whole-event => explicit event-record projection
 
         using var server = PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: Policy());
-        // Installing runs PluginPreparedPackageValidator over the Unit-returning Handle: must NOT throw now
-        // that whole-event (no Select) is a valid local-terminal shape.
+        // Installing runs PluginPreparedPackageValidator over the value-returning Handle: a no-Select RunLocal
+        // stays author-friendly while still being distinguishable from an ordinary Unit-returning Run.
         var kernel = await server.InstallAsync(package);
         Assert.True(kernel.Manifest.Subscriptions[0].LocalTerminal);
     }
@@ -132,7 +132,31 @@ public sealed class RemoteRunLocalValidationTests
     }
 
     [Fact]
-    public async Task Ordinary_Run_package_tampered_to_whole_event_RunLocal_is_rejected_at_install()
+    public async Task Ordinary_Run_package_tampered_to_current_whole_event_RunLocal_is_rejected_at_install()
+    {
+        var package = LowerToPackage(OrdinaryRunSource);
+        var subscription = Assert.Single(package.Manifest.Subscriptions);
+        var metadata = new Dictionary<string, string>(package.Module.Metadata, StringComparer.Ordinal)
+        {
+            ["callbackSubscriptionId"] = "callback-tamper"
+        };
+        var tampered = package with
+        {
+            Manifest = package.Manifest with
+            {
+                Subscriptions = [subscription with { LocalTerminal = true, ProjectedType = "record" }]
+            },
+            Module = package.Module with { Metadata = metadata }
+        };
+
+        using var server = PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: Policy());
+        var ex = await Assert.ThrowsAsync<DotBoxD.Kernels.Model.SandboxValidationException>(
+            async () => await server.InstallAsync(tampered).AsTask());
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK031");
+    }
+
+    [Fact]
+    public async Task Ordinary_Run_package_tampered_to_legacy_null_projection_RunLocal_is_rejected_at_install()
     {
         var package = LowerToPackage(OrdinaryRunSource);
         var subscription = Assert.Single(package.Manifest.Subscriptions);
@@ -147,6 +171,25 @@ public sealed class RemoteRunLocalValidationTests
                 Subscriptions = [subscription with { LocalTerminal = true }]
             },
             Module = package.Module with { Metadata = metadata }
+        };
+
+        using var server = PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: Policy());
+        var ex = await Assert.ThrowsAsync<DotBoxD.Kernels.Model.SandboxValidationException>(
+            async () => await server.InstallAsync(tampered).AsTask());
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK031");
+    }
+
+    [Fact]
+    public async Task Whole_event_RunLocal_package_tampered_to_legacy_null_projection_is_rejected_at_install()
+    {
+        var package = LowerToPackage(WholeEventSource);
+        var subscription = Assert.Single(package.Manifest.Subscriptions);
+        var tampered = package with
+        {
+            Manifest = package.Manifest with
+            {
+                Subscriptions = [subscription with { ProjectedType = null }]
+            }
         };
 
         using var server = PluginServer.Create(new InMemoryPluginMessageSink(), defaultPolicy: Policy());
