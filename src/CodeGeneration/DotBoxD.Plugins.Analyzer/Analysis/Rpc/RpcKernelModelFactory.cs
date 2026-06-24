@@ -37,7 +37,7 @@ internal static partial class RpcKernelModelFactory
         try
         {
             var graft = RpcServerExtensionGraft.Create(type, graftType);
-            var method = ResolveBatchMethod(type);
+            var method = ResolveBatchMethod(type, context.SemanticModel.Compilation);
             ValidateBatchMethodParameters(method);
             var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
             if (ContainsUnsupported(liveSettings))
@@ -91,61 +91,6 @@ internal static partial class RpcKernelModelFactory
         {
             return Fail(declaration, ex.Message);
         }
-    }
-
-    private static IMethodSymbol ResolveBatchMethod(INamedTypeSymbol type)
-    {
-        IMethodSymbol? found = null;
-        foreach (var member in type.GetMembers())
-        {
-            if (member is IMethodSymbol
-                {
-                    MethodKind: MethodKind.Ordinary,
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsStatic: false
-                } method &&
-                method.Parameters.Length > 0 &&
-                string.Equals(
-                    method.Parameters[method.Parameters.Length - 1].Type.ToDisplayString(),
-                    DotBoxDMetadataNames.HookContextType,
-                    StringComparison.Ordinal))
-            {
-                if (found is not null)
-                {
-                    throw new NotSupportedException("A server extension must declare exactly one batch method (a public method whose last parameter is HookContext).");
-                }
-
-                found = method;
-            }
-        }
-
-        return found ?? throw new NotSupportedException("A server extension must declare one public batch method whose last parameter is HookContext.");
-    }
-
-    private static void ValidateBatchMethodParameters(IMethodSymbol method)
-    {
-        for (var i = 0; i < method.Parameters.Length - 1; i++)
-        {
-            var parameter = method.Parameters[i];
-            if (parameter.RefKind != RefKind.None)
-            {
-                throw new NotSupportedException(
-                    $"Server extension parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
-            }
-        }
-    }
-
-    private static BlockSyntax MethodBody(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        foreach (var reference in method.DeclaringSyntaxReferences)
-        {
-            if (reference.GetSyntax(cancellationToken) is MethodDeclarationSyntax { Body: { } block })
-            {
-                return block;
-            }
-        }
-
-        throw new NotSupportedException($"Server extension method '{method.Name}' must have a block body declared in source.");
     }
 
     private static GeneratedPluginPackage EmitPackage(
