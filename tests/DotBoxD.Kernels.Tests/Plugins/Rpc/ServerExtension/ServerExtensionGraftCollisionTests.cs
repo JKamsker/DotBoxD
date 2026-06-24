@@ -9,28 +9,29 @@ public sealed class ServerExtensionGraftCollisionTests
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
             using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
 
             namespace Sample;
 
-            public sealed class RemoteMonsterControl : IServerExtensionClientAccessor
+            [DotBoxDService]
+            public interface IRemoteMonsterControl
             {
-                public IServerExtensionClientRegistry ServerExtensions { get; } = null!;
             }
 
-            [ServerExtension(typeof(RemoteMonsterControl), "first")]
+            [ServerExtension(typeof(IRemoteMonsterControl), "first")]
             public sealed partial class FirstKernel
             {
-                [ServerExtensionMethod(typeof(RemoteMonsterControl))]
+                [ServerExtensionMethod(typeof(IRemoteMonsterControl))]
                 public int Kill(int monsterId, HookContext ctx)
                 {
                     return monsterId;
                 }
             }
 
-            [ServerExtension(typeof(RemoteMonsterControl), "second")]
+            [ServerExtension(typeof(IRemoteMonsterControl), "second")]
             public sealed partial class SecondKernel
             {
-                [ServerExtensionMethod(typeof(RemoteMonsterControl))]
+                [ServerExtensionMethod(typeof(IRemoteMonsterControl))]
                 public int Kill(int id, HookContext ctx)
                 {
                     return id;
@@ -50,21 +51,22 @@ public sealed class ServerExtensionGraftCollisionTests
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
             using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
 
             namespace Domain
             {
-                public sealed class RemoteMonsterControl : IServerExtensionClientAccessor
+                [DotBoxDService]
+                public interface IRemoteMonsterControl
                 {
-                    public IServerExtensionClientRegistry ServerExtensions { get; } = null!;
                 }
             }
 
             namespace Sample.One
             {
-                [ServerExtension(typeof(Domain.RemoteMonsterControl), "first")]
+                [ServerExtension(typeof(Domain.IRemoteMonsterControl), "first")]
                 public sealed partial class FirstKernel
                 {
-                    [ServerExtensionMethod(typeof(Domain.RemoteMonsterControl))]
+                    [ServerExtensionMethod(typeof(Domain.IRemoteMonsterControl))]
                     public int Kill(int monsterId, HookContext ctx)
                     {
                         return monsterId;
@@ -74,10 +76,10 @@ public sealed class ServerExtensionGraftCollisionTests
 
             namespace Sample.Two
             {
-                [ServerExtension(typeof(Domain.RemoteMonsterControl), "second")]
+                [ServerExtension(typeof(Domain.IRemoteMonsterControl), "second")]
                 public sealed partial class SecondKernel
                 {
-                    [ServerExtensionMethod(typeof(Domain.RemoteMonsterControl))]
+                    [ServerExtensionMethod(typeof(Domain.IRemoteMonsterControl))]
                     public int Kill(int id, HookContext ctx)
                     {
                         return id;

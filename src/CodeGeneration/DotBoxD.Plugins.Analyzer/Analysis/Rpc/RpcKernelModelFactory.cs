@@ -36,6 +36,7 @@ internal static partial class RpcKernelModelFactory
 
         try
         {
+            var graft = RpcServerExtensionGraft.Create(type, graftType);
             var method = ResolveBatchMethod(type);
             ValidateBatchMethodParameters(method);
             var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
@@ -56,7 +57,7 @@ internal static partial class RpcKernelModelFactory
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
             var effects = new SortedSet<string>(StringComparer.Ordinal);
             var lowerer = new DotBoxDRpcJsonLowerer(context.SemanticModel, capabilities, effects, cancellationToken);
-            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graftType);
+            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
             var bodyJson = lowerer.LowerBody(body);
 
             effects.Add("Cpu");
@@ -76,14 +77,14 @@ internal static partial class RpcKernelModelFactory
                 serviceType,
                 serviceMethod,
                 clientExtensions,
-                graftType,
+                graft,
                 hasReceiverId);
             var grafts = RpcKernelGraftSignatureFactory.Create(
                 type,
                 method,
                 serviceMethod,
                 clientExtensions,
-                graftType);
+                graft);
             return new RpcKernelModelResult(source, null, grafts);
         }
         catch (NotSupportedException ex)
@@ -158,7 +159,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
-        INamedTypeSymbol? graftType,
+        RpcServerExtensionGraft? graft,
         bool hasReceiverId)
     {
         var methodName = method.Name;
@@ -204,7 +205,7 @@ internal static partial class RpcKernelModelFactory
 
         return new GeneratedPluginPackage(
             HintName(type),
-            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graftType, method),
+            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graft, method),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -215,7 +216,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
-        INamedTypeSymbol? graftType,
+        RpcServerExtensionGraft? graft,
         IMethodSymbol kernelMethod)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
@@ -245,11 +246,11 @@ internal static partial class RpcKernelModelFactory
                 builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions));
             }
         }
-        else if (graftType is not null &&
+        else if (graft is not null &&
                  RpcKernelClientExtensionModelFactory.HasExtensionAttribute(kernelMethod))
         {
             builder.AppendLine();
-            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graftType, kernelMethod));
+            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod));
         }
 
         return builder.ToString();

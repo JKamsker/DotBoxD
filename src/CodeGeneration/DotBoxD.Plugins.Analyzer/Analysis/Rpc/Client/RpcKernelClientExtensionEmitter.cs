@@ -6,13 +6,11 @@ using Microsoft.CodeAnalysis;
 
 internal sealed record RpcKernelClientPropertyExtension(
     INamedTypeSymbol ReceiverType,
-    string Name,
-    INamedTypeSymbol? ServerExtensionsInterfaceType);
+    string Name);
 
 internal sealed record RpcKernelClientMethodExtension(
     INamedTypeSymbol ReceiverType,
-    string Name,
-    INamedTypeSymbol? ServerExtensionsInterfaceType);
+    string Name);
 
 internal sealed record RpcKernelClientExtensions(
     RpcKernelClientPropertyExtension? Property,
@@ -94,12 +92,18 @@ internal static class RpcKernelClientExtensionEmitter
     {
         builder.Append("        public ").Append(TypeName(serviceType)).Append(' ')
             .Append(Identifier(property.Name)).AppendLine();
-        AppendClientExpression(
+        builder.AppendLine("        {");
+        builder.AppendLine("            get");
+        builder.AppendLine("            {");
+        AppendAccessorGuard(builder, receiver, "                ");
+        AppendClientReturn(
             builder,
             kernelType,
             serviceType,
-            receiver,
-            property.ServerExtensionsInterfaceType);
+            serviceMethod: null,
+            indent: "                ");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
     }
 
     private static void AppendMethod(
@@ -112,27 +116,37 @@ internal static class RpcKernelClientExtensionEmitter
     {
         builder.Append("        public ").Append(TypeName(serviceMethod.ReturnType)).Append(' ')
             .Append(Identifier(method.Name)).Append('(').Append(ParameterList(serviceMethod)).AppendLine(")");
-        AppendClientExpression(
+        builder.AppendLine("        {");
+        AppendAccessorGuard(builder, receiver, "            ");
+        AppendClientReturn(
             builder,
             kernelType,
             serviceType,
-            receiver,
-            method.ServerExtensionsInterfaceType,
-            serviceMethod);
+            serviceMethod,
+            indent: "            ");
+        builder.AppendLine("        }");
     }
 
-    private static void AppendClientExpression(
+    private static void AppendAccessorGuard(StringBuilder builder, string receiver, string indent)
+    {
+        builder.Append(indent).Append("if (").Append(receiver)
+            .AppendLine(" is not global::DotBoxD.Abstractions.IServerExtensionClientAccessor __accessor)");
+        builder.Append(indent).AppendLine("{");
+        builder.Append(indent).AppendLine("    throw new global::System.InvalidOperationException(\"Server extension calls require a generated plugin facade receiver.\");");
+        builder.Append(indent).AppendLine("}");
+    }
+
+    private static void AppendClientReturn(
         StringBuilder builder,
         INamedTypeSymbol kernelType,
         INamedTypeSymbol serviceType,
-        string receiver,
-        INamedTypeSymbol? serverExtensionsInterfaceType,
-        IMethodSymbol? serviceMethod = null)
+        IMethodSymbol? serviceMethod,
+        string indent)
     {
-        var registry = ServerExtensionsRegistryExpression(receiver, serverExtensionsInterfaceType);
-        builder.Append("            => ").Append(ClientTypeName(kernelType)).AppendLine(".Create(");
-        builder.Append("                ").Append(registry).AppendLine(",");
-        builder.Append("                ").Append(registry).Append(".PluginId<")
+        const string registry = "__accessor.ServerExtensions";
+        builder.Append(indent).Append("return ").Append(ClientTypeName(kernelType)).AppendLine(".Create(");
+        builder.Append(indent).Append("    ").Append(registry).AppendLine(",");
+        builder.Append(indent).Append("    ").Append(registry).Append(".PluginId<")
             .Append(TypeName(serviceType)).Append(">())");
         if (serviceMethod is null)
         {
@@ -141,7 +155,7 @@ internal static class RpcKernelClientExtensionEmitter
         }
 
         builder.AppendLine();
-        builder.Append("                .").Append(Identifier(serviceMethod.Name)).Append('(')
+        builder.Append(indent).Append("    .").Append(Identifier(serviceMethod.Name)).Append('(')
             .Append(ArgumentList(serviceMethod)).AppendLine(");");
     }
 
@@ -181,11 +195,6 @@ internal static class RpcKernelClientExtensionEmitter
             : kernelType.ContainingNamespace.ToDisplayString() + ".";
         return "global::" + ns + kernelType.Name + "ServerExtensionClient";
     }
-
-    private static string ServerExtensionsRegistryExpression(string receiver, INamedTypeSymbol? interfaceType)
-        => interfaceType is null
-            ? receiver + ".ServerExtensions"
-            : "((" + TypeName(interfaceType) + ")" + receiver + ").ServerExtensions";
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);

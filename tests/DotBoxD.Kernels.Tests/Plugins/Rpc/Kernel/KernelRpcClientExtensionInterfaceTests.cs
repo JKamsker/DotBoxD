@@ -13,22 +13,23 @@ public sealed class ServerExtensionClientExtensionInterfaceTests
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public interface IServerExtensionsBacked
+        [DotBoxDService]
+        public interface IRemoteMonsterControl
         {
-            DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
-        public sealed class RemoteMonsterControl : IServerExtensionsBacked
+        public sealed class RemoteMonsterControl : IRemoteMonsterControl, IServerExtensionClientAccessor
         {
             private readonly DotBoxD.Plugins.IServerExtensionClientRegistry _kernelRpc;
 
             public RemoteMonsterControl(DotBoxD.Plugins.IServerExtensionClientRegistry kernelRpc) => _kernelRpc = kernelRpc;
 
-            DotBoxD.Plugins.IServerExtensionClientRegistry IServerExtensionsBacked.ServerExtensions => _kernelRpc;
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => _kernelRpc;
         }
 
         public interface IMonsterKillerService
@@ -44,7 +45,7 @@ public sealed class ServerExtensionClientExtensionInterfaceTests
 
         public readonly record struct KillResult(int MonsterId, bool Success);
 
-        [ServerExtensionClient(typeof(RemoteMonsterControl))]
+        [ServerExtensionClient(typeof(IRemoteMonsterControl))]
         [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
         public sealed partial class MonsterKillerKernel
         {
@@ -64,7 +65,7 @@ public sealed class ServerExtensionClientExtensionInterfaceTests
         """;
 
     [Fact]
-    public async Task Generated_domain_extension_uses_explicit_interface_kernel_rpc_property()
+    public async Task Generated_domain_extension_uses_runtime_accessor_on_server_owned_receiver()
     {
         var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(ExplicitInterfaceReceiverSource);
         var controlType = assembly.GetType("Sample.RemoteMonsterControl", throwOnError: true)!;
@@ -88,7 +89,7 @@ public sealed class ServerExtensionClientExtensionInterfaceTests
     }
 
     [Fact]
-    public void Generated_domain_extension_reports_inaccessible_explicit_interface_kernel_rpc_property()
+    public void Generated_domain_extension_reports_plugin_owned_receiver_with_explicit_interface_property()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
             using System.Threading.Tasks;
@@ -131,7 +132,7 @@ public sealed class ServerExtensionClientExtensionInterfaceTests
         Assert.Contains(
             diagnostics,
             d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("ServerExtensions property", StringComparison.Ordinal));
+                 d.GetMessage().Contains("server-owned [DotBoxDService] interface", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
     }
 

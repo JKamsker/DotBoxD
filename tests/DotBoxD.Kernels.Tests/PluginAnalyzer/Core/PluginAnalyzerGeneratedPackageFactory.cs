@@ -1,6 +1,7 @@
 using System.Reflection;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Services.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -103,6 +104,7 @@ internal static class PluginAnalyzerGeneratedPackageFactory
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxDServiceAttribute).Assembly.Location))
                 .Concat(AdditionalReferences(additionalReferenceTypes)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
