@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Plugins.Kernel;
 
@@ -188,6 +189,36 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
             }
 
             return _ownedInstallIds.Contains(kernel.InstallId);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Atomically fetches the kernel currently registered under <paramref name="pluginId"/> AND verifies this
+    /// session owns it, returning that exact instance. Use this instead of a separate <see cref="Owns"/> + registry
+    /// lookup so authorization binds to the kernel actually returned — there is no window in which a same-id
+    /// hot-replace could swap a different kernel in between the check and the fetch.
+    /// </summary>
+    public bool TryGetOwned(string pluginId, [MaybeNullWhen(false)] out InstalledKernel kernel)
+    {
+        ArgumentNullException.ThrowIfNull(pluginId);
+        _gate.Wait();
+        try
+        {
+            if (Volatile.Read(ref _disposed) == 0 &&
+                _server.Kernels.TryGet(pluginId, out var owned) &&
+                ReferenceEquals(owned.OwnerId, this) &&
+                _ownedInstallIds.Contains(owned.InstallId))
+            {
+                kernel = owned;
+                return true;
+            }
+
+            kernel = null;
+            return false;
         }
         finally
         {

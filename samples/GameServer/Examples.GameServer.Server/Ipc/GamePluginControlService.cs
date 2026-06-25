@@ -127,9 +127,10 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(pluginId);
         ArgumentNullException.ThrowIfNull(arguments);
 
-        // Owner-checked: reject ids this session does not own before dispatching to the verified extension.
-        // The decode/convert/invoke/encode marshalling now lives in the framework (InvokeServerExtensionRpcAsync).
-        if (!_session.Owns(pluginId) || !_server.Kernels.TryGet(pluginId, out var kernel))
+        // Owner-checked atomically: bind authz to the exact kernel returned, so a same-id hot-replace can't swap
+        // a different session's kernel in between an ownership check and a separate lookup. The decode/convert/
+        // invoke/encode marshalling lives in the framework (InvokeServerExtensionRpcAsync).
+        if (!_session.TryGetOwned(pluginId, out var kernel))
         {
             throw new InvalidOperationException(
                 $"Server extension '{pluginId}' is not owned by this plugin session.");

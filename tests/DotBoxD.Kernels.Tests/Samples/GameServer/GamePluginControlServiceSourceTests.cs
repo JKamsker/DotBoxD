@@ -8,9 +8,11 @@ public sealed class GamePluginControlServiceSourceTests
         var source = File.ReadAllText(GamePluginControlServicePath());
         var method = ExtractInvokeServerExtensionAsync(source);
 
-        // The host must gate on session ownership, never reach for the kernel by id without an owner check.
+        // The host must fetch the kernel atomically owner-checked — never via a separate registry lookup that
+        // a same-id hot-replace could race (no Get, no detached TryGet after an Owns check).
         Assert.DoesNotContain("_server.Kernels.Get(pluginId)", method, StringComparison.Ordinal);
-        Assert.Contains("_session.Owns(pluginId)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("_server.Kernels.TryGet(pluginId", method, StringComparison.Ordinal);
+        Assert.Contains("_session.TryGetOwned(pluginId", method, StringComparison.Ordinal);
     }
 
     private static string ExtractInvokeServerExtensionAsync(string source)
