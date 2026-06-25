@@ -34,16 +34,31 @@ public sealed class PluginEventAdapterRegistry
 
     internal bool TryResolveShape(string eventName, out PluginEventShape shape)
     {
-        foreach (var adapter in _adapters.Values)
+        // Prefer the fully-qualified type-name match (the dictionary key) so a package targeting one of two
+        // same-simple-name events in different namespaces is validated against THAT event's shape, not the first
+        // suffix collision. Otherwise fall back to the by-name match (exact, or the qualified-vs-simple bridge).
+        // The fallback stays safe even when more than one adapter matches: the DBXK034 registration check forbids
+        // two same-name adapters with different parameter shapes, so any same-name match yields the same shape.
+        PluginEventShape? fallback = null;
+        foreach (var entry in _adapters)
         {
-            var current = adapter.Shape;
-            // The manifest event name may be fully qualified (Namespace.TypeName) while an adapter reports
-            // only the simple name; EventNameMatch bridges that seam and still honours exact matches.
-            if (EventNameMatch.Matches(current.EventName, eventName))
+            var current = entry.Value.Shape;
+            if (string.Equals(entry.Key.FullName, eventName, StringComparison.Ordinal))
             {
                 shape = current;
                 return true;
             }
+
+            if (fallback is null && EventNameMatch.Matches(current.EventName, eventName))
+            {
+                fallback = current;
+            }
+        }
+
+        if (fallback is not null)
+        {
+            shape = fallback.Value;
+            return true;
         }
 
         shape = default!;

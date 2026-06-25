@@ -186,8 +186,10 @@ public sealed class PluginServerFacadeRegressionTests
 
         Assert.Empty(outputCompilation.GetDiagnostics()
             .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
-        Assert.Contains("class MonsterPluginService", generated, StringComparison.Ordinal);
-        Assert.Contains("class MonsterPluginService_2", generated, StringComparison.Ordinal);
+        // Match the class declarations precisely (": " follows the wrapper name) so the first assertion cannot be
+        // satisfied by the disambiguated "_2" name as a prefix substring.
+        Assert.Contains("class MonsterPluginService :", generated, StringComparison.Ordinal);
+        Assert.Contains("class MonsterPluginService_2 :", generated, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -155,7 +155,10 @@ public sealed partial class PluginServer : IDisposable
         if (removed is not null)
         {
             RemoveKernelReferences(removed);
-            ClearServerExtensionRegistrations(pluginId);
+            // Clear by the REMOVED kernel's manifest plugin id, not the caller's argument: Kernels.Remove also
+            // resolves by install id, so a caller passing an install id would otherwise leave the server-extension
+            // registration (keyed by plugin id) mapped to a now-removed kernel and hand out a stale proxy.
+            ClearServerExtensionRegistrations(removed.Manifest.PluginId);
         }
 
         return removed is not null;

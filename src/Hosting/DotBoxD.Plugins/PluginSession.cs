@@ -93,8 +93,16 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
     /// and so no such window.)
     /// </para>
     /// </summary>
-    /// <remarks>Opt-in convenience: hand-write the equivalent with <see cref="InstallAsync"/> + your wire
-    /// action + <see cref="Uninstall"/> on failure if this shape doesn't fit — all public.</remarks>
+    /// <remarks>
+    /// Opt-in convenience over public primitives: hand-write the equivalent with
+    /// <see cref="InstallStagedAsync"/> + your wire action + <see cref="Promote"/> on success /
+    /// <see cref="Uninstall"/> on failure if this shape doesn't fit. <b>The <paramref name="wire"/> callback runs
+    /// while the session gate is held</b>, so it must only touch server-side routing (e.g.
+    /// <see cref="PluginServer.WireHook"/> / <see cref="PluginServer.WireSubscription"/>) and must NOT call back
+    /// into this session (<see cref="InstallAsync"/> / <see cref="InstallStagedAsync"/> / <see cref="Promote"/> /
+    /// <see cref="Uninstall"/> / <see cref="Owns"/> / <see cref="TryGetOwned"/> / <see cref="UpdateSettingsAsync"/>),
+    /// which would deadlock on the non-reentrant gate.
+    /// </remarks>
     public async ValueTask<InstalledKernel> InstallAndWireAsync(
         PluginPackage package,
         Action<InstalledKernel> wire,
@@ -146,6 +154,60 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
             }
 
             throw;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Installs <paramref name="package"/> owned by this session as a <b>non-current instance</b>: a same-id
+    /// incumbent (if any) stays current and un-revoked. Pair with <see cref="Promote"/> once the returned kernel
+    /// is wired, or roll it back with <see cref="Uninstall"/> (or by disposing the session). This is the public
+    /// staging primitive behind <see cref="InstallAndWireAsync"/> — it lets a host wire a kernel <b>before</b> it
+    /// displaces the incumbent, so the helper's behavior is reproducible by hand with public API.
+    /// </summary>
+    public async ValueTask<InstalledKernel> InstallStagedAsync(
+        PluginPackage package,
+        SandboxPolicy? policy = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            var kernel = await _server.InstallOwnedStagedAsync(this, package, policy, cancellationToken).ConfigureAwait(false);
+            _ownedInstallIds.Add(kernel.InstallId);
+            return kernel;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Promotes a kernel previously installed via <see cref="InstallStagedAsync"/> to be the current kernel for its
+    /// plugin id, revoking and detaching any prior same-id incumbent only now (so a pre-promotion failure leaves
+    /// the incumbent live). Rejects a kernel this session does not own. A local-terminal kernel has no current-kernel
+    /// semantics, so promotion is a no-op for it.
+    /// </summary>
+    public void Promote(InstalledKernel kernel)
+    {
+        ArgumentNullException.ThrowIfNull(kernel);
+        _gate.Wait();
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (!_ownedInstallIds.Contains(kernel.InstallId))
+            {
+                throw new InvalidOperationException(
+                    $"install id '{kernel.InstallId}' is not owned by this session and cannot be promoted.");
+            }
+
+            _server.PromoteOwned(this, kernel);
         }
         finally
         {

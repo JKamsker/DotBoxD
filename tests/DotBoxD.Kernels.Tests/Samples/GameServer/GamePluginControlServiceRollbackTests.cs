@@ -86,6 +86,8 @@ public sealed class GamePluginControlServiceRollbackTests
             Assert.True(server.Kernels.TryGet("retaliation", out var installed));
             Assert.Same(incumbent, installed);
             Assert.False(incumbent.IsRevoked);
+            // The staged (failed) instance was rolled back — only the incumbent remains under this plugin id.
+            Assert.Single(server.Kernels.Snapshot(), k => k.Manifest.PluginId == "retaliation");
         }
     }
 
