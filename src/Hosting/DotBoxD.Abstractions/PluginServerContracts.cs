@@ -78,6 +78,12 @@ public sealed class GeneratePluginServerAttribute : Attribute
     public Type? Context { get; set; }
 
     /// <summary>
+    /// Optional control-plane service contract for install, live-settings, and lifecycle calls. When omitted,
+    /// the generator falls back to the legacy <c>{WorldNamespace}.Ipc.IGamePluginControlService</c> convention.
+    /// </summary>
+    public Type? ControlService { get; set; }
+
+    /// <summary>
     /// Optional static factory method name on <see cref="Context"/> with signature
     /// <c>TContext Factory(HookContext raw)</c>.
     /// </summary>

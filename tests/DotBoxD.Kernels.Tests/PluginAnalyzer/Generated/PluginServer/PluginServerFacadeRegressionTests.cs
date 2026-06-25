@@ -97,6 +97,72 @@ public sealed class PluginServerFacadeRegressionTests
     }
 
     [Fact]
+    public void Generated_plugin_server_accepts_explicit_control_service_and_infers_update_type()
+    {
+        var (result, outputCompilation) = RunGenerator("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Explicit.Game
+            {
+                [DotBoxDService]
+                public interface IGameWorldAccess;
+            }
+
+            namespace Explicit.Control
+            {
+                public readonly record struct PluginSettingPatch(string Name, string Value);
+
+                public interface IPluginControl : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        PluginSettingPatch[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static Explicit.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+                }
+            }
+
+            namespace Explicit.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using Explicit.Game;
+
+                [GeneratePluginServer(
+                    Context = typeof(RemotePluginContext),
+                    ControlService = typeof(Explicit.Control.IPluginControl))]
+                public partial class RemotePluginServer : IGameWorldAccess;
+
+                public sealed partial class RemotePluginContext;
+            }
+            """);
+        var generated = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Empty(outputCompilation.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Contains("global::Explicit.Control.IPluginControl", generated, StringComparison.Ordinal);
+        Assert.Contains("global::Explicit.Control.PluginSettingPatch", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGamePluginControlService", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generated_plugin_server_disambiguates_same_simple_name_returned_services()
     {
         // Two [DotBoxDService] interfaces named IMonster live in different namespaces and are both returned from
