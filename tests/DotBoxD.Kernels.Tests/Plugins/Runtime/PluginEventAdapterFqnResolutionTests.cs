@@ -40,6 +40,22 @@ namespace DotBoxD.Kernels.Tests.Plugins.AdapterFqn
             Assert.False(registry.TryResolveErased("DamageEvent", out _));
         }
 
+        [Fact]
+        public void TryResolveShape_validates_ambiguous_same_name_against_the_common_shape()
+        {
+            // DBXK034 lets two adapters share a simple EventName when their parameter shapes are identical. A
+            // legacy simple-name manifest must still resolve THAT shape so install-time parameter validation
+            // (DBXK033) runs — otherwise a malformed kernel would install and only fail later. Wiring still rejects
+            // the ambiguity (it must not guess which event to route to), but validation does not.
+            var registry = new PluginEventAdapterRegistry();
+            registry.Register(new SimpleNameDamageAdapter<First.DamageEvent>());
+            registry.Register(new SimpleNameDamageAdapter<Second.DamageEvent>());
+
+            Assert.True(registry.TryResolveShape("DamageEvent", out var shape));
+            Assert.Equal("DamageEvent", shape.EventName);
+            Assert.False(registry.TryResolveErased("DamageEvent", out _));
+        }
+
         // Reports only the SIMPLE event name (the convention default), reproducing the collision scenario.
         private sealed class SimpleNameDamageAdapter<TEvent> : IPluginEventAdapter<TEvent>
         {

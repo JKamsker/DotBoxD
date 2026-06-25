@@ -34,7 +34,11 @@ public sealed class PluginEventAdapterRegistry
 
     internal bool TryResolveShape(string eventName, out PluginEventShape shape)
     {
-        if (TryResolveRegistered(eventName, out var registered))
+        // Validation tolerates an ambiguous same-name collision. DBXK034 already forbids two adapters sharing an
+        // EventName with DIFFERENT parameter shapes, so every same-name match yields the same shape — returning it
+        // keeps install-time DBXK033 parameter validation running instead of silently skipping it (which would let
+        // a malformed kernel install and only fail later at wiring/invocation).
+        if (TryResolveRegistered(eventName, rejectAmbiguous: false, out var registered))
         {
             shape = registered.Shape;
             return true;
@@ -47,15 +51,16 @@ public sealed class PluginEventAdapterRegistry
     /// <summary>
     /// Resolves the type-erased, wire-capable adapter for <paramref name="eventName"/> (a manifest event name,
     /// possibly fully qualified) so the host-side router can wire an installed kernel to the right typed
-    /// pipeline terminal with no reflection. Uses the same precedence as <see cref="TryResolveShape"/>, so a
-    /// package is validated against the SAME adapter it is wired to. Returns <c>false</c> when no registered
-    /// adapter matches (or the match is ambiguous). Public as a composability seam — build custom by-name wiring
-    /// on top of it when <see cref="PluginServer.WireHook"/>/<see cref="PluginServer.WireSubscription"/> don't
-    /// fit; the adapter must be registered first (the router does not auto-register by name).
+    /// pipeline terminal with no reflection. Shares precedence with <see cref="TryResolveShape"/>, so an
+    /// unambiguous resolution picks the same adapter a package was validated against; unlike validation, wiring
+    /// <b>rejects</b> an ambiguous collision (returns <c>false</c>) rather than guess which event to wire to.
+    /// Public as a composability seam — build custom by-name wiring on top of it when
+    /// <see cref="PluginServer.WireHook"/>/<see cref="PluginServer.WireSubscription"/> don't fit; the adapter must
+    /// be registered first (the router does not auto-register by name).
     /// </summary>
     public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
-        if (TryResolveRegistered(eventName, out var registered))
+        if (TryResolveRegistered(eventName, rejectAmbiguous: true, out var registered))
         {
             adapter = registered.Erased;
             return true;
@@ -67,16 +72,18 @@ public sealed class PluginEventAdapterRegistry
 
     /// <summary>
     /// Single by-name resolution shared by wiring (<see cref="TryResolveErased"/>) and shape validation
-    /// (<see cref="TryResolveShape"/>) so a package can never be validated against one event and wired to another.
-    /// Precedence, refusing to guess on a collision:
-    ///   1. An unambiguous exact (ordinal) match on the adapter's reported name; two adapters reporting the same
-    ///      name is genuinely ambiguous, so reject rather than pick the first.
+    /// (<see cref="TryResolveShape"/>) so an unambiguous resolution picks the same adapter for both.
+    /// Precedence:
+    ///   1. Exact (ordinal) match on the adapter's reported name.
     ///   2. A fully-qualified match on the event TYPE's name (the dictionary key). Convention/hand-written
     ///      adapters report only the simple name, so two same-simple-name events in different namespaces are
     ///      indistinguishable by (1) and (3); the manifest records the FQN and the type's FullName is unique.
-    ///   3. A qualified-vs-simple suffix bridge — only when it resolves to a single adapter.
+    ///   3. A qualified-vs-simple suffix bridge.
+    /// When a tier has more than one match it is ambiguous: <paramref name="rejectAmbiguous"/> wiring refuses it
+    /// (so a kernel is never wired to the wrong event's pipeline), while validation accepts the first match (every
+    /// same-name match shares a shape by the DBXK034 rule, so the validated shape is well-defined).
     /// </summary>
-    private bool TryResolveRegistered(string eventName, out RegisteredPluginEventAdapter resolved)
+    private bool TryResolveRegistered(string eventName, bool rejectAmbiguous, out RegisteredPluginEventAdapter resolved)
     {
         RegisteredPluginEventAdapter exactMatch = default;
         var exactCount = 0;
@@ -90,7 +97,11 @@ public sealed class PluginEventAdapterRegistry
             var registered = entry.Value;
             if (string.Equals(registered.Shape.EventName, eventName, StringComparison.Ordinal))
             {
-                exactMatch = registered;
+                if (exactCount == 0)
+                {
+                    exactMatch = registered;
+                }
+
                 exactCount++;
                 continue;
             }
@@ -112,7 +123,7 @@ public sealed class PluginEventAdapterRegistry
             }
         }
 
-        if (exactCount == 1)
+        if (exactCount == 1 || (exactCount > 1 && !rejectAmbiguous))
         {
             resolved = exactMatch;
             return true;
@@ -124,13 +135,13 @@ public sealed class PluginEventAdapterRegistry
             return true;
         }
 
-        if (exactCount == 0 && !hasTypeNameMatch && suffixCount == 1)
+        if (exactCount == 0 && !hasTypeNameMatch && (suffixCount == 1 || (suffixCount > 1 && !rejectAmbiguous)))
         {
             resolved = suffixMatch;
             return true;
         }
 
-        // Zero matches, or an ambiguous collision we refuse to resolve by registration order.
+        // No match, or an ambiguous tier that wiring refuses to resolve by registration order.
         resolved = default;
         return false;
     }
