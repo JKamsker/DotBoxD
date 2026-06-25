@@ -1,6 +1,6 @@
 # InvokeAsync — inline-kernel and explicit capture bag (deep dive)
 
-This document specifies how `server.Kernels.InvokeAsync(lambda)` is detected, lowered to verified sandboxed
+This document specifies how `server.InvokeAsync(lambda)` is detected, lowered to verified sandboxed
 IR at compile time, shipped over async IPC, and executed server-side. It also documents both capture paths:
 an explicit mutable capture bag, and an implicit-capture convenience path whose generated reflection fallback
 can be statically rewritten by the DotBoxD Fody weaver. The server never compiles plugin source; only
@@ -15,7 +15,7 @@ It corrects the reviewed designs where they were unsound and states every deferr
 No-capture inline kernel:
 
 ```csharp
-var monsterHealth = await server.Kernels.InvokeAsync((IGameWorldAccess world) =>
+var monsterHealth = await server.InvokeAsync(async (IGameWorldAccess world) =>
 {
     // Runs INSIDE the kernel (server-side, sandboxed verified IR).
     var monster = world.GetMonster("monster-2");
@@ -27,9 +27,9 @@ Explicit capture-bag sync-in/out:
 
 ```csharp
 var capture = new MonsterProbeCapture { MonsterId = "monster-2" };
-var monsterName = await server.Kernels.InvokeAsync(
+var monsterName = await server.InvokeAsync(
     capture,
-    (IGameWorldAccess world, MonsterProbeCapture bag) =>
+    async (IGameWorldAccess world, MonsterProbeCapture bag) =>
     {
         var monster = world.GetMonster(bag.MonsterId);
         bag.LastHealth = monster.Health;
@@ -46,7 +46,7 @@ Implicit capture convenience:
 ```csharp
 var monsterId = "monster-2";
 var lastHealth = 0;
-var monsterName = await server.Kernels.InvokeAsync((IGameWorldAccess world) =>
+var monsterName = await server.InvokeAsync(async (IGameWorldAccess world) =>
 {
     var monster = world.GetMonster(monsterId);
     lastHealth = monster.Health;
@@ -85,9 +85,10 @@ var invokeAsyncResults = context.SyntaxProvider
 ```
 
 The predicate is allocation-free and name-only. `InvokeAsyncModelFactory.Create` then **resolves the
-receiver's type and returns `null` unless it is the kernel-invocation surface**
-(`DotBoxDGenerationNames.Metadata.KernelInvocationSurfaceType` = the FQN of `RemoteKernelControl`), mirroring
-`HookChainModelFactory`'s `HookPipeline<TEvent>` guard. Name alone is not a sufficient discriminator.
+receiver's type and returns `null` unless it is a generated plugin server facade or generated server
+interface**. Calls through the erased `IPluginServer<TWorld>` surface are rejected with a diagnostic because
+the generated interceptor needs the concrete generated server receiver. Name alone is not a sufficient
+discriminator.
 
 ### Lambda shape validation
 
@@ -96,9 +97,10 @@ Accept only:
   reflection-backed local/parameter captures, or
 - a mutable capture object argument plus a two-parameter lambda
   `(IGameWorldAccess world, TCaptures captures)`, where `TCaptures` is a supported record-shaped DTO, and
-- a **block body** (expression-body lambdas are out of scope — use `InvokeKernel` for those).
+- a **block body** (expression-body lambdas are out of scope).
 
-Anything else returns `null` (fail-safe, no output).
+Wrong DotBoxD receiver shapes produce a build diagnostic. Unrelated methods named `InvokeAsync` return
+`null` from the generator pipeline and are ignored.
 
 ---
 
@@ -202,9 +204,9 @@ The stable capture path is an explicit mutable capture bag:
 
 ```csharp
 var bag = new MonsterProbeCapture { MonsterId = "monster-2" };
-var name = await server.Kernels.InvokeAsync(
+var name = await server.InvokeAsync(
     bag,
-    (IGameWorldAccess world, MonsterProbeCapture captures) =>
+    async (IGameWorldAccess world, MonsterProbeCapture captures) =>
     {
         var monster = world.GetMonster(captures.MonsterId);
         captures.LastHealth = monster.Health;
@@ -242,17 +244,17 @@ the original helper call in place, so the reflection fallback continues to work.
 ```csharp
 [InterceptsLocation(version, "<data>")]
 internal static async ValueTask<int> InvokeAsync_0(
-    this RemoteKernelControl kernels,
-    Func<IGameWorldAccess, int> lambda)   // matches the original signature exactly
+    this GamePluginServer server,
+    Func<IGameWorldAccess, ValueTask<int>> lambda)   // matches the original signature exactly
 {
     ArgumentNullException.ThrowIfNull(lambda);
-    var __pluginId = await kernels
+    var __pluginId = await server.Services
         .EnsureAnonymousKernelAsync("$anon:<hex>", global::…$anon_<hex>PluginPackage.Create)
         .ConfigureAwait(false);
 
     var __request  = KernelRpcBinaryCodec.EncodeArguments(Array.Empty<KernelRpcValue>());
-    var __response = await kernels.WireClient
-        .InvokeKernelRpcAsync(__pluginId, __request).ConfigureAwait(false);
+    var __response = await server.Services.WireClient
+        .InvokeServerExtensionAsync(__pluginId, __request).ConfigureAwait(false);
     var __result   = KernelRpcBinaryCodec.DecodeValue(__response);
 
     return __result.RequireInt32();
@@ -274,35 +276,22 @@ decoded return value.
 
 ## 7. Anonymous-kernel install — identity, caching, concurrency
 
-New members on `RemoteKernelControl`:
+Generated plugin server facades expose a generated `Services` accessor. Anonymous `InvokeAsync` kernels use
+that accessor's server-extension install and invoke path:
 
 ```csharp
-internal IKernelRpcWireClient WireClient => _control;   // IGamePluginControlService implements InvokeKernelRpcAsync
+internal IServerExtensionWireClient WireClient => _control;
 
 private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _anonymousKernels = new(StringComparer.Ordinal);
 
-internal Task<string> EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> packageFactory)
+public Task<string> EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> packageFactory)
     => _anonymousKernels.GetOrAdd(
         pluginId,
-        static (id, args) => new Lazy<Task<string>>(
-            () => InstallAnonymousKernelAsync(id, args.PackageFactory, args.Control),
-            LazyThreadSafetyMode.ExecutionAndPublication),
-        (PackageFactory: packageFactory, Control: _control)).Value;
+        id => new Lazy<Task<string>>(() => InstallServerExtensionPackageAsync(packageFactory()).AsTask()))
+        .Value;
 
-private static async Task<string> InstallAnonymousKernelAsync(
-    string pluginId,
-    Func<PluginPackage> packageFactory,
-    IGamePluginControlService control)
-{
-    var json = PluginPackageJsonSerializer.Export(packageFactory());
-    var installedPluginId = await control.InstallKernelRpcAsync(json).ConfigureAwait(false);
-    if (!string.Equals(installedPluginId, pluginId, StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException(...);
-    }
-
-    return installedPluginId;
-}
+private ValueTask<string> InstallServerExtensionPackageAsync(PluginPackage package)
+    => RequireControl().InstallServerExtensionAsync(PluginPackageJsonSerializer.Export(package));
 ```
 
 - **Install-once-per-id-per-connection.** The `ConcurrentDictionary<string, Lazy<Task<string>>>` `GetOrAdd`
@@ -310,28 +299,26 @@ private static async Task<string> InstallAnonymousKernelAsync(
   of the same `$anon:` id trigger the same-owner reinstall guard (`KernelRegistry.Add`, DBXK060), which
   **replaces and revokes** the incumbent — cancelling an in-flight invoke's execution gate. The concurrency-safe
   cache is **mandatory**, not an optimization.
-- **Per-connection cache.** `RemoteKernelControl` is constructed fresh per connection
-  (`new RemotePluginServer(...)`), so the cache clears naturally on reconnect; the new session re-installs
-  and the old one is revoked on disconnect.
-- **Throwing stub overload.** `RemoteKernelControl` declares
-  `public ValueTask<TReturn> InvokeAsync<TReturn>(Func<IGameWorldAccess, TReturn> lambda) => throw …;` so an
-  un-intercepted call (interceptors opt-in missing, or `GetInterceptableLocation` returned null) fails
-  loudly. Ensure this is the **sole** `InvokeAsync` candidate at the call site to avoid overload-resolution
-  mis-binding, and emit a build diagnostic when interception location is null.
+- **Per-connection cache.** The generated server facade is constructed fresh per connection, so the cache
+  clears naturally on reconnect; the new session re-installs and the old one is revoked on disconnect.
+- **Throwing stub overload.** The generated facade declares
+  `public ValueTask<TReturn> InvokeAsync<TReturn>(Func<IGameWorldAccess, ValueTask<TReturn>> lambda) => throw …;`
+  so an un-intercepted call (interceptors opt-in missing, or `GetInterceptableLocation` returned null) fails
+  loudly. The generator also emits a build diagnostic when the call site is not interceptable.
 
 ---
 
 ## 8. Server-side execution
 
-Anonymous kernels reuse the entire named-RPC path, unchanged:
+Anonymous kernels reuse the server-extension RPC path:
 
-1. `InstallKernelRpcAsync(json)` → `PluginPackageJsonSerializer.Import` → `ServerPolicy.ForKernel(manifest
-   .RequiredCapabilities)` → `PluginSession.InstallRpcAsync` → `PluginServer.InstallRpcCoreAsync` →
+1. `InstallServerExtensionAsync(json)` → `PluginPackageJsonSerializer.Import` → `ServerPolicy.ForKernel(manifest
+   .RequiredCapabilities)` → `PluginSession.InstallServerExtensionAsync` → `PluginServer.InstallServerExtensionAsync` →
    `RpcKernelPackageValidator.Validate` → `SandboxHost.PrepareAsync` (capability deny-at-install via
    `PolicyResolver.Validate`) → `RpcKernelPackageValidator.ValidatePrepared` → `new InstalledKernel(...)`
    owned by the session.
-2. `InvokeKernelRpcAsync(pluginId, bytes)` → `DecodeArguments` → per-arg `KernelRpcValueConverter
-   .ToSandboxValue` against each `function.Parameters[i].Type` → `InstalledKernel.InvokeRpcAsync` →
+2. `InvokeServerExtensionAsync(pluginId, bytes)` → `DecodeArguments` → per-arg `KernelRpcValueConverter
+   .ToSandboxValue` against each `function.Parameters[i].Type` → `InstalledKernel.InvokeServerExtensionAsync` →
    `BuildRpcInput` → execute → return one `SandboxValue`.
 
 ### `BuildRpcInput` parameter shapes (must match the generated IR)
@@ -357,7 +344,7 @@ infrastructure.**
 ## 9. Sync-out wire envelope
 
 The response must carry mutated capture-bag fields alongside the return value. The implemented carrier is a
-single `Record` over the existing `InvokeKernelRpcAsync` method:
+single `Record` over the existing `InvokeServerExtensionAsync` method:
 
 - no sync-out: the response is the user return value directly;
 - with sync-out: the response is `Record([returnValue, syncOut0, …])`.
@@ -394,14 +381,12 @@ refactored to call it.
 **Reused as-is:** `HookChainIdentity.Compute`; `DotBoxDRpcJsonLowerer.LowerBody`/`LowerInvocation`/
 `LowerMemberAccess`; `DotBoxDHostBindingExpressionLowerer` (capability sink); `DotBoxDRpcTypeMapper.JsonType`;
 `KernelRpcBinaryCodec` (encode args / decode value); `KernelRpcValueConverter`; `InstalledKernel
-.InvokeRpcAsync` + `BuildRpcInput`; `PluginSession`/`PluginServer` install + ownership + revocation;
+.InvokeServerExtensionAsync` + `BuildRpcInput`; `PluginSession`/`PluginServer` install + ownership + revocation;
 `SandboxHost.PrepareAsync` + `PolicyResolver` capability gating; `RpcKernelPackageValidator`.
 
 **New:** `InvokeAsyncModelFactory`, `InvokeAsyncCallShape`, `InvokeAsyncInterceptorEmitter`, shared
-`InterceptsLocationAttributeEmitter`, the fourth generator pipeline,
-`DotBoxDGenerationNames.Metadata.KernelInvocationSurfaceType`,
-`DotBoxDGenerationNames.Metadata.KernelInvocationDelegateType`, `RemoteKernelControl` members
-(`InvokeAsync<TReturn>` stub, capture-bag `InvokeAsync<TCaptures,TReturn>` stub, `WireClient`,
-`EnsureAnonymousKernelAsync`), reflection capture helpers in generated interceptors,
+`InterceptsLocationAttributeEmitter`, the fourth generator pipeline, generated facade members
+(`InvokeAsync<TReturn>` stub, capture-bag `InvokeAsync<TCaptures,TReturn>` stub, `Services.WireClient`,
+`Services.EnsureAnonymousKernelAsync`), reflection capture helpers in generated interceptors,
 `DotBoxD.Plugins.Fody` for safe static implicit-capture rewriting, and the sample `world.GetMonster(id)`
 snapshot binding.

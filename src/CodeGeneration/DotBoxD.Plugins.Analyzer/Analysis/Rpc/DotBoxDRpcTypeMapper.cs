@@ -9,7 +9,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 /// and <c>record.get</c> indices use. Anything unsupported throws <see cref="NotSupportedException"/> so
 /// the whole kernel fails generation safely.
 /// </summary>
-internal static class DotBoxDRpcTypeMapper
+internal static partial class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
@@ -257,40 +257,6 @@ internal static class DotBoxDRpcTypeMapper
     public static bool EnumUsesI64(INamedTypeSymbol enumType)
         => enumType.EnumUnderlyingType?.SpecialType is
             SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
-
-    /// <summary>
-    /// Rejects a DTO that inherits public instance properties from a base type: <see cref="RecordFields"/>
-    /// only sees declared members (so inherited fields would be silently dropped on both the analyzer and the
-    /// runtime marshaller). Fail generation with a clear message instead.
-    /// </summary>
-    internal static void RejectInheritedDtoProperties(INamedTypeSymbol type)
-    {
-        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
-        {
-            if (baseType.SpecialType is SpecialType.System_Object or SpecialType.System_ValueType)
-            {
-                continue;
-            }
-
-            foreach (var member in baseType.GetMembers())
-            {
-                if (member is IPropertySymbol
-                    {
-                        DeclaredAccessibility: Accessibility.Public,
-                        IsStatic: false,
-                        GetMethod: not null,
-                        IsIndexer: false
-                    } property &&
-                    !property.IsImplicitlyDeclared &&
-                    !IsIgnoredDataMember(property))
-                {
-                    throw new NotSupportedException(
-                        $"Server extension DTO '{type.ToDisplayString()}' must not inherit public properties from " +
-                        $"base type '{baseType.ToDisplayString()}'; flatten the DTO into a single type.");
-                }
-            }
-        }
-    }
 
     private static string Scalar(string name) => "\"" + name + "\"";
 

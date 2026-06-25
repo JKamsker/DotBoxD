@@ -1,11 +1,8 @@
-using DotBoxD.Plugins;
-using DotBoxD.Plugins.Analyzer.Analysis;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-internal static class InvokeAsyncGenerationTestSources
+internal static partial class InvokeAsyncGenerationTestSources
 {
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -28,6 +25,15 @@ internal static class InvokeAsyncGenerationTestSources
             {
                 [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
                 int GetHealth(string entityId);
+            }
+        }
+
+        namespace DotBoxD.Services.Generated
+        {
+            public static class DotBoxDGeneratedExtensions
+            {
+                public static IGameWorldAccess GetGameWorldAccess(DotBoxD.Services.Peer.RpcPeer peer)
+                    => throw new InvalidOperationException("not used");
             }
         }
 
@@ -226,6 +232,15 @@ internal static class InvokeAsyncGenerationTestSources
             }
         }
 
+        namespace DotBoxD.Services.Generated
+        {
+            public static class DotBoxDGeneratedExtensions
+            {
+                public static IGameWorldAccess GetGameWorldAccess(DotBoxD.Services.Peer.RpcPeer peer)
+                    => throw new InvalidOperationException("not used");
+            }
+        }
+
         namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
         {
             public readonly record struct LiveSettingUpdate(string Name, string Value);
@@ -261,29 +276,4 @@ internal static class InvokeAsyncGenerationTestSources
         }
         """;
 
-    internal static GeneratorDriverRunResult RunGenerator(string source)
-    {
-        var compilation = CSharpCompilation.Create(
-            "DotBoxDInvokeAsyncGeneratorTest",
-            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            TrustedPlatformReferences()
-                .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new PluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: ParseOptions);
-        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out _);
-        return driver.GetRunResult();
-    }
-
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
-    {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
-    }
 }

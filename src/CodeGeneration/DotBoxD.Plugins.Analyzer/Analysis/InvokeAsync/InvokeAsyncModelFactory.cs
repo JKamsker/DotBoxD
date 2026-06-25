@@ -84,6 +84,8 @@ internal static class InvokeAsyncModelFactory
                 "lambda must use a supported block body and capture shape.");
         }
 
+        InvokeAsyncGeneratedTypeValidator.Validate(shape, model.Compilation);
+
         var capabilities = new SortedSet<string>(StringComparer.Ordinal);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var lowerer = new DotBoxDRpcJsonLowerer(model, capabilities, effects, cancellationToken);
@@ -223,7 +225,7 @@ internal static class InvokeAsyncModelFactory
             var value = reader.ReadExpression(syncOut.Type, "__result.GetItem(" + (i + 1) + ")");
             syncOutAssignments[i] = shape.UsesReflectionCaptures
                 ? "__WriteCapture(lambda, " + Str(syncOut.TargetName) + ", " + value + ")"
-                : "captures." + syncOut.TargetName + " = " + value;
+                : "captures." + InvokeAsyncSourceIdentifier.Escape(syncOut.TargetName) + " = " + value;
         }
 
         var packageFullName = string.IsNullOrEmpty(ns)
@@ -289,4 +291,5 @@ internal static class InvokeAsyncModelFactory
 
         return string.Join(",", parts);
     }
+
 }

@@ -84,10 +84,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
             !HasDotBoxDServiceAttribute(method.ReturnType) ||
-            invocation.ArgumentList.Arguments.Count == 0)
+            IsHookContextHostMarker(method))
         {
             handleId = string.Empty;
             return false;
+        }
+
+        if (invocation.ArgumentList.Arguments.Count != 1)
+        {
+            throw new NotSupportedException(
+                $"Scoped service handle accessor '{method.Name}' must pass exactly one scope argument.");
         }
 
         handleId = output is null
@@ -95,4 +101,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             : LowerExpressionWithPrelude(invocation.ArgumentList.Arguments[0].Expression, output);
         return true;
     }
+
+    private static bool IsHookContextHostMarker(IMethodSymbol method)
+        => string.Equals(method.Name, "Host", StringComparison.Ordinal) &&
+           method.Arity == 1 &&
+           method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
+           "global::DotBoxD.Abstractions.HookContext";
 }

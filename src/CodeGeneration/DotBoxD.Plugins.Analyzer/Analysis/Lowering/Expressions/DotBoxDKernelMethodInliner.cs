@@ -59,9 +59,10 @@ internal static partial class DotBoxDKernelMethodInliner
                 $"[KernelMethod] '{method.Name}' is recursive; recursive kernel methods cannot be inlined.");
         }
 
-        var bindings = BindArguments(call, context, lowerExpression);
         if (TryKernelMethodBody(method, context.CancellationToken) is { } body)
         {
+            KernelMethodArgumentReuseValidator.Validate(method, body, call);
+            var bindings = BindArguments(call, context, lowerExpression);
             var bodySemanticModel = context.SemanticModel.Compilation.GetSemanticModel(body.SyntaxTree);
             var inlineContext = context.ForInlinedMethod(bodySemanticModel, bindings, methodKey);
             var result = DotBoxDExpressionModelFactory.Create(body, inlineContext);
@@ -74,7 +75,8 @@ internal static partial class DotBoxDKernelMethodInliner
             return result;
         }
 
-        return InlineMetadataDescriptor(method, context, bindings, returnType);
+        var descriptorBindings = BindArguments(call, context, lowerExpression);
+        return InlineMetadataDescriptor(method, context, descriptorBindings, returnType);
     }
 
     private static bool IsServerContextReceiver(
@@ -111,8 +113,20 @@ internal static partial class DotBoxDKernelMethodInliner
         for (var i = 0; i < call.Arguments.Count; i++)
         {
             var argument = call.Arguments[i];
-            var lowered = LowerArgument(argument, context, lowerExpression);
             var expected = DotBoxDTypeNameReader.KernelMethodTypeName(argument.Parameter.Type);
+            if (string.Equals(expected, DotBoxDGenerationNames.ManifestTypes.Unsupported, StringComparison.Ordinal))
+            {
+                throw new NotSupportedException(
+                    $"[KernelMethod] '{call.Method.Name}' parameter '{argument.Parameter.Name}' must use a supported sandbox type.");
+            }
+
+            var lowered = LowerArgument(argument, context, lowerExpression);
+            if (string.Equals(lowered.Type, DotBoxDGenerationNames.ManifestTypes.Unsupported, StringComparison.Ordinal))
+            {
+                throw new NotSupportedException(
+                    $"[KernelMethod] '{call.Method.Name}' argument {i} must lower to a supported sandbox type.");
+            }
+
             if (!string.Equals(lowered.Type, expected, StringComparison.Ordinal))
             {
                 throw new NotSupportedException(

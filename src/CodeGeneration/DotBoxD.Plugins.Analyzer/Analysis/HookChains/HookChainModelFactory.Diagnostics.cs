@@ -61,7 +61,7 @@ internal static partial class HookChainModelFactory
         if (receiverKind is not (HookChainReceiverKind.Local or HookChainReceiverKind.Remote))
         {
             var stages = new List<HookChainStage>();
-            var seed = WalkToSeed(terminalAccess.Expression, stages);
+            var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
             if (seed is null ||
                 GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken)?.Kind !=
                 GeneratedRemoteHookChainKind.Hook)
@@ -98,7 +98,7 @@ internal static partial class HookChainModelFactory
         }
 
         var stages = new List<HookChainStage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
         if (seed is null ||
             GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken) is null)
         {
@@ -130,7 +130,7 @@ internal static partial class HookChainModelFactory
         }
 
         var stages = new List<HookChainStage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
         if (seed is null ||
             GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken) is null)
         {

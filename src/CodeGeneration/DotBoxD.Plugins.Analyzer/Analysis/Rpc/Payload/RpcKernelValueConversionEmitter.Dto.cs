@@ -135,7 +135,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         {
             if (constructor.DeclaredAccessibility is not (
                     Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
-                constructor.Parameters.Length != fields.Count ||
+                constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
                 continue;

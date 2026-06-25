@@ -66,7 +66,7 @@ internal static partial class HookChainModelFactory
 
         var terminalMethod = terminalAccess.Name.Identifier.ValueText;
         var stages = new List<HookChainStage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
         if (seed is null)
         {
             return null;

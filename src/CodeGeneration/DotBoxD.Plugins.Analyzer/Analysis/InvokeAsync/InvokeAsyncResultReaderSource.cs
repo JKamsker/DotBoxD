@@ -164,7 +164,7 @@ internal sealed class InvokeAsyncResultReaderSource
         var method = NextHelperName();
         _readers[key] = method;
         var fields = DotBoxDRpcTypeMapper.RecordFields(type);
-        var arguments = DtoConstructorArguments(fields, ResolveConstructor(type, fields));
+        var body = BuildDtoReconstruction(type, fields);
         _helpers.Append("        private static ").Append(TypeName(type)).Append(' ').Append(method)
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("        {");
@@ -174,11 +174,38 @@ internal sealed class InvokeAsyncResultReaderSource
         _helpers.AppendLine("                throw new global::System.NotSupportedException(\"Server extension record field count did not match the generated DTO shape.\");");
         _helpers.AppendLine("            }");
         _helpers.AppendLine();
-        _helpers.Append("            return new ").Append(TypeName(type)).Append('(')
-            .Append(string.Join(", ", arguments)).AppendLine(");");
+        _helpers.AppendLine(body);
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         return method;
+    }
+
+    private string BuildDtoReconstruction(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    {
+        if (TryResolveConstructor(type, fields) is { } constructor)
+        {
+            return "            return new " + TypeName(type) + "(" +
+                string.Join(", ", DtoConstructorArguments(fields, constructor)) + ");";
+        }
+
+        if (CanUseObjectInitializer(type, fields))
+        {
+            var initializer = new StringBuilder();
+            initializer.Append("            return new ").Append(TypeName(type)).AppendLine();
+            initializer.AppendLine("            {");
+            for (var i = 0; i < fields.Count; i++)
+            {
+                initializer.Append("                ").Append(Identifier(fields[i].Name)).Append(" = ")
+                    .Append(ReadExpression(fields[i].Type, "value.GetItem(" + i + ")")).AppendLine(",");
+            }
+
+            initializer.Append("            };");
+            return initializer.ToString();
+        }
+
+        throw new NotSupportedException(
+            $"InvokeAsync DTO '{type.ToDisplayString()}' must expose either a constructor matching its " +
+            "public fields or a parameterless constructor with settable properties.");
     }
 
     private List<string> DtoConstructorArguments(IReadOnlyList<RecordMember> fields, IMethodSymbol constructor)
@@ -193,11 +220,14 @@ internal sealed class InvokeAsyncResultReaderSource
         return arguments;
     }
 
-    private static IMethodSymbol ResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private static IMethodSymbol? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (constructor.Parameters.Length != fields.Count || constructor.Parameters.Length == 0)
+            if (constructor.DeclaredAccessibility is not (
+                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
+                constructor.Parameters.Length > fields.Count ||
+                constructor.Parameters.Length == 0)
             {
                 continue;
             }
@@ -222,9 +252,35 @@ internal sealed class InvokeAsyncResultReaderSource
             }
         }
 
-        throw new NotSupportedException(
-            $"Server extension DTO '{type.ToDisplayString()}' must expose a constructor matching its public fields.");
+        return null;
     }
+
+    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    {
+        if (fields.Count == 0 || (!type.IsValueType && !HasAccessibleParameterlessConstructor(type)))
+        {
+            return false;
+        }
+
+        foreach (var field in fields)
+        {
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
+        => type.InstanceConstructors.Any(static constructor =>
+            constructor.Parameters.Length == 0 &&
+            constructor.DeclaredAccessibility is
+                Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal);
+
+    private static string Identifier(string name)
+        => "@" + name;
 
     private string NextHelperName() => _helperPrefix + _nextHelper++;
 

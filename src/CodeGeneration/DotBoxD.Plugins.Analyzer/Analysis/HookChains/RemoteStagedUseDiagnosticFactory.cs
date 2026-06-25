@@ -8,6 +8,9 @@ internal static class RemoteStagedUseDiagnosticFactory
     private const string Message =
         "Remote Where/Select stages only lower when the terminal is Run, RunLocal, Register, or RegisterLocal; " +
         "calling Use/UseGeneratedChain after Where/Select would ignore those stages.";
+    private const string DiscardedStageMessage =
+        "Remote Where/Select stages must be chained into Run, RunLocal, Register, or RegisterLocal; " +
+        "discarding the stage result would ignore the stage.";
 
     public static bool IsCandidate(SyntaxNode node)
         => node is InvocationExpressionSyntax
@@ -19,6 +22,8 @@ internal static class RemoteStagedUseDiagnosticFactory
                     or "UseGeneratedLocalChain"
                     or "UseGeneratedResultChain"
                     or "UseGeneratedLocalResultChain"
+                    or "Where"
+                    or "Select"
             }
         };
 
@@ -30,6 +35,11 @@ internal static class RemoteStagedUseDiagnosticFactory
         if (invocation.Expression is not MemberAccessExpressionSyntax access)
         {
             return null;
+        }
+
+        if (access.Name.Identifier.ValueText is "Where" or "Select")
+        {
+            return CreateDiscardedStageDiagnostic(invocation, access, context.SemanticModel, cancellationToken);
         }
 
         var receiverType = context.SemanticModel.GetTypeInfo(access.Expression, cancellationToken).Type;
@@ -47,6 +57,29 @@ internal static class RemoteStagedUseDiagnosticFactory
 
         return new PluginKernelDiagnostic(
             Message,
+            PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
+    private static PluginKernelDiagnostic? CreateDiscardedStageDiagnostic(
+        InvocationExpressionSyntax invocation,
+        MemberAccessExpressionSyntax access,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (invocation.Parent is not ExpressionStatementSyntax)
+        {
+            return null;
+        }
+
+        var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
+        if (!IsRemoteChainOrStageType(receiverType) &&
+            !IsGeneratedRemoteChain(access.Expression, model, cancellationToken))
+        {
+            return null;
+        }
+
+        return new PluginKernelDiagnostic(
+            DiscardedStageMessage,
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
     }
 

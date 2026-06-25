@@ -10,6 +10,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             bool b => Obj(("bool", b ? "true" : "false")),
             int i => Obj(("i32", i.ToString(CultureInfo.InvariantCulture))),
             long l => Obj(("i64", l.ToString(CultureInfo.InvariantCulture))),
+            float f => FiniteDoubleLiteralJson(f),
             double d => FiniteDoubleLiteralJson(d),
             string s => Obj(("string", Str(s))),
             _ => throw new NotSupportedException($"Kernel RPC service literal '{value}' is not supported.")

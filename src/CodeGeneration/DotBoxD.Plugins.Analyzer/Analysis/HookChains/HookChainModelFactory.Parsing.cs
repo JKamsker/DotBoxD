@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -26,8 +27,35 @@ internal static partial class HookChainModelFactory
             _ => null
         };
 
-    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<HookChainStage> stages)
+    private static InvocationExpressionSyntax? WalkToSeed(
+        ExpressionSyntax receiver,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => WalkToSeed(receiver, stages, model, cancellationToken, depth: 0);
+
+    private static InvocationExpressionSyntax? WalkToSeed(
+        ExpressionSyntax receiver,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        int depth)
     {
+        if (depth > 8)
+        {
+            return null;
+        }
+
+        while (receiver is ParenthesizedExpressionSyntax parenthesized)
+        {
+            receiver = parenthesized.Expression;
+        }
+
+        if (AliasInitializer(receiver, model, cancellationToken) is { } initializer)
+        {
+            return WalkToSeed(initializer, stages, model, cancellationToken, depth + 1);
+        }
+
         var current = receiver;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
@@ -36,6 +64,17 @@ internal static partial class HookChainModelFactory
             if (string.Equals(name, OnMethod, StringComparison.Ordinal))
             {
                 return invocation;
+            }
+
+            if (AliasInitializer(access.Expression, model, cancellationToken) is { } stageInitializer)
+            {
+                current = SyntaxFactory.InvocationExpression(
+                    SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.ParenthesizedExpression(stageInitializer),
+                        access.Name),
+                    invocation.ArgumentList);
+                continue;
             }
 
             var isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
@@ -48,6 +87,36 @@ internal static partial class HookChainModelFactory
             }
 
             return null;
+        }
+
+        return null;
+    }
+
+    private static ExpressionSyntax? AliasInitializer(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        if (expression is not IdentifierNameSyntax identifier ||
+            model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
+        {
+            return null;
+        }
+
+        foreach (var reference in local.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer
+                })
+            {
+                return initializer;
+            }
         }
 
         return null;

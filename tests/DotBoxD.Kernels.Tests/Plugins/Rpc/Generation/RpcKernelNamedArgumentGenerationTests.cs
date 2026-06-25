@@ -104,6 +104,35 @@ public sealed class RpcKernelNamedArgumentGenerationTests
         }
         """;
 
+    private const string NamedArgumentEvaluationOrderSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public interface IAudit
+        {
+            [HostBinding("host.audit.mark", "audit", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+            int Mark(string name);
+
+            [HostBinding("host.audit.combine", "audit", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+            int Combine(int first, int second);
+        }
+
+        [ServerExtension("named-eval-order")]
+        public sealed partial class NamedEvalOrderKernel
+        {
+            public int Run(HookContext ctx)
+            {
+                return ctx.Host<IAudit>().Combine(
+                    second: ctx.Host<IAudit>().Mark("B"),
+                    first: ctx.Host<IAudit>().Mark("A"));
+            }
+        }
+        """;
+
     [Fact]
     public async Task Host_binding_named_arguments_are_lowered_in_parameter_order()
     {
@@ -171,10 +200,44 @@ public sealed class RpcKernelNamedArgumentGenerationTests
         AssertFight(list.Values[1], 10, true);
     }
 
+    [Fact]
+    public void Reordered_named_arguments_evaluate_in_call_site_order()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            NamedArgumentEvaluationOrderSource,
+            "Sample.NamedEvalOrderPluginPackage");
+
+        var body = Assert.Single(package.Module.Functions).Body;
+        var assignments = body.OfType<AssignmentStatement>().ToArray();
+        var marks = assignments
+            .Where(assignment => assignment.Value is CallExpression { Name: "host.audit.mark" })
+            .ToArray();
+        var returned = Assert.IsType<ReturnStatement>(body[^1]);
+
+        Assert.Equal("B", MarkArgument(marks[0], assignments));
+        Assert.Equal("A", MarkArgument(marks[1], assignments));
+
+        var combine = Assert.IsType<CallExpression>(returned.Value);
+        Assert.Equal("host.audit.combine", combine.Name);
+        Assert.Equal(marks[1].Name, Assert.IsType<VariableExpression>(combine.Arguments[0]).Name);
+        Assert.Equal(marks[0].Name, Assert.IsType<VariableExpression>(combine.Arguments[1]).Name);
+    }
+
     private static void AssertFight(SandboxValue value, int expectedId, bool expectedSuccess)
     {
         var record = Assert.IsType<RecordValue>(value);
         Assert.Equal([SandboxValue.FromInt32(expectedId), SandboxValue.FromBool(expectedSuccess)], record.Fields);
+    }
+
+    private static string MarkArgument(
+        AssignmentStatement mark,
+        IReadOnlyList<AssignmentStatement> assignments)
+    {
+        var call = Assert.IsType<CallExpression>(mark.Value);
+        var argumentName = Assert.IsType<VariableExpression>(Assert.Single(call.Arguments)).Name;
+        var argument = assignments.Single(assignment => assignment.Name == argumentName);
+        var literal = Assert.IsType<LiteralExpression>(argument.Value);
+        return Assert.IsType<StringValue>(literal.Value).Value;
     }
 
     private static void AddThresholdBinding(SandboxHostBuilder builder)

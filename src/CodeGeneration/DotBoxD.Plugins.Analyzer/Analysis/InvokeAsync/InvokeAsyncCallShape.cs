@@ -15,6 +15,7 @@ internal sealed partial class InvokeAsyncCallShape
         string parametersJson,
         string returnTypeJson,
         string argumentsExpression,
+        IReadOnlyList<ITypeSymbol> argumentTypes,
         EquatableArray<InvokeAsyncSyncOut> syncOuts,
         IReadOnlyList<(string Name, ExpressionSyntax Value)> leadingLocals,
         Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
@@ -28,6 +29,7 @@ internal sealed partial class InvokeAsyncCallShape
         ParametersJson = parametersJson;
         ReturnTypeJson = returnTypeJson;
         ArgumentsExpression = argumentsExpression;
+        ArgumentTypes = argumentTypes;
         SyncOuts = syncOuts;
         LeadingLocals = leadingLocals;
         AssignmentOverride = assignmentOverride;
@@ -49,6 +51,8 @@ internal sealed partial class InvokeAsyncCallShape
     public string ReturnTypeJson { get; }
 
     public string ArgumentsExpression { get; }
+
+    public IReadOnlyList<ITypeSymbol> ArgumentTypes { get; }
 
     public EquatableArray<InvokeAsyncSyncOut> SyncOuts { get; }
 
@@ -216,6 +220,7 @@ internal sealed partial class InvokeAsyncCallShape
             parametersJson: "[]",
             returnTypeJson: DotBoxDRpcReturnType.JsonType(returnType),
             argumentsExpression: "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
+            argumentTypes: [],
             default,
             [],
             assignmentOverride: null,
@@ -239,6 +244,7 @@ internal sealed partial class InvokeAsyncCallShape
             CaptureParametersJson(captureParameter),
             returnTypeJson,
             CaptureArgumentsExpression(captureParameter.Type),
+            [captureParameter.Type],
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             CreateLeadingLocals(syncOuts),
             (assignment, lower) => LowerCaptureAssignment(assignment, captureParameter, syncOuts, lower),

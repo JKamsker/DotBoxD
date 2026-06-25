@@ -59,7 +59,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             return LiteralJson((long)i);
         }
-        if (converted?.SpecialType == SpecialType.System_Double && value is IConvertible convertible)
+        if (converted?.SpecialType is SpecialType.System_Double or SpecialType.System_Single &&
+            value is IConvertible convertible)
         {
             return LiteralJson(convertible.ToDouble(CultureInfo.InvariantCulture));
         }

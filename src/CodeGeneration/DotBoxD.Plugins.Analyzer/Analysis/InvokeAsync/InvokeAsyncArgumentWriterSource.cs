@@ -56,7 +56,7 @@ internal static class InvokeAsyncArgumentWriterSource
         var values = new string[fields.Count];
         for (var i = 0; i < fields.Count; i++)
         {
-            values[i] = WriteExpression(fields[i].Type, expression + "." + fields[i].Name);
+            values[i] = WriteExpression(fields[i].Type, expression + "." + InvokeAsyncSourceIdentifier.Escape(fields[i].Name));
         }
 
         return "global::DotBoxD.Plugins.KernelRpcValue.Record(new global::DotBoxD.Plugins.KernelRpcValue[] { " +
@@ -77,4 +77,5 @@ internal static class InvokeAsyncArgumentWriterSource
            "new global::DotBoxD.Plugins.KernelRpcValue[] { " +
            WriteExpression(keyType, "__entry.Key") + ", " +
            WriteExpression(valueType, "__entry.Value") + " })))";
+
 }
