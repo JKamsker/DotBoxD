@@ -27,14 +27,19 @@ internal static class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken)
     {
         var invocation = (InvocationExpressionSyntax)context.Node;
-        if (invocation.Expression is not MemberAccessExpressionSyntax access ||
-            !ContainsStageInvocation(access.Expression))
+        if (invocation.Expression is not MemberAccessExpressionSyntax access)
         {
             return null;
         }
 
         var receiverType = context.SemanticModel.GetTypeInfo(access.Expression, cancellationToken).Type;
-        if (!IsRemoteChainType(receiverType) &&
+        if (!ContainsStageInvocationOrAlias(access.Expression, context.SemanticModel, cancellationToken) &&
+            !IsRemoteStageType(receiverType))
+        {
+            return null;
+        }
+
+        if (!IsRemoteChainOrStageType(receiverType) &&
             !IsGeneratedRemoteChain(access.Expression, context.SemanticModel, cancellationToken))
         {
             return null;
@@ -64,6 +69,42 @@ internal static class RemoteStagedUseDiagnosticFactory
 
         return expression is MemberAccessExpressionSyntax access &&
             ContainsStageInvocation(access.Expression);
+    }
+
+    private static bool ContainsStageInvocationOrAlias(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (ContainsStageInvocation(expression))
+        {
+            return true;
+        }
+
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        if (expression is not IdentifierNameSyntax identifier ||
+            model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
+        {
+            return false;
+        }
+
+        foreach (var reference in local.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer
+                } &&
+                ContainsStageInvocation(initializer))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsGeneratedRemoteChain(
@@ -105,7 +146,7 @@ internal static class RemoteStagedUseDiagnosticFactory
         return null;
     }
 
-    private static bool IsRemoteChainType(ITypeSymbol? type)
+    private static bool IsRemoteChainOrStageType(ITypeSymbol? type)
     {
         if (type is not INamedTypeSymbol named)
         {
@@ -121,6 +162,22 @@ internal static class RemoteStagedUseDiagnosticFactory
                 "RemoteSubscriptionPipeline",
             "DotBoxD.Plugins.Runtime.Hooks" => name == "RemoteHookStage",
             "DotBoxD.Plugins.Runtime.Subscriptions" => name == "RemoteSubscriptionStage",
+            _ => false
+        };
+    }
+
+    private static bool IsRemoteStageType(ITypeSymbol? type)
+    {
+        if (type is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        var ns = named.ContainingNamespace.ToDisplayString();
+        return ns switch
+        {
+            "DotBoxD.Plugins.Runtime.Hooks" => named.Name == "RemoteHookStage",
+            "DotBoxD.Plugins.Runtime.Subscriptions" => named.Name == "RemoteSubscriptionStage",
             _ => false
         };
     }

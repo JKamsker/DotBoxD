@@ -15,29 +15,65 @@ internal sealed partial class InvokeAsyncCallShape
         var syncOuts = new List<InvokeAsyncSyncOut>();
         foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
         {
-            if (!TryCaptureMember(assignment.Left, captureParameter.Name, model, out var member, out var property))
+            if (!TryCaptureMember(assignment.Left, captureParameter.Name, model, out var member, out var target))
             {
                 continue;
             }
 
-            if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression ||
-                property.SetMethod is null ||
-                property.SetMethod.IsInitOnly ||
-                !IsAccessibleFromGeneratedCode(property.SetMethod))
+            var recordMember = DotBoxDRpcTypeMapper.RecordFields(captureParameter.Type)
+                .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.Symbol, target));
+            if (recordMember.Symbol is null)
             {
                 throw new NotSupportedException(
-                    $"InvokeAsync capture property '{property.Name}' must be assigned with an accessible set accessor.");
+                    $"InvokeAsync capture member '{target.Name}' must be a public marshalled field.");
             }
 
-            if (syncOuts.Any(item => string.Equals(item.TargetName, property.Name, StringComparison.Ordinal)))
+            if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression)
+            {
+                throw new NotSupportedException(
+                    $"InvokeAsync capture member '{recordMember.Name}' must use a simple assignment.");
+            }
+
+            ValidateWritableCapture(recordMember);
+            if (syncOuts.Any(item => string.Equals(item.TargetName, recordMember.Name, StringComparison.Ordinal)))
             {
                 continue;
             }
 
-            syncOuts.Add(new InvokeAsyncSyncOut(property.Name, property.Type, "__syncOut_" + property.Name, member));
+            syncOuts.Add(new InvokeAsyncSyncOut(
+                recordMember.Name,
+                recordMember.Type,
+                "__syncOut_" + recordMember.Name,
+                member));
         }
 
         return syncOuts;
+    }
+
+    private static void ValidateWritableCapture(RecordMember member)
+    {
+        switch (member.Symbol)
+        {
+            case IPropertySymbol property
+                when property.SetMethod is not null &&
+                     !property.SetMethod.IsInitOnly &&
+                     IsAccessibleFromGeneratedCode(property.SetMethod.DeclaredAccessibility):
+                return;
+            case IPropertySymbol property:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture property '{property.Name}' must be assigned with an accessible set accessor.");
+            case IFieldSymbol field
+                when !field.IsReadOnly &&
+                     !field.IsConst &&
+                     IsAccessibleFromGeneratedCode(field.DeclaredAccessibility):
+                return;
+            case IFieldSymbol field:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture field '{field.Name}' must be writable and accessible from generated code.");
+            default:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture member '{member.Name}' must be a writable property or field.");
+        }
     }
 
     private static bool TryCaptureMember(
@@ -45,27 +81,37 @@ internal sealed partial class InvokeAsyncCallShape
         string captureParameterName,
         SemanticModel model,
         out MemberAccessExpressionSyntax member,
-        out IPropertySymbol property)
+        out ISymbol target)
     {
         member = null!;
-        property = null!;
+        target = null!;
         if (expression is not MemberAccessExpressionSyntax
             {
                 Expression: IdentifierNameSyntax receiver
             } found ||
-            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal) ||
-            model.GetSymbolInfo(found).Symbol is not IPropertySymbol foundProperty)
+            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        target = model.GetSymbolInfo(found).Symbol switch
+        {
+            IPropertySymbol property => property,
+            IFieldSymbol field => field,
+            _ => null!
+        };
+
+        if (target is null)
         {
             return false;
         }
 
         member = found;
-        property = foundProperty;
         return true;
     }
 
-    private static bool IsAccessibleFromGeneratedCode(IMethodSymbol setMethod)
-        => setMethod.DeclaredAccessibility is Accessibility.Public
+    private static bool IsAccessibleFromGeneratedCode(Accessibility accessibility)
+        => accessibility is Accessibility.Public
             or Accessibility.Internal
             or Accessibility.ProtectedOrInternal;
 
@@ -87,8 +133,28 @@ internal sealed partial class InvokeAsyncCallShape
             return null;
         }
 
-        var syncOut = syncOuts.Single(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        var syncOut = syncOuts.FirstOrDefault(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        if (syncOut is null)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync capture member '{propertyName}' must be a writable marshalled field.");
+        }
+
         return DotBoxDRpcJsonLowerer.SetGeneratedLocal(syncOut.LocalName, lower(assignment.Right));
+    }
+
+    private static string? LowerCaptureRead(
+        ExpressionSyntax expression,
+        InvokeAsyncCaptureParameter captureParameter,
+        IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
+    {
+        if (!TryCaptureMember(expression, captureParameter.Name, captureParameter.Type, out var propertyName))
+        {
+            return null;
+        }
+
+        var syncOut = syncOuts.FirstOrDefault(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        return syncOut is null ? null : DotBoxDRpcJsonLowerer.Var(syncOut.LocalName);
     }
 
     private static bool TryCaptureMember(

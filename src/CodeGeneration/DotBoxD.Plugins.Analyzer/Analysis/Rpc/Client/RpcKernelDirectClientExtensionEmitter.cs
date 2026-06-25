@@ -5,13 +5,18 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelDirectClientExtensionEmitter
 {
-    public static string Emit(INamedTypeSymbol kernelType, RpcServerExtensionGraft graft, IMethodSymbol kernelMethod)
-        => new Writer(kernelType, graft, kernelMethod).Emit();
+    public static string Emit(
+        INamedTypeSymbol kernelType,
+        RpcServerExtensionGraft graft,
+        IMethodSymbol kernelMethod,
+        RpcKernelClientMethodExtension methodExtension)
+        => new Writer(kernelType, graft, kernelMethod, methodExtension).Emit();
 
     private sealed class Writer(
         INamedTypeSymbol kernelType,
         RpcServerExtensionGraft graft,
-        IMethodSymbol kernelMethod)
+        IMethodSymbol kernelMethod,
+        RpcKernelClientMethodExtension methodExtension)
     {
         private readonly RpcKernelValueConversionEmitter _conv = new();
 
@@ -40,7 +45,8 @@ internal static class RpcKernelDirectClientExtensionEmitter
             }
 
             builder.Append(returnType).Append(' ')
-                .Append(Identifier(kernelMethod.Name)).Append("(this ").Append(TypeName(graft.ReceiverType)).Append(" value");
+                .Append(Identifier(methodExtension.Name)).Append("(this ")
+                .Append(TypeName(methodExtension.ReceiverType)).Append(" value");
             for (var i = 0; i < userParameterCount; i++)
             {
                 var parameter = kernelMethod.Parameters[i];

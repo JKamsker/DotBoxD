@@ -26,6 +26,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
     private readonly HashSet<string> _reservedNames = new(StringComparer.Ordinal);
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? _assignmentOverride;
+    private Func<ExpressionSyntax, string?>? _expressionOverride;
     private IReadOnlyList<string> _returnRecordFields = [];
     private string? _returnRecordType;
     private int _tempCounter;
@@ -41,9 +42,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyList<(string Name, ExpressionSyntax Value)> leadingLocals,
         IReadOnlyList<string> returnRecordFields,
         string? returnRecordType,
-        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride)
+        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
+        Func<ExpressionSyntax, string?>? expressionOverride = null)
     {
         _assignmentOverride = assignmentOverride;
+        _expressionOverride = null;
         _returnRecordFields = returnRecordFields;
         _returnRecordType = returnRecordType;
         try
@@ -54,12 +57,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             {
                 parts.Add(SetStatement(leadingLocals[i].Name, LowerExpression(leadingLocals[i].Value)));
             }
+
+            _expressionOverride = expressionOverride;
             LowerStatements(block.Statements, parts);
             return "[" + string.Join(",", parts) + "]";
         }
         finally
         {
             _assignmentOverride = null;
+            _expressionOverride = null;
             _returnRecordFields = [];
             _returnRecordType = null;
         }
@@ -92,6 +98,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 break;
             case ReturnStatementSyntax { Expression: { } returned }:
                 output.Add(Obj(("op", Str("return")), ("value", ReturnValue(LowerExpression(returned)))));
+                break;
+            case ReturnStatementSyntax:
+                output.Add(Obj(("op", Str("return")), ("value", Unit())));
                 break;
             case ContinueStatementSyntax:
                 output.Add(Obj(("op", Str("continue"))));
@@ -229,34 +238,6 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"Server extension foreach local '{loop.Identifier.ValueText}' could not be resolved.");
         var item = Call("list.get", null, Var(source), Var(index));
         return ApplyNumericConversion(elementType, local.Type, item);
-    }
-
-    private void ReserveUserNames(BlockSyntax block)
-    {
-        foreach (var token in block.DescendantTokens())
-        {
-            if (token.IsKind(SyntaxKind.IdentifierToken))
-            {
-                _reservedNames.Add(token.ValueText);
-            }
-        }
-    }
-
-    private int NextLoopTempSuffix()
-    {
-        while (true)
-        {
-            var suffix = _tempCounter++;
-            if (_reservedNames.Contains("__sir_src" + suffix) ||
-                _reservedNames.Contains("__sir_i" + suffix))
-            {
-                continue;
-            }
-
-            _reservedNames.Add("__sir_src" + suffix);
-            _reservedNames.Add("__sir_i" + suffix);
-            return suffix;
-        }
     }
 
     private string LowerIf(IfStatementSyntax branch)

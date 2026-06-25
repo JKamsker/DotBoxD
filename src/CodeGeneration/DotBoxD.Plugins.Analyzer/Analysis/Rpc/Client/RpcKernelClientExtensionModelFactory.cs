@@ -59,7 +59,9 @@ internal static class RpcKernelClientExtensionModelFactory
         return null;
     }
 
-    private static RpcKernelClientMethodExtension? ResolveClientMethod(IMethodSymbol kernelMethod)
+    public static RpcKernelClientMethodExtension? ResolveClientMethod(
+        IMethodSymbol kernelMethod,
+        INamedTypeSymbol? defaultReceiverType = null)
     {
         foreach (var attribute in kernelMethod.GetAttributes())
         {
@@ -68,24 +70,39 @@ internal static class RpcKernelClientExtensionModelFactory
                 continue;
             }
 
-            var receiverType = ReceiverType(attribute, "method");
+            var receiverType = ReceiverType(attribute, "method", defaultReceiverType);
             var name = OptionalName(attribute) ?? kernelMethod.Name;
             ValidateMemberName(name, "method");
+            ValidateReceiver(receiverType, name, "method");
             return new RpcKernelClientMethodExtension(receiverType, name);
         }
 
         return null;
     }
 
-    private static INamedTypeSymbol ReceiverType(AttributeData attribute, string memberKind)
+    private static INamedTypeSymbol ReceiverType(
+        AttributeData attribute,
+        string memberKind,
+        INamedTypeSymbol? defaultReceiverType = null)
     {
+        if (attribute.ConstructorArguments.Length > 0 &&
+            attribute.ConstructorArguments[0].Value is INamedTypeSymbol receiverType)
+        {
+            return receiverType;
+        }
+
+        if (defaultReceiverType is not null)
+        {
+            return defaultReceiverType;
+        }
+
         if (attribute.ConstructorArguments.Length == 0 ||
-            attribute.ConstructorArguments[0].Value is not INamedTypeSymbol receiverType)
+            attribute.ConstructorArguments[0].Value is not INamedTypeSymbol)
         {
             throw new NotSupportedException($"Server extension client {memberKind} requires a receiver type.");
         }
 
-        return receiverType;
+        throw new NotSupportedException($"Server extension client {memberKind} requires a receiver type.");
     }
 
     private static string? OptionalName(AttributeData attribute)

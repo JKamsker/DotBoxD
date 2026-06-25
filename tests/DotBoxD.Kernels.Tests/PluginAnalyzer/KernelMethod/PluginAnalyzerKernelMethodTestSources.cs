@@ -102,6 +102,28 @@ internal static class PluginAnalyzerKernelMethodTestSources
         }
         """;
 
+    public const string ProjectedRecordHelperUsesProjectedValueChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public sealed record ThreatSnapshot(string MonsterId, int Distance);
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Select(e => new ThreatSnapshot(e.MonsterId, e.Distance + 10))
+                    .Where(snapshot => IsClose(snapshot))
+                    .Run((snapshot, ctx) => ctx.Messages.Send(snapshot.MonsterId, "calm"));
+
+            [KernelMethod]
+            public static bool IsClose(ThreatSnapshot snapshot) => snapshot.Distance <= 5;
+        }
+        """;
+
     public const string RunSendHelperChain = """
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;

@@ -43,7 +43,8 @@ internal sealed partial class InvokeAsyncCallShape
             ImplicitArgumentsExpression(captures.All),
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             [],
-            assignmentOverride: null);
+            assignmentOverride: null,
+            expressionOverride: null);
     }
 
     private static string ImplicitParametersJson(IReadOnlyList<ImplicitCapture> captures)

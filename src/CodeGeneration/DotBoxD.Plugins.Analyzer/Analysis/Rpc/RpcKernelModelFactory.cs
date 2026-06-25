@@ -48,10 +48,15 @@ internal static partial class RpcKernelModelFactory
             ValidateGeneratedParameterNames(method, liveSettings);
             IMethodSymbol? serviceMethod = null;
             RpcKernelClientExtensions? clientExtensions = null;
+            RpcKernelClientMethodExtension? directClientMethod = null;
             if (serviceType is not null)
             {
                 serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(serviceType, method);
                 clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
+            }
+            else if (graft is not null)
+            {
+                directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(method, graft.ReceiverType);
             }
             var body = MethodBody(method, cancellationToken);
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
@@ -84,6 +89,7 @@ internal static partial class RpcKernelModelFactory
                 serviceType,
                 serviceMethod,
                 clientExtensions,
+                directClientMethod,
                 graft,
                 hasReceiverId);
             var grafts = RpcKernelGraftSignatureFactory.Create(
@@ -91,6 +97,7 @@ internal static partial class RpcKernelModelFactory
                 method,
                 serviceMethod,
                 clientExtensions,
+                directClientMethod,
                 graft);
             return new RpcKernelModelResult(source, null, grafts);
         }
@@ -111,6 +118,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
+        RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
         bool hasReceiverId)
     {
@@ -157,7 +165,7 @@ internal static partial class RpcKernelModelFactory
 
         return new GeneratedPluginPackage(
             HintName(type),
-            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graft, method),
+            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, directClientMethod, graft, method),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -168,6 +176,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
+        RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
         IMethodSymbol kernelMethod)
     {
@@ -199,10 +208,10 @@ internal static partial class RpcKernelModelFactory
             }
         }
         else if (graft is not null &&
-                 RpcKernelClientExtensionModelFactory.HasExtensionAttribute(kernelMethod))
+                 directClientMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod));
+            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod, directClientMethod));
         }
 
         return builder.ToString();

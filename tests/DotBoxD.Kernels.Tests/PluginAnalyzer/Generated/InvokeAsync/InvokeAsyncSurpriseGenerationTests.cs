@@ -60,6 +60,61 @@ public sealed class InvokeAsyncSurpriseGenerationTests
     }
 
     [Fact]
+    public void Explicit_capture_bag_reads_sync_out_local_after_assignment()
+    {
+        var result = RunGenerator(CaptureBagSource("""
+            public sealed class MonsterCapture
+            {
+                public string MonsterId { get; set; } = "";
+                public int LastHealth { get; set; }
+            }
+
+            public static class Usage
+            {
+                public static ValueTask<int> Run(RemotePluginServer kernels, MonsterCapture captures)
+                    => kernels.InvokeAsync(captures, async (IGameWorldAccess world, MonsterCapture bag) =>
+                    {
+                        bag.LastHealth = world.GetHealth(bag.MonsterId);
+                        return bag.LastHealth;
+                    });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+        var syncOutReads = source.Split("\\\"var\\\":\\\"__syncOut_LastHealth\\\"").Length - 1;
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.True(syncOutReads >= 2, source);
+    }
+
+    [Fact]
+    public void Explicit_capture_bag_supports_public_field_sync_out()
+    {
+        var result = RunGenerator(CaptureBagSource("""
+            public sealed class MonsterCapture
+            {
+                public string MonsterId = "";
+                public int LastHealth;
+            }
+
+            public static class Usage
+            {
+                public static ValueTask<int> Run(RemotePluginServer kernels, MonsterCapture captures)
+                    => kernels.InvokeAsync(captures, async (IGameWorldAccess world, MonsterCapture bag) =>
+                    {
+                        bag.LastHealth = world.GetHealth(bag.MonsterId);
+                        return bag.LastHealth;
+                    });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+        var syncOutReads = source.Split("\\\"var\\\":\\\"__syncOut_LastHealth\\\"").Length - 1;
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("captures.LastHealth =", source, StringComparison.Ordinal);
+        Assert.True(syncOutReads >= 2, source);
+    }
+
+    [Fact]
     public void Erased_IPluginServer_receiver_reports_InvokeAsync_diagnostic()
     {
         var result = RunGenerator(UsageSource("""

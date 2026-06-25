@@ -1,4 +1,3 @@
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -14,7 +13,11 @@ internal static class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
-        type = DotBoxDTypeNameReader.UnwrapTaskLike(type);
+        if (DotBoxDRpcReturnType.PayloadType(type) is not { } payloadType)
+        {
+            return "\"Unit\"";
+        }
+        type = payloadType;
         if (DotBoxDNullableScalarType.IsNullableValueType(type))
         {
             throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
@@ -94,7 +97,6 @@ internal static class DotBoxDRpcTypeMapper
     public static bool IsGuid(ITypeSymbol type)
         => type is INamedTypeSymbol { Name: "Guid", ContainingNamespace: { Name: "System" } ns }
            && ns.ContainingNamespace is { IsGlobalNamespace: true };
-
     /// <summary>The element type of a list-shaped parameter/return (<c>List&lt;T&gt;</c>,
     /// <c>IReadOnlyList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, or <c>T[]</c>), else null.</summary>
     public static ITypeSymbol? ListElementType(ITypeSymbol type)

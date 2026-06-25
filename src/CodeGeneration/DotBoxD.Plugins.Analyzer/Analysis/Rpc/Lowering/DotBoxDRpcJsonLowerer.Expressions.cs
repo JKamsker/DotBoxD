@@ -14,6 +14,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     public string LowerExpression(ExpressionSyntax expression)
     {
         _cancellationToken.ThrowIfCancellationRequested();
+        if (_expressionOverride?.Invoke(expression) is { } overridden)
+        {
+            return overridden;
+        }
+
         if (_model.GetConstantValue(expression, _cancellationToken) is { HasValue: true } constant)
         {
             if (constant.Value is string)

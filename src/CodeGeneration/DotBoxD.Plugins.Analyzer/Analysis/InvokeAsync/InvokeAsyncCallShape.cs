@@ -17,7 +17,8 @@ internal sealed partial class InvokeAsyncCallShape
         string argumentsExpression,
         EquatableArray<InvokeAsyncSyncOut> syncOuts,
         IReadOnlyList<(string Name, ExpressionSyntax Value)> leadingLocals,
-        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride)
+        Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
+        Func<ExpressionSyntax, string?>? expressionOverride)
     {
         Block = block;
         WorldType = worldType;
@@ -30,6 +31,7 @@ internal sealed partial class InvokeAsyncCallShape
         SyncOuts = syncOuts;
         LeadingLocals = leadingLocals;
         AssignmentOverride = assignmentOverride;
+        ExpressionOverride = expressionOverride;
     }
 
     public BlockSyntax Block { get; }
@@ -53,6 +55,8 @@ internal sealed partial class InvokeAsyncCallShape
     private IReadOnlyList<(string Name, ExpressionSyntax Value)> LeadingLocals { get; }
 
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? AssignmentOverride { get; }
+
+    private Func<ExpressionSyntax, string?>? ExpressionOverride { get; }
 
     public static InvokeAsyncCallShape? Create(
         InvocationExpressionSyntax invocation,
@@ -194,7 +198,13 @@ internal sealed partial class InvokeAsyncCallShape
     }
 
     public string LowerBody(DotBoxDRpcJsonLowerer lowerer, BlockSyntax block)
-        => lowerer.LowerBody(block, LeadingLocals, ReturnLocalNames(), ReturnTypeJsonForBody(), AssignmentOverride);
+        => lowerer.LowerBody(
+            block,
+            LeadingLocals,
+            ReturnLocalNames(),
+            ReturnTypeJsonForBody(),
+            AssignmentOverride,
+            ExpressionOverride);
 
     private static InvokeAsyncCallShape NoCapture(BlockSyntax block, ITypeSymbol worldType, ITypeSymbol returnType)
         => new(
@@ -208,7 +218,8 @@ internal sealed partial class InvokeAsyncCallShape
             argumentsExpression: "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
             default,
             [],
-            assignmentOverride: null);
+            assignmentOverride: null,
+            expressionOverride: null);
 
     private static InvokeAsyncCallShape CaptureBag(
         ITypeSymbol returnType,
@@ -230,7 +241,8 @@ internal sealed partial class InvokeAsyncCallShape
             CaptureArgumentsExpression(captureParameter.Type),
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             CreateLeadingLocals(syncOuts),
-            (assignment, lower) => LowerCaptureAssignment(assignment, captureParameter, syncOuts, lower));
+            (assignment, lower) => LowerCaptureAssignment(assignment, captureParameter, syncOuts, lower),
+            expression => LowerCaptureRead(expression, captureParameter, syncOuts));
     }
 
     private IReadOnlyList<string> ReturnLocalNames()

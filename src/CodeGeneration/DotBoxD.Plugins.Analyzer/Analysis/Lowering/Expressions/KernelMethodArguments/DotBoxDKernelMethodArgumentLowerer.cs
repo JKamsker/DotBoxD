@@ -13,6 +13,7 @@ internal static class DotBoxDKernelMethodArgumentLowerer
     {
         if (context.EventParameterName.Length == 0 ||
             expression is not IdentifierNameSyntax identifier ||
+            string.Equals(identifier.Identifier.ValueText, context.ProjectedElementName, StringComparison.Ordinal) ||
             !string.Equals(identifier.Identifier.ValueText, context.EventParameterName, StringComparison.Ordinal) ||
             parameter.Type is not INamedTypeSymbol recordType ||
             !string.Equals(
