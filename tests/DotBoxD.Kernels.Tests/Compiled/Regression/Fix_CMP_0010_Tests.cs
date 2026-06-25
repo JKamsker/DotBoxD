@@ -7,13 +7,13 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression;
 public sealed class Fix_CMP_0010_Tests
 {
     [Fact]
-    public void Generated_package_exposes_capability_request_and_setting_range_for_review()
+    public void Generated_package_exposes_required_capability_and_setting_range_for_review()
     {
         var package = FireDamagePluginPackage.Create();
 
         Assert.Contains(
-            package.Module.CapabilityRequests,
-            request => request.Id == "host.message.write");
+            "host.message.write",
+            package.Manifest.RequiredCapabilities);
 
         var minDamage = Assert.Single(
             package.Manifest.LiveSettings,

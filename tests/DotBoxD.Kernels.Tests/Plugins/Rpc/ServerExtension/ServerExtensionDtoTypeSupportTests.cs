@@ -32,11 +32,17 @@ public sealed class ServerExtensionDtoTypeSupportTests
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
+        [DotBoxDService]
+        public interface IRemoteWorldControl
+        {
+        }
+
+        public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
         {
             public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
@@ -44,10 +50,10 @@ public sealed class ServerExtensionDtoTypeSupportTests
 
         public enum Color { Red, Green, Blue }
 
-        [ServerExtension(typeof(RemoteWorldControl), "color-echo")]
+        [ServerExtension(typeof(IRemoteWorldControl), "color-echo")]
         public sealed partial class ColorEchoKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public Color Echo(Color color, HookContext ctx)
             {
                 return color;
@@ -65,11 +71,17 @@ public sealed class ServerExtensionDtoTypeSupportTests
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
+        [DotBoxDService]
+        public interface IRemoteWorldControl
+        {
+        }
+
+        public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
         {
             public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
@@ -81,10 +93,10 @@ public sealed class ServerExtensionDtoTypeSupportTests
             public string Name { get; init; }
         }
 
-        [ServerExtension(typeof(RemoteWorldControl), "profile")]
+        [ServerExtension(typeof(IRemoteWorldControl), "profile")]
         public sealed partial class ProfileKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public Profile Describe(int id, HookContext ctx)
             {
                 return new Profile { Id = id, Name = "hero" };

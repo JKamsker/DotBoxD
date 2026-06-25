@@ -29,10 +29,8 @@ internal sealed record PluginKernelModel(
     public bool LocalTerminal { get; init; }
 
     /// <summary>
-    /// The manifest type the <c>Select</c> projection returns, or <c>null</c> for a whole-event
-    /// <c>RunLocal</c> (no <c>Select</c>). The runtime treats a null <see cref="ProjectedType"/> on a
-    /// <see cref="LocalTerminal"/> chain as a whole-event push and a non-null one as a projection push,
-    /// so the payload kind needs no separate persisted field.
+    /// The manifest type the local-terminal projection returns. For a no-<c>Select</c> <c>RunLocal</c>, the
+    /// generator emits an explicit event-record projection so this is still non-null.
     /// </summary>
     public string? ProjectedType { get; init; }
 

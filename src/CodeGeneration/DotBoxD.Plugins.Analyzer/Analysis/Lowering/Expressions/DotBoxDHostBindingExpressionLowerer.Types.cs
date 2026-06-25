@@ -6,7 +6,17 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static partial class DotBoxDHostBindingExpressionLowerer
 {
-    private static string HostBindingManifestTag(ITypeSymbol type, string bindingId, string position)
+    internal static string HostBindingReturnTag(ITypeSymbol type, string bindingId)
+    {
+        if (type.SpecialType == SpecialType.System_Void || IsUnitTaskLike(type))
+        {
+            return ManifestTypes.Unit;
+        }
+
+        return HostBindingManifestTag(DotBoxDTypeNameReader.UnwrapTaskLike(type), bindingId, "return");
+    }
+
+    internal static string HostBindingManifestTag(ITypeSymbol type, string bindingId, string position)
     {
         if (ContainsNullableValueType(type, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default)))
         {

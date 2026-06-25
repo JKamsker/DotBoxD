@@ -83,8 +83,8 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             package =>
             {
                 installed = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -156,13 +156,13 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     }
 
     [Fact]
-    public void Whole_event_chain_lowers_to_a_local_terminal_with_null_projected_type()
+    public void Whole_event_chain_lowers_to_a_local_terminal_event_projection()
     {
         var package = LowerToPackage(RemoteWholeEventSource);
 
         var subscription = Assert.Single(package.Manifest.Subscriptions);
         Assert.True(subscription.LocalTerminal);     // a local-terminal (RunLocal) chain
-        Assert.Null(subscription.ProjectedType);     // no Select => whole-event push (not a projection)
+        Assert.Equal("record", subscription.ProjectedType); // no Select => explicit whole-event projection
         Assert.Empty(package.Manifest.RequiredCapabilities);
     }
 

@@ -5,12 +5,12 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelDirectClientExtensionEmitter
 {
-    public static string Emit(INamedTypeSymbol kernelType, INamedTypeSymbol receiverType, IMethodSymbol kernelMethod)
-        => new Writer(kernelType, receiverType, kernelMethod).Emit();
+    public static string Emit(INamedTypeSymbol kernelType, RpcServerExtensionGraft graft, IMethodSymbol kernelMethod)
+        => new Writer(kernelType, graft, kernelMethod).Emit();
 
     private sealed class Writer(
         INamedTypeSymbol kernelType,
-        INamedTypeSymbol receiverType,
+        RpcServerExtensionGraft graft,
         IMethodSymbol kernelMethod)
     {
         private readonly RpcKernelValueConversionEmitter _conv = new();
@@ -30,7 +30,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
         {
             var returnType = TypeName(kernelMethod.ReturnType);
             var isAsyncReturn = TryGetPayloadReturnType(kernelMethod.ReturnType, out var payloadReturnType);
-            var hasReceiverId = HasReceiverId(receiverType);
+            var hasReceiverId = graft.InjectsReceiverId;
             var userParameterCount = kernelMethod.Parameters.Length - 1;
             var argumentOffset = hasReceiverId ? 1 : 0;
             builder.Append("    public static ");
@@ -40,7 +40,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             }
 
             builder.Append(returnType).Append(' ')
-                .Append(Identifier(kernelMethod.Name)).Append("(this ").Append(TypeName(receiverType)).Append(" value");
+                .Append(Identifier(kernelMethod.Name)).Append("(this ").Append(TypeName(graft.ReceiverType)).Append(" value");
             for (var i = 0; i < userParameterCount; i++)
             {
                 var parameter = kernelMethod.Parameters[i];
@@ -106,37 +106,6 @@ internal static class RpcKernelDirectClientExtensionEmitter
 
         private static string TypeName(ITypeSymbol type)
             => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-        private static bool HasReceiverId(INamedTypeSymbol type)
-        {
-            if (HasStringIdProperty(type))
-            {
-                return true;
-            }
-
-            foreach (var inherited in type.AllInterfaces)
-            {
-                if (HasStringIdProperty(inherited))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasStringIdProperty(INamedTypeSymbol type)
-        {
-            foreach (var member in type.GetMembers("Id"))
-            {
-                if (member is IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_String })
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         private static string Identifier(string name) => "@" + name;
 

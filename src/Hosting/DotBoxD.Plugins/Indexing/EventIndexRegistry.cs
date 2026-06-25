@@ -1,29 +1,37 @@
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Kernel;
+using DotBoxD.Plugins.Runtime;
 
 namespace DotBoxD.Plugins.Indexing;
 
 /// <summary>
 /// A first-class, reusable host dispatch index (issue #50). A host registers a subscription kernel together
-/// with its manifest <see cref="IndexedPredicate"/>s; the registry compiles them into an
+/// with its generated <see cref="IndexedPredicate"/>s; the registry recomputes them from verified IR and
+/// compiles them into an
 /// <see cref="EventIndexMatcher{TEvent}"/> (precompiled getters, no per-event reflection) and, when the host
 /// publishes an event, runs the cheap index check <i>before</i> entering the sandbox. Events the index
 /// rejects never reach the verified IR; survivors are dispatched to <see cref="InstalledKernel"/> as the
-/// correctness authority — the verified <c>ShouldHandle</c> still runs unless the index fully covers the
-/// predicate (<see cref="IndexedPredicate"/> set == the whole predicate and every path is an index key).
+/// correctness authority — the verified <c>ShouldHandle</c> still runs after a matching index check because
+/// package-supplied coverage metadata is not trusted across the manifest boundary.
 /// <para>
 /// This is the "register a subscription and get index-based prefiltering without writing your own matcher"
 /// surface. Subscriptions whose predicates touch no indexed field are rejected by <see cref="Register"/>
 /// (returns <c>false</c>) so the host can leave them on its broad pipeline.
 /// </para>
 /// </summary>
-public sealed class EventIndexRegistry
+public sealed partial class EventIndexRegistry
 {
     private readonly object _gate = new();
+    private readonly Action<SubscriptionDeliveryFault>? _onFault;
     private readonly Dictionary<Type, IEventIndexChannel> _channels = [];
     private readonly List<Task> _inFlight = [];
     private long _considered;
     private long _prefiltered;
     private long _dispatched;
+
+    public EventIndexRegistry(Action<SubscriptionDeliveryFault>? onFault = null)
+        => _onFault = onFault;
 
     /// <summary>Aggregate prefilter diagnostics across every published event and registered subscription.</summary>
     public EventIndexStats Stats => new(
@@ -33,9 +41,12 @@ public sealed class EventIndexRegistry
 
     /// <summary>
     /// Registers <paramref name="kernel"/> as an indexed subscription for <typeparamref name="TEvent"/>.
-    /// Returns <c>false</c> (registering nothing) when none of <paramref name="predicates"/> map onto an
-    /// <see cref="EventIndexKeyAttribute"/> field — the caller should keep such a subscription on its broad
-    /// pipeline. Returns <c>true</c> when the subscription is now served from the index.
+    /// The matching predicates are recomputed from the kernel's verified <c>ShouldHandle</c> IR; the
+    /// <paramref name="predicates"/> and <paramref name="indexCoversPredicate"/> arguments are the package's
+    /// untrusted manifest claims and are intentionally <b>not</b> read here. Returns <c>false</c> (registering
+    /// nothing) when none of the recomputed predicates map onto an <see cref="EventIndexKeyAttribute"/> field
+    /// — the caller should keep such a subscription on its broad pipeline. Returns <c>true</c> when the
+    /// subscription is now served from the index.
     /// </summary>
     public bool Register<TEvent>(
         IPluginEventAdapter<TEvent> adapter,
@@ -47,20 +58,19 @@ public sealed class EventIndexRegistry
         ArgumentNullException.ThrowIfNull(kernel);
         ArgumentNullException.ThrowIfNull(predicates);
 
-        var matcher = EventIndexMatcher<TEvent>.Create(predicates);
+        _ = predicates;
+        var trustedPredicates = TrustedIndexPredicateExtractor.Extract(kernel.Package, adapter.Parameters);
+        var matcher = EventIndexMatcher<TEvent>.Create(trustedPredicates);
         if (!matcher.HasIndex)
         {
             return false;
         }
 
-        // The host may skip the verified IR only when the index serves the *entire* predicate: the manifest
-        // reported full coverage AND every predicate path is one this host indexes (so nothing was dropped or
-        // left to the IR). Double-typed predicates are excluded from the skip — the verified IR rejects
-        // non-finite doubles (NaN/Infinity) at marshalling, which the cheap index does not replicate, so a
-        // double index key stays prefilter-only and the IR remains the authority for those events.
-        var fullyCovered = indexCoversPredicate &&
-            matcher.HonoredPredicates.Count == predicates.Count &&
-            !AnyDoubleTyped(matcher.HonoredPredicates);
+        _ = indexCoversPredicate;
+        // Index metadata travels in the mutable package manifest, so neither predicates nor coverage claims
+        // are trusted. The runtime recomputes necessary predicates from verified ShouldHandle IR and always
+        // runs the verified predicate after an index survivor.
+        const bool fullyCovered = false;
         lock (_gate)
         {
             if (!_channels.TryGetValue(typeof(TEvent), out var existing))
@@ -69,9 +79,20 @@ public sealed class EventIndexRegistry
                 _channels[typeof(TEvent)] = existing;
             }
 
-            ((EventIndexChannel<TEvent>)existing).Add(new EventIndexEntry<TEvent>(matcher, kernel, fullyCovered));
+            var channel = (EventIndexChannel<TEvent>)existing;
+            if (!ReferenceEquals(channel.Adapter, adapter))
+            {
+                throw new SandboxValidationException([
+                    new SandboxDiagnostic(
+                        "DBXK034",
+                        $"Event index for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
+                ]);
+            }
+
+            channel.Add(new EventIndexEntry<TEvent>(matcher, kernel, fullyCovered));
         }
 
+        kernel.RegisterRevocationCallback(Unregister);
         return true;
     }
 
@@ -82,6 +103,11 @@ public sealed class EventIndexRegistry
     /// </summary>
     public void Publish<TEvent>(TEvent value, CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         EventIndexChannel<TEvent>? channel;
         lock (_gate)
         {
@@ -118,7 +144,7 @@ public sealed class EventIndexRegistry
             }
 
             Interlocked.Increment(ref _dispatched);
-            Track(Task.Run(() => DispatchAsync(channel.Adapter, entry, value, cancellationToken)));
+            Track(Task.Run(() => DispatchAsync(channel.Adapter, entry, value, cancellationToken, _onFault)));
         }
     }
 
@@ -133,19 +159,6 @@ public sealed class EventIndexRegistry
                 channel.Remove(kernel);
             }
         }
-    }
-
-    private static bool AnyDoubleTyped(IReadOnlyList<IndexedPredicate> predicates)
-    {
-        for (var i = 0; i < predicates.Count; i++)
-        {
-            if (string.Equals(predicates[i].ValueType, "double", StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>Awaits every in-flight dispatch launched by <see cref="Publish"/> (e.g. on host shutdown).</summary>
@@ -172,21 +185,75 @@ public sealed class EventIndexRegistry
         IPluginEventAdapter<TEvent> adapter,
         EventIndexEntry<TEvent> entry,
         TEvent value,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<SubscriptionDeliveryFault>? onFault)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        bool shouldHandle;
         try
         {
-            // Full coverage: the index already proved the predicate, so the verified ShouldHandle is
-            // redundant and may be skipped. Otherwise the verified IR predicate remains the authority.
-            if (entry.FullyCovered || await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false))
-            {
-                await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
-            }
+            // The verified IR predicate remains the authority; manifest coverage claims are not trusted.
+            shouldHandle = entry.FullyCovered ||
+                await entry.Kernel.ShouldHandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
+            return;
+        }
+
+        if (!shouldHandle || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            await entry.Kernel.HandleAsync(adapter, value, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (SandboxRuntimeException ex) when (WasCallerCancelled(ex, cancellationToken))
+        {
+        }
+        catch (Exception ex)
+        {
+            Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Handler);
+        }
+    }
+
+    private static bool WasCallerCancelled(SandboxRuntimeException exception, CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested && exception.Error.Code == SandboxErrorCode.Cancelled;
+
+    private static void Report<TEvent>(
+        Action<SubscriptionDeliveryFault>? onFault,
+        Exception exception,
+        SubscriptionDeliveryStage stage)
+    {
+        if (onFault is null)
+        {
+            return;
+        }
+
+        try
+        {
+            onFault(new SubscriptionDeliveryFault(typeof(TEvent), stage, exception));
         }
         catch
         {
-            // Fire-and-forget dispatch mirrors the broad subscription pipeline: a faulting kernel cannot
-            // take down the host's publish loop.
         }
     }
 
@@ -210,43 +277,6 @@ public sealed class EventIndexRegistry
             TaskScheduler.Default);
     }
 
-    private interface IEventIndexChannel
-    {
-        void Remove(InstalledKernel kernel);
-    }
-
-    private sealed class EventIndexChannel<TEvent>(IPluginEventAdapter<TEvent> adapter) : IEventIndexChannel
-    {
-        private readonly object _gate = new();
-
-        // Copy-on-write under _gate; volatile so Publish reads the latest snapshot without locking.
-        private volatile EventIndexEntry<TEvent>[] _entries = [];
-
-        public IPluginEventAdapter<TEvent> Adapter { get; } = adapter;
-
-        public void Add(EventIndexEntry<TEvent> entry)
-        {
-            lock (_gate)
-            {
-                _entries = [.. _entries, entry];
-            }
-        }
-
-        public void Remove(InstalledKernel kernel)
-        {
-            lock (_gate)
-            {
-                _entries = [.. _entries.Where(entry => !ReferenceEquals(entry.Kernel, kernel))];
-            }
-        }
-
-        public EventIndexEntry<TEvent>[] Snapshot() => _entries;
-    }
-
-    private sealed record EventIndexEntry<TEvent>(
-        EventIndexMatcher<TEvent> Matcher,
-        InstalledKernel Kernel,
-        bool FullyCovered);
 }
 
 /// <summary>

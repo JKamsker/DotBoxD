@@ -15,6 +15,29 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 /// </summary>
 public sealed class ServerExtensionMapTypeSupportTests
 {
+    private const string CommonControlSource = """
+        using System.Collections.Generic;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [DotBoxDService]
+        public interface IRemoteWorldControl
+        {
+        }
+
+        public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
+        {
+            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
+        }
+        """;
+
     [Fact]
     public void Marshaller_round_trips_a_dictionary_through_a_map_value()
     {
@@ -169,26 +192,11 @@ public sealed class ServerExtensionMapTypeSupportTests
         return Activator.CreateInstance(controlType, [registry])!;
     }
 
-    private const string DirectMapParameterSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
-        [ServerExtension(typeof(RemoteWorldControl), "score-sum")]
+    private const string DirectMapParameterSource = CommonControlSource + """
+        [ServerExtension(typeof(IRemoteWorldControl), "score-sum")]
         public sealed partial class ScoreSumKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public int Sum(Dictionary<string, int> scores, HookContext ctx)
             {
                 return 0;
@@ -202,26 +210,11 @@ public sealed class ServerExtensionMapTypeSupportTests
         }
         """;
 
-    private const string DirectMapReturnSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
-        [ServerExtension(typeof(RemoteWorldControl), "score-snapshot")]
+    private const string DirectMapReturnSource = CommonControlSource + """
+        [ServerExtension(typeof(IRemoteWorldControl), "score-snapshot")]
         public sealed partial class ScoreSnapshotKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public Dictionary<string, int> Snapshot(HookContext ctx)
             {
                 return new Dictionary<string, int>();
@@ -235,28 +228,13 @@ public sealed class ServerExtensionMapTypeSupportTests
         }
         """;
 
-    private const string DirectRecordReturnWithMapFieldSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
+    private const string DirectRecordReturnWithMapFieldSource = CommonControlSource + """
         public readonly record struct ScoreBag(int Id, Dictionary<string, int> Scores);
 
-        [ServerExtension(typeof(RemoteWorldControl), "score-bag")]
+        [ServerExtension(typeof(IRemoteWorldControl), "score-bag")]
         public sealed partial class ScoreBagKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public ScoreBag Make(int id, HookContext ctx)
             {
                 var scores = new Dictionary<string, int>();

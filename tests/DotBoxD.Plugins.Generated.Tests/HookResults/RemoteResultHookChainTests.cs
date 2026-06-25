@@ -212,7 +212,7 @@ public sealed partial class RemoteResultHookChainTests
             {
                 var kernel = await server.InstallAsync(package).ConfigureAwait(false);
                 var subscription = Assert.Single(package.Manifest.Subscriptions);
-                var subscriptionId = package.Manifest.PluginId;
+                var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                 var pipeline = server.Hooks.On<RemoteDamageContext>();
                 if (subscription.ResultLocalTerminal)
                 {

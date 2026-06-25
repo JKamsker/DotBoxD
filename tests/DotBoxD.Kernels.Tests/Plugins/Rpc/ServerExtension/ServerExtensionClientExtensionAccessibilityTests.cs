@@ -61,7 +61,7 @@ public sealed class ServerExtensionClientExtensionAccessibilityTests
     }
 
     [Fact]
-    public void Generated_extension_reports_inaccessible_server_extensions_interface()
+    public void Generated_extension_reports_plugin_owned_receiver_even_when_it_exposes_server_extensions()
     {
         var diagnostics = Diagnostics("""
             public sealed class Owner
@@ -88,29 +88,30 @@ public sealed class ServerExtensionClientExtensionAccessibilityTests
         Assert.Contains(
             diagnostics,
             d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("ServerExtensions property interface", StringComparison.Ordinal));
+                 d.GetMessage().Contains("server-owned [DotBoxDService] interface", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Id == "CS0122");
     }
 
     [Fact]
-    public void Generated_extension_supports_accessible_explicit_server_extensions_interface()
+    public void Generated_extension_supports_server_owned_receiver_with_runtime_accessor()
         => PluginAnalyzerGeneratedPackageFactory.CreateAssembly("""
             using System.Threading.Tasks;
             using DotBoxD.Kernels;
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
             using DotBoxD.Abstractions;
 
             namespace Sample;
 
+            [DotBoxDService]
             public interface IRemoteMonsterControl
             {
-                DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
             }
 
-            public sealed class RemoteMonsterControl : IRemoteMonsterControl
+            public sealed class RemoteMonsterControl : IRemoteMonsterControl, IServerExtensionClientAccessor
             {
-                DotBoxD.Plugins.IServerExtensionClientRegistry IRemoteMonsterControl.ServerExtensions => null!;
+                public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; } = null!;
             }
 
             public interface IMonsterKillerService
@@ -118,7 +119,7 @@ public sealed class ServerExtensionClientExtensionAccessibilityTests
                 ValueTask<int> KillAsync(int monsterId);
             }
 
-            [ServerExtensionClient(typeof(RemoteMonsterControl))]
+            [ServerExtensionClient(typeof(IRemoteMonsterControl))]
             [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
             public sealed partial class MonsterKillerKernel
             {

@@ -2,16 +2,16 @@ using DotBoxD.Plugins.Kernel;
 
 namespace DotBoxD.Plugins.Runtime;
 
-internal sealed class KernelHandlerSet<TEvent>
+internal sealed class KernelHandlerSet<TEvent, TContext>
 {
     private readonly object _gate = new();
-    private volatile Func<TEvent, HookContext, ValueTask>[] _handlers = [];
-    private readonly Dictionary<InstalledKernel, List<Func<TEvent, HookContext, ValueTask>>> _kernelHandlers = [];
-    private readonly Dictionary<InstalledKernelPool, List<Func<TEvent, HookContext, ValueTask>>> _poolHandlers = [];
+    private volatile Func<TEvent, HookContext, TContext, ValueTask>[] _handlers = [];
+    private readonly Dictionary<InstalledKernel, List<Func<TEvent, HookContext, TContext, ValueTask>>> _kernelHandlers = [];
+    private readonly Dictionary<InstalledKernelPool, List<Func<TEvent, HookContext, TContext, ValueTask>>> _poolHandlers = [];
 
-    public Func<TEvent, HookContext, ValueTask>[] Snapshot => _handlers;
+    public Func<TEvent, HookContext, TContext, ValueTask>[] Snapshot => _handlers;
 
-    public void Add(Func<TEvent, HookContext, ValueTask> handler)
+    public void Add(Func<TEvent, HookContext, TContext, ValueTask> handler)
     {
         lock (_gate)
         {
@@ -19,7 +19,7 @@ internal sealed class KernelHandlerSet<TEvent>
         }
     }
 
-    public void Add(InstalledKernel kernel, Func<TEvent, HookContext, ValueTask> handler)
+    public void Add(InstalledKernel kernel, Func<TEvent, HookContext, TContext, ValueTask> handler)
     {
         lock (_gate)
         {
@@ -34,7 +34,7 @@ internal sealed class KernelHandlerSet<TEvent>
         }
     }
 
-    public void Add(InstalledKernelPool pool, Func<TEvent, HookContext, ValueTask> handler)
+    public void Add(InstalledKernelPool pool, Func<TEvent, HookContext, TContext, ValueTask> handler)
     {
         lock (_gate)
         {
@@ -71,7 +71,7 @@ internal sealed class KernelHandlerSet<TEvent>
         }
     }
 
-    private void AddCore(Func<TEvent, HookContext, ValueTask> handler)
+    private void AddCore(Func<TEvent, HookContext, TContext, ValueTask> handler)
         => _handlers = [.. _handlers, handler];
 
     private void RemoveCore(InstalledKernelPool pool)
@@ -82,11 +82,11 @@ internal sealed class KernelHandlerSet<TEvent>
         }
     }
 
-    private static Func<TEvent, HookContext, ValueTask>[] RemoveHandlers(
-        Func<TEvent, HookContext, ValueTask>[] current,
-        List<Func<TEvent, HookContext, ValueTask>> removed)
+    private static Func<TEvent, HookContext, TContext, ValueTask>[] RemoveHandlers(
+        Func<TEvent, HookContext, TContext, ValueTask>[] current,
+        List<Func<TEvent, HookContext, TContext, ValueTask>> removed)
     {
-        var next = new List<Func<TEvent, HookContext, ValueTask>>(current.Length);
+        var next = new List<Func<TEvent, HookContext, TContext, ValueTask>>(current.Length);
         foreach (var handler in current)
         {
             if (!removed.Contains(handler))

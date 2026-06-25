@@ -116,6 +116,9 @@ internal sealed class GameWorld
     internal int GetLevel(string entityId)
         => FindEntity(entityId)?.Level ?? 0;
 
+    internal int GetThreat(string entityId)
+        => FindEntity(entityId) is { Kind: EntityKind.Monster } monster ? monster.Level : 0;
+
     internal int GetPosition(string entityId)
         => FindEntity(entityId)?.Position ?? 0;
 

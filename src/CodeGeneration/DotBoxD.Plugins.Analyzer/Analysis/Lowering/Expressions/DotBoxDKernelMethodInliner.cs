@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 /// <summary>
-/// Inlines a call to a <c>[KernelMethod]</c>-annotated static helper into the calling kernel/hook IR.
+/// Inlines a call to a <c>[KernelMethod]</c>-annotated helper into the calling kernel/hook IR.
 /// The method's expression (or single-return) body is lowered with each parameter bound to the
 /// already-lowered IR of the corresponding call-site argument, so the result is identical to writing the
 /// body inline at the call site. Lets plugin authors factor shared gate/handler logic out of a
@@ -12,13 +12,14 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// <c>Handle</c>) while staying inside the sandbox.
 /// <para>
 /// A method without <c>[KernelMethod]</c> returns <see langword="null"/> so the caller can try the next
-/// handler. Once the attribute is seen this lowerer owns the call: any unsupported shape (non-static,
-/// non-scalar signature, multi-statement body, recursion, named/mismatched arguments) throws
+/// handler. Once the attribute is seen this lowerer owns the call: any unsupported shape (non-static except
+/// for the configured server context receiver, non-scalar signature, multi-statement body, recursion,
+/// named/mismatched arguments) throws
 /// <see cref="NotSupportedException"/>, which fails the whole chain/kernel safely rather than emitting a
 /// miscompiled package.
 /// </para>
 /// </summary>
-internal static class DotBoxDKernelMethodInliner
+internal static partial class DotBoxDKernelMethodInliner
 {
     public static DotBoxDExpressionModel? TryInline(
         InvocationExpressionSyntax invocation,
@@ -27,14 +28,15 @@ internal static class DotBoxDKernelMethodInliner
     {
         if (context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol
                 is not IMethodSymbol method ||
-            !HasKernelMethodAttribute(method))
+            !HasKernelMethodAttribute(method, context.SemanticModel.Compilation))
         {
             return null;
         }
 
-        if (!method.IsStatic)
+        if (!method.IsStatic && !IsServerContextReceiver(invocation, method, context))
         {
-            throw new NotSupportedException($"[KernelMethod] '{method.Name}' must be static.");
+            throw new NotSupportedException(
+                $"[KernelMethod] '{method.Name}' must be static or called on the server context parameter.");
         }
 
         var returnType = DotBoxDTypeNameReader.SandboxTypeName(method.ReturnType);
@@ -52,17 +54,46 @@ internal static class DotBoxDKernelMethodInliner
         }
 
         var bindings = BindArguments(invocation, method, lowerExpression);
-        var body = KernelMethodBody(method, context.CancellationToken);
-        var bodySemanticModel = context.SemanticModel.Compilation.GetSemanticModel(body.SyntaxTree);
-        var inlineContext = context.ForInlinedMethod(bodySemanticModel, bindings, methodKey);
-        var result = DotBoxDExpressionModelFactory.Create(body, inlineContext);
-        if (!string.Equals(result.Type, returnType, StringComparison.Ordinal))
+        if (TryKernelMethodBody(method, context.CancellationToken) is { } body)
         {
-            throw new NotSupportedException(
-                $"[KernelMethod] '{method.Name}' body lowered to {result.Type} but its return type is {returnType}.");
+            var bodySemanticModel = context.SemanticModel.Compilation.GetSemanticModel(body.SyntaxTree);
+            var inlineContext = context.ForInlinedMethod(bodySemanticModel, bindings, methodKey);
+            var result = DotBoxDExpressionModelFactory.Create(body, inlineContext);
+            if (!string.Equals(result.Type, returnType, StringComparison.Ordinal))
+            {
+                throw new NotSupportedException(
+                    $"[KernelMethod] '{method.Name}' body lowered to {result.Type} but its return type is {returnType}.");
+            }
+
+            return result;
         }
 
-        return result;
+        return InlineMetadataDescriptor(method, context, bindings, returnType);
+    }
+
+    private static bool IsServerContextReceiver(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.ServerContextParameterName is null ||
+            context.ServerContextType is null ||
+            invocation.Expression is not MemberAccessExpressionSyntax member ||
+            member.Expression is not IdentifierNameSyntax receiver ||
+            !string.Equals(receiver.Identifier.ValueText, context.ServerContextParameterName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var current = context.ServerContextType; current is not null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, current))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IReadOnlyDictionary<string, DotBoxDExpressionModel> BindArguments(
@@ -100,7 +131,7 @@ internal static class DotBoxDKernelMethodInliner
         return bindings;
     }
 
-    private static ExpressionSyntax KernelMethodBody(IMethodSymbol method, CancellationToken cancellationToken)
+    private static ExpressionSyntax? TryKernelMethodBody(IMethodSymbol method, CancellationToken cancellationToken)
     {
         foreach (var reference in method.DeclaringSyntaxReferences)
         {
@@ -125,17 +156,14 @@ internal static class DotBoxDKernelMethodInliner
                 $"[KernelMethod] '{method.Name}' must have an expression body or a single return statement.");
         }
 
-        throw new NotSupportedException($"[KernelMethod] '{method.Name}' must be declared in source.");
+        return null;
     }
 
-    private static bool HasKernelMethodAttribute(IMethodSymbol method)
+    private static bool HasKernelMethodAttribute(IMethodSymbol method, Compilation compilation)
     {
         foreach (var attribute in method.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.KernelMethodAttribute,
-                    StringComparison.Ordinal))
+            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.KernelMethodAttribute))
             {
                 return true;
             }
@@ -143,4 +171,8 @@ internal static class DotBoxDKernelMethodInliner
 
         return false;
     }
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 }

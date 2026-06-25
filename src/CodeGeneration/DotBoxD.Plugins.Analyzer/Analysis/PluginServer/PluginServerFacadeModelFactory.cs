@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static DotBoxD.Plugins.Analyzer.Analysis.PluginServer.PluginServerFacadeNameFormatter;
 namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
-internal static class PluginServerFacadeModelFactory
+internal static partial class PluginServerFacadeModelFactory
 {
     private const string ServiceControlType = "DotBoxD.Abstractions.IServiceControl";
     private const string ExtensibleControlType = "DotBoxD.Abstractions.IExtensibleControl";
@@ -36,19 +36,31 @@ internal static class PluginServerFacadeModelFactory
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
-        var controlServiceType = ResolveControlService(compilation, worldType)
+        var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' could not resolve the IGamePluginControlService control-plane contract.");
+                $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
+        var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
+            ?? throw new NotSupportedException(
+                $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
         var controls = ResolveControls(worldType, cancellationToken);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
-        var controlNs = controlServiceType.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
+        var context = ResolveContext(type, compilation, cancellationToken);
         return new PluginServerFacadeModel(
             ns,
             AccessibilityText(type.DeclaredAccessibility),
             type.Name,
             ServerInterfaceName(worldType),
             SetupInterfaceName(type.Name),
+            context.Namespace,
+            AccessibilityText(context.Type.DeclaredAccessibility),
+            context.Type.Name,
+            TypeName(context.Type),
+            context.FactoryMethodName,
+            new EquatableArray<GeneratedKernelMethodDescriptorModel>(
+                GeneratedKernelMethodDescriptorFactory.Create(context.Type, worldType, compilation, cancellationToken)),
+            HookRegistryName(type.Name),
+            SubscriptionRegistryName(type.Name),
             TypeName(worldType),
             PluginServerWorldExtensionSuffixResolver.Resolve(compilation, worldType, cancellationToken),
             PluginServerXmlDocumentation.FromSymbol(
@@ -56,7 +68,7 @@ internal static class PluginServerFacadeModelFactory
                 "Generated plugin-side facade for the remote world domain.",
                 cancellationToken),
             TypeName(controlServiceType),
-            "global::" + controlNs + ".LiveSettingUpdate",
+            TypeName(liveSettingUpdateType),
             new EquatableArray<PluginServerForwardedMethod>(
                 ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
             new EquatableArray<PluginServerControlProperty>(controls),
@@ -64,24 +76,6 @@ internal static class PluginServerFacadeModelFactory
             eventCallback?.ProvideSuffix,
             eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
             eventCallback?.ReturnHasValue ?? false);
-    }
-    private static INamedTypeSymbol? ResolveWorldType(INamedTypeSymbol type)
-    {
-        foreach (var candidate in type.Interfaces)
-        {
-            if (HasAttribute(candidate, DotBoxDMetadataNames.DotBoxDServiceAttribute))
-            {
-                return candidate;
-            }
-        }
-        return null;
-    }
-    private static INamedTypeSymbol? ResolveControlService(
-        Compilation compilation,
-        INamedTypeSymbol worldType)
-    {
-        var worldNamespace = worldType.ContainingNamespace.ToDisplayString();
-        return compilation.GetTypeByMetadataName(worldNamespace + ".Ipc.IGamePluginControlService");
     }
     private static PluginServerControlProperty[] ResolveControls(
         INamedTypeSymbol worldType,
@@ -181,7 +175,7 @@ internal static class PluginServerFacadeModelFactory
         }
         var wrapper = new ServiceWrapperBuilder(
             typeName,
-            ServiceWrapperName(serviceType),
+            UniqueServiceWrapperName(serviceType, serviceWrappers.Values.Select(w => w.WrapperName)),
             PluginServerXmlDocumentation.FromSymbol(
                 serviceType,
                 "Generated scoped client for the remote " + serviceType.Name + " domain service.",
@@ -251,7 +245,6 @@ internal static class PluginServerFacadeModelFactory
 
         return parameters;
     }
-
     private static bool HasAttribute(INamedTypeSymbol type, string metadataName)
     {
         foreach (var attribute in type.GetAttributes())
@@ -264,14 +257,12 @@ internal static class PluginServerFacadeModelFactory
 
         return false;
     }
-
     private static bool IsControlPlaneMember(INamedTypeSymbol type)
     {
         var name = type.ToDisplayString();
         return string.Equals(name, ServiceControlType, StringComparison.Ordinal) ||
                string.Equals(name, ExtensibleControlType, StringComparison.Ordinal);
     }
-
     private static IEnumerable<ISymbol> MembersIncludingInherited(INamedTypeSymbol type)
     {
         foreach (var inherited in type.AllInterfaces.Reverse())
@@ -287,7 +278,6 @@ internal static class PluginServerFacadeModelFactory
             yield return member;
         }
     }
-
     private sealed class ServiceWrapperBuilder(string type, string wrapperName, string documentation)
     {
         public string Type { get; } = type;
@@ -296,5 +286,4 @@ internal static class PluginServerFacadeModelFactory
         public List<PluginServerForwardedProperty> Properties { get; } = [];
         public List<PluginServerForwardedMethod> Methods { get; } = [];
     }
-
 }

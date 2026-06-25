@@ -217,9 +217,9 @@ public sealed class PluginRevocationTests
             .WithWallTime(TimeSpan.FromSeconds(10))
             .Build();
 
-    private static int HandlerCount<TEvent>(HookPipeline<TEvent> pipeline)
+    private static int HandlerCount<TEvent>(HookPipeline<TEvent, HookContext> pipeline)
     {
-        var handlerSetField = typeof(HookPipeline<TEvent>).GetField(
+        var handlerSetField = typeof(HookPipeline<TEvent, HookContext>).GetField(
             "_handlerSet",
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(handlerSetField);

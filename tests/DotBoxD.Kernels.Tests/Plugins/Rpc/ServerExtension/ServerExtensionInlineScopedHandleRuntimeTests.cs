@@ -36,14 +36,14 @@ public sealed class ServerExtensionInlineScopedHandleRuntimeTests
         [DotBoxDService]
         public interface IMonsterControl
         {
-            [HostCapability("game.world.monster.read.handle")]
+            [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
             IMonster Get(string entityId);
         }
 
         [DotBoxDService]
         public interface IMonster
         {
-            [HostCapability("game.world.monster.read.threat")]
+            [HostCapability("game.world.monster.read.threat", HostBindingEffect.HostStateRead)]
             int GetThreat();
         }
 
@@ -76,14 +76,14 @@ public sealed class ServerExtensionInlineScopedHandleRuntimeTests
         [DotBoxDService]
         public interface IMonsterControl
         {
-            [HostCapability("game.world.monster.read.handle")]
+            [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
             IMonster Get(string entityId);
         }
 
         [DotBoxDService]
         public interface IMonster
         {
-            [HostCapability("game.world.monster.read.threat")]
+            [HostCapability("game.world.monster.read.threat", HostBindingEffect.HostStateRead)]
             int GetThreat();
         }
 

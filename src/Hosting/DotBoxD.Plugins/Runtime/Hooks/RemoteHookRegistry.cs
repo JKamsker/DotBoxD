@@ -22,4 +22,10 @@ public sealed class RemoteHookRegistry
     }
 
     public RemoteHookPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers);
+
+    public RemoteHookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
+    {
+        ArgumentNullException.ThrowIfNull(createContext);
+        return new RemoteHookPipeline<TEvent, TContext>(_install, createContext, _localHandlers);
+    }
 }

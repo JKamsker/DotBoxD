@@ -14,28 +14,36 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 /// </summary>
 public sealed class ServerExtensionDtoParameterTests
 {
-    private const string DirectRecordParamSource = """
+    private const string CommonControlSource = """
         using System.Collections.Generic;
         using DotBoxD.Kernels;
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
+        [DotBoxDService]
+        public interface IRemoteWorldControl
+        {
+        }
+
+        public sealed class RemoteWorldControl : IRemoteWorldControl, IServerExtensionClientAccessor
         {
             public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
+        """;
 
+    private const string DirectRecordParamSource = CommonControlSource + """
         public readonly record struct WorldRangeQuery(int Center, int Radius, int MaxResults);
 
-        [ServerExtension(typeof(RemoteWorldControl), "range-query")]
+        [ServerExtension(typeof(IRemoteWorldControl), "range-query")]
         public sealed partial class RangeQueryKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public int CountInRange(WorldRangeQuery query, HookContext ctx)
             {
                 return query.Center + query.Radius + query.MaxResults;
@@ -49,29 +57,14 @@ public sealed class ServerExtensionDtoParameterTests
         }
         """;
 
-    private const string DirectNestedRecordParamSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
+    private const string DirectNestedRecordParamSource = CommonControlSource + """
         public readonly record struct WorldPoint(int Position);
         public readonly record struct WorldRangeQuery(WorldPoint Center, int Radius, int MaxResults);
 
-        [ServerExtension(typeof(RemoteWorldControl), "range-query")]
+        [ServerExtension(typeof(IRemoteWorldControl), "range-query")]
         public sealed partial class RangeQueryKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public int CountInRange(WorldRangeQuery query, HookContext ctx)
             {
                 return query.Center.Position + query.Radius + query.MaxResults;
@@ -85,22 +78,7 @@ public sealed class ServerExtensionDtoParameterTests
         }
         """;
 
-    private const string DirectClassParamSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
+    private const string DirectClassParamSource = CommonControlSource + """
         public sealed class WorldRangeQuery
         {
             public WorldRangeQuery(int center, int radius, int maxResults)
@@ -115,10 +93,10 @@ public sealed class ServerExtensionDtoParameterTests
             public int MaxResults { get; }
         }
 
-        [ServerExtension(typeof(RemoteWorldControl), "range-query")]
+        [ServerExtension(typeof(IRemoteWorldControl), "range-query")]
         public sealed partial class RangeQueryKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public int CountInRange(WorldRangeQuery query, HookContext ctx)
             {
                 return query.Center + query.Radius + query.MaxResults;
@@ -132,28 +110,13 @@ public sealed class ServerExtensionDtoParameterTests
         }
         """;
 
-    private const string DirectRecordReturnWithListFieldSource = """
-        using System.Collections.Generic;
-        using DotBoxD.Kernels;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Plugins.Runtime;
-        using DotBoxD.Abstractions;
-
-        namespace Sample;
-
-        public sealed class RemoteWorldControl : IServerExtensionClientAccessor
-        {
-            public RemoteWorldControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
-        }
-
+    private const string DirectRecordReturnWithListFieldSource = CommonControlSource + """
         public readonly record struct Bag(int Id, List<int> Values);
 
-        [ServerExtension(typeof(RemoteWorldControl), "bag")]
+        [ServerExtension(typeof(IRemoteWorldControl), "bag")]
         public sealed partial class BagKernel
         {
-            [ServerExtensionMethod(typeof(RemoteWorldControl))]
+            [ServerExtensionMethod(typeof(IRemoteWorldControl))]
             public Bag Make(int id, HookContext ctx)
             {
                 var values = new List<int>();

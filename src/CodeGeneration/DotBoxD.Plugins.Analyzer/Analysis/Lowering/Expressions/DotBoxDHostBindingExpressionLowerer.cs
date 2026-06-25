@@ -1,8 +1,8 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+using DotBoxD.Shared.HostBindings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using ManifestTypes = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.ManifestTypes;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
@@ -25,13 +25,12 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         DotBoxDExpressionLoweringContext context,
         Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
     {
-        if (context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol
-                is not IMethodSymbol method ||
-            HostBinding(method) is not { } binding)
+        if (ResolveHostBindingInvocation(invocation, context) is not { } resolved)
         {
             return null;
         }
 
+        var (method, binding) = resolved;
         var (bindingId, capability, effects, isAsync) = binding;
         if (TryLowerPatternCaptureInvocation(
                 invocation,
@@ -50,13 +49,8 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
                 $"Polymorphic handle binding '{bindingId}' must be called on a pattern-captured subtype.");
         }
 
-        // The return (and arguments) may be any host-binding-eligible marshaller type: scalar, Guid, enum,
-        // list, map, or DTO record. Nullable value types are deliberately excluded here even though result-hook
-        // fields use the same RPC marshaller support; HostServiceBindingFactory rejects them before registration.
-        var returnType = HostBindingManifestTag(
-            DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType),
-            bindingId,
-            "return");
+        // Host bindings use the same non-nullable marshaller shapes the runtime binding factory accepts.
+        var returnType = HostBindingReturnTag(method.ReturnType, bindingId);
 
         var arguments = invocation.ArgumentList.Arguments;
         if (arguments.Count != method.Parameters.Length)
@@ -66,7 +60,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         }
 
         var loweredSources = new List<string>(arguments.Count);
-        var allocates = IsAllocatingTag(returnType);
+        var allocates = HostBindingMetadataRules.ReturnAllocatesManifestTag(returnType);
         for (var i = 0; i < arguments.Count; i++)
         {
             if (arguments[i].NameColon is not null ||
@@ -97,26 +91,38 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return new DotBoxDExpressionModel(source, returnType, allocates);
     }
 
-    // Which host-call return shapes the runtime binding factory counts as allocating. This MUST match
-    // HostServiceBindingFactory.ReturnAllocates, which treats anything that is not Unit/Bool/I32/I64/F64 as
-    // allocating — so string, Guid, list, map, and record all allocate (Guid included: the manifest effect must
-    // match the registered binding's, or install fails DBXK041). The bool/int/long/double scalar tags do not.
+    public static DotBoxDExpressionModel? TryLowerProperty(
+        IPropertySymbol property,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (ExplicitHostBinding(property, context.SemanticModel.Compilation) is not { } binding)
+        {
+            return null;
+        }
+
+        var returnType = HostBindingManifestTag(property.Type, binding.BindingId, "return");
+        AddBindingRequirements(context, binding.Capability, binding.Effects, binding.IsAsync);
+        var source =
+            $"new {TypeNames.GlobalCallExpression}({LiteralReader.StringLiteral(binding.BindingId)}, " +
+            "[], null, Span)";
+        return new DotBoxDExpressionModel(source, returnType, HostBindingMetadataRules.ReturnAllocatesManifestTag(returnType));
+    }
+
     private static bool IsAllocatingTag(string tag)
-        => string.Equals(tag, ManifestTypes.String, StringComparison.Ordinal) ||
-           string.Equals(tag, ManifestTypes.Guid, StringComparison.Ordinal) ||
-           string.Equals(tag, ManifestTypes.List, StringComparison.Ordinal) ||
-           string.Equals(tag, ManifestTypes.Map, StringComparison.Ordinal) ||
-           string.Equals(tag, ManifestTypes.Record, StringComparison.Ordinal);
+        => HostBindingMetadataRules.ReturnAllocatesManifestTag(tag);
 
     internal static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? HostBinding(
-        IMethodSymbol method)
+        IMethodSymbol method,
+        Compilation compilation)
+        => ExplicitHostBinding(method, compilation) ?? TryAutoHostBinding(method, compilation);
+
+    private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? ExplicitHostBinding(
+        ISymbol symbol,
+        Compilation compilation)
     {
-        foreach (var attribute in method.GetAttributes())
+        foreach (var attribute in symbol.GetAttributes())
         {
-            if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HostBindingAttribute,
-                    StringComparison.Ordinal) ||
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.HostBindingAttribute) ||
                 attribute.ConstructorArguments.Length != 3)
             {
                 continue;
@@ -131,36 +137,41 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
             }
         }
 
-        return TryAutoHostBinding(method);
+        return null;
     }
 
     private static (string BindingId, string? Capability, IReadOnlyList<string> Effects, bool IsAsync)? TryAutoHostBinding(
-        IMethodSymbol method)
+        IMethodSymbol method,
+        Compilation compilation)
     {
         if (method.MethodKind != MethodKind.Ordinary ||
             method.IsStatic ||
             method.IsGenericMethod ||
-            !HasDotBoxDServiceAttribute(method.ContainingType))
+            !HasDotBoxDServiceAttribute(method.ContainingType, compilation))
         {
             return null;
         }
 
-        var capability = HostCapability(method);
+        var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
+        var capability = HostCapability(method, ReturnAllocates(returnType), compilation);
+        if (capability is null)
+        {
+            throw new NotSupportedException(
+                $"Auto host binding '{HostBindingRoute(method.ContainingType, method)}' must declare [HostCapability] with explicit effects.");
+        }
+
         return (
             HostBindingRoute(method.ContainingType, method),
-            capability,
-            AutoEffectNames(method, capability),
+            capability.Value.Capability,
+            capability.Value.Effects,
             IsTaskLike(method.ReturnType));
     }
 
-    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
+    private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type, Compilation compilation)
     {
         foreach (var attribute in type.GetAttributes())
         {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.DotBoxDServiceAttribute,
-                    StringComparison.Ordinal))
+            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.DotBoxDServiceAttribute))
             {
                 return true;
             }
@@ -172,58 +183,39 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
     private static string HostBindingRoute(INamedTypeSymbol type, IMethodSymbol method)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace
-            ? string.Empty
-            : type.ContainingNamespace.ToDisplayString() + ".";
-        return "host." + ns + type.MetadataName + "." + method.Name;
+            ? null
+            : type.ContainingNamespace.ToDisplayString();
+        return HostBindingMetadataRules.BindingId(ns, type.MetadataName, method.Name);
     }
 
-    private static string? HostCapability(IMethodSymbol method)
+    private static (string Capability, IReadOnlyList<string> Effects)? HostCapability(
+        IMethodSymbol method,
+        bool returnAllocates,
+        Compilation compilation)
     {
         foreach (var attribute in method.GetAttributes())
         {
-            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), HostCapabilityAttribute, StringComparison.Ordinal) &&
-                attribute.ConstructorArguments.Length == 1 &&
+            if (IsDotBoxDAttribute(attribute, compilation, HostCapabilityAttribute) &&
+                attribute.ConstructorArguments.Length == 2 &&
                 attribute.ConstructorArguments[0].Value is string capability &&
                 !string.IsNullOrWhiteSpace(capability))
             {
-                return capability;
+                var effects = HostCapabilityEffects(attribute.ConstructorArguments[1], returnAllocates, method);
+                return (capability, effects);
             }
         }
 
         return null;
     }
 
-    private static IReadOnlyList<string> AutoEffectNames(IMethodSymbol method, string? capability)
-    {
-        var effects = new List<string> { DotBoxDGenerationNames.Effects.Cpu };
-        var returnType = DotBoxDTypeNameReader.UnwrapTaskLike(method.ReturnType);
-        if (ReturnAllocates(returnType))
-        {
-            effects.Add(DotBoxDGenerationNames.Effects.Alloc);
-        }
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 
-        effects.Add(IsWriteMethod(method, capability)
-            ? DotBoxDGenerationNames.Effects.HostStateWrite
-            : DotBoxDGenerationNames.Effects.HostStateRead);
-        return effects;
-    }
-
-    private static bool IsWriteMethod(IMethodSymbol method, string? capability)
-        => capability?.Contains(".write.", StringComparison.Ordinal) == true ||
-           method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Set", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Update", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Add", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Remove", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Move", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Teleport", StringComparison.Ordinal);
-
-    // The auto-binding's Alloc effect must use the SAME allocation classification as the model-flag path
-    // (IsAllocatingTag) and the runtime binding factory — otherwise a Guid/map return adds Alloc on one side only
-    // and install fails DBXK041. Delegate to the shared tag classifier (string/Guid/list/map/record allocate).
+    // Keep auto-binding Alloc classification in sync with runtime binding registration.
     private static bool ReturnAllocates(ITypeSymbol type)
-        => !IsUnitTaskLike(type) && IsAllocatingTag(SandboxTypeSourceEmitter.ManifestTag(type));
+        => !IsUnitTaskLike(type) &&
+           HostBindingMetadataRules.ReturnAllocatesManifestTag(SandboxTypeSourceEmitter.ManifestTag(type));
 
     private static bool IsUnitTaskLike(ITypeSymbol type)
         => type is INamedTypeSymbol
@@ -256,11 +248,7 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         return false;
     }
 
-    /// <summary>
-    /// The single-bit flag names set in a <c>SandboxEffect</c> attribute argument (e.g. "Cpu",
-    /// "HostStateRead"). Read from the enum's own members so the names match the manifest's effect
-    /// tokens (parsed back via <c>Enum.TryParse&lt;SandboxEffect&gt;</c> at install).
-    /// </summary>
+    /// <summary>Single-bit <c>SandboxEffect</c> flag names used as manifest effect tokens.</summary>
     private static IReadOnlyList<string> EffectNames(TypedConstant effects)
     {
         if (effects.Value is null || effects.Type is not INamedTypeSymbol enumType)

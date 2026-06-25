@@ -1,4 +1,7 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 
@@ -10,6 +13,24 @@ namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 public sealed class HookPipelineFluentTests
 {
     private sealed record Ping(string Target, int Value);
+
+    private sealed record HookServerContext(HookContext Raw, string Prefix);
+
+    private sealed record SubscriptionServerContext(HookContext Raw, int Multiplier);
+
+    private static HookServerContext CreateHookContextA(HookContext context)
+        => new(context, "a");
+
+    private static HookServerContext CreateHookContextB(HookContext context)
+        => new(context, "b");
+
+    private static SubscriptionServerContext CreateSubscriptionContextA(HookContext context)
+        => new(context, 1);
+
+    private static SubscriptionServerContext CreateSubscriptionContextB(HookContext context)
+        => new(context, 2);
+
+    private static HookContext Identity(HookContext context) => context;
 
     [Fact]
     public async Task Select_then_RunLocal_runs_the_native_terminal_with_the_projected_value()
@@ -30,7 +51,7 @@ public sealed class HookPipelineFluentTests
     public async Task Staged_Where_short_circuits_the_terminal()
     {
         var messages = new InMemoryPluginMessageSink();
-        using var server = DotBoxD.Plugins.PluginServer.Create(messages);
+        using var server = PluginAddendumTestPolicies.CreateServer(messages);
         server.Hooks.On<Ping>()
             .Select((p, ctx) => p.Value)
             .Where((value, ctx) => value >= 100)
@@ -53,6 +74,31 @@ public sealed class HookPipelineFluentTests
         await server.Hooks.PublishAsync(new Ping("monster-1", 21), cts.Token);
 
         Assert.Equal(cts.Token, observed);
+    }
+
+    [Fact]
+    public async Task Native_wire_methods_return_the_resolved_event_and_terminal()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        using var server = PluginAddendumTestPolicies.CreateServer(messages);
+        server.Events.Resolve<DamageEvent>();
+        var kernel = await server.InstallAsync(
+            FireDamagePluginPackage.Create(),
+            PluginAddendumTestPolicies.LongWall());
+
+        var hook = server.WireHook(kernel);
+        var subscription = server.WireSubscription(kernel);
+
+        Assert.Equal(typeof(DamageEvent), hook.EventType);
+        Assert.Equal(nameof(DamageEvent), hook.EventName);
+        Assert.Equal(KernelWireKind.Plain, hook.Terminal.Kind);
+        Assert.Equal(hook, subscription);
+
+        await server.Hooks.PublishAsync(new DamageEvent("fire", 150, "target-1"));
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("target-1", message.TargetId);
+        Assert.Equal("Ouch, fire.", message.Message);
     }
 
     [Fact]
@@ -101,6 +147,117 @@ public sealed class HookPipelineFluentTests
 
         Assert.False(handled);
     }
+
+    [Fact]
+    public async Task Hook_and_subscription_pipelines_can_use_different_server_context_types()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create();
+        string? hookObserved = null;
+        var subscriptionObserved = new TaskCompletionSource<int>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        server.Hooks.On<Ping, HookServerContext>(ctx => new HookServerContext(ctx, "hook"))
+            .Where((_, ctx) => ctx.Prefix == "hook")
+            .Select((p, ctx) => ctx.Prefix + ":" + p.Target)
+            .RunLocal((value, ctx) =>
+            {
+                Assert.Equal("hook", ctx.Prefix);
+                hookObserved = value;
+            });
+
+        server.Subscriptions.On<Ping, SubscriptionServerContext>(
+                ctx => new SubscriptionServerContext(ctx, Multiplier: 3))
+            .Where((_, ctx) => ctx.Multiplier == 3)
+            .Select((p, ctx) => p.Value * ctx.Multiplier)
+            .RunLocal((value, ctx) =>
+            {
+                Assert.Equal(3, ctx.Multiplier);
+                subscriptionObserved.SetResult(value);
+            });
+
+        await server.Hooks.PublishAsync(new Ping("monster-1", 7));
+        server.Subscriptions.Publish(new Ping("monster-1", 7));
+
+        Assert.Equal("hook:monster-1", hookObserved);
+        Assert.Equal(21, await subscriptionObserved.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void Hook_registry_reuses_the_same_context_factory_and_rejects_conflicts()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create();
+
+        var first = server.Hooks.On<Ping, HookServerContext>(CreateHookContextA);
+        var second = server.Hooks.On<Ping, HookServerContext>(CreateHookContextA);
+
+        Assert.Same(first, second);
+        var exception = Assert.Throws<SandboxValidationException>(
+            () => server.Hooks.On<Ping, HookServerContext>(CreateHookContextB));
+        Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+    }
+
+    [Fact]
+    public void Subscription_registry_reuses_the_same_context_factory_and_rejects_conflicts()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create();
+
+        var first = server.Subscriptions.On<Ping, SubscriptionServerContext>(CreateSubscriptionContextA);
+        var second = server.Subscriptions.On<Ping, SubscriptionServerContext>(CreateSubscriptionContextA);
+
+        Assert.Same(first, second);
+        var exception = Assert.Throws<SandboxValidationException>(
+            () => server.Subscriptions.On<Ping, SubscriptionServerContext>(CreateSubscriptionContextB));
+        Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+    }
+
+    [Fact]
+    public void HookContext_overload_order_fails_deterministically_instead_of_invalid_casting()
+    {
+        using (var server = DotBoxD.Plugins.PluginServer.Create())
+        {
+            _ = server.Hooks.On<Ping>();
+
+            var exception = Assert.Throws<SandboxValidationException>(
+                () => server.Hooks.On<Ping, HookContext>(Identity));
+
+            Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+        }
+
+        using (var server = DotBoxD.Plugins.PluginServer.Create())
+        {
+            _ = server.Hooks.On<Ping, HookContext>(Identity);
+
+            var exception = Assert.Throws<SandboxValidationException>(
+                () => server.Hooks.On<Ping>());
+
+            Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+        }
+    }
+
+    [Fact]
+    public void Subscription_HookContext_overload_order_fails_deterministically_instead_of_invalid_casting()
+    {
+        using (var server = DotBoxD.Plugins.PluginServer.Create())
+        {
+            _ = server.Subscriptions.On<Ping>();
+
+            var exception = Assert.Throws<SandboxValidationException>(
+                () => server.Subscriptions.On<Ping, HookContext>(Identity));
+
+            Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+        }
+
+        using (var server = DotBoxD.Plugins.PluginServer.Create())
+        {
+            _ = server.Subscriptions.On<Ping, HookContext>(Identity);
+
+            var exception = Assert.Throws<SandboxValidationException>(
+                () => server.Subscriptions.On<Ping>());
+
+            Assert.Contains(exception.Diagnostics, d => d.Code == "DBXK067");
+        }
+    }
+
 
     [Fact]
     public void Run_lambda_throws_until_lowered()

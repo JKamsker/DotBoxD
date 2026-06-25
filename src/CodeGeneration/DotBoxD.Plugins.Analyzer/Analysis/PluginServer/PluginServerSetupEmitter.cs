@@ -86,12 +86,12 @@ internal static class PluginServerSetupEmitter
             builder,
             "    ",
             "Setup-time hook registration surface. Recorded hooks plug plugin logic into server decisions and are awaited by the server.");
-        builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks { get; }");
+        builder.Append("    ").Append(model.HookRegistryName).AppendLine(" Hooks { get; }");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
             "Setup-time fire-and-forget subscription registration surface. Recorded subscriptions are notifications and the server does not wait for them.");
-        builder.AppendLine("    global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions { get; }");
+        builder.Append("    ").Append(model.SubscriptionRegistryName).AppendLine(" Subscriptions { get; }");
         foreach (var control in model.Controls)
         {
             PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
@@ -127,18 +127,24 @@ internal static class PluginServerSetupEmitter
     {
         builder.AppendLine("    private readonly struct RecordedInstall");
         builder.AppendLine("    {");
-        builder.AppendLine("        private RecordedInstall(RecordedInstallKind kind, global::DotBoxD.Plugins.PluginPackage package, global::System.Type? registryKey)");
+        builder.AppendLine("        private RecordedInstall(RecordedInstallKind kind, global::DotBoxD.Plugins.PluginPackage package, global::System.Type? registryKey, global::System.Type? secondaryRegistryKey)");
         builder.AppendLine("        {");
         builder.AppendLine("            Kind = kind;");
         builder.AppendLine("            Package = package;");
         builder.AppendLine("            RegistryKey = registryKey;");
+        builder.AppendLine("            SecondaryRegistryKey = secondaryRegistryKey;");
         builder.AppendLine("        }");
         builder.AppendLine("        public RecordedInstallKind Kind { get; }");
         builder.AppendLine("        public global::DotBoxD.Plugins.PluginPackage Package { get; }");
         builder.AppendLine("        public global::System.Type? RegistryKey { get; }");
-        builder.AppendLine("        public static RecordedInstall Plugin(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Plugin, package, null);");
-        builder.AppendLine("        public static RecordedInstall Subscription(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Subscription, package, null);");
-        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey);");
+        builder.AppendLine("        // A server extension is also registered under this second key when present, so an extension recorded");
+        builder.AppendLine("        // by its service contract (Extend<TService, TKernel>) still resolves by the kernel type the generated");
+        builder.AppendLine("        // graft client looks up — and vice versa — instead of throwing \"not registered\".");
+        builder.AppendLine("        public global::System.Type? SecondaryRegistryKey { get; }");
+        builder.AppendLine("        public static RecordedInstall Plugin(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Plugin, package, null, null);");
+        builder.AppendLine("        public static RecordedInstall Subscription(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Subscription, package, null, null);");
+        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey, null);");
+        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey, global::System.Type secondaryRegistryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey, secondaryRegistryKey);");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
@@ -179,6 +185,7 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("            }");
         builder.AppendLine("            var pluginId = await InstallServerExtensionPackageAsync(install.Package, cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("            if (install.RegistryKey is not null) { _serverExtensions[install.RegistryKey] = pluginId; }");
+        builder.AppendLine("            if (install.SecondaryRegistryKey is not null) { _serverExtensions[install.SecondaryRegistryKey] = pluginId; }");
         builder.AppendLine("        }");
         builder.AppendLine("        _setupReplayed = true;");
         builder.AppendLine("    }");
@@ -190,8 +197,8 @@ internal static class PluginServerSetupEmitter
         builder.Append("    private sealed class SetupRecorder : ").Append(model.SetupInterfaceName).AppendLine();
         builder.AppendLine("    {");
         builder.AppendLine("        private readonly global::System.Collections.Generic.List<RecordedInstall> _installs;");
-        builder.AppendLine("        private readonly global::DotBoxD.Plugins.Runtime.RemoteHookRegistry _hooks;");
-        builder.AppendLine("        private readonly global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry _subscriptions;");
+        builder.Append("        private readonly ").Append(model.HookRegistryName).AppendLine(" _hooks;");
+        builder.Append("        private readonly ").Append(model.SubscriptionRegistryName).AppendLine(" _subscriptions;");
         foreach (var control in model.Controls)
         {
             builder.Append("        private readonly ").Append(control.AccumulatorInterfaceName).Append(' ')
@@ -203,16 +210,16 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("            global::DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry? localHandlers)");
         builder.AppendLine("        {");
         builder.AppendLine("            _installs = installs;");
-        builder.AppendLine("            _hooks = new global::DotBoxD.Plugins.Runtime.RemoteHookRegistry(package =>");
+        builder.Append("            _hooks = new ").Append(model.HookRegistryName).AppendLine("(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Plugin(package));");
-        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
+        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);");
         builder.AppendLine("            }, localHandlers);");
-        builder.AppendLine("            _subscriptions = new global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry(package =>");
+        builder.Append("            _subscriptions = new ").Append(model.SubscriptionRegistryName).AppendLine("(package =>");
         builder.AppendLine("            {");
         builder.AppendLine("                _installs.Add(RecordedInstall.Subscription(package));");
-        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.Manifest.PluginId);");
-        builder.AppendLine("            });");
+        builder.AppendLine("                return global::System.Threading.Tasks.ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);");
+        builder.AppendLine("            }, localHandlers);");
         foreach (var control in model.Controls)
         {
             builder.Append("            ").Append(FieldName(control.Name)).Append(" = new ")
@@ -235,12 +242,12 @@ internal static class PluginServerSetupEmitter
             builder,
             "        ",
             "Setup-time hook registration surface. Recorded hooks plug plugin logic into server decisions and are awaited by the server.");
-        builder.AppendLine("        public global::DotBoxD.Plugins.Runtime.RemoteHookRegistry Hooks => _hooks;");
+        builder.Append("        public ").Append(model.HookRegistryName).AppendLine(" Hooks => _hooks;");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "        ",
             "Setup-time fire-and-forget subscription registration surface. Recorded subscriptions are notifications and the server does not wait for them.");
-        builder.AppendLine("        public global::DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry Subscriptions => _subscriptions;");
+        builder.Append("        public ").Append(model.SubscriptionRegistryName).AppendLine(" Subscriptions => _subscriptions;");
 
         builder.AppendLine("    }");
         builder.AppendLine();
@@ -274,7 +281,7 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("        private void Add<TKernel>() where TKernel : class");
         builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TKernel)));");
         builder.AppendLine("        private void Add<TService, TKernel>() where TService : class where TKernel : class");
-        builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TService)));");
+        builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TService), typeof(TKernel)));");
         builder.AppendLine("    }");
         builder.AppendLine();
     }

@@ -70,17 +70,21 @@ internal static partial class HookChainModelFactory
     {
         var original = type.OriginalDefinition.ToDisplayString();
         if (string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookPipelineWithContextOriginal, StringComparison.Ordinal) ||
             string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteHookStageWithContextOriginal, StringComparison.Ordinal) ||
             string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal))
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.RemoteSubscriptionStageWithContextOriginal, StringComparison.Ordinal))
         {
             return HookChainReceiverKind.Remote;
         }
 
-        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineOriginal, StringComparison.Ordinal) ||
-            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageOriginal, StringComparison.Ordinal))
+        if (string.Equals(original, DotBoxDGenerationNames.TypeNames.HookPipelineWithContextOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.HookStageWithContextOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionPipelineWithContextOriginal, StringComparison.Ordinal) ||
+            string.Equals(original, DotBoxDGenerationNames.TypeNames.SubscriptionStageWithContextOriginal, StringComparison.Ordinal))
         {
             return HookChainReceiverKind.Local;
         }
@@ -142,30 +146,25 @@ internal static partial class HookChainModelFactory
         return true;
     }
 
-    // Element-only lambdas (e =>, (e) =>) yield (element, null, null); element+context lambdas ((e, ctx) =>)
-    // yield (element, context, null). A cancellation parameter is accepted for RegisterLocal result terminals
-    // and rejected by ResultHookChain for other result shapes.
-    private static (string? ElementParam, string? ContextParam, string? CancellationParam) LambdaParameters(
+    // Element-only lambdas (e =>, (e) =>) yield (element, null); element+context lambdas ((e, ctx) =>)
+    // yield (element, context). Other arities are unsupported.
+    private static (string? ElementParam, string? ContextParam) LambdaParameters(
         LambdaExpressionSyntax lambda)
     {
         switch (lambda)
         {
             case SimpleLambdaExpressionSyntax simple:
-                return (simple.Parameter.Identifier.ValueText, null, null);
+                return (simple.Parameter.Identifier.ValueText, null);
             case ParenthesizedLambdaExpressionSyntax parenthesized:
                 var parameters = parenthesized.ParameterList.Parameters;
                 return parameters.Count switch
                 {
-                    1 => (parameters[0].Identifier.ValueText, null, null),
-                    2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText, null),
-                    3 => (
-                        parameters[0].Identifier.ValueText,
-                        parameters[1].Identifier.ValueText,
-                        parameters[2].Identifier.ValueText),
-                    _ => (null, null, null),
+                    1 => (parameters[0].Identifier.ValueText, null),
+                    2 => (parameters[0].Identifier.ValueText, parameters[1].Identifier.ValueText),
+                    _ => (null, null),
                 };
             default:
-                return (null, null, null);
+                return (null, null);
         }
     }
 

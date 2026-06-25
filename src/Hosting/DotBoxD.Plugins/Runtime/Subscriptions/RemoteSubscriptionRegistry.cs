@@ -21,4 +21,11 @@ public sealed class RemoteSubscriptionRegistry
     }
 
     public RemoteSubscriptionPipeline<TEvent> On<TEvent>() => new(_install, _localHandlers);
+
+    public RemoteSubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(
+        Func<HookContext, TContext> createContext)
+    {
+        ArgumentNullException.ThrowIfNull(createContext);
+        return new RemoteSubscriptionPipeline<TEvent, TContext>(_install, createContext, _localHandlers);
+    }
 }

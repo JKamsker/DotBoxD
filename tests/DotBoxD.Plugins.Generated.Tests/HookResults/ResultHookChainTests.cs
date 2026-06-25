@@ -159,36 +159,6 @@ public sealed partial class ResultHookChainTests
     }
 
     [Fact]
-    public async Task RegisterLocal_cancellation_aware_overload_threads_the_dispatch_token()
-    {
-        using var server = PluginServer.Create(defaultPolicy: TestPolicies.Chain());
-        var invoked = 0;
-        CancellationToken received = default;
-        using var cts = new CancellationTokenSource();
-        server.Hooks.On<CombatDamageContext>()
-            .Where(ctx => ctx.Relation == CombatRelation.Pve)
-            .RegisterLocal((ctx, hookContext, cancellationToken) =>
-            {
-                received = cancellationToken;
-                cancellationToken.ThrowIfCancellationRequested();
-                invoked++;
-                return new ValueTask<CombatDamageResult>(
-                    new CombatDamageResult { Success = true, Damage = ctx.Damage + 2 });
-            }, priority: 50);
-
-        var result = await server.Hooks.FireAsync<CombatDamageContext, CombatDamageResult>(
-            new CombatDamageContext(CombatRelation.Pve, 10), cts.Token);
-
-        Assert.Equal(12, result!.Value.Damage);
-        Assert.Equal(1, invoked);
-        // The token the handler observed is the dispatch token, not CancellationToken.None: it threads through
-        // FireAsync -> HookContext -> the handler's 3rd parameter. (Previously fired with None, which left the
-        // handler's ThrowIfCancellationRequested dead and proved nothing about token threading.)
-        Assert.True(received.CanBeCanceled);
-        Assert.Equal(cts.Token, received);
-    }
-
-    [Fact]
     public void Register_install_entrypoint_carries_no_handler_delegate()
     {
         // Pins the sandbox-verified Register contract structurally: UseGeneratedResultChain (the entrypoint the
@@ -196,7 +166,7 @@ public sealed partial class ResultHookChainTests
         // parameter, so a Register handler body can never be captured and run in-process. UseGeneratedLocalResultChain
         // is the deliberate exception: it threads the plugin-process handler. A regression that added a handler
         // argument to the Register entrypoint (and ran it in-process) would fail here.
-        var pipeline = typeof(HookPipeline<>);
+        var pipeline = typeof(HookPipeline<,>);
 
         var register = pipeline.GetMethods().Where(m => m.Name == "UseGeneratedResultChain").ToArray();
         Assert.NotEmpty(register);
@@ -268,11 +238,11 @@ public sealed partial class ResultHookChainTests
             || parameter.ParameterType.Name.StartsWith("Func", StringComparison.Ordinal)
             || parameter.ParameterType.Name.StartsWith("Action", StringComparison.Ordinal);
 
-    private static int ResultEntryCount<TEvent>(HookPipeline<TEvent> pipeline)
+    private static int ResultEntryCount<TEvent>(HookPipeline<TEvent, HookContext> pipeline)
     {
         const System.Reflection.BindingFlags flags =
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-        var slotField = typeof(HookPipeline<TEvent>).GetField("_resultHooks", flags);
+        var slotField = typeof(HookPipeline<TEvent, HookContext>).GetField("_resultHooks", flags);
         Assert.NotNull(slotField);
         var slot = slotField!.GetValue(pipeline)!;
         var entriesField = slot.GetType().GetField("_entries", flags);

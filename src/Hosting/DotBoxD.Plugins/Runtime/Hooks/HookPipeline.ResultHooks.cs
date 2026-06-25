@@ -6,44 +6,34 @@ using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Runtime;
 
-// The result-returning hook surface of HookPipeline<TEvent>: the .Register(...) / .RegisterLocal(...) terminals
-// (lowered by the analyzer), the generated install entrypoints the interceptors call, and FireResultAsync the
-// host calls to dispatch. The actual ordered dispatch + abstain/fallthrough logic lives in ResultHookSlot; this
-// partial is the thin pipeline facade over it, kept separate so the notification surface stays focused.
-public sealed partial class HookPipeline<TEvent>
+public partial class HookPipeline<TEvent, TContext>
 {
-    private readonly Hooks.ResultHookSlot<TEvent> _resultHooks;
+    private readonly Hooks.ResultHookSlot<TEvent, TContext> _resultHooks;
     private readonly Dictionary<Type, object> _resultDispatchOptions = [];
 
-    /// <summary>
-    /// The result-returning terminal the analyzer lowers to verified IR: the filter and the result-producing
-    /// handler both run in the sandbox. Un-lowered it throws, so plugin logic never executes unsandboxed.
-    /// </summary>
-    public HookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
+    public HookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
-    /// <summary>
-    /// The result-returning local terminal: the analyzer lowers the filter to verified IR, but the result is
-    /// produced by the plugin-process delegate. Un-lowered it throws; the generated interceptor replaces it.
-    /// </summary>
-    public HookPipeline<TEvent> RegisterLocal<TResult>(Func<TEvent, HookContext, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
-        => throw Hooks.HookLowering.ResultNotLowered();
-
-    public HookPipeline<TEvent> RegisterLocal<TResult>(
-        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
+    public HookPipeline<TEvent, TContext> Register<TResult>(
+        Func<TEvent, TContext, TResult> handler,
         int priority = 0)
         where TResult : struct, IHookResult
         => throw Hooks.HookLowering.ResultNotLowered();
 
-    /// <summary>
-    /// Installs a lowered <c>Register</c> chain: the package's verified <c>ShouldHandle</c> filter and
-    /// result-producing <c>Handle</c> run in the sandbox, and the returned value is decoded to
-    /// <typeparamref name="TResult"/>. Called by the generated interceptor that replaces a
-    /// <c>Register(lambda, priority)</c> call site.
-    /// </summary>
-    public HookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
+    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw Hooks.HookLowering.ResultNotLowered();
+
+    public HookPipeline<TEvent, TContext> RegisterLocal<TResult>(
+        Func<TEvent, TContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw Hooks.HookLowering.ResultNotLowered();
+
+    public HookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(package);
@@ -51,7 +41,7 @@ public sealed partial class HookPipeline<TEvent>
         try
         {
             ValidateResultKernel(kernel, typeof(TResult), resultLocalTerminal: false);
-            _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent>.Decoder<TResult>());
+            _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent, TContext>.Decoder<TResult>());
         }
         catch
         {
@@ -62,35 +52,43 @@ public sealed partial class HookPipeline<TEvent>
         return this;
     }
 
-    public HookPipeline<TEvent> UseResult(InstalledKernel kernel, Type resultType, int priority = 0)
+    public HookPipeline<TEvent, TContext> UseResult(InstalledKernel kernel, Type resultType, int priority = 0)
     {
         ArgumentNullException.ThrowIfNull(kernel);
         ArgumentNullException.ThrowIfNull(resultType);
         EnsureHookResultType(resultType);
         kernel.ValidateFor(_adapter);
         ValidateResultKernel(kernel, resultType, resultLocalTerminal: false);
-        _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent>.Decoder(resultType));
+        _resultHooks.AddSandbox(kernel, priority, Hooks.ResultHookSlot<TEvent, TContext>.Decoder(resultType));
         return this;
     }
 
-    /// <summary>
-    /// Installs a lowered <c>RegisterLocal</c> chain: the package's verified <c>ShouldHandle</c> filter runs in
-    /// the sandbox, and only when it matches is the native <paramref name="handler"/> invoked to produce the
-    /// result. Called by the generated interceptor that replaces a <c>RegisterLocal(lambda, priority)</c> site.
-    /// </summary>
-    public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+    public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
         PluginPackage package,
-        Func<TEvent, HookContext, TResult> handler,
+        Func<TEvent, TResult> handler,
         int priority = 0)
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return UseGeneratedLocalResultChain<TResult>(package, (e, context, _) => new ValueTask<TResult>(handler(e, context)), priority);
+        return UseGeneratedLocalResultChain<TResult>(package, (e, _) => handler(e), priority);
     }
 
-    public HookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+    public HookPipeline<TEvent, TContext> UseGeneratedLocalResultChain<TResult>(
         PluginPackage package,
-        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
+        Func<TEvent, TContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(
+            package,
+            (e, context, _) => new ValueTask<TResult>(handler(e, context)),
+            priority);
+    }
+
+    private HookPipeline<TEvent, TContext> UseGeneratedLocalResultChainCore<TResult>(
+        PluginPackage package,
+        Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
         where TResult : struct, IHookResult
     {
@@ -114,7 +112,7 @@ public sealed partial class HookPipeline<TEvent>
         return this;
     }
 
-    public HookPipeline<TEvent> UseProjectingResult(
+    public HookPipeline<TEvent, TContext> UseProjectingResult(
         InstalledKernel filterKernel,
         string subscriptionId,
         Type resultType,
@@ -129,12 +127,12 @@ public sealed partial class HookPipeline<TEvent>
         LocalCallbackProjection.EnsureWholeEventSupported(_adapter);
         filterKernel.ValidateFor(_adapter);
         ValidateResultKernel(filterKernel, resultType, resultLocalTerminal: true);
-        _resultHooks.AddRemote(filterKernel, priority, async (e, context, ct) =>
+        _resultHooks.AddRemote(filterKernel, priority, async (e, rawContext, _, ct) =>
         {
             var response = await LocalCallbackProjection.RequestResultAsync(
                 _adapter,
                 e,
-                context,
+                rawContext,
                 subscriptionId,
                 request,
                 ct).ConfigureAwait(false);
@@ -145,7 +143,7 @@ public sealed partial class HookPipeline<TEvent>
         return this;
     }
 
-    public HookPipeline<TEvent> UseProjectingResult<TResult>(
+    public HookPipeline<TEvent, TContext> UseProjectingResult<TResult>(
         InstalledKernel filterKernel,
         string subscriptionId,
         RemoteLocalResultRequest request,

@@ -72,15 +72,99 @@ public interface ILiveSettingsHandle<TKernel>
 /// Requests a generated plugin facade and builder for the annotated partial class.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class GeneratePluginServerAttribute : Attribute;
+public sealed class GeneratePluginServerAttribute : Attribute
+{
+    /// <summary>The server-authored context type augmented by the generator and used by parameterless hooks.</summary>
+    public Type? Context { get; set; }
+
+    /// <summary>
+    /// Optional control-plane service contract for install, live-settings, and lifecycle calls. When omitted,
+    /// the generator falls back to the legacy <c>{WorldNamespace}.Ipc.IGamePluginControlService</c> convention.
+    /// The contract must declare an <c>UpdateSettingsAsync</c> method with a typed array parameter for the update
+    /// batch (e.g. <c>UpdateSettingsAsync(string pluginId, TUpdate[] updates, ...)</c>); the generator infers the
+    /// live-setting update element type (<c>TUpdate</c>) from that array, so the parameter need not be named
+    /// <c>updates</c>.
+    /// </summary>
+    public Type? ControlService { get; set; }
+
+    /// <summary>
+    /// Optional static factory method name on <see cref="Context"/> with signature
+    /// <c>TContext Factory(HookContext raw)</c>.
+    /// </summary>
+    public string? ContextFactory { get; set; }
+}
+
+/// <summary>Marks a server-authored context helper as native-only and unavailable to lowered IR.</summary>
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property, Inherited = false)]
+public sealed class LocalAttribute : Attribute;
+
+/// <summary>Analyzer-visible generated IR for server-authored SDK context <c>[KernelMethod]</c> helpers.</summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
+public sealed class GeneratedKernelMethodDescriptorAttribute(
+    int version,
+    Type contextType,
+    string methodMetadataName,
+    string normalizedSignature,
+    string descriptorHash,
+    string descriptorPayload)
+    : Attribute
+{
+    public int Version { get; } = version;
+
+    public Type ContextType { get; } = contextType;
+
+    public string MethodMetadataName { get; } = methodMetadataName;
+
+    public string NormalizedSignature { get; } = normalizedSignature;
+
+    public string DescriptorHash { get; } = descriptorHash;
+
+    public string DescriptorPayload { get; } = descriptorPayload;
+}
 
 /// <summary>
-/// Declares the capability required by an implementation-backed host binding.
+/// Identifies a generated plugin-server hook or subscription registry and the context type its parameterless
+/// <c>On&lt;TEvent&gt;</c> method uses.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class GeneratedPluginServerRegistryAttribute(
+    GeneratedPluginServerRegistryKind kind,
+    Type serverType,
+    Type contextType)
+    : Attribute
+{
+    public GeneratedPluginServerRegistryKind Kind { get; } = kind;
+
+    public Type ServerType { get; } = serverType;
+
+    public Type ContextType { get; } = contextType;
+}
+
+public enum GeneratedPluginServerRegistryKind
+{
+    Hook,
+    Subscription,
+}
+
+/// <summary>Explicit host-service effects for analyzer-visible auto bindings.</summary>
+[Flags]
+public enum HostBindingEffect
+{
+    None = 0,
+    HostStateRead = 1,
+    HostStateWrite = 2,
+    Allocates = 4
+}
+
+/// <summary>
+/// Declares the capability and host-state effects required by an analyzer-visible host binding contract.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-public sealed class HostCapabilityAttribute(string capability) : Attribute
+public sealed class HostCapabilityAttribute(string capability, HostBindingEffect effects) : Attribute
 {
     public string Capability { get; } = capability;
+
+    public HostBindingEffect Effects { get; } = effects;
 }
 
 /// <summary>Wire client used by generated server-extension proxies.</summary>

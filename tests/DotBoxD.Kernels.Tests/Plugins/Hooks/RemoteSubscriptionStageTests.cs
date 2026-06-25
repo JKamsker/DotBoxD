@@ -26,6 +26,21 @@ public sealed class RemoteSubscriptionStageTests
     }
 
     [Fact]
+    public void Typed_pipeline_UseGeneratedLocalChain_validates_null_inputs()
+    {
+        // The pipeline's context-aware UseGeneratedLocalChain overloads forward straight to InstallLocal, which is
+        // the single capture site that guards package/handler/decoder — so a null fails fast at registration
+        // instead of NREing during a later callback.
+        var pipeline = new RemoteSubscriptionRegistry(_ => throw new InvalidOperationException(), new RemoteLocalHandlerRegistry())
+            .On<StageEvent>();
+
+        Assert.Throws<ArgumentNullException>(
+            () => pipeline.UseGeneratedLocalChain(Package(), (Func<StageEvent, HookContext, ValueTask>)null!));
+        Assert.Throws<ArgumentNullException>(
+            () => pipeline.UseGeneratedLocalChain(null!, (StageEvent _, HookContext _) => ValueTask.CompletedTask));
+    }
+
+    [Fact]
     public void UseGeneratedChain_accepts_declared_hook_name_for_ordinary_subscription_packages()
     {
         var installed = false;

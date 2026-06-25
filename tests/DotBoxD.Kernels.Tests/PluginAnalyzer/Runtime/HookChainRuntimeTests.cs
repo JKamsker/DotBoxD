@@ -12,7 +12,7 @@ public sealed record ChainAggroEvent(string MonsterId, int Distance);
 /// End-to-end runtime proof of the Phase C lowering + interceptor hook-up: a real inline chain is
 /// lowered by the generator, compiled, loaded, and the lowered verified IR executes correctly — its
 /// <c>Where</c> gates and its <c>Send</c> runs. One test installs the package directly via
-/// <see cref="HookPipeline{TEvent}.UseGeneratedChain"/>; the other proves the generated C# interceptor
+/// <see cref="HookPipeline{TEvent, TContext}.UseGeneratedChain"/>; the other proves the generated C# interceptor
 /// does it automatically at the <c>Run</c> call site (no manual wiring).
 /// </summary>
 public sealed class HookChainRuntimeTests
@@ -32,7 +32,6 @@ public sealed class HookChainRuntimeTests
         }
         """;
 
-    // A one-parameter Where (no context) lowers and runs exactly like the (e, ctx) form.
     private const string OneParamChainSource = """
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
@@ -66,7 +65,6 @@ public sealed class HookChainRuntimeTests
         Assert.Equal("calm", message.Message);
     }
 
-    // A one-parameter Select projects the element; the projection must flow into the lowered terminal.
     private const string OneParamSelectChainSource = """
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
@@ -95,7 +93,6 @@ public sealed class HookChainRuntimeTests
         await server.Hooks.PublishAsync(new ChainAggroEvent("monster-7", 3));
 
         var message = Assert.Single(messages.Messages);
-        // The element-only Select(e => e.MonsterId) projection reached the lowered terminal's Send target.
         Assert.Equal("monster-7", message.TargetId);
         Assert.Equal("calm", message.Message);
     }
@@ -209,8 +206,6 @@ public sealed class HookChainRuntimeTests
     [Fact]
     public async Task Element_only_runtime_overloads_filter_and_run_without_a_context_parameter()
     {
-        // The native (non-lowered) path: the new element-only Where / RunLocal overloads forward to
-        // the (element, context) forms, so a stage need not take the context it doesn't use.
         var collected = new List<string>();
         using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>()
@@ -226,7 +221,6 @@ public sealed class HookChainRuntimeTests
     [Fact]
     public async Task Element_only_Select_and_stage_overloads_project_without_a_context_parameter()
     {
-        // HookStage element-only Select / Where / RunLocal: each stage independently omits the context.
         var collected = new List<int>();
         using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: ChainPolicy());
         server.Hooks.On<ChainAggroEvent>()
@@ -243,8 +237,6 @@ public sealed class HookChainRuntimeTests
     [Fact]
     public async Task A_lowered_Where_chain_runs_only_when_its_condition_holds()
     {
-        // Interceptors enabled so the generated interceptor file compiles; this test still installs the
-        // package directly (UseGeneratedChain) rather than through the interceptor.
         var assembly = Compile(ChainSource, enableInterceptors: true);
         var package = PackageFrom(assembly);
 
@@ -263,9 +255,6 @@ public sealed class HookChainRuntimeTests
     [Fact]
     public async Task The_generated_interceptor_installs_the_chain_at_the_Run_call_site()
     {
-        // With interceptors enabled, the generated [InterceptsLocation] method replaces the
-        // Run(lambda) call inside Configure with UseGeneratedChain — so running Configure
-        // installs the lowered chain instead of throwing DBXK062.
         var assembly = Compile(ChainSource, enableInterceptors: true);
 
         var messages = new InMemoryPluginMessageSink();

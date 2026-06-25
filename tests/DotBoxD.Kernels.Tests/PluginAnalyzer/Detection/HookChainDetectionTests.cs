@@ -2,14 +2,15 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using PluginPackageGenerator = DotBoxD.Plugins.Analyzer.Analysis.PluginPackageGenerator;
 using PluginServer = DotBoxD.Plugins.PluginServer;
+using RuntimePluginAnalyzer = DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Detection;
 
 /// <summary>
-/// Phase C-0 (detection only): the analyzer flags an inline Run(lambda) hook-chain terminal
-/// with informational DBXK110, since lowering those lambdas to verified IR is a later phase and the
-/// runtime terminal throws until then.
+/// DBXK110 used to come from the analyzer without knowing whether the generator lowered the chain. The generator
+/// now owns not-lowered hook-chain diagnostics, so lowered chains must not carry DBXK110.
 /// </summary>
 public sealed class HookChainDetectionTests
 {
@@ -17,9 +18,9 @@ public sealed class HookChainDetectionTests
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
     [Fact]
-    public async Task Reports_DBXK110_on_an_inline_Run_lambda_chain()
+    public async Task Lowered_Run_lambda_chain_reports_no_DBXK110_when_generator_runs()
     {
-        var diagnostics = await AnalyzeAsync("""
+        var result = await AnalyzeWithGeneratorAsync("""
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
@@ -31,18 +32,27 @@ public sealed class HookChainDetectionTests
                 public static class Usage
                 {
                     public static void Configure(HookRegistry hooks)
-                        => hooks.On<DamageEvent>().Run((e, ctx) => default);
+                        => hooks.On<DamageEvent>().Run((e, ctx) => ctx.Messages.Send(e.TargetId, "damage"));
                 }
             }
             """);
 
-        Assert.Contains(diagnostics, d => d.Id == "DBXK110");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id == "DBXK110");
     }
 
     [Fact]
-    public async Task Does_not_report_DBXK110_for_RunLocal()
+    public void Plugin_analyzer_no_longer_advertises_DBXK110()
+        => Assert.DoesNotContain(
+            new RuntimePluginAnalyzer().SupportedDiagnostics,
+            descriptor => descriptor.Id == "DBXK110");
+
+    [Fact]
+    public async Task RunLocal_reports_no_DBXK110()
     {
-        var diagnostics = await AnalyzeAsync("""
+        var diagnostics = await AnalyzeOnlyAsync("""
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
@@ -62,9 +72,24 @@ public sealed class HookChainDetectionTests
         Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK110");
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    private static async Task<(ImmutableArray<Diagnostic> Diagnostics, ImmutableArray<SyntaxTree> GeneratedTrees)>
+        AnalyzeWithGeneratorAsync(string source)
     {
-        var compilation = CSharpCompilation.Create(
+        var compilation = CreateCompilation(source);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
+        var result = driver.GetRunResult();
+        var diagnostics = result.Diagnostics.AddRange(await AnalyzeCompilationAsync(output));
+        return (diagnostics, result.GeneratedTrees);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeOnlyAsync(string source)
+        => await AnalyzeCompilationAsync(CreateCompilation(source));
+
+    private static Compilation CreateCompilation(string source)
+        => CSharpCompilation.Create(
             "DotBoxDHookChainDetectionTest",
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
             TrustedPlatformReferences()
@@ -72,7 +97,10 @@ public sealed class HookChainDetectionTests
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginServer).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new DotBoxD.Plugins.Analyzer.Analysis.PluginAnalyzer());
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeCompilationAsync(Compilation compilation)
+    {
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new RuntimePluginAnalyzer());
         return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 

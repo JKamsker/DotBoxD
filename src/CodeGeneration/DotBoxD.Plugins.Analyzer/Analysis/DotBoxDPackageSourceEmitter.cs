@@ -171,8 +171,8 @@ internal static class DotBoxDPackageSourceEmitter
         }
 
         // Host-readable mark for a lowered RunLocal chain: persisted so the runtime pushes rather than
-        // re-deriving from IR. A null ProjectedType (no Select) marks a whole-event push; a non-null one
-        // marks a projection push — so the payload kind is derivable and needs no separate field.
+        // re-deriving from IR. No-Select RunLocal chains are emitted as explicit event-record projections, so
+        // every generated local terminal declares a non-null projected type.
         if (model.LocalTerminal)
         {
             builder.Append("                ").Append(LocalTerminalProperty).Append(" = ")
@@ -234,16 +234,30 @@ internal static class DotBoxDPackageSourceEmitter
         builder.AppendLine($"            {LiteralReader.StringLiteral(model.PluginId)},");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
         builder.AppendLine($"            {TypeNames.GlobalSemVersion}.One,");
-        DotBoxDCapabilityRequestSourceEmitter.Emit(builder, model.RequiredCapabilities);
+        builder.AppendLine("            [],");
         builder.Append("            [")
             .Append(DotBoxDGenerationNames.Entrypoints.ShouldHandle)
             .Append("(parameters), ")
             .Append(DotBoxDGenerationNames.Entrypoints.Handle)
             .AppendLine("(parameters)],");
-        builder.AppendLine($"            new {Generic(TypeNames.GlobalDictionary, "string", "string")} {{ [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId)}] = {LiteralReader.StringLiteral(model.PluginId)}, [{LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel)}] = {LiteralReader.StringLiteral(model.KernelName)} }});");
+        builder.Append("            new ").Append(Generic(TypeNames.GlobalDictionary, "string", "string"))
+            .Append(" { [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.PluginId))
+            .Append("] = ").Append(LiteralReader.StringLiteral(model.PluginId))
+            .Append(", [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.Kernel))
+            .Append("] = ").Append(LiteralReader.StringLiteral(model.KernelName));
+        if (model.RequiredCapabilities.Count > 0)
+        {
+            builder.Append(", [").Append(LiteralReader.StringLiteral(DotBoxDGenerationNames.ModuleMetadata.RequiredCapabilities))
+                .Append("] = ").Append(LiteralReader.StringLiteral(RequiredCapabilityMetadata(model.RequiredCapabilities)));
+        }
+
+        builder.AppendLine(" });");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
+
+    private static string RequiredCapabilityMetadata(EquatableArray<string> capabilities)
+        => string.Join(";", capabilities);
 
     private static void EmitFunctions(StringBuilder builder, PluginKernelModel model)
     {

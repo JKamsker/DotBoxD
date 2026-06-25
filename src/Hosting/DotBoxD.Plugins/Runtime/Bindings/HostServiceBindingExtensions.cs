@@ -49,22 +49,32 @@ public static class HostServiceBindingExtensions
 
             var declaringType = method.DeclaringType ?? serviceType;
             var target = ResolveTargetMethod(declaringType, implementation.GetType(), method);
-            var capability = target.GetCustomAttribute<HostCapabilityAttribute>();
+            var capability = method.GetCustomAttribute<HostCapabilityAttribute>();
             if (capability is null)
             {
                 throw new InvalidOperationException(
-                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostCapability] on its implementation.");
+                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostCapability] on its service contract.");
             }
 
             AddBinding(
                 builder,
                 registeredBindings,
-                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability.Capability));
+                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability));
         }
 
         foreach (var property in ServiceProperties(serviceType))
         {
             if (ShouldSkipProperty(property))
+            {
+                continue;
+            }
+
+            if (TryAddPropertyBinding(builder, serviceType, implementation, property, registeredBindings))
+            {
+                continue;
+            }
+
+            if (!HasDotBoxDServiceAttribute(property.PropertyType))
             {
                 continue;
             }
@@ -117,9 +127,33 @@ public static class HostServiceBindingExtensions
                     targetFactory,
                     parentImplementation,
                     handleMethod,
-                    capability.Capability));
+                    capability));
         }
 
+        return true;
+    }
+
+    private static bool TryAddPropertyBinding(
+        SandboxHostBuilder builder,
+        Type serviceType,
+        object implementation,
+        PropertyInfo property,
+        HashSet<string> registeredBindings)
+    {
+        var binding = property.GetCustomAttribute<HostBindingAttribute>();
+        if (binding is null)
+        {
+            return false;
+        }
+
+        var getter = property.GetMethod
+            ?? throw new InvalidOperationException($"Host service property '{property.Name}' must have a getter.");
+        var declaringType = getter.DeclaringType ?? serviceType;
+        var targetGetter = ResolveTargetMethod(declaringType, implementation.GetType(), getter);
+        AddBinding(
+            builder,
+            registeredBindings,
+            HostServiceBindingFactory.CreatePropertyBinding(property, targetGetter, implementation, binding));
         return true;
     }
 
@@ -191,10 +225,12 @@ public static class HostServiceBindingExtensions
             string.Equals(t.FullName, ServiceControlType, StringComparison.Ordinal));
 
     private static bool HasDotBoxDServiceAttribute(Type type)
+        => HasDirectDotBoxDServiceAttribute(type) || type.GetInterfaces().Any(HasDirectDotBoxDServiceAttribute);
+
+    private static bool HasDirectDotBoxDServiceAttribute(Type type)
         => type.GetCustomAttributes(inherit: false)
             .Any(attribute => string.Equals(
                 attribute.GetType().FullName,
                 DotBoxDServiceAttributeType,
                 StringComparison.Ordinal));
-
 }

@@ -15,6 +15,9 @@ internal sealed class DotBoxDExpressionLoweringContext
         string? projectedElementName = null,
         DotBoxDExpressionModel? projectedElement = null,
         ITypeSymbol? projectedElementType = null,
+        string? serverContextParameterName = null,
+        ITypeSymbol? serverContextType = null,
+        ITypeSymbol? contextWorldType = null,
         ICollection<string>? capabilities = null,
         ICollection<string>? effects = null,
         IReadOnlyDictionary<string, DotBoxDExpressionModel>? inlinedBindings = null,
@@ -29,6 +32,9 @@ internal sealed class DotBoxDExpressionLoweringContext
         ProjectedElementName = projectedElementName;
         ProjectedElement = projectedElement;
         ProjectedElementType = projectedElementType;
+        ServerContextParameterName = serverContextParameterName;
+        ServerContextType = serverContextType;
+        ContextWorldType = contextWorldType ?? ResolveGeneratedContextWorldType(serverContextType, semanticModel.Compilation);
         Capabilities = capabilities;
         Effects = effects;
         InlinedBindings = inlinedBindings;
@@ -61,6 +67,103 @@ internal sealed class DotBoxDExpressionLoweringContext
     /// than being misread as a same-named event property. Null in event mode or for a non-record projection.
     /// </summary>
     public ITypeSymbol? ProjectedElementType { get; }
+
+    public string? ServerContextParameterName { get; }
+
+    public ITypeSymbol? ServerContextType { get; }
+
+    public ITypeSymbol? ContextWorldType { get; }
+
+    private static ITypeSymbol? ResolveGeneratedContextWorldType(ITypeSymbol? contextType, Compilation compilation)
+    {
+        if (contextType is null)
+        {
+            return null;
+        }
+
+        foreach (var candidate in TypesInNamespace(contextType.ContainingAssembly.GlobalNamespace))
+        {
+            if (!GeneratedContextMatches(candidate, contextType, compilation))
+            {
+                continue;
+            }
+
+            foreach (var iface in candidate.Interfaces)
+            {
+                if (HasAttribute(iface, DotBoxDMetadataNames.DotBoxDServiceAttribute, compilation))
+                {
+                    return iface;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool GeneratedContextMatches(
+        INamedTypeSymbol serverType,
+        ITypeSymbol contextType,
+        Compilation compilation)
+    {
+        foreach (var attribute in serverType.GetAttributes())
+        {
+            if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.GeneratePluginServerAttribute))
+            {
+                continue;
+            }
+
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (string.Equals(argument.Key, "Context", StringComparison.Ordinal) &&
+                    argument.Value.Value is ITypeSymbol declaredContext &&
+                    SymbolEqualityComparer.Default.Equals(declaredContext, contextType))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAttribute(INamedTypeSymbol type, string metadataName, Compilation compilation)
+        => type.GetAttributes().Any(attribute => IsDotBoxDAttribute(attribute, compilation, metadataName));
+
+    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
+
+    private static IEnumerable<INamedTypeSymbol> TypesInNamespace(INamespaceSymbol ns)
+    {
+        foreach (var type in ns.GetTypeMembers())
+        {
+            yield return type;
+            foreach (var nested in NestedTypes(type))
+            {
+                yield return nested;
+            }
+        }
+
+        foreach (var child in ns.GetNamespaceMembers())
+        {
+            foreach (var type in TypesInNamespace(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> NestedTypes(INamedTypeSymbol type)
+    {
+        foreach (var nested in type.GetTypeMembers())
+        {
+            yield return nested;
+            foreach (var descendant in NestedTypes(nested))
+            {
+                yield return descendant;
+            }
+        }
+    }
 
     /// <summary>
     /// Sink for capabilities the lowered IR requires (a <c>ctx.Messages.Send</c>, a
@@ -137,6 +240,9 @@ internal sealed class DotBoxDExpressionLoweringContext
             CancellationToken,
             projectedElementName: null,
             projectedElement: null,
+            serverContextParameterName: ServerContextParameterName,
+            serverContextType: ServerContextType,
+            contextWorldType: ContextWorldType,
             capabilities: Capabilities,
             effects: Effects,
             inlinedBindings: bindings,
@@ -164,6 +270,9 @@ internal sealed class DotBoxDExpressionLoweringContext
             ProjectedElementName,
             ProjectedElement,
             ProjectedElementType,
+            ServerContextParameterName,
+            ServerContextType,
+            ContextWorldType,
             Capabilities,
             Effects,
             InlinedBindings,

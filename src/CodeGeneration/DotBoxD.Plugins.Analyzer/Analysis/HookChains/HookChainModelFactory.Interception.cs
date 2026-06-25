@@ -17,6 +17,9 @@ internal static partial class HookChainModelFactory
         string terminalElementTypeFullName,
         GeneratedRemoteHookChainKind? generatedRemoteKind,
         HookChainInterceptorInstallKind installKind,
+        string? generatedRemoteServerContextTypeFullName,
+        bool terminalHasServerContext,
+        bool terminalReturnsVoid,
         bool hasLocalDecoder,
         ITypeSymbol? projectedTypeSymbol,
         CancellationToken cancellationToken)
@@ -32,8 +35,9 @@ internal static partial class HookChainModelFactory
             : DotBoxDGenerationNames.TypeNames.GlobalPrefix + chainModel.Namespace + "." + chainModel.PackageName;
 
         if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.Parameters.Length == 1 &&
-            model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
+            method.Parameters.Length >= 1 &&
+            model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol expressionReceiverType &&
+            ResolvedReceiverType(method, expressionReceiverType) is { } receiverType &&
             ReceiverKind(receiverType) is not null)
         {
             // When the terminal projection is an anonymous type, neither the receiver (RemoteHookStage<TEvent, T>)
@@ -95,6 +99,9 @@ internal static partial class HookChainModelFactory
             eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             stages.Any(stage => stage.IsSelect),
             terminalElementTypeFullName,
+            generatedRemoteServerContextTypeFullName,
+            terminalHasServerContext,
+            terminalReturnsVoid,
             packageFullName,
             installKind,
             generatedRemoteKind.Value,
@@ -128,4 +135,9 @@ internal static partial class HookChainModelFactory
         return DotBoxDGenerationNames.TypeNames.GlobalPrefix + prefix + named.Name +
             "<" + string.Join(", ", arguments) + ">";
     }
+
+    private static INamedTypeSymbol? ResolvedReceiverType(IMethodSymbol method, INamedTypeSymbol expressionReceiverType)
+        => method.ReceiverType is INamedTypeSymbol receiverType && receiverType.TypeKind != TypeKind.Error
+            ? receiverType
+            : expressionReceiverType;
 }

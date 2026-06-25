@@ -31,7 +31,7 @@ public sealed class LiveSettingAttribute : Attribute;
 /// effect validation gate the call. Set <see cref="IsAsync"/> when that registered binding declares
 /// asynchronous host work.
 /// </summary>
-[AttributeUsage(AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
 public sealed class HostBindingAttribute(string bindingId, string capability, SandboxEffect effects) : Attribute
 {
     /// <summary>The sandbox binding id the call lowers to (e.g. <c>host.world.getHealth</c>).</summary>
@@ -69,7 +69,8 @@ public sealed class CapabilityAttribute(string id) : Attribute
 /// Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR
 /// at every call site, so plugin authors can factor shared gate/handler logic out of a
 /// <c>Where</c>/<c>Select</c>/<c>Run</c> lambda (or a kernel-class <c>ShouldHandle</c>/<c>Handle</c>)
-/// without leaving the sandbox. For example:
+/// without leaving the sandbox. The helper can be a static method, or an instance method called on the generated
+/// server-context parameter. For example:
 /// <code>
 /// server.Hooks.On&lt;MonsterAggroEvent&gt;()
 ///     .Where((e, ctx) => IsBullying(e.MonsterLevel, e.PlayerLevel))
@@ -83,8 +84,8 @@ public sealed class CapabilityAttribute(string id) : Attribute
 /// inside the body contribute their capabilities to the calling kernel's manifest.
 /// <para>
 /// Constraints (verified at generation time; a violation fails the chain/kernel safely rather than
-/// miscompiling): the method must be <c>static</c>, have an expression body or a single
-/// <c>return</c> statement, and use only the supported scalar types (<c>bool</c>, <c>int</c>,
+/// miscompiling): the method must be static or called on the server-context parameter, have an expression body
+/// or a single <c>return</c> statement, and use only the supported scalar types (<c>bool</c>, <c>int</c>,
 /// <c>long</c>, <c>double</c>, <c>string</c>) for its parameters and return. Recursion is not allowed.
 /// </para>
 /// </summary>

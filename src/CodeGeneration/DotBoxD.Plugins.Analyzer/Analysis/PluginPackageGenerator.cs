@@ -132,6 +132,12 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         var rpcPackageIdentities = rpcPackages
             .Select(static (package, _) => GeneratedPluginPackageIdentity.From(package))
             .Collect();
+        var rpcGraftCollisions = rpcResults
+            .Collect()
+            .Select(static (results, _) => RpcKernelGraftCollisionDetector.FindDuplicates(results));
+        context.RegisterSourceOutput(
+            rpcGraftCollisions.SelectMany(static (collisions, _) => RpcKernelGraftCollisionDetector.Diagnostics(collisions)),
+            static (context, diagnostic) => context.ReportDiagnostic(diagnostic));
         var duplicateIdentities = pluginPackageIdentities
             .Combine(eventKernelPackageIdentities)
             .Combine(chainPackageIdentities)

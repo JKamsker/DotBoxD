@@ -1,6 +1,7 @@
 using System.Reflection;
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Services.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -22,9 +23,31 @@ internal static class PluginAnalyzerGeneratedPackageFactory
         return Assert.IsType<PluginPackage>(create.Invoke(null, null));
     }
 
+    public static PluginPackage CreateWithReferences(
+        string source,
+        string factoryTypeName,
+        params MetadataReference[] additionalReferences)
+    {
+        var loaded = CreateAssemblyWithReferences(source, additionalReferences);
+        var factory = loaded.GetType(factoryTypeName, throwOnError: true)!;
+        var create = factory.GetMethod("Create", BindingFlags.Public | BindingFlags.Static)!;
+        return Assert.IsType<PluginPackage>(create.Invoke(null, null));
+    }
+
     public static Assembly CreateAssembly(string source, params Type[] additionalReferenceTypes)
     {
         var compilation = CreateCompilation(source, additionalReferenceTypes);
+        return CreateAssembly(compilation);
+    }
+
+    public static Assembly CreateAssemblyWithReferences(string source, params MetadataReference[] additionalReferences)
+    {
+        var compilation = CreateCompilation(source, additionalReferences);
+        return CreateAssembly(compilation);
+    }
+
+    private static Assembly CreateAssembly(CSharpCompilation compilation)
+    {
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new PluginPackageGenerator().AsSourceGenerator()],
             parseOptions: ParseOptions);
@@ -96,6 +119,11 @@ internal static class PluginAnalyzerGeneratedPackageFactory
     }
 
     private static CSharpCompilation CreateCompilation(string source, params Type[] additionalReferenceTypes)
+        => CreateCompilation(
+            source,
+            AdditionalReferences(additionalReferenceTypes));
+
+    private static CSharpCompilation CreateCompilation(string source, IEnumerable<MetadataReference> additionalReferences)
         => CSharpCompilation.Create(
             "DotBoxDGeneratedPackageRuntimeTest",
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
@@ -103,7 +131,8 @@ internal static class PluginAnalyzerGeneratedPackageFactory
                 .Append(MetadataReference.CreateFromFile(typeof(PluginAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(SandboxModule).Assembly.Location))
-                .Concat(AdditionalReferences(additionalReferenceTypes)),
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxDServiceAttribute).Assembly.Location))
+                .Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
     private static IEnumerable<MetadataReference> AdditionalReferences(IEnumerable<Type> referenceTypes)

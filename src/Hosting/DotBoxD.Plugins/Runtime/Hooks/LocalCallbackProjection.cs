@@ -6,12 +6,15 @@ namespace DotBoxD.Plugins.Runtime.Hooks;
 
 /// <summary>
 /// Shared per-event push logic for lowered remote <c>RunLocal</c> chains, used by both the hook and the
-/// subscription pipeline. A lowered chain is one of two kinds, distinguished by the manifest:
+/// subscription pipeline. Current generated packages always carry an explicit projected type, including
+/// no-Select <c>RunLocal</c> chains where the projected value is the event record itself. The legacy
+/// <c>ProjectedType == null</c> branch is retained only as a defensive runtime fallback; install validation
+/// rejects new packages that try to use it.
 /// <list type="bullet">
 ///   <item><b>Projection</b> (<c>ProjectedType != null</c>): the lowered <c>Handle</c> returns the
 ///   <c>Select</c> value; the host pushes that value.</item>
-///   <item><b>Whole-event</b> (<c>ProjectedType == null</c>, no <c>Select</c>): the lowered <c>Handle</c>
-///   returns <c>Unit</c>; the host evaluates only the <c>Where</c> filter and pushes the whole event record.</item>
+///   <item><b>Legacy whole-event</b> (<c>ProjectedType == null</c>): the lowered <c>Handle</c> returns
+///   <c>Unit</c>; the host evaluates only the <c>Where</c> filter and pushes the whole event record.</item>
 /// </list>
 /// In both kinds the filter runs server-side in the sandbox <i>before</i> anything crosses the wire, so a
 /// non-matching event produces no push — the premise that filtering is server-side and IPC carries only the

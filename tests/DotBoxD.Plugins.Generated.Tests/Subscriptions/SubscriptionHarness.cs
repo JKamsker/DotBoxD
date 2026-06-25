@@ -33,7 +33,7 @@ internal sealed class SubscriptionHarness<TEvent> : IDisposable
             async package =>
             {
                 var kernel = await server.InstallAsync(package).ConfigureAwait(false);
-                var subscriptionId = package.Manifest.PluginId;
+                var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                 server.Subscriptions.On<TEvent>().UseProjecting(
                     kernel,
                     subscriptionId,

@@ -36,7 +36,8 @@ internal static partial class RpcKernelModelFactory
 
         try
         {
-            var method = ResolveBatchMethod(type);
+            var graft = RpcServerExtensionGraft.Create(type, graftType);
+            var method = ResolveBatchMethod(type, context.SemanticModel.Compilation);
             ValidateBatchMethodParameters(method);
             var liveSettings = PluginSymbolReader.LiveSettings(type, context.SemanticModel, cancellationToken);
             if (ContainsUnsupported(liveSettings))
@@ -56,7 +57,7 @@ internal static partial class RpcKernelModelFactory
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
             var effects = new SortedSet<string>(StringComparer.Ordinal);
             var lowerer = new DotBoxDRpcJsonLowerer(context.SemanticModel, capabilities, effects, cancellationToken);
-            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graftType);
+            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
             var bodyJson = lowerer.LowerBody(body);
 
             effects.Add("Cpu");
@@ -76,69 +77,20 @@ internal static partial class RpcKernelModelFactory
                 serviceType,
                 serviceMethod,
                 clientExtensions,
-                graftType,
+                graft,
                 hasReceiverId);
-            return new RpcKernelModelResult(source, null);
+            var grafts = RpcKernelGraftSignatureFactory.Create(
+                type,
+                method,
+                serviceMethod,
+                clientExtensions,
+                graft);
+            return new RpcKernelModelResult(source, null, grafts);
         }
         catch (NotSupportedException ex)
         {
             return Fail(declaration, ex.Message);
         }
-    }
-
-    private static IMethodSymbol ResolveBatchMethod(INamedTypeSymbol type)
-    {
-        IMethodSymbol? found = null;
-        foreach (var member in type.GetMembers())
-        {
-            if (member is IMethodSymbol
-                {
-                    MethodKind: MethodKind.Ordinary,
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsStatic: false
-                } method &&
-                method.Parameters.Length > 0 &&
-                string.Equals(
-                    method.Parameters[method.Parameters.Length - 1].Type.ToDisplayString(),
-                    DotBoxDMetadataNames.HookContextType,
-                    StringComparison.Ordinal))
-            {
-                if (found is not null)
-                {
-                    throw new NotSupportedException("A server extension must declare exactly one batch method (a public method whose last parameter is HookContext).");
-                }
-
-                found = method;
-            }
-        }
-
-        return found ?? throw new NotSupportedException("A server extension must declare one public batch method whose last parameter is HookContext.");
-    }
-
-    private static void ValidateBatchMethodParameters(IMethodSymbol method)
-    {
-        for (var i = 0; i < method.Parameters.Length - 1; i++)
-        {
-            var parameter = method.Parameters[i];
-            if (parameter.RefKind != RefKind.None)
-            {
-                throw new NotSupportedException(
-                    $"Server extension parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
-            }
-        }
-    }
-
-    private static BlockSyntax MethodBody(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        foreach (var reference in method.DeclaringSyntaxReferences)
-        {
-            if (reference.GetSyntax(cancellationToken) is MethodDeclarationSyntax { Body: { } block })
-            {
-                return block;
-            }
-        }
-
-        throw new NotSupportedException($"Server extension method '{method.Name}' must have a block body declared in source.");
     }
 
     private static GeneratedPluginPackage EmitPackage(
@@ -152,7 +104,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
-        INamedTypeSymbol? graftType,
+        RpcServerExtensionGraft? graft,
         bool hasReceiverId)
     {
         var methodName = method.Name;
@@ -198,7 +150,7 @@ internal static partial class RpcKernelModelFactory
 
         return new GeneratedPluginPackage(
             HintName(type),
-            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graftType, method),
+            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graft, method),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -209,7 +161,7 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
-        INamedTypeSymbol? graftType,
+        RpcServerExtensionGraft? graft,
         IMethodSymbol kernelMethod)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
@@ -239,11 +191,11 @@ internal static partial class RpcKernelModelFactory
                 builder.Append(RpcKernelClientExtensionEmitter.Emit(type, serviceType, serviceMethod, clientExtensions));
             }
         }
-        else if (graftType is not null &&
+        else if (graft is not null &&
                  RpcKernelClientExtensionModelFactory.HasExtensionAttribute(kernelMethod))
         {
             builder.AppendLine();
-            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graftType, kernelMethod));
+            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod));
         }
 
         return builder.ToString();
@@ -278,7 +230,10 @@ internal static partial class RpcKernelModelFactory
         => type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
 
     private static RpcKernelModelResult Fail(ClassDeclarationSyntax declaration, string message)
-        => new(null, PluginKernelDiagnostic.Create(declaration.Identifier, message));
+        => new(null, PluginKernelDiagnostic.Create(declaration.Identifier, message), default);
 }
 
-internal sealed record RpcKernelModelResult(GeneratedPluginPackage? Package, PluginKernelDiagnostic? Diagnostic);
+internal sealed record RpcKernelModelResult(
+    GeneratedPluginPackage? Package,
+    PluginKernelDiagnostic? Diagnostic,
+    EquatableArray<RpcKernelGraftSignature> Grafts);

@@ -5,12 +5,16 @@
     <Description>DotBoxD.Kernels plugin manifest, installed kernel, hook, and message-binding APIs.</Description>
     <PackageTags>dotboxd;sandbox;plugins;hooks;kernels</PackageTags>
   </PropertyGroup>
-<ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels\DotBoxD.Kernels.csproj" />
     <ProjectReference Include="..\DotBoxD.Hosting\DotBoxD.Hosting.csproj" />
     <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Runtime\DotBoxD.Kernels.Runtime.csproj" />
     <ProjectReference Include="..\..\Kernels\DotBoxD.Kernels.Serialization.Json\DotBoxD.Kernels.Serialization.Json.csproj" />
     <ProjectReference Include="..\DotBoxD.Abstractions\DotBoxD.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Shared\HostBindings\HostBindingMetadataRules.cs" Link="Shared\HostBindingMetadataRules.cs" />
   </ItemGroup>
 
   <!--

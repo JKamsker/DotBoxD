@@ -17,9 +17,9 @@ public sealed record MonsterSnapshot(string Id, string Name, int Health, int Lev
 /// generated builder's <c>Setup</c> accumulator, and live tuning (<c>Get</c>) lives on the facade, NOT here —
 /// so a kernel that gets the world injected sees only domain reads, never an install verb that would throw.
 /// <b>Routing is automatic</b>:
-/// each method's identity is the binding/RPC route. The capability each call requires is declared on the
-/// <b>server implementation</b> (see <c>GameWorldAccess</c>'s <c>[HostCapability]</c>); the read/write effect
-/// is inferred from the impl.</para>
+/// each method's identity is the binding/RPC route. The capability and host-state effect each call requires
+/// are declared on this SDK contract with <c>[HostCapability]</c>, so the analyzer and runtime consume the
+/// same metadata.</para>
 /// </summary>
 [DotBoxDService]
 public interface IGameWorldAccess
@@ -39,11 +39,11 @@ public interface IMonsterControl
     /// <c>Monsters.Get(id).KillAsync()</c>. This is a nested proxy: cheap and local (no I/O); the async hop
     /// happens when you call a method on the returned <see cref="IMonster"/>.
     /// </summary>
-    [HostCapability("game.world.monster.read.handle")]
+    [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
     IMonster Get(string entityId);
 
     /// <summary>Whether the id currently belongs to a monster (collection-level classification).</summary>
-    [HostCapability("game.world.monster.read.kind")]
+    [HostCapability("game.world.monster.read.kind", HostBindingEffect.HostStateRead)]
     ValueTask<bool> IsMonsterAsync(string entityId);
 }
 
@@ -51,7 +51,7 @@ public interface IMonsterControl
 public interface IEntityControl
 {
     /// <summary>A scoped <b>handle</b> for one entity. The id is captured; calls on it omit it. No I/O.</summary>
-    [HostCapability("game.world.entity.read.handle")]
+    [HostCapability("game.world.entity.read.handle", HostBindingEffect.HostStateRead)]
     IEntity Get(string entityId);
 }
 
@@ -66,15 +66,15 @@ public interface IEntity
     string Id { get; }
 
     /// <summary>The entity's current hit points (0 if unknown or defeated).</summary>
-    [HostCapability("game.world.entity.read.health")]
+    [HostCapability("game.world.entity.read.health", HostBindingEffect.HostStateRead)]
     ValueTask<int> GetHealthAsync();
 
     /// <summary>The entity's level (0 if unknown).</summary>
-    [HostCapability("game.world.entity.read.level")]
+    [HostCapability("game.world.entity.read.level", HostBindingEffect.HostStateRead)]
     ValueTask<int> GetLevelAsync();
 
     /// <summary>The entity's 1D world position (0 if unknown).</summary>
-    [HostCapability("game.world.entity.read.position")]
+    [HostCapability("game.world.entity.read.position", HostBindingEffect.HostStateRead)]
     ValueTask<int> GetPositionAsync();
 }
 
@@ -87,18 +87,18 @@ public interface IEntity
 public interface IMonster : IEntity
 {
     /// <summary>Immutable snapshot of this monster. An unknown/non-monster id yields an empty snapshot.</summary>
-    [HostCapability("game.world.monster.read.snapshot")]
+    [HostCapability("game.world.monster.read.snapshot", HostBindingEffect.HostStateRead | HostBindingEffect.Allocates)]
     ValueTask<MonsterSnapshot> SnapshotAsync();
 
     /// <summary>Kills this monster and returns whether the world changed.</summary>
-    [HostCapability("game.world.monster.write.kill")]
+    [HostCapability("game.world.monster.write.kill", HostBindingEffect.HostStateWrite)]
     ValueTask<bool> KillAsync();
 
     /// <summary>This monster's combat threat rating (gated under its own capability subtree, server-side).</summary>
-    [HostCapability("game.world.combat.threat")]
+    [HostCapability("game.world.combat.threat", HostBindingEffect.HostStateRead)]
     ValueTask<int> GetThreatAsync();
 
     /// <summary>Moves this monster to a 1D world position.</summary>
-    [HostCapability("game.world.monster.write.position")]
+    [HostCapability("game.world.monster.write.position", HostBindingEffect.HostStateWrite)]
     ValueTask TeleportToAsync(int position);
 }

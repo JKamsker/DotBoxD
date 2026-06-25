@@ -7,6 +7,38 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed partial class PluginAnalyzerHookChainTests
 {
     [Fact]
+    public void Unlowered_Run_reports_DBXK114_as_warning()
+    {
+        var result = RunGenerator("""
+            using System.Threading.Tasks;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(HookRegistry hooks)
+                    => hooks.On<DamageEvent>()
+                        .Run((e, ctx) =>
+                        {
+                            ctx.Messages.Send(e.TargetId, "damage");
+                            return ValueTask.CompletedTask;
+                        });
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK114"));
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("HookChain_", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Unlowered_RegisterLocal_reports_DBXK113_as_info()
     {
         // RegisterLocal is an escape hatch whose body need not lower; a not-lowered case stays Info, consistent

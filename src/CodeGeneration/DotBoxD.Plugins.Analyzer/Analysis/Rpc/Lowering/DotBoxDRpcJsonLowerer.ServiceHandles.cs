@@ -19,7 +19,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         // lowers the captured key — so that lowering and its side effects run only for a real scoped host call.
         if (invocation.Expression is not MemberAccessExpressionSyntax member ||
             _model.GetSymbolInfo(invocation, _cancellationToken).Symbol is not IMethodSymbol method ||
-            DotBoxDHostBindingExpressionLowerer.HostBinding(method) is not { } binding ||
+            DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is not { } binding ||
             TryResolveScopeHandle(member.Expression) is not { } handleId)
         {
             return null;

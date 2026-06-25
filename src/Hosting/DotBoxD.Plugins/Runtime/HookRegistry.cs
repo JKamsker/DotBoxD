@@ -9,15 +9,30 @@ internal interface IKernelHandlerPipeline
     void RemoveKernelPool(InstalledKernelPool pool);
 }
 
-public sealed class HookRegistry
+internal interface IHookPipeline<TEvent> : IKernelHandlerPipeline
+{
+    bool UsesAdapter(IPluginEventAdapter<TEvent> adapter);
+    Hooks.IResultHookRegistration<TEvent>[] ResultRegistrations();
+    ValueTask PublishAsync(TEvent e, CancellationToken cancellationToken);
+    ValueTask<TResult?> FireResultAsync<TResult>(TEvent e, CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult;
+    ValueTask<TResult?> FireResultAsync<TResult>(
+        TEvent e,
+        ResultHookDispatchOptions<TResult> options,
+        CancellationToken cancellationToken = default)
+        where TResult : struct, IHookResult;
+}
+
+public sealed partial class HookRegistry
 {
     private readonly object _gate = new();
-    private readonly Dictionary<Type, object> _pipelines = [];
+    private readonly Dictionary<PipelineKey, object> _pipelines = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<ResultHookFault>? _onFault;
+    private long _resultOrder;
 
     internal HookRegistry(
         IPluginMessageSink messages,
@@ -33,52 +48,91 @@ public sealed class HookRegistry
         _onFault = onFault;
     }
 
-    public HookPipeline<TEvent> On<TEvent>()
+    public HookPipeline<TEvent, HookContext> On<TEvent>()
     {
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
 
-    public HookPipeline<TEvent> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+    public HookPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
+        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+
+    public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
+        var adapter = _events.Resolve<TEvent>();
+        return On(adapter, createContext);
+    }
+
+    public HookPipeline<TEvent, TContext> On<TEvent, TContext>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, TContext> createContext)
+    {
+        ArgumentNullException.ThrowIfNull(createContext);
+        if (typeof(TContext) == typeof(HookContext))
+        {
+            return (HookPipeline<TEvent, TContext>)(object)OnHookContext(adapter, (Func<HookContext, HookContext>)(object)createContext);
+        }
+
         lock (_gate)
         {
-            if (_pipelines.TryGetValue(typeof(TEvent), out var existing))
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(TContext));
+            if (_pipelines.TryGetValue(key, out var existing))
             {
-                var pipeline = (HookPipeline<TEvent>)existing;
-                if (!pipeline.UsesAdapter(adapter))
-                {
-                    throw new SandboxValidationException([
-                        new SandboxDiagnostic(
-                            "DBXK034",
-                            $"Hook pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
-                    ]);
-                }
-
+                var pipeline = (HookPipeline<TEvent, TContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
                 return pipeline;
             }
 
-            var created = new HookPipeline<TEvent>(adapter, _messages, _kernels, _installer, _onFault);
-            _pipelines[typeof(TEvent)] = created;
+            var created = new HookPipeline<TEvent, TContext>(
+                adapter,
+                _messages,
+                new ServerContextFactory<TContext>(createContext),
+                _kernels,
+                _installer,
+                _onFault,
+                NextResultOrder);
+            _pipelines[key] = created;
             return created;
         }
     }
+
+    private HookPipeline<TEvent, HookContext> OnHookContext<TEvent>(
+        IPluginEventAdapter<TEvent> adapter,
+        Func<HookContext, HookContext> createContext)
+    {
+        lock (_gate)
+        {
+            EnsureCanRegisterLocked(adapter);
+            var key = new PipelineKey(typeof(TEvent), typeof(HookContext));
+            if (_pipelines.TryGetValue(key, out var existing))
+            {
+                var pipeline = (HookPipeline<TEvent, HookContext>)existing;
+                EnsureContextFactoryMatches(pipeline.UsesContextFactory, createContext, "hook");
+                return pipeline;
+            }
+
+            var created = new HookPipeline<TEvent, HookContext>(
+                adapter,
+                _messages,
+                new ServerContextFactory<HookContext>(createContext),
+                _kernels,
+                _installer,
+                _onFault,
+                NextResultOrder);
+            _pipelines[key] = created;
+            return created;
+        }
+    }
+
+    private long NextResultOrder()
+        => Interlocked.Increment(ref _resultOrder) - 1;
 
     internal void EnsureCanRegister<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
         lock (_gate)
         {
-            if (!_pipelines.TryGetValue(typeof(TEvent), out var existing) ||
-                ((HookPipeline<TEvent>)existing).UsesAdapter(adapter))
-            {
-                return;
-            }
-
-            throw new SandboxValidationException([
-                new SandboxDiagnostic(
-                    "DBXK034",
-                    $"Hook pipeline for event '{typeof(TEvent).Name}' is already registered with a different adapter.")
-            ]);
+            EnsureCanRegisterLocked(adapter);
         }
     }
 
@@ -110,18 +164,23 @@ public sealed class HookRegistry
         }
     }
 
-    public async ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
-        object? pipeline;
+        object? single;
+        object[]? multiple;
         lock (_gate)
         {
-            _pipelines.TryGetValue(typeof(TEvent), out pipeline);
+            (single, multiple) = PipelinesForEventLocked<TEvent>();
         }
 
-        if (pipeline is not null)
+        if (multiple is not null)
         {
-            await ((HookPipeline<TEvent>)pipeline).PublishAsync(e, cancellationToken).ConfigureAwait(false);
+            return PublishManyAsync(multiple, e, cancellationToken);
         }
+
+        return single is null
+            ? ValueTask.CompletedTask
+            : ((IHookPipeline<TEvent>)single).PublishAsync(e, cancellationToken);
     }
 
     /// <summary>
@@ -132,22 +191,27 @@ public sealed class HookRegistry
     /// host — unlike the plugin authoring side, where it is inferred from the <c>[Hook]</c> context — already
     /// knows the type it will apply.
     /// </summary>
-    public ValueTask<TResult?> FireAsync<TContext, TResult>(TContext context, CancellationToken cancellationToken = default)
+    public ValueTask<TResult?> FireAsync<TContext, TResult>(
+        TContext context,
+        CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult
     {
-        object? pipeline;
+        object? single;
+        object[]? multiple;
         lock (_gate)
         {
-            _pipelines.TryGetValue(typeof(TContext), out pipeline);
+            (single, multiple) = PipelinesForEventLocked<TContext>();
         }
 
         ValidateResultType<TContext, TResult>();
-        if (pipeline is null)
+        if (multiple is not null)
         {
-            return new ValueTask<TResult?>((TResult?)null);
+            return FireManyAsync<TContext, TResult>(multiple, context, cancellationToken);
         }
 
-        return ((HookPipeline<TContext>)pipeline).FireResultAsync<TResult>(context, cancellationToken);
+        return single is null
+            ? new ValueTask<TResult?>((TResult?)null)
+            : ((IHookPipeline<TContext>)single).FireResultAsync<TResult>(context, cancellationToken);
     }
 
     public ValueTask<TResult?> FireAsync<TContext, TResult>(
@@ -158,19 +222,22 @@ public sealed class HookRegistry
     {
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
-        object? pipeline;
+        object? single;
+        object[]? multiple;
         lock (_gate)
         {
-            _pipelines.TryGetValue(typeof(TContext), out pipeline);
+            (single, multiple) = PipelinesForEventLocked<TContext>();
         }
 
         ValidateResultType<TContext, TResult>();
-        if (pipeline is null)
+        if (multiple is not null)
         {
-            return new ValueTask<TResult?>((TResult?)null);
+            return FireManyAsync(multiple, context, options, cancellationToken);
         }
 
-        return ((HookPipeline<TContext>)pipeline).FireResultAsync(context, options, cancellationToken);
+        return single is null
+            ? new ValueTask<TResult?>((TResult?)null)
+            : ((IHookPipeline<TContext>)single).FireResultAsync(context, options, cancellationToken);
     }
 
     private static void ValidateResultType<TContext, TResult>()
@@ -198,4 +265,6 @@ public sealed class HookRegistry
         internal static readonly HookAttribute? Attr =
             (HookAttribute?)Attribute.GetCustomAttribute(typeof(TContext), typeof(HookAttribute), inherit: false);
     }
+
+    private readonly record struct PipelineKey(Type EventType, Type ContextType);
 }

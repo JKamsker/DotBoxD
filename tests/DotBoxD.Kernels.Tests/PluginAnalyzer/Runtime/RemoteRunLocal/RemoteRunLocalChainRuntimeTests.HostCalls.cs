@@ -65,7 +65,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         [global::DotBoxD.Services.Attributes.DotBoxDService]
         public interface IIdWorld
         {
-            [HostCapability("probe.read.id")]
+            [HostCapability("probe.read.id", HostBindingEffect.HostStateRead | HostBindingEffect.Allocates)]
             System.Guid GenerateId(string zone);
         }
 

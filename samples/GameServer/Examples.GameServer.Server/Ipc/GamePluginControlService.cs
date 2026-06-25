@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Kernels.Game.Server.Simulation;
 using DotBoxD.Plugins.Json;
+using DotBoxD.Plugins.Kernel;
 using PluginServer = DotBoxD.Plugins.PluginServer;
 
 namespace DotBoxD.Kernels.Game.Server.Ipc;
@@ -19,7 +20,6 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     private readonly GameCommandSink _sink;
     private readonly GameWorld _world;
     private readonly GamePluginKernelWiring _kernelWiring;
-    private readonly GamePluginServerExtensionInvoker _serverExtensions;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _shutdown = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -27,7 +27,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
     // needs no callback. Kept as a distinct overload so reflection-based construction with four positional
     // arguments resolves unambiguously.
     public GamePluginControlService(PluginServer server, PluginSession session, GameCommandSink sink, GameWorld world)
-        : this(server, session, sink, world, null)
+        : this(server, session, sink, world, (IPluginEventCallback?)null)
     {
     }
 
@@ -42,8 +42,7 @@ internal sealed class GamePluginControlService : IGamePluginControlService
             session,
             sink,
             world,
-            new GamePluginKernelWiring(server, world, eventCallback),
-            new GamePluginServerExtensionInvoker(server, session))
+            new GamePluginKernelWiring(server, world, eventCallback))
     {
     }
 
@@ -52,15 +51,13 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         PluginSession session,
         GameCommandSink sink,
         GameWorld world,
-        GamePluginKernelWiring kernelWiring,
-        GamePluginServerExtensionInvoker serverExtensions)
+        GamePluginKernelWiring kernelWiring)
     {
         _server = server;
         _session = session;
         _sink = sink;
         _world = world;
         _kernelWiring = kernelWiring;
-        _serverExtensions = serverExtensions;
     }
 
     /// <summary>Completes once the plugin has installed its kernels and is holding the connection.</summary>
@@ -74,13 +71,15 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        _kernelWiring.ValidateSupportedEvent(package);
         Console.WriteLine($"[server] installing plugin kernel '{package.Manifest.PluginId}'...");
-        var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
-        var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
-        _kernelWiring.WireHook(kernel);
+        var kernel = await _session.InstallAndWireAsync(
+            package,
+            _kernelWiring.WireHook,
+            policy: pkg => ServerPolicy.ForKernel(_server.GetRequiredCapabilities(pkg)),
+            validate: _kernelWiring.ValidateRoute,
+            ct).ConfigureAwait(false);
         Console.WriteLine($"[server] installed plugin kernel '{kernel.Manifest.PluginId}'.");
-        return kernel.Manifest.PluginId;
+        return InstallRouteId(kernel);
     }
 
     public async ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default)
@@ -88,14 +87,16 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ArgumentNullException.ThrowIfNull(packageJson);
 
         var package = PluginPackageJsonSerializer.Import(packageJson);
-        _kernelWiring.ValidateSupportedEvent(package);
         Console.WriteLine($"[server] installing subscription kernel '{package.Manifest.PluginId}'...");
-        var policy = ServerPolicy.ForKernel(_server.GetRequiredCapabilities(package));
-        var kernel = await _session.InstallAsync(package, policy, ct).ConfigureAwait(false);
-        _kernelWiring.WireSubscription(kernel);
+        var kernel = await _session.InstallAndWireAsync(
+            package,
+            _kernelWiring.WireSubscription,
+            policy: pkg => ServerPolicy.ForKernel(_server.GetRequiredCapabilities(pkg)),
+            validate: _kernelWiring.ValidateRoute,
+            ct).ConfigureAwait(false);
         EventIndexDiagnostics.Report(kernel);
         Console.WriteLine($"[server] installed subscription kernel '{kernel.Manifest.PluginId}'.");
-        return kernel.Manifest.PluginId;
+        return InstallRouteId(kernel);
     }
 
     public async ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
@@ -118,11 +119,25 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         }
     }
 
-    public ValueTask<byte[]> InvokeServerExtensionAsync(
+    public async ValueTask<byte[]> InvokeServerExtensionAsync(
         string pluginId,
         byte[] arguments,
         CancellationToken ct = default)
-        => _serverExtensions.InvokeAsync(pluginId, arguments, ct);
+    {
+        ArgumentNullException.ThrowIfNull(pluginId);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        // Owner-checked atomically: bind authz to the exact kernel returned, so a same-id hot-replace can't swap
+        // a different session's kernel in between an ownership check and a separate lookup. The decode/convert/
+        // invoke/encode marshalling lives in the framework (InvokeServerExtensionRpcAsync).
+        if (!_session.TryGetOwned(pluginId, out var kernel))
+        {
+            throw new InvalidOperationException(
+                $"Server extension '{pluginId}' is not owned by this plugin session.");
+        }
+
+        return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+    }
 
     public ValueTask UpdateSettingsAsync(
         string pluginId,
@@ -160,6 +175,9 @@ internal sealed class GamePluginControlService : IGamePluginControlService
         ct.ThrowIfCancellationRequested();
         return ValueTask.FromResult(_sink.DrainEffects());
     }
+
+    private static string InstallRouteId(InstalledKernel kernel)
+        => kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
 
     // The per-entity domain calls (KillMonster / IsMonster / GetEntity*) moved to GameWorldAccess, which
     // implements IGameWorldAccess directly. This control service is now control-plane only. (GetWorldAsync

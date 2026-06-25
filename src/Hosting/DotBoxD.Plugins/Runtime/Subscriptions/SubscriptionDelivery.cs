@@ -7,13 +7,19 @@ internal static class SubscriptionDelivery
     // RunLocal subscription look like "it just does nothing", so every caught fault is reported to the optional
     // observer before delivery is abandoned. Control flow is unchanged: a failed filter still drops the event, a
     // failed handler still lets the remaining handlers run.
-    internal static async ValueTask PublishSafelyAsync<TEvent>(
-        Func<TEvent, HookContext, ValueTask<bool>>[] filters,
-        Func<TEvent, HookContext, ValueTask>[] handlers,
+    internal static async ValueTask PublishSafelyAsync<TEvent, TContext>(
+        Func<TEvent, TContext, ValueTask<bool>>[] filters,
+        Func<TEvent, HookContext, TContext, ValueTask>[] handlers,
         TEvent e,
-        HookContext context,
+        HookContext rawContext,
+        TContext context,
         Action<SubscriptionDeliveryFault>? onFault)
     {
+        if (rawContext.CancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         try
         {
             for (var i = 0; i < filters.Length; i++)
@@ -24,6 +30,10 @@ internal static class SubscriptionDelivery
                 }
             }
         }
+        catch (OperationCanceledException) when (rawContext.CancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
         catch (Exception ex)
         {
             Report<TEvent>(onFault, ex, SubscriptionDeliveryStage.Filter);
@@ -32,9 +42,18 @@ internal static class SubscriptionDelivery
 
         for (var i = 0; i < handlers.Length; i++)
         {
+            if (rawContext.CancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             try
             {
-                await handlers[i](e, context).ConfigureAwait(false);
+                await handlers[i](e, rawContext, context).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (rawContext.CancellationToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {

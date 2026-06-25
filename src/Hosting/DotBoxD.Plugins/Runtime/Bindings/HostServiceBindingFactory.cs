@@ -3,23 +3,24 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime.Rpc;
+using DotBoxD.Shared.HostBindings;
 
 namespace DotBoxD.Hosting.Execution;
 
-internal static class HostServiceBindingFactory
+internal static partial class HostServiceBindingFactory
 {
     public static BindingDescriptor CreateBinding(
         MethodInfo interfaceMethod,
         MethodInfo targetMethod,
         object target,
-        string capability)
+        HostCapabilityAttribute capability)
     {
         var payloadType = UnwrapReturnType(interfaceMethod.ReturnType);
         var parameters = interfaceMethod.GetParameters()
             .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
             .ToArray();
         var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
-        var effects = InferEffects(interfaceMethod, returnType, capability);
+        var effects = DeclaredEffects(interfaceMethod, returnType, capability);
         var id = HostBindingRoute(interfaceMethod.DeclaringType!, interfaceMethod);
         var callTarget = new HostServiceCallTarget(targetMethod);
 
@@ -28,10 +29,10 @@ internal static class HostServiceBindingFactory
             parameters,
             returnType,
             effects,
-            capability,
+            capability.Capability,
             IsTaskLike(interfaceMethod.ReturnType),
             (context, args, cancellationToken) =>
-                InvokeAsync(context, args, cancellationToken, id, capability, effects, callTarget, target, payloadType));
+                InvokeAsync(context, args, cancellationToken, id, capability.Capability, effects, callTarget, target, payloadType));
     }
 
     public static BindingDescriptor CreateHandleBinding(
@@ -39,7 +40,7 @@ internal static class HostServiceBindingFactory
         MethodInfo factoryTargetMethod,
         object factoryTarget,
         MethodInfo handleInterfaceMethod,
-        string capability)
+        HostCapabilityAttribute capability)
     {
         var payloadType = UnwrapReturnType(handleInterfaceMethod.ReturnType);
         var parameters = factoryInterfaceMethod.GetParameters()
@@ -47,7 +48,7 @@ internal static class HostServiceBindingFactory
             .Select(parameter => ServerExtensionSandboxTypeOf(parameter.ParameterType))
             .ToArray();
         var returnType = payloadType is null ? SandboxType.Unit : ServerExtensionSandboxTypeOf(payloadType);
-        var effects = InferEffects(handleInterfaceMethod, returnType, capability);
+        var effects = DeclaredEffects(handleInterfaceMethod, returnType, capability);
         var id = HostBindingRoute(handleInterfaceMethod.DeclaringType!, handleInterfaceMethod);
         var factoryCallTarget = new HostServiceCallTarget(factoryTargetMethod);
         var handleCallTarget = new HostServiceCallTarget(handleInterfaceMethod);
@@ -57,7 +58,7 @@ internal static class HostServiceBindingFactory
             parameters,
             returnType,
             effects,
-            capability,
+            capability.Capability,
             IsTaskLike(handleInterfaceMethod.ReturnType),
             (context, args, cancellationToken) =>
                 InvokeHandleAsync(
@@ -65,13 +66,13 @@ internal static class HostServiceBindingFactory
                     args,
                     cancellationToken,
                     id,
-                    capability,
+                    capability.Capability,
                     effects,
                     factoryInterfaceMethod,
                     factoryCallTarget,
                     factoryTarget,
                     handleCallTarget,
-                    payloadType));
+                payloadType));
     }
 
     public static Type? UnwrapReturnType(Type type)
@@ -202,39 +203,31 @@ internal static class HostServiceBindingFactory
     private static bool IsTaskLike(Type type)
         => HostServiceCallTarget.IsTaskLike(type);
 
-    private static SandboxEffect InferEffects(MethodInfo method, SandboxType returnType, string capability)
+    private static SandboxEffect DeclaredEffects(
+        MethodInfo method,
+        SandboxType returnType,
+        HostCapabilityAttribute capability)
     {
+        var declaredEffects = HostBindingMetadataRules.ValidateDeclaredEffects(
+            (long)capability.Effects,
+            ReturnAllocates(returnType),
+            $"Host capability on '{method.DeclaringType?.FullName}.{method.Name}'");
         var effects = SandboxEffect.Cpu;
-        if (ReturnAllocates(returnType))
+        if ((declaredEffects & HostBindingMetadataRules.Allocates) == HostBindingMetadataRules.Allocates)
         {
             effects |= SandboxEffect.Alloc;
         }
 
-        return IsWriteMethod(method, capability)
+        return (declaredEffects & HostBindingMetadataRules.HostStateWrite) == HostBindingMetadataRules.HostStateWrite
             ? effects | SandboxEffect.HostStateWrite
             : effects | SandboxEffect.HostStateRead;
     }
 
-    private static bool IsWriteMethod(MethodInfo method, string capability)
-        => capability.Contains(".write.", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Kill", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Set", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Update", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Delete", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Add", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Remove", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Move", StringComparison.Ordinal) ||
-           method.Name.StartsWith("Teleport", StringComparison.Ordinal);
-
     private static bool ReturnAllocates(SandboxType type)
-        => type != SandboxType.Unit &&
-           type != SandboxType.Bool &&
-           type != SandboxType.I32 &&
-           type != SandboxType.I64 &&
-           type != SandboxType.F64;
+        => HostBindingMetadataRules.ReturnAllocatesSandboxTypeName(type.Name);
 
     private static long BaseFuel(SandboxType returnType) => ReturnAllocates(returnType) ? 3 : 2;
 
     private static string HostBindingRoute(Type type, MethodInfo method)
-        => "host." + (type.Namespace is null ? type.Name : type.Namespace + "." + type.Name) + "." + method.Name;
+        => HostBindingMetadataRules.BindingId(type.Namespace, type.Name, method.Name);
 }

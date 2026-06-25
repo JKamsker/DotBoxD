@@ -7,7 +7,31 @@ public sealed partial class RemoteHookPipeline<TEvent>
         => throw ResultNotLowered();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
+        Func<TEvent, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
+        Func<TEvent, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
+        Func<TEvent, HookContext, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+        => throw ResultLocalHandlersNotSupported();
+
+    public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
+        Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
         where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
@@ -30,18 +54,71 @@ public sealed partial class RemoteHookPipeline<TEvent>
 
     public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
         PluginPackage package,
-        Func<TEvent, HookContext, TResult> handler,
+        Func<TEvent, TResult> handler,
         int priority = 0)
         where TResult : struct, IHookResult
     {
         ArgumentNullException.ThrowIfNull(handler);
         return UseGeneratedLocalResultChain<TResult>(
             package,
+            (e, _) => handler(e),
+            priority);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, HookContext, TResult> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(
+            package,
             (e, context, _) => new ValueTask<TResult>(handler(e, context)),
             priority);
     }
 
     public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(package, (e, _, _) => handler(e), priority);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, HookContext, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(package, (e, context, _) => handler(e, context), priority);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(package, (e, _, ct) => handler(e, ct), priority);
+    }
+
+    public RemoteHookPipeline<TEvent> UseGeneratedLocalResultChain<TResult>(
+        PluginPackage package,
+        Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
+        int priority = 0)
+        where TResult : struct, IHookResult
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return UseGeneratedLocalResultChainCore<TResult>(package, handler, priority);
+    }
+
+    internal RemoteHookPipeline<TEvent> UseGeneratedLocalResultChainCore<TResult>(
         PluginPackage package,
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
@@ -56,8 +133,20 @@ public sealed partial class RemoteHookPipeline<TEvent>
             throw ResultLocalHandlersNotSupported();
         }
 
-        var subscriptionId = _install(WithPriority(package, priority)).AsTask().GetAwaiter().GetResult();
-        _localHandlers.RegisterResult(subscriptionId, handler);
+        var subscriptionId = LocalTerminalIdentity.CreateCallbackSubscriptionId();
+        var registration = _localHandlers.RegisterResult(subscriptionId, handler);
+        try
+        {
+            _install(LocalTerminalIdentity.WithCallbackSubscriptionId(WithPriority(package, priority), subscriptionId))
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            registration.Dispose();
+            throw;
+        }
 
         return this;
     }

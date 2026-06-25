@@ -9,12 +9,13 @@ internal delegate SandboxEffect ManifestEffectsValidator(
     PluginManifest manifest,
     List<SandboxDiagnostic> diagnostics);
 
-internal static class PluginPreparedPackageValidator
+internal static partial class PluginPreparedPackageValidator
 {
     public static void Validate(
         PluginPackage package,
         ExecutionPlan plan,
         PluginEventAdapterRegistry events,
+        SandboxPolicy installPolicy,
         ManifestEffectsValidator validateManifestEffects)
     {
         var diagnostics = new List<SandboxDiagnostic>();
@@ -33,6 +34,7 @@ internal static class PluginPreparedPackageValidator
             plan,
             [package.Entrypoints.ShouldHandle, package.Entrypoints.Handle],
             diagnostics);
+        ValidateRequiredCapabilityGrants(package.Manifest, installPolicy, diagnostics);
         var contractEvent = ValidateContract(package, diagnostics);
         ValidatePreparedEntrypoints(package, plan, events, contractEvent, diagnostics);
         ThrowIfErrors(diagnostics);
@@ -79,6 +81,26 @@ internal static class PluginPreparedPackageValidator
         => plan.FunctionAnalysis.TryGetValue(entrypoint, out var analysis) &&
            (analysis.Effects & SandboxEffect.Concurrency) != 0;
 
+    private static void ValidateRequiredCapabilityGrants(
+        PluginManifest manifest,
+        SandboxPolicy installPolicy,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var now = installPolicy.GrantClock;
+        foreach (var capability in manifest.RequiredCapabilities.Distinct(StringComparer.Ordinal))
+        {
+            if (string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
+                installPolicy.GrantsCapability(capability, now))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-CAP",
+                $"required capability '{capability}' is not granted"));
+        }
+    }
+
     private static string? ValidateContract(PluginPackage package, List<SandboxDiagnostic> diagnostics)
     {
         if (!package.Manifest.Contract.StartsWith(PluginManifestNames.EventKernelContract.Prefix, StringComparison.Ordinal) ||
@@ -120,8 +142,8 @@ internal static class PluginPreparedPackageValidator
             return;
         }
 
-        // Projection RunLocal and sandbox result Register return a non-Unit Handle. Whole-event RunLocal,
-        // ordinary chains, and result RegisterLocal keep a Unit-returning Handle.
+        // RunLocal and sandbox result Register return a non-Unit Handle. Ordinary chains and result
+        // RegisterLocal keep a Unit-returning Handle.
         var handleReturnsValue = false;
         foreach (var subscription in package.Manifest.Subscriptions)
         {
@@ -134,6 +156,7 @@ internal static class PluginPreparedPackageValidator
         }
 
         ValidateReturnTypes(plan, shouldHandle, handle, handleReturnsValue, diagnostics);
+        ValidateLocalTerminalRouting(package.Manifest.Subscriptions, plan, handle.Id, diagnostics);
         if (!ParametersMatch(shouldHandle.Parameters, handle.Parameters))
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK034", "Kernel entrypoints must use the same parameter shape."));

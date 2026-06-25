@@ -13,14 +13,20 @@ public sealed class ServerExtensionClientExtensionTests
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public sealed class RemoteMonsterControl
+        [DotBoxDService]
+        public interface IRemoteMonsterControl
         {
-            public RemoteMonsterControl(DotBoxD.Plugins.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
-            public DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; }
+        }
+
+        public sealed class RemoteMonsterControl : IRemoteMonsterControl, IServerExtensionClientAccessor
+        {
+            public RemoteMonsterControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
         }
 
         public interface IMonsterKillerService
@@ -36,11 +42,11 @@ public sealed class ServerExtensionClientExtensionTests
 
         public readonly record struct KillResult(int MonsterId, bool Success);
 
-        [ServerExtensionClient(typeof(RemoteMonsterControl))]
+        [ServerExtensionClient(typeof(IRemoteMonsterControl))]
         [ServerExtension("monster-killer", typeof(IMonsterKillerService))]
         public sealed partial class MonsterKillerKernel
         {
-            [ServerExtensionMethod(typeof(RemoteMonsterControl))]
+            [ServerExtensionMethod(typeof(IRemoteMonsterControl))]
             public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
             {
                 var results = new List<KillResult>();
@@ -65,11 +71,17 @@ public sealed class ServerExtensionClientExtensionTests
         using DotBoxD.Kernels.Sandbox;
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
         using DotBoxD.Abstractions;
 
         namespace Sample;
 
-        public sealed class RemoteMonsterControl : IServerExtensionClientAccessor
+        [DotBoxDService]
+        public interface IRemoteMonsterControl
+        {
+        }
+
+        public sealed class RemoteMonsterControl : IRemoteMonsterControl, IServerExtensionClientAccessor
         {
             public RemoteMonsterControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions) => ServerExtensions = serverExtensions;
             public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
@@ -83,10 +95,10 @@ public sealed class ServerExtensionClientExtensionTests
 
         public readonly record struct KillResult(int MonsterId, bool Success);
 
-        [ServerExtension(typeof(RemoteMonsterControl), "monster-killer")]
+        [ServerExtension(typeof(IRemoteMonsterControl), "monster-killer")]
         public sealed partial class MonsterKillerKernel
         {
-            [ServerExtensionMethod(typeof(RemoteMonsterControl))]
+            [ServerExtensionMethod(typeof(IRemoteMonsterControl))]
             public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
             {
                 var results = new List<KillResult>();
@@ -157,7 +169,7 @@ public sealed class ServerExtensionClientExtensionTests
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(
             ConflictSource(
                 "public int MonsterKiller => 0;",
-                "[ServerExtensionClient(typeof(RemoteMonsterControl))]",
+                "[ServerExtensionClient(typeof(IRemoteMonsterControl))]",
                 string.Empty));
 
         Assert.Contains(
@@ -173,7 +185,7 @@ public sealed class ServerExtensionClientExtensionTests
             ConflictSource(
                 "public void KillMonsters() { }",
                 string.Empty,
-                "[ServerExtensionMethod(typeof(RemoteMonsterControl))]"));
+                "[ServerExtensionMethod(typeof(IRemoteMonsterControl))]"));
 
         Assert.Contains(
             diagnostics,
@@ -189,14 +201,20 @@ public sealed class ServerExtensionClientExtensionTests
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Services.Attributes;
             using DotBoxD.Abstractions;
 
             namespace Sample;
 
-            public sealed class RemoteMonsterControl
+            [DotBoxDService]
+            public interface IRemoteMonsterControl
             {
-                public DotBoxD.Plugins.IServerExtensionClientRegistry ServerExtensions { get; } = null!;
                 {{receiverMember}}
+            }
+
+            public sealed class RemoteMonsterControl : IRemoteMonsterControl, IServerExtensionClientAccessor
+            {
+                public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; } = null!;
             }
 
             public interface IMonsterKillerService

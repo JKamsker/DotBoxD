@@ -5,6 +5,40 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
+    private static HookChainCreateResult? NotLoweredDiagnostic(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        string? detail = null)
+    {
+        if (TryRemoteRunLocalLocation(invocation, model, cancellationToken, out var location))
+        {
+            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(location));
+        }
+
+        if (TryResultChainLocation(invocation, model, cancellationToken, out var resultLocation, out var isLocalTerminal))
+        {
+            return new HookChainCreateResult(
+                null,
+                new HookChainNotLoweredDiagnostic(
+                    resultLocation,
+                    HookChainNotLoweredKind.ResultChain,
+                    LocalResultTerminal: isLocalTerminal));
+        }
+
+        if (TryRunChainLocation(invocation, model, cancellationToken, out var runLocation))
+        {
+            return new HookChainCreateResult(
+                null,
+                new HookChainNotLoweredDiagnostic(
+                    runLocation,
+                    HookChainNotLoweredKind.RunChain,
+                    Detail: detail ?? string.Empty));
+        }
+
+        return null;
+    }
+
     // True when the call site is a Register/RegisterLocal terminal on a known hook pipeline - the surface whose
     // native terminal throws when the generator does not intercept it.
     private static bool TryResultChainLocation(
@@ -28,7 +62,9 @@ internal static partial class HookChainModelFactory
         {
             var stages = new List<HookChainStage>();
             var seed = WalkToSeed(terminalAccess.Expression, stages);
-            if (seed is null || GeneratedRemoteHookChainFallback.CandidateKind(seed) != GeneratedRemoteHookChainKind.Hook)
+            if (seed is null ||
+                GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken)?.Kind !=
+                GeneratedRemoteHookChainKind.Hook)
             {
                 return false;
             }
@@ -52,6 +88,38 @@ internal static partial class HookChainModelFactory
         if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
             !string.Equals(terminalAccess.Name.Identifier.ValueText, RunLocalMethod, StringComparison.Ordinal) ||
             ReceiverKind(model, terminalAccess.Expression, cancellationToken) != HookChainReceiverKind.Remote)
+        {
+            return false;
+        }
+
+        location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
+        return true;
+    }
+
+    private static bool TryRunChainLocation(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        out PluginDiagnosticLocation location)
+    {
+        location = default;
+        if (invocation.Expression is not MemberAccessExpressionSyntax terminalAccess ||
+            !string.Equals(terminalAccess.Name.Identifier.ValueText, RunMethod, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (ReceiverKind(model, terminalAccess.Expression, cancellationToken) is HookChainReceiverKind.Local
+            or HookChainReceiverKind.Remote)
+        {
+            location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
+            return true;
+        }
+
+        var stages = new List<HookChainStage>();
+        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        if (seed is null ||
+            GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken) is null)
         {
             return false;
         }

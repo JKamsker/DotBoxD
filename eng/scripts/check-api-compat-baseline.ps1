@@ -516,7 +516,10 @@ function Write-Baseline([string] $Path, [string] $PackageId, [string[]] $Api) {
         "# Update intentionally with scripts/check-api-compat-baseline.ps1 -Update when approving public API changes.",
         ""
     ) + $Api
-    Set-Content -LiteralPath $Path -Value $content
+    [System.IO.File]::WriteAllText(
+        $Path,
+        (($content -join "`n") + "`n"),
+        [System.Text.UTF8Encoding]::new($false))
 }
 
 function Compare-Baseline([string] $PackageId, [string[]] $Expected, [string[]] $Actual) {

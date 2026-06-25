@@ -63,9 +63,10 @@ public sealed partial class RemoteResultHookChainTests
             async package =>
             {
                 var kernel = await server.InstallAsync(package).ConfigureAwait(false);
+                var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
                 server.Hooks.On<RemoteOptionalContext>().UseProjectingResult(
                     kernel,
-                    package.Manifest.PluginId,
+                    subscriptionId,
                     typeof(RemoteOptionalResult),
                     (id, payload, token) => localHandlers.DispatchResultAsync(
                         id,
@@ -73,7 +74,7 @@ public sealed partial class RemoteResultHookChainTests
                         new HookContext(new InMemoryPluginMessageSink(), token),
                         token),
                     Assert.Single(package.Manifest.Subscriptions).Priority);
-                return package.Manifest.PluginId;
+                return subscriptionId;
             },
             localHandlers);
 
@@ -153,5 +154,89 @@ public sealed partial class RemoteResultHookChainTests
 
         Assert.Equal(cts.Token, observed);
         Assert.Equal(24, result!.Value.Damage);
+    }
+
+    [Fact]
+    public async Task Cross_context_remote_result_uses_winning_pipeline_options_unless_dispatch_overrides()
+    {
+        var faults = new List<ResultHookFault>();
+        using var server = PluginServer.Create(
+            defaultPolicy: TestPolicies.Chain(),
+            onResultHookFault: faults.Add);
+        var packageA = WithPluginId(CaptureLocalPackage(), "remote-result-options-a");
+        var packageB = WithPluginId(CaptureLocalPackage(), "remote-result-options-b");
+        var never = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        RemoteLocalResultRequest request = (_, _, _) => new ValueTask<byte[]>(never.Task);
+
+        await InstallRemoteResultAsync(
+            server,
+            packageA,
+            CrossResultContextA.Create,
+            priority: 0,
+            ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
+                TimeSpan.FromMilliseconds(100),
+                new RemoteDamageResult(true, "a-timeout", -1)),
+            request);
+        await InstallRemoteResultAsync(
+            server,
+            packageB,
+            CrossResultContextB.Create,
+            priority: 100,
+            ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
+                TimeSpan.FromMilliseconds(100),
+                new RemoteDamageResult(true, "b-timeout", -2)),
+            request);
+
+        var defaultResult = await server.Hooks.FireAsync(new RemoteDamageContext(12));
+        var explicitResult = await server.Hooks.FireAsync<RemoteDamageContext, RemoteDamageResult>(
+            new RemoteDamageContext(12),
+            ResultHookDispatchOptions<RemoteDamageResult>.FailClosedAfter(
+                TimeSpan.FromMilliseconds(100),
+                new RemoteDamageResult(true, "explicit-timeout", -9)));
+
+        Assert.Equal(-2, defaultResult!.Value.Damage);
+        Assert.Equal("b-timeout", defaultResult.Value.Reason);
+        Assert.Equal(-9, explicitResult!.Value.Damage);
+        Assert.Equal("explicit-timeout", explicitResult.Value.Reason);
+        Assert.Equal(2, faults.Count);
+        Assert.All(faults, fault => Assert.IsType<TimeoutException>(fault.Exception));
+    }
+
+    private static async Task InstallRemoteResultAsync<TContext>(
+        PluginServer server,
+        PluginPackage package,
+        Func<HookContext, TContext> createContext,
+        int priority,
+        ResultHookDispatchOptions<RemoteDamageResult> options,
+        RemoteLocalResultRequest request)
+    {
+        var kernel = await server.InstallAsync(package).ConfigureAwait(false);
+        var subscriptionId = kernel.CallbackSubscriptionId ?? kernel.Manifest.PluginId;
+        server.Hooks.On<RemoteDamageContext, TContext>(createContext)
+            .ConfigureResultDispatch(options)
+            .UseProjectingResult(
+                kernel,
+                subscriptionId,
+                typeof(RemoteDamageResult),
+                request,
+                priority);
+    }
+
+    private static PluginPackage WithPluginId(PluginPackage package, string pluginId)
+    {
+        var metadata = package.Module.Metadata.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        metadata["pluginId"] = pluginId;
+        return package with
+        {
+            Manifest = package.Manifest with { PluginId = pluginId },
+            Module = package.Module with
+            {
+                Id = pluginId,
+                Metadata = metadata
+            }
+        };
     }
 }

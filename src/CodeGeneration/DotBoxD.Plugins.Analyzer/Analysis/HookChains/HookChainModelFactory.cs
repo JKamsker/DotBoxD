@@ -13,7 +13,7 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// lowering context's projected-element binding); the <c>Run</c> terminal's single
 /// <c>ctx.Messages.Send(targetId, message)</c> becomes <c>Handle</c>. Supported subset: expression-body
 /// lambdas and a single Send terminal. Any other shape fails safe (returns <c>null</c>, no package),
-/// leaving the runtime terminal to throw DBXK062 / the analyzer to flag DBXK110.
+/// leaving the runtime terminal to throw DBXK062 / the generator to report DBXK114.
 /// </summary>
 internal static partial class HookChainModelFactory
 {
@@ -34,13 +34,15 @@ internal static partial class HookChainModelFactory
         }
 
         HookChainResult? chain;
+        string? notLoweredDetail = null;
         try
         {
             chain = TryCreate(invocation, context.SemanticModel, cancellationToken);
         }
-        catch (NotSupportedException)
+        catch (NotSupportedException ex)
         {
             chain = null;
+            notLoweredDetail = ex.Message;
         }
 
         if (chain is not null)
@@ -48,24 +50,7 @@ internal static partial class HookChainModelFactory
             return new HookChainCreateResult(chain, null);
         }
 
-        // No package was emitted. Either the call site is not a recognized chain (nothing to do), or it IS a remote
-        // RunLocal chain whose Where/Select stages could not be lowered. Only the latter leaves the native terminal
-        // to throw NotSupportedException at runtime, so surface a build-time diagnostic for exactly that case.
-        if (TryRemoteRunLocalLocation(invocation, context.SemanticModel, cancellationToken, out var location))
-        {
-            return new HookChainCreateResult(null, new HookChainNotLoweredDiagnostic(location));
-        }
-
-        // A recognized in-process result hook (On<TContext>().Register/RegisterLocal) that produced no package
-        // leaves its native terminal to throw at runtime; surface DBXK113 so the cause shows at build time.
-        if (TryResultChainLocation(invocation, context.SemanticModel, cancellationToken, out var resultLocation, out var isLocalTerminal))
-        {
-            return new HookChainCreateResult(
-                null,
-                new HookChainNotLoweredDiagnostic(resultLocation, ResultChain: true, LocalResultTerminal: isLocalTerminal));
-        }
-
-        return null;
+        return NotLoweredDiagnostic(invocation, context.SemanticModel, cancellationToken, notLoweredDetail);
     }
 
     private static HookChainResult? TryCreate(
@@ -88,15 +73,18 @@ internal static partial class HookChainModelFactory
 
         var receiverKind = ReceiverKind(model, terminalAccess.Expression, cancellationToken);
         var receiverIsKnownHookChain = receiverKind is not null;
-        var generatedRemoteCandidate = receiverIsKnownHookChain
+        var generatedRemoteTarget = receiverIsKnownHookChain
             ? null
-            : GeneratedRemoteHookChainFallback.CandidateKind(seed);
-        if (!receiverIsKnownHookChain && generatedRemoteCandidate is null)
+            : GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken);
+        if (!receiverIsKnownHookChain && generatedRemoteTarget is null)
         {
             return null;
         }
 
-        var generatedRemoteKind = receiverIsKnownHookChain ? null : generatedRemoteCandidate;
+        var generatedRemoteKind = receiverIsKnownHookChain ? null : generatedRemoteTarget?.Kind;
+        var generatedRemoteServerContextTypeFullName = generatedRemoteTarget is { } target
+            ? GeneratedRemoteHookChainFallback.ServerContextTypeFullName(model, seed, target, cancellationToken)
+            : null;
         var installKind = InstallKind(terminalMethod, receiverKind, generatedRemoteKind);
         if (installKind is null)
         {
@@ -112,14 +100,11 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
-        var (terminalElementParam, terminalContextParam, terminalCancellationParam) = LambdaParameters(terminalLambda);
+        var (terminalElementParam, terminalContextParam, terminalIsAsyncLocal, terminalHasCancellationToken) =
+            installKind == HookChainInterceptorInstallKind.LocalResultChain
+                ? ResultLocalLambdaParameters(invocation, terminalLambda, model, cancellationToken)
+                : ResultLocalTerminalShape.From(LambdaParameters(terminalLambda));
         if (terminalElementParam is null)
-        {
-            return null;
-        }
-
-        if (terminalCancellationParam is not null &&
-            installKind != HookChainInterceptorInstallKind.LocalResultChain)
         {
             return null;
         }
@@ -153,9 +138,11 @@ internal static partial class HookChainModelFactory
                 terminalLambda,
                 terminalElementParam,
                 terminalContextParam,
-                terminalCancellationParam is not null,
                 installKind == HookChainInterceptorInstallKind.LocalResultChain,
-                generatedRemoteKind);
+                terminalIsAsyncLocal,
+                terminalHasCancellationToken,
+                generatedRemoteKind,
+                generatedRemoteServerContextTypeFullName);
         }
 
         // Collectors for the whole chain: every Where/Select/terminal-Send deposits the capabilities its
@@ -169,7 +156,10 @@ internal static partial class HookChainModelFactory
             eventProperties,
             eventType,
             model,
-                cancellationToken);
+            cancellationToken);
+        var terminalContextType = terminalContextParam is null
+            ? null
+            : LambdaParameterType(terminalLambda, terminalContextParam, model, cancellationToken);
         var shouldHandle = HookChainStageLowerer.CreateShouldHandle(
             stages,
             eventProperties,
@@ -178,9 +168,10 @@ internal static partial class HookChainModelFactory
             capabilities,
             effects);
         var localCallbackProjection = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? HookChainStageLowerer.CreateProjection(
+            ? LocalCallbackProjection(
                 stages,
                 eventProperties,
+                eventType,
                 model,
                 cancellationToken,
                 capabilities,
@@ -188,11 +179,12 @@ internal static partial class HookChainModelFactory
             : null;
         var handleBody = installKind == HookChainInterceptorInstallKind.LocalCallback
             ? LocalCallbackHandleBody(localCallbackProjection)
-            : LowerSendHandle(
+            : LowerRunHandle(
                 stages,
                 terminalLambda,
                 terminalElementParam,
                 terminalContextParam,
+                terminalContextType,
                 eventProperties,
                 model,
                 cancellationToken,
@@ -250,9 +242,9 @@ internal static partial class HookChainModelFactory
             IndexPredicates: indexPredicates,
             IndexCoversPredicate: indexCoversPredicate)
         {
-            // Persist the local-terminal nature in the manifest (mine's host-readable mark) so the runtime
-            // knows to push rather than run; a null ProjectedType (no Select) is a whole-event push, a
-            // non-null one is a projection push — so the payload kind needs no separate persisted field.
+            // Persist the local-terminal nature in the manifest (a host-readable mark) so the runtime knows to
+            // push rather than run. Even no-Select RunLocal chains are emitted as an explicit event-record
+            // projection, so ordinary Unit-returning Run packages cannot be relabeled into native callbacks.
             LocalTerminal = installKind == HookChainInterceptorInstallKind.LocalCallback,
             ProjectedType = localCallbackProjection?.Value.Type,
             LocalDecoderSource = localDecoderSource,
@@ -270,6 +262,9 @@ internal static partial class HookChainModelFactory
                 terminalElementTypeFullName,
                 generatedRemoteKind,
                 installKind.Value,
+                generatedRemoteServerContextTypeFullName,
+                terminalContextParam is not null,
+                TerminalReturnsVoid(terminalLambda, model, cancellationToken),
                 localDecoderSource is not null,
                 projectedTypeSymbol,
                 cancellationToken));

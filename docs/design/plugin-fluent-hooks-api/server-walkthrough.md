@@ -14,12 +14,12 @@ Phases A–C land. It is illustrative, not a diff — focus on *how the project 
 │                              │                                  │                              │
 │  • Kernels (plain C#)        │                                  │  • Owns the SandboxPolicy    │
 │  • server.Hooks.On<>()...    │                                  │  • Runs IR in the sandbox    │
-│  • server.Events.On<>()...   │                                  │  • Drives the simulation     │
+│  • server.Subscriptions.On<>()... │                              │  • Drives the simulation     │
 └─────────────────────────────┘                                  └──────────────────────────────┘
         │                                                                    ▲
         │ source generator (DotBoxD.Plugins.Analyzer)                          │
         ▼                                                                    │
-   lowers kernels + Where/Select/InvokeKernel lambdas  ────────────────────▶ opaque verified IR
+   lowers kernels + Where/Select/Run lambdas  ─────────────────────────────▶ opaque verified IR
 ```
 
 The server's responsibilities: it **owns the policy**, receives verified IR (never source), runs that
@@ -125,7 +125,7 @@ internal static class Program
         using var server = PluginServer.Create(sink, policyCeiling: ServerPolicy.CreateCeiling());
 
         // (b) The world publishes events through the hook pipeline.
-        var world = GameWorld.CreateDefault(server.Hooks);
+        var world = GameWorld.CreateDefault(server.Hooks, server.Subscriptions);
         sink.Bind(world);
 
         // (c) Baseline phase: no plugins yet -> monsters bully the weak players.
@@ -159,9 +159,22 @@ internal static class Program
 
 ## 3. The server-side fluent API is the *same shape* the plugin uses
 
-The plugin's shim mirrors what the server itself exposes via `server.Hooks` / `server.Events`. On the
-server, `On<TEvent>()` returns a `HookPipeline<TEvent>` that supports the full chain. The world drives
-it by publishing:
+The plugin's generated facade mirrors what the server itself exposes via `server.Hooks` /
+`server.Subscriptions`, but the server author names and attaches the plugin-side partial context
+explicitly:
+
+```csharp
+[GeneratePluginServer(Context = typeof(GamePluginContext))]
+public partial class GamePluginServer : IGameWorldAccess;
+
+public sealed partial class GamePluginContext;
+```
+
+For `GamePluginServer`, the generator augments `GamePluginContext` and emits
+`GamePluginHookRegistry` plus `GamePluginSubscriptionRegistry`; parameterless
+`server.Hooks.On<TEvent>()` and `server.Subscriptions.On<TEvent>()` use `GamePluginContext`
+automatically. The lower-level runtime still exposes `On<TEvent, TServerContext>(raw => ...)` as an
+escape hatch for explicit contexts.
 
 ```csharp
 // Inside the simulation (server side), publishing an event runs the installed pipeline:
@@ -170,39 +183,104 @@ await server.Hooks.PublishAsync(
     cancellationToken);
 ```
 
-After Phase B, the pipeline gains `Select` (re-typing the flowing element), `InvokeLocal` /
-`InvokeKernel` terminals, and auto-install. Pre-kernel gating is a fluent `Where` (no `filter:`
-parameter) — see [ownership-auth-and-policy.md](ownership-auth-and-policy.md) §1:
+The ordinary fluent authoring shape is consistent across hooks, subscriptions, and stages:
+one-parameter lambdas receive only the current event/value; two-parameter lambdas receive the
+current event/value first and the server context second. The same rule applies to `Where`,
+`Select`, `Run`, `RunLocal`, `Register`, and `RegisterLocal` wherever those terminals exist.
 
 ```csharp
-public sealed class HookPipeline<TEvent>
+public sealed class HookPipeline<TEvent, TServerContext>
 {
-    // Gate. Before a UseKernel terminal these Where(s) are lowered and AND-composed into the
-    // kernel's gate at compile time; the kernel's own ShouldHandle still runs after.
-    public HookPipeline<TEvent> Where(Func<TEvent, HookContext, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, bool> filter);
+    public HookPipeline<TEvent, TServerContext> Where(Func<TEvent, TServerContext, bool> filter);
 
-    // NEW: project the flowing element to a different type for downstream stages.
-    public HookStage<TEvent, TNext> Select<TNext>(Func<TEvent, HookContext, TNext> projection);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(Func<TEvent, TNext> projection);
+    public HookStage<TEvent, TNext, TServerContext> Select<TNext>(
+        Func<TEvent, TServerContext, TNext> projection);
 
-    // Native host code (was InvokeHostHandler; that name becomes an [Obsolete] forwarder).
-    public HookPipeline<TEvent> InvokeLocal(Func<TEvent, HookContext, ValueTask> handler);
+    // Lowered by the analyzer to verified IR. Un-lowered, it throws.
+    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, ValueTask> handler);
+    public HookPipeline<TEvent, TServerContext> Run(Func<TEvent, TServerContext, ValueTask> handler);
 
-    // The API the analyzer lowers. Un-lowered, its body throws DBXK040 so it never runs unsandboxed.
-    public HookPipeline<TEvent> InvokeKernel(Func<TEvent, HookContext, ValueTask> handler);
+    // Native host/plugin process code.
+    public HookPipeline<TEvent, TServerContext> RunLocal(Func<TEvent, ValueTask> handler);
+    public HookPipeline<TEvent, TServerContext> RunLocal(
+        Func<TEvent, TServerContext, ValueTask> handler);
 
-    // Internal wiring primitive only — binds an already-installed kernel. The public way to bind a
-    // kernel class is server.Kernels.Register<TService, TKernel>() (see kernel-binding-model.md §1).
-    internal HookPipeline<TEvent> UseKernel(InstalledKernel kernel);
+    public HookPipeline<TEvent, TServerContext> Register<TResult>(Func<TEvent, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> Register<TResult>(
+        Func<TEvent, TServerContext, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(Func<TEvent, TResult> handler);
+    public HookPipeline<TEvent, TServerContext> RegisterLocal<TResult>(
+        Func<TEvent, TServerContext, TResult> handler);
 }
 ```
 
-Binding a kernel **class** is no longer a hook-chain terminal — it moved to
-`server.Kernels.Register<TService, TKernel>()`. That call resolves the kernel package, installs it
-through the owning session under the resolved per-plugin policy, and wires it **generically** —
-resolving the adapter by the manifest's event name instead of the old hardcoded `WireHook` switch
-([GamePluginControlService.cs](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)
-is deleted). See [kernel-binding-model.md](kernel-binding-model.md) §4.
+Sandbox-lowered stages and terminals such as `Where`, `Select`, `Run`, and `Register` can only use
+members the analyzer knows how to lower into verified IR. The supported contract is explicit:
+extend the declared partial context with pure helper methods marked `[KernelMethod]` so their bodies
+inline into the chain. Host calls flow through analyzer-visible host-service contracts annotated with
+`[HostCapability]`; use `RunLocal` / `RegisterLocal` when the handler needs arbitrary in-process
+services from the generated server context.
 
-`server.Events` is the fire-and-forget mirror of `server.Hooks` (same chain surface; isolates handler
-exceptions and does not await decisions). See the plugin walkthrough for the Hooks-vs-Events
+For example, the generated context supplies the raw hook plumbing, while the plugin adds domain
+members in a partial:
+
+```csharp
+public sealed partial class GamePluginContext
+{
+    [KernelMethod]
+    public bool CanInspect(int distance) => distance <= 4;
+
+    [KernelMethod]
+    public int ScaleDamage(int amount) => amount * 2;
+}
+
+server.Hooks.On<DamageContext>()
+    .Where((damage, ctx) => ctx.CanInspect(damage.Distance))
+    .Register((damage, ctx) => new DamageResult
+    {
+        Success = true,
+        Damage = ctx.ScaleDamage(damage.Amount),
+    });
+```
+
+The generated context augmentation also preserves the `HookContext` conveniences:
+
+```csharp
+server.Hooks.On<MonsterAggroEvent>()
+    .Where(e => e.Distance <= 5)
+    .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
+```
+
+A non-default context can still be selected explicitly when a chain needs a different facade — here a
+`CombatHookContext` that wraps the ambient context plus the world:
+
+```csharp
+public sealed class CombatHookContext(HookContext inner, IGameWorldAccess world)
+{
+    public bool CanReact(string monsterId) => world.Monsters.Get(monsterId) is not null;
+}
+
+server.Hooks.On<MonsterAggroEvent, CombatHookContext>(ctx => new CombatHookContext(ctx, world))
+    .Where((e, ctx) => ctx.CanReact(e.MonsterId))
+    .Select(e => "aggro")
+    .RunLocal(key => Telemetry.Count(key));
+
+server.Subscriptions.On<MonsterAggroEvent, TelemetrySubscriptionContext>(
+        ctx => new TelemetrySubscriptionContext(ctx, metrics))
+    .Select(e => e.MonsterId)
+    .RunLocal(id => Metrics.Record(id));
+```
+
+Binding a kernel **class** is no longer a hook-chain terminal: the generated facade records it in
+`Setup(s => s.Hooks.On<TEvent>().Use<TKernel>())` or
+`Setup(s => s.Subscriptions.On<TEvent>().Use<TKernel>())`, and the host wires the installed package with
+`server.Hooks.On<TEvent>().Use(kernel)` / `server.Subscriptions.On<TEvent>().Use(kernel)`. The host
+resolves the adapter through `server.Events.Resolve<TEvent>()` instead of the old hardcoded adapter-instance switch
+([GamePluginControlService.cs](../../../samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs)
+keeps the control-plane install methods). See [kernel-binding-model.md](kernel-binding-model.md) §4.
+
+`server.Subscriptions` is the notification mirror of `server.Hooks` (same chain surface; isolates handler
+exceptions and does not await decisions). See the plugin walkthrough for the Hooks-vs-Subscriptions
 contrast from the author's side.

@@ -1,4 +1,3 @@
-using DotBoxD.Abstractions;
 using DotBoxD.Hosting.Execution;
 using DotBoxD.Kernels.Game.Plugin.Kernels;
 using DotBoxD.Kernels.Game.Server.Abstractions;
@@ -10,7 +9,7 @@ namespace DotBoxD.Kernels.Game.Plugin.Tests;
 // Install ids are now DERIVED from the kernel type (GuardianKernel -> "guardian",
 // MonsterKillerKernel -> "monster-killer"); the verbs are keyed purely by type. The literals asserted below
 // are those derived values, not hand-typed ids.
-public sealed class RemotePluginServerBuilderTests
+public sealed partial class RemotePluginServerBuilderTests
 {
     [Fact]
     public void FromConnection_build_performs_no_control_plane_io()
@@ -103,6 +102,28 @@ public sealed class RemotePluginServerBuilderTests
                 Assert.False(result.Killed);
             });
     }
+    [Fact]
+    public async Task Generated_server_extensions_are_callable_after_two_arg_Extend()
+    {
+        // Regression: Extend<TService, TKernel> records the extension under BOTH the service type and the kernel
+        // type, so the generated graft client — which looks the extension up by the KERNEL type — resolves it
+        // instead of throwing "not registered". The explicit PluginId<TService>() lookup keeps working too.
+        var control = new RecordingGamePluginControlService();
+        using var server = GamePluginServerBuilder
+            .FromConnection(control, new FakeWorld())
+            .Setup(s => s.Monsters.Extend<IMonsterControl, MonsterKillerKernel>())
+            .Build();
+        await server.StartAsync();
+
+        var results = await server.Monsters.KillMonstersAsync(["monster-3", "monster-4"]);
+
+        Assert.Equal("monster-killer", control.LastRpcPluginId);
+        Assert.Equal("monster-killer", server.ServerExtensions.PluginId<MonsterKillerKernel>());
+        Assert.Equal("monster-killer", server.ServerExtensions.PluginId<IMonsterControl>());
+        Assert.Equal(["monster-3", "monster-4"], DecodeRequestedMonsterIds(control.LastRpcArguments));
+        Assert.Equal(2, results.Count);
+    }
+
     [Fact]
     public async Task Generated_handle_extensions_send_receiver_id()
     {
@@ -236,65 +257,4 @@ public sealed class RemotePluginServerBuilderTests
         return builder.Build();
     }
 
-    private sealed class FakeWorld : IGameWorldAccess
-    {
-        public FakeWorld()
-        {
-            Monsters = new FakeMonsterControl();
-            Entities = new FakeEntityControl();
-        }
-
-        public IMonsterControl Monsters { get; }
-
-        public IEntityControl Entities { get; }
-    }
-
-    private sealed class FakeMonsterControl : IMonsterControl
-    {
-        public IMonster Get(string entityId) => new FakeMonster(entityId);
-
-        [HostCapability("game.world.monster.read.kind")]
-        public ValueTask<bool> IsMonsterAsync(string entityId)
-            => ValueTask.FromResult(true);
-    }
-
-    private sealed class FakeEntityControl : IEntityControl
-    {
-        public IEntity Get(string entityId) => new FakeEntity(entityId);
-    }
-
-    private sealed class FakeMonster : IMonster
-    {
-        public FakeMonster(string id) => Id = id;
-
-        public string Id { get; }
-
-        public ValueTask<MonsterSnapshot> SnapshotAsync()
-            => ValueTask.FromResult(new MonsterSnapshot(Id, Id, 42, 8, 5));
-
-        public ValueTask<bool> KillAsync() => ValueTask.FromResult(true);
-
-        public ValueTask<int> GetThreatAsync() => ValueTask.FromResult(7);
-
-        public ValueTask TeleportToAsync(int position) => ValueTask.CompletedTask;
-
-        public ValueTask<int> GetHealthAsync() => ValueTask.FromResult(42);
-
-        public ValueTask<int> GetLevelAsync() => ValueTask.FromResult(8);
-
-        public ValueTask<int> GetPositionAsync() => ValueTask.FromResult(5);
-    }
-
-    private sealed class FakeEntity : IEntity
-    {
-        public FakeEntity(string id) => Id = id;
-
-        public string Id { get; }
-
-        public ValueTask<int> GetHealthAsync() => ValueTask.FromResult(42);
-
-        public ValueTask<int> GetLevelAsync() => ValueTask.FromResult(8);
-
-        public ValueTask<int> GetPositionAsync() => ValueTask.FromResult(5);
-    }
 }

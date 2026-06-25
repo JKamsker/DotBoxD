@@ -90,6 +90,8 @@ function XmlEscape([string] $value) {
 }
 
 $isolatedPackagesFolder = Join-Path $resolvedWorkRoot ".nuget-packages"
+$splitSdkPackageDirectory = Join-Path $resolvedWorkRoot "split-sdk-packages"
+New-Item -ItemType Directory -Path $splitSdkPackageDirectory | Out-Null
 $nugetConfig = @"
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -105,6 +107,7 @@ $nugetConfig = @"
   <packageSources>
     <clear />
     <add key="local" value="$(XmlEscape $fullPackageDirectory)" />
+    <add key="split-sdk" value="$(XmlEscape $splitSdkPackageDirectory)" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
   <!--
@@ -117,6 +120,9 @@ $nugetConfig = @"
     <packageSource key="local">
       <package pattern="DotBoxD" />
       <package pattern="DotBoxD.*" />
+    </packageSource>
+    <packageSource key="split-sdk">
+      <package pattern="DotBoxD.PluginSdkSplit.Sdk" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
@@ -440,5 +446,316 @@ public sealed partial class SmokeKernel : IEventKernel<SmokeEvent>
 }
 
 Invoke-DotBoxDPluginAuthoringSmoke
+
+function Invoke-PluginSdkSplitSmoke {
+    $sdkRoot = Join-Path $resolvedWorkRoot "DotBoxD.PluginSdkSplit.Sdk"
+    $consumerRoot = Join-Path $resolvedWorkRoot "DotBoxD.PluginSdkSplit.Consumer"
+    $sdkVersion = "0.1.0-smoke"
+    New-Item -ItemType Directory -Path $sdkRoot | Out-Null
+    New-Item -ItemType Directory -Path $consumerRoot | Out-Null
+
+    $sdkProject = @"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <DotBoxDDisableExtraAnalyzers>true</DotBoxDDisableExtraAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <IsPackable>true</IsPackable>
+    <PackageId>DotBoxD.PluginSdkSplit.Sdk</PackageId>
+    <Version>$sdkVersion</Version>
+    <Authors>DotBoxD</Authors>
+    <Description>Temporary SDK package used by the DotBoxD package consumer smoke.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DotBoxD.Abstractions" Version="$($versions["DotBoxD.Abstractions"])" />
+    <PackageReference Include="DotBoxD.Plugins" Version="$($versions["DotBoxD.Plugins"])" />
+    <PackageReference Include="DotBoxD.Services" Version="$($versions["DotBoxD.Services"])" />
+    <PackageReference Include="DotBoxD.Pushdown.Services" Version="$($versions["DotBoxD.Pushdown.Services"])" />
+    <PackageReference Include="DotBoxD.Plugins.Analyzer" Version="$($versions["DotBoxD.Plugins.Analyzer"])" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
+"@
+    Set-Content -LiteralPath (Join-Path $sdkRoot "DotBoxD.PluginSdkSplit.Sdk.csproj") -Value $sdkProject
+
+    $sdkSource = @"
+using System.Threading;
+using System.Threading.Tasks;
+using DotBoxD.Abstractions;
+using DotBoxD.Services.Attributes;
+
+namespace SplitSdk
+{
+    [DotBoxDService]
+    public interface ISplitControls
+    {
+        [HostCapability("split.read.tool", HostBindingEffect.HostStateRead)]
+        int Peek(string id);
+    }
+
+    [DotBoxDService]
+    public interface IGameWorld
+    {
+        ISplitControls Tools { get; }
+
+        [HostCapability("split.read.value", HostBindingEffect.HostStateRead)]
+        int Read(string id);
+    }
+
+    public sealed record SplitEvent(string TargetId, int Amount);
+
+    [GeneratePluginServer(Context = typeof(GamePluginContext))]
+    public partial class GamePluginServer : IGameWorld
+    {
+    }
+
+    public sealed partial class GamePluginContext
+    {
+        [KernelMethod]
+        public bool IsAllowed(string id, int minimum) => World.Read(id) >= minimum;
+
+        [KernelMethod]
+        public bool IsEven(int value) => value % 2 == 0;
+    }
+}
+
+namespace SplitSdk.Ipc
+{
+    public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+    [DotBoxDService]
+    public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+    {
+        ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+        ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+        ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+        ValueTask UpdateSettingsAsync(string pluginId, LiveSettingUpdate[] updates, bool atomic = false, CancellationToken ct = default);
+        ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+    }
+}
+
+"@
+    Set-Content -LiteralPath (Join-Path $sdkRoot "Sdk.cs") -Value $sdkSource
+
+    dotnet restore $sdkRoot --configfile (Join-Path $resolvedWorkRoot "NuGet.config")
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet build $sdkRoot --configuration $Configuration --no-restore
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet pack $sdkRoot --configuration $Configuration --no-build --output $splitSdkPackageDirectory
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    $sdkPackage = Join-Path $splitSdkPackageDirectory "DotBoxD.PluginSdkSplit.Sdk.$sdkVersion.nupkg"
+    if (-not (Test-Path -LiteralPath $sdkPackage)) {
+        throw "Split SDK smoke did not produce expected package: $sdkPackage"
+    }
+
+    $consumerProject = @"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <DotBoxDDisableExtraAnalyzers>true</DotBoxDDisableExtraAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <InterceptorsNamespaces>DotBoxD.Plugins.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DotBoxD.PluginSdkSplit.Sdk" Version="$sdkVersion" />
+    <PackageReference Include="DotBoxD.Plugins" Version="$($versions["DotBoxD.Plugins"])" />
+    <PackageReference Include="DotBoxD.Pushdown.Services" Version="$($versions["DotBoxD.Pushdown.Services"])" />
+    <PackageReference Include="DotBoxD.Plugins.Analyzer" Version="$($versions["DotBoxD.Plugins.Analyzer"])" PrivateAssets="all" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
+"@
+    Set-Content -LiteralPath (Join-Path $consumerRoot "DotBoxD.PluginSdkSplit.Consumer.csproj") -Value $consumerProject
+
+    $consumerProgram = @"
+using System.Reflection;
+using DotBoxD.Abstractions;
+using DotBoxD.Plugins;
+using DotBoxD.Plugins.Json;
+using DotBoxD.Pushdown.Services;
+using DotBoxD.Services.Generated;
+using SplitSdk;
+using SplitSdk.Ipc;
+
+var pipeName = "dotboxd-split-sdk-" + Guid.NewGuid().ToString("N");
+var control = new RecordingControlService();
+await using var ipcHost = RpcMessagePackIpc.ListenNamedPipe(pipeName, peer =>
+{
+    peer.ProvideGamePluginControlService(control);
+    peer.ProvideGameWorld(new FakeWorld());
+});
+await ipcHost.StartAsync();
+
+await using IGameWorldServer server = GamePluginServerBuilder
+    .FromPipeName(pipeName)
+    .Setup(s => s.Tools.Extend<BonusKernel>())
+    .Build();
+await server.StartAsync();
+
+var hooks = server.Hooks;
+var subscriptions = server.Subscriptions;
+SplitSdkConsumerUsage.Configure(hooks, subscriptions);
+
+if (control.ServerExtensions.Count != 1 ||
+    control.ServerExtensions[0].Manifest.PluginId != "split-bonus" ||
+    !control.ServerExtensions[0].Manifest.RequiredCapabilities.Contains("split.read.tool"))
+{
+    throw new InvalidOperationException("The split SDK consumer did not install the grafted extension package.");
+}
+
+var extensionResult = server.Tools.AddBonus(5);
+if (extensionResult != 12 || control.LastRpcPluginId != "split-bonus")
+{
+    throw new InvalidOperationException("The split SDK grafted extension did not invoke through the generated IPC wire client.");
+}
+
+if (control.Hooks.Count != 1 ||
+    control.Hooks[0].Manifest.Subscriptions[0].Event != "SplitSdk.SplitEvent" ||
+    !control.Hooks[0].Manifest.RequiredCapabilities.Contains("split.read.value") ||
+    !control.Hooks[0].Manifest.RequiredCapabilities.Contains("host.message.write"))
+{
+    throw new InvalidOperationException("The prebuilt SDK context descriptor did not flow host requirements into the hook package.");
+}
+
+if (control.Subscriptions.Count != 1 ||
+    control.Subscriptions[0].Manifest.Subscriptions[0].Event != "SplitSdk.SplitEvent" ||
+    !control.Subscriptions[0].Manifest.RequiredCapabilities.Contains("host.message.write"))
+{
+    throw new InvalidOperationException("The prebuilt SDK subscription registry marker was not honored through PackageReference.");
+}
+
+var generatedPackageTypes = Assembly.GetExecutingAssembly().GetTypes().Count(type =>
+    type.Name.StartsWith("HookChain_", StringComparison.Ordinal) &&
+    type.Name.EndsWith("PluginPackage", StringComparison.Ordinal));
+if (generatedPackageTypes < 2)
+{
+    throw new InvalidOperationException("The consumer did not generate both hook and subscription packages from the prebuilt SDK facade.");
+}
+
+Console.WriteLine(control.Hooks[0].Manifest.PluginId + ":" + control.Subscriptions[0].Manifest.PluginId + ":" + extensionResult);
+
+public static class SplitSdkConsumerUsage
+{
+    public static void Configure(GamePluginHookRegistry hooks, GamePluginSubscriptionRegistry subscriptions)
+    {
+        var aliasedHooks = hooks;
+        aliasedHooks.On<SplitEvent>()
+            .Where((e, ctx) => ctx.IsAllowed(e.TargetId, e.Amount))
+            .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "accepted"));
+
+        var aliasedSubscriptions = subscriptions;
+        aliasedSubscriptions.On<SplitEvent>()
+            .Where((e, ctx) => ctx.IsEven(e.Amount))
+            .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "even"));
+    }
+}
+
+[ServerExtension(typeof(ISplitControls), "split-bonus")]
+public sealed partial class BonusKernel
+{
+    private readonly ISplitControls _tools;
+
+    public BonusKernel(ISplitControls tools) => _tools = tools;
+
+    [ServerExtensionMethod(typeof(ISplitControls))]
+    public int AddBonus(int amount, HookContext ctx)
+    {
+        return amount + _tools.Peek("bonus");
+    }
+}
+
+public sealed class FakeWorld : IGameWorld
+{
+    public ISplitControls Tools { get; } = new FakeSplitControls();
+
+    public int Read(string id) => id.Length + 10;
+}
+
+public sealed class FakeSplitControls : ISplitControls
+{
+    public int Peek(string id) => 7;
+}
+
+public sealed class RecordingControlService : IGamePluginControlService
+{
+    public List<PluginPackage> Hooks { get; } = new();
+    public List<PluginPackage> Subscriptions { get; } = new();
+    public List<PluginPackage> ServerExtensions { get; } = new();
+    public string LastRpcPluginId { get; private set; } = string.Empty;
+
+    public ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default)
+    {
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        Hooks.Add(package);
+        return ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);
+    }
+
+    public ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default)
+    {
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        Subscriptions.Add(package);
+        return ValueTask.FromResult(package.CallbackSubscriptionId ?? package.Manifest.PluginId);
+    }
+
+    public ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default)
+    {
+        var package = PluginPackageJsonSerializer.Import(packageJson);
+        ServerExtensions.Add(package);
+        return ValueTask.FromResult(package.Manifest.PluginId);
+    }
+
+    public ValueTask<byte[]> InvokeServerExtensionAsync(string pluginId, byte[] arguments, CancellationToken ct = default)
+    {
+        LastRpcPluginId = pluginId;
+        var amount = KernelRpcBinaryCodec.DecodeArguments(arguments)[0].Int32Value;
+        return ValueTask.FromResult(KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.Int32(amount + 7)));
+    }
+
+    public ValueTask UpdateSettingsAsync(
+        string pluginId,
+        LiveSettingUpdate[] updates,
+        bool atomic = false,
+        CancellationToken ct = default)
+        => ValueTask.CompletedTask;
+
+    public ValueTask HoldUntilShutdownAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+}
+"@
+    Set-Content -LiteralPath (Join-Path $consumerRoot "Program.cs") -Value $consumerProgram
+
+    dotnet restore $consumerRoot --configfile (Join-Path $resolvedWorkRoot "NuGet.config")
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet build $consumerRoot --configuration $Configuration --no-restore
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    dotnet run --project $consumerRoot --configuration $Configuration --no-build
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
+Invoke-PluginSdkSplitSmoke
 
 Write-Host "Package consumer smoke passed."

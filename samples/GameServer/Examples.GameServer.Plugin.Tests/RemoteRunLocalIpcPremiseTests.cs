@@ -4,10 +4,8 @@ using DotBoxD.Kernels.Game.Server.Abstractions.Events;
 using DotBoxD.Kernels.Game.Server.Abstractions.Ipc;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins;
-using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Hooks;
 using DotBoxD.Pushdown.Services;
-using DotBoxD.Services.Generated;
 using DotBoxD.Services.Peer;
 using DotBoxD.Transports.NamedPipes;
 
@@ -70,12 +68,12 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var localHandlers = new RemoteLocalHandlerRegistry();
         PluginPackage? lowered = null;
         string? subscriptionId = null;
-        var hooks = new RemoteHookRegistry(
+        var hooks = new GamePluginHookRegistry(
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -103,10 +101,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         // --- Server side: install the lowered package and wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -137,12 +138,12 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var localHandlers = new RemoteLocalHandlerRegistry();
         PluginPackage? lowered = null;
         string? subscriptionId = null;
-        var hooks = new RemoteHookRegistry(
+        var hooks = new GamePluginHookRegistry(
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -158,7 +159,7 @@ public sealed class RemoteRunLocalIpcPremiseTests
         Assert.NotNull(subscriptionId);
         var subscription = Assert.Single(lowered!.Manifest.Subscriptions);
         Assert.True(subscription.LocalTerminal);
-        Assert.Null(subscription.ProjectedType);   // no Select => whole-event push
+        Assert.Equal("record", subscription.ProjectedType);   // no Select => explicit whole-event projection
 
         // --- Live named-pipe IPC: plugin PROVIDES the callback; server GETS the proxy. ---
         var pipeName = "dotboxd-runlocal-we-e2e-" + Guid.NewGuid().ToString("N");
@@ -169,10 +170,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         // --- Server side: install + wire the projecting push across the pipe. ---
         var serverMessages = new InMemoryPluginMessageSink();
@@ -199,12 +203,12 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var localHandlers = new RemoteLocalHandlerRegistry();
         PluginPackage? lowered = null;
         string? subscriptionId = null;
-        var hooks = new RemoteHookRegistry(
+        var hooks = new GamePluginHookRegistry(
             package =>
             {
                 lowered = package;
-                subscriptionId = package.Manifest.PluginId;
-                return ValueTask.FromResult(package.Manifest.PluginId);
+                subscriptionId = package.CallbackSubscriptionId ?? package.Manifest.PluginId;
+                return ValueTask.FromResult(subscriptionId);
             },
             localHandlers);
 
@@ -228,10 +232,13 @@ public sealed class RemoteRunLocalIpcPremiseTests
         var callbackSink = new CallbackSink(localHandlers);
         await using var clientSession = await RpcMessagePackIpc.ConnectAsync(
             new NamedPipeClientTransport(".", pipeName),
-            peer => peer.ProvidePluginEventCallback(callbackSink));
+            peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.ProvidePluginEventCallback(
+                peer,
+                callbackSink));
 
         var serverPeer = await serverPeerReady.Task;
-        var pushProxy = serverPeer.GetPluginEventCallback();
+        var pushProxy =
+            global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.GetPluginEventCallback(serverPeer);
 
         using var server = PluginServer.Create(defaultPolicy: ProjectionPolicy());
         var kernel = await server.InstallAsync(lowered!);

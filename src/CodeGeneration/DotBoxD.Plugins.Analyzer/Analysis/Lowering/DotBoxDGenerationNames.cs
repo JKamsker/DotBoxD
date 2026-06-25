@@ -28,10 +28,13 @@ internal static class DotBoxDGenerationNames
         public const string HostBindingAttribute = "DotBoxD.Abstractions.HostBindingAttribute";
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
+        public const string LocalAttribute = "DotBoxD.Abstractions.LocalAttribute";
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
         public const string ServerExtensionMethodAttribute = "DotBoxD.Abstractions.ServerExtensionMethodAttribute";
         public const string GeneratePluginServerAttribute = "DotBoxD.Abstractions.GeneratePluginServerAttribute";
+        public const string GeneratedKernelMethodDescriptorAttribute =
+            "DotBoxD.Abstractions.GeneratedKernelMethodDescriptorAttribute";
         public const string PolymorphicHandleAttribute = "DotBoxD.Abstractions.PolymorphicHandleAttribute";
         public const string HandleSubtypeAttribute = "DotBoxD.Abstractions.HandleSubtypeAttribute";
         public const string DotBoxDServiceAttribute = "DotBoxD.Services.Attributes.DotBoxDServiceAttribute";
@@ -40,14 +43,18 @@ internal static class DotBoxDGenerationNames
         public const string ServerInvocationDelegateOriginal = ServerInvocationDelegateType + "<TWorld, TCaptures, TReturn>";
         public const string GameWorldAccessType = "DotBoxD.Kernels.Game.Server.Abstractions.IGameWorldAccess";
         public const string GameWorldMonsterSnapshotType = "DotBoxD.Kernels.Game.Server.Abstractions.MonsterSnapshot";
-        public const string HookPipelineOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent>";
-        public const string HookStageOriginal = "DotBoxD.Plugins.Runtime.Hooks.HookStage<TEvent, TCurrent>";
+        public const string HookPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.HookPipeline<TEvent, TContext>";
+        public const string HookStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Hooks.HookStage<TEvent, TCurrent, TContext>";
         public const string RemoteHookPipelineOriginal = "DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent>";
+        public const string RemoteHookPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteHookPipeline<TEvent, TContext>";
         public const string RemoteHookStageOriginal = "DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage<TEvent, TCurrent>";
-        public const string SubscriptionPipelineOriginal = "DotBoxD.Plugins.Runtime.SubscriptionPipeline<TEvent>";
-        public const string SubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.SubscriptionStage<TEvent, TCurrent>";
+        public const string RemoteHookStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage<TEvent, TCurrent, TContext>";
+        public const string SubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.SubscriptionPipeline<TEvent, TContext>";
+        public const string SubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.SubscriptionStage<TEvent, TCurrent, TContext>";
         public const string RemoteSubscriptionPipelineOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent>";
+        public const string RemoteSubscriptionPipelineWithContextOriginal = "DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline<TEvent, TContext>";
         public const string RemoteSubscriptionStageOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent>";
+        public const string RemoteSubscriptionStageWithContextOriginal = "DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage<TEvent, TCurrent, TContext>";
 
         public const string ListOriginal = "System.Collections.Generic.List<T>";
         public const string ReadOnlyListOriginal = "System.Collections.Generic.IReadOnlyList<T>";
@@ -75,8 +82,8 @@ internal static class DotBoxDGenerationNames
         public const string GlobalFunc = GlobalPrefix + "System.Func";
         public const string GlobalInvalidOperationException = GlobalPrefix + "System.InvalidOperationException";
         public const string GlobalReadOnlyList = GlobalPrefix + "System.Collections.Generic.IReadOnlyList";
-        public const string GlobalValueTask = GlobalPrefix + "System.Threading.Tasks.ValueTask";
         public const string GlobalCancellationToken = GlobalPrefix + "System.Threading.CancellationToken";
+        public const string GlobalValueTask = GlobalPrefix + "System.Threading.Tasks.ValueTask";
 
         public const string GlobalHookContext = GlobalPrefix + HookContext;
         public const string GlobalPluginPackage = GlobalPrefix + "DotBoxD.Plugins.PluginPackage";
@@ -115,8 +122,7 @@ internal static class DotBoxDGenerationNames
         public const string EventKernelPrefix = "IEventKernel<";
         public const string EventKernelSuffix = ">";
 
-        public static string EventKernel(string eventName)
-            => EventKernelPrefix + eventName + EventKernelSuffix;
+        public static string EventKernel(string eventName) => EventKernelPrefix + eventName + EventKernelSuffix;
     }
 
     public static class CSharpTypes
@@ -149,6 +155,7 @@ internal static class DotBoxDGenerationNames
 
     public static class ManifestTypes
     {
+        public const string Unit = "unit";
         public const string Bool = "bool";
         public const string Int = "int";
         public const string Long = "long";
@@ -167,8 +174,7 @@ internal static class DotBoxDGenerationNames
 
         public const string Unsupported = "unsupported";
 
-        public static bool IsNumeric(string type)
-            => type is Int or Long or Double;
+        public static bool IsNumeric(string type) => type is Int or Long or Double;
     }
 
     public static class RangeAttributeArguments
@@ -250,8 +256,7 @@ internal static class DotBoxDGenerationNames
 
     public static class IrTypes
     {
-        public const string IfStatement = TypeNames.GlobalIfStatement;
-        public const string ReturnStatement = TypeNames.GlobalReturnStatement;
+        public const string IfStatement = TypeNames.GlobalIfStatement, ReturnStatement = TypeNames.GlobalReturnStatement;
     }
 
     public static class BindingIds
@@ -270,8 +275,8 @@ internal static class DotBoxDGenerationNames
 
     public static class ModuleMetadata
     {
-        public const string PluginId = "pluginId";
-        public const string Kernel = "kernel";
+        public const string PluginId = "pluginId", Kernel = "kernel";
+        public const string RequiredCapabilities = "requiredCapabilities";
     }
 
     public static class Operators

@@ -12,6 +12,29 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 /// </summary>
 internal static partial class DotBoxDExpressionModelFactory
 {
+    private static DotBoxDExpressionModel? TryLowerContextMember(
+        MemberAccessExpressionSyntax member,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.ServerContextParameterName is null ||
+            member.Expression is not IdentifierNameSyntax receiver ||
+            !string.Equals(receiver.Identifier.ValueText, context.ServerContextParameterName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return context.SemanticModel.GetSymbolInfo(member, context.CancellationToken).Symbol switch
+        {
+            IPropertySymbol property when HasLocalAttribute(property) => throw new NotSupportedException(
+                "[Local] context members cannot be used in lowered server-side IR."),
+            IPropertySymbol property => DotBoxDHostBindingExpressionLowerer.TryLowerProperty(property, context)
+                ?? throw new NotSupportedException(
+                    $"Unsupported server context property '{memberName}'. Use generated context surfaces or [KernelMethod] helpers for server-side IR."),
+            _ => null
+        };
+    }
+
     // Reads a field of the projected record (after a Select) as record.get(projection, index). The field is
     // matched by name against the projected DTO's declared fields — the same positional order record.new emitted
     // and the kernel parameter / decoder use — so dto.Field crosses to exactly that field's value and type.
@@ -136,6 +159,12 @@ internal static partial class DotBoxDExpressionModelFactory
             return false;
         }
     }
+
+    private static bool HasLocalAttribute(IPropertySymbol property)
+        => property.GetAttributes().Any(attribute => string.Equals(
+            attribute.AttributeClass?.ToDisplayString(),
+            DotBoxDMetadataNames.LocalAttribute,
+            StringComparison.Ordinal));
 
     /// <summary>
     /// Records the capability gating a <c>[Capability]</c>-annotated event property so reading it
