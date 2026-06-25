@@ -48,6 +48,12 @@ internal static partial class PluginServerFacadeModelFactory
                 return controlServiceType;
             }
 
+            if (argument.Value.Value is null)
+            {
+                // Explicit `ControlService = null` is equivalent to omitting it: fall back to the convention.
+                return null;
+            }
+
             throw new NotSupportedException("ControlService must be typeof(TControlService).");
         }
 
@@ -71,16 +77,36 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
-            foreach (var parameter in method.Parameters)
+            if (LiveSettingUpdateElementType(method) is { } elementType)
             {
-                if (string.Equals(parameter.Name, "updates", StringComparison.Ordinal) &&
-                    parameter.Type is IArrayTypeSymbol updateArray)
-                {
-                    return updateArray.ElementType;
-                }
+                return elementType;
             }
         }
 
         return null;
+    }
+
+    // The live-setting update element type is the element type of UpdateSettingsAsync's update-batch array.
+    // The conventional `updates` parameter wins when present; otherwise the method's single array parameter is
+    // used, so an explicit control-plane contract is not forced to use a specific parameter name.
+    private static ITypeSymbol? LiveSettingUpdateElementType(IMethodSymbol method)
+    {
+        IArrayTypeSymbol? fallback = null;
+        foreach (var parameter in method.Parameters)
+        {
+            if (parameter.Type is not IArrayTypeSymbol updateArray)
+            {
+                continue;
+            }
+
+            if (string.Equals(parameter.Name, "updates", StringComparison.Ordinal))
+            {
+                return updateArray.ElementType;
+            }
+
+            fallback ??= updateArray;
+        }
+
+        return fallback?.ElementType;
     }
 }

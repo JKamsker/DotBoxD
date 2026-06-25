@@ -41,7 +41,7 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed updates array parameter.");
+                $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
         var controls = ResolveControls(worldType, cancellationToken);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);

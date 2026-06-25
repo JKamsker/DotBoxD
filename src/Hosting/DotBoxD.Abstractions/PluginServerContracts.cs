@@ -80,6 +80,10 @@ public sealed class GeneratePluginServerAttribute : Attribute
     /// <summary>
     /// Optional control-plane service contract for install, live-settings, and lifecycle calls. When omitted,
     /// the generator falls back to the legacy <c>{WorldNamespace}.Ipc.IGamePluginControlService</c> convention.
+    /// The contract must declare an <c>UpdateSettingsAsync</c> method with a typed array parameter for the update
+    /// batch (e.g. <c>UpdateSettingsAsync(string pluginId, TUpdate[] updates, ...)</c>); the generator infers the
+    /// live-setting update element type (<c>TUpdate</c>) from that array, so the parameter need not be named
+    /// <c>updates</c>.
     /// </summary>
     public Type? ControlService { get; set; }
 
