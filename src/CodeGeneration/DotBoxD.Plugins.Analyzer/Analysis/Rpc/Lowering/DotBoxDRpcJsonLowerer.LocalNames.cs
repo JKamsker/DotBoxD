@@ -48,6 +48,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return name;
     }
 
+    private string NextDiscardLocal()
+    {
+        while (true)
+        {
+            var name = "__sir_discard" + _tempCounter++;
+            if (_reservedNames.Add(name))
+            {
+                return name;
+            }
+        }
+    }
+
     private static string StableHash(string value)
     {
         const ulong offset = 14695981039346656037UL;

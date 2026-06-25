@@ -123,7 +123,7 @@ internal static partial class RpcKernelModelFactory
         bool hasReceiverId)
     {
         var methodName = method.Name;
-        var returnType = DotBoxDRpcTypeMapper.JsonType(method.ReturnType);
+        var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType);
         var parameters = new List<string>();
         if (hasReceiverId)
         {

@@ -43,24 +43,96 @@ public sealed class ServerExtensionSurpriseRegressionTests
         Assert.Equal(SandboxType.Unit, Assert.Single(package.Module.Functions).ReturnType);
     }
 
-    [Fact]
-    public async Task Direct_extension_supports_non_generic_ValueTask_return()
+    [Theory]
+    [InlineData("void", "")]
+    [InlineData("Task", "async")]
+    [InlineData("ValueTask", "async")]
+    public async Task Direct_extension_supports_non_generic_no_payload_return(
+        string returnType,
+        string modifier)
     {
         var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(
-            NoPayloadSource("ValueTask", "async", includeProbe: true));
+            NoPayloadSource(returnType, modifier, includeProbe: true));
         var controlType = assembly.GetType("Sample.RemoteMonsterControl", throwOnError: true)!;
         var probeType = assembly.GetType("Sample.Probe", throwOnError: true)!;
         var registry = new RecordingServerExtensionsRegistry("ping", []);
         var control = Activator.CreateInstance(controlType, [registry])!;
 
-        var valueTask = probeType.GetMethod("Ping", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [control])!;
-        await AwaitValueTask(valueTask);
+        var result = probeType.GetMethod("Ping", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [control]);
+        await AwaitNoPayload(result);
 
         Assert.Equal("ping", registry.LastPluginId);
         Assert.Equal("Sample.PingKernel", registry.LastServiceType);
         var arguments = KernelRpcBinaryCodec.DecodeArguments(registry.LastArguments);
         Assert.Equal(4, arguments[0].Int32Value);
+    }
+
+    [Fact]
+    public void Server_extension_rejects_nested_task_like_dto_member()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record BadDto(Task<int> Count);
+
+            [ServerExtension("bad-dto")]
+            public sealed partial class BadKernel
+            {
+                public int Run(BadDto dto, HookContext ctx)
+                {
+                    return 1;
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("top-level return type", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Server_extension_discard_temp_does_not_collide_with_user_local()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            """
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IGameWorld
+            {
+                [HostBinding("host.world.touch", "game.world.touch", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+                int Touch();
+            }
+
+            [ServerExtension("discard-temp")]
+            public sealed partial class DiscardKernel
+            {
+                public int Run(HookContext ctx)
+                {
+                    var __sir_discard0 = 7;
+                    ctx.Host<IGameWorld>().Touch();
+                    return __sir_discard0;
+                }
+            }
+            """,
+            "Sample.DiscardPluginPackage");
+        var assignments = Assert.Single(package.Module.Functions).Body.OfType<AssignmentStatement>().ToArray();
+
+        Assert.Contains(assignments, statement => statement.Name == "__sir_discard0");
+        Assert.Contains(
+            assignments,
+            statement => statement.Name.StartsWith("__sir_discard", StringComparison.Ordinal) &&
+                         statement.Name != "__sir_discard0");
     }
 
     private const string DirectMethodMetadataSource = """
@@ -105,13 +177,7 @@ public sealed class ServerExtensionSurpriseRegressionTests
     private static string NoPayloadSource(string returnType, string modifier, bool includeProbe = false)
     {
         var probe = includeProbe
-            ? """
-
-            public static class Probe
-            {
-                public static ValueTask Ping(RemoteMonsterControl control) => control.Ping(4);
-            }
-            """
+            ? ProbeSource(returnType)
             : string.Empty;
 
         return $$"""
@@ -156,6 +222,38 @@ public sealed class ServerExtensionSurpriseRegressionTests
             }
             {{probe}}
             """;
+    }
+
+    private static string ProbeSource(string returnType)
+        => returnType == "void"
+            ? """
+
+            public static class Probe
+            {
+                public static void Ping(RemoteMonsterControl control) => control.Ping(4);
+            }
+            """
+            : $$"""
+
+            public static class Probe
+            {
+                public static {{returnType}} Ping(RemoteMonsterControl control) => control.Ping(4);
+            }
+            """;
+
+    private static async Task AwaitNoPayload(object? result)
+    {
+        switch (result)
+        {
+            case null:
+                return;
+            case Task task:
+                await task.ConfigureAwait(false);
+                return;
+            default:
+                await AwaitValueTask(result).ConfigureAwait(false);
+                return;
+        }
     }
 
     private static async Task AwaitValueTask(object valueTask)

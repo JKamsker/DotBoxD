@@ -87,6 +87,33 @@ public sealed class InvokeAsyncSurpriseGenerationTests
     }
 
     [Fact]
+    public void Explicit_capture_bag_applies_numeric_conversion_to_sync_out_reads()
+    {
+        var result = RunGenerator(CaptureBagSource("""
+            public sealed class MonsterCapture
+            {
+                public string MonsterId { get; set; } = "";
+                public int LastHealth { get; set; }
+            }
+
+            public static class Usage
+            {
+                public static ValueTask<long> Run(RemotePluginServer kernels, MonsterCapture captures)
+                    => kernels.InvokeAsync(captures, async (IGameWorldAccess world, MonsterCapture bag) =>
+                    {
+                        bag.LastHealth = world.GetHealth(bag.MonsterId);
+                        long health = bag.LastHealth;
+                        return health;
+                    });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("numeric.toI64", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Explicit_capture_bag_supports_public_field_sync_out()
     {
         var result = RunGenerator(CaptureBagSource("""

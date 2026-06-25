@@ -62,6 +62,8 @@ public sealed class PluginAnalyzerKernelMethodProjectionRegressionTests
             parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
 
+        Assert.DoesNotContain(diagnostics, d => d.Id == "DBXK100");
+        Assert.DoesNotContain(output.GetDiagnostics(), d => d.Id == "DBXK100");
         Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
 

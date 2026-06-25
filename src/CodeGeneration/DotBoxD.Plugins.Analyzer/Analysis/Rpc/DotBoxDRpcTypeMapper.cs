@@ -13,11 +13,11 @@ internal static class DotBoxDRpcTypeMapper
 {
     public static string JsonType(ITypeSymbol type)
     {
-        if (DotBoxDRpcReturnType.PayloadType(type) is not { } payloadType)
+        if (type.SpecialType == SpecialType.System_Void || DotBoxDRpcReturnType.IsTaskLike(type))
         {
-            return "\"Unit\"";
+            throw new NotSupportedException(
+                $"Server extension type '{type.ToDisplayString()}' is only supported as a top-level return type.");
         }
-        type = payloadType;
         if (DotBoxDNullableScalarType.IsNullableValueType(type))
         {
             throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");

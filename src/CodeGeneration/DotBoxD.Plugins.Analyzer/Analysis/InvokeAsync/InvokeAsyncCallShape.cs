@@ -214,7 +214,7 @@ internal sealed partial class InvokeAsyncCallShape
             captureType: null,
             usesReflectionCaptures: false,
             parametersJson: "[]",
-            returnTypeJson: DotBoxDRpcTypeMapper.JsonType(returnType),
+            returnTypeJson: DotBoxDRpcReturnType.JsonType(returnType),
             argumentsExpression: "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
             default,
             [],
@@ -266,11 +266,11 @@ internal sealed partial class InvokeAsyncCallShape
     {
         if (syncOuts.Count == 0)
         {
-            return DotBoxDRpcTypeMapper.JsonType(returnType);
+            return DotBoxDRpcReturnType.JsonType(returnType);
         }
 
         var fields = new string[1 + syncOuts.Count];
-        fields[0] = DotBoxDRpcTypeMapper.JsonType(returnType);
+        fields[0] = DotBoxDRpcReturnType.JsonType(returnType);
         for (var i = 0; i < syncOuts.Count; i++)
         {
             fields[i + 1] = DotBoxDRpcTypeMapper.JsonType(syncOuts[i].Type);

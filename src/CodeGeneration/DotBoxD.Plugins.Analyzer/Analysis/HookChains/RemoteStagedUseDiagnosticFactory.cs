@@ -112,16 +112,24 @@ internal static class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var seed = WalkToSeed(expression);
+        var seed = WalkToSeed(expression, model, cancellationToken);
         return seed is not null &&
             GeneratedRemoteHookChainFallback.Candidate(seed, model, cancellationToken) is not null;
     }
 
-    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax expression)
+    private static InvocationExpressionSyntax? WalkToSeed(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
         {
             expression = parenthesized.Expression;
+        }
+
+        if (AliasInitializer(expression, model, cancellationToken) is { } initializer)
+        {
+            return WalkToSeed(initializer, model, cancellationToken);
         }
 
         var current = expression;
@@ -141,6 +149,36 @@ internal static class RemoteStagedUseDiagnosticFactory
             }
 
             return null;
+        }
+
+        return null;
+    }
+
+    private static ExpressionSyntax? AliasInitializer(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        if (expression is not IdentifierNameSyntax identifier ||
+            model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
+        {
+            return null;
+        }
+
+        foreach (var reference in local.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer
+                })
+            {
+                return initializer;
+            }
         }
 
         return null;

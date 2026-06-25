@@ -25,7 +25,7 @@ internal sealed partial class InvokeAsyncCallShape
             if (recordMember.Symbol is null)
             {
                 throw new NotSupportedException(
-                    $"InvokeAsync capture member '{target.Name}' must be a public marshalled field.");
+                    $"InvokeAsync capture member '{target.Name}' must be a public marshalled field or property.");
             }
 
             if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression)
@@ -135,7 +135,7 @@ internal sealed partial class InvokeAsyncCallShape
         if (syncOut is null)
         {
             throw new NotSupportedException(
-                $"InvokeAsync capture member '{propertyName}' must be a writable marshalled field.");
+                $"InvokeAsync capture member '{propertyName}' must be a writable marshalled field or property.");
         }
 
         return DotBoxDRpcJsonLowerer.SetGeneratedLocal(syncOut.LocalName, lower(assignment.Right));

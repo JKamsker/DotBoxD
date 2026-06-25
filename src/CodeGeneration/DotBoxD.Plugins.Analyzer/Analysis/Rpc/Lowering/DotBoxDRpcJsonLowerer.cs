@@ -172,12 +172,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 return;
             case InvocationExpressionSyntax invocation:
                 output.Add(SetStatement(
-                    "__sir_discard" + _tempCounter++,
+                    NextDiscardLocal(),
                     LowerExpressionWithPrelude(invocation, output)));
                 return;
             case AwaitExpressionSyntax { Expression: InvocationExpressionSyntax invocation }:
                 output.Add(SetStatement(
-                    "__sir_discard" + _tempCounter++,
+                    NextDiscardLocal(),
                     LowerExpressionWithPrelude(invocation, output)));
                 return;
             default:
