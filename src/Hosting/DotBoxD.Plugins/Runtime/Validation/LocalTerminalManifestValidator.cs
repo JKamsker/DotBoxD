@@ -63,8 +63,19 @@ internal static class LocalTerminalManifestValidator
            type.GetInterfaces().Any(IsGenericMap);
 
     private static bool IsGenericMap(Type type)
-        => type.IsGenericType &&
-           type.GetGenericTypeDefinition() == typeof(IDictionary<,>);
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        // A RunLocal map projection whose handler parameter is declared as IReadOnlyDictionary<,> (or a
+        // Dictionary<,>, which implements both) is treated as a map by the generator/RPC mapper; accept it here
+        // too so the decoder's materialized Dictionary is not rejected before the callback is even registered.
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(IDictionary<,>) ||
+               definition == typeof(IReadOnlyDictionary<,>);
+    }
 
     private static bool TypeNameMatches(string declared, Type expected)
     {

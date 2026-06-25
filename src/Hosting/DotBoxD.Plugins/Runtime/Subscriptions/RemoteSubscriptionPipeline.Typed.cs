@@ -199,6 +199,10 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         PluginPackage package,
         Func<TProjected, TContext, ValueTask> handler)
     {
+        // Guard here at the single capture site so every UseGeneratedLocalChain entry — including the overloads
+        // that forward straight through — fails fast at registration instead of NREing during a later callback.
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(handler);
         _inner.InstallLocal<TProjected>(package, (value, rawContext) => handler(value, _createContext(rawContext)));
         return this;
     }
@@ -208,6 +212,9 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         Func<TProjected, TContext, ValueTask> handler,
         Func<KernelRpcValue, TProjected> decoder)
     {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(decoder);
         _inner.InstallLocal(package, (value, rawContext) => handler(value, _createContext(rawContext)), decoder);
         return this;
     }
@@ -217,6 +224,9 @@ public sealed class RemoteSubscriptionPipeline<TEvent, TContext>
         Func<TProjected, TContext, ValueTask> handler,
         Func<ReadOnlyMemory<byte>, TProjected> decoder)
     {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(decoder);
         _inner.InstallLocal(package, (value, rawContext) => handler(value, _createContext(rawContext)), decoder);
         return this;
     }

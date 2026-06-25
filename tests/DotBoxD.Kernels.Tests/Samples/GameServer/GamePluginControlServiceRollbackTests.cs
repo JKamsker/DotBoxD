@@ -63,6 +63,33 @@ public sealed class GamePluginControlServiceRollbackTests
     }
 
     [Fact]
+    public async Task Failed_post_install_wiring_keeps_existing_same_id_kernel()
+    {
+        // A same-id replacement whose WIRING fails after install must not destroy the incumbent. The new kernel
+        // is installed as a non-current instance and wired before it displaces the incumbent, so a wire failure
+        // rolls the staged instance back with the incumbent still current and un-revoked. (Previously the install
+        // revoked the incumbent up front and rollback only removed the new install id, leaving the id with NO
+        // kernel.)
+        var (server, session, service) = CreateControlService();
+        using (server)
+        {
+            var incumbentPackage = ResolveGamePluginPackage("DotBoxD.Kernels.Game.Plugin.Kernels.RetaliationKernel");
+            await InstallPluginAsync(service, PluginPackageJsonSerializer.Export(incumbentPackage));
+            var incumbent = server.Kernels.Get("retaliation");
+
+            // Same plugin id, but a result hook on a non-result event: install succeeds, wiring throws.
+            var brokenReplacement = ResultHookOnNonResultEventPackage("retaliation");
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await InstallPluginAsync(service, PluginPackageJsonSerializer.Export(brokenReplacement)));
+
+            Assert.True(session.Owns("retaliation"));
+            Assert.True(server.Kernels.TryGet("retaliation", out var installed));
+            Assert.Same(incumbent, installed);
+            Assert.False(incumbent.IsRevoked);
+        }
+    }
+
+    [Fact]
     public async Task Wire_classifies_a_sandbox_result_hook_with_no_callback_as_the_Result_terminal()
     {
         // A result hook with no callback id and no ResultLocalTerminal is a sandbox Register: the verified

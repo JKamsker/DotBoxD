@@ -97,6 +97,100 @@ public sealed class PluginServerFacadeRegressionTests
     }
 
     [Fact]
+    public void Generated_plugin_server_disambiguates_same_simple_name_returned_services()
+    {
+        // Two [DotBoxDService] interfaces named IMonster live in different namespaces and are both returned from
+        // one control. Returned-service wrapper classes are named from the SIMPLE type name and emitted as nested
+        // siblings, so without disambiguation both would become `class MonsterPluginService` (CS0102). The model
+        // dedups by FULL name, so they are two distinct wrappers; their emitted names must differ.
+        var (result, outputCompilation) = RunGenerator("""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Collision.Game
+            {
+                [DotBoxDService]
+                public interface IGameWorldAccess
+                {
+                    IMonsterControl Monsters { get; }
+                }
+
+                [DotBoxDService]
+                public interface IMonsterControl
+                {
+                    ValueTask<Collision.Game.Alpha.IMonster> GetAlphaAsync(string id);
+                    ValueTask<Collision.Game.Beta.IMonster> GetBetaAsync(string id);
+                }
+            }
+
+            namespace Collision.Game.Alpha
+            {
+                [DotBoxDService]
+                public interface IMonster
+                {
+                    ValueTask<int> GetHealthAsync();
+                }
+            }
+
+            namespace Collision.Game.Beta
+            {
+                [DotBoxDService]
+                public interface IMonster
+                {
+                    ValueTask<int> GetLevelAsync();
+                }
+            }
+
+            namespace Collision.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, System.Threading.CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        System.Threading.CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(System.Threading.CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static Collision.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+                }
+            }
+
+            namespace Collision.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using Collision.Game;
+
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : IGameWorldAccess;
+
+                public sealed partial class RemotePluginContext;
+            }
+            """);
+        var generated = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Empty(outputCompilation.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Contains("class MonsterPluginService", generated, StringComparison.Ordinal);
+        Assert.Contains("class MonsterPluginService_2", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generated_plugin_server_uses_disambiguated_world_proxy_suffix()
     {
         var (result, outputCompilation) = RunGenerator("""

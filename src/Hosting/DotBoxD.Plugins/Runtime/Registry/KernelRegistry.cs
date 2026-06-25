@@ -97,6 +97,39 @@ public sealed class KernelRegistry : IEnumerable<InstalledKernel>
     }
 
     /// <summary>
+    /// Promotes an already-registered instance (added via <see cref="AddInstance"/>) to be the current kernel for
+    /// its plugin id, revoking and removing any prior same-id incumbent and returning it. This lets a caller fully
+    /// wire a freshly installed kernel <b>before</b> it displaces the incumbent, so a wiring failure can roll the
+    /// new instance back with the incumbent still live and un-revoked (revocation is a one-way latch, so revoking
+    /// before wiring succeeds could never be undone).
+    /// </summary>
+    internal InstalledKernel? Promote(InstalledKernel kernel)
+    {
+        InstalledKernel? revoke = null;
+        lock (_gate)
+        {
+            if (!_kernelsByInstallId.TryGetValue(kernel.InstallId, out var registered) ||
+                !ReferenceEquals(registered, kernel))
+            {
+                throw new InvalidOperationException(
+                    $"kernel install id '{kernel.InstallId}' is not registered as an instance and cannot be promoted.");
+            }
+
+            if (_currentByPluginId.TryGetValue(kernel.Manifest.PluginId, out var existing) &&
+                !ReferenceEquals(existing, kernel))
+            {
+                revoke = existing;
+                RemoveCore(existing);
+            }
+
+            _currentByPluginId[kernel.Manifest.PluginId] = kernel;
+        }
+
+        revoke?.Revoke();
+        return revoke;
+    }
+
+    /// <summary>
     /// Removes and revokes a kernel instance only if it is owned by <paramref name="owner"/> (or has no owner),
     /// so a session disposal never tears down another session's same-principal kernel.
     /// </summary>

@@ -38,10 +38,10 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     /// <summary>The named pipe the plugin peer dials, or empty when started over a non-pipe transport.</summary>
     public string PipeName { get; }
 
-    /// <summary>Completes when a plugin connects, yielding the object <c>configure</c> returned for it; faults if <c>configure</c> throws.</summary>
+    /// <summary>Completes when a plugin connects, yielding the object <c>configure</c> returned for it; faults if <c>configure</c> throws; cancels if the host is stopped/disposed before any plugin connects.</summary>
     public Task<TConnection> Connected => _connected.Task;
 
-    /// <summary>Completes when the connected plugin drops, after its session has been disposed.</summary>
+    /// <summary>Completes when the connected plugin drops (after its session has been disposed) OR the host is stopped/disposed.</summary>
     public Task Disconnected => _disconnected.Task;
 
     /// <summary>
@@ -104,19 +104,21 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                 return;
             }
 
-            var session = server.CreateSession();
-            self._session = session;
-            peer.Disconnected += (_, _) =>
-            {
-                self.DisposeSessionOnce();        // revoke + unregister the kernels this peer owned
-                self._disconnected.TrySetResult();
-            };
-
-            // The caller provides its services over the session (before the peer starts) and returns whatever it
-            // wants to await on Connected. If it throws, dispose the just-minted session and surface the failure
-            // on Connected/Disconnected instead of leaking the session and letting callers time out.
+            // Everything from minting the session onward runs inside the try. The caller provides its services
+            // over the session (before the peer starts) and returns whatever it wants to await on Connected. If
+            // CreateSession, the Disconnected wiring, or configure throws, dispose the just-minted session and
+            // surface the failure on Connected/Disconnected instead of stranding both awaiters (and burning the
+            // accept-once latch) on a half-provisioned peer.
             try
             {
+                var session = server.CreateSession();
+                self._session = session;
+                peer.Disconnected += (_, _) =>
+                {
+                    self.DisposeSessionOnce();        // revoke + unregister the kernels this peer owned
+                    self._disconnected.TrySetResult();
+                };
+
                 var connection = configure(peer, session);
                 self._connected.TrySetResult(connection);
             }
@@ -140,14 +142,30 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     }
 
     /// <summary>
+    /// Completes the lifecycle awaiters on a local stop/dispose so a caller awaiting <see cref="Connected"/> or
+    /// <see cref="Disconnected"/> can never hang. A local stop cancels the listener's read loop, so the peer's
+    /// <c>Disconnected</c> event never fires — without this, both tasks would stay pending forever. A plugin that
+    /// already connected wins the Connected race; one that never connected sees a cancellation; Disconnected
+    /// always completes once the session has been torn down. <c>TrySet*</c> is idempotent, so a genuine peer-drop
+    /// that already completed these is unaffected.
+    /// </summary>
+    private void CompleteLifecycle()
+    {
+        _connected.TrySetCanceled();
+        _disconnected.TrySetResult();
+    }
+
+    /// <summary>
     /// Stops accepting connections and disposes the connected plugin's session. A local stop does not raise the
     /// peer's <c>Disconnected</c> event, so this is the cleanup path when the host shuts the listener down while
-    /// a plugin is still connected.
+    /// a plugin is still connected; it also completes <see cref="Connected"/>/<see cref="Disconnected"/> so no
+    /// awaiter is left hanging.
     /// </summary>
     public async Task StopAsync()
     {
         await _host.StopAsync().ConfigureAwait(false);
         DisposeSessionOnce();
+        CompleteLifecycle();
     }
 
     /// <inheritdoc/>
@@ -155,5 +173,6 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     {
         await _host.DisposeAsync().ConfigureAwait(false);
         DisposeSessionOnce();
+        CompleteLifecycle();
     }
 }

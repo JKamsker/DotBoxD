@@ -77,9 +77,21 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
     /// hand-write. <paramref name="validate"/> runs <b>before</b> install for host route checks;
     /// <paramref name="policy"/> overrides the default install policy; <paramref name="wire"/> is the host's
     /// routing choice (typically <see cref="PluginServer.WireHook"/> or
-    /// <see cref="PluginServer.WireSubscription"/> with host wire options). On any failure the just-installed
-    /// kernel is uninstalled by its exact install id — so a same-id incumbent is never disturbed — and the
-    /// original exception is rethrown.
+    /// <see cref="PluginServer.WireSubscription"/> with host wire options).
+    /// <para>
+    /// The kernel is installed as a non-current instance, wired, and only then promoted to current — all under
+    /// the session gate. So: a same-id incumbent is <b>not</b> revoked until wiring succeeds (a wiring failure
+    /// rolls the new instance back by its exact install id with the incumbent still live and current), and a
+    /// concurrent <see cref="Dispose"/> cannot tear the kernel down mid-wire and leave a dangling handler. On any
+    /// failure the original exception is rethrown.
+    /// </para>
+    /// <para>
+    /// Note: during a same-id hot-replace there is a brief window — between wiring the new kernel and promoting it
+    /// (which revokes the incumbent) — in which <b>both</b> the outgoing and incoming kernels are wired, since
+    /// pipeline handlers are keyed per kernel instance. A concurrent publish of the same event in that window may
+    /// be observed by both kernels until promotion completes. (The first install of a given id has no incumbent
+    /// and so no such window.)
+    /// </para>
     /// </summary>
     /// <remarks>Opt-in convenience: hand-write the equivalent with <see cref="InstallAsync"/> + your wire
     /// action + <see cref="Uninstall"/> on failure if this shape doesn't fit — all public.</remarks>
@@ -95,53 +107,49 @@ public sealed class PluginSession : IDisposable, IAsyncDisposable
 
         validate?.Invoke(package);
 
-        InstalledKernel? kernel = null;
+        InstalledKernel? staged = null;
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            kernel = await InstallAsync(package, policy?.Invoke(package), cancellationToken).ConfigureAwait(false);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
-            // The session can be disposed (e.g. the peer disconnected) between InstallAsync releasing its gate
-            // and this wire step; Dispose then revokes + unregisters the just-installed kernel. Don't wire into a
-            // torn-down session — that would leave a dead handler in the pipeline that nothing later removes.
-            if (Volatile.Read(ref _disposed) != 0)
-            {
-                throw new InvalidOperationException(
-                    $"Plugin session was disposed while installing '{package.Manifest.PluginId}'.");
-            }
+            // Stage as a non-current instance, wire, then promote — all while holding the gate. Dispose takes the
+            // same gate, so it cannot interleave between the install and the wire to revoke the kernel out from
+            // under us (it tears the kernel down only after we release), and the incumbent is displaced only once
+            // wiring has succeeded.
+            staged = await _server.InstallOwnedStagedAsync(this, package, policy?.Invoke(package), cancellationToken)
+                .ConfigureAwait(false);
+            _ownedInstallIds.Add(staged.InstallId);
 
-            wire(kernel);
-            return kernel;
+            wire(staged);
+
+            _server.PromoteOwned(this, staged);
+            return staged;
         }
         catch
         {
-            if (kernel is not null)
+            if (staged is not null)
             {
-                RollBack(kernel);
+                try
+                {
+                    // Roll the just-staged instance back by its exact install id. It was never promoted, so the
+                    // incumbent (if any) was never revoked and stays current; UninstallOwned also detaches any
+                    // handlers wire() managed to register before failing.
+                    _ownedInstallIds.Remove(staged.InstallId);
+                    _server.UninstallOwned(this, staged.InstallId);
+                }
+                catch
+                {
+                    // Best-effort rollback: never let a cleanup failure mask the original install/wire exception,
+                    // which is the actionable error and is rethrown below.
+                }
             }
 
             throw;
         }
-    }
-
-    private void RollBack(InstalledKernel kernel)
-    {
-        try
+        finally
         {
-            _gate.Wait();
-            try
-            {
-                _ownedInstallIds.Remove(kernel.InstallId);
-            }
-            finally
-            {
-                _gate.Release();
-            }
-
-            _server.UninstallOwned(this, kernel.InstallId);
-        }
-        catch
-        {
-            // Best-effort rollback: the original install/wire failure is the actionable error and is rethrown.
+            _gate.Release();
         }
     }
 

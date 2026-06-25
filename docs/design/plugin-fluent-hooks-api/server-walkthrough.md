@@ -253,9 +253,15 @@ server.Hooks.On<MonsterAggroEvent>()
     .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "calm"));
 ```
 
-A non-default context can still be selected explicitly when a chain needs a different facade:
+A non-default context can still be selected explicitly when a chain needs a different facade — here a
+`CombatHookContext` that wraps the ambient context plus the world:
 
 ```csharp
+public sealed class CombatHookContext(HookContext inner, IGameWorldAccess world)
+{
+    public bool CanReact(string monsterId) => world.Monsters.Get(monsterId) is not null;
+}
+
 server.Hooks.On<MonsterAggroEvent, CombatHookContext>(ctx => new CombatHookContext(ctx, world))
     .Where((e, ctx) => ctx.CanReact(e.MonsterId))
     .Select(e => "aggro")

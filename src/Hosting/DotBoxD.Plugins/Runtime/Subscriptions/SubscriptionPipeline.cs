@@ -156,6 +156,7 @@ public class SubscriptionPipeline<TEvent, TContext> : ISubscriptionPipeline<TEve
 
     public SubscriptionPipeline<TEvent, TContext> Use(InstalledKernel kernel)
     {
+        ArgumentNullException.ThrowIfNull(kernel);
         kernel.ValidateFor(_adapter);
         _handlerSet.Add(kernel, (e, rawContext, _) => kernel.InvokeAsync(_adapter, e, rawContext.CancellationToken));
         return this;

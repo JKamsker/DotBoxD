@@ -60,25 +60,63 @@ public sealed class PluginEventAdapterRegistry
     /// </summary>
     public bool TryResolveErased(string eventName, out IErasedPluginEventAdapter adapter)
     {
-        // Prefer an exact (ordinal) name match over a qualified-vs-simple suffix match, so a precisely-named
-        // event always resolves to its own adapter and never to one that merely suffix-collides with it.
+        // Resolution prefers the most precise match and refuses to guess when two events collide:
+        //   1. Exact (ordinal) match on the adapter's reported name — but if two adapters report the same name
+        //      it is genuinely ambiguous, so reject rather than silently pick the first.
+        //   2. Fully-qualified match on the event TYPE's name (the dictionary key). Convention/hand-written
+        //      adapters report only the simple name, so two same-simple-name events in different namespaces are
+        //      indistinguishable by name (1) and by suffix (3); the manifest records the FQN precisely, and the
+        //      event type's FullName is unique, so this is what disambiguates them.
+        //   3. Qualified-vs-simple suffix bridge — only when it resolves to a single adapter.
+        IErasedPluginEventAdapter? exactMatch = null;
+        var exactCount = 0;
+        IErasedPluginEventAdapter? typeNameMatch = null;
         IErasedPluginEventAdapter? suffixMatch = null;
-        foreach (var registered in _adapters.Values)
+        var suffixCount = 0;
+
+        foreach (var entry in _adapters)
         {
+            var registered = entry.Value;
             if (string.Equals(registered.Shape.EventName, eventName, StringComparison.Ordinal))
             {
-                adapter = registered.Erased;
-                return true;
+                exactMatch = registered.Erased;
+                exactCount++;
+                continue;
             }
 
-            if (suffixMatch is null && EventNameMatch.Matches(registered.Shape.EventName, eventName))
+            if (typeNameMatch is null && string.Equals(entry.Key.FullName, eventName, StringComparison.Ordinal))
             {
-                suffixMatch = registered.Erased;
+                typeNameMatch = registered.Erased;
+            }
+
+            if (EventNameMatch.Matches(registered.Shape.EventName, eventName))
+            {
+                suffixMatch ??= registered.Erased;
+                suffixCount++;
             }
         }
 
-        adapter = suffixMatch!;
-        return suffixMatch is not null;
+        if (exactCount == 1)
+        {
+            adapter = exactMatch!;
+            return true;
+        }
+
+        if (exactCount == 0 && typeNameMatch is not null)
+        {
+            adapter = typeNameMatch;
+            return true;
+        }
+
+        if (exactCount == 0 && typeNameMatch is null && suffixCount == 1)
+        {
+            adapter = suffixMatch!;
+            return true;
+        }
+
+        // Zero matches, or an ambiguous collision we refuse to resolve by registration order.
+        adapter = null!;
+        return false;
     }
 
     private static IPluginEventAdapter<TEvent>? TryDiscoverAdapter<TEvent>()
