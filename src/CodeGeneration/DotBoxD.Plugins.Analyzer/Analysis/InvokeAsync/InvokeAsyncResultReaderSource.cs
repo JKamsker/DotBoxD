@@ -35,7 +35,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
             SpecialType.System_Int32 => $"{expression}.Int32Value",
             SpecialType.System_Int64 => $"{expression}.Int64Value",
             SpecialType.System_Double => $"{expression}.DoubleValue",
-            SpecialType.System_Single => $"(float){expression}.DoubleValue",
+            SpecialType.System_Single => $"{EnsureSingleValueReader()}({expression})",
             SpecialType.System_String => $"{expression}.TextValue",
             _ => ReadComplexExpression(type, expression)
         };
@@ -49,9 +49,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
 
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
-            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? $"unchecked(({TypeName(type)}){expression}.Int64Value)"
-                : $"unchecked(({TypeName(type)}){expression}.Int32Value)";
+            return $"{EnsureEnumValueReader(enumType)}({expression})";
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
