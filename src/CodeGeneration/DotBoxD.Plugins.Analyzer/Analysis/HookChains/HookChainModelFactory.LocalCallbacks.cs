@@ -22,12 +22,13 @@ internal static partial class HookChainModelFactory
             cancellationToken,
             capabilities,
             effects);
-        return projection ?? WholeEventProjection(eventType, eventProperties, effects);
+        return projection ?? WholeEventProjection(eventType, eventProperties, capabilities, effects);
     }
 
     private static HookChainProjection WholeEventProjection(
         INamedTypeSymbol eventType,
         EquatableArray<EventPropertyModel> eventProperties,
+        ICollection<string> capabilities,
         ICollection<string> effects)
     {
         var sandboxType = Rpc.SandboxTypeSourceEmitter.TryEmit(eventType) ?? throw new NotSupportedException();
@@ -36,6 +37,11 @@ internal static partial class HookChainModelFactory
         {
             fields[i] = DotBoxDGenerationNames.Helpers.Var + "(" +
                 LiteralReader.StringLiteral(DotBoxDExpressionModelFactory.EventVariable(eventProperties[i].Name)) + ")";
+
+            // A whole-event push materializes (reads) every event property, so a [Capability]-gated property
+            // crosses the IPC boundary exactly as an explicit .Select(e => e.Gated) would. Collect its gate so
+            // the chain requires the same capability either way (no Select must not weaken the posture).
+            CollectGatedPropertyCapabilities(eventType, eventProperties[i].Name, capabilities);
         }
 
         effects.Add(DotBoxDGenerationNames.Effects.Alloc);
@@ -46,6 +52,40 @@ internal static partial class HookChainModelFactory
                 Rpc.SandboxTypeSourceEmitter.ManifestTag(eventType),
                 Allocates: true),
             eventType);
+    }
+
+    // Reads the [Capability] gate(s) of the named event property (searching the declaring type and its base
+    // types so inherited gated properties are still honored) and adds them to the chain's required set. Mirrors
+    // DotBoxDExpressionModelFactory.CollectEventPropertyCapability, which gates the same read on the Select path.
+    private static void CollectGatedPropertyCapabilities(
+        INamedTypeSymbol eventType,
+        string propertyName,
+        ICollection<string> capabilities)
+    {
+        for (INamedTypeSymbol? type = eventType; type is not null; type = type.BaseType)
+        {
+            foreach (var member in type.GetMembers(propertyName))
+            {
+                if (member is not IPropertySymbol property)
+                {
+                    continue;
+                }
+
+                foreach (var attribute in property.GetAttributes())
+                {
+                    if (string.Equals(
+                            attribute.AttributeClass?.ToDisplayString(),
+                            DotBoxDMetadataNames.CapabilityAttribute,
+                            StringComparison.Ordinal) &&
+                        attribute.ConstructorArguments.Length == 1 &&
+                        attribute.ConstructorArguments[0].Value is string id &&
+                        !string.IsNullOrEmpty(id))
+                    {
+                        capabilities.Add(id);
+                    }
+                }
+            }
+        }
     }
 
     private static string RpcRecordNew(IReadOnlyList<string> fields, string sandboxType)
