@@ -48,17 +48,43 @@ internal static partial class RpcKernelModelFactory
             ValidateGeneratedParameterNames(method, liveSettings);
             IMethodSymbol? serviceMethod = null;
             RpcKernelClientExtensions? clientExtensions = null;
+            RpcKernelClientMethodExtension? directClientMethod = null;
             if (serviceType is not null)
             {
                 serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(serviceType, method);
                 clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
             }
+            else if (graft is not null)
+            {
+                directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(method, graft.ReceiverType);
+                if (directClientMethod is not null &&
+                    !SymbolEqualityComparer.Default.Equals(directClientMethod.ReceiverType, graft.ReceiverType))
+                {
+                    throw new NotSupportedException(
+                        $"Server extension client method receiver '{directClientMethod.ReceiverType.ToDisplayString()}' " +
+                        $"must match the class receiver '{graft.ReceiverType.ToDisplayString()}'.");
+                }
+            }
+            else if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method))
+            {
+                throw new NotSupportedException(
+                    "[ServerExtensionMethod] requires a service-backed or receiver-grafted [ServerExtension] class.");
+            }
             var body = MethodBody(method, cancellationToken);
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
             var effects = new SortedSet<string>(StringComparer.Ordinal);
-            var lowerer = new DotBoxDRpcJsonLowerer(context.SemanticModel, capabilities, effects, cancellationToken);
+            var contextParameter = method.Parameters[method.Parameters.Length - 1];
+            var lowerer = new DotBoxDRpcJsonLowerer(
+                context.SemanticModel,
+                capabilities,
+                effects,
+                cancellationToken,
+                serverContextParameterName: contextParameter.Name,
+                serverContextType: contextParameter.Type);
             var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
-            var bodyJson = lowerer.LowerBody(body);
+            var bodyJson = body.Block is { } block
+                ? lowerer.LowerBody(block)
+                : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);
 
             effects.Add("Cpu");
             if (lowerer.Allocates)
@@ -77,13 +103,16 @@ internal static partial class RpcKernelModelFactory
                 serviceType,
                 serviceMethod,
                 clientExtensions,
+                directClientMethod,
                 graft,
-                hasReceiverId);
+                hasReceiverId,
+                context.SemanticModel.Compilation);
             var grafts = RpcKernelGraftSignatureFactory.Create(
                 type,
                 method,
                 serviceMethod,
                 clientExtensions,
+                directClientMethod,
                 graft);
             return new RpcKernelModelResult(source, null, grafts);
         }
@@ -104,11 +133,13 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
+        RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
-        bool hasReceiverId)
+        bool hasReceiverId,
+        Compilation compilation)
     {
         var methodName = method.Name;
-        var returnType = DotBoxDRpcTypeMapper.JsonType(method.ReturnType);
+        var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType);
         var parameters = new List<string>();
         if (hasReceiverId)
         {
@@ -150,7 +181,16 @@ internal static partial class RpcKernelModelFactory
 
         return new GeneratedPluginPackage(
             HintName(type),
-            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, graft, method),
+            BuildSource(
+                type,
+                json,
+                serviceType,
+                serviceMethod,
+                clientExtensions,
+                directClientMethod,
+                graft,
+                method,
+                compilation),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -161,8 +201,10 @@ internal static partial class RpcKernelModelFactory
         INamedTypeSymbol? serviceType,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
+        RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
-        IMethodSymbol kernelMethod)
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
         var builder = new System.Text.StringBuilder();
@@ -184,7 +226,7 @@ internal static partial class RpcKernelModelFactory
         if (serviceType is not null && serviceMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelClientProxyEmitter.Emit(type, serviceType, serviceMethod));
+            builder.Append(RpcKernelClientProxyEmitter.Emit(type, serviceType, serviceMethod, compilation));
             if (clientExtensions is { IsEmpty: false })
             {
                 builder.AppendLine();
@@ -192,10 +234,15 @@ internal static partial class RpcKernelModelFactory
             }
         }
         else if (graft is not null &&
-                 RpcKernelClientExtensionModelFactory.HasExtensionAttribute(kernelMethod))
+                 directClientMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod));
+            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(
+                type,
+                graft,
+                kernelMethod,
+                directClientMethod,
+                compilation));
         }
 
         return builder.ToString();

@@ -43,6 +43,42 @@ public sealed class RpcKernelNumericConversionGenerationTests
         }
         """;
 
+    private const string FloatLiteralSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [ServerExtension("float-literal")]
+        public sealed partial class FloatLiteralKernel
+        {
+            public float Half(HookContext ctx)
+            {
+                return 1.5f;
+            }
+        }
+        """;
+
+    private const string FloatParameterSource = """
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [ServerExtension("float-parameter")]
+        public sealed partial class FloatParameterKernel
+        {
+            public float Echo(int value, HookContext ctx)
+            {
+                return value;
+            }
+        }
+        """;
+
     [Fact]
     public async Task Generated_rpc_kernel_preserves_implicit_numeric_literal_conversions()
     {
@@ -71,6 +107,36 @@ public sealed class RpcKernelNumericConversionGenerationTests
         var result = await kernel.InvokeServerExtensionAsync([SandboxValue.FromInt32(42)]);
 
         Assert.Equal(42L, Assert.IsType<I64Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Generated_rpc_kernel_preserves_float_literals()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            FloatLiteralSource,
+            "Sample.FloatLiteralPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([]);
+
+        Assert.Equal(1.5, Assert.IsType<F64Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Generated_rpc_kernel_preserves_int_to_float_variable_conversions()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            FloatParameterSource,
+            "Sample.FloatParameterPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([SandboxValue.FromInt32(42)]);
+
+        Assert.Equal(42.0, Assert.IsType<F64Value>(result).Value);
     }
 
     private static SandboxPolicy PurePolicy()

@@ -31,7 +31,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         if (sourceType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 &&
-            targetType.SpecialType == SpecialType.System_Double)
+            targetType.SpecialType is SpecialType.System_Double or SpecialType.System_Single)
         {
             return Call("numeric.toF64", null, lowered);
         }

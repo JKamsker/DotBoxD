@@ -106,4 +106,15 @@ internal static class PluginAnalyzerDiagnostics
             + "wrong result type, or whose filter/handler cannot be lowered is skipped by the generator; without "
             + "interception its native Register/RegisterLocal terminal throws at runtime.",
         helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK113");
+
+    public static readonly DiagnosticDescriptor SourceGeneratorFailureRule = new(
+        "DBXK117",
+        "Plugin source generator stage failed",
+        "Plugin source generator stage '{0}' failed with {1}: {2}",
+        "DotBoxD.Kernels.Generation",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "An unexpected plugin source generator failure was isolated to the affected syntax or output "
+            + "stage. The generator skipped that item instead of failing the whole generation pass.",
+        helpLinkUri: UnshippedRulesHelpLinkBase + "DBXK117");
 }

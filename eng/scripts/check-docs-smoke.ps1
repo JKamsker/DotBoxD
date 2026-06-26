@@ -163,7 +163,7 @@ Assert-DocumentsDoNotContain $pluginFluentDocs "SetValuesAsync" "live-settings A
 
 if (-not $IsWindows) {
     Write-Host "Skipping GameServer runtime smoke on non-Windows runners."
-    Write-Host "Docs/example smoke checks passed."
+    Write-Host "Docs/static smoke checks passed; GameServer runtime smoke was skipped."
     return
 }
 

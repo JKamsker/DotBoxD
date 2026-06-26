@@ -34,12 +34,17 @@ internal static partial class HookChainModelFactory
         var asyncLocal = lambda.AsyncKeyword.RawKind != 0 || LambdaReturnsValueTask(lambda, model, cancellationToken);
         if (parameters.Count == 3)
         {
-            return LooksLikeCancellationToken(lambda, index: 2, model, cancellationToken)
+            return LooksLikeCancellationToken(lambda, index: 2, model, cancellationToken, allowNameFallback: asyncLocal)
                 ? new ResultLocalTerminalShape(parameters[0], parameters[1], true, true)
                 : default;
         }
 
-        if (parameters.Count == 2 && LooksLikeCancellationToken(lambda, index: 1, model, cancellationToken))
+        if (parameters.Count == 2 && LooksLikeCancellationToken(
+                lambda,
+                index: 1,
+                model,
+                cancellationToken,
+                allowNameFallback: asyncLocal))
         {
             return new ResultLocalTerminalShape(parameters[0], null, true, true);
         }
@@ -91,7 +96,8 @@ internal static partial class HookChainModelFactory
         LambdaExpressionSyntax lambda,
         int index,
         SemanticModel model,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowNameFallback)
     {
         if (lambda is not ParenthesizedLambdaExpressionSyntax parenthesized ||
             parenthesized.ParameterList.Parameters.Count <= index)
@@ -104,6 +110,11 @@ internal static partial class HookChainModelFactory
             model.GetTypeInfo(parameter.Type, cancellationToken).Type is { } type)
         {
             return IsCancellationToken(type);
+        }
+
+        if (!allowNameFallback)
+        {
+            return false;
         }
 
         var name = parameter.Identifier.ValueText;

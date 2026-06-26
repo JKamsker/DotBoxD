@@ -52,6 +52,25 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static Func<ValueTask<SandboxValue>, object?> CreateMaterializer(Type returnType)
     {
+        if (returnType == typeof(void))
+        {
+            return pending =>
+            {
+                ConsumeUnit(pending.AsTask().GetAwaiter().GetResult());
+                return null;
+            };
+        }
+
+        if (returnType == typeof(Task))
+        {
+            return pending => InvokeTaskAsync(pending);
+        }
+
+        if (returnType == typeof(ValueTask))
+        {
+            return pending => InvokeValueTaskAsync(pending);
+        }
+
         if (returnType.IsGenericType)
         {
             var definition = returnType.GetGenericTypeDefinition();
@@ -84,7 +103,19 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static void ValidateServiceContract(Type serviceType)
     {
-        foreach (var method in ContractMethods(serviceType))
+        if (!serviceType.IsInterface)
+        {
+            throw new NotSupportedException("Server extension proxy service type must be an interface.");
+        }
+
+        var methods = ContractMethods(serviceType).ToArray();
+        if (methods.Length != 1)
+        {
+            throw new NotSupportedException(
+                "Server extension proxy service type must declare exactly one method.");
+        }
+
+        foreach (var method in methods)
         {
             foreach (var parameter in method.GetParameters())
             {
@@ -143,6 +174,21 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static object BoxValueTaskAsync<T>(ValueTask<SandboxValue> pending)
         => InvokeValueTaskAsync<T>(pending);
+
+    private static async Task InvokeTaskAsync(ValueTask<SandboxValue> pending)
+        => ConsumeUnit(await pending.ConfigureAwait(false));
+
+    private static async ValueTask InvokeValueTaskAsync(ValueTask<SandboxValue> pending)
+        => ConsumeUnit(await pending.ConfigureAwait(false));
+
+    private static void ConsumeUnit(SandboxValue value)
+    {
+        if (value.Type != SandboxType.Unit)
+        {
+            throw new NotSupportedException(
+                $"Server extension value expected '{SandboxType.Unit}' but received '{value.Type}'.");
+        }
+    }
 
     private sealed class ServerExtensionMethod
     {

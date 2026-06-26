@@ -4,16 +4,20 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
-internal sealed class InvokeAsyncResultReaderSource
+internal sealed partial class InvokeAsyncResultReaderSource
 {
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly StringBuilder _helpers = new();
     private readonly string _helperPrefix;
+    private readonly Compilation? _compilation;
     private int _nextHelper;
 
-    public InvokeAsyncResultReaderSource(string helperPrefix = "ReadInvokeAsyncResult")
+    public InvokeAsyncResultReaderSource(
+        string helperPrefix = "ReadInvokeAsyncResult",
+        Compilation? compilation = null)
     {
         _helperPrefix = helperPrefix;
+        _compilation = compilation;
     }
 
     public static (string Expression, string Helpers) Create(ITypeSymbol type, string expression)
@@ -38,9 +42,26 @@ internal sealed class InvokeAsyncResultReaderSource
 
     private string ReadComplexExpression(ITypeSymbol type, string expression)
     {
+        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        {
+            return $"{expression}.GuidValue";
+        }
+
+        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+        {
+            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+                ? $"unchecked(({TypeName(type)}){expression}.Int64Value)"
+                : $"unchecked(({TypeName(type)}){expression}.Int32Value)";
+        }
+
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
         {
             return $"{EnsureListReader(type)}({expression})";
+        }
+
+        if (DotBoxDRpcTypeMapper.MapTypes(type) is not null)
+        {
+            return $"{EnsureMapReader(type)}({expression})";
         }
 
         if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
@@ -79,6 +100,43 @@ internal sealed class InvokeAsyncResultReaderSource
         return method;
     }
 
+    private string EnsureMapReader(ITypeSymbol type)
+    {
+        var key = TypeName(type);
+        if (_readers.TryGetValue(key, out var existing))
+        {
+            return existing;
+        }
+
+        var map = DotBoxDRpcTypeMapper.MapTypes(type)
+                  ?? throw new NotSupportedException($"InvokeAsync map return type '{type.ToDisplayString()}' is not supported.");
+        var method = NextHelperName();
+        _readers[key] = method;
+        var keyName = TypeName(map.Key);
+        var valueName = TypeName(map.Value);
+        var keyExpression = ReadExpression(map.Key, "value.GetItem(i)");
+        var valueExpression = ReadExpression(map.Value, "value.GetItem(i + 1)");
+        _helpers.Append("        private static ").Append(TypeName(type)).Append(' ').Append(method)
+            .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            value.RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Map);");
+        _helpers.AppendLine("            if ((value.ItemCount & 1) != 0)");
+        _helpers.AppendLine("            {");
+        _helpers.AppendLine("                throw new global::System.NotSupportedException(\"InvokeAsync map result had an odd key/value entry count.\");");
+        _helpers.AppendLine("            }");
+        _helpers.Append("            var __result = new global::System.Collections.Generic.Dictionary<")
+            .Append(keyName).Append(", ").Append(valueName).AppendLine(">(value.ItemCount / 2);");
+        _helpers.AppendLine("            for (var i = 0; i < value.ItemCount; i += 2)");
+        _helpers.AppendLine("            {");
+        _helpers.Append("                __result[").Append(keyExpression).Append("] = ").Append(valueExpression).AppendLine(";");
+        _helpers.AppendLine("            }");
+        _helpers.AppendLine();
+        _helpers.AppendLine("            return __result;");
+        _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        return method;
+    }
+
     private void AppendListReaderBody(string elementName, string itemExpression, bool returnsArray)
     {
         if (returnsArray)
@@ -110,7 +168,7 @@ internal sealed class InvokeAsyncResultReaderSource
         var method = NextHelperName();
         _readers[key] = method;
         var fields = DotBoxDRpcTypeMapper.RecordFields(type);
-        var arguments = DtoConstructorArguments(fields, ResolveConstructor(type, fields));
+        var body = BuildDtoReconstruction(type, fields);
         _helpers.Append("        private static ").Append(TypeName(type)).Append(' ').Append(method)
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("        {");
@@ -120,56 +178,10 @@ internal sealed class InvokeAsyncResultReaderSource
         _helpers.AppendLine("                throw new global::System.NotSupportedException(\"Server extension record field count did not match the generated DTO shape.\");");
         _helpers.AppendLine("            }");
         _helpers.AppendLine();
-        _helpers.Append("            return new ").Append(TypeName(type)).Append('(')
-            .Append(string.Join(", ", arguments)).AppendLine(");");
+        _helpers.AppendLine(body);
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         return method;
-    }
-
-    private List<string> DtoConstructorArguments(IReadOnlyList<RecordMember> fields, IMethodSymbol constructor)
-    {
-        var arguments = new List<string>(constructor.Parameters.Length);
-        foreach (var parameter in constructor.Parameters)
-        {
-            var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            arguments.Add(ReadExpression(fields[fieldIndex].Type, "value.GetItem(" + fieldIndex + ")"));
-        }
-
-        return arguments;
-    }
-
-    private static IMethodSymbol ResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
-    {
-        foreach (var constructor in type.InstanceConstructors)
-        {
-            if (constructor.Parameters.Length != fields.Count || constructor.Parameters.Length == 0)
-            {
-                continue;
-            }
-
-            var matched = true;
-            var assigned = new bool[fields.Count];
-            foreach (var parameter in constructor.Parameters)
-            {
-                var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0 || assigned[fieldIndex])
-                {
-                    matched = false;
-                    break;
-                }
-
-                assigned[fieldIndex] = true;
-            }
-
-            if (matched)
-            {
-                return constructor;
-            }
-        }
-
-        throw new NotSupportedException(
-            $"Server extension DTO '{type.ToDisplayString()}' must expose a constructor matching its public fields.");
     }
 
     private string NextHelperName() => _helperPrefix + _nextHelper++;

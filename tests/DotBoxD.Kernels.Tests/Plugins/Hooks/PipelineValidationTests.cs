@@ -41,6 +41,7 @@ public sealed class PipelineValidationTests
             () => pipeline.InvokeHostHandler((Func<GuardEvent, GuardContext, ValueTask>)null!));
         Assert.Throws<ArgumentNullException>(
             () => pipeline.InvokeHostHandler((Action<GuardEvent, GuardContext>)null!));
+        Assert.Throws<ArgumentNullException>(() => pipeline.Use((InstalledKernel)null!));
     }
 
     [Fact]
@@ -52,6 +53,19 @@ public sealed class PipelineValidationTests
         LocalTerminalManifestValidator.ValidateRunLocal<IDictionary<string, int>>(map);
         Assert.Throws<InvalidOperationException>(
             () => LocalTerminalManifestValidator.ValidateRunLocal<IDictionary<string, int>>(list));
+    }
+
+    [Fact]
+    public void Local_terminal_validation_accepts_read_only_dictionary_map_projection()
+    {
+        var map = PackageWithProjection("map");
+
+        // Regression: a RunLocal map projection whose handler parameter is IReadOnlyDictionary<,> (or a concrete
+        // Dictionary<,>, which implements it) must validate as a map — the decoder materializes a Dictionary
+        // assignable to that parameter. Previously only IDictionary / IDictionary<,> were recognized, so such a
+        // package failed ValidateRunLocal before its callback was ever registered.
+        LocalTerminalManifestValidator.ValidateRunLocal<IReadOnlyDictionary<string, int>>(map);
+        LocalTerminalManifestValidator.ValidateRunLocal<Dictionary<string, int>>(map);
     }
 
     private static GuardContext CreateContext(HookContext context) => new(context);

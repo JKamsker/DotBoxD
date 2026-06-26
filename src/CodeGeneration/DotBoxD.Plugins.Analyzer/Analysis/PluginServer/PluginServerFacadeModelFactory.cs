@@ -36,12 +36,27 @@ internal static partial class PluginServerFacadeModelFactory
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
-        var controlServiceType = ResolveControlService(compilation, worldType)
+        var controlServiceType = ResolveControlService(type, compilation, worldType)
             ?? throw new NotSupportedException(
-                $"Generated plugin server '{type.Name}' could not resolve the IGamePluginControlService control-plane contract.");
+                $"Generated plugin server '{type.Name}' could not resolve a control-plane contract. Set ControlService = typeof(TControlService), or declare {worldType.ContainingNamespace}.Ipc.IGamePluginControlService.");
+        var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
+            ?? throw new NotSupportedException(
+                $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
+        ValidateControlServiceContract(type, compilation, controlServiceType, liveSettingUpdateType);
+        ValidatePublicFacadeSignatureTypes(type, worldType, controlServiceType, liveSettingUpdateType);
         var controls = ResolveControls(worldType, cancellationToken);
+        var worldServiceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
+        var worldProperties = ResolveForwardedProperties(
+            worldType,
+            worldServiceWrappers,
+            skipServiceProperties: true,
+            cancellationToken);
+        var worldMethods = ResolveMethods(
+            worldType,
+            worldServiceWrappers,
+            cancellationToken);
+        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
-        var controlNs = controlServiceType.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
         var context = ResolveContext(type, compilation, cancellationToken);
         return new PluginServerFacadeModel(
@@ -66,74 +81,38 @@ internal static partial class PluginServerFacadeModelFactory
                 "Generated plugin-side facade for the remote world domain.",
                 cancellationToken),
             TypeName(controlServiceType),
-            "global::" + controlNs + ".LiveSettingUpdate",
-            new EquatableArray<PluginServerForwardedMethod>(
-                ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
+            TypeName(liveSettingUpdateType),
+            compilation.GetTypeByMetadataName("DotBoxD.Pushdown.Services.RpcMessagePackIpc") is not null,
+            new EquatableArray<PluginServerForwardedProperty>(worldProperties),
+            new EquatableArray<PluginServerForwardedMethod>(worldMethods),
             new EquatableArray<PluginServerControlProperty>(controls),
             eventCallback is null ? null : TypeName(eventCallback.Value.Type),
             eventCallback?.ProvideSuffix,
             eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
             eventCallback?.ReturnHasValue ?? false);
     }
-    private static PluginServerControlProperty[] ResolveControls(
-        INamedTypeSymbol worldType,
-        CancellationToken cancellationToken)
-    {
-        var controls = new List<PluginServerControlProperty>();
-        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var member in MembersIncludingInherited(worldType))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (member is not IPropertySymbol
-                {
-                    IsStatic: false,
-                    GetMethod: not null,
-                    SetMethod: null,
-                    Type: INamedTypeSymbol propertyType
-                } property ||
-                !HasAttribute(propertyType, DotBoxDMetadataNames.DotBoxDServiceAttribute) ||
-                !seenProperties.Add(property.Name))
-            {
-                continue;
-            }
-            controls.Add(new PluginServerControlProperty(
-                property.Name,
-                TypeName(propertyType),
-                PluginServerXmlDocumentation.FromSymbol(
-                    property,
-                    "Accesses the server's " + property.Name + " domain control after StartAsync.",
-                    cancellationToken),
-                property.Name + "PluginControl",
-                propertyType.Name + "Accumulator",
-                new EquatableArray<PluginServerForwardedMethod>(
-                    ResolveMethods(propertyType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
-                new EquatableArray<PluginServerServiceWrapper>(ResolveServiceWrappers(propertyType, cancellationToken))));
-        }
-        return controls.ToArray();
-    }
+
     private static PluginServerForwardedMethod[] ResolveMethods(
         INamedTypeSymbol controlType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
         CancellationToken cancellationToken)
     {
         var methods = new List<PluginServerForwardedMethod>();
+        var seenMethods = new Dictionary<string, PluginServerForwardedMethod>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(controlType))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (member is IMethodSymbol
-                {
-                    MethodKind: MethodKind.Ordinary,
-                    IsStatic: false,
-                    IsGenericMethod: false
-                } method &&
+            if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method &&
                 !IsControlPlaneMember(method.ContainingType))
             {
+                ValidateForwardedMethod(method);
                 var (returnWrapperName, returnWrapperKind) = ResolveReturnWrapper(
                     method.ReturnType,
                     serviceWrappers,
                     cancellationToken);
-                methods.Add(new PluginServerForwardedMethod(
+                var forwarded = new PluginServerForwardedMethod(
                     method.Name,
+                    TypeName(method.ContainingType),
                     TypeName(method.ReturnType),
                     PluginServerXmlDocumentation.FromSymbol(
                         method,
@@ -141,25 +120,48 @@ internal static partial class PluginServerFacadeModelFactory
                         cancellationToken),
                     returnWrapperName,
                     returnWrapperKind,
-                    new EquatableArray<PluginServerParameter>(ResolveParameters(method))));
+                    new EquatableArray<PluginServerParameter>(ResolveParameters(method)));
+                var signature = MethodSignatureKey(method);
+                if (seenMethods.TryGetValue(signature, out var existing))
+                {
+                    if (!string.Equals(existing.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
+                    {
+                        throw new NotSupportedException(
+                            $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with a different return type.");
+                    }
+
+                    continue;
+                }
+
+                seenMethods.Add(signature, forwarded);
+                methods.Add(forwarded);
             }
         }
         return methods.ToArray();
     }
-    private static PluginServerServiceWrapper[] ResolveServiceWrappers(
-        INamedTypeSymbol controlType,
-        CancellationToken cancellationToken)
+
+    private static void ValidateForwardedMethod(IMethodSymbol method)
     {
-        var serviceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
-        ResolveMethods(controlType, serviceWrappers, cancellationToken);
-        return serviceWrappers.Values
-            .Select(static wrapper => new PluginServerServiceWrapper(
-                wrapper.Type,
-                wrapper.WrapperName,
-                wrapper.Documentation,
-                new EquatableArray<PluginServerForwardedProperty>(wrapper.Properties.ToArray()),
-                new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
-            .ToArray();
+        if (method.IsStatic)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' must be an instance method.");
+        }
+
+        if (method.IsGenericMethod)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' must not be generic.");
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None)
+            {
+                throw new NotSupportedException(
+                    $"Generated plugin server member '{method.ToDisplayString()}' must not declare ref, out, or in parameters.");
+            }
+        }
     }
     private static string EnsureServiceWrapper(
         INamedTypeSymbol serviceType,
@@ -173,7 +175,7 @@ internal static partial class PluginServerFacadeModelFactory
         }
         var wrapper = new ServiceWrapperBuilder(
             typeName,
-            ServiceWrapperName(serviceType),
+            UniqueServiceWrapperName(serviceType, serviceWrappers.Values.Select(w => w.WrapperName)),
             PluginServerXmlDocumentation.FromSymbol(
                 serviceType,
                 "Generated scoped client for the remote " + serviceType.Name + " domain service.",
@@ -209,27 +211,11 @@ internal static partial class PluginServerFacadeModelFactory
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
         CancellationToken cancellationToken)
     {
-        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var member in MembersIncludingInherited(serviceType))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (member is IPropertySymbol
-                {
-                    IsStatic: false,
-                    GetMethod: not null,
-                    SetMethod: null
-                } property &&
-                seenProperties.Add(property.Name))
-            {
-                wrapper.Properties.Add(new PluginServerForwardedProperty(
-                    property.Name,
-                    TypeName(property.Type),
-                    PluginServerXmlDocumentation.FromSymbol(
-                        property,
-                        "Forwards the " + property.Name + " property from the remote domain service.",
-                        cancellationToken)));
-            }
-        }
+        wrapper.Properties.AddRange(ResolveForwardedProperties(
+            serviceType,
+            serviceWrappers,
+            skipServiceProperties: false,
+            cancellationToken));
         wrapper.Methods.AddRange(ResolveMethods(serviceType, serviceWrappers, cancellationToken));
     }
     private static PluginServerParameter[] ResolveParameters(IMethodSymbol method)
@@ -238,11 +224,19 @@ internal static partial class PluginServerFacadeModelFactory
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var parameter = method.Parameters[i];
-            parameters[i] = new PluginServerParameter(parameter.Name, TypeName(parameter.Type));
+            parameters[i] = new PluginServerParameter(
+                parameter.Name,
+                TypeName(parameter.Type),
+                LiteralReader.ParameterDefaultLiteral(parameter));
         }
 
         return parameters;
     }
+
+    private static string MethodSignatureKey(IMethodSymbol method)
+        => method.Name + "(" + string.Join(
+            ",",
+            method.Parameters.Select(static parameter => TypeName(parameter.Type))) + ")";
     private static bool HasAttribute(INamedTypeSymbol type, string metadataName)
     {
         foreach (var attribute in type.GetAttributes())

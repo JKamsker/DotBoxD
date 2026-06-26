@@ -29,7 +29,7 @@ internal static class PluginServerSetupEmitter
             builder,
             string.Empty,
             "Builder for the generated plugin server. Use Setup to record installs without I/O, then Build to create the runtime facade.");
-        builder.Append("public sealed class ").Append(model.ClassName).AppendLine("Builder");
+        builder.Append(model.Accessibility).Append(" sealed class ").Append(model.ClassName).AppendLine("Builder");
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
         builder.Append("    private readonly ").Append(model.ControlServiceType).AppendLine("? _control;");
@@ -37,12 +37,15 @@ internal static class PluginServerSetupEmitter
         builder.Append("    private global::System.Action<").Append(model.SetupInterfaceName).AppendLine(">? _setup;");
         builder.AppendLine("    private " + model.ClassName + "Builder(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory) => _connectionFactory = connectionFactory;");
         builder.AppendLine("    private " + model.ClassName + "Builder(" + model.ControlServiceType + " control, " + model.WorldType + "? world) { _control = control; _world = world; }");
-        PluginServerXmlDocumentation.AppendSummary(
-            builder,
-            "    ",
-            "Creates a builder that connects to a running game server by named pipe when StartAsync is called.");
-        builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
-        builder.AppendLine("        => new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, configurePeer, cancellationToken: ct)));");
+        if (model.EmitPipeBuilder)
+        {
+            PluginServerXmlDocumentation.AppendSummary(
+                builder,
+                "    ",
+                "Creates a builder that connects to a running game server by named pipe when StartAsync is called.");
+            builder.AppendLine("    public static " + model.ClassName + "Builder FromPipeName(string pipeName)");
+            builder.AppendLine("        => new((configurePeer, ct) => new global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>(global::DotBoxD.Pushdown.Services.RpcMessagePackIpc.ConnectNamedPipeAsync(pipeName, configurePeer, cancellationToken: ct)));");
+        }
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
@@ -64,7 +67,7 @@ internal static class PluginServerSetupEmitter
             "    ",
             "Builds the generated plugin server facade. For pipe-based builders, call StartAsync before using runtime APIs.");
         builder.AppendLine("    public " + model.ServerInterfaceName + " Build()");
-        builder.AppendLine("        => _connectionFactory is not null ? new " + model.ClassName + "(_connectionFactory, _setup) : new " + model.ClassName + "(_control!, _world, _setup);");
+        builder.AppendLine("        => _connectionFactory is not null ? new " + PluginServerIdentifier.Escape(model.ClassName) + "(_connectionFactory, _setup) : new " + PluginServerIdentifier.Escape(model.ClassName) + "(_control!, _world, _setup);");
         builder.AppendLine("}");
     }
 
@@ -96,7 +99,7 @@ internal static class PluginServerSetupEmitter
         {
             PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
             builder.Append("    ").Append(control.AccumulatorInterfaceName).Append(' ')
-                .Append(control.Name).AppendLine(" { get; }");
+                .Append(PluginServerIdentifier.Escape(control.Name)).AppendLine(" { get; }");
         }
 
         builder.AppendLine("}");
@@ -127,18 +130,24 @@ internal static class PluginServerSetupEmitter
     {
         builder.AppendLine("    private readonly struct RecordedInstall");
         builder.AppendLine("    {");
-        builder.AppendLine("        private RecordedInstall(RecordedInstallKind kind, global::DotBoxD.Plugins.PluginPackage package, global::System.Type? registryKey)");
+        builder.AppendLine("        private RecordedInstall(RecordedInstallKind kind, global::DotBoxD.Plugins.PluginPackage package, global::System.Type? registryKey, global::System.Type? secondaryRegistryKey)");
         builder.AppendLine("        {");
         builder.AppendLine("            Kind = kind;");
         builder.AppendLine("            Package = package;");
         builder.AppendLine("            RegistryKey = registryKey;");
+        builder.AppendLine("            SecondaryRegistryKey = secondaryRegistryKey;");
         builder.AppendLine("        }");
         builder.AppendLine("        public RecordedInstallKind Kind { get; }");
         builder.AppendLine("        public global::DotBoxD.Plugins.PluginPackage Package { get; }");
         builder.AppendLine("        public global::System.Type? RegistryKey { get; }");
-        builder.AppendLine("        public static RecordedInstall Plugin(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Plugin, package, null);");
-        builder.AppendLine("        public static RecordedInstall Subscription(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Subscription, package, null);");
-        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey);");
+        builder.AppendLine("        // A server extension is also registered under this second key when present, so an extension recorded");
+        builder.AppendLine("        // by its service contract (Extend<TService, TKernel>) still resolves by the kernel type the generated");
+        builder.AppendLine("        // graft client looks up — and vice versa — instead of throwing \"not registered\".");
+        builder.AppendLine("        public global::System.Type? SecondaryRegistryKey { get; }");
+        builder.AppendLine("        public static RecordedInstall Plugin(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Plugin, package, null, null);");
+        builder.AppendLine("        public static RecordedInstall Subscription(global::DotBoxD.Plugins.PluginPackage package) => new(RecordedInstallKind.Subscription, package, null, null);");
+        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey, null);");
+        builder.AppendLine("        public static RecordedInstall ServerExtension(global::DotBoxD.Plugins.PluginPackage package, global::System.Type registryKey, global::System.Type secondaryRegistryKey) => new(RecordedInstallKind.ServerExtension, package, registryKey, secondaryRegistryKey);");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
@@ -164,21 +173,26 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("    private async global::System.Threading.Tasks.ValueTask ReplaySetupAsync(global::System.Threading.CancellationToken cancellationToken)");
         builder.AppendLine("    {");
         builder.AppendLine("        if (_setupReplayed) { return; }");
-        builder.AppendLine("        foreach (var install in _setupInstalls)");
+        builder.AppendLine("        while (_setupReplayIndex < _setupInstalls.Count)");
         builder.AppendLine("        {");
         builder.AppendLine("            cancellationToken.ThrowIfCancellationRequested();");
+        builder.AppendLine("            var install = _setupInstalls[_setupReplayIndex];");
         builder.AppendLine("            if (install.Kind == RecordedInstallKind.Plugin)");
         builder.AppendLine("            {");
         builder.AppendLine("                _ = await InstallPluginPackageAsync(install.Package, cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("                _setupReplayIndex++;");
         builder.AppendLine("                continue;");
         builder.AppendLine("            }");
         builder.AppendLine("            if (install.Kind == RecordedInstallKind.Subscription)");
         builder.AppendLine("            {");
         builder.AppendLine("                _ = await InstallSubscriptionPackageAsync(install.Package, cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("                _setupReplayIndex++;");
         builder.AppendLine("                continue;");
         builder.AppendLine("            }");
         builder.AppendLine("            var pluginId = await InstallServerExtensionPackageAsync(install.Package, cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("            if (install.RegistryKey is not null) { _serverExtensions[install.RegistryKey] = pluginId; }");
+        builder.AppendLine("            if (install.SecondaryRegistryKey is not null) { _serverExtensions[install.SecondaryRegistryKey] = pluginId; }");
+        builder.AppendLine("            _setupReplayIndex++;");
         builder.AppendLine("        }");
         builder.AppendLine("        _setupReplayed = true;");
         builder.AppendLine("    }");
@@ -195,7 +209,7 @@ internal static class PluginServerSetupEmitter
         foreach (var control in model.Controls)
         {
             builder.Append("        private readonly ").Append(control.AccumulatorInterfaceName).Append(' ')
-                .Append(FieldName(control.Name)).AppendLine(";");
+                .Append(control.FieldName).AppendLine(";");
         }
 
         builder.AppendLine("        public SetupRecorder(");
@@ -215,7 +229,7 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("            }, localHandlers);");
         foreach (var control in model.Controls)
         {
-            builder.Append("            ").Append(FieldName(control.Name)).Append(" = new ")
+            builder.Append("            ").Append(control.FieldName).Append(" = new ")
                 .Append(control.Name).AppendLine("SetupAccumulator(installs);");
         }
 
@@ -229,7 +243,8 @@ internal static class PluginServerSetupEmitter
         {
             PluginServerXmlDocumentation.Append(builder, "        ", control.Documentation);
             builder.Append("        public ").Append(control.AccumulatorInterfaceName).Append(' ')
-                .Append(control.Name).Append(" => ").Append(FieldName(control.Name)).AppendLine(";");
+                .Append(PluginServerIdentifier.Escape(control.Name)).Append(" => ")
+                .Append(control.FieldName).AppendLine(";");
         }
         PluginServerXmlDocumentation.AppendSummary(
             builder,
@@ -274,11 +289,8 @@ internal static class PluginServerSetupEmitter
         builder.AppendLine("        private void Add<TKernel>() where TKernel : class");
         builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TKernel)));");
         builder.AppendLine("        private void Add<TService, TKernel>() where TService : class where TKernel : class");
-        builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TService)));");
+        builder.AppendLine("            => _installs.Add(RecordedInstall.ServerExtension(global::DotBoxD.Plugins.Kernel.KernelPackageRegistry.Resolve<TKernel>(), typeof(TService), typeof(TKernel)));");
         builder.AppendLine("    }");
         builder.AppendLine();
     }
-
-    private static string FieldName(string propertyName)
-        => "_" + char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
 }

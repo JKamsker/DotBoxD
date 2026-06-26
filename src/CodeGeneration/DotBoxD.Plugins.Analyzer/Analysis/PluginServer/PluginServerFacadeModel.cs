@@ -19,6 +19,8 @@ internal sealed record PluginServerFacadeModel(
     string WorldDocumentation,
     string ControlServiceType,
     string LiveSettingUpdateType,
+    bool EmitPipeBuilder,
+    EquatableArray<PluginServerForwardedProperty> WorldProperties,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
     EquatableArray<PluginServerControlProperty> Controls,
     // Reverse server->plugin event-callback contract for remote RunLocal chains, discovered by the
@@ -33,22 +35,29 @@ internal sealed record PluginServerFacadeModel(
 
 internal sealed record PluginServerControlProperty(
     string Name,
+    string FieldName,
     string Type,
     string Documentation,
     string WrapperName,
     string AccumulatorInterfaceName,
+    EquatableArray<PluginServerForwardedProperty> Properties,
     EquatableArray<PluginServerForwardedMethod> Methods,
     EquatableArray<PluginServerServiceWrapper> ServiceWrappers);
 
 internal sealed record PluginServerForwardedMethod(
     string Name,
+    string ReceiverType,
     string ReturnType,
     string Documentation,
     string? ReturnWrapperName,
     PluginServerReturnWrapperKind ReturnWrapperKind,
     EquatableArray<PluginServerParameter> Parameters);
 
-internal sealed record PluginServerForwardedProperty(string Name, string Type, string Documentation);
+internal sealed record PluginServerForwardedProperty(
+    string Name,
+    string Type,
+    string Documentation,
+    string? ReturnWrapperName = null);
 
 internal sealed record PluginServerServiceWrapper(
     string Type,
@@ -57,7 +66,7 @@ internal sealed record PluginServerServiceWrapper(
     EquatableArray<PluginServerForwardedProperty> Properties,
     EquatableArray<PluginServerForwardedMethod> Methods);
 
-internal sealed record PluginServerParameter(string Name, string Type);
+internal sealed record PluginServerParameter(string Name, string Type, string DefaultClause);
 
 internal sealed record GeneratedKernelMethodDescriptorModel(
     string ContextType,

@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -12,7 +13,8 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 /// the flowing element and downstream lambdas substitute that projection at compile time (via the
 /// lowering context's projected-element binding); the <c>Run</c> terminal's single
 /// <c>ctx.Messages.Send(targetId, message)</c> becomes <c>Handle</c>. Supported subset: expression-body
-/// lambdas and a single Send terminal. Any other shape fails safe (returns <c>null</c>, no package),
+/// lambdas and a direct Send terminal or static <c>[KernelMethod]</c> Send helper. Any other shape fails safe
+/// (returns <c>null</c>, no package),
 /// leaving the runtime terminal to throw DBXK062 / the generator to report DBXK114.
 /// </summary>
 internal static partial class HookChainModelFactory
@@ -24,7 +26,6 @@ internal static partial class HookChainModelFactory
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
-
     public static HookChainCreateResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -39,17 +40,24 @@ internal static partial class HookChainModelFactory
         {
             chain = TryCreate(invocation, context.SemanticModel, cancellationToken);
         }
+        catch (KernelMethodArgumentReuseException ex)
+        {
+            return new HookChainCreateResult(
+                null,
+                null,
+                new PluginKernelDiagnostic(
+                    ex.Message,
+                    ex.Location ?? PluginDiagnosticLocation.From(invocation.GetLocation())));
+        }
         catch (NotSupportedException ex)
         {
             chain = null;
             notLoweredDetail = ex.Message;
         }
-
         if (chain is not null)
         {
             return new HookChainCreateResult(chain, null);
         }
-
         return NotLoweredDiagnostic(invocation, context.SemanticModel, cancellationToken, notLoweredDetail);
     }
 
@@ -65,7 +73,7 @@ internal static partial class HookChainModelFactory
 
         var terminalMethod = terminalAccess.Name.Identifier.ValueText;
         var stages = new List<HookChainStage>();
-        var seed = WalkToSeed(terminalAccess.Expression, stages);
+        var seed = WalkToSeed(terminalAccess.Expression, stages, model, cancellationToken);
         if (seed is null)
         {
             return null;
@@ -211,7 +219,7 @@ internal static partial class HookChainModelFactory
         // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
         // keep the reflective 2-arg registration so they do not regress.
         var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? BuildLocalDecoderSource(projectedTypeSymbol)
+            ? BuildLocalDecoderSource(projectedTypeSymbol, model.Compilation)
             : null;
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(
@@ -250,25 +258,37 @@ internal static partial class HookChainModelFactory
             LocalDecoderSource = localDecoderSource,
         };
 
-        return new HookChainResult(
+        var interception = Interception(
+            invocation,
+            model,
             modelResult,
-            Interception(
-                invocation,
-                model,
-                modelResult,
-                terminalAccess.Expression,
-                eventType,
-                stages,
-                terminalElementTypeFullName,
-                generatedRemoteKind,
-                installKind.Value,
-                generatedRemoteServerContextTypeFullName,
-                terminalContextParam is not null,
-                TerminalReturnsVoid(terminalLambda, model, cancellationToken),
-                localDecoderSource is not null,
-                projectedTypeSymbol,
-                cancellationToken));
+            terminalAccess.Expression,
+            eventType,
+            stages,
+            terminalElementTypeFullName,
+            generatedRemoteKind,
+            installKind.Value,
+            generatedRemoteServerContextTypeFullName,
+            terminalContextParam is not null,
+            TerminalReturnsVoid(terminalLambda, model, cancellationToken),
+            localDecoderSource is not null,
+            projectedTypeSymbol,
+            cancellationToken);
+        if (interception is null)
+        {
+            throw new NotSupportedException(InterceptionFailureDetail(generatedRemoteKind, projectedTypeSymbol));
+        }
+
+        return new HookChainResult(modelResult, interception);
     }
+
+    private static string InterceptionFailureDetail(
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        ITypeSymbol? projectedTypeSymbol)
+        => generatedRemoteKind is not null &&
+           projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true }
+            ? "anonymous terminal projections on generated-server chains require a named record projection"
+            : "the call site is not interceptable";
 
 }
 

@@ -9,16 +9,18 @@ internal static partial class RpcKernelClientProxyEmitter
     public static string Emit(
         INamedTypeSymbol kernelType,
         IMethodSymbol kernelMethod,
-        INamedTypeSymbol serviceType)
+        INamedTypeSymbol serviceType,
+        Compilation compilation)
     {
         var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod);
-        return Emit(kernelType, serviceType, serviceMethod);
+        return Emit(kernelType, serviceType, serviceMethod, compilation);
     }
 
     public static string Emit(
         INamedTypeSymbol kernelType,
         INamedTypeSymbol serviceType,
-        IMethodSymbol serviceMethod)
+        IMethodSymbol serviceMethod,
+        Compilation compilation)
     {
         EnsureAccessibleFromGeneratedClient(serviceType);
         if (serviceType.TypeKind != TypeKind.Interface)
@@ -26,7 +28,7 @@ internal static partial class RpcKernelClientProxyEmitter
             throw new NotSupportedException("Server extension client generation requires an interface contract type.");
         }
 
-        return new ProxySourceWriter(kernelType, serviceType, serviceMethod).Emit();
+        return new ProxySourceWriter(kernelType, serviceType, serviceMethod, compilation).Emit();
     }
 
     internal static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
@@ -88,18 +90,20 @@ internal static partial class RpcKernelClientProxyEmitter
         private readonly INamedTypeSymbol _kernelType;
         private readonly INamedTypeSymbol _serviceType;
         private readonly IMethodSymbol _serviceMethod;
-        private readonly ITypeSymbol _payloadReturnType;
+        private readonly ITypeSymbol? _payloadReturnType;
         private readonly ReturnShape _returnShape;
-        private readonly RpcKernelValueConversionEmitter _conv = new();
+        private readonly RpcKernelValueConversionEmitter _conv;
 
         public ProxySourceWriter(
             INamedTypeSymbol kernelType,
             INamedTypeSymbol serviceType,
-            IMethodSymbol serviceMethod)
+            IMethodSymbol serviceMethod,
+            Compilation compilation)
         {
             _kernelType = kernelType;
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
+            _conv = new RpcKernelValueConversionEmitter(compilation);
             _returnShape = Shape(serviceMethod.ReturnType, out _payloadReturnType);
         }
 
@@ -176,23 +180,47 @@ internal static partial class RpcKernelClientProxyEmitter
                     .Append(request).AppendLine(").ConfigureAwait(false);");
             }
 
-            builder.Append("        var ").Append(result)
-                .Append(" = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(")
-                .Append(response).AppendLine(");");
-            builder.Append("        return ").Append(_conv.ReadExpression(_payloadReturnType, result)).AppendLine(";");
+            if (_payloadReturnType is null)
+            {
+                builder.AppendLine("        return;");
+            }
+            else
+            {
+                builder.Append("        var ").Append(result)
+                    .Append(" = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(")
+                    .Append(response).AppendLine(");");
+                builder.Append("        return ").Append(_conv.ReadExpression(_payloadReturnType, result)).AppendLine(";");
+            }
+
             builder.AppendLine("    }");
             builder.AppendLine();
         }
 
-        private static ReturnShape Shape(ITypeSymbol type, out ITypeSymbol payloadType)
+        private static ReturnShape Shape(ITypeSymbol type, out ITypeSymbol? payloadType)
         {
-            if (IsGenericTask(type, out payloadType))
+            if (type.SpecialType == SpecialType.System_Void)
             {
+                payloadType = null;
+                return ReturnShape.Direct;
+            }
+
+            if (DotBoxDRpcReturnType.PayloadType(type) is null)
+            {
+                payloadType = null;
+                return type is INamedTypeSymbol { Name: "ValueTask" }
+                    ? ReturnShape.ValueTask
+                    : ReturnShape.Task;
+            }
+
+            if (IsGenericTask(type, out var taskPayloadType))
+            {
+                payloadType = taskPayloadType;
                 return ReturnShape.Task;
             }
 
-            if (IsGenericValueTask(type, out payloadType))
+            if (IsGenericValueTask(type, out var valueTaskPayloadType))
             {
+                payloadType = valueTaskPayloadType;
                 return ReturnShape.ValueTask;
             }
 

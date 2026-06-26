@@ -41,10 +41,15 @@ public sealed class InvokeAsyncRuntimeTests
         Assert.Contains("game.world.monster.read.snapshot", package.Manifest.RequiredCapabilities);
         Assert.Equal(SandboxType.I32, Assert.Single(package.Module.Functions).ReturnType);
         var function = Assert.Single(package.Module.Functions);
-        var assignment = Assert.IsType<AssignmentStatement>(function.Body[0]);
+        var argument = Assert.IsType<AssignmentStatement>(function.Body[0]);
+        Assert.StartsWith("__sir_arg", argument.Name, StringComparison.Ordinal);
+        Assert.Equal("monster-2", Assert.IsType<StringValue>(Assert.IsType<LiteralExpression>(argument.Value).Value).Value);
+        var assignment = Assert.IsType<AssignmentStatement>(function.Body[1]);
         Assert.Equal("monster", assignment.Name);
-        Assert.Equal("host.world.getMonster", Assert.IsType<CallExpression>(assignment.Value).Name);
-        var returned = Assert.IsType<ReturnStatement>(function.Body[1]);
+        var hostCall = Assert.IsType<CallExpression>(assignment.Value);
+        Assert.Equal("host.world.getMonster", hostCall.Name);
+        Assert.Equal(argument.Name, Assert.IsType<VariableExpression>(Assert.Single(hostCall.Arguments)).Name);
+        var returned = Assert.IsType<ReturnStatement>(function.Body[2]);
         var recordGet = Assert.IsType<CallExpression>(returned.Value);
         Assert.Equal("record.get", recordGet.Name);
         Assert.Equal("monster", Assert.IsType<VariableExpression>(recordGet.Arguments[0]).Name);
@@ -256,11 +261,8 @@ public sealed class InvokeAsyncRuntimeTests
         if (enableInterceptors)
         {
             parseOptions = parseOptions.WithFeatures([
-                new KeyValuePair<string, string>(
-                    "InterceptorsNamespaces",
-                    DotBoxDGenerationNames.TypeNames.GeneratedInterceptorsNamespace)]);
+                new KeyValuePair<string, string>("InterceptorsNamespaces", DotBoxDGenerationNames.TypeNames.GeneratedInterceptorsNamespace)]);
         }
-
         var compilation = CSharpCompilation.Create(
             "DotBoxDInvokeAsyncRuntimeTest",
             [CSharpSyntaxTree.ParseText(source, parseOptions)],
@@ -272,9 +274,7 @@ public sealed class InvokeAsyncRuntimeTests
                 .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeerSession).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Pushdown.Services.RpcMessagePackIpc).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new PluginPackageGenerator().AsSourceGenerator()],
-            parseOptions: parseOptions);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create([new PluginPackageGenerator().AsSourceGenerator()], parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));

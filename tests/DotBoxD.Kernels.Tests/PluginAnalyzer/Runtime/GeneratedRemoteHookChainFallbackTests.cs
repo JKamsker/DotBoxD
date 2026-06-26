@@ -1,7 +1,9 @@
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
@@ -55,6 +57,41 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     }
 
     [Fact]
+    public void Same_compilation_generated_server_fields_and_properties_use_the_owning_server_context()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public sealed class FieldUsage
+            {
+                private AlphaPluginServer _server = null!;
+
+                public void Configure()
+                    => this._server.Hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "field"));
+            }
+
+            public sealed class PropertyUsage
+            {
+                public AlphaPluginServer Server { get; init; } = null!;
+
+                public void Configure()
+                    => this.Server.Hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "property"));
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+        const string Pipeline = "RemoteHookPipeline<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, " +
+                                "global::ChainSample.Plugin.AlphaPluginContext>";
+
+        Assert.True(Count(generated, Pipeline) >= 3, generated);
+    }
+
+    [Fact]
     public void Same_simple_name_foreign_registry_alias_is_not_intercepted()
     {
         var result = RunGenerator(SameSimpleNameForeignRegistrySource);
@@ -103,6 +140,56 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Registry_type_declared_in_another_syntax_tree_does_not_throw()
+    {
+        var declarationTree = CSharpSyntaxTree.ParseText("""
+            namespace ChainSample.Plugin;
+
+            public sealed partial class Owner
+            {
+                public ForeignHookRegistry Hooks { get; } = new();
+            }
+
+            public sealed class ForeignHookRegistry
+            {
+                public ForeignHookPipeline<TEvent> On<TEvent>() => new();
+            }
+
+            public sealed class ForeignHookPipeline<TEvent>
+            {
+                public void Run(global::System.Action<TEvent> handler) { }
+            }
+            """, ParseOptions);
+        var usageTree = CSharpSyntaxTree.ParseText("""
+            namespace ChainSample.Plugin;
+
+            public sealed partial class Owner
+            {
+                public void Configure()
+                    => Hooks.On<int>().Run(_ => { });
+            }
+            """, ParseOptions);
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDGeneratedRemoteHookFallbackCrossTreeTest",
+            [declarationTree, usageTree],
+            TrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var onInvocation = usageTree.GetRoot().DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single(static invocation => invocation.Expression is MemberAccessExpressionSyntax
+            {
+                Name.Identifier.ValueText: "On"
+            });
+
+        var candidate = GeneratedRemoteHookChainFallback.Candidate(
+            onInvocation,
+            compilation.GetSemanticModel(usageTree),
+            CancellationToken.None);
+
+        Assert.Null(candidate);
+    }
+
     private static GeneratorDriverRunResult RunGenerator(
         string source,
         params MetadataReference[] additionalReferences)
@@ -146,6 +233,19 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
     private static string[] GeneratedSources(GeneratorDriverRunResult result)
         => result.GeneratedTrees.Select(tree => tree.GetText().ToString()).ToArray();
+
+    private static int Count(string value, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
 
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {

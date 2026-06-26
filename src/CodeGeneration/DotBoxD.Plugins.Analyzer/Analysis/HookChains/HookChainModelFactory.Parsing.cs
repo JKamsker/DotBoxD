@@ -26,12 +26,48 @@ internal static partial class HookChainModelFactory
             _ => null
         };
 
-    private static InvocationExpressionSyntax? WalkToSeed(ExpressionSyntax receiver, List<HookChainStage> stages)
+    private static InvocationExpressionSyntax? WalkToSeed(
+        ExpressionSyntax receiver,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => WalkToSeed(receiver, stages, model, cancellationToken, depth: 0);
+
+    private static InvocationExpressionSyntax? WalkToSeed(
+        ExpressionSyntax receiver,
+        List<HookChainStage> stages,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        int depth)
     {
-        var current = receiver;
-        while (current is InvocationExpressionSyntax invocation &&
-               invocation.Expression is MemberAccessExpressionSyntax access)
+        if (depth > 8)
         {
+            return null;
+        }
+
+        receiver = HookChainAliasResolver.UnwrapParentheses(receiver);
+
+        if (HookChainAliasResolver.Initializer(receiver, model, cancellationToken) is { } initializer)
+        {
+            return WalkToSeed(initializer, stages, model, cancellationToken, depth + 1);
+        }
+
+        var current = receiver;
+        while (true)
+        {
+            current = HookChainAliasResolver.UnwrapParentheses(current);
+            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            {
+                current = currentInitializer;
+                continue;
+            }
+
+            if (current is not InvocationExpressionSyntax invocation ||
+                invocation.Expression is not MemberAccessExpressionSyntax access)
+            {
+                return null;
+            }
+
             var name = access.Name.Identifier.ValueText;
             if (string.Equals(name, OnMethod, StringComparison.Ordinal))
             {
@@ -43,14 +79,12 @@ internal static partial class HookChainModelFactory
                 TryLambda(invocation, out var lambda))
             {
                 stages.Add(new HookChainStage(isSelect, lambda));
-                current = access.Expression;
+                current = HookChainAliasResolver.UnwrapParentheses(access.Expression);
                 continue;
             }
 
             return null;
         }
-
-        return null;
     }
 
     private static HookChainReceiverKind? ReceiverKind(

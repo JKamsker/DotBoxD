@@ -142,15 +142,19 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (expression is not IdentifierNameSyntax identifier)
+        var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
+        if (symbol is null &&
+            expression is MemberAccessExpressionSyntax { Name: SimpleNameSyntax name })
         {
-            return null;
+            symbol = model.GetSymbolInfo(name, cancellationToken).Symbol;
         }
 
-        return model.GetSymbolInfo(identifier, cancellationToken).Symbol switch
+        return symbol switch
         {
             IParameterSymbol parameter => ParameterTypeSyntax(parameter, cancellationToken),
             ILocalSymbol local => LocalTypeSyntax(local, cancellationToken),
+            IFieldSymbol field => FieldTypeSyntax(field, cancellationToken),
+            IPropertySymbol property => PropertyTypeSyntax(property, cancellationToken),
             _ => null
         };
     }
@@ -160,6 +164,39 @@ internal static partial class GeneratedRemoteHookChainFallback
         foreach (var reference in parameter.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is ParameterSyntax { Type: { } typeSyntax })
+            {
+                return typeSyntax;
+            }
+        }
+
+        return null;
+    }
+
+    private static TypeSyntax? FieldTypeSyntax(IFieldSymbol field, CancellationToken cancellationToken)
+    {
+        foreach (var reference in field.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax
+                    {
+                        Type: { } typeSyntax,
+                        Parent: FieldDeclarationSyntax
+                    }
+                })
+            {
+                return typeSyntax;
+            }
+        }
+
+        return null;
+    }
+
+    private static TypeSyntax? PropertyTypeSyntax(IPropertySymbol property, CancellationToken cancellationToken)
+    {
+        foreach (var reference in property.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax { Type: { } typeSyntax })
             {
                 return typeSyntax;
             }
@@ -190,7 +227,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        var resolvedType = TypeFromSyntax(typeSyntax, model, cancellationToken);
         if (resolvedType is { TypeKind: not TypeKind.Error })
         {
             return resolvedType is INamedTypeSymbol registryType
@@ -223,7 +260,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        var resolvedType = TypeFromSyntax(typeSyntax, model, cancellationToken);
         if (resolvedType is { TypeKind: not TypeKind.Error })
         {
             return resolvedType is INamedTypeSymbol serverType

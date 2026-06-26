@@ -15,22 +15,20 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var pluginAttributeResults = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                DotBoxDMetadataNames.PluginAttribute,
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
-        var eventKernelAttributeResults = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                DotBoxDMetadataNames.EventKernelAttribute,
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
-        RegisterDiagnostics(context, pluginAttributeResults);
-        RegisterDiagnostics(context, eventKernelAttributeResults);
+        var pluginAttributeResults = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.PluginAttribute,
+            static (node, _) => node is ClassDeclarationSyntax,
+            "plugin kernel model",
+            static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct));
+        var eventKernelAttributeResults = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.EventKernelAttribute,
+            static (node, _) => node is ClassDeclarationSyntax,
+            "event kernel model",
+            static (ctx, ct) => PluginKernelModelFactory.Create(ctx, ct));
+        PluginPackageGeneratorOutput.RegisterDiagnostics(context, pluginAttributeResults);
+        PluginPackageGeneratorOutput.RegisterDiagnostics(context, eventKernelAttributeResults);
 
         var pluginModels = pluginAttributeResults
             .Where(static result => result.Model is not null)
@@ -41,11 +39,17 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Select(static (result, _) => result.Model!)
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.ModelResult);
 
-        var pluginPackages = pluginModels
-            .Select(static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
+        var pluginPackages = GeneratorGuard.TransformValues(
+                context,
+                pluginModels,
+                "plugin package source",
+                static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
-        var eventKernelPackages = eventKernelModels
-            .Select(static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
+        var eventKernelPackages = GeneratorGuard.TransformValues(
+                context,
+                eventKernelModels,
+                "event kernel package source",
+                static (model, _) => DotBoxDPackageSourceEmitter.Emit(model))
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
 
         var pluginPackageIdentities = pluginPackages
@@ -58,19 +62,37 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         // Phase C: lower inline On<TEvent>().Where?(lambda).Select?(lambda).Run(lambda) chains
         // to the same PluginKernelModel a kernel class produces. Unsupported shapes fail safe (no package);
         // a recognized remote RunLocal chain that fails to lower also carries a DBXK111 diagnostic.
-        var chainCreateResults = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                static (node, _) => IsHookChainTerminal(node),
-                static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
+        var chainCreateResults = GeneratorGuard.SyntaxValues(
+            context,
+            static (node, _) => IsHookChainTerminal(node),
+            "hook chain model",
+            static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct));
+        var remoteStagedUseDiagnostics = GeneratorGuard.SyntaxValues(
+            context,
+            static (node, _) => RemoteStagedUseDiagnosticFactory.IsCandidate(node),
+            "remote staged-use diagnostic",
+            static (syntaxContext, ct) => RemoteStagedUseDiagnosticFactory.Create(syntaxContext, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
+            remoteStagedUseDiagnostics,
+            "remote staged-use diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         // Report DBXK111 for a recognized remote RunLocal chain whose stages could not be lowered, so the
         // otherwise-silent skip (and the runtime NotSupportedException it leads to) is visible at build time.
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             chainCreateResults
                 .Where(static result => result.Diagnostic is not null)
                 .Select(static (result, _) => result.Diagnostic!),
+            "hook chain not-lowered diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        GeneratorGuard.RegisterOutput(
+            context,
+            chainCreateResults
+                .Where(static result => result.UnsupportedDiagnostic is not null)
+                .Select(static (result, _) => result.UnsupportedDiagnostic!),
+            "hook chain unsupported diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var chainResults = chainCreateResults
@@ -79,16 +101,29 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         // Server extensions: lower a [ServerExtension] class's batch method to a verified-IR package
         // whose Create() imports the JSON. Unsupported shapes emit a diagnostic and no package.
-        var rpcResults = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                DotBoxDMetadataNames.ServerExtensionAttribute,
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, ct) => RpcKernelModelFactory.Create(ctx, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
+        var rpcResults = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.ServerExtensionAttribute,
+            static (node, _) => node is ClassDeclarationSyntax,
+            "server extension package model",
+            static (ctx, ct) => RpcKernelModelFactory.Create(ctx, ct));
 
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             rpcResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
+            "server extension diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+
+        var serverExtensionMethodDiagnostics = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.ServerExtensionMethodAttribute,
+            static (node, _) => node is MethodDeclarationSyntax,
+            "server extension method diagnostic",
+            static (ctx, ct) => ServerExtensionMethodDiagnosticFactory.Create(ctx, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
+            serverExtensionMethodDiagnostics,
+            "server extension method diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var rpcPackages = rpcResults
@@ -96,35 +131,49 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Select(static (result, _) => result.Package!)
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
 
-        var invokeAsyncResults = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                static (node, _) => node is InvocationExpressionSyntax
-                {
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" }
-                },
-                static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
-        context.RegisterSourceOutput(
-            invokeAsyncResults.Select(static (result, _) => result.Package),
+        var invokeAsyncResults = GeneratorGuard.SyntaxValues(
+            context,
+            static (node, _) => node is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" }
+                    or IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" }
+                    or GenericNameSyntax { Identifier.ValueText: "InvokeAsync" }
+            },
+            "InvokeAsync package model",
+            static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
+            invokeAsyncResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
+            "InvokeAsync diagnostic output",
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        GeneratorGuard.RegisterOutput(
+            context,
+            invokeAsyncResults.Where(static result => result.Package is not null).Select(static (result, _) => result.Package!),
+            "InvokeAsync source output",
             static (sourceContext, package) => sourceContext.AddSource(package.HintName, package.Source));
 
-        var pluginServerResults = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                DotBoxDMetadataNames.GeneratePluginServerAttribute,
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, ct) => PluginServerFacadeModelFactory.Create(ctx, ct))
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
-        context.RegisterSourceOutput(
+        var pluginServerResults = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.GeneratePluginServerAttribute,
+            static (node, _) => node is ClassDeclarationSyntax,
+            "plugin server facade model",
+            static (ctx, ct) => PluginServerFacadeModelFactory.Create(ctx, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
             pluginServerResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
+            "plugin server facade diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             pluginServerResults.Where(static result => result.Source is not null).Select(static (result, _) => result.Source!),
+            "plugin server facade source output",
             static (sourceContext, source) => sourceContext.AddSource(source.HintName, source.Source));
 
-        var chainPackages = chainResults
-            .Select(static (result, _) => DotBoxDPackageSourceEmitter.Emit(result.Model))
+        var chainPackages = GeneratorGuard.TransformValues(
+                context,
+                chainResults,
+                "hook chain package source",
+                static (result, _) => DotBoxDPackageSourceEmitter.Emit(result.Model))
             .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.PackageResult);
         var chainPackageIdentities = chainPackages
             .Select(static (package, _) => GeneratedPluginPackageIdentity.From(package))
@@ -132,31 +181,40 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
         var rpcPackageIdentities = rpcPackages
             .Select(static (package, _) => GeneratedPluginPackageIdentity.From(package))
             .Collect();
-        var rpcGraftCollisions = rpcResults
-            .Collect()
-            .Select(static (results, _) => RpcKernelGraftCollisionDetector.FindDuplicates(results));
-        context.RegisterSourceOutput(
+        var rpcGraftCollisions = GeneratorGuard.TransformValueOrDefault(
+            context,
+            rpcResults.Collect(),
+            "server extension graft collision detection",
+            static (results, _) => RpcKernelGraftCollisionDetector.FindDuplicates(results));
+        GeneratorGuard.RegisterOutput(
+            context,
             rpcGraftCollisions.SelectMany(static (collisions, _) => RpcKernelGraftCollisionDetector.Diagnostics(collisions)),
+            "server extension graft collision diagnostic output",
             static (context, diagnostic) => context.ReportDiagnostic(diagnostic));
-        var duplicateIdentities = pluginPackageIdentities
-            .Combine(eventKernelPackageIdentities)
-            .Combine(chainPackageIdentities)
-            .Combine(rpcPackageIdentities)
-            .Select(static (pair, _) => PluginPackageDuplicateDetector.FindDuplicates(
+        var duplicateIdentities = GeneratorGuard.TransformValueOrDefault(
+            context,
+            pluginPackageIdentities
+                .Combine(eventKernelPackageIdentities)
+                .Combine(chainPackageIdentities)
+                .Combine(rpcPackageIdentities),
+            "plugin package duplicate detection",
+            static (pair, _) => PluginPackageDuplicateDetector.FindDuplicates(
                 pair.Left.Left.Left,
                 pair.Left.Left.Right,
                 pair.Left.Right,
                 pair.Right));
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             duplicateIdentities.SelectMany(static (duplicates, _) => PluginPackageDuplicateDetector.Diagnostics(duplicates)),
+            "plugin package duplicate diagnostic output",
             static (context, diagnostic) => context.ReportDiagnostic(Diagnostic.Create(
                 PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule,
                 Location.None,
                 diagnostic.Message)));
-        RegisterPackageSources(context, pluginPackages, duplicateIdentities);
-        RegisterPackageSources(context, eventKernelPackages, duplicateIdentities);
-        RegisterPackageSources(context, chainPackages, duplicateIdentities);
-        RegisterPackageSources(context, rpcPackages, duplicateIdentities);
+        PluginPackageGeneratorOutput.RegisterPackageSources(context, pluginPackages, duplicateIdentities);
+        PluginPackageGeneratorOutput.RegisterPackageSources(context, eventKernelPackages, duplicateIdentities);
+        PluginPackageGeneratorOutput.RegisterPackageSources(context, chainPackages, duplicateIdentities);
+        PluginPackageGeneratorOutput.RegisterPackageSources(context, rpcPackages, duplicateIdentities);
 
         // Emit a C# interceptor per lowered chain so the Run call site installs + wires its
         // generated package (UseGeneratedChain) instead of throwing DBXK062.
@@ -168,51 +226,58 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             .Where(static result => result.Interception is not null)
             .Select(static (result, _) => result.Interception!)
             .Collect();
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             interceptions,
+            "hook chain interceptor source output",
             static (sourceContext, items) => DotBoxDHookChainInterceptorEmitter.Emit(sourceContext, items));
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             invokeAsyncInterceptions,
+            "InvokeAsync interceptor source output",
             static (sourceContext, items) => InvokeAsyncInterceptorEmitter.Emit(sourceContext, items));
 
         RegistrationAccumulatorGenerator.Register(context);
 
         // [HookResult] builder surface: Ok()/Reject()/With<Field>() for each annotated result record, plus the
         // DBXK112 diagnostic when the Success/Reason contract is missing.
-        var hookResultModels = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
-                DotBoxDMetadataNames.HookResultAttribute,
-                static (node, _) => node is TypeDeclarationSyntax,
-                static (ctx, ct) => HookResultModelFactory.Create(ctx, ct))
-            .Where(static model => model is not null)
-            .Select(static (model, _) => model!);
-        context.RegisterSourceOutput(
+        var hookResultModels = GeneratorGuard.AttributeValues(
+            context,
+            DotBoxDMetadataNames.HookResultAttribute,
+            static (node, _) => node is TypeDeclarationSyntax,
+            "hook result model",
+            static (ctx, ct) => HookResultModelFactory.Create(ctx, ct));
+        GeneratorGuard.RegisterOutput(
+            context,
             hookResultModels
                 .Where(static model => model.Diagnostic is not null)
                 .Select(static (model, _) => model.Diagnostic!),
+            "hook result diagnostic output",
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
-        context.RegisterSourceOutput(
-            hookResultModels.Select(static (model, _) => HookResultBuilderEmitter.Emit(model)),
-            static (sourceContext, source) =>
-            {
-                if (source is not null)
-                {
-                    sourceContext.AddSource(
-                        source.HintName,
-                        Microsoft.CodeAnalysis.Text.SourceText.From(source.Source, System.Text.Encoding.UTF8));
-                }
-            });
+        var hookResultBuilderSources = GeneratorGuard.TransformNullableValues(
+            context,
+            hookResultModels,
+            "hook result builder source",
+            static (model, _) => HookResultBuilderEmitter.Emit(model));
+        GeneratorGuard.RegisterOutput(
+            context,
+            hookResultBuilderSources,
+            "hook result builder source output",
+            static (sourceContext, source) => sourceContext.AddSource(
+                source.HintName,
+                Microsoft.CodeAnalysis.Text.SourceText.From(source.Source, System.Text.Encoding.UTF8)));
 
-        var hookFireAsyncModels = context.SyntaxProvider
-            .ForAttributeWithMetadataName(
+        var hookFireAsyncModels = GeneratorGuard.AttributeValues(
+                context,
                 DotBoxDMetadataNames.HookAttribute,
                 static (node, _) => node is TypeDeclarationSyntax,
+                "hook FireAsync extension model",
                 static (ctx, ct) => HookFireAsyncModelFactory.Create(ctx, ct))
-            .Where(static model => model is not null)
-            .Select(static (model, _) => model!)
             .Collect();
-        context.RegisterSourceOutput(
+        GeneratorGuard.RegisterOutput(
+            context,
             hookFireAsyncModels,
+            "hook FireAsync extension source output",
             static (sourceContext, models) => HookFireAsyncExtensionEmitter.Emit(sourceContext, models));
     }
 
@@ -225,24 +290,4 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             }
         };
 
-    private static void RegisterDiagnostics(
-        IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<PluginKernelModelResult> results)
-        => context.RegisterSourceOutput(
-            results
-                .Where(static result => result.Diagnostic is not null)
-                .Select(static (result, _) => result.Diagnostic!)
-                .WithTrackingName(DotBoxDPluginPackageGeneratorTrackingNames.DiagnosticResult),
-            static (context, diagnostic) => context.ReportDiagnostic(diagnostic.ToDiagnostic()));
-
-    private static void RegisterPackageSources(
-        IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<GeneratedPluginPackage> packages,
-        IncrementalValueProvider<EquatableArray<GeneratedPluginPackageIdentity>> duplicateIdentities)
-        => context.RegisterSourceOutput(
-            packages
-                .Combine(duplicateIdentities)
-                .Where(static pair => !PluginPackageDuplicateDetector.Contains(pair.Right, pair.Left))
-                .Select(static (pair, _) => pair.Left),
-            static (context, package) => context.AddSource(package.HintName, package.Source));
 }

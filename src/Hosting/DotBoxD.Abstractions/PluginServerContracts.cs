@@ -10,11 +10,14 @@ public interface IPluginServer<TWorld>
 
     ValueTask RunAsync(CancellationToken cancellationToken = default);
 
-    ValueTask<TReturn> InvokeAsync<TReturn>(Func<TWorld, ValueTask<TReturn>> lambda);
+    ValueTask<TReturn> InvokeAsync<TReturn>(
+        Func<TWorld, ValueTask<TReturn>> lambda,
+        CancellationToken cancellationToken = default);
 
     ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(
         TCaptures captures,
-        RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda)
+        RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda,
+        CancellationToken cancellationToken = default)
         where TCaptures : class;
 
     ValueTask HoldUntilShutdownAsync(CancellationToken cancellationToken = default);
@@ -76,6 +79,16 @@ public sealed class GeneratePluginServerAttribute : Attribute
 {
     /// <summary>The server-authored context type augmented by the generator and used by parameterless hooks.</summary>
     public Type? Context { get; set; }
+
+    /// <summary>
+    /// Optional control-plane service contract for install, live-settings, and lifecycle calls. When omitted,
+    /// the generator falls back to the legacy <c>{WorldNamespace}.Ipc.IGamePluginControlService</c> convention.
+    /// The contract must declare an <c>UpdateSettingsAsync</c> method with a typed array parameter for the update
+    /// batch (e.g. <c>UpdateSettingsAsync(string pluginId, TUpdate[] updates, ...)</c>); the generator infers the
+    /// live-setting update element type (<c>TUpdate</c>) from that array, so the parameter need not be named
+    /// <c>updates</c>.
+    /// </summary>
+    public Type? ControlService { get; set; }
 
     /// <summary>
     /// Optional static factory method name on <see cref="Context"/> with signature
