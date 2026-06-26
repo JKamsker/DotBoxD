@@ -23,6 +23,73 @@ public static partial class KernelRpcBinaryCodec
         WriteSandboxValue(writer, value);
     }
 
+    internal static void BeginRecord(int fieldCount, IBufferWriter<byte> writer)
+    {
+        if (fieldCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fieldCount));
+        }
+
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.Record);
+        WriteLength(writer, fieldCount);
+    }
+
+    internal static void EncodeRecordField(SandboxValue value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteSandboxValue(writer, value);
+    }
+
+    internal static void EncodeBoolValue(bool value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.Bool);
+        WriteByte(writer, value ? (byte)1 : (byte)0);
+    }
+
+    internal static void EncodeInt32Value(int value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.I32);
+        WriteInt32(writer, value);
+    }
+
+    internal static void EncodeInt64Value(long value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.I64);
+        WriteInt64(writer, value);
+    }
+
+    internal static void EncodeDoubleValue(double value, IBufferWriter<byte> writer)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), "Kernel RPC F64 values must be finite.");
+        }
+
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.F64);
+        WriteInt64(writer, BitConverter.DoubleToInt64Bits(value));
+    }
+
+    internal static void EncodeStringValue(string value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.String);
+        WriteString(writer, value);
+    }
+
+    internal static void EncodeGuidValue(Guid value, IBufferWriter<byte> writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        WriteByte(writer, (byte)KernelRpcValueKind.Guid);
+        WriteGuid(writer, value);
+    }
+
     private static void WriteSandboxValue(IBufferWriter<byte> writer, SandboxValue value)
     {
         switch (value)
