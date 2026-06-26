@@ -11,7 +11,8 @@ public static partial class KernelRpcBinaryCodec
     {
         ArgumentNullException.ThrowIfNull(value);
         using var writer = PooledRpcBufferWriter.Rent();
-        EncodeValue(value, writer);
+        var itemCount = 0;
+        WriteSandboxValue(value, writer, 0, ref itemCount);
         return writer.WrittenMemory.ToArray();
     }
 
@@ -20,10 +21,15 @@ public static partial class KernelRpcBinaryCodec
     {
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(writer);
-        WriteSandboxValue(writer, value);
+        var itemCount = 0;
+        WriteSandboxValue(value, writer, 0, ref itemCount);
     }
 
-    private static void WriteSandboxValue(IBufferWriter<byte> writer, SandboxValue value)
+    private static void WriteSandboxValue(
+        SandboxValue value,
+        IBufferWriter<byte> writer,
+        int depth,
+        ref int itemCount)
     {
         switch (value)
         {
@@ -63,16 +69,23 @@ public static partial class KernelRpcBinaryCodec
                 WriteGuid(writer, guid.Value);
                 return;
             case ListValue list:
+                var listDepth = EnterEncodeCollection(depth);
+                ReserveEncodeItems(list.Values.Count, ref itemCount);
                 WriteByte(writer, (byte)KernelRpcValueKind.List);
-                WriteListValues(writer, list.Values);
+                WriteListValues(writer, list.Values, listDepth, ref itemCount);
                 return;
             case RecordValue record:
+                var recordDepth = EnterEncodeCollection(depth);
+                ReserveEncodeItems(record.Fields.Count, ref itemCount);
                 WriteByte(writer, (byte)KernelRpcValueKind.Record);
-                WriteListValues(writer, record.Fields);
+                WriteListValues(writer, record.Fields, recordDepth, ref itemCount);
                 return;
             case MapValue map:
+                var mapDepth = EnterEncodeCollection(depth);
+                var mapItemCount = checked(map.Values.Count * 2);
+                ReserveEncodeItems(mapItemCount, ref itemCount);
                 WriteByte(writer, (byte)KernelRpcValueKind.Map);
-                WriteMapValues(writer, map.Values);
+                WriteMapValues(writer, map.Values, mapDepth, mapItemCount, ref itemCount);
                 return;
             default:
                 throw new NotSupportedException(
@@ -80,22 +93,31 @@ public static partial class KernelRpcBinaryCodec
         }
     }
 
-    private static void WriteListValues(IBufferWriter<byte> writer, IReadOnlyList<SandboxValue> values)
+    private static void WriteListValues(
+        IBufferWriter<byte> writer,
+        IReadOnlyList<SandboxValue> values,
+        int depth,
+        ref int itemCount)
     {
         WriteLength(writer, values.Count);
         for (var i = 0; i < values.Count; i++)
         {
-            WriteSandboxValue(writer, values[i]);
+            WriteSandboxValue(values[i], writer, depth, ref itemCount);
         }
     }
 
-    private static void WriteMapValues(IBufferWriter<byte> writer, IReadOnlyDictionary<SandboxValue, SandboxValue> values)
+    private static void WriteMapValues(
+        IBufferWriter<byte> writer,
+        IReadOnlyDictionary<SandboxValue, SandboxValue> values,
+        int depth,
+        int itemCount,
+        ref int aggregateItemCount)
     {
-        WriteLength(writer, checked(values.Count * 2));
+        WriteLength(writer, itemCount);
         foreach (var pair in values)
         {
-            WriteSandboxValue(writer, pair.Key);
-            WriteSandboxValue(writer, pair.Value);
+            WriteSandboxValue(pair.Key, writer, depth, ref aggregateItemCount);
+            WriteSandboxValue(pair.Value, writer, depth, ref aggregateItemCount);
         }
     }
 }
