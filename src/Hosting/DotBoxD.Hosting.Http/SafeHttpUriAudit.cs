@@ -18,6 +18,9 @@ internal static class SafeHttpUriAudit
         return uri.IsDefaultPort && StringComparer.OrdinalIgnoreCase.Equals(allowed, uri.Host);
     }
 
+    public static bool MatchesAllowedAuthority(IReadOnlySet<string> allowedHosts, Uri uri)
+        => allowedHosts.Count > 0 && allowedHosts.Contains(NormalizedAuthority(uri));
+
     public static bool SameUri(Uri left, Uri right)
         => StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
            StringComparer.OrdinalIgnoreCase.Equals(NormalizedAuthority(left), NormalizedAuthority(right)) &&
