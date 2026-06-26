@@ -51,7 +51,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
             SpecialType.System_Int32 => $"{expression}.Int32Value",
             SpecialType.System_Int64 => $"{expression}.Int64Value",
             SpecialType.System_Double => $"{expression}.DoubleValue",
-            SpecialType.System_Single => $"(float){expression}.DoubleValue",
+            SpecialType.System_Single => $"{EnsureSingleValueReader()}({expression})",
             SpecialType.System_String => $"{expression}.TextValue",
             _ => ReadComplexExpression(type, expression)
         };
@@ -97,8 +97,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
-            var accessor = DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? "Int64Value" : "Int32Value";
-            return $"unchecked(({TypeName(type)}){expression}.{accessor})";
+            return $"{EnsureEnumValueReader(enumType)}({expression})";
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)

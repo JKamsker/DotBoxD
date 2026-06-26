@@ -30,10 +30,20 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         var serviceMethod = methods[0];
+        ValidateNonGeneric(serviceMethod);
         ValidateName(serviceMethod, kernelMethod);
         ValidateParameters(serviceMethod, kernelMethod);
         ValidateReturn(serviceMethod, kernelMethod);
         return serviceMethod;
+    }
+
+    private static void ValidateNonGeneric(IMethodSymbol serviceMethod)
+    {
+        if (serviceMethod.TypeParameters.Length > 0)
+        {
+            throw new NotSupportedException(
+                $"Server extension method '{serviceMethod.Name}' must be non-generic.");
+        }
     }
 
     private static void ValidateName(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)

@@ -359,6 +359,8 @@ jobs:
               "ServerExtensionSurpriseRegressionTests",
               "ServerExtensionGeneratedDtoReaderRegressionTests",
               "ServerExtensionClientNoPayloadValidationTests",
+              "ServerExtensionClientContractSurpriseTests",
+              "ServerExtensionClientDecodeSurpriseTests",
               "ServerExtensionClientProxySurpriseTests",
               "KernelRpcMarshallerSurpriseTests",
               "KernelRpcMarshallerDtoOrderTests",
