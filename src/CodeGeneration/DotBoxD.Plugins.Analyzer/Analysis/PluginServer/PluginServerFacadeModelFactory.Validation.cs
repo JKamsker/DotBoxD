@@ -155,6 +155,7 @@ internal static partial class PluginServerFacadeModelFactory
     }
 
     private static void ValidateGeneratedSurfaceCollisions(
+        INamedTypeSymbol serverType,
         INamedTypeSymbol worldType,
         IReadOnlyList<PluginServerForwardedProperty> properties,
         IReadOnlyList<PluginServerForwardedMethod> methods,
@@ -178,9 +179,11 @@ internal static partial class PluginServerFacadeModelFactory
             "InvokeServerExtensionAsync",
             "EnsureAnonymousKernelAsync",
         };
+        var generatedMembers = new HashSet<string>(reserved, StringComparer.Ordinal);
 
         foreach (var property in properties)
         {
+            generatedMembers.Add(property.Name);
             if (reserved.Contains(property.Name))
             {
                 throw new NotSupportedException(
@@ -190,6 +193,7 @@ internal static partial class PluginServerFacadeModelFactory
 
         foreach (var method in methods)
         {
+            generatedMembers.Add(method.Name);
             if (reserved.Contains(method.Name))
             {
                 throw new NotSupportedException(
@@ -199,10 +203,28 @@ internal static partial class PluginServerFacadeModelFactory
 
         foreach (var control in controls)
         {
+            generatedMembers.Add(control.Name);
             if (reserved.Contains(control.Name))
             {
                 throw new NotSupportedException(
-                    $"Generated plugin server control '{control.Name}' collides with the generated facade surface.");
+                $"Generated plugin server control '{control.Name}' collides with the generated facade surface.");
+            }
+        }
+
+        foreach (var member in serverType.GetMembers())
+        {
+            if (member.IsImplicitlyDeclared ||
+                member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } ||
+                string.Equals(member.Name, "OnConfigured", StringComparison.Ordinal) ||
+                string.Equals(member.Name, "InvokeAsync", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (generatedMembers.Contains(member.Name))
+            {
+                throw new NotSupportedException(
+                    $"Generated plugin server '{serverType.ToDisplayString()}' member '{member.Name}' collides with the generated facade surface.");
             }
         }
     }

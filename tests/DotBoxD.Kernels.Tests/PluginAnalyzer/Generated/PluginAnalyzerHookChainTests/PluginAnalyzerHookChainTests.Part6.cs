@@ -60,6 +60,34 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Remote_fresh_staged_local_ignored_by_original_Run_reports_DBXK100_error()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    var pipeline = hooks.On<DamageEvent>();
+                    var filtered = pipeline.Where(e => e.TargetId == "monster-1");
+                    _ = filtered;
+                    pipeline.Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                }
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("discarding", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("monster-1", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Remote_staged_Select_from_alias_lowers()
     {
         const string source = """

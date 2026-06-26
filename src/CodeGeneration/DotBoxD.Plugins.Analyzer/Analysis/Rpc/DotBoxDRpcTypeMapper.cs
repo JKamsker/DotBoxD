@@ -220,6 +220,7 @@ internal static partial class DotBoxDRpcTypeMapper
                     GetMethod: not null,
                     IsIndexer: false
                 } property &&
+                property.GetMethod.DeclaredAccessibility == Accessibility.Public &&
                 !property.IsImplicitlyDeclared &&
                 !IsIgnoredDataMember(property))
             {

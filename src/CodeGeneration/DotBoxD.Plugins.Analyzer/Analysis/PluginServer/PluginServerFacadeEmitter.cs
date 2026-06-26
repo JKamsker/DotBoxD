@@ -271,7 +271,8 @@ internal static class PluginServerFacadeEmitter
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
             builder.Append("    public ").Append(method.ReturnType).Append(' ')
                 .Append(PluginServerIdentifier.Escape(method.Name))
-                .Append('(').Append(ParameterList(method)).Append(") => RequireWorld().")
+                .Append('(').Append(ParameterList(method)).Append(") => ((")
+                .Append(method.ReceiverType).Append(")RequireWorld()).")
                 .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
                 .Append(ArgumentList(method)).AppendLine(");");
         }
@@ -305,7 +306,7 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("            return this;");
         builder.AppendLine("        }");
         builder.AppendLine("        public global::System.Threading.Tasks.ValueTask ApplyAsync(bool atomic = false)");
-        builder.AppendLine("            => _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic);");
+        builder.AppendLine("            => _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic, default);");
         builder.AppendLine("        public global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
         builder.AppendLine("            var draft = new TKernel();");
@@ -314,13 +315,13 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("                .Where(p => p.GetMethod is not null && p.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length != 0)");
         builder.AppendLine("                .Select(p => new " + model.LiveSettingUpdateType + "(p.Name, global::System.Convert.ToString(p.GetValue(draft), global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty))");
         builder.AppendLine("                .ToArray();");
-        builder.AppendLine("            return _owner.RequireControl().UpdateSettingsAsync(_pluginId, updates, atomic);");
+        builder.AppendLine("            return _owner.RequireControl().UpdateSettingsAsync(_pluginId, updates, atomic, default);");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
 
     private static string ParameterList(PluginServerForwardedMethod method)
-        => string.Join(", ", method.Parameters.Select(p => p.Type + " @" + p.Name));
+        => string.Join(", ", method.Parameters.Select(p => p.Type + " @" + p.Name + p.DefaultClause));
 
     private static string ArgumentList(PluginServerForwardedMethod method)
         => string.Join(", ", method.Parameters.Select(p => "@" + p.Name));

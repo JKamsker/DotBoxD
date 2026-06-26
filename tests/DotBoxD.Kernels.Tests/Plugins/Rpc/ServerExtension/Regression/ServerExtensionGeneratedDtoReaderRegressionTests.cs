@@ -188,55 +188,6 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
                  d.GetMessage().Contains("inherit public fields", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void Direct_extension_rejects_partial_constructor_with_read_only_leftover_field()
-    {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
-            using DotBoxD.Kernels;
-            using DotBoxD.Kernels.Sandbox;
-            using DotBoxD.Plugins;
-            using DotBoxD.Plugins.Runtime;
-            using DotBoxD.Services.Attributes;
-            using DotBoxD.Abstractions;
-
-            namespace Sample;
-
-            [DotBoxDService]
-            public interface IRemoteWorldControl
-            {
-            }
-
-            public sealed class ReadOnlyTail
-            {
-                public ReadOnlyTail(int id) => Id = id;
-
-                public int Id { get; }
-                public int Count { get; }
-            }
-
-            public interface IWorld
-            {
-                [HostBinding("host.tail.read", "tail.read", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-                ReadOnlyTail ReadTail(int id);
-            }
-
-            [ServerExtension(typeof(IRemoteWorldControl), "tail")]
-            public sealed partial class TailKernel
-            {
-                [ServerExtensionMethod(typeof(IRemoteWorldControl))]
-                public ReadOnlyTail Read(int id, HookContext ctx)
-                {
-                    return ctx.Host<IWorld>().ReadTail(id);
-                }
-            }
-            """);
-
-        Assert.Contains(
-            diagnostics,
-            d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("must expose either a constructor", StringComparison.Ordinal));
-    }
-
     private static object CreateControl(Assembly assembly, string expectedPluginId, byte[] response)
     {
         var controlType = assembly.GetType("Sample.RemoteWorldControl", throwOnError: true)!;

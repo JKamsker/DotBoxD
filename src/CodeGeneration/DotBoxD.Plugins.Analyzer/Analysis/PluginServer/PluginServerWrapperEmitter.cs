@@ -69,7 +69,8 @@ internal static class PluginServerWrapperEmitter
             builder,
             indent,
             "Registry for server extension clients installed through setup, Extend, or EnsureAnonymousKernelAsync.");
-        builder.Append(indent).AppendLine("public global::DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions => _owner;");
+        builder.Append(indent)
+            .AppendLine("global::DotBoxD.Abstractions.IServerExtensionClientRegistry global::DotBoxD.Abstractions.IServerExtensionClientAccessor.ServerExtensions => _owner;");
     }
 
     private static void AppendProperty(StringBuilder builder, PluginServerForwardedProperty property, string indent)
@@ -100,25 +101,28 @@ internal static class PluginServerWrapperEmitter
             .Append('(').Append(ParameterList(method)).Append(") => ");
         if (method.ReturnWrapperName is null)
         {
-            builder.Append("_inner.").Append(PluginServerIdentifier.Escape(method.Name))
+            builder.Append("((").Append(method.ReceiverType).Append(")_inner).")
+                .Append(PluginServerIdentifier.Escape(method.Name))
                 .Append('(').Append(ArgumentList(method)).AppendLine(");");
             return;
         }
 
         if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
         {
-            builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, await _inner.")
+            builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, await ((")
+                .Append(method.ReceiverType).Append(")_inner).")
                 .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method))
                 .AppendLine(").ConfigureAwait(false));");
             return;
         }
 
-        builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, _inner.")
+        builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, ((")
+            .Append(method.ReceiverType).Append(")_inner).")
             .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method)).AppendLine("));");
     }
 
     private static string ParameterList(PluginServerForwardedMethod method)
-        => string.Join(", ", method.Parameters.Select(static p => p.Type + " @" + p.Name));
+        => string.Join(", ", method.Parameters.Select(static p => p.Type + " @" + p.Name + p.DefaultClause));
 
     private static string ArgumentList(PluginServerForwardedMethod method)
         => string.Join(", ", method.Parameters.Select(static p => "@" + p.Name));

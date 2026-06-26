@@ -38,11 +38,18 @@ internal sealed partial class InvokeAsyncCallShape
     private static void ValidateExplicitCaptureMutations(
         BlockSyntax block,
         InvokeAsyncCaptureParameter captureParameter,
-        SemanticModel model)
+        SemanticModel model,
+        ISet<string> captureAliases)
     {
         string? CapturedName(ExpressionSyntax expression)
         {
-            if (!TryCaptureMember(expression, captureParameter.Name, model, out _, out var target))
+            if (!TryCaptureMember(
+                    expression,
+                    captureParameter.Name,
+                    captureAliases,
+                    model,
+                    out _,
+                    out var target))
             {
                 return null;
             }

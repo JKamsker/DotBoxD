@@ -89,6 +89,144 @@ public sealed class PluginServerMemberShapeRegressionTests
                           diagnostic.GetMessage().Contains("get-only instance property", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Generated_plugin_server_preserves_forwarded_method_default_parameters()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(ServerSource("""
+                    ValueTask<int> ReadAsync(int max = 10, CancellationToken ct = default);
+            """));
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.Contains(
+            "ReadAsync(int @max = 10, global::System.Threading.CancellationToken @ct = default)",
+            generated,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_plugin_server_deduplicates_compatible_inherited_methods()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Regression.Game
+            {
+                [DotBoxDService]
+                public interface ILeftWorld
+                {
+                    ValueTask<int> PingAsync();
+                }
+
+                [DotBoxDService]
+                public interface IRightWorld
+                {
+                    ValueTask<int> PingAsync();
+                }
+
+                [DotBoxDService]
+                public interface IGameWorldAccess : ILeftWorld, IRightWorld;
+            }
+
+            namespace Regression.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static Regression.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+                }
+            }
+
+            namespace Regression.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using Regression.Game;
+
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : IGameWorldAccess;
+
+                public sealed partial class RemotePluginContext;
+            }
+            """);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.Equal(1, Count(generated, "public global::System.Threading.Tasks.ValueTask<int> PingAsync("));
+    }
+
+    [Fact]
+    public void Generated_plugin_server_wraps_domain_ServerExtensions_member_without_collision()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(ServerSource("""
+                    IMonsterControl Monsters { get; }
+            """, """
+
+                [DotBoxDService]
+                public interface IMonsterControl
+                {
+                    string ServerExtensions { get; }
+                }
+            """));
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.Contains(
+            "IServerExtensionClientAccessor.ServerExtensions => _owner;",
+            generated,
+            StringComparison.Ordinal);
+        Assert.Contains("public string ServerExtensions => _inner.ServerExtensions;", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_plugin_server_supports_required_control_update_cancellation_token()
+    {
+        var source = ServerSource("")
+            .Replace("bool atomic = false,", "bool atomic,", StringComparison.Ordinal)
+            .Replace("CancellationToken ct = default);", "CancellationToken ct);", StringComparison.Ordinal);
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run(source);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.Contains(
+            "UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic, default)",
+            generated,
+            StringComparison.Ordinal);
+    }
+
+    private static int Count(string text, string value)
+    {
+        var count = 0;
+        for (var index = 0; ; index += value.Length)
+        {
+            index = text.IndexOf(value, index, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return count;
+            }
+
+            count++;
+        }
+    }
+
     private static string ServerSource(string worldMembers, string extraGameTypes = "")
         => $$"""
             using System.Threading;

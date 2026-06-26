@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
-internal static class InvokeAsyncReceiverResolver
+internal static partial class InvokeAsyncReceiverResolver
 {
     private const string BuilderSuffix = "Builder";
 
@@ -28,13 +28,14 @@ internal static class InvokeAsyncReceiverResolver
 
         if (semanticType is not null &&
             IsGeneratedServerInterfaceCandidate(semanticType) &&
-            InvokeAsyncGeneratedServerInterfaceResolver.TryResolve(
-                model.Compilation,
-                semanticType,
-                cancellationToken,
-                out receiverType,
-                out serverAccessType,
-                out worldType))
+            (TryResolveGeneratedServerShape(semanticType, out receiverType, out serverAccessType, out worldType) ||
+             InvokeAsyncGeneratedServerInterfaceResolver.TryResolve(
+                 model.Compilation,
+                 semanticType,
+                 cancellationToken,
+                 out receiverType,
+                 out serverAccessType,
+                 out worldType)))
         {
             return true;
         }
@@ -76,13 +77,60 @@ internal static class InvokeAsyncReceiverResolver
     private static bool IsGeneratedServerInterfaceCandidate(INamedTypeSymbol type)
         => IsGeneratedServerInterfaceNameCandidate(type.Name) &&
            (type.TypeKind == TypeKind.Error ||
-            (type.TypeKind == TypeKind.Interface && InheritsPluginServerInterface(type)));
+            (type.TypeKind == TypeKind.Interface &&
+             InheritsPluginServerInterface(type) &&
+             HasGeneratedServerShape(type)));
 
     private static bool InheritsPluginServerInterface(INamedTypeSymbol type)
         => type.AllInterfaces.Any(static candidate => string.Equals(
             candidate.OriginalDefinition.ToDisplayString(),
             "DotBoxD.Abstractions.IPluginServer<TWorld>",
             StringComparison.Ordinal));
+
+    private static bool TryResolveGeneratedServerShape(
+        INamedTypeSymbol type,
+        out string receiverType,
+        out string? serverAccessType,
+        out INamedTypeSymbol worldType)
+    {
+        receiverType = string.Empty;
+        serverAccessType = null;
+        worldType = null!;
+        if (!TryPluginServerWorld(type, out worldType))
+        {
+            return false;
+        }
+
+        receiverType = PluginServerInterfaceTypeName(worldType);
+        serverAccessType = TypeName(type);
+        return true;
+    }
+
+    private static bool TryPluginServerWorld(INamedTypeSymbol type, out INamedTypeSymbol worldType)
+    {
+        foreach (var candidate in type.AllInterfaces)
+        {
+            if (string.Equals(
+                    candidate.OriginalDefinition.ToDisplayString(),
+                    "DotBoxD.Abstractions.IPluginServer<TWorld>",
+                    StringComparison.Ordinal) &&
+                candidate.TypeArguments.Length == 1 &&
+                candidate.TypeArguments[0] is INamedTypeSymbol named)
+            {
+                worldType = named;
+                return true;
+            }
+        }
+
+        worldType = null!;
+        return false;
+    }
+
+    private static bool HasGeneratedServerShape(INamedTypeSymbol type)
+        => type.GetMembers("Services").OfType<IPropertySymbol>().Any(property =>
+               SymbolEqualityComparer.Default.Equals(property.Type, type)) &&
+           type.GetMembers("WireClient").OfType<IPropertySymbol>().Any() &&
+           type.GetMembers("EnsureAnonymousKernelAsync").OfType<IMethodSymbol>().Any();
 
     private static bool TryResolveGeneratedBuilderLocal(
         SemanticModel model,
@@ -249,33 +297,4 @@ internal static class InvokeAsyncReceiverResolver
         return false;
     }
 
-    private static string PluginServerInterfaceTypeName(INamedTypeSymbol worldType)
-        => "global::DotBoxD.Abstractions.IPluginServer<" + TypeName(worldType) + ">";
-
-    private static string ServerInterfaceTypeName(INamedTypeSymbol facadeType, INamedTypeSymbol worldType)
-    {
-        var ns = facadeType.ContainingNamespace.IsGlobalNamespace
-            ? string.Empty
-            : facadeType.ContainingNamespace.ToDisplayString() + ".";
-        return "global::" + ns + ServerInterfaceName(worldType);
-    }
-
-    private static string ServerInterfaceName(INamedTypeSymbol worldType)
-    {
-        var name = worldType.Name;
-        if (name.StartsWith("I", StringComparison.Ordinal) && name.Length > 1 && char.IsUpper(name[1]))
-        {
-            name = name.Substring(1);
-        }
-
-        if (name.EndsWith("Access", StringComparison.Ordinal) && name.Length > "Access".Length)
-        {
-            name = name.Substring(0, name.Length - "Access".Length);
-        }
-
-        return "I" + name + "Server";
-    }
-
-    private static string TypeName(INamedTypeSymbol type)
-        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 }

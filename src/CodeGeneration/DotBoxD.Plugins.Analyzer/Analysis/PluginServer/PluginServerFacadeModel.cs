@@ -19,6 +19,7 @@ internal sealed record PluginServerFacadeModel(
     string WorldDocumentation,
     string ControlServiceType,
     string LiveSettingUpdateType,
+    bool EmitPipeBuilder,
     EquatableArray<PluginServerForwardedProperty> WorldProperties,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
     EquatableArray<PluginServerControlProperty> Controls,
@@ -45,6 +46,7 @@ internal sealed record PluginServerControlProperty(
 
 internal sealed record PluginServerForwardedMethod(
     string Name,
+    string ReceiverType,
     string ReturnType,
     string Documentation,
     string? ReturnWrapperName,
@@ -64,7 +66,7 @@ internal sealed record PluginServerServiceWrapper(
     EquatableArray<PluginServerForwardedProperty> Properties,
     EquatableArray<PluginServerForwardedMethod> Methods);
 
-internal sealed record PluginServerParameter(string Name, string Type);
+internal sealed record PluginServerParameter(string Name, string Type, string DefaultClause);
 
 internal sealed record GeneratedKernelMethodDescriptorModel(
     string ContextType,

@@ -13,6 +13,14 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
         out string? serverAccessType,
         out INamedTypeSymbol worldType)
     {
+        if (type.TypeKind != TypeKind.Error && !HasGeneratedServerShape(type))
+        {
+            receiverType = string.Empty;
+            serverAccessType = null;
+            worldType = null!;
+            return false;
+        }
+
         if (TryResolveByConvention(compilation, type, out receiverType, out serverAccessType, out worldType))
         {
             return true;
@@ -149,6 +157,12 @@ internal static class InvokeAsyncGeneratedServerInterfaceResolver
 
     private static bool HasDotBoxDServiceAttribute(INamedTypeSymbol type)
         => HasAttribute(type, DotBoxDMetadataNames.DotBoxDServiceAttribute);
+
+    private static bool HasGeneratedServerShape(INamedTypeSymbol type)
+        => type.GetMembers("Services").OfType<IPropertySymbol>().Any(property =>
+               SymbolEqualityComparer.Default.Equals(property.Type, type)) &&
+           type.GetMembers("WireClient").OfType<IPropertySymbol>().Any() &&
+           type.GetMembers("EnsureAnonymousKernelAsync").OfType<IMethodSymbol>().Any();
 
     private static bool HasAttribute(INamedTypeSymbol type, string metadataName)
     {

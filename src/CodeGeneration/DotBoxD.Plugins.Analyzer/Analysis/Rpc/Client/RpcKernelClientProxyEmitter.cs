@@ -9,16 +9,18 @@ internal static partial class RpcKernelClientProxyEmitter
     public static string Emit(
         INamedTypeSymbol kernelType,
         IMethodSymbol kernelMethod,
-        INamedTypeSymbol serviceType)
+        INamedTypeSymbol serviceType,
+        Compilation compilation)
     {
         var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod);
-        return Emit(kernelType, serviceType, serviceMethod);
+        return Emit(kernelType, serviceType, serviceMethod, compilation);
     }
 
     public static string Emit(
         INamedTypeSymbol kernelType,
         INamedTypeSymbol serviceType,
-        IMethodSymbol serviceMethod)
+        IMethodSymbol serviceMethod,
+        Compilation compilation)
     {
         EnsureAccessibleFromGeneratedClient(serviceType);
         if (serviceType.TypeKind != TypeKind.Interface)
@@ -26,7 +28,7 @@ internal static partial class RpcKernelClientProxyEmitter
             throw new NotSupportedException("Server extension client generation requires an interface contract type.");
         }
 
-        return new ProxySourceWriter(kernelType, serviceType, serviceMethod).Emit();
+        return new ProxySourceWriter(kernelType, serviceType, serviceMethod, compilation).Emit();
     }
 
     internal static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
@@ -90,16 +92,18 @@ internal static partial class RpcKernelClientProxyEmitter
         private readonly IMethodSymbol _serviceMethod;
         private readonly ITypeSymbol? _payloadReturnType;
         private readonly ReturnShape _returnShape;
-        private readonly RpcKernelValueConversionEmitter _conv = new();
+        private readonly RpcKernelValueConversionEmitter _conv;
 
         public ProxySourceWriter(
             INamedTypeSymbol kernelType,
             INamedTypeSymbol serviceType,
-            IMethodSymbol serviceMethod)
+            IMethodSymbol serviceMethod,
+            Compilation compilation)
         {
             _kernelType = kernelType;
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
+            _conv = new RpcKernelValueConversionEmitter(compilation);
             _returnShape = Shape(serviceMethod.ReturnType, out _payloadReturnType);
         }
 

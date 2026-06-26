@@ -87,6 +87,8 @@ internal sealed partial class InvokeAsyncCallShape
                 model,
                 capturesExpression,
                 cancellationToken,
+                expectedWorldType: null,
+                expectedCaptureType: method.TypeArguments[0],
                 out var captureParameter,
                 out worldType) &&
             !HasExternalCaptures(lambda, model))
@@ -122,6 +124,7 @@ internal sealed partial class InvokeAsyncCallShape
                 capturesExpression,
                 cancellationToken,
                 generatedWorldType,
+                ExplicitCaptureType(invocation, model, cancellationToken),
                 out var captureParameter,
                 out worldType) &&
             TryGeneratedReceiverReturnType(invocation, captureBlock, model, cancellationToken, expectedTypeArgumentCount: 2, typeArgumentIndex: 1, out returnType) &&
@@ -132,6 +135,20 @@ internal sealed partial class InvokeAsyncCallShape
 
         return null;
     }
+
+    private static ITypeSymbol? ExplicitCaptureType(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+        => TryExplicitGenericTypeArgument(
+            invocation,
+            model,
+            cancellationToken,
+            expectedTypeArgumentCount: 2,
+            typeArgumentIndex: 0,
+            out var captureType)
+            ? captureType
+            : null;
 
     private static bool TryGeneratedReceiverReturnType(
         InvocationExpressionSyntax invocation,
@@ -223,7 +240,8 @@ internal sealed partial class InvokeAsyncCallShape
         SemanticModel model,
         ITypeSymbol worldType)
     {
-        var syncOuts = FindSyncOuts(block, captureParameter, model);
+        var captureAliases = CaptureBagAliases(block, captureParameter.Name);
+        var syncOuts = FindSyncOuts(block, captureParameter, model, captureAliases);
         var returnTypeJson = BuildReturnTypeJson(returnType, syncOuts);
         return new InvokeAsyncCallShape(
             block,
@@ -237,8 +255,13 @@ internal sealed partial class InvokeAsyncCallShape
             [captureParameter.Type],
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             CreateLeadingLocals(syncOuts),
-            (assignment, lower) => LowerCaptureAssignment(assignment, captureParameter, syncOuts, lower),
-            expression => LowerCaptureRead(expression, captureParameter, syncOuts));
+            (assignment, lower) => LowerCaptureAssignment(
+                assignment,
+                captureParameter,
+                syncOuts,
+                captureAliases,
+                lower),
+            expression => LowerCaptureRead(expression, captureParameter, syncOuts, captureAliases));
     }
 
     private IReadOnlyList<string> ReturnLocalNames()
@@ -258,28 +281,4 @@ internal sealed partial class InvokeAsyncCallShape
     private static bool HasExternalCaptures(LambdaExpressionSyntax lambda, SemanticModel model)
         => ImplicitCaptureSet.Create(lambda, model) is { HasExternalCaptures: true };
 
-    private static string BuildReturnTypeJson(ITypeSymbol returnType, IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
-    {
-        if (syncOuts.Count == 0)
-        {
-            return DotBoxDRpcReturnType.JsonType(returnType);
-        }
-
-        var fields = new string[1 + syncOuts.Count];
-        fields[0] = DotBoxDRpcReturnType.JsonType(returnType);
-        for (var i = 0; i < syncOuts.Count; i++)
-        {
-            fields[i + 1] = DotBoxDRpcTypeMapper.JsonType(syncOuts[i].Type);
-        }
-
-        return "{\"name\":\"Record\",\"arguments\":[" + string.Join(",", fields) + "]}";
-    }
 }
-
-internal sealed record InvokeAsyncCaptureParameter(string Name, INamedTypeSymbol Type);
-
-internal sealed record InvokeAsyncSyncOut(
-    string TargetName,
-    ITypeSymbol Type,
-    string LocalName,
-    ExpressionSyntax? Initializer);

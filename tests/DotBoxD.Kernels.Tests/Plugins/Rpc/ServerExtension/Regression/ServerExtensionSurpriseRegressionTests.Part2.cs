@@ -184,9 +184,13 @@ public sealed partial class ServerExtensionSurpriseRegressionTests
             }
             """);
 
-        Assert.True(float.IsNaN((float)GeneratedExtensionDefault(assembly, "Nan").DefaultValue!));
-        Assert.Equal(float.PositiveInfinity, GeneratedExtensionDefault(assembly, "Positive").DefaultValue);
-        Assert.Equal(float.NegativeInfinity, GeneratedExtensionDefault(assembly, "Negative").DefaultValue);
+        var nan = Assert.IsType<float>(GeneratedExtensionDefault(assembly, "Nan").DefaultValue);
+        var positive = Assert.IsType<float>(GeneratedExtensionDefault(assembly, "Positive").DefaultValue);
+        var negative = Assert.IsType<float>(GeneratedExtensionDefault(assembly, "Negative").DefaultValue);
+
+        Assert.True(float.IsNaN(nan));
+        Assert.Equal(float.PositiveInfinity, positive);
+        Assert.Equal(float.NegativeInfinity, negative);
     }
 
     [Fact]

@@ -9,16 +9,18 @@ internal static class RpcKernelDirectClientExtensionEmitter
         INamedTypeSymbol kernelType,
         RpcServerExtensionGraft graft,
         IMethodSymbol kernelMethod,
-        RpcKernelClientMethodExtension methodExtension)
-        => new Writer(kernelType, graft, kernelMethod, methodExtension).Emit();
+        RpcKernelClientMethodExtension methodExtension,
+        Compilation compilation)
+        => new Writer(kernelType, graft, kernelMethod, methodExtension, compilation).Emit();
 
     private sealed class Writer(
         INamedTypeSymbol kernelType,
         RpcServerExtensionGraft graft,
         IMethodSymbol kernelMethod,
-        RpcKernelClientMethodExtension methodExtension)
+        RpcKernelClientMethodExtension methodExtension,
+        Compilation compilation)
     {
-        private readonly RpcKernelValueConversionEmitter _conv = new();
+        private readonly RpcKernelValueConversionEmitter _conv = new(compilation);
 
         public string Emit()
         {

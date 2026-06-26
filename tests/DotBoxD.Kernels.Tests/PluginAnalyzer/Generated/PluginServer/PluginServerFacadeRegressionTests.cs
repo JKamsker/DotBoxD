@@ -116,7 +116,10 @@ public sealed class PluginServerFacadeRegressionTests
         Assert.Contains("RemotePluginSubscriptionRegistry Subscriptions { get; }", generated, StringComparison.Ordinal);
         Assert.Contains("public global::Regression.Game.IMonsterControl Monsters", generated, StringComparison.Ordinal);
         Assert.Contains("public async global::System.Threading.Tasks.ValueTask<global::Regression.Game.IMonster> GetAsync", generated, StringComparison.Ordinal);
-        Assert.Contains("new MonsterPluginService(_owner, await _inner.GetAsync", generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "new MonsterPluginService(_owner, await ((global::Regression.Game.IMonsterControl)_inner).GetAsync",
+            generated,
+            StringComparison.Ordinal);
     }
 
     [Fact]

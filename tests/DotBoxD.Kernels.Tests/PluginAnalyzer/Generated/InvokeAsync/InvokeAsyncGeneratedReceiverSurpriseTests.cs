@@ -2,7 +2,7 @@ using static DotBoxD.Kernels.Tests.PluginAnalyzer.Generated.InvokeAsyncGeneratio
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class InvokeAsyncGeneratedReceiverSurpriseTests
+public sealed partial class InvokeAsyncGeneratedReceiverSurpriseTests
 {
     [Fact]
     public void Explicit_capture_bag_sync_out_local_avoids_user_local_collision()
@@ -125,65 +125,119 @@ public sealed class InvokeAsyncGeneratedReceiverSurpriseTests
         Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
     }
 
-    private static string GeneratedFacadeBodySource(string serverMembers, string worldMembers = "")
-        => """
-        using System;
-        using System.Threading;
-        using System.Threading.Tasks;
-        using DotBoxD.Abstractions;
-        using DotBoxD.Kernels.Sandbox;
-        using DotBoxD.Plugins;
-        using DotBoxD.Services.Attributes;
-        using DotBoxD.Kernels.Game.Plugin.Client;
-        using DotBoxD.Kernels.Game.Server.Abstractions;
+    [Fact]
+    public void Lookalike_IPluginServer_interface_without_generated_shape_reports_DBXK100()
+    {
+        var result = RunGenerator(GeneratedFacadeBodySource("""
+                public ValueTask<int> Probe(IGameWorldServer server)
+                    => server.InvokeAsync(async (IGameWorldAccess world) =>
+                    {
+                        return world.GetHealth("monster-1");
+                    });
+            """, """
+            public interface IGameWorldServer : IPluginServer<IGameWorldAccess>;
+            """));
 
-        namespace DotBoxD.Kernels.Game.Server.Abstractions
-        {
-            [DotBoxDService]
-            public interface IGameWorldAccess
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("AnonymousInvokeAsync", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Explicit_capture_bag_uses_explicit_generic_upcast_type()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public class CaptureBase
             {
-                [HostBinding("host.world.getHealth", "game.world.monster.read.health", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
-                int GetHealth(string entityId);
-            }
-        """ + worldMembers + """
-        }
-
-        namespace DotBoxD.Services.Generated
-        {
-            public static class DotBoxDGeneratedExtensions
-            {
-                public static IGameWorldAccess GetGameWorldAccess(DotBoxD.Services.Peer.RpcPeer peer)
-                    => throw new InvalidOperationException("not used");
-            }
-        }
-
-        namespace DotBoxD.Kernels.Game.Server.Abstractions.Ipc
-        {
-            public readonly record struct LiveSettingUpdate(string Name, string Value);
-
-            public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
-            {
-                ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
-                ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
-                ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
-                ValueTask UpdateSettingsAsync(
-                    string pluginId,
-                    LiveSettingUpdate[] updates,
-                    bool atomic = false,
-                    CancellationToken ct = default);
-                ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
-            }
-        }
-
-        namespace DotBoxD.Kernels.Game.Plugin.Client
-        {
-            [GeneratePluginServer(Context = typeof(RemotePluginContext))]
-            public partial class RemotePluginServer : IGameWorldAccess
-            {
-        """ + serverMembers + """
+                public string MonsterId { get; set; } = "";
+                public int LastHealth { get; set; }
             }
 
-            public sealed partial class RemotePluginContext;
-        }
-        """;
+            public sealed class DerivedCapture : CaptureBase;
+
+            public static ValueTask<int> Run(RemotePluginServer kernels, DerivedCapture captures)
+                => kernels.InvokeAsync<CaptureBase, int>(captures, async (IGameWorldAccess world, CaptureBase bag) =>
+                {
+                    bag.LastHealth = world.GetHealth(bag.MonsterId);
+                    return bag.LastHealth;
+                });
+            """));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains(
+            result.GeneratedTrees,
+            tree => tree.ToString().Contains("CaptureBase", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Explicit_capture_bag_alias_syncs_member_assignments()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public sealed class Capture
+            {
+                public string MonsterId { get; set; } = "";
+                public int LastHealth { get; set; }
+            }
+
+            public static ValueTask<int> Run(RemotePluginServer kernels, Capture captures)
+                => kernels.InvokeAsync(captures, async (IGameWorldAccess world, Capture bag) =>
+                {
+                    var alias = bag;
+                    alias.LastHealth = world.GetHealth(alias.MonsterId);
+                    return alias.LastHealth;
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("captures.LastHealth =", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Explicit_capture_bag_alias_mutable_collection_mutation_reports_DBXK100()
+    {
+        var result = RunGenerator(UsageSource("""
+            public sealed class Capture
+            {
+                public System.Collections.Generic.List<int> Values { get; set; } = [];
+            }
+
+            public static ValueTask<int> Run(RemotePluginServer kernels, Capture captures)
+                => kernels.InvokeAsync(captures, async (IGameWorldAccess world, Capture bag) =>
+                {
+                    var alias = bag;
+                    var values = alias.Values;
+                    values.Add(world.GetHealth("monster-1"));
+                    return values.Count;
+                });
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("captured collection 'Values'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Unqualified_InvokeAsync_inside_generated_facade_respects_user_overload()
+    {
+        var result = RunGeneratorAndAssertCompiles(GeneratedFacadeBodySource("""
+                private ValueTask<int> InvokeAsync(Func<IGameWorldAccess, ValueTask<int>> lambda)
+                    => new(7);
+
+                public ValueTask<int> Probe()
+                    => InvokeAsync(async (IGameWorldAccess world) =>
+                    {
+                        return world.GetHealth("monster-1");
+                    });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
 }

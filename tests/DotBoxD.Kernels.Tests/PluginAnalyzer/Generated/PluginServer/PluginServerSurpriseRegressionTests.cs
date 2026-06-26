@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
-public sealed class PluginServerSurpriseRegressionTests
+public sealed partial class PluginServerSurpriseRegressionTests
 {
     [Fact]
     public void Internal_plugin_server_emits_internal_builder()
@@ -96,7 +96,7 @@ public sealed class PluginServerSurpriseRegressionTests
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
         Assert.Contains("public global::Keyword.Game.IControl @event", generated, StringComparison.Ordinal);
         Assert.Contains("public global::System.Threading.Tasks.ValueTask<int> @class", generated, StringComparison.Ordinal);
-        Assert.Contains("_inner.@class(@record)", generated, StringComparison.Ordinal);
+        Assert.Contains("((global::Keyword.Game.IControl)_inner).@class(@record)", generated, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -160,13 +160,36 @@ public sealed class PluginServerSurpriseRegressionTests
         Assert.Contains("_anonymousKernels).Remove", generated, StringComparison.Ordinal);
     }
 
-    private static string BaseServerSource(
-        string serverAccessibility = "public",
-        string contextAccessibility = "public",
-        string controlAccessibility = "public",
-        string worldMembers = "",
-        string extraGameTypes = "")
-        => $$"""
+    [Fact]
+    public void Generated_plugin_server_without_pushdown_reference_omits_pipe_builder()
+    {
+        var (generated, outputCompilation) =
+            PluginServerGenerationTestDriver.RunWithoutPushdownServices(BaseServerSource());
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.DoesNotContain("FromPipeName", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("DotBoxD.Pushdown.Services", generated, StringComparison.Ordinal);
+        Assert.Contains("FromConnection", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_plugin_server_reports_user_partial_member_collisions()
+    {
+        var diagnostics = PluginServerGenerationTestDriver.Diagnostics(BaseServerSource(serverMembers: """
+                public ValueTask StartAsync(CancellationToken cancellationToken = default)
+                    => default;
+            """));
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("collides with the generated facade surface", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Generated_plugin_server_reports_ambiguous_inherited_control_properties()
+    {
+        var diagnostics = PluginServerGenerationTestDriver.Diagnostics("""
             using System.Threading;
             using System.Threading.Tasks;
             using DotBoxD.Abstractions;
@@ -176,18 +199,32 @@ public sealed class PluginServerSurpriseRegressionTests
             namespace Regression.Game
             {
                 [DotBoxDService]
-                public interface IGameWorldAccess
+                public interface ILeftControl;
+
+                [DotBoxDService]
+                public interface IRightControl;
+
+                [DotBoxDService]
+                public interface ILeftWorld
                 {
-            {{worldMembers}}
+                    ILeftControl Tools { get; }
                 }
-            {{extraGameTypes}}
+
+                [DotBoxDService]
+                public interface IRightWorld
+                {
+                    IRightControl Tools { get; }
+                }
+
+                [DotBoxDService]
+                public interface IGameWorldAccess : ILeftWorld, IRightWorld;
             }
 
             namespace Regression.Game.Ipc
             {
                 public readonly record struct LiveSettingUpdate(string Name, string Value);
 
-                {{controlAccessibility}} interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
                 {
                     ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
                     ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
@@ -201,25 +238,22 @@ public sealed class PluginServerSurpriseRegressionTests
                 }
             }
 
-            namespace DotBoxD.Services.Generated
-            {
-                public static class DotBoxDGeneratedExtensions
-                {
-                    public static Regression.Game.IGameWorldAccess GetGameWorldAccess(
-                        DotBoxD.Services.Peer.RpcPeer peer)
-                        => throw new System.InvalidOperationException("not used");
-                }
-            }
-
             namespace Regression.Plugin
             {
                 using DotBoxD.Abstractions;
                 using Regression.Game;
 
                 [GeneratePluginServer(Context = typeof(RemotePluginContext))]
-                {{serverAccessibility}} partial class RemotePluginServer : IGameWorldAccess;
+                public partial class RemotePluginServer : IGameWorldAccess;
 
-                {{contextAccessibility}} sealed partial class RemotePluginContext;
+                public sealed partial class RemotePluginContext;
             }
-            """;
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("inherited property collision", StringComparison.Ordinal));
+    }
+
 }

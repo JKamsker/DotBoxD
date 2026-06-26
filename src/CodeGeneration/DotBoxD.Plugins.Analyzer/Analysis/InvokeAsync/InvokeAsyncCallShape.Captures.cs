@@ -11,14 +11,21 @@ internal sealed partial class InvokeAsyncCallShape
     private static List<InvokeAsyncSyncOut> FindSyncOuts(
         BlockSyntax block,
         InvokeAsyncCaptureParameter captureParameter,
-        SemanticModel model)
+        SemanticModel model,
+        ISet<string> captureAliases)
     {
-        ValidateExplicitCaptureMutations(block, captureParameter, model);
+        ValidateExplicitCaptureMutations(block, captureParameter, model, captureAliases);
         var syncOuts = new List<InvokeAsyncSyncOut>();
         var reservedLocalNames = ReservedLocalNames(block);
         foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
         {
-            if (!TryCaptureMember(assignment.Left, captureParameter.Name, model, out var member, out var target))
+            if (!TryCaptureMember(
+                    assignment.Left,
+                    captureParameter.Name,
+                    captureAliases,
+                    model,
+                    out var member,
+                    out var target))
             {
                 continue;
             }
@@ -109,6 +116,7 @@ internal sealed partial class InvokeAsyncCallShape
     private static bool TryCaptureMember(
         ExpressionSyntax expression,
         string captureParameterName,
+        ISet<string> captureAliases,
         SemanticModel model,
         out MemberAccessExpressionSyntax member,
         out ISymbol target)
@@ -119,7 +127,7 @@ internal sealed partial class InvokeAsyncCallShape
             {
                 Expression: IdentifierNameSyntax receiver
             } found ||
-            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal))
+            !IsCaptureBagName(receiver.Identifier.ValueText, captureParameterName, captureAliases))
         {
             return false;
         }
@@ -154,9 +162,15 @@ internal sealed partial class InvokeAsyncCallShape
         AssignmentExpressionSyntax assignment,
         InvokeAsyncCaptureParameter captureParameter,
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
+        ISet<string> captureAliases,
         Func<ExpressionSyntax, string> lower)
     {
-        if (!TryCaptureMember(assignment.Left, captureParameter.Name, captureParameter.Type, out var propertyName))
+        if (!TryCaptureMember(
+                assignment.Left,
+                captureParameter.Name,
+                captureParameter.Type,
+                captureAliases,
+                out var propertyName))
         {
             return null;
         }
@@ -174,9 +188,15 @@ internal sealed partial class InvokeAsyncCallShape
     private static string? LowerCaptureRead(
         ExpressionSyntax expression,
         InvokeAsyncCaptureParameter captureParameter,
-        IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
+        IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
+        ISet<string> captureAliases)
     {
-        if (!TryCaptureMember(expression, captureParameter.Name, captureParameter.Type, out var propertyName))
+        if (!TryCaptureMember(
+                expression,
+                captureParameter.Name,
+                captureParameter.Type,
+                captureAliases,
+                out var propertyName))
         {
             return null;
         }
@@ -189,6 +209,7 @@ internal sealed partial class InvokeAsyncCallShape
         ExpressionSyntax expression,
         string captureParameterName,
         INamedTypeSymbol captureType,
+        ISet<string> captureAliases,
         out string propertyName)
     {
         propertyName = string.Empty;
@@ -196,7 +217,7 @@ internal sealed partial class InvokeAsyncCallShape
             {
                 Expression: IdentifierNameSyntax receiver
             } member ||
-            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal))
+            !IsCaptureBagName(receiver.Identifier.ValueText, captureParameterName, captureAliases))
         {
             return false;
         }
@@ -211,6 +232,52 @@ internal sealed partial class InvokeAsyncCallShape
         propertyName = name;
         return true;
     }
+
+    private static HashSet<string> CaptureBagAliases(
+        BlockSyntax block,
+        string captureParameterName)
+    {
+        var aliases = new HashSet<string>(StringComparer.Ordinal);
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var declarator in block.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (declarator.Initializer?.Value is { } initializer &&
+                    IsCaptureBagExpression(initializer, captureParameterName, aliases))
+                {
+                    changed |= aliases.Add(declarator.Identifier.ValueText);
+                }
+            }
+
+            foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
+                    assignment.Left is IdentifierNameSyntax left &&
+                    IsCaptureBagExpression(assignment.Right, captureParameterName, aliases))
+                {
+                    changed |= aliases.Add(left.Identifier.ValueText);
+                }
+            }
+        }
+
+        return aliases;
+    }
+
+    private static bool IsCaptureBagExpression(
+        ExpressionSyntax expression,
+        string captureParameterName,
+        ISet<string> captureAliases)
+        => expression is IdentifierNameSyntax identifier &&
+           IsCaptureBagName(identifier.Identifier.ValueText, captureParameterName, captureAliases);
+
+    private static bool IsCaptureBagName(
+        string name,
+        string captureParameterName,
+        ISet<string> captureAliases)
+        => string.Equals(name, captureParameterName, StringComparison.Ordinal) ||
+           captureAliases.Contains(name);
 
     private static string CaptureParametersJson(InvokeAsyncCaptureParameter captureParameter)
         => "[{\"name\":" + DotBoxDRpcJsonLowerer.Str(captureParameter.Name) +

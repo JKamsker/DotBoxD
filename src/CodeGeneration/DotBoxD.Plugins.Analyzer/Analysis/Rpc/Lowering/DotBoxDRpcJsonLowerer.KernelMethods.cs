@@ -126,6 +126,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private string LiteralJson(IParameterSymbol parameter, object? value)
     {
         var converted = DotBoxDTypeNameReader.UnwrapTaskLike(parameter.Type);
+        if (converted is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType)
+        {
+            return EnumLiteralJson(enumType, value);
+        }
+
         if (converted.SpecialType == SpecialType.System_Int64 && value is int i)
         {
             return LiteralJson((long)i);

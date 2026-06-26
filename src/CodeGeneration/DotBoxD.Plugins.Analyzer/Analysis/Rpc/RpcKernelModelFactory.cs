@@ -105,7 +105,8 @@ internal static partial class RpcKernelModelFactory
                 clientExtensions,
                 directClientMethod,
                 graft,
-                hasReceiverId);
+                hasReceiverId,
+                context.SemanticModel.Compilation);
             var grafts = RpcKernelGraftSignatureFactory.Create(
                 type,
                 method,
@@ -134,7 +135,8 @@ internal static partial class RpcKernelModelFactory
         RpcKernelClientExtensions? clientExtensions,
         RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
-        bool hasReceiverId)
+        bool hasReceiverId,
+        Compilation compilation)
     {
         var methodName = method.Name;
         var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType);
@@ -179,7 +181,16 @@ internal static partial class RpcKernelModelFactory
 
         return new GeneratedPluginPackage(
             HintName(type),
-            BuildSource(type, json, serviceType, serviceMethod, clientExtensions, directClientMethod, graft, method),
+            BuildSource(
+                type,
+                json,
+                serviceType,
+                serviceMethod,
+                clientExtensions,
+                directClientMethod,
+                graft,
+                method,
+                compilation),
             Namespace(type),
             PackageName(type.Name));
     }
@@ -192,7 +203,8 @@ internal static partial class RpcKernelModelFactory
         RpcKernelClientExtensions? clientExtensions,
         RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft,
-        IMethodSymbol kernelMethod)
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
         var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
         var builder = new System.Text.StringBuilder();
@@ -214,7 +226,7 @@ internal static partial class RpcKernelModelFactory
         if (serviceType is not null && serviceMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelClientProxyEmitter.Emit(type, serviceType, serviceMethod));
+            builder.Append(RpcKernelClientProxyEmitter.Emit(type, serviceType, serviceMethod, compilation));
             if (clientExtensions is { IsEmpty: false })
             {
                 builder.AppendLine();
@@ -225,7 +237,12 @@ internal static partial class RpcKernelModelFactory
                  directClientMethod is not null)
         {
             builder.AppendLine();
-            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(type, graft, kernelMethod, directClientMethod));
+            builder.Append(RpcKernelDirectClientExtensionEmitter.Emit(
+                type,
+                graft,
+                kernelMethod,
+                directClientMethod,
+                compilation));
         }
 
         return builder.ToString();

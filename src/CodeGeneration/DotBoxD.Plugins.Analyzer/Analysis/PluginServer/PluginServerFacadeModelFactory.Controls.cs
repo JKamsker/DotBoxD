@@ -11,7 +11,7 @@ internal static partial class PluginServerFacadeModelFactory
         CancellationToken cancellationToken)
     {
         var controls = new List<PluginServerControlProperty>();
-        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
+        var seenProperties = new Dictionary<string, string>(StringComparer.Ordinal);
         var fieldNames = new HashSet<string>(ReservedFacadeFieldNames(), StringComparer.Ordinal);
         var accumulatorNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(worldType))
@@ -24,17 +24,29 @@ internal static partial class PluginServerFacadeModelFactory
                     SetMethod: null,
                     Type: INamedTypeSymbol propertyType
                 } property ||
-                !HasAttribute(propertyType, DotBoxDMetadataNames.DotBoxDServiceAttribute) ||
-                !seenProperties.Add(property.Name))
+                !HasAttribute(propertyType, DotBoxDMetadataNames.DotBoxDServiceAttribute))
             {
                 continue;
             }
 
+            var propertyTypeName = TypeName(propertyType);
+            if (seenProperties.TryGetValue(property.Name, out var existingType))
+            {
+                if (!string.Equals(existingType, propertyTypeName, StringComparison.Ordinal))
+                {
+                    throw new NotSupportedException(
+                        $"Generated plugin server control '{property.Name}' has an inherited property collision with a different type.");
+                }
+
+                continue;
+            }
+
+            seenProperties.Add(property.Name, propertyTypeName);
             var serviceWrappers = new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal);
             controls.Add(new PluginServerControlProperty(
                 property.Name,
                 UniqueFieldName(property.Name, fieldNames),
-                TypeName(propertyType),
+                propertyTypeName,
                 PluginServerXmlDocumentation.FromSymbol(
                     property,
                     "Accesses the server's " + property.Name + " domain control after StartAsync.",

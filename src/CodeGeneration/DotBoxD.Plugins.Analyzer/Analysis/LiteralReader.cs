@@ -7,6 +7,55 @@ namespace DotBoxD.Plugins.Analyzer.Analysis;
 
 internal static class LiteralReader
 {
+    public static string ParameterDefaultLiteral(IParameterSymbol parameter)
+    {
+        if (!parameter.HasExplicitDefaultValue)
+        {
+            return string.Empty;
+        }
+
+        return " = " + ObjectDefaultLiteral(parameter.Type, parameter.ExplicitDefaultValue);
+    }
+
+    public static string ObjectDefaultLiteral(ITypeSymbol type, object? value)
+    {
+        if (value is null && type.IsValueType)
+        {
+            return "default";
+        }
+
+        if (type.TypeKind == TypeKind.Enum)
+        {
+            return value is null
+                ? "default"
+                : "unchecked((" + TypeName(type) + ")" + EnumSignedLiteral((INamedTypeSymbol)type, value) + ")";
+        }
+
+        if (type.SpecialType == SpecialType.System_Single && value is float number)
+        {
+            if (float.IsNaN(number))
+            {
+                return "global::System.Single.NaN";
+            }
+
+            if (float.IsPositiveInfinity(number))
+            {
+                return "global::System.Single.PositiveInfinity";
+            }
+
+            if (float.IsNegativeInfinity(number))
+            {
+                return "global::System.Single.NegativeInfinity";
+            }
+
+            return number.ToString(
+                DotBoxDGenerationNames.CSharpLiterals.DoubleRoundTripFormat,
+                System.Globalization.CultureInfo.InvariantCulture) + "f";
+        }
+
+        return ObjectLiteral(value);
+    }
+
     public static string DefaultValue(
         ITypeSymbol type,
         ExpressionSyntax? expression,
@@ -57,4 +106,28 @@ internal static class LiteralReader
         };
 
     public static string StringLiteral(string value) => SymbolDisplay.FormatLiteral(value, quote: true);
+
+    private static string TypeName(ITypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    private static string EnumSignedLiteral(INamedTypeSymbol enumType, object value)
+    {
+        var raw = enumType.EnumUnderlyingType?.SpecialType switch
+        {
+            SpecialType.System_UInt64 => unchecked((long)(ulong)value),
+            SpecialType.System_UInt32 => unchecked((int)(uint)value),
+            SpecialType.System_Int64 => (long)value,
+            SpecialType.System_Int32 => (int)value,
+            SpecialType.System_UInt16 => (ushort)value,
+            SpecialType.System_Int16 => (short)value,
+            SpecialType.System_Byte => (byte)value,
+            SpecialType.System_SByte => (sbyte)value,
+            _ => throw new NotSupportedException(
+                $"Enum literal values for '{enumType.ToDisplayString()}' are not supported.")
+        };
+        return raw.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+               (enumType.EnumUnderlyingType?.SpecialType is SpecialType.System_Int64 or SpecialType.System_UInt64
+                   ? DotBoxDGenerationNames.CSharpLiterals.Int64Suffix
+                   : string.Empty);
+    }
 }

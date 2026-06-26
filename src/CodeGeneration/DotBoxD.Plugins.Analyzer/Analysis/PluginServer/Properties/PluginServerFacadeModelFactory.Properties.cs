@@ -13,7 +13,7 @@ internal static partial class PluginServerFacadeModelFactory
         CancellationToken cancellationToken)
     {
         var properties = new List<PluginServerForwardedProperty>();
-        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
+        var seenProperties = new Dictionary<string, PluginServerForwardedProperty>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(serviceType))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -24,25 +24,33 @@ internal static partial class PluginServerFacadeModelFactory
             }
 
             ValidateForwardedProperty(property);
-            if (!seenProperties.Add(property.Name))
-            {
-                continue;
-            }
-
             var returnWrapperName = ReturnPropertyWrapper(property.Type, serviceWrappers, skipServiceProperties, cancellationToken);
             if (returnWrapperName.IsSkipped)
             {
                 continue;
             }
 
-            properties.Add(new PluginServerForwardedProperty(
+            var forwarded = new PluginServerForwardedProperty(
                 property.Name,
                 TypeName(property.Type),
                 PluginServerXmlDocumentation.FromSymbol(
                     property,
                     "Forwards the " + property.Name + " property from the remote domain service.",
                     cancellationToken),
-                returnWrapperName.Name));
+                returnWrapperName.Name);
+            if (seenProperties.TryGetValue(property.Name, out var existing))
+            {
+                if (!string.Equals(existing.Type, forwarded.Type, StringComparison.Ordinal))
+                {
+                    throw new NotSupportedException(
+                        $"Generated plugin server member '{property.ToDisplayString()}' has an inherited property collision with a different type.");
+                }
+
+                continue;
+            }
+
+            seenProperties.Add(property.Name, forwarded);
+            properties.Add(forwarded);
         }
 
         return properties.ToArray();
