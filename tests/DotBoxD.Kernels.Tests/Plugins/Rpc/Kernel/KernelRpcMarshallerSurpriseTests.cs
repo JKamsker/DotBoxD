@@ -1,6 +1,7 @@
 using System.Collections;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
+using DotBoxD.Plugins;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
@@ -85,6 +86,42 @@ public sealed class KernelRpcMarshallerSurpriseTests
             () => KernelRpcMarshaller.FromSandboxValue(SandboxValue.FromInt32(1), typeof(LongBackedEnum)));
     }
 
+    [Fact]
+    public void FromSandboxValue_rejects_finite_double_values_that_overflow_float()
+    {
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(
+                SandboxValue.FromDouble(double.MaxValue),
+                typeof(float)));
+    }
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_finite_double_values_that_overflow_float()
+    {
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(
+                KernelRpcValue.Double(double.MaxValue),
+                typeof(float)));
+    }
+
+    [Fact]
+    public void FromSandboxValue_rejects_narrow_enum_values_outside_underlying_range()
+    {
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(SandboxValue.FromInt32(300), typeof(ByteBackedEnum)));
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(SandboxValue.FromInt32(70000), typeof(ShortBackedEnum)));
+    }
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_narrow_enum_values_outside_underlying_range()
+    {
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(KernelRpcValue.Int32(300), typeof(ByteBackedEnum)));
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(KernelRpcValue.Int32(70000), typeof(ShortBackedEnum)));
+    }
+
     private sealed class GetOnlyTailDto
     {
         public int Id { get; set; }
@@ -141,5 +178,16 @@ public sealed class KernelRpcMarshallerSurpriseTests
     private enum LongBackedEnum : long
     {
         One = 1
+    }
+
+    private enum ByteBackedEnum : byte
+    {
+        Zero = 0,
+        FortyFour = 44
+    }
+
+    private enum ShortBackedEnum : short
+    {
+        Zero = 0
     }
 }
