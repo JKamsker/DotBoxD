@@ -4,6 +4,44 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 
 internal static partial class SandboxValidatedValueShapeMeter
 {
+    private static bool TryMeasureEmptyCollection(
+        SandboxValue value,
+        SandboxType expectedType,
+        ValidationFailure failure,
+        ResourceLimits? limits,
+        out ValueShape shape)
+    {
+        shape = new ValueShape(0, 0, 0, 0, 0, 0);
+        switch (value)
+        {
+            case ListValue { Values.Count: 0 } list:
+                if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
+                    list.ItemType != expectedType.Arguments[0] ||
+                    !expectedType.IsKnown())
+                {
+                    throw Error(failure);
+                }
+
+                EnsureCollectionLimits(0, 0, 1, limits);
+                shape = AddCollection(shape, 0, 0, 0, 1, limits);
+                return true;
+            case MapValue { Values.Count: 0 } map:
+                if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
+                    map.KeyType != expectedType.Arguments[0] ||
+                    map.ValueType != expectedType.Arguments[1] ||
+                    !expectedType.IsKnown())
+                {
+                    throw Error(failure);
+                }
+
+                EnsureCollectionLimits(0, 0, 1, limits);
+                shape = AddCollection(shape, 0, 0, 0, 1, limits);
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static ValueShape AddList(
         ValueShape shape,
         ListValue list,

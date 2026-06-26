@@ -74,6 +74,12 @@ if (args.Contains("--probe-validated-value-type", StringComparer.OrdinalIgnoreCa
     return;
 }
 
+if (args.Contains("--probe-empty-validated-value", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Validation.EmptyStructuralValidationProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-compiled-binding-fast-path", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.CompiledBindingFastPathProbe.Run();

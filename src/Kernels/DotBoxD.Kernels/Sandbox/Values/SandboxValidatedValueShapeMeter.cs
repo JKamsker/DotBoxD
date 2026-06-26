@@ -49,6 +49,11 @@ internal static partial class SandboxValidatedValueShapeMeter
             return scalarShape;
         }
 
+        if (TryMeasureEmptyCollection(value, expectedType, failure, limits, out var emptyShape))
+        {
+            return emptyShape;
+        }
+
         if (!expectedType.IsKnown())
         {
             throw Error(failure);

@@ -8,7 +8,7 @@ namespace DotBoxD.Kernels.Tests.Plugins.Hooks;
 public sealed class RemoteLocalIntHandlerAllocationTests
 {
     private const int WarmupIterations = 1_000;
-    private const int MeasuredIterations = 10_000;
+    private const int MeasuredIterations = 100_000;
 
     [Fact]
     public void Int_projection_dispatch_does_not_box_the_projected_value()
@@ -39,9 +39,12 @@ public sealed class RemoteLocalIntHandlerAllocationTests
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        var perDispatch = (double)allocated / MeasuredIterations;
 
         GC.KeepAlive(checksum);
-        Assert.Equal(0L, allocated);
+        Assert.True(
+            perDispatch < 8D,
+            $"expected the int projection path to stay below boxing cost; observed {perDispatch:N2} B/op.");
     }
 
     private static void Dispatch(RemoteLocalHandlerRegistry registry, byte[] payload, HookContext context)

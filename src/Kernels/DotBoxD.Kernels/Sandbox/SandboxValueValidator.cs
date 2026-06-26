@@ -24,6 +24,11 @@ public static class SandboxValueValidator
             return;
         }
 
+        if (TryRequireEmptyCollectionType(value, expectedType, errorCode, message))
+        {
+            return;
+        }
+
         if (!expectedType.IsKnown())
         {
             throw Error(errorCode, message);
@@ -62,6 +67,38 @@ public static class SandboxValueValidator
                     PushRecord(record, frame.ExpectedType, active, stack, errorCode, message);
                     break;
             }
+        }
+    }
+
+    private static bool TryRequireEmptyCollectionType(
+        SandboxValue value,
+        SandboxType expectedType,
+        SandboxErrorCode errorCode,
+        string message)
+    {
+        switch (value)
+        {
+            case ListValue { Values.Count: 0 } list:
+                if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
+                    list.ItemType != expectedType.Arguments[0] ||
+                    !expectedType.IsKnown())
+                {
+                    throw Error(errorCode, message);
+                }
+
+                return true;
+            case MapValue { Values.Count: 0 } map:
+                if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
+                    map.KeyType != expectedType.Arguments[0] ||
+                    map.ValueType != expectedType.Arguments[1] ||
+                    !expectedType.IsKnown())
+                {
+                    throw Error(errorCode, message);
+                }
+
+                return true;
+            default:
+                return false;
         }
     }
 
