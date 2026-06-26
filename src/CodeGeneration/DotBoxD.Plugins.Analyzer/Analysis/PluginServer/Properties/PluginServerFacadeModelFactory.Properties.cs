@@ -66,6 +66,12 @@ internal static partial class PluginServerFacadeModelFactory
             throw new NotSupportedException(
                 $"Generated plugin server member '{property.ToDisplayString()}' must be a get-only instance property.");
         }
+
+        if (property.RefKind != RefKind.None)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{property.ToDisplayString()}' must not declare ref returns.");
+        }
     }
 
     private static ServicePropertyWrapper ReturnPropertyWrapper(

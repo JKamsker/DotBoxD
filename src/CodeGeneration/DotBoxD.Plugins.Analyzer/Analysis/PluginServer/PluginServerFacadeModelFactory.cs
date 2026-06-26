@@ -167,6 +167,12 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server member '{method.ToDisplayString()}' must not be generic.");
         }
 
+        if (method.RefKind != RefKind.None)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' must not declare ref returns.");
+        }
+
         foreach (var parameter in method.Parameters)
         {
             if (parameter.RefKind != RefKind.None)
