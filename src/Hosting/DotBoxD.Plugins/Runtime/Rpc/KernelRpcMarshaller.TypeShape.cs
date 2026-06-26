@@ -101,11 +101,14 @@ public static partial class KernelRpcMarshaller
     private static RecordShape GetRecordShape(Type type)
         => RecordShapeCache.GetOrAdd(type, static candidate =>
         {
+            RejectInheritedDtoMembers(candidate);
+
             var members = new List<RecordMember>();
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
             foreach (var property in candidate.GetProperties(flags))
             {
-                if (property.CanRead && property.GetIndexParameters().Length == 0 &&
+                if (property.GetMethod is { IsPublic: true } &&
+                    property.GetIndexParameters().Length == 0 &&
                     !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
                     !IsIgnoredMember(property))
                 {
@@ -131,6 +134,41 @@ public static partial class KernelRpcMarshaller
             members.Sort(static (left, right) => left.Member.MetadataToken.CompareTo(right.Member.MetadataToken));
             return new RecordShape(candidate, members.ToArray());
         });
+
+    private static void RejectInheritedDtoMembers(Type type)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (baseType == typeof(object) || baseType == typeof(ValueType))
+            {
+                continue;
+            }
+
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            foreach (var property in baseType.GetProperties(flags))
+            {
+                if (property.GetMethod is not null &&
+                    property.GetIndexParameters().Length == 0 &&
+                    !string.Equals(property.Name, "EqualityContract", StringComparison.Ordinal) &&
+                    !IsIgnoredMember(property))
+                {
+                    throw new NotSupportedException(
+                        $"Server extension DTO '{type}' inherits public properties from base type " +
+                        $"'{baseType}'; flatten the DTO into a single type.");
+                }
+            }
+
+            foreach (var field in baseType.GetFields(flags))
+            {
+                if (!field.IsLiteral && !IsIgnoredMember(field))
+                {
+                    throw new NotSupportedException(
+                        $"Server extension DTO '{type}' inherits public fields from base type " +
+                        $"'{baseType}'; flatten the DTO into a single type.");
+                }
+            }
+        }
+    }
 
     // A member marked [IgnoreDataMember] (System.Runtime.Serialization) is non-wire — a lazily-resolved or
     // computed member, not serialized data — so it is excluded from the marshalled record shape, matching the

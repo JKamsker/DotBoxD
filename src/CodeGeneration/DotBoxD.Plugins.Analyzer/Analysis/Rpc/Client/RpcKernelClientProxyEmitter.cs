@@ -182,6 +182,9 @@ internal static partial class RpcKernelClientProxyEmitter
 
             if (_payloadReturnType is null)
             {
+                builder.Append("        global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(")
+                    .Append(response)
+                    .AppendLine(").RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Unit);");
                 builder.AppendLine("        return;");
             }
             else

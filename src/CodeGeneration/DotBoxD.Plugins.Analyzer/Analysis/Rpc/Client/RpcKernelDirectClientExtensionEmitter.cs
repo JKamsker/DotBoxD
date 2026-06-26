@@ -82,7 +82,8 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.AppendLine("        var __request = global::DotBoxD.Plugins.KernelRpcBinaryCodec.EncodeArguments(__arguments);");
             if (payloadReturnType is null)
             {
-                AppendInvoke(builder, isAsyncReturn, assignResponse: false);
+                AppendInvoke(builder, isAsyncReturn, assignResponse: true);
+                builder.AppendLine("        global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(__response).RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Unit);");
                 builder.AppendLine("        return;");
             }
             else

@@ -141,13 +141,16 @@ public static partial class KernelRpcMarshaller
 
         if (type.IsEnum)
         {
-            return value switch
+            if (EnumUsesI64(type))
             {
-                I32Value i => Enum.ToObject(type, i.Value),
-                I64Value l => Enum.ToObject(type, l.Value),
-                _ => throw new NotSupportedException(
-                    $"Server extension cannot marshal a sandbox value to enum '{type}'.")
-            };
+                return value is I64Value longValue
+                    ? Enum.ToObject(type, longValue.Value)
+                    : throw CannotMarshalEnum(value, type, SandboxType.I64);
+            }
+
+            return value is I32Value intValue
+                ? Enum.ToObject(type, intValue.Value)
+                : throw CannotMarshalEnum(value, type, SandboxType.I32);
         }
 
         if (value is RecordValue record && DtoShape(type) is { } shape)
@@ -192,6 +195,12 @@ public static partial class KernelRpcMarshaller
 
         throw new NotSupportedException($"Server extension cannot marshal a sandbox value to type '{type}'.");
     }
+
+    private static NotSupportedException CannotMarshalEnum(
+        SandboxValue value,
+        Type type,
+        SandboxType expected)
+        => new($"Server extension cannot marshal sandbox value '{value.Type}' to enum '{type}'; expected '{expected}'.");
 
     public static SandboxType SandboxTypeOf(Type type)
     {

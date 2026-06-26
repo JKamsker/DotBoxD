@@ -54,7 +54,7 @@ public static partial class KernelRpcMarshaller
             if (!Equals(actual, expected))
             {
                 throw new NotSupportedException(
-                    $"Server extension DTO '{_type}' field '{field.Name}' is read-only and could not be reconstructed.");
+                    $"Server extension DTO '{_type}' field '{field.Name}' is private or read-only and could not be reconstructed.");
             }
         }
     }

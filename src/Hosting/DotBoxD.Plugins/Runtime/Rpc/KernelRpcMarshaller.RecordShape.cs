@@ -15,7 +15,7 @@ public static partial class KernelRpcMarshaller
         // properties do expose a set accessor, so reflection can still assign them.
         public bool IsSettable => Member switch
         {
-            PropertyInfo property => property.SetMethod is not null,
+            PropertyInfo property => property.SetMethod is { IsPublic: true },
             FieldInfo fieldInfo => !fieldInfo.IsInitOnly,
             _ => false,
         };
