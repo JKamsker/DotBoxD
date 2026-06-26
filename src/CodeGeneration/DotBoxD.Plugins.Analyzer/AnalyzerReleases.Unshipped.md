@@ -12,3 +12,4 @@ DBXK113 | DotBoxD.Kernels.Generation | Info | Result hook Register/RegisterLocal
 DBXK114 | DotBoxD.Kernels.Generation | Warning | Run chain could not be lowered and will throw DBXK062 at runtime
 DBXK115 | DotBoxD.Kernels.Generation | Error | Duplicate generated server-extension graft signatures are rejected
 DBXK116 | DotBoxD.Kernels.Generation | Error | [Local] context helpers are rejected outside declared contexts and from lowered server-side IR
+DBXK117 | DotBoxD.Kernels.Generation | Error | Unexpected plugin source generator failures are reported without failing the whole generation pass

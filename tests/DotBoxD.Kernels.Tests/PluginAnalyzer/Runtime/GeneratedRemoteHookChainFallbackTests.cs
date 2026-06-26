@@ -1,7 +1,9 @@
 using DotBoxD.Plugins;
 using DotBoxD.Plugins.Analyzer.Analysis;
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime;
 
@@ -136,6 +138,56 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             "global::ChainSample.Plugin.AlphaPluginContext, global::System.Threading.Tasks.ValueTask>",
             generated,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Registry_type_declared_in_another_syntax_tree_does_not_throw()
+    {
+        var declarationTree = CSharpSyntaxTree.ParseText("""
+            namespace ChainSample.Plugin;
+
+            public sealed partial class Owner
+            {
+                public ForeignHookRegistry Hooks { get; } = new();
+            }
+
+            public sealed class ForeignHookRegistry
+            {
+                public ForeignHookPipeline<TEvent> On<TEvent>() => new();
+            }
+
+            public sealed class ForeignHookPipeline<TEvent>
+            {
+                public void Run(global::System.Action<TEvent> handler) { }
+            }
+            """, ParseOptions);
+        var usageTree = CSharpSyntaxTree.ParseText("""
+            namespace ChainSample.Plugin;
+
+            public sealed partial class Owner
+            {
+                public void Configure()
+                    => Hooks.On<int>().Run(_ => { });
+            }
+            """, ParseOptions);
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDGeneratedRemoteHookFallbackCrossTreeTest",
+            [declarationTree, usageTree],
+            TrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var onInvocation = usageTree.GetRoot().DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single(static invocation => invocation.Expression is MemberAccessExpressionSyntax
+            {
+                Name.Identifier.ValueText: "On"
+            });
+
+        var candidate = GeneratedRemoteHookChainFallback.Candidate(
+            onInvocation,
+            compilation.GetSemanticModel(usageTree),
+            CancellationToken.None);
+
+        Assert.Null(candidate);
     }
 
     private static GeneratorDriverRunResult RunGenerator(

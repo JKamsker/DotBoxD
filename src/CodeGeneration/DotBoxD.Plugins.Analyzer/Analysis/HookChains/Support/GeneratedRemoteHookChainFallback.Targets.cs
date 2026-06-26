@@ -227,7 +227,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        var resolvedType = TypeFromSyntax(typeSyntax, model, cancellationToken);
         if (resolvedType is { TypeKind: not TypeKind.Error })
         {
             return resolvedType is INamedTypeSymbol registryType
@@ -260,7 +260,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        var resolvedType = model.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        var resolvedType = TypeFromSyntax(typeSyntax, model, cancellationToken);
         if (resolvedType is { TypeKind: not TypeKind.Error })
         {
             return resolvedType is INamedTypeSymbol serverType
