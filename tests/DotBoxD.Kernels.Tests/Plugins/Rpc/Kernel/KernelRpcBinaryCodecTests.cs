@@ -187,6 +187,22 @@ public sealed class KernelRpcBinaryCodecTests
         Assert.Contains("finite", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void EncodeValue_rejects_non_finite_direct_sandbox_f64(double value)
+    {
+        var sandbox = new F64Value(value);
+        var writer = new ArrayBufferWriter<byte>();
+
+        var bytesEx = Assert.Throws<ArgumentOutOfRangeException>(() => KernelRpcBinaryCodec.EncodeValue(sandbox));
+        var writerEx = Assert.Throws<ArgumentOutOfRangeException>(() => KernelRpcBinaryCodec.EncodeValue(sandbox, writer));
+
+        Assert.Contains("finite", bytesEx.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("finite", writerEx.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static byte[] NestedListPayload(int depth)
     {
         var bytes = new List<byte>((depth * 2) + 1);
