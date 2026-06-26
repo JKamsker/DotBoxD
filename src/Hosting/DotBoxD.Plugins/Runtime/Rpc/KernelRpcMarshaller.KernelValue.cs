@@ -102,7 +102,12 @@ public static partial class KernelRpcMarshaller
         {
             var key = FromKernelRpcValue(values[i], keyType)
                 ?? throw new NotSupportedException("Server extension cannot marshal a null map key.");
-            result[key] = FromKernelRpcValue(values[i + 1], valueType);
+            if (result.Contains(key))
+            {
+                throw new FormatException("Server extension map payload contains a duplicate key.");
+            }
+
+            result.Add(key, FromKernelRpcValue(values[i + 1], valueType));
         }
 
         return result;
