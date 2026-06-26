@@ -146,6 +146,32 @@ public sealed partial class PluginPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_multiple_manifest_subscriptions()
+    {
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var package = FireDamagePluginPackage.Create();
+        var subscription = package.Manifest.Subscriptions[0];
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                Subscriptions =
+                [
+                    subscription,
+                    subscription with { Priority = subscription.Priority + 1 }
+                ]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK031" &&
+            d.Message.Contains("exactly one hook subscription", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Manifest_compiled_mode_does_not_force_plugin_compiler_dispatch()
     {
         var compiler = new FailingCompiler();
