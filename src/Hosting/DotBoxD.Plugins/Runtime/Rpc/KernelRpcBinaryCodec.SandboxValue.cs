@@ -43,6 +43,14 @@ public static partial class KernelRpcBinaryCodec
                 WriteInt64(writer, number.Value);
                 return;
             case F64Value number:
+                if (!double.IsFinite(number.Value))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(value),
+                        number.Value,
+                        "F64 values must be finite.");
+                }
+
                 WriteByte(writer, (byte)KernelRpcValueKind.F64);
                 WriteInt64(writer, BitConverter.DoubleToInt64Bits(number.Value));
                 return;

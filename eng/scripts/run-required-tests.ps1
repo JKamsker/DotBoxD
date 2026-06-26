@@ -97,6 +97,7 @@ $defaultMinimums = @{
     KernelRpcMarshallerSurpriseTests = 18
     KernelRpcMarshallerDtoOrderTests = 18
     KernelRpcValueTests = 15
+    KernelRpcBinaryCodecTests = 17
     ServerExtensionMapTypeSupportTests = 8
     HookResultBuilderHintNameRegressionTests = 1
     ServerExtensionEnumOverflowRegressionTests = 1

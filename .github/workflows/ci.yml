@@ -372,6 +372,7 @@ jobs:
               "KernelRpcMarshallerSurpriseTests",
               "KernelRpcMarshallerDtoOrderTests",
               "KernelRpcValueTests",
+              "KernelRpcBinaryCodecTests",
               "ServerExtensionMapTypeSupportTests",
               "HookResultBuilderHintNameRegressionTests",
               "ServerExtensionEnumOverflowRegressionTests",
