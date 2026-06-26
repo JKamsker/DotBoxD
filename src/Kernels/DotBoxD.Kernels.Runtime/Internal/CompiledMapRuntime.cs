@@ -73,14 +73,18 @@ internal static class CompiledMapRuntime
     internal static SandboxValue Remove(SandboxContext context, SandboxValue map, SandboxValue key)
     {
         // Source map is already validated and immutable, so trust its entries (as reads and map.set do) and
-        // validate only the key. The result still uses a full shape charge because removal changes an
-        // existing subtree set and cannot be composed forward from the source shape without subtracting.
+        // validate only the key. Zero-shape scalar maps can subtract the removed entry exactly; complex maps
+        // still fall back to a full shape walk because removal can change nested maxima.
         var typedMap = AsMapReadOnly(map);
         RequireType(key, typedMap.KeyType, "map key type mismatch");
         context.ChargeFuel(SandboxCollectionFuel.Copy(typedMap.Values.Count));
-        var count = typedMap.Values.ContainsKey(key) ? typedMap.Values.Count - 1 : typedMap.Values.Count;
+        var keyWasPresent = typedMap.Values.ContainsKey(key);
+        var count = keyWasPresent ? typedMap.Values.Count - 1 : typedMap.Values.Count;
         context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(count, 32, minimumOne: true));
-        return ChargeValue(context, typedMap.RemoveEntry(key));
+        var removed = typedMap.RemoveEntry(key);
+        return ValueShapeCache.TryChargeScalarMapRemove(context, typedMap, removed, keyWasPresent)
+            ? removed
+            : ChargeValue(context, removed);
     }
 
     // Read-only map operations only need the runtime kind, not a recursive re-walk

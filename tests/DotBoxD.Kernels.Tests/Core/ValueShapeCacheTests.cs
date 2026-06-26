@@ -1,3 +1,6 @@
+using DotBoxD.Kernels.Bindings;
+using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
 
@@ -71,5 +74,103 @@ public sealed class ValueShapeCacheTests
 
         Assert.Equal(donor.Nodes, got.Nodes);
         Assert.Equal(donor.Shape, got.Shape);
+    }
+
+    [Fact]
+    public void TryChargeScalarMapRemove_present_key_matches_full_walk_charge()
+    {
+        var source = I32Map(entries: 128);
+        var removed = source.RemoveEntry(SandboxValue.FromInt32(64));
+        var optimizedContext = CreateContext();
+
+        Assert.True(ValueShapeCache.TryChargeScalarMapRemove(
+            optimizedContext,
+            source,
+            removed,
+            keyWasPresent: true));
+
+        AssertMatchesFullWalkCharge(optimizedContext, removed);
+    }
+
+    [Fact]
+    public void TryChargeScalarMapRemove_missing_key_matches_full_walk_charge()
+    {
+        var source = I32Map(entries: 128);
+        var removed = source.RemoveEntry(SandboxValue.FromInt32(500));
+        var optimizedContext = CreateContext();
+
+        Assert.True(ValueShapeCache.TryChargeScalarMapRemove(
+            optimizedContext,
+            source,
+            removed,
+            keyWasPresent: false));
+
+        AssertMatchesFullWalkCharge(optimizedContext, removed);
+    }
+
+    [Fact]
+    public void TryChargeScalarMapRemove_rejects_values_with_string_shape()
+    {
+        var source = (MapValue)SandboxValue.FromMap(
+            new Dictionary<SandboxValue, SandboxValue>
+            {
+                [SandboxValue.FromInt32(1)] = SandboxValue.FromString("alpha"),
+                [SandboxValue.FromInt32(2)] = SandboxValue.FromString("beta")
+            },
+            SandboxType.I32,
+            SandboxType.String);
+        var removed = source.RemoveEntry(SandboxValue.FromInt32(1));
+
+        Assert.False(ValueShapeCache.TryChargeScalarMapRemove(
+            CreateContext(),
+            source,
+            removed,
+            keyWasPresent: true));
+    }
+
+    private static MapValue I32Map(int entries)
+    {
+        var values = new Dictionary<SandboxValue, SandboxValue>();
+        for (var i = 0; i < entries; i++)
+        {
+            values.Add(SandboxValue.FromInt32(i), SandboxValue.FromInt32(i * 10));
+        }
+
+        return (MapValue)SandboxValue.FromMap(values, SandboxType.I32, SandboxType.I32);
+    }
+
+    private static void AssertMatchesFullWalkCharge(SandboxContext optimizedContext, MapValue removed)
+    {
+        var optimized = optimizedContext.Budget.Snapshot();
+        var walkedContext = CreateContext();
+        walkedContext.ChargeValue(removed);
+        var walked = walkedContext.Budget.Snapshot();
+        var cached = ValueShapeCache.GetOrMeasure(removed);
+        var measured = SandboxValueShapeMeter.MeasureWithNodes(removed);
+
+        Assert.Equal(walked.FuelUsed, optimized.FuelUsed);
+        Assert.Equal(walked.AllocatedBytes, optimized.AllocatedBytes);
+        Assert.Equal(walked.CollectionElements, optimized.CollectionElements);
+        Assert.Equal(walked.StringBytes, optimized.StringBytes);
+        Assert.Equal(measured.Nodes, cached.Nodes);
+        Assert.Equal(measured.Shape, cached.Shape);
+    }
+
+    private static SandboxContext CreateContext()
+    {
+        var limits = new ResourceLimits(
+            MaxFuel: long.MaxValue,
+            MaxWallTime: TimeSpan.FromMinutes(5),
+            MaxAllocatedBytes: long.MaxValue,
+            MaxMapEntries: int.MaxValue,
+            MaxTotalCollectionElements: long.MaxValue);
+        var policy = SandboxPolicyBuilder.Create().Build() with { ResourceLimits = limits };
+        return new SandboxContext(
+            SandboxRunId.New(),
+            policy,
+            new ResourceMeter(limits),
+            new BindingRegistryBuilder().Build(),
+            new InMemoryAuditSink(),
+            CancellationToken.None);
     }
 }

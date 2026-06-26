@@ -5,7 +5,7 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Memoizes the measured <see cref="ValueShape"/> (and metering-walk frame count) of immutable collection
-/// values so that <c>list.add</c> / <c>map.set</c> can charge their result incrementally instead of
+/// values so that <c>list.add</c> / <c>map.set</c> / scalar <c>map.remove</c> can charge their result incrementally instead of
 /// re-walking the entire collection on every operation.
 ///
 /// Why this matters: <c>ChargeValue</c> walks the whole value to measure its shape (and charges
@@ -117,6 +117,50 @@ internal static class ValueShapeCache
         context.ChargeComposedValue(info);
         Set(updated, info);
     }
+
+    /// <summary>
+    /// Charges removal from a map whose keys and values have zero scalar shape. Returns false for text,
+    /// opaque IDs, paths, URIs, and nested values because those removals can change maxima that are not
+    /// derivable from the aggregate source shape alone.
+    /// </summary>
+    public static bool TryChargeScalarMapRemove(
+        Sandbox.SandboxContext context,
+        MapValue source,
+        MapValue removed,
+        bool keyWasPresent)
+    {
+        if (!HasZeroShape(source.KeyType) || !HasZeroShape(source.ValueType))
+        {
+            return false;
+        }
+
+        var sourceInfo = GetOrMeasure(source, context.CancellationToken);
+        if (!keyWasPresent)
+        {
+            context.ChargeComposedValue(sourceInfo);
+            Set(removed, sourceInfo);
+            return true;
+        }
+
+        var newCount = source.Values.Count - 1;
+        var shape = sourceInfo.Shape with
+        {
+            Elements = sourceInfo.Shape.Elements - 1,
+            MaxMapEntries = newCount
+        };
+        var info = new ShapeInfo(shape, sourceInfo.Nodes - 2);
+        context.ChargeComposedValue(info);
+        Set(removed, info);
+        return true;
+    }
+
+    private static bool HasZeroShape(SandboxType type)
+        => ReferenceEquals(type, SandboxType.Unit) ||
+           ReferenceEquals(type, SandboxType.Bool) ||
+           ReferenceEquals(type, SandboxType.I32) ||
+           ReferenceEquals(type, SandboxType.I64) ||
+           ReferenceEquals(type, SandboxType.F64) ||
+           ReferenceEquals(type, SandboxType.Guid);
 }
 
 /// <summary>A value's pure shape plus the number of frames its metering walk would process.</summary>
