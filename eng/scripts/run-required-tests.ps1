@@ -96,6 +96,7 @@ $defaultMinimums = @{
     ServerExtensionClientProxySurpriseTests = 1
     KernelRpcMarshallerSurpriseTests = 17
     KernelRpcMarshallerDtoOrderTests = 18
+    KernelRpcValueTests = 15
     HookResultBuilderHintNameRegressionTests = 1
     ServerExtensionEnumOverflowRegressionTests = 1
     Computed_dto_projection_round_trips = 1

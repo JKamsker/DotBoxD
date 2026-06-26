@@ -98,7 +98,11 @@ public static class KernelRpcValueConverter
             for (var i = 0; i + 1 < source.Length; i += 2)
             {
                 var key = ToSandboxValue(source[i], keyType);
-                entries[key] = ToSandboxValue(source[i + 1], valueType);
+                var item = ToSandboxValue(source[i + 1], valueType);
+                if (!entries.TryAdd(key, item))
+                {
+                    throw new FormatException("Server extension IPC map payload contains a duplicate key.");
+                }
             }
 
             return SandboxValue.FromMap(entries, keyType, valueType);

@@ -371,6 +371,7 @@ jobs:
               "ServerExtensionClientProxySurpriseTests",
               "KernelRpcMarshallerSurpriseTests",
               "KernelRpcMarshallerDtoOrderTests",
+              "KernelRpcValueTests",
               "HookResultBuilderHintNameRegressionTests",
               "ServerExtensionEnumOverflowRegressionTests",
               "Computed_dto_projection_round_trips",
