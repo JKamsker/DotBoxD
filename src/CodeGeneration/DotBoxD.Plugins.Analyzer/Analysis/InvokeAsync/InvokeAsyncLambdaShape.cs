@@ -1,5 +1,6 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
@@ -55,6 +56,7 @@ internal static class InvokeAsyncLambdaShape
             captureArgument,
             cancellationToken,
             expectedWorldType: null,
+            expectedCaptureType: null,
             out parameter,
             out worldType);
 
@@ -64,6 +66,7 @@ internal static class InvokeAsyncLambdaShape
         ExpressionSyntax captureArgument,
         CancellationToken cancellationToken,
         ITypeSymbol? expectedWorldType,
+        ITypeSymbol? expectedCaptureType,
         out InvokeAsyncCaptureParameter parameter,
         out ITypeSymbol worldType)
     {
@@ -71,7 +74,7 @@ internal static class InvokeAsyncLambdaShape
         worldType = null!;
         if (lambda is not ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters.Count: 2 } parenthesized ||
             LambdaParameterTypes(lambda, model, cancellationToken) is not { Count: 2 } parameterTypes ||
-            model.GetTypeInfo(captureArgument, cancellationToken).Type is not INamedTypeSymbol captureType ||
+            CaptureType(model, captureArgument, expectedCaptureType, cancellationToken) is not INamedTypeSymbol captureType ||
             DotBoxDRpcTypeMapper.RecordFields(captureType).Count == 0)
         {
             return false;
@@ -100,6 +103,21 @@ internal static class InvokeAsyncLambdaShape
 
         parameter = new InvokeAsyncCaptureParameter(captureSyntax.Identifier.ValueText, captureType);
         return true;
+    }
+
+    private static ITypeSymbol? CaptureType(
+        SemanticModel model,
+        ExpressionSyntax captureArgument,
+        ITypeSymbol? expectedCaptureType,
+        CancellationToken cancellationToken)
+    {
+        if (expectedCaptureType is not null)
+        {
+            var conversion = model.ClassifyConversion(captureArgument, expectedCaptureType);
+            return conversion.Exists && conversion.IsImplicit ? expectedCaptureType : null;
+        }
+
+        return model.GetTypeInfo(captureArgument, cancellationToken).Type;
     }
 
     internal static bool TryReturnType(

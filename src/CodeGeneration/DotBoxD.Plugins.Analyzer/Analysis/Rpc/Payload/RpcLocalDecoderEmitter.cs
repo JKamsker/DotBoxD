@@ -18,17 +18,17 @@ internal static class RpcLocalDecoderEmitter
     /// package class, or <c>null</c> when <paramref name="projectedType"/> is not wire-eligible — in which case
     /// the chain keeps the reflective 2-arg registration so non-eligible types do not regress.
     /// </summary>
-    public static string? TryEmit(ITypeSymbol projectedType)
+    public static string? TryEmit(ITypeSymbol projectedType, Compilation? compilation = null)
     {
         try
         {
             if (projectedType is INamedTypeSymbol { IsAnonymousType: true } anonymousType)
             {
-                return TryEmitAnonymous(anonymousType);
+                return TryEmitAnonymous(anonymousType, compilation);
             }
 
-            var conv = new RpcKernelValueConversionEmitter();
-            var payload = new RpcKernelPayloadReadEmitter();
+            var conv = new RpcKernelValueConversionEmitter(compilation);
+            var payload = new RpcKernelPayloadReadEmitter(compilation);
             // Compute the read expression first: it appends any nested list/DTO helpers to conv.Helpers, so the
             // ReadProjected body never splices a helper into the middle of itself.
             var readExpression = conv.ReadExpression(projectedType, "value");
@@ -51,7 +51,7 @@ internal static class RpcLocalDecoderEmitter
         }
     }
 
-    private static string TryEmitAnonymous(INamedTypeSymbol projectedType)
+    private static string TryEmitAnonymous(INamedTypeSymbol projectedType, Compilation? compilation)
     {
         var fields = DotBoxDRpcTypeMapper.RecordFields(projectedType);
         if (fields.Count == 0)
@@ -59,8 +59,8 @@ internal static class RpcLocalDecoderEmitter
             throw new NotSupportedException("Anonymous projection must expose at least one field.");
         }
 
-        var conv = new RpcKernelValueConversionEmitter();
-        var payload = new RpcKernelPayloadReadEmitter();
+        var conv = new RpcKernelValueConversionEmitter(compilation);
+        var payload = new RpcKernelPayloadReadEmitter(compilation);
         var arguments = new string[fields.Count];
         var payloadArguments = new string[fields.Count];
         for (var i = 0; i < fields.Count; i++)

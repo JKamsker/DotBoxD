@@ -41,9 +41,11 @@ internal sealed partial class InvokeAsyncCallShape
             ImplicitParametersJson(captures.All),
             BuildReturnTypeJson(returnType, syncOuts),
             ImplicitArgumentsExpression(captures.All),
+            captures.All.Select(static capture => capture.Type).ToArray(),
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
             [],
-            assignmentOverride: null);
+            assignmentOverride: null,
+            expressionOverride: null);
     }
 
     private static string ImplicitParametersJson(IReadOnlyList<ImplicitCapture> captures)
@@ -112,6 +114,7 @@ internal sealed partial class InvokeAsyncCallShape
                 }
             }
 
+            ValidateImplicitCaptureMutations(block, all, model);
             return new ImplicitCaptureSet(all, syncOuts);
         }
 

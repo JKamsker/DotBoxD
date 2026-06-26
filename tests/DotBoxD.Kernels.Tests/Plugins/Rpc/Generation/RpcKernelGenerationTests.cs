@@ -13,7 +13,7 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 /// IR, installed via <see cref="DotBoxD.Plugins.PluginServer.InstallServerExtensionAsync"/>, and invoked request/response returning
 /// the list of objects in one roundtrip.
 /// </summary>
-public sealed class RpcKernelGenerationTests
+public sealed partial class RpcKernelGenerationTests
 {
     private const string MonsterKillerSource = """
         using System.Collections.Generic;
@@ -215,34 +215,6 @@ public sealed class RpcKernelGenerationTests
 
         var text = Assert.IsType<StringValue>(result);
         Assert.Equal("\b\f", text.Value);
-    }
-
-    [Theory]
-    [InlineData("double.NaN")]
-    [InlineData("double.PositiveInfinity")]
-    [InlineData("double.NegativeInfinity")]
-    public void Non_finite_double_literals_are_rejected_by_rpc_analyzer(string literal)
-    {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics($$"""
-            using DotBoxD.Plugins;
-            using DotBoxD.Abstractions;
-
-            namespace Sample;
-
-            [ServerExtension("bad-f64")]
-            public sealed partial class BadF64Kernel
-            {
-                public double Read(HookContext ctx)
-                {
-                    return {{literal}};
-                }
-            }
-            """);
-
-        Assert.Contains(
-            diagnostics,
-            d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("finite", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void AssertKill(SandboxValue value, int expectedId, bool expectedSuccess)

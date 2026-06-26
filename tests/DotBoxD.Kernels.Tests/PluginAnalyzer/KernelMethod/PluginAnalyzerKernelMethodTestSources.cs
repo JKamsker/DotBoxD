@@ -80,6 +80,142 @@ internal static class PluginAnalyzerKernelMethodTestSources
         }
         """;
 
+    public const string RichRecordHelperChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public sealed record ThreatSnapshot(string MonsterId, int Distance);
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Select(e => new ThreatSnapshot(e.MonsterId, e.Distance))
+                    .Where(snapshot => IsClose(snapshot))
+                    .Run((snapshot, ctx) => ctx.Messages.Send(snapshot.MonsterId, "calm"));
+
+            [KernelMethod]
+            public static bool IsClose(ThreatSnapshot snapshot) => snapshot.Distance <= 5;
+        }
+        """;
+
+    public const string ProjectedRecordHelperUsesProjectedValueChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public sealed record ThreatSnapshot(string MonsterId, int Distance);
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Select(e => new ThreatSnapshot(e.MonsterId, e.Distance + 10))
+                    .Where(snapshot => IsClose(snapshot))
+                    .Run((snapshot, ctx) => ctx.Messages.Send(snapshot.MonsterId, "calm"));
+
+            [KernelMethod]
+            public static bool IsClose(ThreatSnapshot snapshot) => snapshot.Distance <= 5;
+        }
+        """;
+
+    public const string RunSendHelperChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Where(e => e.Distance <= 5)
+                    .Run((e, ctx) => SendCalm(ctx, e.MonsterId));
+
+            [KernelMethod]
+            public static void SendCalm(HookContext ctx, string monsterId)
+                => ctx.Messages.Send(monsterId, "calm");
+        }
+        """;
+
+    public const string ExtensionNamedDefaultChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Where(e => e.IsBullyingAndClose(playerLevel: e.PlayerLevel, monsterLevel: e.MonsterLevel))
+                    .Run((e, ctx) => SendCalm(monsterId: e.MonsterId, ctx: ctx));
+
+            [KernelMethod]
+            public static bool IsBullyingAndClose(
+                this global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent e,
+                int monsterLevel,
+                int playerLevel,
+                int maxDistance = 5)
+                => monsterLevel - playerLevel >= 3 && e.Distance <= maxDistance;
+
+            [KernelMethod]
+            public static void SendCalm(HookContext ctx, string monsterId, string message = "calm")
+                => ctx.Messages.Send(monsterId, message);
+        }
+        """;
+
+    public const string NullableDefaultChain = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace ChainSample;
+
+        public static class Usage
+        {
+            public static void Configure(HookRegistry hooks)
+                => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                    .Where(e => IsClose(e.Distance))
+                    .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "nullable"));
+
+            [KernelMethod]
+            public static bool IsClose(int distance, int? maxDistance = 5)
+                => distance <= 5;
+        }
+        """;
+
+    public const string HandleSendHelper = """
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        public sealed record AggroEvent(
+            string MonsterId, string Message, int MonsterLevel, int PlayerLevel, int Distance);
+
+        [Plugin("inlined-handle-helper")]
+        public sealed partial class InlinedHandleHelperKernel : IEventKernel<AggroEvent>
+        {
+            public bool ShouldHandle(AggroEvent e, HookContext ctx) => e.Distance <= 5;
+
+            public void Handle(AggroEvent e, HookContext ctx)
+                => SendCalm(ctx, e.MonsterId);
+
+            [KernelMethod]
+            public static void SendCalm(HookContext ctx, string monsterId)
+                => ctx.Messages.Send(monsterId, "calm");
+        }
+        """;
+
     public const string MultiStatement = """
         using DotBoxD.Plugins;
         using DotBoxD.Plugins.Runtime;

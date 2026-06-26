@@ -1,3 +1,4 @@
+using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,58 +11,145 @@ internal sealed partial class InvokeAsyncCallShape
     private static List<InvokeAsyncSyncOut> FindSyncOuts(
         BlockSyntax block,
         InvokeAsyncCaptureParameter captureParameter,
-        SemanticModel model)
+        SemanticModel model,
+        ISet<string> captureAliases)
     {
+        ValidateExplicitCaptureMutations(block, captureParameter, model, captureAliases);
         var syncOuts = new List<InvokeAsyncSyncOut>();
+        var reservedLocalNames = ReservedLocalNames(block);
         foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
         {
-            if (!TryCaptureMember(assignment.Left, captureParameter.Name, model, out var member, out var property))
+            if (!TryCaptureMember(
+                    assignment.Left,
+                    captureParameter.Name,
+                    captureAliases,
+                    model,
+                    out var member,
+                    out var target))
             {
                 continue;
             }
 
-            if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression ||
-                property.SetMethod is null ||
-                property.SetMethod.IsInitOnly)
+            var recordMember = DotBoxDRpcTypeMapper.RecordFields(captureParameter.Type)
+                .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.Symbol, target));
+            if (recordMember.Symbol is null)
             {
                 throw new NotSupportedException(
-                    $"InvokeAsync capture property '{property.Name}' must be assigned with a public set accessor.");
+                    $"InvokeAsync capture member '{target.Name}' must be a public marshalled field or property.");
             }
 
-            if (syncOuts.Any(item => string.Equals(item.TargetName, property.Name, StringComparison.Ordinal)))
+            if (assignment.Kind() != SyntaxKind.SimpleAssignmentExpression)
+            {
+                throw new NotSupportedException(
+                    $"InvokeAsync capture member '{recordMember.Name}' must use a simple assignment.");
+            }
+
+            ValidateWritableCapture(recordMember, model.Compilation);
+            if (syncOuts.Any(item => string.Equals(item.TargetName, recordMember.Name, StringComparison.Ordinal)))
             {
                 continue;
             }
 
-            syncOuts.Add(new InvokeAsyncSyncOut(property.Name, property.Type, "__syncOut_" + property.Name, member));
+            syncOuts.Add(new InvokeAsyncSyncOut(
+                recordMember.Name,
+                recordMember.Type,
+                ReserveSyncOutLocal(recordMember.Name, reservedLocalNames),
+                member));
         }
 
         return syncOuts;
     }
 
+    private static HashSet<string> ReservedLocalNames(BlockSyntax block)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var token in block.DescendantTokens())
+        {
+            if (token.IsKind(SyntaxKind.IdentifierToken))
+            {
+                names.Add(token.ValueText);
+            }
+        }
+
+        return names;
+    }
+
+    private static string ReserveSyncOutLocal(string memberName, ISet<string> reserved)
+    {
+        var seed = "__syncOut_" + memberName;
+        var name = seed;
+        for (var suffix = 0; reserved.Contains(name); suffix++)
+        {
+            name = seed + "_" + suffix.ToString(CultureInfo.InvariantCulture);
+        }
+
+        reserved.Add(name);
+        return name;
+    }
+
+    private static void ValidateWritableCapture(RecordMember member, Compilation compilation)
+    {
+        switch (member.Symbol)
+        {
+            case IPropertySymbol property
+                when property.SetMethod is not null &&
+                     !property.SetMethod.IsInitOnly &&
+                     IsAccessibleFromGeneratedCode(property.SetMethod, compilation):
+                return;
+            case IPropertySymbol property:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture property '{property.Name}' must be assigned with an accessible set accessor.");
+            case IFieldSymbol field
+                when !field.IsReadOnly &&
+                     !field.IsConst &&
+                     IsAccessibleFromGeneratedCode(field, compilation):
+                return;
+            case IFieldSymbol field:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture field '{field.Name}' must be writable and accessible from generated code.");
+            default:
+                throw new NotSupportedException(
+                    $"InvokeAsync capture member '{member.Name}' must be a writable property or field.");
+        }
+    }
+
     private static bool TryCaptureMember(
         ExpressionSyntax expression,
         string captureParameterName,
+        ISet<string> captureAliases,
         SemanticModel model,
         out MemberAccessExpressionSyntax member,
-        out IPropertySymbol property)
+        out ISymbol target)
     {
         member = null!;
-        property = null!;
+        target = null!;
         if (expression is not MemberAccessExpressionSyntax
             {
                 Expression: IdentifierNameSyntax receiver
             } found ||
-            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal) ||
-            model.GetSymbolInfo(found).Symbol is not IPropertySymbol foundProperty)
+            !IsCaptureBagName(receiver.Identifier.ValueText, captureParameterName, captureAliases))
+        {
+            return false;
+        }
+
+        target = model.GetSymbolInfo(found).Symbol switch
+        {
+            IPropertySymbol property => property,
+            IFieldSymbol field => field,
+            _ => null!
+        };
+
+        if (target is null)
         {
             return false;
         }
 
         member = found;
-        property = foundProperty;
         return true;
     }
+
+    private static bool IsAccessibleFromGeneratedCode(ISymbol symbol, Compilation compilation)
+        => compilation.IsSymbolAccessibleWithin(symbol, compilation.Assembly);
 
     private static IReadOnlyList<(string Name, ExpressionSyntax Value)> CreateLeadingLocals(
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
@@ -74,21 +162,54 @@ internal sealed partial class InvokeAsyncCallShape
         AssignmentExpressionSyntax assignment,
         InvokeAsyncCaptureParameter captureParameter,
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
+        ISet<string> captureAliases,
         Func<ExpressionSyntax, string> lower)
     {
-        if (!TryCaptureMember(assignment.Left, captureParameter.Name, captureParameter.Type, out var propertyName))
+        if (!TryCaptureMember(
+                assignment.Left,
+                captureParameter.Name,
+                captureParameter.Type,
+                captureAliases,
+                out var propertyName))
         {
             return null;
         }
 
-        var syncOut = syncOuts.Single(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        var syncOut = syncOuts.FirstOrDefault(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        if (syncOut is null)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync capture member '{propertyName}' must be a writable marshalled field or property.");
+        }
+
         return DotBoxDRpcJsonLowerer.SetGeneratedLocal(syncOut.LocalName, lower(assignment.Right));
+    }
+
+    private static string? LowerCaptureRead(
+        ExpressionSyntax expression,
+        InvokeAsyncCaptureParameter captureParameter,
+        IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
+        ISet<string> captureAliases)
+    {
+        if (!TryCaptureMember(
+                expression,
+                captureParameter.Name,
+                captureParameter.Type,
+                captureAliases,
+                out var propertyName))
+        {
+            return null;
+        }
+
+        var syncOut = syncOuts.FirstOrDefault(item => string.Equals(item.TargetName, propertyName, StringComparison.Ordinal));
+        return syncOut is null ? null : DotBoxDRpcJsonLowerer.Var(syncOut.LocalName);
     }
 
     private static bool TryCaptureMember(
         ExpressionSyntax expression,
         string captureParameterName,
         INamedTypeSymbol captureType,
+        ISet<string> captureAliases,
         out string propertyName)
     {
         propertyName = string.Empty;
@@ -96,7 +217,7 @@ internal sealed partial class InvokeAsyncCallShape
             {
                 Expression: IdentifierNameSyntax receiver
             } member ||
-            !string.Equals(receiver.Identifier.ValueText, captureParameterName, StringComparison.Ordinal))
+            !IsCaptureBagName(receiver.Identifier.ValueText, captureParameterName, captureAliases))
         {
             return false;
         }
@@ -111,6 +232,52 @@ internal sealed partial class InvokeAsyncCallShape
         propertyName = name;
         return true;
     }
+
+    private static HashSet<string> CaptureBagAliases(
+        BlockSyntax block,
+        string captureParameterName)
+    {
+        var aliases = new HashSet<string>(StringComparer.Ordinal);
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var declarator in block.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            {
+                if (declarator.Initializer?.Value is { } initializer &&
+                    IsCaptureBagExpression(initializer, captureParameterName, aliases))
+                {
+                    changed |= aliases.Add(declarator.Identifier.ValueText);
+                }
+            }
+
+            foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
+                    assignment.Left is IdentifierNameSyntax left &&
+                    IsCaptureBagExpression(assignment.Right, captureParameterName, aliases))
+                {
+                    changed |= aliases.Add(left.Identifier.ValueText);
+                }
+            }
+        }
+
+        return aliases;
+    }
+
+    private static bool IsCaptureBagExpression(
+        ExpressionSyntax expression,
+        string captureParameterName,
+        ISet<string> captureAliases)
+        => expression is IdentifierNameSyntax identifier &&
+           IsCaptureBagName(identifier.Identifier.ValueText, captureParameterName, captureAliases);
+
+    private static bool IsCaptureBagName(
+        string name,
+        string captureParameterName,
+        ISet<string> captureAliases)
+        => string.Equals(name, captureParameterName, StringComparison.Ordinal) ||
+           captureAliases.Contains(name);
 
     private static string CaptureParametersJson(InvokeAsyncCaptureParameter captureParameter)
         => "[{\"name\":" + DotBoxDRpcJsonLowerer.Str(captureParameter.Name) +

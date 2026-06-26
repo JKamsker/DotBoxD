@@ -23,7 +23,7 @@ The user wants two additions, **without removing the imperative APIs**:
 1. **A fluent `RemotePluginServerBuilder`** (`FromConnection(...)` / `FromPipeName(...)`,
    `.SetupKernelRpc(...)`, `.SetupKernels(...)`, `.Build()`) as pure syntactic sugar over the existing
    `RemoteKernelControl.Register` / `RemoteKernelRpcControl.Register`.
-2. **A new `server.Kernels.InvokeAsync(lambda)`** that lowers an anonymous block-body lambda to verified
+2. **A new top-level `server.InvokeAsync(lambda)`** that lowers an anonymous block-body lambda to verified
    sandboxed IR at compile time (like the existing `InvokeKernel(lambda)` interceptor path), ships it over
    async IPC, and runs it server-side. No-capture lambdas and reflection-backed implicit local/parameter
    captures use the lambda-only overload; the DotBoxD Fody weaver can rewrite safe implicit captures to
@@ -48,7 +48,7 @@ go through the identical install + capability-gating + session-ownership path as
   generated purely from `[KernelRpcClientProperty]`/`[KernelRpcClientMethod]` on `MonsterKillerKernel`,
   **independent of how Register is called**. The builder does not change extension generation.
 - `KernelRpcBinaryCodec` (encode/decode `KernelRpcValue` ↔ `byte[]`), `KernelRpcValueConverter`
-  (`KernelRpcValue` ↔ `SandboxValue`), `InstalledKernel.InvokeRpcAsync` + `BuildRpcInput`, and the
+  (`KernelRpcValue` ↔ `SandboxValue`), `InstalledKernel.InvokeServerExtensionAsync` + `BuildRpcInput`, and the
   `InvokeKernel` interceptor pipeline (`PluginPackageGenerator.cs:37-45`,
   `DotBoxDHookChainInterceptorEmitter.cs`) are all reusable as-is or as templates.
 
@@ -58,7 +58,7 @@ The builder (Phase 1) is a self-contained, low-risk runtime facade with **zero g
 wire-protocol change**. `InvokeAsync` is a substantially larger investment that touches the analyzer
 (a new interceptor pipeline + capture analysis + lambda lowering) and the runtime invocation path
 (argument encoding plus an optional response record for capture-bag sync-out). It keeps the existing
-`InvokeKernelRpcAsync` IPC contract. It is split across Phases 2–4 so each is independently shippable with
+server-extension IPC contract. It is split across Phases 2–4 so each is independently shippable with
 green build + tests. The richer flat snapshot surface `world.GetMonster(id).Name` is its own **Phase 4**.
 
 > **Decided (user):** The builder follows the ASP.NET Core `HostBuilder` lifecycle — a **synchronous
@@ -266,7 +266,7 @@ the imperative and `--use-builder` paths with identical output; existing
 
 ## Phase 2 — `InvokeAsync`: detection, lambda lowering, and implicit capture convenience
 
-**Goal.** Detect `server.Kernels.InvokeAsync(lambda)` at compile time, lower the **block-body** lambda to
+**Goal.** Detect `server.InvokeAsync(lambda)` on the generated plugin server facade at compile time, lower the **block-body** lambda to
 verified IR via the existing RPC lowerer, ship it as an anonymous RPC kernel, run it server-side, and
 return the typed result. Lambda-only calls support no-capture lowering and a reflection-backed implicit
 local/parameter capture convenience path. Capture sync-in/out is also provided by the explicit mutable
@@ -276,9 +276,9 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 
 - **Detection mirrors `InvokeKernel`.** A new `CreateSyntaxProvider` keyed on
   `MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" }`. The semantic transform
-  resolves the receiver and **skips (returns null) unless the receiver type is the kernel-invocation
-  surface** (`RemoteKernelControl`), mirroring `HookChainModelFactory`'s receiver-type guard. Name alone
-  is not sufficient.
+  resolves the receiver and **skips (returns null) unless the receiver type is a generated plugin server
+  facade or generated server interface**. Calls through erased `IPluginServer<TWorld>` are diagnosed because
+  the interceptor needs the generated receiver type. Name alone is not sufficient.
 - **Lambda shape.** Exactly one explicitly-typed parameter whose type is the host-access interface
   (`IGameWorldAccess`), **block body** (expression-body lambdas are out of scope; use `InvokeKernel`).
 - **Capture analysis via `SemanticModel.AnalyzeDataFlow(block)`.** Lambda-only calls use zero arguments when
@@ -301,7 +301,7 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 - **Anonymous kernel identity.** `pluginId = "$anon:" + HookChainIdentity.Compute(invocation)` (FNV-1a of
   file path + span start). Verified to pass `ValidateText` / descriptor guards. The generator emits
   `module.id == pluginId` and `module.metadata.pluginId == pluginId` identically (the existing RPC factory
-  pattern). Per-connection `RemoteKernelControl` construction naturally clears the install cache on
+  pattern). Per-connection generated server facade construction naturally clears the install cache on
   reconnect.
 - **Concurrency-safe install is mandatory.** `EnsureAnonymousKernelAsync` uses
   `ConcurrentDictionary<string, Lazy<Task<string>>>` (install-once-per-id-per-connection via `GetOrAdd` of a
@@ -325,26 +325,26 @@ capture-bag overload because generated C# interceptors cannot directly access ca
 |---|---|
 | `src/CodeGeneration/.../HookChains/InterceptsLocationAttributeEmitter.cs` | **Create.** Shared one-shot emitter for `DotBoxDInterceptsLocationAttribute.g.cs`. Refactor `DotBoxDHookChainInterceptorEmitter.Emit` to call it instead of emitting the attribute itself. |
 | `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` | **Create.** Detection (receiver-type guard), lambda-shape validation, implicit-capture analysis, `DotBoxDRpcJsonLowerer.LowerBody` invocation, IR function construction, manifest + package JSON (mirrors `RpcKernelModelFactory.EmitPackage`: `mode=Auto`, `liveSettings=[]`, `subscriptions=[]`, `rpcEntrypoint`=function id, `requiredCapabilities` from the host-binding sink). Returns `InvokeAsyncResult(Package, Interception)`. |
-| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode arguments → `EnsureAnonymousKernelAsync` → `InvokeKernelRpcAsync` → `DecodeValue` → typed result reconstruction. Emits reflection helpers for implicit captures and a null-interception diagnostic when location is null. |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` | **Create.** Emits the `[InterceptsLocation]` interceptor: encode arguments → `EnsureAnonymousKernelAsync` → `InvokeServerExtensionAsync` → `DecodeValue` → typed result reconstruction. Emits reflection helpers for implicit captures and a null-interception diagnostic when location is null. |
 | `src/CodeGeneration/.../PluginPackageGenerator.cs` | **Modify.** Add the fourth `CreateSyntaxProvider` pipeline; register the package output (reuse `AddSource(package.HintName, package.Source)`); wire the combined attribute-dedup provider; register the interceptor output. |
-| `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs` | **Modify.** Add `Metadata.KernelInvocationSurfaceType` constant (FQN of `RemoteKernelControl`). |
+| `src/CodeGeneration/.../InvokeAsync/InvokeAsyncReceiverResolver.cs` | **Create.** Resolve generated plugin server facades, generated server interfaces, and generated builder locals to the world/access types required by the interceptor. |
 | `src/CodeGeneration/DotBoxD.Plugins.Fody/**` | **Create.** Fody add-in that discovers generated `InvokeAsync_*` call sites, maps each interceptor to its compiler display class, rewrites safe reflection helper calls to static closure-field IL, and leaves reflection fallback calls untouched otherwise. |
-| `samples/GameServer/Examples.GameServer.Plugin/Client/RemoteKernelControl.cs` | **Modify.** Add `InvokeAsync<TReturn>(Func<IGameWorldAccess,TReturn>)` throwing stub (replaced by the interceptor); add `internal IKernelRpcWireClient WireClient` (the `IGamePluginControlService`, which implements `InvokeKernelRpcAsync`); add `EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching, calling `_control.InstallKernelRpcAsync` and validating the installed id. |
+| generated plugin server facade | **Modify.** Add top-level `InvokeAsync<TReturn>(Func<TWorld,ValueTask<TReturn>>)` throwing stub (replaced by the interceptor), capture-bag overload, `Services.WireClient` for `InvokeServerExtensionAsync`, and `Services.EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> factory)` with `ConcurrentDictionary<string, Lazy<Task<string>>>` caching through `InstallServerExtensionAsync`. |
 
 ### Generator / runtime / wire pieces that change
 
 - **Generator:** new pipeline + two new emitters + shared attribute emitter. Reuses `DotBoxDRpcJsonLowerer`,
   `DotBoxDHostBindingExpressionLowerer` (capability sink), `DotBoxDRpcTypeMapper`, `HookChainIdentity`.
-- **Runtime:** new `RemoteKernelControl` members only. **No new IPC method this phase** — no-capture and
-  implicit-capture calls use the existing `InstallKernelRpcAsync` + `InvokeKernelRpcAsync(pluginId, byte[]) →
+- **Runtime:** new generated facade members only. **No new IPC method this phase** — no-capture and
+  implicit-capture calls use the existing `InstallServerExtensionAsync` + `InvokeServerExtensionAsync(pluginId, byte[]) →
   byte[]` path.
-- **Wire:** unchanged. `EncodeArguments(captures-or-empty)` → existing `InvokeKernelRpcAsync` →
+- **Wire:** unchanged. `EncodeArguments(captures-or-empty)` → existing `InvokeServerExtensionAsync` →
   `DecodeValue(returnValue-or-response-record)`.
 
 ### Tests (Phase 2)
 
 Generator tests (in `tests/DotBoxD.Kernels.Tests/Plugins/Rpc/`, the existing extension-test folder, using
-self-contained string fixtures with inline stub `RemoteKernelControl`/`IGameWorldAccess`):
+self-contained string fixtures with inline generated-server facade/`IGameWorldAccess` stubs):
 
 - `InvokeAsync_block_body_lambda_generates_interceptor_and_package`.
 - `InvokeAsync_no_capture_block_body_generates_zero_argument_package`.
@@ -354,7 +354,7 @@ self-contained string fixtures with inline stub `RemoteKernelControl`/`IGameWorl
 - `InterceptsLocationAttribute_emitted_once_when_both_hookchain_and_invokeasync_present` — the dedup guard.
 
 Runtime/round-trip tests (the anonymous package validated + executed via `PluginServer.Create` +
-`InstalledKernel.InvokeRpcAsync` with hand-built IR matching `BuildRpcInput`'s 0/1/N-param shapes):
+`InstalledKernel.InvokeServerExtensionAsync` with hand-built IR matching `BuildRpcInput`'s 0/1/N-param shapes):
 
 - `Anonymous_kernel_install_validates_and_prepares` — `RpcKernelPackageValidator.Validate` /
   `ValidatePrepared` accept the `$anon:` package (rpcEntrypoint set, return type known).
@@ -379,7 +379,7 @@ touches an ungranted binding.
 capture object explicitly, and the lambda takes that object as its second parameter:
 
 ```csharp
-await server.Kernels.InvokeAsync(capture, (IGameWorldAccess world, MonsterProbeCapture bag) =>
+await server.InvokeAsync(capture, async (IGameWorldAccess world, MonsterProbeCapture bag) =>
 {
     var monster = world.GetMonster(bag.MonsterId);
     bag.LastHealth = monster.Health;
@@ -395,7 +395,7 @@ await server.Kernels.InvokeAsync(capture, (IGameWorldAccess world, MonsterProbeC
 - Reads like `bag.MonsterId` lower to `record.get(Var("bag"), index)`.
 - Simple assignments to settable bag properties lower to generated sync-out locals.
 - If sync-out exists, each return is structurally wrapped as `Record([returnValue, syncOut0, ...])`.
-- The existing `InvokeKernelRpcAsync` response carries that single record; no new IPC method or codec is
+- The existing `InvokeServerExtensionAsync` response carries that single record; no new IPC method or codec is
   needed.
 - The generated interceptor checks the expected response field count and writes decoded sync-out values
   back onto the same bag object after the await.
@@ -471,8 +471,8 @@ unchanged.
 
 - **Imperative registration is untouched.** `new RemotePluginServer(control)` +
   `server.Kernels.Register<…>()` + `server.KernelRpc.Register<…>()` compile and run exactly as today
-  (`Client/RemotePluginServer.cs` is unchanged in Phase 1; Phase 2 only **adds** members to
-  `RemoteKernelControl`). The existing `Program.cs` block is preserved as the imperative demonstration.
+  (`Client/RemotePluginServer.cs` is unchanged in Phase 1; Phase 2 only **adds** generated facade/service
+  members). The existing `Program.cs` block is preserved as the imperative demonstration.
 - **`server.World.Monsters.KillMonstersAsync(...)` and `.MonsterKiller`** keep working — they are generated
   from kernel-class attributes, independent of the builder. The builder does not change extension
   generation, and Phase 2 does not touch the RPC extension pipeline.
@@ -489,11 +489,11 @@ unchanged.
   connection the server itself opened (`FromPipeName`); a `FromConnection` caller-owned control is never
   disposed by the server, so it cannot close the session before `HoldUntilShutdownAsync` returns.
 - **Anonymous `InvokeAsync` kernels reuse the existing ownership + revocation path.** They install through
-  `InstallKernelRpcAsync`, are added to the session's `_owned` set, and are revoked on disconnect like any
-  named kernel. No new lifecycle.
+  `InstallServerExtensionAsync`, are added to the session's `_owned` set, and are revoked on disconnect like
+  any named kernel. No new lifecycle.
 - **Wire/IPC compatibility.** All phases keep the existing IPC contract. Phase 3 carries sync-out as one
-  `KernelRpcValue.Record` returned by the existing `InvokeKernelRpcAsync` method; `InstallKernelRpcAsync` is
-  unchanged.
+  `KernelRpcValue.Record` returned by the existing `InvokeServerExtensionAsync` method;
+  `InstallServerExtensionAsync` is unchanged.
 
 ---
 
@@ -543,8 +543,8 @@ unchanged.
   `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs` (new),
   `src/CodeGeneration/.../InvokeAsync/InvokeAsyncInterceptorEmitter.cs` (new),
   `src/CodeGeneration/DotBoxD.Plugins.Fody/**` (new),
-  `src/CodeGeneration/.../Lowering/DotBoxDGenerationNames.cs`,
-  `samples/.../Examples.GameServer.Plugin/Client/RemotePluginServer.cs` (`RemoteKernelControl`).
+  `src/CodeGeneration/.../InvokeAsync/InvokeAsyncReceiverResolver.cs`,
+  generated plugin server facade/service accessor output.
 - **Phase 3:** `src/CodeGeneration/.../InvokeAsync/InvokeAsyncModelFactory.cs`,
   `…/InvokeAsyncCallShape*.cs`, `…/InvokeAsyncArgumentWriterSource.cs`,
   `…/InvokeAsyncInterceptorEmitter.cs`, and `…/Rpc/DotBoxDRpcJsonLowerer.cs`.

@@ -10,11 +10,13 @@ internal static class PluginServerContextSurfaceEmitter
             builder,
             string.Empty,
             "Generated server hook context. Extend this partial type with helper members; [KernelMethod] instance members can be consumed by lowered hook chains.");
-        builder.Append(model.ContextAccessibility).Append(" partial class ").Append(model.ContextName).AppendLine();
+        builder.Append(model.ContextAccessibility).Append(" partial class ")
+            .Append(PluginServerIdentifier.Escape(model.ContextName)).AppendLine();
         builder.AppendLine("{");
         builder.AppendLine("    private readonly global::DotBoxD.Abstractions.HookContext _raw;");
         builder.AppendLine();
-        builder.Append("    public ").Append(model.ContextName).AppendLine("(global::DotBoxD.Abstractions.HookContext raw)");
+        builder.Append("    public ").Append(PluginServerIdentifier.Escape(model.ContextName))
+            .AppendLine("(global::DotBoxD.Abstractions.HookContext raw)");
         builder.AppendLine("    {");
         builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(raw);");
         builder.AppendLine("        _raw = raw;");
@@ -28,9 +30,10 @@ internal static class PluginServerContextSurfaceEmitter
         builder.AppendLine("    public global::System.Threading.CancellationToken CancellationToken => _raw.CancellationToken;");
         builder.AppendLine("    public bool HasCancelableDispatch => _raw.CancellationToken.CanBeCanceled;");
         builder.AppendLine();
-        builder.Append("    public static ").Append(model.ContextName)
+        builder.Append("    public static ").Append(PluginServerIdentifier.Escape(model.ContextName))
             .Append(" FromHookContext(global::DotBoxD.Abstractions.HookContext raw) => ")
-            .Append(model.ContextFactoryMethodName ?? "new").AppendLine("(raw);");
+            .Append(model.ContextFactoryMethodName is null ? "new" : PluginServerIdentifier.Escape(model.ContextFactoryMethodName))
+            .AppendLine("(raw);");
         builder.AppendLine();
         builder.AppendLine("    partial void OnCreated(global::DotBoxD.Abstractions.HookContext raw);");
         builder.AppendLine("}");
@@ -97,7 +100,7 @@ internal static class PluginServerContextSurfaceEmitter
             .Append("global::DotBoxD.Abstractions.GeneratedPluginServerRegistryKind.")
             .Append(kind)
             .Append(", typeof(")
-            .Append(TypeReference(model, model.ClassName))
+            .Append(TypeReference(model, PluginServerIdentifier.Escape(model.ClassName)))
             .Append("), typeof(")
             .Append(model.ContextFullName)
             .AppendLine("))]");

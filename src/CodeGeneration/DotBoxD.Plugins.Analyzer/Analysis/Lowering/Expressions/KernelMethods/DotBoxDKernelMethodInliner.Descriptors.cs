@@ -7,6 +7,7 @@ internal static partial class DotBoxDKernelMethodInliner
     private static DotBoxDExpressionModel InlineMetadataDescriptor(
         IMethodSymbol method,
         DotBoxDExpressionLoweringContext context,
+        BoundKernelMethodCall call,
         IReadOnlyDictionary<string, DotBoxDExpressionModel> bindings,
         string returnType)
     {
@@ -23,7 +24,7 @@ internal static partial class DotBoxDKernelMethodInliner
                 continue;
             }
 
-            return InlineDescriptorPayload(method, context, bindings, returnType, descriptor);
+            return InlineDescriptorPayload(method, context, call, bindings, returnType, descriptor);
         }
 
         throw new NotSupportedException(
@@ -33,6 +34,7 @@ internal static partial class DotBoxDKernelMethodInliner
     private static DotBoxDExpressionModel InlineDescriptorPayload(
         IMethodSymbol method,
         DotBoxDExpressionLoweringContext context,
+        BoundKernelMethodCall call,
         IReadOnlyDictionary<string, DotBoxDExpressionModel> bindings,
         string returnType,
         KernelMethodDescriptorPayload descriptor)
@@ -49,6 +51,7 @@ internal static partial class DotBoxDKernelMethodInliner
         }
 
         var occurrences = ValidateDescriptorParameters(method, descriptor);
+        ValidateDescriptorArgumentUses(method, occurrences, call, context.SemanticModel, context.CancellationToken);
         var recomputed = RecomputeDescriptorRequirements(method, context, descriptor);
         var shape = RevalidateDescriptorShape(method, context, descriptor);
         var replacements = new List<DescriptorPlaceholderReplacement>();
@@ -57,7 +60,7 @@ internal static partial class DotBoxDKernelMethodInliner
         {
             var parameter = method.Parameters[i];
             var descriptorParameter = descriptor.Parameters[i];
-            var expected = DotBoxDTypeNameReader.SandboxTypeName(parameter.Type);
+            var expected = DotBoxDTypeNameReader.KernelMethodTypeName(parameter.Type);
             if (!string.Equals(descriptorParameter.Type, expected, StringComparison.Ordinal) ||
                 !bindings.TryGetValue(parameter.Name, out var lowered))
             {

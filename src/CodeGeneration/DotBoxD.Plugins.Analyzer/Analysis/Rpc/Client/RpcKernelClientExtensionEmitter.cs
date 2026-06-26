@@ -1,6 +1,5 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
-using System.Collections.Generic;
 using System.Text;
 using Microsoft.CodeAnalysis;
 
@@ -61,7 +60,7 @@ internal static class RpcKernelClientExtensionEmitter
         RpcKernelClientPropertyExtension? property,
         RpcKernelClientMethodExtension? method)
     {
-        const string receiver = "value";
+        var receiver = ReceiverParameterName(serviceMethod);
 
         builder.Append("    extension(").Append(TypeName(receiverType)).Append(' ').Append(receiver).AppendLine(")");
         builder.AppendLine("    {");
@@ -115,7 +114,8 @@ internal static class RpcKernelClientExtensionEmitter
         string receiver)
     {
         builder.Append("        public ").Append(TypeName(serviceMethod.ReturnType)).Append(' ')
-            .Append(Identifier(method.Name)).Append('(').Append(ParameterList(serviceMethod)).AppendLine(")");
+            .Append(Identifier(method.Name)).Append('(')
+            .Append(RpcKernelClientParameterSource.ParameterList(serviceMethod)).AppendLine(")");
         builder.AppendLine("        {");
         AppendAccessorGuard(builder, receiver, "            ");
         AppendClientReturn(
@@ -156,7 +156,7 @@ internal static class RpcKernelClientExtensionEmitter
 
         builder.AppendLine();
         builder.Append(indent).Append("    .").Append(Identifier(serviceMethod.Name)).Append('(')
-            .Append(ArgumentList(serviceMethod)).AppendLine(");");
+            .Append(RpcKernelClientParameterSource.ArgumentList(serviceMethod)).AppendLine(");");
     }
 
     private static bool SameReceiver(
@@ -165,28 +165,6 @@ internal static class RpcKernelClientExtensionEmitter
         => property is not null &&
            method is not null &&
            SymbolEqualityComparer.Default.Equals(property.ReceiverType, method.ReceiverType);
-
-    private static string ParameterList(IMethodSymbol method)
-    {
-        var parts = new List<string>();
-        foreach (var parameter in method.Parameters)
-        {
-            parts.Add(TypeName(parameter.Type) + " " + Identifier(parameter.Name));
-        }
-
-        return string.Join(", ", parts);
-    }
-
-    private static string ArgumentList(IMethodSymbol method)
-    {
-        var parts = new List<string>();
-        foreach (var parameter in method.Parameters)
-        {
-            parts.Add(Identifier(parameter.Name));
-        }
-
-        return string.Join(", ", parts);
-    }
 
     private static string ClientTypeName(INamedTypeSymbol kernelType)
     {
@@ -200,4 +178,25 @@ internal static class RpcKernelClientExtensionEmitter
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
     private static string Identifier(string name) => "@" + name;
+
+    private static string ReceiverParameterName(IMethodSymbol serviceMethod)
+    {
+        const string seed = "__receiver";
+        if (!HasParameter(serviceMethod, seed))
+        {
+            return seed;
+        }
+
+        for (var suffix = 0; ; suffix++)
+        {
+            var candidate = seed + "_" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!HasParameter(serviceMethod, candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static bool HasParameter(IMethodSymbol method, string name)
+        => method.Parameters.Any(parameter => string.Equals(parameter.Name, name, StringComparison.Ordinal));
 }

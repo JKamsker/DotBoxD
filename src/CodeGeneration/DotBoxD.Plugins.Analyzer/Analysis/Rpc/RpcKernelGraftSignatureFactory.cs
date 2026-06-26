@@ -9,6 +9,7 @@ internal static class RpcKernelGraftSignatureFactory
         IMethodSymbol kernelMethod,
         IMethodSymbol? serviceMethod,
         RpcKernelClientExtensions? clientExtensions,
+        RpcKernelClientMethodExtension? directClientMethod,
         RpcServerExtensionGraft? graft)
     {
         var items = new List<RpcKernelGraftSignature>(2);
@@ -17,12 +18,12 @@ internal static class RpcKernelGraftSignatureFactory
             AddClientExtensions(items, kernelType, serviceMethod, clientExtensions);
         }
         else if (graft is not null &&
-                 RpcKernelClientExtensionModelFactory.HasExtensionAttribute(kernelMethod))
+                 directClientMethod is not null)
         {
             items.Add(MethodSignature(
                 kernelType,
-                graft.ReceiverType,
-                kernelMethod.Name,
+                directClientMethod.ReceiverType,
+                directClientMethod.Name,
                 UserParameterTypes(kernelMethod),
                 kernelMethod));
         }

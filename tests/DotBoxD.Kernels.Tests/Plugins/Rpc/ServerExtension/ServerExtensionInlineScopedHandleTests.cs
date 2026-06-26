@@ -130,6 +130,21 @@ public sealed class ServerExtensionInlineScopedHandleTests
     }
 
     [Fact]
+    public void Scoped_handle_accessor_with_multiple_arguments_reports_DBXK100()
+    {
+        var source = InlineKernel
+            .Replace("IMonster Get(string entityId);", "IMonster Get(string entityId, string shardId);", StringComparison.Ordinal)
+            .Replace("_world.Monsters.Get(id).KillAsync()", "_world.Monsters.Get(id, id).KillAsync()", StringComparison.Ordinal);
+
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(source);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("exactly one scope argument", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Inline_and_local_scoped_handle_kernels_require_the_same_capability()
     {
         var local = BuildPackage(LocalKernel);

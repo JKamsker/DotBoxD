@@ -31,7 +31,7 @@ internal static partial class DotBoxDKernelMethodInliner
 
         for (var i = 0; i < method.Parameters.Length; i++)
         {
-            var expectedType = DotBoxDTypeNameReader.SandboxTypeName(method.Parameters[i].Type);
+            var expectedType = DotBoxDTypeNameReader.KernelMethodTypeName(method.Parameters[i].Type);
             var expectedPlaceholder = DescriptorPlaceholder(i);
             var actual = descriptor.Parameters[i];
             if (!string.Equals(actual.Placeholder, expectedPlaceholder, StringComparison.Ordinal) ||
@@ -92,6 +92,34 @@ internal static partial class DotBoxDKernelMethodInliner
         }
 
         return builder.ToString();
+    }
+
+    private static void ValidateDescriptorArgumentUses(
+        IMethodSymbol method,
+        IReadOnlyList<DescriptorPlaceholderOccurrence> occurrences,
+        BoundKernelMethodCall call,
+        SemanticModel callSiteSemanticModel,
+        CancellationToken cancellationToken)
+    {
+        var usageCounts = new Dictionary<IParameterSymbol, int>(SymbolEqualityComparer.Default);
+        var firstUseOrder = new List<IParameterSymbol>();
+        foreach (var occurrence in occurrences.OrderBy(static occurrence => occurrence.Span.Start))
+        {
+            var parameter = method.Parameters[occurrence.ParameterIndex];
+            usageCounts[parameter] = usageCounts.TryGetValue(parameter, out var count) ? count + 1 : 1;
+            if (!firstUseOrder.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, parameter)))
+            {
+                firstUseOrder.Add(parameter);
+            }
+        }
+
+        KernelMethodArgumentReuseValidator.Validate(
+            method,
+            usageCounts,
+            firstUseOrder,
+            call,
+            callSiteSemanticModel,
+            cancellationToken);
     }
 
     private static string DescriptorPlaceholder(int index)

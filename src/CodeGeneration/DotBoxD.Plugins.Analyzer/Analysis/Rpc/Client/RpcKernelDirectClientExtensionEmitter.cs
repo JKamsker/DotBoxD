@@ -5,15 +5,22 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelDirectClientExtensionEmitter
 {
-    public static string Emit(INamedTypeSymbol kernelType, RpcServerExtensionGraft graft, IMethodSymbol kernelMethod)
-        => new Writer(kernelType, graft, kernelMethod).Emit();
+    public static string Emit(
+        INamedTypeSymbol kernelType,
+        RpcServerExtensionGraft graft,
+        IMethodSymbol kernelMethod,
+        RpcKernelClientMethodExtension methodExtension,
+        Compilation compilation)
+        => new Writer(kernelType, graft, kernelMethod, methodExtension, compilation).Emit();
 
     private sealed class Writer(
         INamedTypeSymbol kernelType,
         RpcServerExtensionGraft graft,
-        IMethodSymbol kernelMethod)
+        IMethodSymbol kernelMethod,
+        RpcKernelClientMethodExtension methodExtension,
+        Compilation compilation)
     {
-        private readonly RpcKernelValueConversionEmitter _conv = new();
+        private readonly RpcKernelValueConversionEmitter _conv = new(compilation);
 
         public string Emit()
         {
@@ -33,6 +40,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var hasReceiverId = graft.InjectsReceiverId;
             var userParameterCount = kernelMethod.Parameters.Length - 1;
             var argumentOffset = hasReceiverId ? 1 : 0;
+            var receiver = ReceiverParameterName(kernelMethod);
             builder.Append("    public static ");
             if (isAsyncReturn)
             {
@@ -40,16 +48,17 @@ internal static class RpcKernelDirectClientExtensionEmitter
             }
 
             builder.Append(returnType).Append(' ')
-                .Append(Identifier(kernelMethod.Name)).Append("(this ").Append(TypeName(graft.ReceiverType)).Append(" value");
+                .Append(RpcKernelClientParameterSource.Identifier(methodExtension.Name)).Append("(this ")
+                .Append(TypeName(methodExtension.ReceiverType)).Append(' ').Append(receiver);
             for (var i = 0; i < userParameterCount; i++)
             {
                 var parameter = kernelMethod.Parameters[i];
-                builder.Append(", ").Append(TypeName(parameter.Type)).Append(' ').Append(Identifier(parameter.Name));
+                builder.Append(", ").Append(RpcKernelClientParameterSource.Declaration(parameter));
             }
 
             builder.AppendLine(")");
             builder.AppendLine("    {");
-            builder.AppendLine("        if (value is not global::DotBoxD.Abstractions.IServerExtensionClientAccessor __accessor)");
+            builder.Append("        if (").Append(receiver).AppendLine(" is not global::DotBoxD.Abstractions.IServerExtensionClientAccessor __accessor)");
             builder.AppendLine("        {");
             builder.AppendLine("            throw new global::System.InvalidOperationException(\"Server extension calls require a generated plugin facade receiver.\");");
             builder.AppendLine("        }");
@@ -58,14 +67,16 @@ internal static class RpcKernelDirectClientExtensionEmitter
                 .Append(userParameterCount + argumentOffset).AppendLine("];");
             if (hasReceiverId)
             {
-                builder.AppendLine("        __arguments[0] = global::DotBoxD.Plugins.KernelRpcValue.String(value.Id);");
+                builder.Append("        __arguments[0] = global::DotBoxD.Plugins.KernelRpcValue.String(")
+                    .Append(receiver).AppendLine(".Id);");
             }
 
             for (var i = 0; i < userParameterCount; i++)
             {
                 var parameter = kernelMethod.Parameters[i];
                 builder.Append("        __arguments[").Append(i + argumentOffset).Append("] = ")
-                    .Append(_conv.WriteExpression(parameter.Type, Identifier(parameter.Name))).AppendLine(";");
+                    .Append(_conv.WriteExpression(parameter.Type, RpcKernelClientParameterSource.Identifier(parameter.Name)))
+                    .AppendLine(";");
             }
 
             builder.AppendLine("        var __request = global::DotBoxD.Plugins.KernelRpcBinaryCodec.EncodeArguments(__arguments);");
@@ -107,8 +118,6 @@ internal static class RpcKernelDirectClientExtensionEmitter
         private static string TypeName(ITypeSymbol type)
             => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-        private static string Identifier(string name) => "@" + name;
-
         private static bool TryGetPayloadReturnType(ITypeSymbol returnType, out ITypeSymbol? payloadReturnType)
         {
             if (returnType.SpecialType == SpecialType.System_Void)
@@ -133,5 +142,26 @@ internal static class RpcKernelDirectClientExtensionEmitter
             payloadReturnType = returnType;
             return false;
         }
+
+        private static string ReceiverParameterName(IMethodSymbol method)
+        {
+            const string seed = "__receiver";
+            if (!HasParameter(method, seed))
+            {
+                return seed;
+            }
+
+            for (var suffix = 0; ; suffix++)
+            {
+                var candidate = seed + "_" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (!HasParameter(method, candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        private static bool HasParameter(IMethodSymbol method, string name)
+            => method.Parameters.Any(parameter => string.Equals(parameter.Name, name, StringComparison.Ordinal));
     }
 }

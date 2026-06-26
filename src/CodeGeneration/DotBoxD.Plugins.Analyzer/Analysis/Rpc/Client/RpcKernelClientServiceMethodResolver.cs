@@ -1,7 +1,6 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 using System.Collections.Generic;
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelClientServiceMethodResolver
@@ -99,9 +98,16 @@ internal static class RpcKernelClientServiceMethodResolver
 
     private static void ValidateReturn(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)
     {
-        var serviceReturn = DotBoxDTypeNameReader.UnwrapTaskLike(serviceMethod.ReturnType);
-        var kernelReturn = DotBoxDTypeNameReader.UnwrapTaskLike(kernelMethod.ReturnType);
-        if (SymbolEqualityComparer.Default.Equals(serviceReturn, kernelReturn))
+        var serviceReturn = DotBoxDRpcReturnType.PayloadType(serviceMethod.ReturnType);
+        var kernelReturn = DotBoxDRpcReturnType.PayloadType(kernelMethod.ReturnType);
+        if (serviceReturn is null && kernelReturn is null)
+        {
+            return;
+        }
+
+        if (serviceReturn is not null &&
+            kernelReturn is not null &&
+            SymbolEqualityComparer.Default.Equals(serviceReturn, kernelReturn))
         {
             return;
         }

@@ -15,7 +15,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             throw new NotSupportedException($"{description} call must pass {parameters.Count} argument(s).");
         }
 
-        var lowered = new string[parameters.Count];
+        var bound = new (int ParameterIndex, ExpressionSyntax Expression)[arguments.Count];
         var assigned = new bool[parameters.Count];
         var nextPositional = 0;
         var hasOutOfPositionNamedArgument = false;
@@ -48,7 +48,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"{description} call has duplicate or misplaced arguments.");
             }
 
-            lowered[index] = LowerExpression(argument.Expression);
+            bound[ordinal] = (index, argument.Expression);
             assigned[index] = true;
             nextPositional = NextUnassigned(assigned, nextPositional);
         }
@@ -59,6 +59,21 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             {
                 throw new NotSupportedException($"{description} call must pass parameter '{parameters[i].Name}'.");
             }
+        }
+
+        var lowered = new string[parameters.Count];
+        foreach (var argument in bound)
+        {
+            var value = LowerExpression(argument.Expression);
+            if (_expressionPrelude is null)
+            {
+                lowered[argument.ParameterIndex] = value;
+                continue;
+            }
+
+            var localName = ReserveGeneratedLocal("__sir_arg");
+            AddExpressionPrelude(SetStatement(localName, value));
+            lowered[argument.ParameterIndex] = Var(localName);
         }
 
         return lowered;

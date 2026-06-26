@@ -1,4 +1,3 @@
-using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using TypeNames = DotBoxD.Plugins.Analyzer.Analysis.Lowering.DotBoxDGenerationNames.TypeNames;
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -10,14 +9,29 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 /// and <c>record.get</c> indices use. Anything unsupported throws <see cref="NotSupportedException"/> so
 /// the whole kernel fails generation safely.
 /// </summary>
-internal static class DotBoxDRpcTypeMapper
+internal static partial class DotBoxDRpcTypeMapper
 {
+    private const int MaxJsonTypeDepth = 8;
+
     public static string JsonType(ITypeSymbol type)
+        => JsonType(type, 0, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
+
+    private static string JsonType(ITypeSymbol type, int depth, HashSet<ITypeSymbol> visiting)
     {
-        type = DotBoxDTypeNameReader.UnwrapTaskLike(type);
+        if (type.SpecialType == SpecialType.System_Void || DotBoxDRpcReturnType.IsTaskLike(type))
+        {
+            throw new NotSupportedException(
+                $"Server extension type '{type.ToDisplayString()}' is only supported as a top-level return type.");
+        }
         if (DotBoxDNullableScalarType.IsNullableValueType(type))
         {
             throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
+        }
+        if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
+        {
+            throw new NotSupportedException(
+                $"Server extension nullable reference type '{type.ToDisplayString()}' is not supported; " +
+                "kernel RPC does not encode null reference values.");
         }
         switch (type.SpecialType)
         {
@@ -44,47 +58,56 @@ internal static class DotBoxDRpcTypeMapper
         }
         if (ListElementType(type) is { } elementType)
         {
-            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType)}]}}";
+            RejectTooDeep(type, depth);
+            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType, depth + 1, visiting)}]}}";
         }
         if (MapTypes(type) is { } map)
         {
+            RejectTooDeep(type, depth);
             if (!IsSupportedMapKey(map.Key))
             {
                 throw new NotSupportedException(
                     $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
                     "map keys must be bool, int, long, string, or an enum.");
             }
-            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key)},{JsonType(map.Value)}]}}";
+            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, depth + 1, visiting)},{JsonType(map.Value, depth + 1, visiting)}]}}";
         }
         if (type is INamedTypeSymbol named && IsRecordDto(named))
         {
-            RejectInheritedDtoProperties(named);
-            var fields = RecordFields(named);
-            var fieldTypes = new List<string>(fields.Count);
-            foreach (var field in fields)
+            RejectTooDeep(type, depth);
+            if (!visiting.Add(named))
             {
-                fieldTypes.Add(JsonType(field.Type));
+                throw new NotSupportedException(
+                    $"Server extension DTO type '{named.ToDisplayString()}' is cyclic; recursive DTO shapes are not supported.");
             }
-            return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
+
+            RejectInheritedDtoProperties(named);
+            try
+            {
+                var fields = RecordFields(named);
+                var fieldTypes = new List<string>(fields.Count);
+                foreach (var field in fields)
+                {
+                    fieldTypes.Add(JsonType(field.Type, depth + 1, visiting));
+                }
+                return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
+            }
+            finally
+            {
+                visiting.Remove(named);
+            }
         }
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
     }
-    /// <summary>
-    /// True when <paramref name="member"/> can be written through an object initializer: a property with an
-    /// accessible <c>set</c>/<c>init</c>, or a non-readonly public field. Used for the parameterless-construct
-    /// + object-initializer fallback when a DTO exposes no constructor matching its fields.
-    /// </summary>
-    public static bool IsObjectInitializerWritable(RecordMember member)
-        => member.Symbol switch
+
+    private static void RejectTooDeep(ITypeSymbol type, int depth)
+    {
+        if (depth >= MaxJsonTypeDepth)
         {
-            IPropertySymbol
-            {
-                SetMethod.DeclaredAccessibility:
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal
-            } => true,
-            IFieldSymbol { IsReadOnly: false, IsConst: false } => true,
-            _ => false
-        };
+            throw new NotSupportedException(
+                $"Server extension type '{type.ToDisplayString()}' exceeds the supported RPC shape depth.");
+        }
+    }
     public static bool IsScalar(ITypeSymbol type)
         => type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Int32
             or SpecialType.System_Int64 or SpecialType.System_Double or SpecialType.System_Single
@@ -94,7 +117,6 @@ internal static class DotBoxDRpcTypeMapper
     public static bool IsGuid(ITypeSymbol type)
         => type is INamedTypeSymbol { Name: "Guid", ContainingNamespace: { Name: "System" } ns }
            && ns.ContainingNamespace is { IsGlobalNamespace: true };
-
     /// <summary>The element type of a list-shaped parameter/return (<c>List&lt;T&gt;</c>,
     /// <c>IReadOnlyList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, or <c>T[]</c>), else null.</summary>
     public static ITypeSymbol? ListElementType(ITypeSymbol type)
@@ -173,7 +195,9 @@ internal static class DotBoxDRpcTypeMapper
     public static bool IsRecordDto(INamedTypeSymbol type)
         => type.TypeKind is TypeKind.Class or TypeKind.Struct &&
            !IsScalar(type) &&
+           !IsUnsupportedFrameworkStruct(type) &&
            !DotBoxDNullableScalarType.IsNullableValueType(type) &&
+           ListElementType(type) is null &&
            MapTypes(type) is null &&
            RecordFields(type).Count > 0;
 
@@ -196,6 +220,7 @@ internal static class DotBoxDRpcTypeMapper
                     GetMethod: not null,
                     IsIndexer: false
                 } property &&
+                property.GetMethod.DeclaredAccessibility == Accessibility.Public &&
                 !property.IsImplicitlyDeclared &&
                 !IsIgnoredDataMember(property))
             {
@@ -255,46 +280,9 @@ internal static class DotBoxDRpcTypeMapper
         => enumType.EnumUnderlyingType?.SpecialType is
             SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
 
-    /// <summary>
-    /// Rejects a DTO that inherits public instance properties from a base type: <see cref="RecordFields"/>
-    /// only sees declared members (so inherited fields would be silently dropped on both the analyzer and the
-    /// runtime marshaller). Fail generation with a clear message instead.
-    /// </summary>
-    internal static void RejectInheritedDtoProperties(INamedTypeSymbol type)
-    {
-        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
-        {
-            if (baseType.SpecialType is SpecialType.System_Object or SpecialType.System_ValueType)
-            {
-                continue;
-            }
-
-            foreach (var member in baseType.GetMembers())
-            {
-                if (member is IPropertySymbol
-                    {
-                        DeclaredAccessibility: Accessibility.Public,
-                        IsStatic: false,
-                        GetMethod: not null,
-                        IsIndexer: false
-                    } property &&
-                    !property.IsImplicitlyDeclared &&
-                    !IsIgnoredDataMember(property))
-                {
-                    throw new NotSupportedException(
-                        $"Server extension DTO '{type.ToDisplayString()}' must not inherit public properties from " +
-                        $"base type '{baseType.ToDisplayString()}'; flatten the DTO into a single type.");
-                }
-            }
-        }
-    }
-
     private static string Scalar(string name) => "\"" + name + "\"";
 
+    private static bool IsUnsupportedFrameworkStruct(INamedTypeSymbol type)
+        => type.ContainingNamespace.ToDisplayString() == "System" &&
+           type.Name is "DateTime" or "DateTimeOffset" or "TimeSpan";
 }
-
-/// <summary>
-/// A DTO/record field for marshalling: a public property, or (for a field-only value type) a public field.
-/// <see cref="Symbol"/> is the underlying property/field symbol for callers that need more than name and type.
-/// </summary>
-internal readonly record struct RecordMember(string Name, ITypeSymbol Type, ISymbol Symbol);

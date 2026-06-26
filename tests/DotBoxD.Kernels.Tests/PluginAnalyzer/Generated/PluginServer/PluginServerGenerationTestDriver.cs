@@ -11,11 +11,19 @@ internal static class PluginServerGenerationTestDriver
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
     public static (string Generated, Compilation OutputCompilation) Run(string source)
+        => Run(source, includePushdownServices: true);
+
+    public static (string Generated, Compilation OutputCompilation) RunWithoutPushdownServices(string source)
+        => Run(source, includePushdownServices: false);
+
+    private static (string Generated, Compilation OutputCompilation) Run(
+        string source,
+        bool includePushdownServices)
     {
         var compilation = CSharpCompilation.Create(
             "DotBoxDPluginServerRegressionTest",
             [CSharpSyntaxTree.ParseText(source, ParseOptions)],
-            TrustedPlatformReferences()
+            TrustedPlatformReferences(includePushdownServices)
                 .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
                 .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
@@ -31,6 +39,24 @@ internal static class PluginServerGenerationTestDriver
         return (generated, outputCompilation);
     }
 
+    public static IReadOnlyList<Diagnostic> Diagnostics(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDPluginServerDiagnosticTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+
+        return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+    }
+
     public static void AssertNoCompilationErrors(Compilation compilation)
     {
         Assert.Empty(compilation.GetDiagnostics().Where(IsError));
@@ -41,10 +67,16 @@ internal static class PluginServerGenerationTestDriver
         return diagnostic.Severity == DiagnosticSeverity.Error;
     }
 
-    private static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    private static IEnumerable<MetadataReference> TrustedPlatformReferences(bool includePushdownServices = true)
     {
         var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
-        return references.Select(reference => MetadataReference.CreateFromFile(reference));
+        return references
+            .Where(reference => includePushdownServices ||
+                                !string.Equals(
+                                    Path.GetFileNameWithoutExtension(reference),
+                                    "DotBoxD.Pushdown.Services",
+                                    StringComparison.Ordinal))
+            .Select(reference => MetadataReference.CreateFromFile(reference));
     }
 }

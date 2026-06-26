@@ -11,10 +11,10 @@ internal static partial class HookChainModelFactory
     // terminal handler receives: the final Select element type, or the whole event when there is no Select.
     // Returns null when the type is not wire-eligible (the reader emitter declines) so the chain falls back to
     // the reflective registration.
-    private static string? BuildLocalDecoderSource(ITypeSymbol? projectedTypeSymbol)
+    private static string? BuildLocalDecoderSource(ITypeSymbol? projectedTypeSymbol, Compilation compilation)
         => projectedTypeSymbol is null
             ? null
-            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedTypeSymbol);
+            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedTypeSymbol, compilation);
 
     // The CLR type the pushed value decodes to: the final Select body's type (using the same
     // ConvertedType ?? Type resolution as TerminalElementTypeFullName so the generated ReadProjected return
@@ -147,6 +147,17 @@ internal static partial class HookChainModelFactory
             serverContextType: terminalContextType,
             capabilities: capabilities,
             effects: effects);
+        if (terminalContextParam is not null &&
+            body is InvocationExpressionSyntax helperInvocation &&
+            DotBoxDKernelMethodInliner.TryInlineSendHandle(
+                helperInvocation,
+                terminalContextParam,
+                context,
+                part => DotBoxDExpressionModelFactory.Create(part, context)) is { } helperHandle)
+        {
+            return DotBoxDHandleBodyModelFactory.FromSend(helperHandle with { Prefix = projection?.Prefix });
+        }
+
         var expression = DotBoxDExpressionModelFactory.Create(body, context);
         if (!string.Equals(expression.Type, DotBoxDGenerationNames.ManifestTypes.Unit, StringComparison.Ordinal))
         {
@@ -239,19 +250,20 @@ internal static partial class HookChainModelFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (lambda is not ParenthesizedLambdaExpressionSyntax parenthesized)
+        if (lambda is ParenthesizedLambdaExpressionSyntax parenthesized)
         {
-            return null;
-        }
-
-        foreach (var parameter in parenthesized.ParameterList.Parameters)
-        {
-            if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
+            foreach (var parameter in parenthesized.ParameterList.Parameters)
             {
-                return (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
+                if (string.Equals(parameter.Identifier.ValueText, parameterName, StringComparison.Ordinal))
+                {
+                    var type = (model.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol)?.Type;
+                    return type is { TypeKind: not TypeKind.Error }
+                        ? type
+                        : GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
+                }
             }
         }
 
-        return null;
+        return GeneratedRemoteHookChainFallback.ServerContextTypeForLambda(lambda, model, cancellationToken);
     }
 }

@@ -18,7 +18,13 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _writers = new(StringComparer.Ordinal);
+    private readonly Compilation? _compilation;
     private int _nextHelper;
+
+    public RpcKernelValueConversionEmitter(Compilation? compilation = null)
+    {
+        _compilation = compilation;
+    }
 
     /// <summary>The accumulated helper method definitions, appended after the emitter's own members.</summary>
     public string Helpers => _helpers.ToString();
@@ -60,8 +66,8 @@ internal sealed partial class RpcKernelValueConversionEmitter
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
             return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
-                ? $"global::DotBoxD.Plugins.KernelRpcValue.Int64((long){expression})"
-                : $"global::DotBoxD.Plugins.KernelRpcValue.Int32((int){expression})";
+                ? $"global::DotBoxD.Plugins.KernelRpcValue.Int64(unchecked((long){expression}))"
+                : $"global::DotBoxD.Plugins.KernelRpcValue.Int32(unchecked((int){expression}))";
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
@@ -92,7 +98,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
             var accessor = DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? "Int64Value" : "Int32Value";
-            return $"({TypeName(type)})({expression}.{accessor})";
+            return $"unchecked(({TypeName(type)}){expression}.{accessor})";
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)

@@ -64,6 +64,15 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                 static (syntaxContext, ct) => HookChainModelFactory.Create(syntaxContext, ct))
             .Where(static result => result is not null)
             .Select(static (result, _) => result!);
+        var remoteStagedUseDiagnostics = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => RemoteStagedUseDiagnosticFactory.IsCandidate(node),
+                static (syntaxContext, ct) => RemoteStagedUseDiagnosticFactory.Create(syntaxContext, ct))
+            .Where(static diagnostic => diagnostic is not null)
+            .Select(static (diagnostic, _) => diagnostic!);
+        context.RegisterSourceOutput(
+            remoteStagedUseDiagnostics,
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         // Report DBXK111 for a recognized remote RunLocal chain whose stages could not be lowered, so the
         // otherwise-silent skip (and the runtime NotSupportedException it leads to) is visible at build time.
@@ -71,6 +80,11 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             chainCreateResults
                 .Where(static result => result.Diagnostic is not null)
                 .Select(static (result, _) => result.Diagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            chainCreateResults
+                .Where(static result => result.UnsupportedDiagnostic is not null)
+                .Select(static (result, _) => result.UnsupportedDiagnostic!),
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var chainResults = chainCreateResults
@@ -91,6 +105,17 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             rpcResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
+        var serverExtensionMethodDiagnostics = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                DotBoxDMetadataNames.ServerExtensionMethodAttribute,
+                static (node, _) => node is MethodDeclarationSyntax,
+                static (ctx, ct) => ServerExtensionMethodDiagnosticFactory.Create(ctx, ct))
+            .Where(static diagnostic => diagnostic is not null)
+            .Select(static (diagnostic, _) => diagnostic!);
+        context.RegisterSourceOutput(
+            serverExtensionMethodDiagnostics,
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+
         var rpcPackages = rpcResults
             .Where(static result => result.Package is not null)
             .Select(static (result, _) => result.Package!)
@@ -101,12 +126,17 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                 static (node, _) => node is InvocationExpressionSyntax
                 {
                     Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" }
+                        or IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" }
+                        or GenericNameSyntax { Identifier.ValueText: "InvokeAsync" }
                 },
                 static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct))
             .Where(static result => result is not null)
             .Select(static (result, _) => result!);
         context.RegisterSourceOutput(
-            invokeAsyncResults.Select(static (result, _) => result.Package),
+            invokeAsyncResults.Where(static result => result.Diagnostic is not null).Select(static (result, _) => result.Diagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            invokeAsyncResults.Where(static result => result.Package is not null).Select(static (result, _) => result.Package!),
             static (sourceContext, package) => sourceContext.AddSource(package.HintName, package.Source));
 
         var pluginServerResults = context.SyntaxProvider

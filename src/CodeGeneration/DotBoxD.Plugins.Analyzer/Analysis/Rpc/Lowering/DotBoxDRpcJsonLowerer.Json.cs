@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
@@ -10,6 +11,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             bool b => Obj(("bool", b ? "true" : "false")),
             int i => Obj(("i32", i.ToString(CultureInfo.InvariantCulture))),
             long l => Obj(("i64", l.ToString(CultureInfo.InvariantCulture))),
+            float f => FiniteDoubleLiteralJson(f),
             double d => FiniteDoubleLiteralJson(d),
             string s => Obj(("string", Str(s))),
             _ => throw new NotSupportedException($"Kernel RPC service literal '{value}' is not supported.")
@@ -27,7 +29,39 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal static string Var(string name) => Obj(("var", Str(name)));
 
+    private static string Unit() => Obj(("unit", "true"));
+
     private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));
+
+    private static string I64(long value) => Obj(("i64", value.ToString(CultureInfo.InvariantCulture)));
+
+    private static string EnumLiteralJson(INamedTypeSymbol enumType, object? value)
+    {
+        if (value is null)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service enum literal '{enumType.ToDisplayString()}' is not supported.");
+        }
+
+        return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+            ? I64(EnumInt64Value(enumType, value))
+            : I32(unchecked((int)EnumInt64Value(enumType, value)));
+    }
+
+    private static long EnumInt64Value(INamedTypeSymbol enumType, object value)
+        => enumType.EnumUnderlyingType?.SpecialType switch
+        {
+            SpecialType.System_UInt64 => unchecked((long)(ulong)value),
+            SpecialType.System_UInt32 => (uint)value,
+            SpecialType.System_Int64 => (long)value,
+            SpecialType.System_Int32 => (int)value,
+            SpecialType.System_UInt16 => (ushort)value,
+            SpecialType.System_Int16 => (short)value,
+            SpecialType.System_Byte => (byte)value,
+            SpecialType.System_SByte => (sbyte)value,
+            _ => throw new NotSupportedException(
+                $"Kernel RPC service enum literal '{enumType.ToDisplayString()}' is not supported.")
+        };
 
     private static string BinaryJson(string op, string left, string right)
         => Obj(("op", Str(op)), ("left", left), ("right", right));
