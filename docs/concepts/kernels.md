@@ -17,8 +17,10 @@ Lifecycle (via `SandboxHost` in `DotBoxD.Hosting`):
 Everything is **metered**: fuel, loop iterations, call depth, list length, output bytes, and
 per-capability quotas. A buggy or hostile kernel cannot exhaust host resources or reach disallowed
 effects. Host capabilities (files, time, random, logging, HTTP via `DotBoxD.Hosting.Http`) are exposed
-only through explicit **capability grants** — see [capabilities-and-bindings](../security/sandbox-caveats.md)
-and the full spec under [`docs/Specs/`](../Specs/).
+only through explicit **capability grants**. Hosts can add their own registered bindings for external
+APIs; see [host-bindings.md](host-bindings.md),
+[capabilities-and-bindings](../security/sandbox-caveats.md), and the full spec under
+[`docs/Specs/`](../Specs/).
 
 Async binding tails are also capability-gated. Policies must grant `dotboxd.runtime.async` via
 `AllowRuntimeAsync()` before kernels can call bindings that may complete asynchronously.
@@ -27,6 +29,7 @@ Async binding tails are also capability-gated. Policies must grant `dotboxd.runt
 > plugin assembly — see [security/sandbox-caveats.md](../security/sandbox-caveats.md).
 
 Diagnostics use the `DBXK###` prefix. **See also:** the GameServer sample under
-[`samples/GameServer`](../../samples/GameServer), [runtime](runtime.md), and
+[`samples/GameServer`](../../samples/GameServer), [runtime](runtime.md),
+[host bindings](host-bindings.md), and
 [`docs/examples/coverage-gaps.md`](../examples/coverage-gaps.md) for kernel scenarios no longer shown
 by maintained samples.

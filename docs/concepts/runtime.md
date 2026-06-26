@@ -31,6 +31,11 @@ author-supplied logic safe to run in-process. See
 [security/sandbox-caveats.md](../security/sandbox-caveats.md) and the full specification under
 [`docs/Specs/`](../Specs/).
 
+Hosts can expose their own APIs through the same binding model. For the service-based route, annotate
+`[DotBoxDService]` methods with `[HostCapability]` and register the host implementation with
+`SandboxHostBuilder.AddBindingsFrom<TService>()`; for lower-level control, register a
+`BindingDescriptor` directly. See [host-bindings.md](host-bindings.md).
+
 Async-capable bindings are opt-in. A binding marked `BindingDescriptor.IsAsync` adds the
 `Concurrency` effect and requires the `dotboxd.runtime.async` runtime capability. Hosts grant it with
 `SandboxPolicyBuilder.AllowRuntimeAsync()`; without that grant, preparation fails closed and the

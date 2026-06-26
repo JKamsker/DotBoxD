@@ -68,6 +68,8 @@ compile time.
 
 A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host imports it,
 validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
+Hosts can still expose their own APIs deliberately through policy-gated host bindings; see
+[`docs/concepts/host-bindings.md`](docs/concepts/host-bindings.md).
 
 ```csharp
 using DotBoxD.Hosting;

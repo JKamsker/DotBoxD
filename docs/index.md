@@ -24,8 +24,9 @@ flowchart LR
 
 - **Getting started** — [`getting-started/`](getting-started/): install, first service, first kernel,
   pushdown quickstart.
-- **Concepts** — [`concepts/`](concepts/): services, kernels, pushdown, channels & transports, the
-  kernel runtime (interpreted vs verified-IL, fuel/quotas/capabilities).
+- **Concepts** — [`concepts/`](concepts/): services, kernels, pushdown,
+  [host bindings](concepts/host-bindings.md), channels & transports, the kernel runtime (interpreted
+  vs verified-IL, fuel/quotas/capabilities).
 - **Security** — [`security/`](security/): the threat model and the all-important
   [sandbox caveats](security/sandbox-caveats.md) (what is and isn't a boundary). See also the top-level
   [`SECURITY.md`](../SECURITY.md).
