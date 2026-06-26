@@ -5,7 +5,7 @@ using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
-public sealed class ServerExtensionSurpriseRegressionTests
+public sealed partial class ServerExtensionSurpriseRegressionTests
 {
     [Fact]
     public void Direct_extension_honors_method_level_receiver_and_name()

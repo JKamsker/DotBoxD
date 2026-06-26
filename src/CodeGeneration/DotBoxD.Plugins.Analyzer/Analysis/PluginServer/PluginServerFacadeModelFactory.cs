@@ -42,7 +42,13 @@ internal static partial class PluginServerFacadeModelFactory
         var liveSettingUpdateType = ResolveLiveSettingUpdateType(controlServiceType, cancellationToken)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' must declare UpdateSettingsAsync with a typed array parameter carrying the live-setting updates.");
+        ValidatePublicFacadeSignatureTypes(type, worldType, controlServiceType, liveSettingUpdateType);
         var controls = ResolveControls(worldType, cancellationToken);
+        var worldMethods = ResolveMethods(
+            worldType,
+            new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal),
+            cancellationToken);
+        ValidateGeneratedSurfaceCollisions(worldType, worldMethods, controls);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
         var context = ResolveContext(type, compilation, cancellationToken);
@@ -69,50 +75,14 @@ internal static partial class PluginServerFacadeModelFactory
                 cancellationToken),
             TypeName(controlServiceType),
             TypeName(liveSettingUpdateType),
-            new EquatableArray<PluginServerForwardedMethod>(
-                ResolveMethods(worldType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
+            new EquatableArray<PluginServerForwardedMethod>(worldMethods),
             new EquatableArray<PluginServerControlProperty>(controls),
             eventCallback is null ? null : TypeName(eventCallback.Value.Type),
             eventCallback?.ProvideSuffix,
             eventCallback is null ? null : TypeName(eventCallback.Value.ReturnType),
             eventCallback?.ReturnHasValue ?? false);
     }
-    private static PluginServerControlProperty[] ResolveControls(
-        INamedTypeSymbol worldType,
-        CancellationToken cancellationToken)
-    {
-        var controls = new List<PluginServerControlProperty>();
-        var seenProperties = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var member in MembersIncludingInherited(worldType))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (member is not IPropertySymbol
-                {
-                    IsStatic: false,
-                    GetMethod: not null,
-                    SetMethod: null,
-                    Type: INamedTypeSymbol propertyType
-                } property ||
-                !HasAttribute(propertyType, DotBoxDMetadataNames.DotBoxDServiceAttribute) ||
-                !seenProperties.Add(property.Name))
-            {
-                continue;
-            }
-            controls.Add(new PluginServerControlProperty(
-                property.Name,
-                TypeName(propertyType),
-                PluginServerXmlDocumentation.FromSymbol(
-                    property,
-                    "Accesses the server's " + property.Name + " domain control after StartAsync.",
-                    cancellationToken),
-                property.Name + "PluginControl",
-                propertyType.Name + "Accumulator",
-                new EquatableArray<PluginServerForwardedMethod>(
-                    ResolveMethods(propertyType, new Dictionary<string, ServiceWrapperBuilder>(StringComparer.Ordinal), cancellationToken)),
-                new EquatableArray<PluginServerServiceWrapper>(ResolveServiceWrappers(propertyType, cancellationToken))));
-        }
-        return controls.ToArray();
-    }
+
     private static PluginServerForwardedMethod[] ResolveMethods(
         INamedTypeSymbol controlType,
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,

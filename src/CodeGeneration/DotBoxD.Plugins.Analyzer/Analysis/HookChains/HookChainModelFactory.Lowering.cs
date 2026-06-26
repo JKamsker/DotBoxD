@@ -11,10 +11,10 @@ internal static partial class HookChainModelFactory
     // terminal handler receives: the final Select element type, or the whole event when there is no Select.
     // Returns null when the type is not wire-eligible (the reader emitter declines) so the chain falls back to
     // the reflective registration.
-    private static string? BuildLocalDecoderSource(ITypeSymbol? projectedTypeSymbol)
+    private static string? BuildLocalDecoderSource(ITypeSymbol? projectedTypeSymbol, Compilation compilation)
         => projectedTypeSymbol is null
             ? null
-            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedTypeSymbol);
+            : Rpc.RpcLocalDecoderEmitter.TryEmit(projectedTypeSymbol, compilation);
 
     // The CLR type the pushed value decodes to: the final Select body's type (using the same
     // ConvertedType ?? Type resolution as TerminalElementTypeFullName so the generated ReadProjected return

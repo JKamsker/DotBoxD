@@ -81,6 +81,11 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                 .Where(static result => result.Diagnostic is not null)
                 .Select(static (result, _) => result.Diagnostic!),
             static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            chainCreateResults
+                .Where(static result => result.UnsupportedDiagnostic is not null)
+                .Select(static (result, _) => result.UnsupportedDiagnostic!),
+            static (sourceContext, diagnostic) => sourceContext.ReportDiagnostic(diagnostic.ToDiagnostic()));
 
         var chainResults = chainCreateResults
             .Where(static result => result.Chain is not null)

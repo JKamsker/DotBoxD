@@ -18,7 +18,13 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _writers = new(StringComparer.Ordinal);
+    private readonly Compilation? _compilation;
     private int _nextHelper;
+
+    public RpcKernelValueConversionEmitter(Compilation? compilation = null)
+    {
+        _compilation = compilation;
+    }
 
     /// <summary>The accumulated helper method definitions, appended after the emitter's own members.</summary>
     public string Helpers => _helpers.ToString();

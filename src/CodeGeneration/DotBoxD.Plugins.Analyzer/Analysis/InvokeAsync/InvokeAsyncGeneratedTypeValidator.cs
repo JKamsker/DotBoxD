@@ -5,30 +5,45 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
 internal static class InvokeAsyncGeneratedTypeValidator
 {
+    private const int MaxTypeDepth = 8;
+
     public static void Validate(InvokeAsyncCallShape shape, Compilation compilation)
     {
-        ValidateType(shape.ReturnType, compilation, "return type");
+        ValidateType(shape.ReturnType, compilation, "return type", 0, NewVisitingSet());
         foreach (var argumentType in shape.ArgumentTypes)
         {
-            ValidateType(argumentType, compilation, "capture type");
+            ValidateType(argumentType, compilation, "capture type", 0, NewVisitingSet());
         }
 
         if (shape.CaptureType is { } captureType)
         {
-            ValidateType(captureType, compilation, "capture bag type");
+            ValidateType(captureType, compilation, "capture bag type", 0, NewVisitingSet());
         }
 
         foreach (var syncOut in shape.SyncOuts)
         {
-            ValidateType(syncOut.Type, compilation, "capture member '" + syncOut.TargetName + "'");
+            ValidateType(syncOut.Type, compilation, "capture member '" + syncOut.TargetName + "'", 0, NewVisitingSet());
         }
     }
 
-    private static void ValidateType(ITypeSymbol type, Compilation compilation, string role)
+    private static void ValidateType(
+        ITypeSymbol type,
+        Compilation compilation,
+        string role,
+        int depth,
+        HashSet<ITypeSymbol> visiting)
     {
+        if (DotBoxDNullableScalarType.IsNullableValueType(type) ||
+            type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync {role} '{type.ToDisplayString()}' cannot be nullable because kernel RPC does not encode null values.");
+        }
+
         if (type is IArrayTypeSymbol array)
         {
-            ValidateType(array.ElementType, compilation, role + " element");
+            RejectTooDeep(type, role, depth);
+            ValidateType(array.ElementType, compilation, role + " element", depth + 1, visiting);
             return;
         }
 
@@ -57,7 +72,7 @@ internal static class InvokeAsyncGeneratedTypeValidator
 
         foreach (var typeArgument in named.TypeArguments)
         {
-            ValidateType(typeArgument, compilation, role + " type argument");
+            ValidateType(typeArgument, compilation, role + " type argument", depth + 1, visiting);
         }
 
         if (DotBoxDRpcTypeMapper.IsScalar(type) ||
@@ -69,23 +84,51 @@ internal static class InvokeAsyncGeneratedTypeValidator
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is { } elementType)
         {
-            ValidateType(elementType, compilation, role + " element");
+            RejectTooDeep(type, role, depth);
+            ValidateType(elementType, compilation, role + " element", depth + 1, visiting);
             return;
         }
 
         if (DotBoxDRpcTypeMapper.MapTypes(type) is { } map)
         {
-            ValidateType(map.Key, compilation, role + " key");
-            ValidateType(map.Value, compilation, role + " value");
+            RejectTooDeep(type, role, depth);
+            ValidateType(map.Key, compilation, role + " key", depth + 1, visiting);
+            ValidateType(map.Value, compilation, role + " value", depth + 1, visiting);
             return;
         }
 
         if (DotBoxDRpcTypeMapper.IsRecordDto(named))
         {
-            foreach (var field in DotBoxDRpcTypeMapper.RecordFields(named))
+            RejectTooDeep(type, role, depth);
+            if (!visiting.Add(named))
             {
-                ValidateType(field.Type, compilation, role + " member '" + field.Name + "'");
+                throw new NotSupportedException(
+                    $"InvokeAsync {role} '{type.ToDisplayString()}' is cyclic; recursive DTO shapes are not supported.");
+            }
+
+            try
+            {
+                foreach (var field in DotBoxDRpcTypeMapper.RecordFields(named))
+                {
+                    ValidateType(field.Type, compilation, role + " member '" + field.Name + "'", depth + 1, visiting);
+                }
+            }
+            finally
+            {
+                visiting.Remove(named);
             }
         }
     }
+
+    private static void RejectTooDeep(ITypeSymbol type, string role, int depth)
+    {
+        if (depth >= MaxTypeDepth)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync {role} '{type.ToDisplayString()}' exceeds the supported RPC shape depth.");
+        }
+    }
+
+    private static HashSet<ITypeSymbol> NewVisitingSet()
+        => new(SymbolEqualityComparer.Default);
 }

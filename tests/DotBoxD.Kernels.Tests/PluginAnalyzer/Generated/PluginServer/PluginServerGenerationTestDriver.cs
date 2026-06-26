@@ -31,6 +31,24 @@ internal static class PluginServerGenerationTestDriver
         return (generated, outputCompilation);
     }
 
+    public static IReadOnlyList<Diagnostic> Diagnostics(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDPluginServerDiagnosticTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+
+        return driver.RunGenerators(compilation).GetRunResult().Diagnostics;
+    }
+
     public static void AssertNoCompilationErrors(Compilation compilation)
     {
         Assert.Empty(compilation.GetDiagnostics().Where(IsError));

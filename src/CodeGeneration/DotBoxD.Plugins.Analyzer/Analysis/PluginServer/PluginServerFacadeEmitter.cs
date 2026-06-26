@@ -80,7 +80,8 @@ internal static class PluginServerFacadeEmitter
             builder,
             string.Empty,
             "Generated plugin-side client for the remote world domain. Call StartAsync before using runtime domain, hook, subscription, or server extension APIs.");
-        builder.Append(model.Accessibility).Append(" partial class ").Append(model.ClassName)
+        builder.Append(model.Accessibility).Append(" partial class ")
+            .Append(PluginServerIdentifier.Escape(model.ClassName))
             .Append(" : ").AppendLine(model.ServerInterfaceName);
         builder.AppendLine("{");
         builder.AppendLine("    private const string NotStartedMessage = \"Call StartAsync() before using the server.\";");
@@ -101,11 +102,12 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("    private global::DotBoxD.Services.Peer.RpcPeerSession? _session;");
         foreach (var control in model.Controls)
         {
-            builder.Append("    private ").Append(control.WrapperName).Append("? _")
-                .Append(FieldName(control.Name)).AppendLine(";");
+            builder.Append("    private ").Append(control.WrapperName).Append("? ")
+                .Append(control.FieldName).AppendLine(";");
         }
         builder.AppendLine("    private bool _started;");
         builder.AppendLine("    private bool _setupReplayed;");
+        builder.AppendLine("    private int _setupReplayIndex;");
         builder.AppendLine("    private bool _configured;");
         builder.AppendLine("    private bool _disposed;");
         builder.AppendLine();
@@ -113,7 +115,8 @@ internal static class PluginServerFacadeEmitter
             builder,
             "    ",
             "Creates a generated plugin server over an already connected control-plane service.");
-        builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
+        builder.Append("    public ").Append(PluginServerIdentifier.Escape(model.ClassName)).Append('(')
+            .Append(model.ControlServiceType)
             .Append(" control, ").Append(model.WorldType).AppendLine("? world = null)");
         builder.AppendLine("        : this(control, world, setup: null)");
         builder.AppendLine("    {");
@@ -123,7 +126,8 @@ internal static class PluginServerFacadeEmitter
             builder,
             "    ",
             "Creates a generated plugin server and records setup actions for replay when the server starts.");
-        builder.Append("    public ").Append(model.ClassName).Append('(').Append(model.ControlServiceType)
+        builder.Append("    public ").Append(PluginServerIdentifier.Escape(model.ClassName)).Append('(')
+            .Append(model.ControlServiceType)
             .Append(" control, ").Append(model.WorldType).Append("? world, global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
         builder.AppendLine("    {");
@@ -133,13 +137,13 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        _started = true;");
         builder.AppendLine("    }");
         builder.AppendLine();
-        builder.Append("    internal ").Append(model.ClassName)
+        builder.Append("    internal ").Append(PluginServerIdentifier.Escape(model.ClassName))
             .AppendLine("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory)");
         builder.AppendLine("        : this(connectionFactory, setup: null)");
         builder.AppendLine("    {");
         builder.AppendLine("    }");
         builder.AppendLine();
-        builder.Append("    internal ").Append(model.ClassName)
+        builder.Append("    internal ").Append(PluginServerIdentifier.Escape(model.ClassName))
             .Append("(global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>> connectionFactory, global::System.Action<")
             .Append(model.SetupInterfaceName).AppendLine(">? setup)");
         builder.AppendLine("    {");
@@ -241,8 +245,9 @@ internal static class PluginServerFacadeEmitter
         builder.AppendLine("        _subscriptions = new " + model.SubscriptionRegistryName + "(package => InstallSubscriptionPackageAsync(package)" + localHandlersArg + ");");
         foreach (var control in model.Controls)
         {
-            builder.Append("        _").Append(FieldName(control.Name)).Append(" = world is null ? null : new ")
-                .Append(control.WrapperName).Append("(this, world.").Append(control.Name).AppendLine(");");
+            builder.Append("        ").Append(control.FieldName).Append(" = world is null ? null : new ")
+                .Append(control.WrapperName).Append("(this, world.")
+                .Append(PluginServerIdentifier.Escape(control.Name)).AppendLine(");");
         }
         builder.AppendLine("    }");
         builder.AppendLine("    private " + model.ControlServiceType + " RequireControl() => _started && _control is not null ? _control : throw new global::System.InvalidOperationException(NotStartedMessage);");
@@ -255,9 +260,11 @@ internal static class PluginServerFacadeEmitter
         foreach (var method in model.WorldMethods)
         {
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
-            builder.Append("    public ").Append(method.ReturnType).Append(' ').Append(method.Name)
+            builder.Append("    public ").Append(method.ReturnType).Append(' ')
+                .Append(PluginServerIdentifier.Escape(method.Name))
                 .Append('(').Append(ParameterList(method)).Append(") => RequireWorld().")
-                .Append(method.Name).Append('(').Append(ArgumentList(method)).AppendLine(");");
+                .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
+                .Append(ArgumentList(method)).AppendLine(");");
         }
 
         if (model.WorldMethods.Count > 0)
@@ -270,10 +277,10 @@ internal static class PluginServerFacadeEmitter
     {
         builder.AppendLine("    private sealed class LiveSettingsHandle<TKernel> : global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> where TKernel : class, new()");
         builder.AppendLine("    {");
-        builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
+        builder.AppendLine("        private readonly " + PluginServerIdentifier.Escape(model.ClassName) + " _owner;");
         builder.AppendLine("        private readonly string _pluginId;");
         builder.AppendLine("        private readonly global::System.Collections.Generic.List<" + model.LiveSettingUpdateType + "> _updates = new();");
-        builder.AppendLine("        public LiveSettingsHandle(" + model.ClassName + " owner, string pluginId) { _owner = owner; _pluginId = pluginId; }");
+        builder.AppendLine("        public LiveSettingsHandle(" + PluginServerIdentifier.Escape(model.ClassName) + " owner, string pluginId) { _owner = owner; _pluginId = pluginId; }");
         builder.AppendLine("        public global::DotBoxD.Abstractions.ILiveSettingsHandle<TKernel> Set<TValue>(global::System.Linq.Expressions.Expression<global::System.Func<TKernel, TValue>> member, TValue value)");
         builder.AppendLine("        {");
         builder.AppendLine("            var body = member.Body is global::System.Linq.Expressions.UnaryExpression unary ? unary.Operand : member.Body;");
@@ -308,9 +315,6 @@ internal static class PluginServerFacadeEmitter
 
     private static string ArgumentList(PluginServerForwardedMethod method)
         => string.Join(", ", method.Parameters.Select(p => "@" + p.Name));
-
-    private static string FieldName(string propertyName)
-        => char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
 
     private static string HintName(PluginServerFacadeModel model)
         => (string.IsNullOrWhiteSpace(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName) +

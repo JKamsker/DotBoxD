@@ -81,9 +81,16 @@ internal sealed partial class RpcKernelValueConversionEmitter
         {
             var construction = "new " + TypeName(type) + "(" +
                 string.Join(", ", DtoConstructorArguments(fields, constructor.Symbol)) + ")";
-            if (!HasWritableUnassignedField(fields, constructor.Assigned))
+            if (constructor.AssignedCount == fields.Count)
             {
                 return "        return " + construction + ";";
+            }
+
+            if (!CanReconstructAllUnassignedFields(fields, constructor.Assigned))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type.ToDisplayString()}' constructor '{constructor.Symbol.ToDisplayString()}' " +
+                    "does not assign every public field and the remaining fields are not settable.");
             }
 
             return BuildDtoInitializer("        return " + construction, fields, constructor.Assigned);
@@ -145,13 +152,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
         return arguments;
     }
 
-    private static ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         ResolvedDtoConstructor? partial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (constructor.DeclaredAccessibility is not (
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
+            if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
                 constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
@@ -196,7 +202,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
     /// (<c>set</c> or <c>init</c>) and the type is a value type or exposes an accessible parameterless
     /// constructor — the same fallback the runtime marshaller uses.
     /// </summary>
-    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         if (fields.Count == 0)
         {
@@ -210,7 +216,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
         foreach (var field in fields)
         {
-            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation))
             {
                 return false;
             }
@@ -219,13 +225,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
         return true;
     }
 
-    private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
+    private bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
     {
         foreach (var constructor in type.InstanceConstructors)
         {
             if (constructor.Parameters.Length == 0 &&
-                constructor.DeclaredAccessibility is
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal)
+                DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation))
             {
                 return true;
             }
@@ -234,8 +239,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
         return false;
     }
 
-    private static bool HasWritableUnassignedField(IReadOnlyList<RecordMember> fields, bool[] assigned)
-        => fields.Where((_, index) => !assigned[index]).Any(DotBoxDRpcTypeMapper.IsObjectInitializerWritable);
+    private bool CanReconstructAllUnassignedFields(IReadOnlyList<RecordMember> fields, bool[] assigned)
+        => fields.Where((_, index) => !assigned[index])
+            .All(field =>
+                DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation) ||
+                DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(field, fields, assigned));
 
     private static int AssignedCount(bool[] assigned)
         => assigned.Count(static item => item);

@@ -9,11 +9,15 @@ internal sealed partial class InvokeAsyncResultReaderSource
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
     private readonly StringBuilder _helpers = new();
     private readonly string _helperPrefix;
+    private readonly Compilation? _compilation;
     private int _nextHelper;
 
-    public InvokeAsyncResultReaderSource(string helperPrefix = "ReadInvokeAsyncResult")
+    public InvokeAsyncResultReaderSource(
+        string helperPrefix = "ReadInvokeAsyncResult",
+        Compilation? compilation = null)
     {
         _helperPrefix = helperPrefix;
+        _compilation = compilation;
     }
 
     public static (string Expression, string Helpers) Create(ITypeSymbol type, string expression)

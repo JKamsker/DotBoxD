@@ -33,6 +33,7 @@ internal sealed record PluginServerFacadeModel(
 
 internal sealed record PluginServerControlProperty(
     string Name,
+    string FieldName,
     string Type,
     string Documentation,
     string WrapperName,

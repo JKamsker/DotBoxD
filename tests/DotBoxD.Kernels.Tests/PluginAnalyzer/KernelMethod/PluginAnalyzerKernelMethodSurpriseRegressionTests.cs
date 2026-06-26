@@ -86,4 +86,44 @@ public sealed class PluginAnalyzerKernelMethodSurpriseRegressionTests
             diagnostic => diagnostic.Id == "DBXK100" &&
                           diagnostic.GetMessage().Contains("nullable parameter", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void KernelMethod_send_helper_rejects_repeated_non_repeatable_argument()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public interface IProbeWorld
+            {
+                [HostBinding("host.probe.getTarget", "probe.read.target", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+                string GetTarget(string id);
+            }
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    hooks.On<DamageEvent>()
+                        .Run((e, ctx) => SendBoth(ctx, ctx.Host<IProbeWorld>().GetTarget(e.TargetId)));
+                }
+
+                [KernelMethod]
+                public static void SendBoth(HookContext ctx, string value)
+                    => ctx.Messages.Send(value, value);
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("used more than once", StringComparison.Ordinal));
+    }
 }

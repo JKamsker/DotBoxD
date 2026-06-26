@@ -12,13 +12,13 @@ internal static class PluginServerWrapperEmitter
         PluginServerXmlDocumentation.Append(builder, "    ", control.Documentation);
         builder.AppendLine("    public sealed class " + control.WrapperName + " : " + control.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("    {");
-        builder.AppendLine("        private readonly " + model.ClassName + " _owner;");
+        builder.AppendLine("        private readonly " + PluginServerIdentifier.Escape(model.ClassName) + " _owner;");
         builder.AppendLine("        private readonly " + control.Type + " _inner;");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "        ",
             "Creates a generated wrapper around the remote domain control and the owning plugin server.");
-        builder.AppendLine("        public " + control.WrapperName + "(" + model.ClassName + " owner, " + control.Type + " inner) { _owner = owner; _inner = inner; }");
+        builder.AppendLine("        public " + control.WrapperName + "(" + PluginServerIdentifier.Escape(model.ClassName) + " owner, " + control.Type + " inner) { _owner = owner; _inner = inner; }");
         AppendAccessorSurface(builder, "        ");
         foreach (var method in control.Methods)
         {
@@ -41,15 +41,16 @@ internal static class PluginServerWrapperEmitter
         PluginServerXmlDocumentation.Append(builder, "        ", wrapper.Documentation);
         builder.AppendLine("        private sealed class " + wrapper.WrapperName + " : " + wrapper.Type + ", global::DotBoxD.Abstractions.IServerExtensionClientAccessor");
         builder.AppendLine("        {");
-        builder.AppendLine("            private readonly " + model.ClassName + " _owner;");
+        builder.AppendLine("            private readonly " + PluginServerIdentifier.Escape(model.ClassName) + " _owner;");
         builder.AppendLine("            private readonly " + wrapper.Type + " _inner;");
-        builder.AppendLine("            public " + wrapper.WrapperName + "(" + model.ClassName + " owner, " + wrapper.Type + " inner) { _owner = owner; _inner = inner; }");
+        builder.AppendLine("            public " + wrapper.WrapperName + "(" + PluginServerIdentifier.Escape(model.ClassName) + " owner, " + wrapper.Type + " inner) { _owner = owner; _inner = inner; }");
         AppendAccessorSurface(builder, "            ");
         foreach (var property in wrapper.Properties)
         {
             PluginServerXmlDocumentation.Append(builder, "            ", property.Documentation);
-            builder.Append("            public ").Append(property.Type).Append(' ').Append(property.Name)
-                .Append(" => _inner.").Append(property.Name).AppendLine(";");
+            builder.Append("            public ").Append(property.Type).Append(' ')
+                .Append(PluginServerIdentifier.Escape(property.Name))
+                .Append(" => _inner.").Append(PluginServerIdentifier.Escape(property.Name)).AppendLine(";");
         }
 
         foreach (var method in wrapper.Methods)
@@ -78,24 +79,25 @@ internal static class PluginServerWrapperEmitter
             builder.Append("async ");
         }
 
-        builder.Append(method.ReturnType).Append(' ').Append(method.Name)
+        builder.Append(method.ReturnType).Append(' ').Append(PluginServerIdentifier.Escape(method.Name))
             .Append('(').Append(ParameterList(method)).Append(") => ");
         if (method.ReturnWrapperName is null)
         {
-            builder.Append("_inner.").Append(method.Name).Append('(').Append(ArgumentList(method)).AppendLine(");");
+            builder.Append("_inner.").Append(PluginServerIdentifier.Escape(method.Name))
+                .Append('(').Append(ArgumentList(method)).AppendLine(");");
             return;
         }
 
         if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
         {
             builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, await _inner.")
-                .Append(method.Name).Append('(').Append(ArgumentList(method))
+                .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method))
                 .AppendLine(").ConfigureAwait(false));");
             return;
         }
 
         builder.Append("new ").Append(method.ReturnWrapperName).Append("(_owner, _inner.")
-            .Append(method.Name).Append('(').Append(ArgumentList(method)).AppendLine("));");
+            .Append(PluginServerIdentifier.Escape(method.Name)).Append('(').Append(ArgumentList(method)).AppendLine("));");
     }
 
     private static string ParameterList(PluginServerForwardedMethod method)

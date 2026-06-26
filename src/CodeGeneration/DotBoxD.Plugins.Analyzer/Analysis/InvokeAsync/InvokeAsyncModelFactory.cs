@@ -214,7 +214,9 @@ internal static class InvokeAsyncModelFactory
             return null;
         }
 
-        var reader = new InvokeAsyncResultReaderSource("ReadInvokeAsyncResult_" + packageName + "_");
+        var reader = new InvokeAsyncResultReaderSource(
+            "ReadInvokeAsyncResult_" + packageName + "_",
+            model.Compilation);
         var resultExpression = reader.ReadExpression(
             shape.ReturnType,
             shape.SyncOuts.Count == 0 ? "__result" : "__result.GetItem(0)");

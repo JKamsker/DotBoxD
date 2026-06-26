@@ -6,21 +6,31 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelPayloadDtoReaderBuilder
 {
-    public static string BuildReconstruction(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    public static string BuildReconstruction(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        Compilation? compilation = null)
     {
-        if (TryResolveConstructor(type, fields) is { } constructor)
+        if (TryResolveConstructor(type, fields, compilation) is { } constructor)
         {
             var construction = "new " + TypeName(type) + "(" +
                 string.Join(", ", DtoConstructorArguments(fields, constructor.Symbol)) + ")";
-            if (!HasWritableUnassignedField(fields, constructor.Assigned))
+            if (constructor.AssignedCount == fields.Count)
             {
                 return "        return " + construction + ";";
+            }
+
+            if (!CanReconstructAllUnassignedFields(fields, constructor.Assigned, compilation))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type.ToDisplayString()}' constructor '{constructor.Symbol.ToDisplayString()}' " +
+                    "does not assign every public field and the remaining fields are not settable.");
             }
 
             return BuildInitializer("        return " + construction, fields, constructor.Assigned);
         }
 
-        if (CanUseObjectInitializer(type, fields))
+        if (CanUseObjectInitializer(type, fields, compilation))
         {
             return BuildInitializer("        return new " + TypeName(type), fields, assigned: null);
         }
@@ -64,13 +74,15 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         return initializer.ToString();
     }
 
-    private static ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private static ResolvedDtoConstructor? TryResolveConstructor(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        Compilation? compilation)
     {
         ResolvedDtoConstructor? partial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (constructor.DeclaredAccessibility is not (
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
+            if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation) ||
                 constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
@@ -110,19 +122,28 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         return partial;
     }
 
-    private static bool HasWritableUnassignedField(IReadOnlyList<RecordMember> fields, bool[] assigned)
-        => fields.Where((_, index) => !assigned[index]).Any(DotBoxDRpcTypeMapper.IsObjectInitializerWritable);
+    private static bool CanReconstructAllUnassignedFields(
+        IReadOnlyList<RecordMember> fields,
+        bool[] assigned,
+        Compilation? compilation)
+        => fields.Where((_, index) => !assigned[index])
+            .All(field =>
+                DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, compilation) ||
+                DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(field, fields, assigned));
 
-    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private static bool CanUseObjectInitializer(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        Compilation? compilation)
     {
-        if (fields.Count == 0 || (!type.IsValueType && !HasAccessibleParameterlessConstructor(type)))
+        if (fields.Count == 0 || (!type.IsValueType && !HasAccessibleParameterlessConstructor(type, compilation)))
         {
             return false;
         }
 
         foreach (var field in fields)
         {
-            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, compilation))
             {
                 return false;
             }
@@ -131,11 +152,10 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         return true;
     }
 
-    private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
-        => type.InstanceConstructors.Any(static constructor =>
+    private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type, Compilation? compilation)
+        => type.InstanceConstructors.Any(constructor =>
             constructor.Parameters.Length == 0 &&
-            constructor.DeclaredAccessibility is
-                Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal);
+            DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation));
 
     private static string FieldLocal(int index)
         => "__field" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);

@@ -41,6 +41,21 @@ internal static class RpcKernelClientExtensionModelFactory
         => HasAttribute(symbol, DotBoxDMetadataNames.ServerExtensionClientAttribute) ||
            HasAttribute(symbol, DotBoxDMetadataNames.ServerExtensionMethodAttribute);
 
+    public static bool HasReceiverExtensionAttribute(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (AttributeMatches(attribute, DotBoxDMetadataNames.ServerExtensionMethodAttribute) &&
+                attribute.ConstructorArguments.Length > 0 &&
+                attribute.ConstructorArguments[0].Value is INamedTypeSymbol)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static RpcKernelClientPropertyExtension? ResolveClientProperty(INamedTypeSymbol kernelType)
     {
         foreach (var attribute in kernelType.GetAttributes())

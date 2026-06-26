@@ -13,7 +13,13 @@ internal sealed class RpcKernelPayloadReadEmitter
 {
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
+    private readonly Compilation? _compilation;
     private int _nextHelper;
+
+    public RpcKernelPayloadReadEmitter(Compilation? compilation = null)
+    {
+        _compilation = compilation;
+    }
 
     public string Helpers => _helpers.ToString();
 
@@ -157,7 +163,7 @@ internal sealed class RpcKernelPayloadReadEmitter
             fieldReads[i] = ReadExpression(fields[i].Type, "reader");
         }
 
-        var body = RpcKernelPayloadDtoReaderBuilder.BuildReconstruction(type, fields);
+        var body = RpcKernelPayloadDtoReaderBuilder.BuildReconstruction(type, fields, _compilation);
         _helpers.Append("    private static ").Append(TypeName(type)).Append(' ').Append(method)
             .AppendLine("(ref global::DotBoxD.Plugins.KernelRpcPayloadReader reader)");
         _helpers.AppendLine("    {");

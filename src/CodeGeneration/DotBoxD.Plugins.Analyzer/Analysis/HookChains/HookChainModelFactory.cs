@@ -1,4 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -25,7 +26,6 @@ internal static partial class HookChainModelFactory
     private const string WhereMethod = "Where";
     private const string SelectMethod = "Select";
     private const string OnMethod = "On";
-
     public static HookChainCreateResult? Create(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -40,17 +40,24 @@ internal static partial class HookChainModelFactory
         {
             chain = TryCreate(invocation, context.SemanticModel, cancellationToken);
         }
+        catch (KernelMethodArgumentReuseException ex)
+        {
+            return new HookChainCreateResult(
+                null,
+                null,
+                new PluginKernelDiagnostic(
+                    ex.Message,
+                    ex.Location ?? PluginDiagnosticLocation.From(invocation.GetLocation())));
+        }
         catch (NotSupportedException ex)
         {
             chain = null;
             notLoweredDetail = ex.Message;
         }
-
         if (chain is not null)
         {
             return new HookChainCreateResult(chain, null);
         }
-
         return NotLoweredDiagnostic(invocation, context.SemanticModel, cancellationToken, notLoweredDetail);
     }
 
@@ -212,7 +219,7 @@ internal static partial class HookChainModelFactory
         // event when there is no Select). Null for a non-local chain or a type that is not wire-eligible — those
         // keep the reflective 2-arg registration so they do not regress.
         var localDecoderSource = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? BuildLocalDecoderSource(projectedTypeSymbol)
+            ? BuildLocalDecoderSource(projectedTypeSymbol, model.Compilation)
             : null;
 
         var (indexPredicates, indexCoversPredicate) = HookChainIndexPredicateExtractor.Extract(

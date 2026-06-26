@@ -38,11 +38,34 @@ internal sealed record RpcServerExtensionGraft(
         foreach (var member in kernelType.GetMembers())
         {
             if (member is IFieldSymbol field &&
-                SymbolEqualityComparer.Default.Equals(field.Type, receiverType))
+                CanStoreReceiver(field.Type, receiverType))
             {
                 yield return field.Name;
             }
         }
+    }
+
+    private static bool CanStoreReceiver(ITypeSymbol fieldType, INamedTypeSymbol receiverType)
+    {
+        if (SymbolEqualityComparer.Default.Equals(fieldType, receiverType))
+        {
+            return true;
+        }
+
+        if (fieldType is not INamedTypeSymbol namedField)
+        {
+            return false;
+        }
+
+        foreach (var inherited in receiverType.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(namedField, inherited))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasStringIdProperty(INamedTypeSymbol type)

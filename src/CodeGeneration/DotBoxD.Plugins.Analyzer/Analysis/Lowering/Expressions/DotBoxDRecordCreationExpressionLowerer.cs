@@ -42,15 +42,38 @@ internal static class DotBoxDRecordCreationExpressionLowerer
 
         // Object-initializer construction (e.g. `new() { Success = true, Damage = x }`) is how the generated
         // hook-result builders and explicit `new Result { ... }` produce a value: lower each assigned field and
-        // fill the omitted ones with their manifest-tag zero. Mixed positional + initializer is rejected.
+        // fill the omitted ones with their manifest-tag zero. If constructor arguments are present, lower them
+        // first and let the initializer override them, matching C# object-initializer semantics.
         if (creation.Initializer is { } initializer)
         {
             if (arguments.Count > 0)
             {
-                throw new System.NotSupportedException();
+                var fieldSources = new string?[fields.Count];
+                var allocates = LowerConstructorArguments(
+                    constructor,
+                    arguments,
+                    fields,
+                    fieldSources,
+                    context,
+                    lowerExpression);
+                return LowerInitializer(
+                    fields,
+                    recordTypeSource,
+                    initializer,
+                    context,
+                    lowerExpression,
+                    fieldSources,
+                    allocates);
             }
 
-            return LowerInitializer(fields, recordTypeSource, initializer, context, lowerExpression);
+            return LowerInitializer(
+                fields,
+                recordTypeSource,
+                initializer,
+                context,
+                lowerExpression,
+                fieldSources: null,
+                allocates: true);
         }
 
         if (arguments.Count != fields.Count || constructor.Parameters.Length != fields.Count)
@@ -63,12 +86,49 @@ internal static class DotBoxDRecordCreationExpressionLowerer
         // record.new wants its arguments in the DTO's declared field order. Map each declared field to the
         // constructor argument that fills it (positional records line up 1:1; named/reordered constructors are
         // resolved by parameter name) and lower that argument with the field's expected type.
-        var fieldSources = new string[fields.Count];
-        var allocates = true;
-        for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        var positionalSources = new string?[fields.Count];
+        var positionalAllocates = LowerConstructorArguments(
+            constructor,
+            arguments,
+            fields,
+            positionalSources,
+            context,
+            lowerExpression);
+
+        context.Effects?.Add(DotBoxDGenerationNames.Effects.Alloc);
+
+        return new DotBoxDExpressionModel(
+            RecordNew(System.Array.ConvertAll(positionalSources, static s => s!), recordTypeSource),
+            ManifestTypes.Record,
+            positionalAllocates);
+    }
+
+    private static bool LowerConstructorArguments(
+        IMethodSymbol constructor,
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        IReadOnlyList<RecordMember> fields,
+        string?[] fieldSources,
+        DotBoxDExpressionLoweringContext context,
+        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
+    {
+        if (arguments.Count != constructor.Parameters.Length || constructor.Parameters.Length > fields.Count)
         {
-            var argumentIndex = ConstructorArgumentIndex(constructor, arguments, fields[fieldIndex].Name);
-            if (argumentIndex < 0)
+            throw new System.NotSupportedException();
+        }
+
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            if (arguments[i].NameColon is not null)
+            {
+                throw new System.NotSupportedException();
+            }
+        }
+
+        var allocates = true;
+        for (var i = 0; i < constructor.Parameters.Length; i++)
+        {
+            var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, constructor.Parameters[i]);
+            if (fieldIndex < 0 || fieldSources[fieldIndex] is not null)
             {
                 throw new System.NotSupportedException();
             }
@@ -78,13 +138,8 @@ internal static class DotBoxDRecordCreationExpressionLowerer
             // arg into an enum field, or List<long> into a List<int> field), the coarse manifest-tag check below
             // would still pass while the emitted record carried a value of the wrong shape. Require an exact type
             // match so only a faithful positional construction lowers; anything else fails safe.
-            if (!SymbolEqualityComparer.Default.Equals(constructor.Parameters[argumentIndex].Type, fields[fieldIndex].Type))
-            {
-                throw new System.NotSupportedException();
-            }
-
             var lowered = LowerFieldValue(
-                arguments[argumentIndex].Expression,
+                arguments[i].Expression,
                 fields[fieldIndex].Type,
                 context,
                 lowerExpression);
@@ -93,9 +148,7 @@ internal static class DotBoxDRecordCreationExpressionLowerer
             allocates |= lowered.Allocates;
         }
 
-        context.Effects?.Add(DotBoxDGenerationNames.Effects.Alloc);
-
-        return new DotBoxDExpressionModel(RecordNew(fieldSources, recordTypeSource), ManifestTypes.Record, allocates);
+        return allocates;
     }
 
     // The record.new IR-construction source for the given (declaration-ordered) field sources. Shared by the
@@ -113,10 +166,11 @@ internal static class DotBoxDRecordCreationExpressionLowerer
         string recordTypeSource,
         InitializerExpressionSyntax initializer,
         DotBoxDExpressionLoweringContext context,
-        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression)
+        System.Func<ExpressionSyntax, DotBoxDExpressionModel> lowerExpression,
+        string?[]? fieldSources,
+        bool allocates)
     {
-        var fieldSources = new string?[fields.Count];
-        var allocates = true;
+        fieldSources ??= new string?[fields.Count];
         foreach (var expression in initializer.Expressions)
         {
             if (expression is not AssignmentExpressionSyntax assignment ||
@@ -127,7 +181,7 @@ internal static class DotBoxDRecordCreationExpressionLowerer
             }
 
             var index = FieldIndex(fields, fieldName.Identifier.ValueText);
-            if (index < 0 || fieldSources[index] is not null)
+            if (index < 0)
             {
                 throw new System.NotSupportedException();
             }
@@ -219,47 +273,4 @@ internal static class DotBoxDRecordCreationExpressionLowerer
         return -1;
     }
 
-    // The positional argument that fills the field named <paramref name="fieldName"/>: the argument whose
-    // constructor parameter matches the field by name (exact first, then a single case-insensitive match),
-    // mirroring the runtime marshaller's field-to-constructor mapping. Named arguments are not accepted —
-    // a remote Select projects with positional construction.
-    private static int ConstructorArgumentIndex(
-        IMethodSymbol constructor,
-        SeparatedSyntaxList<ArgumentSyntax> arguments,
-        string fieldName)
-    {
-        for (var i = 0; i < arguments.Count; i++)
-        {
-            if (arguments[i].NameColon is not null)
-            {
-                return -1;
-            }
-        }
-
-        var match = -1;
-        for (var i = 0; i < constructor.Parameters.Length; i++)
-        {
-            if (string.Equals(constructor.Parameters[i].Name, fieldName, StringComparison.Ordinal))
-            {
-                return i;
-            }
-        }
-
-        for (var i = 0; i < constructor.Parameters.Length; i++)
-        {
-            if (!string.Equals(constructor.Parameters[i].Name, fieldName, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (match >= 0)
-            {
-                return -1;
-            }
-
-            match = i;
-        }
-
-        return match;
-    }
 }

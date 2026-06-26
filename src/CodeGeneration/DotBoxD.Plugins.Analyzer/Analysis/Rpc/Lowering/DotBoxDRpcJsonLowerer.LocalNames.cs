@@ -74,9 +74,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return hash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private void ReserveUserNames(BlockSyntax block)
+    private void ReserveUserNames(SyntaxNode node)
     {
-        foreach (var token in block.DescendantTokens())
+        foreach (var token in node.DescendantTokens())
         {
             if (token.IsKind(SyntaxKind.IdentifierToken))
             {

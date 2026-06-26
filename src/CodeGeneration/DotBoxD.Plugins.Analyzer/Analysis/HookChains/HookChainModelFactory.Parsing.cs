@@ -1,6 +1,5 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -46,10 +45,7 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
-        while (receiver is ParenthesizedExpressionSyntax parenthesized)
-        {
-            receiver = parenthesized.Expression;
-        }
+        receiver = HookChainAliasResolver.UnwrapParentheses(receiver);
 
         if (HookChainAliasResolver.Initializer(receiver, model, cancellationToken) is { } initializer)
         {
@@ -57,24 +53,25 @@ internal static partial class HookChainModelFactory
         }
 
         var current = receiver;
-        while (current is InvocationExpressionSyntax invocation &&
-               invocation.Expression is MemberAccessExpressionSyntax access)
+        while (true)
         {
+            current = HookChainAliasResolver.UnwrapParentheses(current);
+            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            {
+                current = currentInitializer;
+                continue;
+            }
+
+            if (current is not InvocationExpressionSyntax invocation ||
+                invocation.Expression is not MemberAccessExpressionSyntax access)
+            {
+                return null;
+            }
+
             var name = access.Name.Identifier.ValueText;
             if (string.Equals(name, OnMethod, StringComparison.Ordinal))
             {
                 return invocation;
-            }
-
-            if (HookChainAliasResolver.Initializer(access.Expression, model, cancellationToken) is { } stageInitializer)
-            {
-                current = SyntaxFactory.InvocationExpression(
-                    SyntaxFactory.MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        SyntaxFactory.ParenthesizedExpression(stageInitializer),
-                        access.Name),
-                    invocation.ArgumentList);
-                continue;
             }
 
             var isSelect = string.Equals(name, SelectMethod, StringComparison.Ordinal);
@@ -82,14 +79,12 @@ internal static partial class HookChainModelFactory
                 TryLambda(invocation, out var lambda))
             {
                 stages.Add(new HookChainStage(isSelect, lambda));
-                current = access.Expression;
+                current = HookChainAliasResolver.UnwrapParentheses(access.Expression);
                 continue;
             }
 
             return null;
         }
-
-        return null;
     }
 
     private static HookChainReceiverKind? ReceiverKind(

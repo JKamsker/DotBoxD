@@ -61,7 +61,8 @@ internal static class InvokeAsyncInterceptorEmitter
             interception.CaptureDelegateType is { } captureDelegateType)
         {
             builder.Append("            ").Append(captureType).AppendLine(" captures,");
-            builder.Append("            ").Append(captureDelegateType).AppendLine(" lambda)");
+            builder.Append("            ").Append(captureDelegateType).AppendLine(" lambda,");
+            builder.AppendLine("            global::System.Threading.CancellationToken cancellationToken = default)");
         }
         else
         {
@@ -70,7 +71,8 @@ internal static class InvokeAsyncInterceptorEmitter
                 .Append(", ")
                 .Append("global::System.Threading.Tasks.ValueTask<")
                 .Append(interception.ReturnType)
-                .AppendLine(">> lambda)");
+                .AppendLine(">> lambda,");
+            builder.AppendLine("            global::System.Threading.CancellationToken cancellationToken = default)");
         }
 
         builder.AppendLine("        {");
@@ -92,12 +94,12 @@ internal static class InvokeAsyncInterceptorEmitter
             .Append(Literal(interception.PluginId))
             .Append(", ")
             .Append(interception.PackageFullName)
-            .AppendLine(".Create).ConfigureAwait(false);");
+            .AppendLine(".Create, cancellationToken).ConfigureAwait(false);");
         builder.Append("            var __request = global::DotBoxD.Plugins.KernelRpcBinaryCodec.EncodeArguments(")
             .Append(interception.ArgumentsExpression)
             .AppendLine(");");
         builder.Append("            var __response = await ").Append(server)
-            .AppendLine(".Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request).ConfigureAwait(false);");
+            .AppendLine(".Services.WireClient.InvokeServerExtensionAsync(__pluginId, __request, cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("            var __result = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(__response);");
         if (interception.SyncOutAssignments.Count > 0)
         {

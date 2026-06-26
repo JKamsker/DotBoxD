@@ -11,7 +11,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 /// </summary>
 internal static partial class DotBoxDRpcTypeMapper
 {
+    private const int MaxJsonTypeDepth = 8;
+
     public static string JsonType(ITypeSymbol type)
+        => JsonType(type, 0, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
+
+    private static string JsonType(ITypeSymbol type, int depth, HashSet<ITypeSymbol> visiting)
     {
         if (type.SpecialType == SpecialType.System_Void || DotBoxDRpcReturnType.IsTaskLike(type))
         {
@@ -21,6 +26,12 @@ internal static partial class DotBoxDRpcTypeMapper
         if (DotBoxDNullableScalarType.IsNullableValueType(type))
         {
             throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
+        }
+        if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
+        {
+            throw new NotSupportedException(
+                $"Server extension nullable reference type '{type.ToDisplayString()}' is not supported; " +
+                "kernel RPC does not encode null reference values.");
         }
         switch (type.SpecialType)
         {
@@ -47,47 +58,56 @@ internal static partial class DotBoxDRpcTypeMapper
         }
         if (ListElementType(type) is { } elementType)
         {
-            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType)}]}}";
+            RejectTooDeep(type, depth);
+            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType, depth + 1, visiting)}]}}";
         }
         if (MapTypes(type) is { } map)
         {
+            RejectTooDeep(type, depth);
             if (!IsSupportedMapKey(map.Key))
             {
                 throw new NotSupportedException(
                     $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
                     "map keys must be bool, int, long, string, or an enum.");
             }
-            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key)},{JsonType(map.Value)}]}}";
+            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, depth + 1, visiting)},{JsonType(map.Value, depth + 1, visiting)}]}}";
         }
         if (type is INamedTypeSymbol named && IsRecordDto(named))
         {
-            RejectInheritedDtoProperties(named);
-            var fields = RecordFields(named);
-            var fieldTypes = new List<string>(fields.Count);
-            foreach (var field in fields)
+            RejectTooDeep(type, depth);
+            if (!visiting.Add(named))
             {
-                fieldTypes.Add(JsonType(field.Type));
+                throw new NotSupportedException(
+                    $"Server extension DTO type '{named.ToDisplayString()}' is cyclic; recursive DTO shapes are not supported.");
             }
-            return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
+
+            RejectInheritedDtoProperties(named);
+            try
+            {
+                var fields = RecordFields(named);
+                var fieldTypes = new List<string>(fields.Count);
+                foreach (var field in fields)
+                {
+                    fieldTypes.Add(JsonType(field.Type, depth + 1, visiting));
+                }
+                return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
+            }
+            finally
+            {
+                visiting.Remove(named);
+            }
         }
         throw new NotSupportedException($"Server extension type '{type.ToDisplayString()}' is not supported.");
     }
-    /// <summary>
-    /// True when <paramref name="member"/> can be written through an object initializer: a property with an
-    /// accessible <c>set</c>/<c>init</c>, or a non-readonly public field. Used for the parameterless-construct
-    /// + object-initializer fallback when a DTO exposes no constructor matching its fields.
-    /// </summary>
-    public static bool IsObjectInitializerWritable(RecordMember member)
-        => member.Symbol switch
+
+    private static void RejectTooDeep(ITypeSymbol type, int depth)
+    {
+        if (depth >= MaxJsonTypeDepth)
         {
-            IPropertySymbol
-            {
-                SetMethod.DeclaredAccessibility:
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal
-            } => true,
-            IFieldSymbol { IsReadOnly: false, IsConst: false } => true,
-            _ => false
-        };
+            throw new NotSupportedException(
+                $"Server extension type '{type.ToDisplayString()}' exceeds the supported RPC shape depth.");
+        }
+    }
     public static bool IsScalar(ITypeSymbol type)
         => type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Int32
             or SpecialType.System_Int64 or SpecialType.System_Double or SpecialType.System_Single
@@ -177,6 +197,7 @@ internal static partial class DotBoxDRpcTypeMapper
            !IsScalar(type) &&
            !IsUnsupportedFrameworkStruct(type) &&
            !DotBoxDNullableScalarType.IsNullableValueType(type) &&
+           ListElementType(type) is null &&
            MapTypes(type) is null &&
            RecordFields(type).Count > 0;
 

@@ -11,6 +11,9 @@ internal static class RemoteStagedUseDiagnosticFactory
     private const string DiscardedStageMessage =
         "Remote Where/Select stages must be chained into Run, RunLocal, Register, or RegisterLocal; " +
         "discarding the stage result would ignore the stage.";
+    private const string AssignedStageMessage =
+        "Remote Where/Select stages assigned to an existing local are not lowered into a later terminal; " +
+        "keep the stage in the fluent chain or initialize a new local with the staged expression.";
 
     public static bool IsCandidate(SyntaxNode node)
         => node is InvocationExpressionSyntax
@@ -66,6 +69,13 @@ internal static class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (invocation.Parent is AssignmentExpressionSyntax assignment &&
+            assignment.Right == invocation &&
+            assignment.Parent is ExpressionStatementSyntax)
+        {
+            return CreateAssignedStageDiagnostic(access, model, cancellationToken);
+        }
+
         if (invocation.Parent is not ExpressionStatementSyntax)
         {
             return null;
@@ -83,12 +93,26 @@ internal static class RemoteStagedUseDiagnosticFactory
             PluginDiagnosticLocation.From(access.Name.GetLocation()));
     }
 
+    private static PluginKernelDiagnostic? CreateAssignedStageDiagnostic(
+        MemberAccessExpressionSyntax access,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
+        if (!IsRemoteChainOrStageType(receiverType) &&
+            !IsGeneratedRemoteChain(access.Expression, model, cancellationToken))
+        {
+            return null;
+        }
+
+        return new PluginKernelDiagnostic(
+            AssignedStageMessage,
+            PluginDiagnosticLocation.From(access.Name.GetLocation()));
+    }
+
     private static bool ContainsStageInvocation(ExpressionSyntax expression)
     {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            expression = parenthesized.Expression;
-        }
+        expression = HookChainAliasResolver.UnwrapParentheses(expression);
 
         if (expression is InvocationExpressionSyntax
             {
@@ -108,14 +132,26 @@ internal static class RemoteStagedUseDiagnosticFactory
         ExpressionSyntax expression,
         SemanticModel model,
         CancellationToken cancellationToken)
+        => ContainsStageInvocationOrAlias(expression, model, cancellationToken, depth: 0);
+
+    private static bool ContainsStageInvocationOrAlias(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        int depth)
     {
+        if (depth > 8)
+        {
+            return false;
+        }
+
         if (ContainsStageInvocation(expression))
         {
             return true;
         }
 
         return HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer &&
-            ContainsStageInvocation(initializer);
+            ContainsStageInvocationOrAlias(initializer, model, cancellationToken, depth + 1);
     }
 
     private static bool IsGeneratedRemoteChain(
@@ -133,10 +169,7 @@ internal static class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            expression = parenthesized.Expression;
-        }
+        expression = HookChainAliasResolver.UnwrapParentheses(expression);
 
         if (HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer)
         {
@@ -144,9 +177,21 @@ internal static class RemoteStagedUseDiagnosticFactory
         }
 
         var current = expression;
-        while (current is InvocationExpressionSyntax invocation &&
-               invocation.Expression is MemberAccessExpressionSyntax access)
+        while (true)
         {
+            current = HookChainAliasResolver.UnwrapParentheses(current);
+            if (HookChainAliasResolver.Initializer(current, model, cancellationToken) is { } currentInitializer)
+            {
+                current = currentInitializer;
+                continue;
+            }
+
+            if (current is not InvocationExpressionSyntax invocation ||
+                invocation.Expression is not MemberAccessExpressionSyntax access)
+            {
+                return null;
+            }
+
             var name = access.Name.Identifier.ValueText;
             if (string.Equals(name, "On", StringComparison.Ordinal))
             {
@@ -161,8 +206,6 @@ internal static class RemoteStagedUseDiagnosticFactory
 
             return null;
         }
-
-        return null;
     }
 
     private static bool IsRemoteChainOrStageType(ITypeSymbol? type)

@@ -136,7 +136,7 @@ public sealed class InvokeAsyncGeneratedCodeRegressionTests
             public static ValueTask<Profile> Run(RemotePluginServer kernels)
                 => kernels.InvokeAsync(async (IGameWorldAccess world) =>
                 {
-                    return new Profile { Health = world.GetHealth("monster-1"), Rank = 9, Name = "hero" };
+                    return new Profile(world.GetHealth("monster-1"), 9) { Name = "hero" };
                 });
             """));
         var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
@@ -147,6 +147,56 @@ public sealed class InvokeAsyncGeneratedCodeRegressionTests
             source,
             StringComparison.Ordinal);
         Assert.Contains("@Name =", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Return_dto_with_inaccessible_constructor_reports_InvokeAsync_diagnostic()
+    {
+        var result = RunGenerator(UsageSource("""
+            public sealed class Profile
+            {
+                private Profile(int health) => Health = health;
+
+                public int Health { get; }
+
+                public static ValueTask<Profile> Run(RemotePluginServer kernels)
+                    => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                    {
+                        return new Profile(world.GetHealth("monster-1"));
+                    });
+            }
+
+            public static ValueTask<Profile> Run(RemotePluginServer kernels)
+                => Profile.Run(kernels);
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("must expose either a constructor", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cyclic_return_dto_reports_InvokeAsync_diagnostic()
+    {
+        var result = RunGenerator(UsageSource("""
+            public sealed class Node
+            {
+                public int Value { get; init; }
+                public Node Next { get; init; } = null!;
+            }
+
+            public static ValueTask<Node> Run(RemotePluginServer kernels)
+                => kernels.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    return new Node { Value = world.GetHealth("monster-1") };
+                });
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("cyclic", StringComparison.Ordinal));
     }
 
     [Fact]

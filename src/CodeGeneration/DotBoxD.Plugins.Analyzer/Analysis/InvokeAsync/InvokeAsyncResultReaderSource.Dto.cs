@@ -12,9 +12,16 @@ internal sealed partial class InvokeAsyncResultReaderSource
         {
             var construction = "new " + TypeName(type) + "(" +
                 string.Join(", ", DtoConstructorArguments(fields, constructor.Symbol)) + ")";
-            if (!HasWritableUnassignedField(fields, constructor.Assigned))
+            if (constructor.AssignedCount == fields.Count)
             {
                 return "            return " + construction + ";";
+            }
+
+            if (!CanReconstructAllUnassignedFields(fields, constructor.Assigned))
+            {
+                throw new NotSupportedException(
+                    $"InvokeAsync DTO '{type.ToDisplayString()}' constructor '{constructor.Symbol.ToDisplayString()}' " +
+                    "does not assign every public field and the remaining fields are not settable.");
             }
 
             return BuildDtoInitializer("            return " + construction, fields, constructor.Assigned);
@@ -62,13 +69,12 @@ internal sealed partial class InvokeAsyncResultReaderSource
         return arguments;
     }
 
-    private static ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         ResolvedDtoConstructor? partial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
-            if (constructor.DeclaredAccessibility is not (
-                    Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal) ||
+            if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
                 constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
@@ -108,7 +114,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
         return partial;
     }
 
-    private static bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
+    private bool CanUseObjectInitializer(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         if (fields.Count == 0 || (!type.IsValueType && !HasAccessibleParameterlessConstructor(type)))
         {
@@ -117,7 +123,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
 
         foreach (var field in fields)
         {
-            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field))
+            if (!DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation))
             {
                 return false;
             }
@@ -126,14 +132,16 @@ internal sealed partial class InvokeAsyncResultReaderSource
         return true;
     }
 
-    private static bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
-        => type.InstanceConstructors.Any(static constructor =>
+    private bool HasAccessibleParameterlessConstructor(INamedTypeSymbol type)
+        => type.InstanceConstructors.Any(constructor =>
             constructor.Parameters.Length == 0 &&
-            constructor.DeclaredAccessibility is
-                Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal);
+            DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation));
 
-    private static bool HasWritableUnassignedField(IReadOnlyList<RecordMember> fields, bool[] assigned)
-        => fields.Where((_, index) => !assigned[index]).Any(DotBoxDRpcTypeMapper.IsObjectInitializerWritable);
+    private bool CanReconstructAllUnassignedFields(IReadOnlyList<RecordMember> fields, bool[] assigned)
+        => fields.Where((_, index) => !assigned[index])
+            .All(field =>
+                DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation) ||
+                DotBoxDRpcTypeMapper.IsDerivedFromAssignedFields(field, fields, assigned));
 
     private static string Identifier(string name)
         => "@" + name;

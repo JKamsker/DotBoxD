@@ -21,9 +21,10 @@ internal static class KernelMethodArgumentReuseValidator
                 argument.Expression is { } expression &&
                 !IsRepeatableArgument(expression))
             {
-                throw new NotSupportedException(
+                throw new KernelMethodArgumentReuseException(
                     $"[KernelMethod] '{method.Name}' parameter '{argument.Parameter.Name}' is used more than once; " +
-                    "pass a repeatable value or store the expensive argument before calling the kernel method.");
+                    "pass a repeatable value or store the expensive argument before calling the kernel method.",
+                    PluginDiagnosticLocation.From(expression.GetLocation()));
             }
         }
     }

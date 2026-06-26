@@ -57,6 +57,18 @@ internal static partial class RpcKernelModelFactory
             else if (graft is not null)
             {
                 directClientMethod = RpcKernelClientExtensionModelFactory.ResolveClientMethod(method, graft.ReceiverType);
+                if (directClientMethod is not null &&
+                    !SymbolEqualityComparer.Default.Equals(directClientMethod.ReceiverType, graft.ReceiverType))
+                {
+                    throw new NotSupportedException(
+                        $"Server extension client method receiver '{directClientMethod.ReceiverType.ToDisplayString()}' " +
+                        $"must match the class receiver '{graft.ReceiverType.ToDisplayString()}'.");
+                }
+            }
+            else if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method))
+            {
+                throw new NotSupportedException(
+                    "[ServerExtensionMethod] requires a service-backed or receiver-grafted [ServerExtension] class.");
             }
             var body = MethodBody(method, cancellationToken);
             var capabilities = new SortedSet<string>(StringComparer.Ordinal);
@@ -70,7 +82,9 @@ internal static partial class RpcKernelModelFactory
                 serverContextParameterName: contextParameter.Name,
                 serverContextType: contextParameter.Type);
             var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
-            var bodyJson = lowerer.LowerBody(body);
+            var bodyJson = body.Block is { } block
+                ? lowerer.LowerBody(block)
+                : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);
 
             effects.Add("Cpu");
             if (lowerer.Allocates)

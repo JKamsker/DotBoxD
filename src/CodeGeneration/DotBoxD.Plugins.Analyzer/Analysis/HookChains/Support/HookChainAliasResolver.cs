@@ -5,15 +5,22 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static class HookChainAliasResolver
 {
-    public static ExpressionSyntax? Initializer(
-        ExpressionSyntax expression,
-        SemanticModel model,
-        CancellationToken cancellationToken)
+    public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
         {
             expression = parenthesized.Expression;
         }
+
+        return expression;
+    }
+
+    public static ExpressionSyntax? Initializer(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        expression = UnwrapParentheses(expression);
 
         if (expression is not IdentifierNameSyntax identifier ||
             model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)

@@ -285,10 +285,26 @@ internal IServerExtensionWireClient WireClient => _control;
 private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _anonymousKernels = new(StringComparer.Ordinal);
 
 public Task<string> EnsureAnonymousKernelAsync(string pluginId, Func<PluginPackage> packageFactory)
-    => _anonymousKernels.GetOrAdd(
+{
+    var install = _anonymousKernels.GetOrAdd(
         pluginId,
-        id => new Lazy<Task<string>>(() => InstallServerExtensionPackageAsync(packageFactory()).AsTask()))
-        .Value;
+        id => new Lazy<Task<string>>(() => InstallServerExtensionPackageAsync(packageFactory()).AsTask()));
+    return AwaitAnonymousKernelAsync(pluginId, install);
+}
+
+private async Task<string> AwaitAnonymousKernelAsync(string pluginId, Lazy<Task<string>> install)
+{
+    try
+    {
+        return await install.Value.ConfigureAwait(false);
+    }
+    catch
+    {
+        ((ICollection<KeyValuePair<string, Lazy<Task<string>>>>)_anonymousKernels)
+            .Remove(new KeyValuePair<string, Lazy<Task<string>>>(pluginId, install));
+        throw;
+    }
+}
 
 private ValueTask<string> InstallServerExtensionPackageAsync(PluginPackage package)
     => RequireControl().InstallServerExtensionAsync(PluginPackageJsonSerializer.Export(package));
@@ -299,6 +315,9 @@ private ValueTask<string> InstallServerExtensionPackageAsync(PluginPackage packa
   of the same `$anon:` id trigger the same-owner reinstall guard (`KernelRegistry.Add`, DBXK060), which
   **replaces and revokes** the incumbent — cancelling an in-flight invoke's execution gate. The concurrency-safe
   cache is **mandatory**, not an optimization.
+- **Failed installs are retryable.** If the shared install task faults or is cancelled, the generated facade removes
+  that exact lazy value from `_anonymousKernels` before rethrowing. The next call for the same anonymous plugin id
+  creates a fresh install attempt instead of reusing a permanently faulted task.
 - **Per-connection cache.** The generated server facade is constructed fresh per connection, so the cache
   clears naturally on reconnect; the new session re-installs and the old one is revoked on disconnect.
 - **Throwing stub overload.** The generated facade declares

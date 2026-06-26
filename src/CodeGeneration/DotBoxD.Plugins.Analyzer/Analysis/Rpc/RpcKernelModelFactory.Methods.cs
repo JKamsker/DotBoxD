@@ -66,19 +66,37 @@ internal static partial class RpcKernelModelFactory
                 throw new NotSupportedException(
                     $"Server extension parameter '{parameter.Name}' cannot use ref, in, or out modifiers.");
             }
+
+            if (parameter.HasExplicitDefaultValue &&
+                parameter.ExplicitDefaultValue is null &&
+                parameter.Type.IsReferenceType)
+            {
+                throw new NotSupportedException(
+                    $"Server extension optional parameter '{parameter.Name}' cannot default to null because kernel RPC does not encode null reference values.");
+            }
         }
     }
 
-    private static BlockSyntax MethodBody(IMethodSymbol method, CancellationToken cancellationToken)
+    private static RpcKernelMethodBody MethodBody(IMethodSymbol method, CancellationToken cancellationToken)
     {
         foreach (var reference in method.DeclaringSyntaxReferences)
         {
-            if (reference.GetSyntax(cancellationToken) is MethodDeclarationSyntax { Body: { } block })
+            if (reference.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration)
             {
-                return block;
+                if (declaration.Body is { } block)
+                {
+                    return new RpcKernelMethodBody(block, null);
+                }
+
+                if (declaration.ExpressionBody is { } expressionBody)
+                {
+                    return new RpcKernelMethodBody(null, expressionBody.Expression);
+                }
             }
         }
 
-        throw new NotSupportedException($"Server extension method '{method.Name}' must have a block body declared in source.");
+        throw new NotSupportedException($"Server extension method '{method.Name}' must have a body declared in source.");
     }
+
+    private readonly record struct RpcKernelMethodBody(BlockSyntax? Block, ExpressionSyntax? Expression);
 }

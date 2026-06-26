@@ -10,11 +10,14 @@ public interface IPluginServer<TWorld>
 
     ValueTask RunAsync(CancellationToken cancellationToken = default);
 
-    ValueTask<TReturn> InvokeAsync<TReturn>(Func<TWorld, ValueTask<TReturn>> lambda);
+    ValueTask<TReturn> InvokeAsync<TReturn>(
+        Func<TWorld, ValueTask<TReturn>> lambda,
+        CancellationToken cancellationToken = default);
 
     ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(
         TCaptures captures,
-        RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda)
+        RemoteServerInvocation<TWorld, TCaptures, TReturn> lambda,
+        CancellationToken cancellationToken = default)
         where TCaptures : class;
 
     ValueTask HoldUntilShutdownAsync(CancellationToken cancellationToken = default);

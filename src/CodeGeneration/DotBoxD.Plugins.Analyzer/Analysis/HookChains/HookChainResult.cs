@@ -16,7 +16,10 @@ internal sealed record HookChainResult(PluginKernelModel Model, HookChainInterce
 /// reports so the otherwise-silent skip surfaces at build time. A null create result means the call site is not a
 /// recognized chain at all (nothing to report).
 /// </summary>
-internal sealed record HookChainCreateResult(HookChainResult? Chain, HookChainNotLoweredDiagnostic? Diagnostic);
+internal sealed record HookChainCreateResult(
+    HookChainResult? Chain,
+    HookChainNotLoweredDiagnostic? Diagnostic,
+    PluginKernelDiagnostic? UnsupportedDiagnostic = null);
 
 /// <summary>
 /// Equatable carrier for generator-owned not-lowered diagnostics, kept equatable so the incremental generator's

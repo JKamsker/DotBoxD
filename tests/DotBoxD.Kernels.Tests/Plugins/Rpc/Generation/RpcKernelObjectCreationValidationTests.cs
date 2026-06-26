@@ -1,13 +1,14 @@
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins.Json;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 public sealed class RpcKernelObjectCreationValidationTests
 {
     [Fact]
-    public void Kernel_rpc_service_rejects_mixed_constructor_and_object_initializer()
+    public void Kernel_rpc_service_supports_mixed_constructor_and_object_initializer()
     {
-        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
             using DotBoxD.Kernels;
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
@@ -35,11 +36,9 @@ public sealed class RpcKernelObjectCreationValidationTests
                     return new KillResult(monsterId, false) { Success = true };
                 }
             }
-            """);
+            """, "Sample.MixedCreationPluginPackage");
 
-        Assert.Contains(
-            diagnostics,
-            d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("cannot combine constructor arguments and object initializers", StringComparison.Ordinal));
+        var json = PluginPackageJsonSerializer.Export(package);
+        Assert.Contains("\"call\":\"record.new\"", json, StringComparison.Ordinal);
     }
 }
