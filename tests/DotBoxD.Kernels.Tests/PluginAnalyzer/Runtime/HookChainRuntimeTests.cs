@@ -98,6 +98,24 @@ public sealed class HookChainRuntimeTests
     }
 
     [Fact]
+    public async Task Staged_UseGeneratedChain_honors_runtime_stage_filter()
+    {
+        var assembly = Compile(OneParamChainSource, enableInterceptors: true);
+        var package = PackageFrom(assembly);
+
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        server.Hooks.On<ChainAggroEvent>()
+            .Select(e => e.MonsterId)
+            .Where(_ => false)
+            .UseGeneratedChain(package);
+
+        await server.Hooks.PublishAsync(new ChainAggroEvent("monster-1", 3));
+
+        Assert.Empty(messages.Messages);
+    }
+
+    [Fact]
     public async Task The_generated_interceptor_installs_a_projected_stage_chain_at_the_Run_call_site()
     {
         var assembly = Compile(OneParamSelectChainSource, enableInterceptors: true);
