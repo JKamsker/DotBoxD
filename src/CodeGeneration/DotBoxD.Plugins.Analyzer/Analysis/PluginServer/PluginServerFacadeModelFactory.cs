@@ -33,6 +33,8 @@ internal static partial class PluginServerFacadeModelFactory
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        ValidateServerTargetShape(type, cancellationToken);
+
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");

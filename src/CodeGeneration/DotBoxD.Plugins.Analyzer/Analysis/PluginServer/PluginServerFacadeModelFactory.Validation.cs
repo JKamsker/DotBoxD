@@ -228,4 +228,33 @@ internal static partial class PluginServerFacadeModelFactory
             }
         }
     }
+
+    private static void ValidateServerTargetShape(
+        INamedTypeSymbol serverType,
+        CancellationToken cancellationToken)
+    {
+        if (serverType.TypeKind != TypeKind.Class)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.ToDisplayString()}' must be a class.");
+        }
+
+        if (serverType.IsGenericType)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.ToDisplayString()}' must be non-generic.");
+        }
+
+        if (serverType.ContainingType is not null)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.ToDisplayString()}' must be non-nested.");
+        }
+
+        if (!IsPartialClass(serverType, cancellationToken))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.ToDisplayString()}' must be partial.");
+        }
+    }
 }
