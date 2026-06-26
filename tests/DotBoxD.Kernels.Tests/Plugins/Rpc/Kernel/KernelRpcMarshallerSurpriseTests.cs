@@ -122,6 +122,48 @@ public sealed class KernelRpcMarshallerSurpriseTests
             () => KernelRpcMarshaller.FromKernelRpcValue(KernelRpcValue.Int32(70000), typeof(ShortBackedEnum)));
     }
 
+    [Fact]
+    public void FromSandboxValue_rejects_float_overflow_inside_constructor_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(
+                SandboxValue.FromRecord([SandboxValue.FromDouble(double.MaxValue)]),
+                typeof(ConstructorFloatDto)));
+
+    [Fact]
+    public void FromSandboxValue_rejects_float_overflow_inside_setter_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(
+                SandboxValue.FromRecord([SandboxValue.FromDouble(double.MaxValue)]),
+                typeof(SetterFloatDto)));
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_float_overflow_inside_constructor_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(
+                KernelRpcValue.Record([KernelRpcValue.Double(double.MaxValue)]),
+                typeof(ConstructorFloatDto)));
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_float_overflow_inside_setter_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(
+                KernelRpcValue.Record([KernelRpcValue.Double(double.MaxValue)]),
+                typeof(SetterFloatDto)));
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_narrow_enum_overflow_inside_constructor_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(
+                KernelRpcValue.Record([KernelRpcValue.Int32(300)]),
+                typeof(ConstructorEnumDto)));
+
+    [Fact]
+    public void FromKernelRpcValue_rejects_narrow_enum_overflow_inside_setter_dto()
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(
+                KernelRpcValue.Record([KernelRpcValue.Int32(300)]),
+                typeof(SetterEnumDto)));
+
     private sealed class GetOnlyTailDto
     {
         public int Id { get; set; }
@@ -168,6 +210,26 @@ public sealed class KernelRpcMarshallerSurpriseTests
     private sealed class PrivateSetterDto
     {
         public int Id { get; private set; }
+    }
+
+    private sealed class ConstructorFloatDto(float value)
+    {
+        public float Value { get; } = value;
+    }
+
+    private sealed class SetterFloatDto
+    {
+        public float Value { get; set; }
+    }
+
+    private sealed class ConstructorEnumDto(ByteBackedEnum value)
+    {
+        public ByteBackedEnum Value { get; } = value;
+    }
+
+    private sealed class SetterEnumDto
+    {
+        public ByteBackedEnum Value { get; set; }
     }
 
     private enum IntBackedEnum
