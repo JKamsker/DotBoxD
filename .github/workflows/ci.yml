@@ -333,6 +333,8 @@ jobs:
               "PluginPackageValidationTests",
               "EventIndexTrustBoundaryTests",
               "CapabilityPolicySplitTests",
+              "HookChainRuntimeTests",
+              "SubscriptionRuntimeTests",
               "RemoteRunLocalChainRuntimeTests",
               "RemoteRunLocalValidationTests",
               "GeneratedRemoteHookChainFallbackTests",

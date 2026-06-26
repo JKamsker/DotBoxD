@@ -98,7 +98,15 @@ public class HookStage<TEvent, TCurrent, TContext>
     }
 
     public HookPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
-        => _root.UseGeneratedChain(package);
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        var project = _project;
+        return _root.UseGeneratedChain(package, async (e, ctx) =>
+        {
+            var (ok, _) = await project(e, ctx).ConfigureAwait(false);
+            return ok;
+        });
+    }
 
     /// <summary>The terminal the analyzer lowers to verified IR; un-lowered it throws (never native).</summary>
     public HookPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
