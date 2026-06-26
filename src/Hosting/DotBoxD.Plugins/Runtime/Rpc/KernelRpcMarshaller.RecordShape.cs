@@ -160,7 +160,26 @@ public static partial class KernelRpcMarshaller
 
         private static Func<object, object?> CreateGetter(RecordMember member)
         {
-            return member.GetValue;
+            // Compile the field read once instead of paying a reflection PropertyInfo/FieldInfo.GetValue
+            // invoke per field per RPC. Convert(instance, DeclaringType) unboxes struct DTOs and casts class
+            // DTOs; the final Convert to object boxes the value type exactly as GetValue did. Mirrors the
+            // proven getter compilation in PluginEventAdapterRegistry. Amortized by RecordShapeCache.
+            var declaringType = member.Member.DeclaringType;
+            if (declaringType is null)
+            {
+                return member.GetValue;
+            }
+
+            var instance = LinqExpression.Parameter(typeof(object), "instance");
+            var typed = LinqExpression.Convert(instance, declaringType);
+            LinqExpression access = member.Member switch
+            {
+                PropertyInfo property => LinqExpression.Property(typed, property),
+                FieldInfo field => LinqExpression.Field(typed, field),
+                _ => throw new NotSupportedException($"Unsupported record member '{member.Name}'."),
+            };
+            var body = LinqExpression.Convert(access, typeof(object));
+            return LinqExpression.Lambda<Func<object, object?>>(body, instance).Compile();
         }
 
         private static (ConstructorInfo? Constructor, int[] Map) FindConstructor(

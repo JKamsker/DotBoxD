@@ -209,13 +209,19 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
             }
         }
 
+        // Reused per thread on the hot TryEventKey path: each call clears, fills, and ToString()s the builder
+        // synchronously before any iterator yield, so a single instance is safe even under reentrant publish.
+        [ThreadStatic]
+        private static StringBuilder? _eventKeyBuilder;
+
         private static string CompositeKey(EventQuerySubscriptionEntry<TEvent> entry, string[] sortedPaths)
         {
             var builder = new StringBuilder();
             foreach (var path in sortedPaths)
             {
                 var key = entry.RoutingKeys.First(k => k.Path == path);
-                builder.Append(key.ValueToken()).Append(Separator);
+                key.AppendValueToken(builder);
+                builder.Append(Separator);
             }
 
             return builder.ToString();
@@ -223,7 +229,8 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
         private static bool TryEventKey(string[] sortedPaths, TEvent e, MemberValueReader reader, out string key)
         {
-            var builder = new StringBuilder();
+            var builder = _eventKeyBuilder ??= new StringBuilder();
+            builder.Clear();
             foreach (var path in sortedPaths)
             {
                 if (!EventQueryRoutingKey.TryFromRuntime(path, reader.Read(e!, path), out var runtimeKey))
@@ -232,7 +239,8 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
                     return false;
                 }
 
-                builder.Append(runtimeKey.ValueToken()).Append(Separator);
+                runtimeKey.AppendValueToken(builder);
+                builder.Append(Separator);
             }
 
             key = builder.ToString();
