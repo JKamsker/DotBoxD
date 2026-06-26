@@ -345,6 +345,7 @@ jobs:
               "InvokeAsyncGeneratedReceiverSurpriseTests",
               "InvokeAsyncGeneratedCodeRegressionTests",
               "InvokeAsyncArrayRegressionTests",
+              "InvokeAsyncDtoConstructorSelectionRegressionTests",
               "InvokeAsyncScalarDecodeRuntimeTests",
               "InvokeAsyncCaptureBagRuntimeTests",
               "PluginAnalyzerKernelMethodTests",

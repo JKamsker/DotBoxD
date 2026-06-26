@@ -209,6 +209,10 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
             if (matched)
             {
+                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
+                    constructor,
+                    $"Server extension DTO '{type.ToDisplayString()}'");
+
                 var assignedCount = AssignedCount(assigned);
                 var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
                 if (assignedCount == fields.Count)

@@ -159,6 +159,10 @@ internal sealed partial class InvokeAsyncResultReaderSource
 
             if (matched)
             {
+                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
+                    constructor,
+                    $"InvokeAsync DTO '{type.ToDisplayString()}'");
+
                 var assignedCount = AssignedCount(assigned);
                 var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
                 if (assignedCount == fields.Count)

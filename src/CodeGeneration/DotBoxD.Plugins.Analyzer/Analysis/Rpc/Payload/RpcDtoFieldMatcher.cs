@@ -4,6 +4,18 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal static class RpcDtoFieldMatcher
 {
+    public static void ValidateNoRefLikeParameters(IMethodSymbol constructor, string owner)
+    {
+        foreach (var parameter in constructor.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None)
+            {
+                throw new NotSupportedException(
+                    $"{owner} constructor '{constructor.ToDisplayString()}' must not declare ref, out, or in parameters.");
+            }
+        }
+    }
+
     public static int FieldIndex(
         IReadOnlyList<RecordMember> fields,
         IParameterSymbol parameter)
