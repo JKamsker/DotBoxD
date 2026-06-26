@@ -101,16 +101,21 @@ public sealed class ServerExtensionInlineScopedHandleTests
     [Fact]
     public void Inline_scoped_handle_call_keeps_the_captured_scope_in_the_lowered_host_call()
     {
-        var localCall = HostCall(BuildPackage(LocalKernel), "KillAsync");
-        var inlineCall = HostCall(BuildPackage(InlineKernel), "KillAsync");
-
-        // Control: the local-variable form has always threaded the captured id as the only host-call argument.
-        var localArgument = Assert.IsType<VariableExpression>(Assert.Single(localCall.Arguments));
-        Assert.Equal("id", localArgument.Name);
-
-        // The fix: the inline form lowers identically — the captured scope is not dropped.
-        var inlineArgument = Assert.IsType<VariableExpression>(Assert.Single(inlineCall.Arguments));
+        // Issue #67: the inline form has no handle local, so the captured id is threaded directly as the only
+        // host-call argument — the scope must not be dropped.
+        var inlineArgument = Assert.IsType<VariableExpression>(
+            Assert.Single(HostCall(BuildPackage(InlineKernel), "KillAsync").Arguments));
         Assert.Equal("id", inlineArgument.Name);
+
+        // Issue #21: the local form evaluates the captured key once into the handle local and threads THAT local
+        // into the call (rather than re-inlining the key), so the call argument is the handle local bound to id.
+        var localPackage = BuildPackage(LocalKernel);
+        var localArgument = Assert.IsType<VariableExpression>(
+            Assert.Single(HostCall(localPackage, "KillAsync").Arguments));
+        var handleAssignment = Assert.Single(
+            Assignments(localPackage),
+            assignment => assignment.Name == localArgument.Name);
+        Assert.Equal("id", Assert.IsType<VariableExpression>(handleAssignment.Value).Name);
     }
 
     [Fact]
@@ -166,6 +171,9 @@ public sealed class ServerExtensionInlineScopedHandleTests
             source,
             "Sample.ScopedCallPluginPackage",
             typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute));
+
+    private static IEnumerable<AssignmentStatement> Assignments(PluginPackage package)
+        => package.Module.Functions.SelectMany(function => function.Body).OfType<AssignmentStatement>();
 
     private static CallExpression HostCall(PluginPackage package, string methodSuffix)
         => package.Module.Functions

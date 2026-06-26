@@ -117,7 +117,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must assign named fields.");
             }
             var index = IndexOfField(fields, fieldName.Identifier.ValueText, named);
-            args[index] = LowerExpression(assignment.Right);
+            args[index] = HoistInitializerMember(LowerExpression(assignment.Right));
             assigned[index] = true;
         }
         if (!requireAllFields)
@@ -136,6 +136,23 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must set field '{fields[i].Name}'.");
             }
         }
+    }
+
+    // Evaluates each object-initializer member in SOURCE (lexical) order: when an expression prelude is
+    // available the lowered value is hoisted into an ordered temp and the member slot just references it. The
+    // record.new args are placed at field-declaration index, so without this the members would be evaluated in
+    // declaration order on the wire; hoisting mirrors the constructor path (LowerArgumentsInParameterOrder) so
+    // side-effectful members run in the order written.
+    private string HoistInitializerMember(string value)
+    {
+        if (_expressionPrelude is null)
+        {
+            return value;
+        }
+
+        var localName = ReserveGeneratedLocal("__sir_arg");
+        AddExpressionPrelude(SetStatement(localName, value));
+        return Var(localName);
     }
 
     private static int IndexOfField(IReadOnlyList<RecordMember> fields, string name, INamedTypeSymbol named)

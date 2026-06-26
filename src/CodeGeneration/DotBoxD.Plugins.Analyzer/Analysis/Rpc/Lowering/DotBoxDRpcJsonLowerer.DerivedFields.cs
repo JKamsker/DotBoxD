@@ -91,6 +91,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                     SyntaxKind.UnaryMinusExpression => Obj(
                         ("unary", Str("-")),
                         ("operand", LowerDerivedExpression(unary.Operand, memberBindings, named, derived))),
+                    // Unary plus is identity; the reconstruction gate (IsSupportedUnary) accepts it, so the
+                    // lowerer must too — emit the operand unchanged rather than throwing.
+                    SyntaxKind.UnaryPlusExpression =>
+                        LowerDerivedExpression(unary.Operand, memberBindings, named, derived),
                     _ => throw DerivedNotSupported(named, derived),
                 };
 

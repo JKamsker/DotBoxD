@@ -164,8 +164,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 return;
             case PostfixUnaryExpressionSyntax { Operand: IdentifierNameSyntax inc } postfix
                 when postfix.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression:
-                var op = postfix.Kind() == SyntaxKind.PostIncrementExpression ? "add" : "sub";
-                output.Add(SetStatement(inc.Identifier.ValueText, BinaryJson(op, Var(inc.Identifier.ValueText), I32(1))));
+                output.Add(LowerIncrementDecrement(inc, postfix.Kind() == SyntaxKind.PostIncrementExpression));
+                return;
+            case PrefixUnaryExpressionSyntax { Operand: IdentifierNameSyntax pre } prefix
+                when prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression:
+                output.Add(LowerIncrementDecrement(pre, prefix.Kind() == SyntaxKind.PreIncrementExpression));
                 return;
             case InvocationExpressionSyntax invocation when TryLowerListAdd(invocation, output) is { } listAdd:
                 output.Add(listAdd);

@@ -45,8 +45,10 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return false;
         }
 
-        _serviceHandleLocals[localName] = handleId;
+        // Evaluate the (possibly effectful) scope key once into the local, then thread the local — not the
+        // re-lowered key — into every subsequent call on the handle, so the key is not evaluated N+1 times.
         output.Add(SetStatement(localName, handleId));
+        _serviceHandleLocals[localName] = Var(localName);
         return true;
     }
 
