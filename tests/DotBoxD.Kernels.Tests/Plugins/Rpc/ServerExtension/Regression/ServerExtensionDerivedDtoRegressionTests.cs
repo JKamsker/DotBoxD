@@ -59,4 +59,30 @@ public sealed class ServerExtensionDerivedDtoRegressionTests
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Contains("numeric.toI64", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Server_extension_lowers_unary_plus_inside_derived_dto_member()
+    {
+        var result = PluginAnalyzerGeneratedPackageFactory.RunGenerator("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed record ScoreDto(int Raw)
+            {
+                public int Echo => +Raw;
+            }
+
+            [ServerExtension("unary-plus-derived")]
+            public sealed partial class UnaryPlusKernel
+            {
+                public ScoreDto Read(int value, HookContext ctx) => new ScoreDto(value);
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+    }
 }

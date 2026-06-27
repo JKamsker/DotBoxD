@@ -67,6 +67,30 @@ public sealed partial class PluginPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_manifest_required_capabilities_that_self_assert_unknown_granted_capability()
+    {
+        var policy = PluginAddendumTestPolicies.LongWall();
+        policy = policy with
+        {
+            Grants = [.. policy.Grants, new CapabilityGrant("vendor.ghost", new Dictionary<string, string>())]
+        };
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: policy);
+        var package = FireDamagePluginPackage.Create();
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = [.. package.Manifest.RequiredCapabilities, "vendor.ghost"]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK044");
+    }
+
+    [Fact]
     public async Task Install_rejects_indexed_predicate_value_that_does_not_match_its_declared_type()
     {
         var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
