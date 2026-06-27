@@ -49,6 +49,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             SyntaxKind.LogicalNotExpression => Obj(("unary", Str("not")), ("operand", LowerExpression(unary.Operand))),
             SyntaxKind.UnaryMinusExpression => Obj(("unary", Str("-")), ("operand", LowerExpression(unary.Operand))),
+            SyntaxKind.UnaryPlusExpression => LowerExpression(unary.Operand),
             _ => throw new NotSupportedException($"Server extension unary '{unary.Kind()}' is not supported.")
         };
 
