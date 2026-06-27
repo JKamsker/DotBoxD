@@ -84,4 +84,85 @@ public sealed partial class PluginAnalyzerHookChainTests
         Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.DoesNotContain(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Non_hook_Where_on_receiver_expression_does_not_block_Run_lowering()
+    {
+        var result = RunGenerator("""
+            using System.Linq;
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    var pipeline = hooks.On<DamageEvent>();
+                    pipeline.ToString().Where(c => c == 'x');
+                    pipeline.Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Remote_staged_alias_reassigned_after_Run_still_lowers_terminal()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    var staged = hooks.On<DamageEvent>()
+                        .Where(e => e.TargetId == "monster-1");
+                    staged.Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                    staged = hooks.On<DamageEvent>()
+                        .Where(e => e.TargetId == "monster-2");
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Id is "DBXK100" or "DBXK114");
+        Assert.Contains(result.GeneratedTrees, tree => tree.ToString().Contains("UseGeneratedChain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Remote_staged_Where_returned_from_local_function_then_Use_reports_DBXK100()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+            public sealed class DamageKernel;
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    RemoteHookPipeline<DamageEvent> Filter()
+                        => hooks.On<DamageEvent>().Where(e => e.TargetId == "monster-1");
+
+                    Filter().Use<DamageKernel>();
+                }
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
 }
