@@ -145,6 +145,51 @@ public sealed class ServerExtensionInlineScopedHandleTests
     }
 
     [Fact]
+    public void Scoped_handle_accessor_with_ref_scope_argument_reports_DBXK100()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Services.Attributes;
+
+            namespace Sample;
+
+            [DotBoxDService]
+            public interface IGameWorldAccess
+            {
+                IMonsterControl Monsters { get; }
+            }
+
+            [DotBoxDService]
+            public interface IMonsterControl
+            {
+                [HostCapability("game.world.monster.read.handle", HostBindingEffect.HostStateRead)]
+                IMonster Get(ref string entityId);
+            }
+
+            [DotBoxDService]
+            public interface IMonster
+            {
+                [HostCapability("game.world.monster.read.threat", HostBindingEffect.HostStateRead)]
+                int Threat();
+            }
+
+            [ServerExtension(typeof(IMonsterControl))]
+            public sealed partial class ScopedCallKernel
+            {
+                private readonly IGameWorldAccess _world;
+                public ScopedCallKernel(IGameWorldAccess world) => _world = world;
+
+                public int Read(string id, HookContext ctx) => _world.Monsters.Get(ref id).Threat();
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("ref, in, or out", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Inline_and_local_scoped_handle_kernels_require_the_same_capability()
     {
         var local = BuildPackage(LocalKernel);
