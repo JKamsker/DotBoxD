@@ -191,6 +191,7 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     [InlineData(typeof(TimeOnly))]
     [InlineData(typeof(Index))]
     [InlineData(typeof(Range))]
+    [InlineData(typeof(CancellationToken))]
     public void SandboxTypeOf_rejects_unsupported_framework_structs_before_dto_reflection(Type type)
     {
         var ex = Assert.Throws<NotSupportedException>(() => KernelRpcMarshaller.SandboxTypeOf(type));

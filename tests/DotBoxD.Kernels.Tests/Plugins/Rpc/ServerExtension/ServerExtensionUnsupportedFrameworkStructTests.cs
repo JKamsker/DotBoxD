@@ -39,12 +39,19 @@ public sealed class ServerExtensionUnsupportedFrameworkStructTests
             {
                 public int UseRange(Range value, HookContext ctx) => 0;
             }
+
+            [ServerExtension("cancellation-token-value")]
+            public sealed partial class CancellationTokenValueKernel
+            {
+                public int UseCancellationToken(System.Threading.CancellationToken value, HookContext ctx) => 0;
+            }
             """);
 
         AssertUnsupported(diagnostics, "System.DateOnly");
         AssertUnsupported(diagnostics, "System.TimeOnly");
         AssertUnsupported(diagnostics, "System.Index");
         AssertUnsupported(diagnostics, "System.Range");
+        AssertUnsupported(diagnostics, "System.Threading.CancellationToken");
     }
 
     private static void AssertUnsupported(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics, string typeName)
