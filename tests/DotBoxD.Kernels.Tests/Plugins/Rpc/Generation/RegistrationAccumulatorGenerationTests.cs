@@ -132,4 +132,34 @@ public sealed class RegistrationAccumulatorGenerationTests
             diagnostic => diagnostic.Id == "DBXK100" &&
                           diagnostic.GetMessage().Contains("has no public child control property", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public void Registration_method_without_result_payload_reports_diagnostic(string returnType)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics($$"""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationAccumulator("ServiceRegistrationAccumulator", "Replace")]
+            internal sealed class RemoteServiceControl
+            {
+                public {{returnType}} Replace<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => {{returnType}}.CompletedTask;
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains(returnType, StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal));
+    }
 }
