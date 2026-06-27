@@ -95,10 +95,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 };
 
             case BinaryExpressionSyntax binary:
-                return BinaryJson(
-                    JsonBinaryOperator(binary),
-                    LowerDerivedExpression(binary.Left, memberBindings, named, derived),
-                    LowerDerivedExpression(binary.Right, memberBindings, named, derived));
+                return LowerBinary(
+                    binary,
+                    part => LowerDerivedExpression(part, memberBindings, named, derived));
 
             default:
                 throw DerivedNotSupported(named, derived);

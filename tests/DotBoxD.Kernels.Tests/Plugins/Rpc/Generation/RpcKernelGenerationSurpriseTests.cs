@@ -143,6 +143,31 @@ public sealed partial class RpcKernelGenerationTests
         Assert.Equal("left:right", Assert.IsType<StringValue>(result).Value);
     }
 
+    [Fact]
+    public void Server_extension_reports_mixed_string_addition()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            [ServerExtension("mixed-string-add")]
+            public sealed partial class MixedStringAddKernel
+            {
+                public string Combine(string left, int count, HookContext ctx)
+                {
+                    return left + count;
+                }
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("both operands to be strings", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("double.NaN")]
     [InlineData("double.PositiveInfinity")]

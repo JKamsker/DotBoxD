@@ -34,7 +34,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private ITypeSymbol? _returnValueType;
     private int _tempCounter;
 
-    /// <summary>True once the body builds a list or record, so the manifest declares the Alloc effect.</summary>
+    /// <summary>True once the body builds an allocating value, so the manifest declares the Alloc effect.</summary>
     public bool Allocates { get; private set; }
 
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
@@ -195,6 +195,23 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     private string LowerCompound(AssignmentExpressionSyntax assignment, IdentifierNameSyntax target, List<string> output)
     {
+        if (assignment.Kind() == SyntaxKind.AddAssignmentExpression &&
+            TypeOf(target).SpecialType == SpecialType.System_String)
+        {
+            if (!IsStringExpression(assignment.Right))
+            {
+                throw new NotSupportedException(
+                    "Server extension operator '+=' requires both operands to be strings or matching numeric operands.");
+            }
+
+            Allocates = true;
+            return Call(
+                "string.concatBudgeted",
+                null,
+                Var(target.Identifier.ValueText),
+                LowerExpressionWithPrelude(assignment.Right, output));
+        }
+
         var op = assignment.Kind() switch
         {
             SyntaxKind.AddAssignmentExpression => "add",

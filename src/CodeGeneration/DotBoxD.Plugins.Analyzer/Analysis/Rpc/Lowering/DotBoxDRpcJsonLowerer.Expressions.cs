@@ -33,10 +33,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             AwaitExpressionSyntax awaited => LowerExpression(awaited.Expression),
             IdentifierNameSyntax identifier => LowerIdentifier(identifier),
             PrefixUnaryExpressionSyntax unary => LowerUnary(unary),
-            BinaryExpressionSyntax binary => BinaryJson(
-                JsonBinaryOperator(binary),
-                LowerExpression(binary.Left),
-                LowerExpression(binary.Right)),
+            BinaryExpressionSyntax binary => LowerBinary(binary),
             InvocationExpressionSyntax invocation => LowerInvocation(invocation),
             ObjectCreationExpressionSyntax creation => LowerRecordCreation(creation),
             ElementAccessExpressionSyntax element => LowerElementAccess(element),
@@ -52,6 +49,32 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             SyntaxKind.UnaryMinusExpression => Obj(("unary", Str("-")), ("operand", LowerExpression(unary.Operand))),
             _ => throw new NotSupportedException($"Server extension unary '{unary.Kind()}' is not supported.")
         };
+
+    private string LowerBinary(BinaryExpressionSyntax binary)
+        => LowerBinary(binary, LowerExpression);
+
+    private string LowerBinary(BinaryExpressionSyntax binary, Func<ExpressionSyntax, string> lower)
+    {
+        if (binary.Kind() == SyntaxKind.AddExpression)
+        {
+            var leftIsString = IsStringExpression(binary.Left);
+            var rightIsString = IsStringExpression(binary.Right);
+            if (leftIsString && rightIsString)
+            {
+                Allocates = true;
+                return Call("string.concatBudgeted", null, lower(binary.Left), lower(binary.Right));
+            }
+
+            if (leftIsString || rightIsString)
+            {
+                throw new NotSupportedException(
+                    "Server extension operator '+' requires both operands to be strings or matching numeric operands.");
+            }
+        }
+
+        return BinaryJson(JsonBinaryOperator(binary), lower(binary.Left), lower(binary.Right));
+    }
+
     private string LiteralJson(ExpressionSyntax expression, object? value)
     {
         var converted = _model.GetTypeInfo(expression, _cancellationToken).ConvertedType;
@@ -222,6 +245,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return _model.GetTypeInfo(expression, _cancellationToken).Type
                ?? throw new NotSupportedException($"Server extension could not resolve the type of '{expression}'.");
     }
+
+    private bool IsStringExpression(ExpressionSyntax expression)
+        => TypeOf(expression).SpecialType == SpecialType.System_String;
 
     private bool IsServerContextExpression(ExpressionSyntax expression)
         => expression switch
