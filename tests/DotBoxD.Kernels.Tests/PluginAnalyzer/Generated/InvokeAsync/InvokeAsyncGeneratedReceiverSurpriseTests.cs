@@ -215,6 +215,32 @@ public sealed partial class InvokeAsyncGeneratedReceiverSurpriseTests
     }
 
     [Fact]
+    public void Explicit_capture_bag_alias_reassignment_reports_DBXK100()
+    {
+        var result = RunGenerator(UsageSource("""
+            public sealed class Capture
+            {
+                public string MonsterId { get; set; } = "";
+                public int LastHealth { get; set; }
+            }
+
+            public static ValueTask<int> Run(RemotePluginServer kernels, Capture captures)
+                => kernels.InvokeAsync(captures, async (IGameWorldAccess world, Capture bag) =>
+                {
+                    var alias = bag;
+                    alias = new Capture { MonsterId = bag.MonsterId, LastHealth = 0 };
+                    alias.LastHealth = world.GetHealth(bag.MonsterId);
+                    return bag.LastHealth;
+                });
+            """));
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("capture alias 'alias'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Explicit_capture_bag_alias_mutable_collection_mutation_reports_DBXK100()
     {
         var result = RunGenerator(UsageSource("""
