@@ -247,6 +247,12 @@ if (args.Contains("--probe-remote-result-hook", StringComparer.OrdinalIgnoreCase
     return;
 }
 
+if (args.Contains("--probe-subscription-dispatch", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Plugins.SubscriptionDispatchProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-literal-scalar-safety", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Validation.LiteralScalarSafetyProbe.Run();
