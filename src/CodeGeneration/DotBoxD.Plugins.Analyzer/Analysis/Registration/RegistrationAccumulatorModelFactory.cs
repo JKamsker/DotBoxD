@@ -131,18 +131,20 @@ internal static class RegistrationAccumulatorModelFactory
                 $"Registration accumulator method '{methodName}' must not declare parameters.");
         }
 
-        if (!IsAwaitableRegistrationReturn(method.ReturnType))
+        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType))
         {
             throw new NotSupportedException(
-                $"Registration accumulator method '{methodName}' must return Task or ValueTask.");
+                $"Registration accumulator method '{methodName}' must return Task<T> or ValueTask<T>; " +
+                $"'{method.ReturnType.ToDisplayString()}' has no result payload.");
         }
 
         return method;
     }
 
-    private static bool IsAwaitableRegistrationReturn(ITypeSymbol type)
+    private static bool IsResultBearingAwaitableRegistrationReturn(ITypeSymbol type)
         => type is INamedTypeSymbol named &&
            named.Name is "Task" or "ValueTask" &&
+           named is { IsGenericType: true, TypeArguments.Length: 1 } &&
            string.Equals(named.ContainingNamespace.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
 
     private static EquatableArray<RegistrationTypeParameterModel> TypeParameters(IMethodSymbol method)
