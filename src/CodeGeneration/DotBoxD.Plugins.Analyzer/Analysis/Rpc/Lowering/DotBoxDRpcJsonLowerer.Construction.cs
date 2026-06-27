@@ -123,7 +123,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must assign named fields.");
             }
             var index = IndexOfField(fields, fieldName.Identifier.ValueText, named);
-            args[index] = LowerExpression(assignment.Right);
+            args[index] = HoistInitializerMember(LowerExpression(assignment.Right));
             assigned[index] = true;
         }
         if (!requireAllFields)
@@ -142,6 +142,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must set field '{fields[i].Name}'.");
             }
         }
+    }
+
+    private string HoistInitializerMember(string value)
+    {
+        if (_expressionPrelude is null)
+        {
+            return value;
+        }
+
+        var localName = ReserveGeneratedLocal("__sir_arg");
+        AddExpressionPrelude(SetStatement(localName, value));
+        return Var(localName);
     }
 
     private static int IndexOfField(IReadOnlyList<RecordMember> fields, string name, INamedTypeSymbol named)

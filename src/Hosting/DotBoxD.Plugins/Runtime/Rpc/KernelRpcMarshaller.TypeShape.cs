@@ -76,7 +76,8 @@ public static partial class KernelRpcMarshaller
             type.IsEnum ||
             ElementType(type) is not null ||
             MapTypes(type) is not null ||
-            !(type.IsClass || type.IsValueType))
+            !(type.IsClass || type.IsValueType) ||
+            ImplementsGenericEnumerable(type))
         {
             return null;
         }
@@ -96,6 +97,26 @@ public static partial class KernelRpcMarshaller
             throw new NotSupportedException(
                 $"Kernel RPC service type '{type}' is not supported; convert it to a supported scalar or DTO type.");
         }
+    }
+
+    // An IEnumerable<T> reaches here only after the recognized list/map shapes have been ruled out, so any
+    // remaining one — e.g. ImmutableArray<T>, ImmutableList<T>, Queue<T> — exposes only scalar getters
+    // (Length/Count/...) and would otherwise be mis-marshalled as a metadata-only record that silently drops its
+    // elements. Excluding it makes the type fail closed with the marshaller's unsupported-type exception, mirroring
+    // the analyzer's DotBoxDRpcTypeMapper.ImplementsGenericEnumerable. A plain DTO does not implement
+    // IEnumerable<T>, so this does not over-exclude.
+    private static bool ImplementsGenericEnumerable(Type type)
+    {
+        foreach (var @interface in type.GetInterfaces())
+        {
+            if (@interface.IsGenericType &&
+                @interface.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IList CreateList(Type elementType)

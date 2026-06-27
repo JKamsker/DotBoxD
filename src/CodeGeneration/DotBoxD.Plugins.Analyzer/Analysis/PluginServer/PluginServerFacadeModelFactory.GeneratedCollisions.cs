@@ -5,6 +5,39 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static partial class PluginServerFacadeModelFactory
 {
+    private static HashSet<string> GeneratedReservedMemberNames()
+        => new(StringComparer.Ordinal)
+        {
+            "Services",
+            "ServerExtensions",
+            "Hooks",
+            "Subscriptions",
+            "WireClient",
+            "StartAsync",
+            "RunAsync",
+            "HoldUntilShutdownAsync",
+            "Dispose",
+            "DisposeAsync",
+            "InvokeAsync",
+            "Get",
+            "PluginId",
+            "InvokeServerExtensionAsync",
+            "EnsureAnonymousKernelAsync",
+            "NotStartedMessage",
+            "NoWorldProxyMessage",
+            "Initialize",
+            "RequireControl",
+            "RequireWorld",
+            "ThrowIfDisposed",
+            "RecordSetup",
+            "ReplaySetupAsync",
+            "AwaitAnonymousKernelAsync",
+            "RemoveAnonymousKernel",
+            "InstallPluginPackageAsync",
+            "InstallSubscriptionPackageAsync",
+            "InstallServerExtensionPackageAsync",
+        };
+
     private static void ValidateGeneratedSiblingTypeCollisions(
         INamedTypeSymbol serverType,
         INamedTypeSymbol worldType)

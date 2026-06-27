@@ -199,55 +199,47 @@ internal static partial class PluginServerFacadeModelFactory
         IReadOnlyList<PluginServerControlProperty> controls,
         bool emitsRemoteLocalEventSink)
     {
-        var reserved = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "Services",
-            "ServerExtensions",
-            "Hooks",
-            "Subscriptions",
-            "WireClient",
-            "StartAsync",
-            "RunAsync",
-            "HoldUntilShutdownAsync",
-            "Dispose",
-            "DisposeAsync",
-            "InvokeAsync",
-            "Get",
-            "PluginId",
-            "InvokeServerExtensionAsync",
-            "EnsureAnonymousKernelAsync",
-        };
+        var reserved = GeneratedReservedMemberNames();
         var generatedMembers = new HashSet<string>(reserved, StringComparer.Ordinal);
         AddGeneratedNestedTypeNames(generatedMembers, controls, emitsRemoteLocalEventSink);
 
         foreach (var property in properties)
         {
-            generatedMembers.Add(property.Name);
             if (reserved.Contains(property.Name))
             {
                 throw new NotSupportedException(
                     $"Generated plugin server world '{worldType.ToDisplayString()}' member '{property.Name}' collides with the generated facade surface.");
             }
+
+            EnsureSingleFacadeCategory(generatedMembers, worldType, property.Name);
         }
 
-        foreach (var method in methods)
+        // Forwarded methods may legitimately repeat a name (overloads differing only by signature); ResolveMethods
+        // keeps each distinct signature, so both reach the methods bucket. Dedupe names before the cross-category
+        // check — overloads share ONE category and must not be flagged as a clash. A name also shared with a
+        // property or control is still a genuine cross-category collision and is rejected.
+        foreach (var methodName in methods
+            .Select(static method => method.Name)
+            .Distinct(StringComparer.Ordinal))
         {
-            generatedMembers.Add(method.Name);
-            if (reserved.Contains(method.Name))
+            if (reserved.Contains(methodName))
             {
                 throw new NotSupportedException(
-                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{method.Name}' collides with the generated facade surface.");
+                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{methodName}' collides with the generated facade surface.");
             }
+
+            EnsureSingleFacadeCategory(generatedMembers, worldType, methodName);
         }
 
         foreach (var control in controls)
         {
-            generatedMembers.Add(control.Name);
             if (reserved.Contains(control.Name))
             {
                 throw new NotSupportedException(
                 $"Generated plugin server control '{control.Name}' collides with the generated facade surface.");
             }
+
+            EnsureSingleFacadeCategory(generatedMembers, worldType, control.Name);
         }
 
         ValidateGeneratedSiblingTypeCollisions(serverType, worldType);
@@ -278,6 +270,21 @@ internal static partial class PluginServerFacadeModelFactory
                 throw new NotSupportedException(
                     $"Generated plugin server '{serverType.ToDisplayString()}' member '{member.Name}' collides with the generated facade surface.");
             }
+        }
+    }
+
+    // Each forwarded category dedupes within itself, but a name shared across categories (e.g. a forwarded
+    // property and a control both named the same, inherited from different interfaces) would emit twice as
+    // CS0102. Surface the cross-category clash as the designed DBXK100 instead.
+    private static void EnsureSingleFacadeCategory(
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        string name)
+    {
+        if (!generatedMembers.Add(name))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server world '{worldType.ToDisplayString()}' member '{name}' is generated in more than one facade category (forwarded property, method, or control).");
         }
     }
 
