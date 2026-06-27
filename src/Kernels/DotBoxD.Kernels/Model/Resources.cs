@@ -98,7 +98,7 @@ public sealed partial class ResourceMeter
             return;
         }
 
-        ChargeMeasuredShape(SandboxValueShapeMeter.Measure(value, Limits, cancellationToken, this));
+        ChargeMeasuredShape(ValueShapeCache.GetOrMeasure(value, cancellationToken));
     }
 
     internal void ChargeValueShape(ValueShape shape) => ChargeMeasuredShape(shape);
@@ -208,51 +208,6 @@ public sealed partial class ResourceMeter
         {
             throw new ArgumentOutOfRangeException(paramName);
         }
-    }
-
-    private void ChargeStringShape(ValueShape shape)
-    {
-        if (shape.MaxStringLength > Limits.MaxStringLength)
-        {
-            throw Quota("string length budget exhausted");
-        }
-
-        if (shape.StringBytes > 0)
-        {
-            ChargeAllocation(shape.StringBytes);
-        }
-
-        StringBytes = AddChecked(StringBytes, shape.StringBytes, "string byte budget exhausted");
-        if (StringBytes > Limits.MaxTotalStringBytes)
-        {
-            throw Quota("string byte budget exhausted");
-        }
-    }
-
-    private void ChargeMeasuredShape(ValueShape shape)
-    {
-        if (shape.MaxListLength > Limits.MaxListLength)
-        {
-            throw Quota("list length budget exhausted");
-        }
-
-        if (shape.MaxMapEntries > Limits.MaxMapEntries)
-        {
-            throw Quota("map entry budget exhausted");
-        }
-
-        if (shape.Depth > Limits.MaxCollectionDepth)
-        {
-            throw Quota("collection depth budget exhausted");
-        }
-
-        CollectionElements = AddChecked(CollectionElements, shape.Elements, "collection element budget exhausted");
-        if (CollectionElements > Limits.MaxTotalCollectionElements)
-        {
-            throw Quota("collection element budget exhausted");
-        }
-
-        ChargeStringShape(shape);
     }
 
     private static long AddChecked(long current, long amount, string quotaMessage)

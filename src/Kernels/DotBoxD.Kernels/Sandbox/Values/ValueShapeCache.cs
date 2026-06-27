@@ -26,10 +26,10 @@ internal static class ValueShapeCache
     /// <summary>Returns the cached shape/frame-count for a value, measuring and caching collections on miss.</summary>
     public static ShapeInfo GetOrMeasure(SandboxValue value, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         // Scalars and text are O(1) to measure and not worth caching (one frame, no children).
         if (value is not (ListValue or MapValue or RecordValue))
         {
-            cancellationToken.ThrowIfCancellationRequested();
             return new ShapeInfo(MeasureScalar(value), Nodes: 1);
         }
 
