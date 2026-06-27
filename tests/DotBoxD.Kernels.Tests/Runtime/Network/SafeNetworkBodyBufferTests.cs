@@ -22,7 +22,10 @@ public sealed class SafeNetworkBodyBufferTests
 
     private static int InitialBodyCapacity(long? contentLength, long maxBytes)
     {
-        var method = typeof(SafeHttpClient).GetMethod(
+        var type = typeof(SafeHttpClient).Assembly.GetType(
+            "DotBoxD.Hosting.Http.Internal.SafeHttpBodyReader",
+            throwOnError: true)!;
+        var method = type.GetMethod(
             "InitialBodyCapacity",
             BindingFlags.NonPublic | BindingFlags.Static);
 

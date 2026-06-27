@@ -53,9 +53,12 @@ internal static class HttpRequestByteAccountingProbe
 
     private static Func<Uri, long> CreateMeasureDelegate()
     {
-        var method = typeof(SafeHttpClient).GetMethod(
+        var type = typeof(SafeHttpClient).Assembly.GetType(
+            "DotBoxD.Hosting.Http.Internal.SafeHttpRequestAccounting",
+            throwOnError: true)!;
+        var method = type.GetMethod(
             "MeasureGetRequestBytes",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
+            BindingFlags.Public | BindingFlags.Static)!;
         return method.CreateDelegate<Func<Uri, long>>();
     }
 
