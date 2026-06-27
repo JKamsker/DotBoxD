@@ -1,5 +1,7 @@
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+using DotBoxD.Plugins;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
@@ -75,4 +77,139 @@ public sealed class ServerExtensionLoweringSurpriseTests
         var variable = Assert.IsType<VariableExpression>(returned.Value);
         Assert.Equal("value", variable.Name);
     }
+
+    [Fact]
+    public async Task Server_extension_lowers_long_postfix_increment()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("long-postfix")]
+            public sealed partial class LongPostfixKernel
+            {
+                public long Count(HookContext ctx)
+                {
+                    long total = 0;
+                    total++;
+                    return total;
+                }
+            }
+            """, "Sample.LongPostfixPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([]);
+
+        Assert.Equal(1L, Assert.IsType<I64Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Server_extension_lowers_prefix_increment_statement()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("prefix-increment")]
+            public sealed partial class PrefixIncrementKernel
+            {
+                public int Count(HookContext ctx)
+                {
+                    var total = 0;
+                    ++total;
+                    return total;
+                }
+            }
+            """, "Sample.PrefixIncrementPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([]);
+
+        Assert.Equal(1, Assert.IsType<I32Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Server_extension_lowers_definite_assigned_local_without_initializer()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("definite-assigned-local")]
+            public sealed partial class DefiniteAssignedLocalKernel
+            {
+                public int Count(HookContext ctx)
+                {
+                    int total;
+                    total = 1;
+                    return total;
+                }
+            }
+            """, "Sample.DefiniteAssignedLocalPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([]);
+
+        Assert.Equal(1, Assert.IsType<I32Value>(result).Value);
+    }
+
+    [Fact]
+    public async Task Server_extension_lowers_while_statement()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("while-loop")]
+            public sealed partial class WhileLoopKernel
+            {
+                public int Count(HookContext ctx)
+                {
+                    var total = 0;
+                    while (total < 3)
+                    {
+                        total++;
+                    }
+
+                    return total;
+                }
+            }
+            """, "Sample.WhileLoopPluginPackage");
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync([]);
+
+        Assert.Equal(3, Assert.IsType<I32Value>(result).Value);
+    }
+
+    private static SandboxPolicy PurePolicy()
+        => SandboxPolicyBuilder.Create()
+            .WithFuel(10_000)
+            .WithMaxHostCalls(100)
+            .WithWallTime(TimeSpan.FromSeconds(5))
+            .Build();
 }
