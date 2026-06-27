@@ -27,6 +27,13 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return true;
         }
 
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
+        if (expression is ConditionalExpressionSyntax conditional)
+        {
+            return ContainsStageInvocationOrAlias(conditional.WhenTrue, model, cancellationToken, depth + 1) ||
+                ContainsStageInvocationOrAlias(conditional.WhenFalse, model, cancellationToken, depth + 1);
+        }
+
         if (ReturnedExpression(expression, model, cancellationToken) is { } returned)
         {
             return ContainsStageInvocationOrAlias(returned, model, cancellationToken, depth + 1);
