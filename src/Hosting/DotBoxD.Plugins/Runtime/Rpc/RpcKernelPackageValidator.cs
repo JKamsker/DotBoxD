@@ -67,7 +67,7 @@ internal static class RpcKernelPackageValidator
         ThrowIfErrors(diagnostics);
     }
 
-    public static void ValidatePrepared(PluginPackage package, ExecutionPlan plan)
+    public static void ValidatePrepared(PluginPackage package, ExecutionPlan plan, SandboxPolicy installPolicy)
     {
         var diagnostics = new List<SandboxDiagnostic>();
         var manifestEffects = PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
@@ -103,6 +103,10 @@ internal static class RpcKernelPackageValidator
         }
 
         PluginManifestCapabilityValidator.Validate(package.Manifest, plan, [entrypointId], diagnostics);
+        PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
+            package.Manifest,
+            installPolicy,
+            diagnostics);
         ValidateLiveSettingSuffix(package.Manifest.LiveSettings, entrypoint, diagnostics);
         ThrowIfErrors(diagnostics);
     }

@@ -54,6 +54,29 @@ internal static class PluginManifestCapabilityValidator
             message));
     }
 
+    public static IEnumerable<string> NonBindingRequiredCapabilities(PluginManifest manifest)
+        => manifest.RequiredCapabilities.Where(IsKnownNonBindingCapability);
+
+    public static void ValidateRequiredCapabilityGrants(
+        PluginManifest manifest,
+        SandboxPolicy installPolicy,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var now = installPolicy.GrantClock;
+        foreach (var capability in manifest.RequiredCapabilities.Distinct(StringComparer.Ordinal))
+        {
+            if (string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
+                installPolicy.GrantsCapability(capability, now))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-CAP",
+                $"required capability '{capability}' is not granted"));
+        }
+    }
+
     private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
