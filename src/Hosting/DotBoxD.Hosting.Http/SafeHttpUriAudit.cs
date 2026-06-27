@@ -22,7 +22,8 @@ internal static class SafeHttpUriAudit
         => allowedHosts.Count > 0 && allowedHosts.Contains(NormalizedAuthority(uri));
 
     public static bool SameUri(Uri left, Uri right)
-        => StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
+        => ReferenceEquals(left, right) ||
+           StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
            StringComparer.OrdinalIgnoreCase.Equals(NormalizedAuthority(left), NormalizedAuthority(right)) &&
            StringComparer.Ordinal.Equals(left.PathAndQuery, right.PathAndQuery);
 

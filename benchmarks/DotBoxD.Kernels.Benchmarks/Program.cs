@@ -62,33 +62,8 @@ if (args.Contains("--probe-resource-meter", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
-if (args.Contains("--probe-http-metadata", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.Http.HttpProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.Http.HttpMetadataAccountingProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-http-request-bytes", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Http.HttpRequestByteAccountingProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-http-allowed-host", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Http.HttpAllowedHostProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-http-audit-path-sanitizer", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Http.HttpAuditPathSanitizerProbe.Run();
-    return;
-}
-
-if (args.Contains("--probe-safe-ip-classifier", StringComparer.OrdinalIgnoreCase))
-{
-    DotBoxD.Kernels.Benchmarks.Http.SafeIpClassifierProbe.Run();
     return;
 }
 
