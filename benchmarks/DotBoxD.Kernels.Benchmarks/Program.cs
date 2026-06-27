@@ -205,9 +205,8 @@ if (args.Contains("--probe-capability-grant-lookup", StringComparer.OrdinalIgnor
     return;
 }
 
-if (args.Contains("--probe-server-extension-proxy-lookup", StringComparer.OrdinalIgnoreCase))
+if (DotBoxD.Kernels.Benchmarks.Runtime.PackageProbeDispatcher.TryRun(args))
 {
-    DotBoxD.Kernels.Benchmarks.Runtime.ServerExtensionProxyLookupProbe.Run();
     return;
 }
 
