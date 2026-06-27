@@ -2,6 +2,7 @@ using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 using DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.MergeableIr;
 using DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 using DotBoxD.Plugins.Analyzer.Analysis.Registration;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
@@ -238,6 +239,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
             static (sourceContext, items) => InvokeAsyncInterceptorEmitter.Emit(sourceContext, items));
 
         RegistrationAccumulatorGenerator.Register(context);
+        MergeableIrStepGenerator.Register(context);
 
         // [HookResult] builder surface: Ok()/Reject()/With<Field>() for each annotated result record, plus the
         // DBXK112 diagnostic when the Success/Reason contract is missing.

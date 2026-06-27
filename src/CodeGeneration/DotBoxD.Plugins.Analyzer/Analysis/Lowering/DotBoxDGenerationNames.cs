@@ -28,6 +28,7 @@ internal static class DotBoxDGenerationNames
         public const string HostBindingAttribute = "DotBoxD.Abstractions.HostBindingAttribute";
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
+        public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";
         public const string LocalAttribute = "DotBoxD.Abstractions.LocalAttribute";
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
