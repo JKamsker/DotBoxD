@@ -24,11 +24,15 @@ internal static class SafeHttpUriAudit
     public static bool SameUri(Uri left, Uri right)
         => ReferenceEquals(left, right) ||
            StringComparer.OrdinalIgnoreCase.Equals(left.Scheme, right.Scheme) &&
-           StringComparer.OrdinalIgnoreCase.Equals(NormalizedAuthority(left), NormalizedAuthority(right)) &&
+           SameAuthority(left, right) &&
            StringComparer.Ordinal.Equals(left.PathAndQuery, right.PathAndQuery);
 
     private static string NormalizedAuthority(Uri uri)
         => uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+
+    private static bool SameAuthority(Uri left, Uri right)
+        => left.Port == right.Port &&
+           StringComparer.OrdinalIgnoreCase.Equals(left.Host, right.Host);
 
     private static string SafePath(Uri uri)
         => AuditTextSanitizer.RedactPathSegments(Uri.UnescapeDataString(uri.AbsolutePath));
