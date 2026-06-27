@@ -94,6 +94,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, invocation.TargetMethod.ContainingType);
+            RecordInitializerRootCall(context, helperGraph, invocation.TargetMethod);
             return;
         }
 
@@ -119,6 +120,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, property.ContainingType);
+            RecordInitializerPropertyRootCall(context, helperGraph, property);
             return;
         }
 
@@ -172,6 +174,7 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
             ReportForbiddenInInitializer(context, reference.Method.ContainingType);
+            RecordInitializerRootCall(context, helperGraph, reference.Method);
             return;
         }
 
@@ -196,6 +199,52 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
             ForbiddenHostApiRule,
             context.Operation.Syntax.GetLocation(),
             type!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+    }
+
+    // A helper invoked (or referenced as a method group) from a field/property initializer in an event kernel is
+    // a call-graph root: its body may transitively reach a forbidden host API even though the directly referenced
+    // type is benign. Record it so the existing taint propagation flags it at the initializer site.
+    private static void RecordInitializerRootCall(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IMethodSymbol target)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol))
+        {
+            return;
+        }
+
+        helperGraph.RecordInitializerRootCall(
+            context.ContainingSymbol.ContainingType,
+            target,
+            context.Operation.Syntax.GetLocation());
+    }
+
+    // A helper property read from an initializer reaches a forbidden API through the accessor it actually uses, so
+    // record a root for the getter on a read and the setter on a write (compound/increment uses both), mirroring
+    // the method-body property path in AnalyzePropertyReference.
+    private static void RecordInitializerPropertyRootCall(
+        OperationAnalysisContext context,
+        ForbiddenHelperCallGraph helperGraph,
+        IPropertySymbol property)
+    {
+        if (context.ContainingSymbol is not (IFieldSymbol or IPropertySymbol))
+        {
+            return;
+        }
+
+        var containingType = context.ContainingSymbol.ContainingType;
+        var (usesGetter, usesSetter) = AccessorUsage(context.Operation);
+        var location = context.Operation.Syntax.GetLocation();
+        if (usesGetter && property.GetMethod is { } getter)
+        {
+            helperGraph.RecordInitializerRootCall(containingType, getter, location);
+        }
+
+        if (usesSetter && property.SetMethod is { } setter)
+        {
+            helperGraph.RecordInitializerRootCall(containingType, setter, location);
+        }
     }
 
     private static (bool Getter, bool Setter) AccessorUsage(IOperation reference)

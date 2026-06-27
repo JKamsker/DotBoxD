@@ -213,15 +213,21 @@ internal static partial class PluginServerFacadeModelFactory
             EnsureSingleFacadeCategory(generatedMembers, worldType, property.Name);
         }
 
-        foreach (var method in methods)
+        // Forwarded methods may legitimately repeat a name (overloads differing only by signature); ResolveMethods
+        // keeps each distinct signature, so both reach the methods bucket. Dedupe names before the cross-category
+        // check — overloads share ONE category and must not be flagged as a clash. A name also shared with a
+        // property or control is still a genuine cross-category collision and is rejected.
+        foreach (var methodName in methods
+            .Select(static method => method.Name)
+            .Distinct(StringComparer.Ordinal))
         {
-            if (reserved.Contains(method.Name))
+            if (reserved.Contains(methodName))
             {
                 throw new NotSupportedException(
-                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{method.Name}' collides with the generated facade surface.");
+                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{methodName}' collides with the generated facade surface.");
             }
 
-            EnsureSingleFacadeCategory(generatedMembers, worldType, method.Name);
+            EnsureSingleFacadeCategory(generatedMembers, worldType, methodName);
         }
 
         foreach (var control in controls)
