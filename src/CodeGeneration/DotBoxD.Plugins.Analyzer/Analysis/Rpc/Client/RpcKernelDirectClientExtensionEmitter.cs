@@ -41,6 +41,7 @@ internal static class RpcKernelDirectClientExtensionEmitter
             var userParameterCount = kernelMethod.Parameters.Length - 1;
             var argumentOffset = hasReceiverId ? 1 : 0;
             var receiver = ReceiverParameterName(kernelMethod);
+            var cancellationToken = CancellationTokenParameterName(kernelMethod, receiver);
             builder.Append("    public static ");
             if (isAsyncReturn)
             {
@@ -56,6 +57,8 @@ internal static class RpcKernelDirectClientExtensionEmitter
                 builder.Append(", ").Append(RpcKernelClientParameterSource.Declaration(parameter));
             }
 
+            builder.Append(", global::System.Threading.CancellationToken ")
+                .Append(cancellationToken).Append(" = default");
             builder.AppendLine(")");
             builder.AppendLine("    {");
             builder.Append("        if (").Append(receiver).AppendLine(" is not global::DotBoxD.Abstractions.IServerExtensionClientAccessor __accessor)");
@@ -82,13 +85,13 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.AppendLine("        var __request = global::DotBoxD.Plugins.KernelRpcBinaryCodec.EncodeArguments(__arguments);");
             if (payloadReturnType is null)
             {
-                AppendInvoke(builder, isAsyncReturn, assignResponse: true);
+                AppendInvoke(builder, isAsyncReturn, cancellationToken, assignResponse: true);
                 builder.AppendLine("        global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(__response).RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Unit);");
                 builder.AppendLine("        return;");
             }
             else
             {
-                AppendInvoke(builder, isAsyncReturn, assignResponse: true);
+                AppendInvoke(builder, isAsyncReturn, cancellationToken, assignResponse: true);
                 builder.AppendLine("        var __result = global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(__response);");
                 builder.Append("        return ").Append(_conv.ReadExpression(payloadReturnType, "__result")).AppendLine(";");
             }
@@ -97,7 +100,11 @@ internal static class RpcKernelDirectClientExtensionEmitter
             builder.AppendLine();
         }
 
-        private void AppendInvoke(StringBuilder builder, bool isAsyncReturn, bool assignResponse)
+        private void AppendInvoke(
+            StringBuilder builder,
+            bool isAsyncReturn,
+            string cancellationToken,
+            bool assignResponse)
         {
             builder.Append("        ");
             if (assignResponse)
@@ -108,12 +115,16 @@ internal static class RpcKernelDirectClientExtensionEmitter
             if (isAsyncReturn)
             {
                 builder.Append("await __accessor.ServerExtensions.InvokeServerExtensionAsync(");
-                builder.Append("__accessor.ServerExtensions.PluginId<").Append(TypeName(kernelType)).AppendLine(">(), __request).ConfigureAwait(false);");
+                builder.Append("__accessor.ServerExtensions.PluginId<").Append(TypeName(kernelType))
+                    .Append(">(), __request, ").Append(cancellationToken)
+                    .AppendLine(").ConfigureAwait(false);");
                 return;
             }
 
             builder.Append("__accessor.ServerExtensions.InvokeServerExtensionAsync(");
-            builder.Append("__accessor.ServerExtensions.PluginId<").Append(TypeName(kernelType)).AppendLine(">(), __request).AsTask().GetAwaiter().GetResult();");
+            builder.Append("__accessor.ServerExtensions.PluginId<").Append(TypeName(kernelType))
+                .Append(">(), __request, ").Append(cancellationToken)
+                .AppendLine(").AsTask().GetAwaiter().GetResult();");
         }
 
         private static string TypeName(ITypeSymbol type)
@@ -156,6 +167,25 @@ internal static class RpcKernelDirectClientExtensionEmitter
             {
                 var candidate = seed + "_" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (!HasParameter(method, candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        private static string CancellationTokenParameterName(IMethodSymbol method, string receiverName)
+        {
+            const string seed = "cancellationToken";
+            if (!HasParameter(method, seed) && !string.Equals(receiverName, seed, StringComparison.Ordinal))
+            {
+                return seed;
+            }
+
+            for (var suffix = 0; ; suffix++)
+            {
+                var candidate = seed + "_" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (!HasParameter(method, candidate) &&
+                    !string.Equals(receiverName, candidate, StringComparison.Ordinal))
                 {
                     return candidate;
                 }
