@@ -362,6 +362,7 @@ jobs:
               "RpcKernelMethodContextHelperRegressionTests",
               "RpcKernelNamedArgumentGenerationTests",
               "RpcKernelNumericConversionGenerationTests",
+              "RpcKernelObjectCreationValidationTests",
               "ServerExtensionInlineScopedHandleTests",
               "ServerExtensionSurpriseRegressionTests",
               "ServerExtensionGeneratedDtoReaderRegressionTests",

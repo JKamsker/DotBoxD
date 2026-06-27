@@ -53,10 +53,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (creation.ArgumentList is { Arguments.Count: > 0 } argumentList)
         {
             if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is not IMethodSymbol constructor ||
-                argumentList.Arguments.Count != constructor.Parameters.Length ||
                 constructor.Parameters.Length > fields.Count)
             {
-                throw new NotSupportedException($"Server extension constructor for '{named.Name}' must pass one argument per constructor parameter, and the constructor must not have more parameters than the record has fields.");
+                throw new NotSupportedException($"Server extension constructor for '{named.Name}' must map each constructor parameter to a record field.");
             }
             var lowered = LowerArgumentsInParameterOrder(
                 argumentList.Arguments,

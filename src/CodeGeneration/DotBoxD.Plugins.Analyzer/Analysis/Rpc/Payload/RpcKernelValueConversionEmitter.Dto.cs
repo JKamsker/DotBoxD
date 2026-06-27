@@ -175,7 +175,19 @@ internal sealed partial class RpcKernelValueConversionEmitter
         var arguments = new List<string>(constructor.Parameters.Length);
         foreach (var parameter in constructor.Parameters)
         {
-            arguments.Add(FieldLocal(RpcDtoFieldMatcher.FieldIndex(fields, parameter)));
+            var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
+            if (fieldIndex >= 0)
+            {
+                arguments.Add(Identifier(parameter.Name) + ": " + FieldLocal(fieldIndex));
+                continue;
+            }
+
+            if (!parameter.HasExplicitDefaultValue)
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+            }
         }
 
         return arguments;
@@ -187,7 +199,6 @@ internal sealed partial class RpcKernelValueConversionEmitter
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
-                constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
                 continue;
@@ -198,7 +209,18 @@ internal sealed partial class RpcKernelValueConversionEmitter
             foreach (var parameter in constructor.Parameters)
             {
                 var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0 || assigned[fieldIndex])
+                if (fieldIndex < 0)
+                {
+                    if (parameter.HasExplicitDefaultValue)
+                    {
+                        continue;
+                    }
+
+                    matched = false;
+                    break;
+                }
+
+                if (assigned[fieldIndex])
                 {
                     matched = false;
                     break;

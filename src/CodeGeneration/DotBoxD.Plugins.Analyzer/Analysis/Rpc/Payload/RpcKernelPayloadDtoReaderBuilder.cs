@@ -54,7 +54,18 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         foreach (var parameter in constructor.Parameters)
         {
             var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            arguments.Add(FieldLocal(fieldIndex));
+            if (fieldIndex >= 0)
+            {
+                arguments.Add(Identifier(parameter.Name) + ": " + FieldLocal(fieldIndex));
+                continue;
+            }
+
+            if (!parameter.HasExplicitDefaultValue)
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+            }
         }
 
         return arguments;
@@ -150,7 +161,6 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation) ||
-                constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
                 continue;
@@ -161,7 +171,18 @@ internal static class RpcKernelPayloadDtoReaderBuilder
             foreach (var parameter in constructor.Parameters)
             {
                 var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0 || assigned[fieldIndex])
+                if (fieldIndex < 0)
+                {
+                    if (parameter.HasExplicitDefaultValue)
+                    {
+                        continue;
+                    }
+
+                    matched = false;
+                    break;
+                }
+
+                if (assigned[fieldIndex])
                 {
                     matched = false;
                     break;

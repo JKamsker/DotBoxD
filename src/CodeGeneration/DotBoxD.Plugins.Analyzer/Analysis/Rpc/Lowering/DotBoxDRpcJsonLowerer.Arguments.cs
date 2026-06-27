@@ -12,8 +12,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     {
         var bound = BindArgumentsInParameterOrder(arguments, parameters, description);
 
-        var lowered = new string[parameters.Count];
-        foreach (var argument in bound)
+        var lowered = new string?[parameters.Count];
+        foreach (var argument in bound.EvaluationOrder)
         {
             var value = LowerExpression(argument.Expression);
             if (_expressionPrelude is null)
@@ -27,7 +27,17 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             lowered[argument.ParameterIndex] = Var(localName);
         }
 
-        return lowered;
+        for (var i = 0; i < lowered.Length; i++)
+        {
+            if (lowered[i] is not null)
+            {
+                continue;
+            }
+
+            lowered[i] = LiteralJson(parameters[i], parameters[i].ExplicitDefaultValue);
+        }
+
+        return lowered!;
     }
 
     private static bool CanBindArgumentsInParameterOrder(
@@ -35,7 +45,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyList<IParameterSymbol> parameters)
         => TryBindArgumentsInParameterOrder(arguments, parameters, description: null, out _);
 
-    private static (int ParameterIndex, ExpressionSyntax Expression)[] BindArgumentsInParameterOrder(
+    private static BoundRpcArguments BindArgumentsInParameterOrder(
         SeparatedSyntaxList<ArgumentSyntax> arguments,
         IReadOnlyList<IParameterSymbol> parameters,
         string description)
@@ -52,12 +62,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         SeparatedSyntaxList<ArgumentSyntax> arguments,
         IReadOnlyList<IParameterSymbol> parameters,
         string? description,
-        out (int ParameterIndex, ExpressionSyntax Expression)[] bound)
+        out BoundRpcArguments bound)
     {
-        bound = [];
-        if (arguments.Count != parameters.Count)
+        bound = new BoundRpcArguments([], []);
+        if (arguments.Count > parameters.Count)
         {
-            return Fail(description, $" call must pass {parameters.Count} argument(s).");
+            return Fail(description, $" call must pass at most {parameters.Count} argument(s).");
         }
 
         var current = new (int ParameterIndex, ExpressionSyntax Expression)[arguments.Count];
@@ -105,13 +115,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         for (var i = 0; i < assigned.Length; i++)
         {
-            if (!assigned[i])
+            if (!assigned[i] && !parameters[i].HasExplicitDefaultValue)
             {
                 return Fail(description, $" call must pass parameter '{parameters[i].Name}'.");
             }
         }
 
-        bound = current;
+        bound = new BoundRpcArguments(assigned, current);
         return true;
     }
 
@@ -152,4 +162,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
         throw new NotSupportedException($"{description} has no parameter '{name}'.");
     }
+
+    private readonly record struct BoundRpcArguments(
+        bool[] Assigned,
+        IReadOnlyList<(int ParameterIndex, ExpressionSyntax Expression)> EvaluationOrder);
 }
