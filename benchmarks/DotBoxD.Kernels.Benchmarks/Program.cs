@@ -164,6 +164,12 @@ if (args.Contains("--probe-host-call-accounting", StringComparer.OrdinalIgnoreCa
     return;
 }
 
+if (args.Contains("--probe-run-summary-policy-id", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Runtime.Audit.RunSummaryPolicyIdProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-binding-dispatch-scope", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.BindingDispatchScopeProbe.Run();
