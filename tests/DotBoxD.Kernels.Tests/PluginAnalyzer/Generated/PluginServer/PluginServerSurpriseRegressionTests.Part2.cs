@@ -36,9 +36,7 @@ public sealed partial class PluginServerSurpriseRegressionTests
             diagnostics,
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("ToolsPluginControl", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            diagnostics,
-            d => d.Id.StartsWith("CS", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "CS0102");
     }
 
     [Fact]

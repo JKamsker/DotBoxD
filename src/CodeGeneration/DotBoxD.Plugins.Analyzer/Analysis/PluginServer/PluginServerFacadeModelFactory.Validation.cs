@@ -196,7 +196,8 @@ internal static partial class PluginServerFacadeModelFactory
         INamedTypeSymbol worldType,
         IReadOnlyList<PluginServerForwardedProperty> properties,
         IReadOnlyList<PluginServerForwardedMethod> methods,
-        IReadOnlyList<PluginServerControlProperty> controls)
+        IReadOnlyList<PluginServerControlProperty> controls,
+        bool emitsRemoteLocalEventSink)
     {
         var reserved = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -217,6 +218,7 @@ internal static partial class PluginServerFacadeModelFactory
             "EnsureAnonymousKernelAsync",
         };
         var generatedMembers = new HashSet<string>(reserved, StringComparer.Ordinal);
+        AddGeneratedNestedTypeNames(generatedMembers, controls, emitsRemoteLocalEventSink);
 
         foreach (var property in properties)
         {

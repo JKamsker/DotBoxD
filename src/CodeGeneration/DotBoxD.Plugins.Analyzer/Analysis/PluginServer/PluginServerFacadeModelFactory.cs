@@ -57,9 +57,9 @@ internal static partial class PluginServerFacadeModelFactory
             worldType,
             worldServiceWrappers,
             cancellationToken);
-        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls);
-        var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
+        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls, eventCallback is not null);
+        var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var context = ResolveContext(type, compilation, cancellationToken);
         return new PluginServerFacadeModel(
             ns,

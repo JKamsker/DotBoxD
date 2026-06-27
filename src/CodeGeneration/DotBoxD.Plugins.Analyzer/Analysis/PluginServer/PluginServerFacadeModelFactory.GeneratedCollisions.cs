@@ -30,6 +30,27 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
+    private static void AddGeneratedNestedTypeNames(
+        HashSet<string> generatedMembers,
+        IReadOnlyList<PluginServerControlProperty> controls,
+        bool emitsRemoteLocalEventSink)
+    {
+        generatedMembers.Add("RecordedInstallKind");
+        generatedMembers.Add("RecordedInstall");
+        generatedMembers.Add("SetupRecorder");
+        generatedMembers.Add("LiveSettingsHandle");
+        if (emitsRemoteLocalEventSink)
+        {
+            generatedMembers.Add("RemoteLocalEventSink");
+        }
+
+        foreach (var control in controls)
+        {
+            generatedMembers.Add(control.WrapperName);
+            generatedMembers.Add(control.Name + "SetupAccumulator");
+        }
+    }
+
     private static bool IsGeneratedInvokeAsyncSignature(IMethodSymbol method, INamedTypeSymbol worldType)
         => IsGeneratedSimpleInvokeAsyncSignature(method, worldType) ||
            IsGeneratedCaptureInvokeAsyncSignature(method, worldType);
