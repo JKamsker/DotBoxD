@@ -25,7 +25,7 @@ public sealed class RemoteLocalIntHandlerAllocationTests
 
         for (var i = 0; i < WarmupIterations; i++)
         {
-            Dispatch(registry, payload, context);
+            Dispatch(registry, "sub-int", payload, context);
         }
 
         GC.Collect();
@@ -35,7 +35,7 @@ public sealed class RemoteLocalIntHandlerAllocationTests
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < MeasuredIterations; i++)
         {
-            Dispatch(registry, payload, context);
+            Dispatch(registry, "sub-int", payload, context);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
@@ -47,12 +47,59 @@ public sealed class RemoteLocalIntHandlerAllocationTests
             $"expected the int projection path to stay below boxing cost; observed {perDispatch:N2} B/op.");
     }
 
-    private static void Dispatch(RemoteLocalHandlerRegistry registry, byte[] payload, HookContext context)
-        => registry.DispatchAsync("sub-int", payload, context).GetAwaiter().GetResult();
+    [Fact]
+    public void Int_backed_enum_projection_dispatch_does_not_box_the_projected_value()
+    {
+        var registry = new RemoteLocalHandlerRegistry();
+        var context = new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None);
+        var payload = EncodeProjected(LocalReaction.Alert);
+        var checksum = 0;
+        registry.Register<LocalReaction>("sub-enum", (value, _) =>
+        {
+            checksum += (int)value;
+            return ValueTask.CompletedTask;
+        });
+
+        for (var i = 0; i < WarmupIterations; i++)
+        {
+            Dispatch(registry, "sub-enum", payload, context);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < MeasuredIterations; i++)
+        {
+            Dispatch(registry, "sub-enum", payload, context);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        var perDispatch = (double)allocated / MeasuredIterations;
+
+        GC.KeepAlive(checksum);
+        Assert.True(
+            perDispatch < 8D,
+            $"expected the enum projection path to stay below boxing cost; observed {perDispatch:N2} B/op.");
+    }
+
+    private static void Dispatch(
+        RemoteLocalHandlerRegistry registry,
+        string subscriptionId,
+        byte[] payload,
+        HookContext context)
+        => registry.DispatchAsync(subscriptionId, payload, context).GetAwaiter().GetResult();
 
     private static byte[] EncodeProjected<TProjected>(TProjected value)
     {
         var sandboxValue = KernelRpcMarshaller.ToSandboxValue(value, typeof(TProjected));
         return KernelRpcBinaryCodec.EncodeValue(sandboxValue);
+    }
+
+    private enum LocalReaction
+    {
+        Calm,
+        Alert
     }
 }

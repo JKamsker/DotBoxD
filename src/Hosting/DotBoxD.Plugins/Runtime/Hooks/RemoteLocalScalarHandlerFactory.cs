@@ -1,5 +1,7 @@
 namespace DotBoxD.Plugins.Runtime.Hooks;
 
+using System.Runtime.CompilerServices;
+
 internal static class RemoteLocalScalarHandlerFactory
 {
     public static bool TryCreate<TProjected>(
@@ -13,7 +15,17 @@ internal static class RemoteLocalScalarHandlerFactory
             return true;
         }
 
+        if (typeof(TProjected).IsEnum &&
+            Enum.GetUnderlyingType(typeof(TProjected)) == typeof(int))
+        {
+            invoke = (value, context) => handler(FromInt32Enum<TProjected>(value.Int32Value), context);
+            return true;
+        }
+
         invoke = null!;
         return false;
     }
+
+    private static TEnum FromInt32Enum<TEnum>(int value)
+        => Unsafe.As<int, TEnum>(ref value);
 }
