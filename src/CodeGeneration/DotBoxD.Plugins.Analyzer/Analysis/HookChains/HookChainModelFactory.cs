@@ -198,12 +198,10 @@ internal static partial class HookChainModelFactory
                 cancellationToken,
                 capabilities,
                 effects);
-        // The CLR type the pushed value carries: the final Select element, or the whole event when there is no
-        // Select. Resolved once and reused for both the Handle return SandboxType (projection chains) and the
-        // reflection-free decoder. Null only for a non-local chain.
-        var projectedTypeSymbol = installKind == HookChainInterceptorInstallKind.LocalCallback
-            ? ProjectedTypeSymbol(stages, eventType, model, cancellationToken)
-            : null;
+        // The CLR type the terminal handler receives: the final Select element, or the whole event when there is
+        // no Select. Anonymous projections are not source-nameable, so interception needs this symbol even for
+        // ordinary remote Run chains to emit a generic interceptor and let Roslyn infer the anonymous argument.
+        var projectedTypeSymbol = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
 
         // An anonymous type CAN be the terminal (pushed) projection — it has a real metadata identity Roslyn can
         // infer as a type ARGUMENT — but it has no C#-source-nameable name. The interceptor handles it by binding

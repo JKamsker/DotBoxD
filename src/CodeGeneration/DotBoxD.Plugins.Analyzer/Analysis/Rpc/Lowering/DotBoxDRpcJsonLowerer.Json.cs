@@ -29,6 +29,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
 
     internal static string Var(string name) => Obj(("var", Str(name)));
 
+    internal static string RecordGet(string receiver, int index)
+        => Call("record.get", null, receiver, I32(index));
+
     private static string Unit() => Obj(("unit", "true"));
 
     private static string I32(int value) => Obj(("i32", value.ToString(CultureInfo.InvariantCulture)));

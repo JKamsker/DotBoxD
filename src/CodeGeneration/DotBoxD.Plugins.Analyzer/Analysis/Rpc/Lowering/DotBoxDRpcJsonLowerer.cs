@@ -42,7 +42,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         => _serviceHandleLocals[name] = handleIdJson;
     internal string LowerBody(
         BlockSyntax block,
-        IReadOnlyList<(string Name, ExpressionSyntax Value)> leadingLocals,
+        IReadOnlyList<(string Name, string Value)> leadingLocals,
         IReadOnlyList<string> returnRecordFields,
         string? returnRecordType,
         Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
@@ -60,7 +60,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             var parts = new List<string>();
             for (var i = 0; i < leadingLocals.Count; i++)
             {
-                parts.Add(SetStatement(leadingLocals[i].Name, LowerExpressionWithPrelude(leadingLocals[i].Value, parts)));
+                parts.Add(SetStatement(leadingLocals[i].Name, leadingLocals[i].Value));
             }
 
             _expressionOverride = expressionOverride;

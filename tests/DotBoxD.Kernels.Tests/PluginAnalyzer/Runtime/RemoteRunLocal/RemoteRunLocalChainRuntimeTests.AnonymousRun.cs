@@ -8,7 +8,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             public static void Configure(RemoteHookRegistry hooks)
                 => hooks.On<Ev.EncounterEvent>().Where(e => e.Distance <= 4)
                     .Select(e => new { Id = e.EncounterId, Zone = e.Zone })
-                    .Run((x, ctx) => ctx.Messages.Send(x.Id.ToString(), x.Zone));
+                    .Run((x, ctx) => ctx.Messages.Send(x.Zone, x.Zone));
         }
         """;
 
@@ -18,7 +18,7 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             public static void Configure(RemoteSubscriptionRegistry subscriptions)
                 => subscriptions.On<Ev.EncounterEvent>().Where(e => e.Distance <= 4)
                     .Select(e => new { Id = e.EncounterId, Zone = e.Zone })
-                    .Run((x, ctx) => ctx.Messages.Send(x.Id.ToString(), x.Zone));
+                    .Run((x, ctx) => ctx.Messages.Send(x.Zone, x.Zone));
         }
         """;
 

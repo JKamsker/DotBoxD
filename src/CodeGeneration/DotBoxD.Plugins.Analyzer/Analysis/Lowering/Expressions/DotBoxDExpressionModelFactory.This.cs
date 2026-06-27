@@ -22,6 +22,27 @@ internal static partial class DotBoxDExpressionModelFactory
             return Unsupported(member);
         }
 
+        return TryLowerThisProperty(property, memberName, context) ?? Unsupported(member);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerImplicitThisIdentifier(
+        IdentifierNameSyntax identifier,
+        DotBoxDExpressionLoweringContext context)
+    {
+        if (context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol
+            is not IPropertySymbol { IsStatic: false } property)
+        {
+            return null;
+        }
+
+        return TryLowerThisProperty(property, identifier.Identifier.ValueText, context);
+    }
+
+    private static DotBoxDExpressionModel? TryLowerThisProperty(
+        IPropertySymbol property,
+        string memberName,
+        DotBoxDExpressionLoweringContext context)
+    {
         if (DotBoxDHostBindingExpressionLowerer.TryLowerProperty(property, context) is { } hostProperty)
         {
             return hostProperty;
@@ -47,7 +68,7 @@ internal static partial class DotBoxDExpressionModelFactory
             return fallbackBound;
         }
 
-        return Unsupported(member);
+        return null;
     }
 
     private static string LiveSettingSymbolKey(IPropertySymbol property)

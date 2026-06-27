@@ -24,14 +24,25 @@ internal sealed partial class InvokeAsyncCallShape
                     captureParameter.Name,
                     captureAliases,
                     model,
-                    out var member,
+                    out _,
                     out var target))
             {
                 continue;
             }
 
-            var recordMember = DotBoxDRpcTypeMapper.RecordFields(captureParameter.Type)
-                .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.Symbol, target));
+            var recordFields = DotBoxDRpcTypeMapper.RecordFields(captureParameter.Type);
+            var recordMemberIndex = -1;
+            RecordMember recordMember = default;
+            for (var i = 0; i < recordFields.Count; i++)
+            {
+                if (SymbolEqualityComparer.Default.Equals(recordFields[i].Symbol, target))
+                {
+                    recordMember = recordFields[i];
+                    recordMemberIndex = i;
+                    break;
+                }
+            }
+
             if (recordMember.Symbol is null)
             {
                 throw new NotSupportedException(
@@ -54,7 +65,9 @@ internal sealed partial class InvokeAsyncCallShape
                 recordMember.Name,
                 recordMember.Type,
                 ReserveSyncOutLocal(recordMember.Name, reservedLocalNames),
-                member));
+                DotBoxDRpcJsonLowerer.RecordGet(
+                    DotBoxDRpcJsonLowerer.Var(captureParameter.Name),
+                    recordMemberIndex)));
         }
 
         return syncOuts;
@@ -151,7 +164,7 @@ internal sealed partial class InvokeAsyncCallShape
     private static bool IsAccessibleFromGeneratedCode(ISymbol symbol, Compilation compilation)
         => compilation.IsSymbolAccessibleWithin(symbol, compilation.Assembly);
 
-    private static IReadOnlyList<(string Name, ExpressionSyntax Value)> CreateLeadingLocals(
+    private static IReadOnlyList<(string Name, string Value)> CreateLeadingLocals(
         IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
         => syncOuts
             .Where(static syncOut => syncOut.Initializer is not null)

@@ -108,4 +108,4 @@ internal sealed record InvokeAsyncSyncOut(
     string TargetName,
     ITypeSymbol Type,
     string LocalName,
-    ExpressionSyntax? Initializer);
+    string? Initializer);

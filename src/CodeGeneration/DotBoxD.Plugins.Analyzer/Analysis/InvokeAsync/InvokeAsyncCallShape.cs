@@ -18,7 +18,7 @@ internal sealed partial class InvokeAsyncCallShape
         string argumentsExpression,
         IReadOnlyList<ITypeSymbol> argumentTypes,
         EquatableArray<InvokeAsyncSyncOut> syncOuts,
-        IReadOnlyList<(string Name, ExpressionSyntax Value)> leadingLocals,
+        IReadOnlyList<(string Name, string Value)> leadingLocals,
         Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
         Func<ExpressionSyntax, string?>? expressionOverride)
     {
@@ -60,7 +60,7 @@ internal sealed partial class InvokeAsyncCallShape
 
     public EquatableArray<InvokeAsyncSyncOut> SyncOuts { get; }
 
-    private IReadOnlyList<(string Name, ExpressionSyntax Value)> LeadingLocals { get; }
+    private IReadOnlyList<(string Name, string Value)> LeadingLocals { get; }
 
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? AssignmentOverride { get; }
 
