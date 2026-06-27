@@ -170,6 +170,12 @@ if (args.Contains("--probe-map-remove", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("--probe-map-set-replace", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Core.MapSetReplaceProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-list-add-type-match", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Core.ListAddTypeMatchProbe.Run();

@@ -109,6 +109,21 @@ public sealed class ValueShapeCacheTests
     }
 
     [Fact]
+    public void TryChargeScalarMapReplace_matches_full_walk_charge()
+    {
+        var source = I32Map(entries: 128);
+        var replaced = source.SetEntry(SandboxValue.FromInt32(64), SandboxValue.FromInt32(123));
+        var optimizedContext = CreateContext();
+
+        Assert.True(ValueShapeCache.TryChargeScalarMapReplace(
+            optimizedContext,
+            source,
+            replaced));
+
+        AssertMatchesFullWalkCharge(optimizedContext, replaced);
+    }
+
+    [Fact]
     public void TryChargeScalarMapRemove_rejects_values_with_string_shape()
     {
         var source = (MapValue)SandboxValue.FromMap(
@@ -126,6 +141,25 @@ public sealed class ValueShapeCacheTests
             source,
             removed,
             keyWasPresent: true));
+    }
+
+    [Fact]
+    public void TryChargeScalarMapReplace_rejects_values_with_string_shape()
+    {
+        var source = (MapValue)SandboxValue.FromMap(
+            new Dictionary<SandboxValue, SandboxValue>
+            {
+                [SandboxValue.FromInt32(1)] = SandboxValue.FromString("alpha"),
+                [SandboxValue.FromInt32(2)] = SandboxValue.FromString("beta")
+            },
+            SandboxType.I32,
+            SandboxType.String);
+        var replaced = source.SetEntry(SandboxValue.FromInt32(1), SandboxValue.FromString("gamma"));
+
+        Assert.False(ValueShapeCache.TryChargeScalarMapReplace(
+            CreateContext(),
+            source,
+            replaced));
     }
 
     private static MapValue I32Map(int entries)

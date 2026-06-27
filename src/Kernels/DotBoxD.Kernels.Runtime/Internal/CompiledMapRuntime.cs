@@ -59,11 +59,13 @@ internal static class CompiledMapRuntime
         var updated = typedMap.SetEntry(key, value);
 
         // New-key insert: charge incrementally from the source's cached shape (identical fuel/shape to a
-        // full walk), turning repeated map.set from O(n^2) into O(n). Replacement changes a value subtree in
-        // place and falls back to a full walk (rare in build loops). Mirrors the interpreter path.
+        // full walk), turning repeated map.set from O(n^2) into O(n). Zero-shape scalar replacements can reuse
+        // the source shape exactly; complex replacements still fall back to a full walk.
         if (isReplace)
         {
-            return ChargeValue(context, updated);
+            return ValueShapeCache.TryChargeScalarMapReplace(context, typedMap, updated)
+                ? updated
+                : ChargeValue(context, updated);
         }
 
         ValueShapeCache.ChargeMapInsert(context, typedMap, key, value, updated, typedMap.Values.Count + 1);

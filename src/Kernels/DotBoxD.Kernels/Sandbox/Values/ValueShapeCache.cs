@@ -5,8 +5,8 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Memoizes the measured <see cref="ValueShape"/> (and metering-walk frame count) of immutable collection
-/// values so that <c>list.add</c> / <c>map.set</c> / scalar <c>map.remove</c> can charge their result incrementally instead of
-/// re-walking the entire collection on every operation.
+/// values so that <c>list.add</c> / <c>map.set</c> / scalar <c>map.remove</c> can charge their result
+/// incrementally instead of re-walking the entire collection on every operation.
 ///
 /// Why this matters: <c>ChargeValue</c> walks the whole value to measure its shape (and charges
 /// <c>nodes / 64</c> scan-fuel while doing so). Building a collection with repeated add/set therefore
@@ -151,6 +151,30 @@ internal static class ValueShapeCache
         var info = new ShapeInfo(shape, sourceInfo.Nodes - 2);
         context.ChargeComposedValue(info);
         Set(removed, info);
+        return true;
+    }
+
+    /// <summary>
+    /// Charges replacement in a map whose keys and values have zero scalar shape. Such replacements keep the
+    /// same map entry count, aggregate shape, and metering-walk node count, so the source shape can be reused
+    /// exactly. Returns false for text, opaque IDs, paths, URIs, and nested values because those replacements
+    /// can change aggregate string or nested collection maxima.
+    /// </summary>
+    public static bool TryChargeScalarMapReplace(
+        Sandbox.SandboxContext context,
+        MapValue source,
+        MapValue replaced)
+    {
+        if (!HasZeroShape(source.KeyType) ||
+            !HasZeroShape(source.ValueType) ||
+            source.Values.Count != replaced.Values.Count)
+        {
+            return false;
+        }
+
+        var sourceInfo = GetOrMeasure(source, context.CancellationToken);
+        context.ChargeComposedValue(sourceInfo);
+        Set(replaced, sourceInfo);
         return true;
     }
 

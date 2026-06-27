@@ -150,12 +150,14 @@ internal static class CollectionOperations
             minimumOne: true));
         var updated = typedMap.SetEntry(key, value);
 
-        // Replacing an existing key changes a value subtree in place, which cannot be composed forward from
-        // the source shape; fall back to a full walk (rare in build loops). Inserting a new key adds exactly
+        // Replacing a zero-shape scalar entry keeps the aggregate map shape unchanged, so it can reuse the
+        // source shape exactly. Complex replacements fall back to a full walk. Inserting a new key adds exactly
         // one entry, so charge it incrementally from the source's cached shape (same fuel/shape as a walk).
         if (isReplace)
         {
-            return Charge(context, updated);
+            return ValueShapeCache.TryChargeScalarMapReplace(context, typedMap, updated)
+                ? updated
+                : Charge(context, updated);
         }
 
         ValueShapeCache.ChargeMapInsert(context, typedMap, key, value, updated, typedMap.Values.Count + 1);
