@@ -52,4 +52,27 @@ public sealed class ServerExtensionLoweringSurpriseTests
         var cast = Assert.IsType<CallExpression>(returned.Value);
         Assert.Equal("numeric.toI64", cast.Name);
     }
+
+    [Fact]
+    public void Server_extension_lowers_unary_plus_expression()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Kernels;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("unary-plus")]
+            public sealed partial class UnaryPlusKernel
+            {
+                public int Echo(int value, HookContext ctx) => +value;
+            }
+            """, "Sample.UnaryPlusPluginPackage");
+
+        var returned = Assert.IsType<ReturnStatement>(Assert.Single(Assert.Single(package.Module.Functions).Body));
+        var variable = Assert.IsType<VariableExpression>(returned.Value);
+        Assert.Equal("value", variable.Name);
+    }
 }
