@@ -106,6 +106,12 @@ public class ServerExtensionProxy : DispatchProxy
         }
 
         var methods = ContractMethods(serviceType).ToArray();
+        if (methods.Any(static method => method.IsSpecialName))
+        {
+            throw new NotSupportedException(
+                "Server extension proxy service type must declare exactly one ordinary method.");
+        }
+
         if (methods.Length != 1)
         {
             throw new NotSupportedException(

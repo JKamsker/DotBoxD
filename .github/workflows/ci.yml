@@ -363,6 +363,7 @@ jobs:
               "PluginServerTargetShapeRegressionTests",
               "ServerExtensionProxyAsyncTests",
               "ServerExtensionProxyCancellationTests",
+              "ServerExtensionProxyNullableContractTests",
               "RpcKernelGenerationTests",
               "RpcKernelLiveSettingRuntimeTests",
               "RpcKernelMethodGenerationTests",
