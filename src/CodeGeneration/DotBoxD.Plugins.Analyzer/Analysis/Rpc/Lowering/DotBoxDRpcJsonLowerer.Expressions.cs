@@ -204,6 +204,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     }
     private string LowerMemberAccess(MemberAccessExpressionSyntax member)
     {
+        if (TryLowerLiveSettingMemberAccess(member) is { } liveSetting)
+        {
+            return liveSetting;
+        }
+
         var receiverType = TypeOf(member.Expression);
         if (string.Equals(member.Name.Identifier.ValueText, "Count", StringComparison.Ordinal) &&
             DotBoxDRpcTypeMapper.ListElementType(receiverType) is not null)
