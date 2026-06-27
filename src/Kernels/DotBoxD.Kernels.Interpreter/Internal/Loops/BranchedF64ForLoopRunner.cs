@@ -38,8 +38,7 @@ internal static class BranchedF64ForLoopRunner
         var checkpoint = 4096;
         for (var i = start; i < end; i++)
         {
-            context.ChargeLoopIteration(LoopFuel);
-            context.ChargeFuel(conditionFuel);
+            context.ChargeLoopIteration(LoopFuel + conditionFuel);
             frame.WriteRawInt32Slot(loopSlot, i);
             var taken = condition.Evaluate(frame, context) ? thenBranch : elseBranch;
             context.ChargeFuel(taken.Fuel);

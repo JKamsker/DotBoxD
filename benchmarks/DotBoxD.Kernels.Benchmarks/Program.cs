@@ -26,6 +26,12 @@ if (args.Contains("--probe-matrix", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("--probe-branched-f64-loop", StringComparer.OrdinalIgnoreCase))
+{
+    await DotBoxD.Kernels.Benchmarks.Interpreter.BranchedF64LoopProbe.RunAsync();
+    return;
+}
+
 if (args.Contains("--probe-rogue", StringComparer.OrdinalIgnoreCase))
 {
     await DotBoxD.Kernels.Benchmarks.Interpreter.RogueScalingProbe.RunAsync();
