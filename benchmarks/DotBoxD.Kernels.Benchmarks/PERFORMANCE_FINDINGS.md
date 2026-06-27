@@ -8,6 +8,7 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 
 | Finding | Probe | Workload | Before total | Before ns/op | Before alloc | Before B/op | After total | After ns/op | After alloc | After B/op | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| JSON schema properties reread embedded resources and allocated a fresh schema string on every access. | `--probe-json-schema-resources` | 20,000 repeated module / plugin schema property reads | 46.9 ms / 49.5 ms | 2,344.1 / 2,473.4 | 711,680,040 B / 1,100,800,040 B | 35,584.0 / 55,040.0 | 1.1 ms / 0.2 ms | 55.1 / 12.5 | 40 B / 40 B | ~0 / ~0 | Schema strings are immutable and now loaded once through thread-safe lazy resources; missing embedded resources still fail on first access. |
 | Scalar `ValueShapeCache` used the generic shape walker for every append. | `--probe-value-shape-cache` | 10,000 scalar `ListAdd` calls | 12.1 ms | 1,210 | 10,099,752 B | 1,010.0 | 12.3 ms | 1,230 | 8,259,752 B | 826.0 | Same fuel and collection-element accounting; allocation reduction is the stable signal. |
 | Pure structural value metering allocated fresh traversal containers on every non-flat `ChargeValue`. | `--probe-resource-meter` | 200,000 nested record/map/list `ChargeValue` checks | 159.4 ms | 797.2 | 150,400,040 B | 752.0 | 110.5 ms | 552.7 | 22,400,040 B | 112.0 | Flat scalar-list fast path remains at ~0 B/op; only recursive shape-meter walks now rent bounded per-thread traversal state. |
 | Repeated non-flat `ChargeValue` calls remeasured immutable values instead of using the existing shape cache. | `--probe-resource-meter` | 200,000 repeated nested record/map/list `ChargeValue` checks after warmup | 110.5 ms | 552.7 | 22,400,040 B | 112.0 | 5.4 ms | 27.0 | 40 B | 0.0 | Successful non-flat `ChargeValue` calls now charge cached shape and scan-fuel; cancellation is still checked on cache hits. |
@@ -78,6 +79,7 @@ as targeted before/after evidence, not BenchmarkDotNet statistical reports.
 
 ```powershell
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-value-shape-cache
+dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-json-schema-resources
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-http-metadata
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-http-request-bytes
 dotnet run -c Release --project benchmarks/DotBoxD.Kernels.Benchmarks -p:UseSharedCompilation=false -- --probe-http-allowed-host

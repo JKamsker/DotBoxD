@@ -259,6 +259,12 @@ if (args.Contains("--probe-event-query-dispatch", StringComparer.OrdinalIgnoreCa
     return;
 }
 
+if (args.Contains("--probe-json-schema-resources", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Json.JsonSchemaResourceProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-literal-scalar-safety", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Validation.LiteralScalarSafetyProbe.Run();
