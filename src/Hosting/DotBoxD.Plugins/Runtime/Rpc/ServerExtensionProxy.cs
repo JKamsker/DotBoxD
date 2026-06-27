@@ -135,14 +135,27 @@ public class ServerExtensionProxy : DispatchProxy
                     continue;
                 }
 
-                KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(parameterType);
+                ValidatePayloadType(parameterType);
             }
 
             if (UnwrapReturnType(method.ReturnType) is { } payloadType)
             {
-                KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(payloadType);
+                ValidatePayloadType(payloadType);
             }
         }
+    }
+
+    private static void ValidatePayloadType(Type type)
+    {
+        if (IsTaskLike(type))
+        {
+            throw new NotSupportedException(
+                $"Server extension proxy task-like payload type '{type}' is not supported; " +
+                "Task and ValueTask are only supported as top-level return types.");
+        }
+
+        KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(type);
+        _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 
     private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)
@@ -187,6 +200,22 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static bool IsCancellationToken(Type type)
         => type == typeof(CancellationToken);
+
+    private static bool IsTaskLike(Type type)
+    {
+        if (type == typeof(Task) || type == typeof(ValueTask))
+        {
+            return true;
+        }
+
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(Task<>) || definition == typeof(ValueTask<>);
+    }
 
     private static object BoxTaskAsync<T>(ValueTask<SandboxValue> pending)
         => InvokeTaskAsync<T>(pending);
