@@ -205,7 +205,7 @@ internal sealed partial class InvokeAsyncCallShape
         ITypeSymbol worldType,
         string worldParameterName)
     {
-        var captureAliases = CaptureBagAliases(block, captureParameter.Name);
+        var captureAliases = CaptureBagAliases(block, captureParameter.Name, model);
         var syncOuts = FindSyncOuts(block, captureParameter, model, captureAliases);
         var returnTypeJson = BuildReturnTypeJson(returnType, syncOuts);
         return new InvokeAsyncCallShape(
@@ -226,8 +226,9 @@ internal sealed partial class InvokeAsyncCallShape
                 captureParameter,
                 syncOuts,
                 captureAliases,
+                model,
                 lower),
-            expression => LowerCaptureRead(expression, captureParameter, syncOuts, captureAliases));
+            expression => LowerCaptureRead(expression, captureParameter, syncOuts, captureAliases, model));
     }
 
     private IReadOnlyList<string> ReturnLocalNames()
