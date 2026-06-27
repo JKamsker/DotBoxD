@@ -50,7 +50,7 @@ internal static partial class RpcKernelModelFactory
                 throw new NotSupportedException("Live settings must use supported scalar types.");
             }
 
-            ValidateGeneratedParameterNames(method, liveSettings);
+            ValidateGeneratedParameterNames(method, liveSettings, graft);
             IMethodSymbol? serviceMethod = null;
             RpcKernelClientExtensions? clientExtensions = null;
             RpcKernelClientMethodExtension? directClientMethod = null;
