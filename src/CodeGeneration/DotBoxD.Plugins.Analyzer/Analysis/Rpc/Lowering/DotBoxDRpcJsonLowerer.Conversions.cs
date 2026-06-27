@@ -17,6 +17,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return ApplyNumericConversion(type.Type, type.ConvertedType, lowered);
     }
 
+    private string ApplyNumericConversion(ExpressionSyntax expression, ITypeSymbol targetType, string lowered)
+    {
+        var sourceType = _model.GetTypeInfo(expression, _cancellationToken).Type;
+        return sourceType is null ? lowered : ApplyNumericConversion(sourceType, targetType, lowered);
+    }
+
     private string ApplyNumericConversion(ITypeSymbol sourceType, ITypeSymbol targetType, string lowered)
     {
         if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))

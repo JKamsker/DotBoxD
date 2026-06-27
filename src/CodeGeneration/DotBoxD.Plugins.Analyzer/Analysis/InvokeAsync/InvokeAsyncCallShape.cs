@@ -173,7 +173,8 @@ internal sealed partial class InvokeAsyncCallShape
             ReturnLocalNames(),
             ReturnTypeJsonForBody(),
             AssignmentOverride,
-            ExpressionOverride);
+            ExpressionOverride,
+            ReturnType);
 
     private static InvokeAsyncCallShape NoCapture(
         BlockSyntax block,

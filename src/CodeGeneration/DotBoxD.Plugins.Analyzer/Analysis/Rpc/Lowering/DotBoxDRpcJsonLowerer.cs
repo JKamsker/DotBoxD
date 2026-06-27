@@ -31,6 +31,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private List<string>? _expressionPrelude;
     private IReadOnlyList<string> _returnRecordFields = [];
     private string? _returnRecordType;
+    private ITypeSymbol? _returnValueType;
     private int _tempCounter;
 
     /// <summary>True once the body builds a list or record, so the manifest declares the Alloc effect.</summary>
@@ -45,12 +46,14 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         IReadOnlyList<string> returnRecordFields,
         string? returnRecordType,
         Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? assignmentOverride,
-        Func<ExpressionSyntax, string?>? expressionOverride = null)
+        Func<ExpressionSyntax, string?>? expressionOverride = null,
+        ITypeSymbol? returnValueType = null)
     {
         _assignmentOverride = assignmentOverride;
         _expressionOverride = null;
         _returnRecordFields = returnRecordFields;
         _returnRecordType = returnRecordType;
+        _returnValueType = returnValueType;
         try
         {
             ReserveUserNames(block);
@@ -70,6 +73,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             _expressionOverride = null;
             _returnRecordFields = [];
             _returnRecordType = null;
+            _returnValueType = null;
         }
     }
     internal static string SetGeneratedLocal(string name, string value) => SetStatement(name, value);
@@ -99,9 +103,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 LowerIf(branch, output);
                 break;
             case ReturnStatementSyntax { Expression: { } returned }:
+                var value = LowerExpressionWithPrelude(returned, output);
+                if (_returnValueType is not null)
+                    value = ApplyNumericConversion(returned, _returnValueType, value);
+
                 output.Add(Obj(
                     ("op", Str("return")),
-                    ("value", ReturnValue(LowerExpressionWithPrelude(returned, output)))));
+                    ("value", ReturnValue(value))));
                 break;
             case ReturnStatementSyntax:
                 output.Add(Obj(("op", Str("return")), ("value", Unit())));
