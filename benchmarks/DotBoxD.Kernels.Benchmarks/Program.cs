@@ -74,6 +74,12 @@ if (args.Contains("--probe-http-allowed-host", StringComparer.OrdinalIgnoreCase)
     return;
 }
 
+if (args.Contains("--probe-http-audit-path-sanitizer", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Http.HttpAuditPathSanitizerProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-value-shape-cache", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.ValueShapeCacheProbe.Run();

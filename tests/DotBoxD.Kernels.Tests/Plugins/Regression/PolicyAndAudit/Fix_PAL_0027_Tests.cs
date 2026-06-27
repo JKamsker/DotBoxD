@@ -59,4 +59,31 @@ public sealed class Fix_PAL_0027_Tests
         Assert.Equal(clean, result);
         Assert.Same(clean, result);
     }
+
+    [Fact]
+    public void RedactPathSegments_returns_same_instance_for_clean_path()
+    {
+        var clean = new string("/v1/config/public/status".ToCharArray());
+
+        var result = AuditTextSanitizer.RedactPathSegments(clean);
+
+        Assert.Equal(clean, result);
+        Assert.Same(clean, result);
+    }
+
+    [Fact]
+    public void RedactPathSegments_still_redacts_direct_secret_marker_and_value()
+    {
+        var result = AuditTextSanitizer.RedactPathSegments("/v1/token/abc123/status");
+
+        Assert.Equal("/v1/[redacted]/[redacted]/status", result);
+    }
+
+    [Fact]
+    public void RedactPathSegments_still_redacts_percent_encoded_secret_marker_and_value()
+    {
+        var result = AuditTextSanitizer.RedactPathSegments("/v1/%74%6f%6b%65%6e/abc123/status");
+
+        Assert.Equal("/v1/[redacted]/[redacted]/status", result);
+    }
 }

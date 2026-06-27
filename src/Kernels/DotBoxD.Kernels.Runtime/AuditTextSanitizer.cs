@@ -91,6 +91,11 @@ public static partial class AuditTextSanitizer
 
     public static string RedactPathSegments(string path)
     {
+        if (!MayContainSecretPathSegment(path))
+        {
+            return path;
+        }
+
         var segments = path.Split('/');
         var previousWasSecretMarker = false;
         for (var i = 0; i < segments.Length; i++)
@@ -106,6 +111,44 @@ public static partial class AuditTextSanitizer
         }
 
         return string.Join("/", segments);
+    }
+
+    private static bool MayContainSecretPathSegment(string path)
+    {
+        for (var i = 0; i < path.Length; i++)
+        {
+            var remaining = path.AsSpan(i);
+            if (path[i] == '%' || StartsSecretPathMarker(remaining))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool StartsSecretPathMarker(ReadOnlySpan<char> value)
+    {
+        if (value.IsEmpty)
+        {
+            return false;
+        }
+
+        return value[0] switch
+        {
+            'a' or 'A' => value.StartsWith("authorization", StringComparison.OrdinalIgnoreCase),
+            'b' or 'B' => value.StartsWith("bearer", StringComparison.OrdinalIgnoreCase),
+            'c' or 'C' => value.StartsWith("credential", StringComparison.OrdinalIgnoreCase),
+            'k' or 'K' => value.StartsWith("key", StringComparison.OrdinalIgnoreCase),
+            'p' or 'P' => value.StartsWith("password", StringComparison.OrdinalIgnoreCase) ||
+                          value.StartsWith("passwd", StringComparison.OrdinalIgnoreCase) ||
+                          value.StartsWith("pwd", StringComparison.OrdinalIgnoreCase),
+            's' or 'S' => value.StartsWith("secret", StringComparison.OrdinalIgnoreCase) ||
+                          value.StartsWith("session", StringComparison.OrdinalIgnoreCase) ||
+                          value.StartsWith("signature", StringComparison.OrdinalIgnoreCase),
+            't' or 'T' => value.StartsWith("token", StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
     }
 
     private static (bool Redact, bool RedactFollowingSegment) ClassifySecretPathSegment(string segment)
