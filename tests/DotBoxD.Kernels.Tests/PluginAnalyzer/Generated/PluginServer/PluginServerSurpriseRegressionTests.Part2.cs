@@ -1,3 +1,5 @@
+using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
+
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class PluginServerSurpriseRegressionTests
@@ -5,7 +7,7 @@ public sealed partial class PluginServerSurpriseRegressionTests
     [Fact]
     public void Generated_plugin_server_reports_existing_server_interface_type_collision()
     {
-        var diagnostics = PluginServerGenerationTestDriver.Diagnostics(BaseServerSource(extraPluginTypes: """
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(BaseServerSource(extraPluginTypes: """
 
                 public interface IGameWorldServer;
             """));
@@ -15,6 +17,28 @@ public sealed partial class PluginServerSurpriseRegressionTests
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("IGameWorldServer", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Id == "CS0101");
+    }
+
+    [Fact]
+    public void Generated_plugin_server_reports_existing_control_wrapper_type_collision()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(BaseServerSource(worldMembers: """
+                    ITools Tools { get; }
+            """, serverMembers: """
+                private sealed class ToolsPluginControl;
+            """, extraGameTypes: """
+
+                [DotBoxDService]
+                public interface ITools;
+            """));
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("ToolsPluginControl", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Id.StartsWith("CS", StringComparison.Ordinal));
     }
 
     [Fact]
