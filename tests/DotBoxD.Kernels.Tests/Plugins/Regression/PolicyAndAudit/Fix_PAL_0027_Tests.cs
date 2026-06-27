@@ -89,6 +89,22 @@ public sealed class Fix_PAL_0027_Tests
         Assert.Equal("/v1/[redacted]/[redacted]/status", result);
     }
 
+    [Fact]
+    public void RedactPathSegments_prefilter_preserves_regex_unicode_case_folding()
+    {
+        var result = AuditTextSanitizer.RedactPathSegments("/v1/\u212Aey=cleanvalue/status");
+
+        Assert.Equal("/v1/[redacted]/status", result);
+    }
+
+    [Fact]
+    public void RedactPathSegments_standalone_marker_preserves_regex_unicode_case_folding()
+    {
+        var result = AuditTextSanitizer.RedactPathSegments("/v1/\u212Aey/abc123/status");
+
+        Assert.Equal("/v1/[redacted]/[redacted]/status", result);
+    }
+
     [Theory]
     [MemberData(nameof(SecretPathSegmentRegexMarkers))]
     public void RedactPathSegments_prefilter_recognizes_every_regex_marker(string marker)

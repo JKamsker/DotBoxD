@@ -215,10 +215,12 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
         public Snapshot Without(EventQuerySubscriptionEntry<TEvent> entry)
             => new(_all.Where(e => !ReferenceEquals(e, entry)).ToArray());
 
-        // Reused per thread on the hot TryEventKey path: each call clears, fills, and ToString()s the builder
-        // synchronously before returning the key, so a single instance is safe even under reentrant publish.
+        // Reused per thread on the hot TryEventKey path. A host event getter can synchronously re-publish
+        // the same event type, so nested calls allocate their own builder instead of clearing the outer key.
         [ThreadStatic]
         private static StringBuilder? _eventKeyBuilder;
+        [ThreadStatic]
+        private static bool _eventKeyBuilderInUse;
 
         private static string CompositeKey(EventQuerySubscriptionEntry<TEvent> entry, string[] sortedPaths)
         {
@@ -235,22 +237,39 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
         public static bool TryEventKey(string[] sortedPaths, TEvent e, MemberValueReader reader, out string key)
         {
-            var builder = _eventKeyBuilder ??= new StringBuilder();
-            builder.Clear();
-            foreach (var path in sortedPaths)
+            var reuseThreadBuilder = !_eventKeyBuilderInUse;
+            var builder = reuseThreadBuilder ? _eventKeyBuilder ??= new StringBuilder() : new StringBuilder();
+            if (reuseThreadBuilder)
             {
-                if (!EventQueryRoutingKey.TryFromRuntime(path, reader.Read(e!, path), out var runtimeKey))
-                {
-                    key = string.Empty;
-                    return false;
-                }
-
-                runtimeKey.AppendValueToken(builder);
-                builder.Append(Separator);
+                _eventKeyBuilderInUse = true;
             }
 
-            key = builder.ToString();
-            return true;
+            try
+            {
+                builder.Clear();
+                foreach (var path in sortedPaths)
+                {
+                    if (!EventQueryRoutingKey.TryFromRuntime(path, reader.Read(e!, path), out var runtimeKey))
+                    {
+                        key = string.Empty;
+                        return false;
+                    }
+
+                    runtimeKey.AppendValueToken(builder);
+                    builder.Append(Separator);
+                }
+
+                key = builder.ToString();
+                return true;
+            }
+            finally
+            {
+                if (reuseThreadBuilder)
+                {
+                    builder.Clear();
+                    _eventKeyBuilderInUse = false;
+                }
+            }
         }
     }
 

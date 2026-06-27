@@ -134,21 +134,61 @@ public static partial class AuditTextSanitizer
             return false;
         }
 
+        if (value[0] > '\u007f')
+        {
+            return StartsSecretPathMarkerInvariant(value);
+        }
+
         return value[0] switch
         {
-            'a' or 'A' => value.StartsWith("authorization", StringComparison.OrdinalIgnoreCase),
-            'b' or 'B' => value.StartsWith("bearer", StringComparison.OrdinalIgnoreCase),
-            'c' or 'C' => value.StartsWith("credential", StringComparison.OrdinalIgnoreCase),
-            'k' or 'K' => value.StartsWith("key", StringComparison.OrdinalIgnoreCase),
-            'p' or 'P' => value.StartsWith("password", StringComparison.OrdinalIgnoreCase) ||
-                          value.StartsWith("passwd", StringComparison.OrdinalIgnoreCase) ||
-                          value.StartsWith("pwd", StringComparison.OrdinalIgnoreCase),
-            's' or 'S' => value.StartsWith("secret", StringComparison.OrdinalIgnoreCase) ||
-                          value.StartsWith("session", StringComparison.OrdinalIgnoreCase) ||
-                          value.StartsWith("signature", StringComparison.OrdinalIgnoreCase),
-            't' or 'T' => value.StartsWith("token", StringComparison.OrdinalIgnoreCase),
+            'a' or 'A' => StartsSecretPathMarker(value, "authorization"),
+            'b' or 'B' => StartsSecretPathMarker(value, "bearer"),
+            'c' or 'C' => StartsSecretPathMarker(value, "credential"),
+            'k' or 'K' => StartsSecretPathMarker(value, "key"),
+            'p' or 'P' => StartsSecretPathMarker(value, "password") ||
+                          StartsSecretPathMarker(value, "passwd") ||
+                          StartsSecretPathMarker(value, "pwd"),
+            's' or 'S' => StartsSecretPathMarker(value, "secret") ||
+                          StartsSecretPathMarker(value, "session") ||
+                          StartsSecretPathMarker(value, "signature"),
+            't' or 'T' => StartsSecretPathMarker(value, "token"),
             _ => false,
         };
+    }
+
+    private static bool StartsSecretPathMarker(ReadOnlySpan<char> value, string marker)
+    {
+        var comparison = ContainsNonAscii(value, marker.Length)
+            ? StringComparison.InvariantCultureIgnoreCase
+            : StringComparison.OrdinalIgnoreCase;
+        return value.StartsWith(marker, comparison);
+    }
+
+    private static bool StartsSecretPathMarkerInvariant(ReadOnlySpan<char> value)
+        => value.StartsWith("authorization", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("bearer", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("credential", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("key", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("password", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("passwd", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("pwd", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("secret", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("session", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("signature", StringComparison.InvariantCultureIgnoreCase) ||
+           value.StartsWith("token", StringComparison.InvariantCultureIgnoreCase);
+
+    private static bool ContainsNonAscii(ReadOnlySpan<char> value, int length)
+    {
+        var count = Math.Min(value.Length, length);
+        for (var i = 0; i < count; i++)
+        {
+            if (value[i] > '\u007f')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static (bool Redact, bool RedactFollowingSegment) ClassifySecretPathSegment(string segment)
@@ -196,19 +236,19 @@ public static partial class AuditTextSanitizer
     private static bool IsStandaloneSecretMarker(string segment)
     {
         var normalized = segment.Trim().Trim('-', '_', '.');
-        return normalized.Equals("authorization", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("bearer", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("credential", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("key", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("password", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("passwd", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("pwd", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("secret", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("session", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("signature", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("token", StringComparison.OrdinalIgnoreCase) ||
-               normalized.EndsWith("-key", StringComparison.OrdinalIgnoreCase) ||
-               normalized.EndsWith("_key", StringComparison.OrdinalIgnoreCase) ||
-               normalized.EndsWith(".key", StringComparison.OrdinalIgnoreCase);
+        return normalized.Equals("authorization", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("bearer", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("credential", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("key", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("password", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("passwd", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("pwd", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("secret", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("session", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("signature", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.Equals("token", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.EndsWith("-key", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.EndsWith("_key", StringComparison.InvariantCultureIgnoreCase) ||
+               normalized.EndsWith(".key", StringComparison.InvariantCultureIgnoreCase);
     }
 }
