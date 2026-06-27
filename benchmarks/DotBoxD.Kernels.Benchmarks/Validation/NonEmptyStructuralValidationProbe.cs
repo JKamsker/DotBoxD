@@ -57,9 +57,9 @@ internal static class NonEmptyStructuralValidationProbe
                 SandboxType.I32),
             SandboxValue.FromList(
                 [
-            SandboxValue.FromRecord([
-                SandboxValue.FromInt32(7),
-                SandboxValue.FromString("alpha"),
+                    SandboxValue.FromRecord([
+                        SandboxValue.FromInt32(7),
+                        SandboxValue.FromString("alpha"),
                         SandboxValue.FromMap(
                             new Dictionary<SandboxValue, SandboxValue>
                             {
@@ -87,8 +87,8 @@ internal static class NonEmptyStructuralValidationProbe
     private static Measurement MeasureWorkerResultShape(SandboxType expectedType, ResourceLimits limits, int iterations)
         => Measure(iterations, static state =>
         {
-            _ = MeasureWorkerResult(CreateValue(), state.ExpectedType, state.Limits);
-        }, new WorkerResultState(expectedType, limits));
+            _ = MeasureWorkerResult(state.Value, state.ExpectedType, state.Limits);
+        }, new WorkerResultState(CreateValue(), expectedType, limits));
 
     private static Measurement MeasureChargeReturn(
         SandboxValue value,
@@ -182,7 +182,10 @@ internal static class NonEmptyStructuralValidationProbe
 
     private readonly record struct RequireTypeState(SandboxValue Value, SandboxType ExpectedType);
 
-    private readonly record struct WorkerResultState(SandboxType ExpectedType, ResourceLimits Limits);
+    private readonly record struct WorkerResultState(
+        SandboxValue Value,
+        SandboxType ExpectedType,
+        ResourceLimits Limits);
 
     private readonly record struct ChargeReturnState(
         SandboxContext Context,

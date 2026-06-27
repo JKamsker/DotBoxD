@@ -19,7 +19,22 @@ internal static class SafeHttpUriAudit
     }
 
     public static bool MatchesAllowedAuthority(IReadOnlySet<string> allowedHosts, Uri uri)
-        => allowedHosts.Count > 0 && allowedHosts.Contains(NormalizedAuthority(uri));
+    {
+        if (allowedHosts.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var allowed in allowedHosts)
+        {
+            if (MatchesAllowedAuthority(allowed, uri))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static bool SameUri(Uri left, Uri right)
         => ReferenceEquals(left, right) ||

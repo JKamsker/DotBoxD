@@ -15,9 +15,8 @@ internal static partial class SandboxValidatedValueShapeMeter
         switch (value)
         {
             case ListValue { Values.Count: 0 } list:
-                if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
-                    list.ItemType != expectedType.Arguments[0] ||
-                    !expectedType.IsKnown())
+                if (!expectedType.IsKnown() ||
+                    !SandboxValueTypeMatcher.MatchesValidationFrame(list, expectedType))
                 {
                     throw Error(failure);
                 }
@@ -26,10 +25,8 @@ internal static partial class SandboxValidatedValueShapeMeter
                 shape = AddCollection(shape, 0, 0, 0, 1, limits);
                 return true;
             case MapValue { Values.Count: 0 } map:
-                if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
-                    map.KeyType != expectedType.Arguments[0] ||
-                    map.ValueType != expectedType.Arguments[1] ||
-                    !expectedType.IsKnown())
+                if (!expectedType.IsKnown() ||
+                    !SandboxValueTypeMatcher.MatchesValidationFrame(map, expectedType))
                 {
                     throw Error(failure);
                 }
@@ -52,8 +49,7 @@ internal static partial class SandboxValidatedValueShapeMeter
         ResourceLimits? limits,
         ValidationFailure failure)
     {
-        if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
-            list.ItemType != expectedType.Arguments[0])
+        if (!SandboxValueTypeMatcher.MatchesValidationFrame(list, expectedType))
         {
             throw Error(failure);
         }
@@ -80,9 +76,7 @@ internal static partial class SandboxValidatedValueShapeMeter
         ResourceLimits? limits,
         ValidationFailure failure)
     {
-        if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
-            map.KeyType != expectedType.Arguments[0] ||
-            map.ValueType != expectedType.Arguments[1])
+        if (!SandboxValueTypeMatcher.MatchesValidationFrame(map, expectedType))
         {
             throw Error(failure);
         }

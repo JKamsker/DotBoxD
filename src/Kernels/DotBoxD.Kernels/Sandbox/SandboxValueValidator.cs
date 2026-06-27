@@ -87,19 +87,16 @@ public static class SandboxValueValidator
         switch (value)
         {
             case ListValue { Values.Count: 0 } list:
-                if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
-                    list.ItemType != expectedType.Arguments[0] ||
-                    !expectedType.IsKnown())
+                if (!expectedType.IsKnown() ||
+                    !SandboxValueTypeMatcher.MatchesValidationFrame(list, expectedType))
                 {
                     throw Error(errorCode, message);
                 }
 
                 return true;
             case MapValue { Values.Count: 0 } map:
-                if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
-                    map.KeyType != expectedType.Arguments[0] ||
-                    map.ValueType != expectedType.Arguments[1] ||
-                    !expectedType.IsKnown())
+                if (!expectedType.IsKnown() ||
+                    !SandboxValueTypeMatcher.MatchesValidationFrame(map, expectedType))
                 {
                     throw Error(errorCode, message);
                 }
@@ -143,8 +140,7 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
-        if (expectedType is not { Name: "List", Arguments.Count: 1 } ||
-            list.ItemType != expectedType.Arguments[0])
+        if (!SandboxValueTypeMatcher.MatchesValidationFrame(list, expectedType))
         {
             throw Error(errorCode, message);
         }
@@ -165,9 +161,7 @@ public static class SandboxValueValidator
         SandboxErrorCode errorCode,
         string message)
     {
-        if (expectedType is not { Name: "Map", Arguments.Count: 2 } ||
-            map.KeyType != expectedType.Arguments[0] ||
-            map.ValueType != expectedType.Arguments[1])
+        if (!SandboxValueTypeMatcher.MatchesValidationFrame(map, expectedType))
         {
             throw Error(errorCode, message);
         }

@@ -39,6 +39,7 @@ internal sealed class CompiledExecutableCache : IDisposable
         var key = new CacheKey(artifact.Manifest.CacheKey, artifact.AssemblyHash);
         if (TryGetSameArtifactHit(key, artifact, out var sameArtifact))
         {
+            CompiledArtifactGuard.ValidateCachedExecutableEnvelope(artifact, plan, entrypoint);
             return await CreateExecutableAsync(sameArtifact, artifact, "Hit", cancellationToken).ConfigureAwait(false);
         }
 

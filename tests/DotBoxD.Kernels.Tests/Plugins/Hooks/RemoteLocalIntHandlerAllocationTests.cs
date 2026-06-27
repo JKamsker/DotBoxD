@@ -41,6 +41,7 @@ public sealed class RemoteLocalIntHandlerAllocationTests
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         var perDispatch = (double)allocated / MeasuredIterations;
 
+        Assert.Equal(42 * (WarmupIterations + MeasuredIterations), checksum);
         GC.KeepAlive(checksum);
         Assert.True(
             perDispatch < 8D,
@@ -78,6 +79,7 @@ public sealed class RemoteLocalIntHandlerAllocationTests
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         var perDispatch = (double)allocated / MeasuredIterations;
 
+        Assert.Equal((int)LocalReaction.Alert * (WarmupIterations + MeasuredIterations), checksum);
         GC.KeepAlive(checksum);
         Assert.True(
             perDispatch < 8D,

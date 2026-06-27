@@ -145,6 +145,7 @@ public sealed class AuditSummaryTests
     [InlineData("summary\\policy")]
     [InlineData("summary\u0000policy")]
     [InlineData("tenant-TOKEN")]
+    [InlineData("tenant-client-key-abc123")]
     [InlineData("client_secret")]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public void SafePolicyId_redacts_unsafe_ids(string policyId)

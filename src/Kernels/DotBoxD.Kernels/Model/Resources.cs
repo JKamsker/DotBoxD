@@ -105,7 +105,7 @@ public sealed partial class ResourceMeter
             return;
         }
 
-        ChargeMeasuredShape(ValueShapeCache.GetOrMeasure(value, cancellationToken));
+        ChargeMeasuredShape(ValueShapeCache.GetOrMeasure(value, cancellationToken, this));
     }
 
     internal void ChargeValueShape(ValueShape shape) => ChargeMeasuredShape(shape);

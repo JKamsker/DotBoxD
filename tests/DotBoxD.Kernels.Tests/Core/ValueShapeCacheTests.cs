@@ -109,6 +109,47 @@ public sealed class ValueShapeCacheTests
     }
 
     [Fact]
+    public void TryChargeScalarMapRemove_last_entry_matches_empty_map_full_walk_charge()
+    {
+        var source = I32Map(entries: 1);
+        var removed = source.RemoveEntry(SandboxValue.FromInt32(0));
+        var optimizedContext = CreateContext();
+
+        Assert.True(ValueShapeCache.TryChargeScalarMapRemove(
+            optimizedContext,
+            source,
+            removed,
+            keyWasPresent: true));
+
+        Assert.Empty(removed.Values);
+        AssertMatchesFullWalkCharge(optimizedContext, removed);
+    }
+
+    [Fact]
+    public void TryChargeScalarMapRemove_rejects_mismatched_removed_count()
+    {
+        var source = I32Map(entries: 1);
+
+        Assert.False(ValueShapeCache.TryChargeScalarMapRemove(
+            CreateContext(),
+            source,
+            source,
+            keyWasPresent: true));
+    }
+
+    [Fact]
+    public void TryChargeScalarMapRemove_rejects_present_key_on_empty_source()
+    {
+        var source = I32Map(entries: 0);
+
+        Assert.False(ValueShapeCache.TryChargeScalarMapRemove(
+            CreateContext(),
+            source,
+            source,
+            keyWasPresent: true));
+    }
+
+    [Fact]
     public void TryChargeScalarMapReplace_matches_full_walk_charge()
     {
         var source = I32Map(entries: 128);

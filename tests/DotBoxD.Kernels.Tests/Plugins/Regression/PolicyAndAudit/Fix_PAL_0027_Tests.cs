@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
 using DotBoxD.Kernels.Runtime;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Regression.PolicyAndAudit;
@@ -85,5 +87,43 @@ public sealed class Fix_PAL_0027_Tests
         var result = AuditTextSanitizer.RedactPathSegments("/v1/%74%6f%6b%65%6e/abc123/status");
 
         Assert.Equal("/v1/[redacted]/[redacted]/status", result);
+    }
+
+    [Theory]
+    [MemberData(nameof(SecretPathSegmentRegexMarkers))]
+    public void RedactPathSegments_prefilter_recognizes_every_regex_marker(string marker)
+    {
+        var result = AuditTextSanitizer.RedactPathSegments($"/v1/{marker}/abc123/status");
+
+        Assert.Equal("/v1/[redacted]/[redacted]/status", result);
+    }
+
+    public static TheoryData<string> SecretPathSegmentRegexMarkers()
+    {
+        const string prefix = "(?i)(^|[-_.])(";
+        const string suffix = ")([-_.=:]|$)";
+        var pattern = SecretPathSegmentRegex().ToString();
+        if (!pattern.StartsWith(prefix, StringComparison.Ordinal) ||
+            !pattern.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("SecretPathSegmentRegex marker pattern changed.");
+        }
+
+        var markers = pattern[prefix.Length..^suffix.Length].Split('|', StringSplitOptions.RemoveEmptyEntries);
+        var data = new TheoryData<string>();
+        foreach (var marker in markers)
+        {
+            data.Add(marker);
+        }
+
+        return data;
+    }
+
+    private static Regex SecretPathSegmentRegex()
+    {
+        var field = typeof(AuditTextSanitizer).GetField(
+            "SecretPathSegmentRegex",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        return (Regex)field.GetValue(null)!;
     }
 }

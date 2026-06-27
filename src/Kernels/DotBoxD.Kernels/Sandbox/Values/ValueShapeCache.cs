@@ -5,8 +5,8 @@ namespace DotBoxD.Kernels.Sandbox.Values;
 
 /// <summary>
 /// Memoizes the measured <see cref="ValueShape"/> (and metering-walk frame count) of immutable collection
-/// values so that <c>list.add</c> / <c>map.set</c> / scalar <c>map.remove</c> can charge their result
-/// incrementally instead of re-walking the entire collection on every operation.
+/// values so that <c>list.add</c> / <c>map.set</c> / zero-shape scalar <c>map.remove</c> can charge their
+/// result incrementally instead of re-walking the entire collection on every operation.
 ///
 /// Why this matters: <c>ChargeValue</c> walks the whole value to measure its shape (and charges
 /// <c>nodes / 64</c> scan-fuel while doing so). Building a collection with repeated add/set therefore
@@ -24,7 +24,10 @@ internal static class ValueShapeCache
     private static readonly ConditionalWeakTable<SandboxValue, StrongBox<ShapeInfo>> Cache = new();
 
     /// <summary>Returns the cached shape/frame-count for a value, measuring and caching collections on miss.</summary>
-    public static ShapeInfo GetOrMeasure(SandboxValue value, CancellationToken cancellationToken = default)
+    public static ShapeInfo GetOrMeasure(
+        SandboxValue value,
+        CancellationToken cancellationToken = default,
+        ResourceMeter? meter = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Scalars and text are O(1) to measure and not worth caching (one frame, no children).
@@ -38,11 +41,14 @@ internal static class ValueShapeCache
             return box.Value;
         }
 
-        var measured = SandboxValueShapeMeter.MeasureWithNodes(value, cancellationToken);
+        var measured = SandboxValueShapeMeter.MeasureWithNodes(value, cancellationToken, meter);
         var info = new ShapeInfo(measured.Shape, measured.Nodes);
         Cache.AddOrUpdate(value, new StrongBox<ShapeInfo>(info));
         return info;
     }
+
+    private static ShapeInfo GetOrMeasure(SandboxValue value, Sandbox.SandboxContext context)
+        => GetOrMeasure(value, context.CancellationToken, context.Budget);
 
     public static bool TryGet(SandboxValue value, out ShapeInfo info)
     {
@@ -86,9 +92,8 @@ internal static class ValueShapeCache
         SandboxValue appended,
         int newCount)
     {
-        var cancellationToken = context.CancellationToken;
-        var sourceInfo = GetOrMeasure(source, cancellationToken);
-        var itemInfo = GetOrMeasure(item, cancellationToken);
+        var sourceInfo = GetOrMeasure(source, context);
+        var itemInfo = GetOrMeasure(item, context);
         var combined = sourceInfo.Shape.Combine(itemInfo.Shape);
         var shape = combined with
         {
@@ -115,10 +120,9 @@ internal static class ValueShapeCache
         SandboxValue updated,
         int newCount)
     {
-        var cancellationToken = context.CancellationToken;
-        var sourceInfo = GetOrMeasure(source, cancellationToken);
-        var keyInfo = GetOrMeasure(key, cancellationToken);
-        var valueInfo = GetOrMeasure(value, cancellationToken);
+        var sourceInfo = GetOrMeasure(source, context);
+        var keyInfo = GetOrMeasure(key, context);
+        var valueInfo = GetOrMeasure(value, context);
         var combined = sourceInfo.Shape.Combine(keyInfo.Shape).Combine(valueInfo.Shape);
         var shape = combined with
         {
@@ -142,11 +146,17 @@ internal static class ValueShapeCache
         MapValue removed,
         bool keyWasPresent)
     {
-        var sourceInfo = GetOrMeasure(source, context.CancellationToken);
+        var expectedCount = keyWasPresent ? source.Values.Count - 1 : source.Values.Count;
+        if (expectedCount < 0 || removed.Values.Count != expectedCount)
+        {
+            return false;
+        }
+
         if (!keyWasPresent)
         {
-            context.ChargeComposedValue(sourceInfo);
-            Set(removed, sourceInfo);
+            var unchangedInfo = GetOrMeasure(source, context);
+            context.ChargeComposedValue(unchangedInfo);
+            Set(removed, unchangedInfo);
             return true;
         }
 
@@ -155,7 +165,8 @@ internal static class ValueShapeCache
             return false;
         }
 
-        var newCount = source.Values.Count - 1;
+        var sourceInfo = GetOrMeasure(source, context);
+        var newCount = expectedCount;
         var shape = sourceInfo.Shape with
         {
             Elements = sourceInfo.Shape.Elements - 1,
@@ -185,7 +196,7 @@ internal static class ValueShapeCache
             return false;
         }
 
-        var sourceInfo = GetOrMeasure(source, context.CancellationToken);
+        var sourceInfo = GetOrMeasure(source, context);
         context.ChargeComposedValue(sourceInfo);
         Set(replaced, sourceInfo);
         return true;

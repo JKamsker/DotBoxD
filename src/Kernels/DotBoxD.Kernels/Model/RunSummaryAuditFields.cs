@@ -24,6 +24,7 @@ public static class RunSummaryAuditFields
         "apikey",
         "account-key",
         "account_key",
+        "client-key",
         "client_key",
         "client-secret",
         "client_secret",

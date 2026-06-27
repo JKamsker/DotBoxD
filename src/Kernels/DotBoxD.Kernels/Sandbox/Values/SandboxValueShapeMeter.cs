@@ -72,16 +72,11 @@ internal static class SandboxValueShapeMeter
         }
     }
 
-    /// <summary>
-    /// Measures the pure shape (no limits, no fuel) of a value and the number of frames the metering walk
-    /// would process. The frame count equals the <c>scanned</c> counter in <see cref="Measure"/>, so the
-    /// scan-fuel a normal <c>ChargeValue</c> walk charges is exactly <c>nodes / 64</c>. Used by
-    /// <see cref="ValueShapeCache"/> to charge collection add/set incrementally without re-walking the whole
-    /// collection, while keeping the charged shape and fuel identical to a full walk.
-    /// </summary>
+    /// <summary>Measures shape and frame count for cache composition; an optional meter preserves deadline checks.</summary>
     public static (ValueShape Shape, long Nodes) MeasureWithNodes(
         SandboxValue value,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ResourceMeter? meter = null)
     {
         var state = SandboxTraversalState<Frame>.Rent();
         var active = state.Active;
@@ -95,6 +90,11 @@ internal static class SandboxValueShapeMeter
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 nodes++;
+                if (nodes % 64 == 0)
+                {
+                    meter?.CheckDeadline();
+                }
+
                 var frame = stack.Pop();
                 if (frame.Exit)
                 {
@@ -191,8 +191,6 @@ internal static class SandboxValueShapeMeter
     {
         Enter(record, active);
         var depth = parentDepth + 1;
-        // A record's fields are counted as collection elements and its nesting as one depth level, so a
-        // record is budgeted exactly like a fixed-size list under the same element/depth limits.
         EnsureCollectionLimits(record.Fields.Count, 0, depth, limits);
         stack.Push(new Frame(record, depth, Exit: true));
         for (var i = record.Fields.Count - 1; i >= 0; i--)

@@ -1,5 +1,6 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Sandbox.Values;
 
 namespace DotBoxD.Kernels.Tests.Resources;
 
@@ -96,6 +97,32 @@ public sealed class ResourceMeterTests
         var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeValue(value));
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
+
+    [Fact]
+    public void Shape_cache_miss_checks_wall_time_during_measurement()
+    {
+        var meter = new ResourceMeter(new ResourceLimits(MaxWallTime: TimeSpan.Zero));
+        var value = CreateFlatScalarList(128);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueShapeMeter.MeasureWithNodes(value, CancellationToken.None, meter));
+
+        Assert.Equal(SandboxErrorCode.Timeout, ex.Error.Code);
+    }
+
+    [Fact]
+    public void Cached_shape_charge_checks_wall_time_after_aggregated_scan_fuel()
+    {
+        var value = CreateFlatScalarList(128);
+        _ = ValueShapeCache.GetOrMeasure(value);
+        var meter = new ResourceMeter(new ResourceLimits(
+            MaxFuel: long.MaxValue,
+            MaxWallTime: TimeSpan.Zero));
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeValue(value));
+
+        Assert.Equal(SandboxErrorCode.Timeout, ex.Error.Code);
     }
 
     [Fact]

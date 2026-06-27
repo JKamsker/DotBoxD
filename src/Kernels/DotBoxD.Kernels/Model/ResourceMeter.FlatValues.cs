@@ -25,6 +25,7 @@ public sealed partial class ResourceMeter
         if (scanFuel > 0)
         {
             ChargeFuel(scanFuel);
+            CheckDeadline();
         }
 
         ChargeMeasuredShape(info.Shape);
