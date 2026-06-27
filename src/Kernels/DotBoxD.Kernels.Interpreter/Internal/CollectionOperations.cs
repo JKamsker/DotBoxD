@@ -21,6 +21,14 @@ internal static class CollectionOperations
         return Charge(context, SandboxValue.FromList(values));
     }
 
+    public static SandboxValue BuildList(SandboxValue[] values, SandboxContext context)
+    {
+        context.ChargeFuel(SandboxCollectionFuel.Copy(values.Length));
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(values.Length, 16));
+        var itemType = values.Length == 0 ? SandboxType.Unit : values[0].Type;
+        return Charge(context, SandboxValue.FromOwnedList(values, itemType));
+    }
+
     public static SandboxValue CountList(SandboxValue list, SandboxContext context)
     {
         var values = AsListReadOnly(list).Values;
@@ -69,6 +77,13 @@ internal static class CollectionOperations
         context.ChargeFuel(SandboxCollectionFuel.Copy(fields.Count));
         context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(fields.Count, 16));
         return Charge(context, SandboxValue.FromRecord(fields));
+    }
+
+    public static SandboxValue BuildRecord(SandboxValue[] fields, SandboxContext context)
+    {
+        context.ChargeFuel(SandboxCollectionFuel.Copy(fields.Length));
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(fields.Length, 16));
+        return Charge(context, SandboxValue.FromOwnedRecord(fields));
     }
 
     public static SandboxValue GetRecordField(SandboxValue index, SandboxValue record, SandboxContext context)

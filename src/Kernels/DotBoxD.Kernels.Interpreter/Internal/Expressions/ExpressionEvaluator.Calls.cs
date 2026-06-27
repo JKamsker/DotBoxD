@@ -157,7 +157,7 @@ internal sealed partial class ExpressionEvaluator
 
     private bool TryEvaluateCollectionCall(
         CallExpression call,
-        IReadOnlyList<SandboxValue> args,
+        SandboxValue[] args,
         out SandboxValue value)
     {
         value = call.Name switch

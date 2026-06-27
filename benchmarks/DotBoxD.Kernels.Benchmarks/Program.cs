@@ -164,6 +164,12 @@ if (args.Contains("--probe-list-add-type-match", StringComparer.OrdinalIgnoreCas
     return;
 }
 
+if (args.Contains("--probe-collection-construction", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Core.CollectionConstructionProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-host-call-accounting", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Runtime.HostCallAccountingProbe.Run();
