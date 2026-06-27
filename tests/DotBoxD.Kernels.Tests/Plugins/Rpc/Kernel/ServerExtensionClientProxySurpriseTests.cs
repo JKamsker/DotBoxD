@@ -92,4 +92,30 @@ public sealed class ServerExtensionClientProxySurpriseTests
                  d.GetMessage().Contains("generic", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(diagnostics, d => d.Id == "CS0246");
     }
+
+    [Fact]
+    public void Server_extension_rejects_existing_generated_package_type_collision()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            public static class EchoPluginPackage;
+
+            [ServerExtension("echo")]
+            public sealed partial class EchoKernel
+            {
+                public int Echo(HookContext ctx) => 1;
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.GetMessage().Contains("EchoPluginPackage", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Id == "CS0101");
+    }
+
 }
