@@ -16,6 +16,7 @@ public sealed class MergeableIrStepGeneratorTests
     {
         var result = RunGeneratorAndAssertCompiles("""
             using System;
+            using System.Collections.Generic;
             using DotBoxD.Abstractions;
             using DotBoxD.Kernels;
 
@@ -25,16 +26,32 @@ public sealed class MergeableIrStepGeneratorTests
 
             public sealed class StepPipeline<T>
             {
+                private readonly List<LoweredPipelineStep> _steps;
+
+                public StepPipeline() : this(new List<LoweredPipelineStep>()) { }
+
+                private StepPipeline(List<LoweredPipelineStep> steps) => _steps = steps;
+
+                public IReadOnlyList<LoweredPipelineStep> Steps => _steps;
+
                 public StepPipeline<T> Where([LowerToIr(LoweredPipelineStepKind.Filter)] Func<T, bool> predicate)
                     => throw new InvalidOperationException("not lowered");
 
-                public StepPipeline<T> Where(LoweredPipelineStep step) => this;
+                public StepPipeline<T> Where(LoweredPipelineStep step)
+                {
+                    _steps.Add(step);
+                    return this;
+                }
 
                 public StepPipeline<TNext> Select<TNext>(
                     [LowerToIr(LoweredPipelineStepKind.Projection)] Func<T, TNext> selector)
                     => throw new InvalidOperationException("not lowered");
 
-                public StepPipeline<TNext> Select<TNext>(LoweredPipelineStep step) => new();
+                public StepPipeline<TNext> Select<TNext>(LoweredPipelineStep step)
+                {
+                    _steps.Add(step);
+                    return new StepPipeline<TNext>(_steps);
+                }
             }
 
             public static class Usage
