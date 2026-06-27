@@ -76,6 +76,40 @@ public sealed partial class RpcKernelGenerationTests
         Assert.Equal(SandboxValue.FromInt64(-1), result);
     }
 
+    [Fact]
+    public async Task Server_extension_lowers_string_concatenation_to_budgeted_concat()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+
+            namespace Sample;
+
+            [ServerExtension("string-concat")]
+            public sealed partial class StringConcatKernel
+            {
+                public string Combine(string left, string right, HookContext ctx)
+                {
+                    return left + ":" + right;
+                }
+            }
+            """, "Sample.StringConcatPluginPackage");
+
+        Assert.Contains("Alloc", package.Manifest.Effects);
+
+        var returned = Assert.IsType<ReturnStatement>(Assert.Single(Assert.Single(package.Module.Functions).Body));
+        var concat = Assert.IsType<CallExpression>(returned.Value);
+        Assert.Equal("string.concatBudgeted", concat.Name);
+
+        using var server = PluginServer.Create(defaultPolicy: PurePolicy());
+        var kernel = await server.InstallServerExtensionAsync(package);
+
+        var result = await kernel.InvokeServerExtensionAsync(
+            [SandboxValue.FromString("left"), SandboxValue.FromString("right")]);
+
+        Assert.Equal("left:right", Assert.IsType<StringValue>(result).Value);
+    }
+
     [Theory]
     [InlineData("double.NaN")]
     [InlineData("double.PositiveInfinity")]
