@@ -18,6 +18,33 @@ internal static class KernelRpcMarshallerCollectionsProbe
         RunMapLane(0);
         RunMapLane(4);
         RunMapLane(32);
+        RunMapEnumerationLane(32);
+    }
+
+    private static void RunMapEnumerationLane(int entries)
+    {
+        var map = CreateSandboxMap(entries);
+        var type = typeof(Dictionary<string, int>);
+
+        _ = Measure(Warmup, static state =>
+            KernelRpcValueConverter.FromSandboxValue(state.Map).ItemCount, new SandboxMapState(map));
+        _ = Measure(Warmup, static state =>
+            ((Dictionary<string, int>)KernelRpcMarshaller.FromSandboxValue(state.Map, state.Type)!).Count,
+            new MarshallerMapState(map, type));
+        _ = Measure(Warmup, static state =>
+            KernelRpcBinaryCodec.EncodeValue(state.Map).Length, new SandboxMapState(map));
+
+        var wire = Measure(Iterations, static state =>
+            KernelRpcValueConverter.FromSandboxValue(state.Map).ItemCount, new SandboxMapState(map));
+        var runtime = Measure(Iterations, static state =>
+            ((Dictionary<string, int>)KernelRpcMarshaller.FromSandboxValue(state.Map, state.Type)!).Count,
+            new MarshallerMapState(map, type));
+        var binary = Measure(Iterations, static state =>
+            KernelRpcBinaryCodec.EncodeValue(state.Map).Length, new SandboxMapState(map));
+
+        Print($"sandbox map -> wire ({entries,2})", wire);
+        Print($"sandbox map -> object dictionary ({entries,2})", runtime);
+        Print($"sandbox map -> binary ({entries,2})", binary);
     }
 
     private static void RunMapLane(int entries)
@@ -75,6 +102,17 @@ internal static class KernelRpcMarshallerCollectionsProbe
         return source;
     }
 
+    private static MapValue CreateSandboxMap(int entries)
+    {
+        var source = new Dictionary<SandboxValue, SandboxValue>(entries);
+        for (var i = 0; i < entries; i++)
+        {
+            source[SandboxValue.FromString($"key-{i}")] = SandboxValue.FromInt32(i);
+        }
+
+        return (MapValue)SandboxValue.FromMap(source, SandboxType.String, SandboxType.I32);
+    }
+
     private static Measurement Measure<TState>(int iterations, Func<TState, int> action, TState state)
     {
         GC.Collect();
@@ -108,6 +146,10 @@ internal static class KernelRpcMarshallerCollectionsProbe
     private sealed record WireState(KernelRpcValue WireMap, SandboxType ExpectedType);
 
     private sealed record ObjectState(Dictionary<string, int> Source);
+
+    private sealed record SandboxMapState(MapValue Map);
+
+    private sealed record MarshallerMapState(MapValue Map, Type Type);
 
     private readonly record struct Measurement(
         double Milliseconds,

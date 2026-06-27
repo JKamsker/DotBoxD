@@ -180,7 +180,7 @@ public static partial class KernelRpcMarshaller
         if (MapTypes(type) is { } mapTypes && value is MapValue map)
         {
             var result = CreateDictionary(mapTypes.Key, mapTypes.Value);
-            foreach (var pair in map.Values)
+            foreach (var pair in map.Entries)
             {
                 var key = FromSandboxValue(pair.Key, mapTypes.Key)
                     ?? throw new NotSupportedException("Server extension cannot marshal a null map key.");

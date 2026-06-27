@@ -131,7 +131,7 @@ public static partial class KernelRpcBinaryCodec
                 return;
             case MapValue map:
                 WriteByte(writer, (byte)KernelRpcValueKind.Map);
-                WriteMapValues(writer, map.Values);
+                WriteMapValues(writer, map);
                 return;
             default:
                 throw new NotSupportedException(
@@ -148,10 +148,10 @@ public static partial class KernelRpcBinaryCodec
         }
     }
 
-    private static void WriteMapValues(IBufferWriter<byte> writer, IReadOnlyDictionary<SandboxValue, SandboxValue> values)
+    private static void WriteMapValues(IBufferWriter<byte> writer, MapValue values)
     {
-        WriteLength(writer, checked(values.Count * 2));
-        foreach (var pair in values)
+        WriteLength(writer, checked(values.Values.Count * 2));
+        foreach (var pair in values.Entries)
         {
             WriteSandboxValue(writer, pair.Key);
             WriteSandboxValue(writer, pair.Value);
