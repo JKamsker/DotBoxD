@@ -105,13 +105,23 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
+        var creation = (IObjectCreationOperation)context.Operation;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
-            ReportForbiddenInInitializer(context, ((IObjectCreationOperation)context.Operation).Type);
+            ReportForbiddenInInitializer(context, creation.Type);
+            if (creation.Constructor is { } initializerConstructor)
+            {
+                RecordInitializerRootCall(context, helperGraph, initializerConstructor);
+            }
+
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, ((IObjectCreationOperation)context.Operation).Type);
+        ReportAndRecordIfForbidden(context, helperGraph, method, creation.Type);
+        if (creation.Constructor is { } constructor)
+        {
+            helperGraph.RecordCall(method, constructor, context.Operation.Syntax.GetLocation());
+        }
     }
 
     private static void AnalyzePropertyReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
