@@ -22,6 +22,12 @@ public sealed class InvokeAsyncScalarDecodeRuntimeTests
             KernelRpcValue.Int32(300));
 
     [Fact]
+    public async Task Generated_InvokeAsync_rejects_negative_ulong_enum_result()
+        => await AssertInvokeAsyncRejects(
+            "ReadHuge",
+            KernelRpcValue.Int64(-1));
+
+    [Fact]
     public async Task Generated_InvokeAsync_rejects_float_overflow_inside_dto_result()
         => await AssertInvokeAsyncRejects(
             "ReadFloatDto",
@@ -103,6 +109,11 @@ public sealed class InvokeAsyncScalarDecodeRuntimeTests
                 FortyFour = 44
             }
 
+            public enum Huge : ulong
+            {
+                Zero = 0
+            }
+
             public sealed record FloatDto(float Value);
 
             public sealed record EnumDto(Small Value);
@@ -114,6 +125,9 @@ public sealed class InvokeAsyncScalarDecodeRuntimeTests
 
                 public static async ValueTask<Small> ReadSmall(RemotePluginServer kernels)
                     => await kernels.InvokeAsync(async (IGameWorldAccess world) => { return Small.Zero; });
+
+                public static async ValueTask<Huge> ReadHuge(RemotePluginServer kernels)
+                    => await kernels.InvokeAsync(async (IGameWorldAccess world) => { return Huge.Zero; });
 
                 public static async ValueTask<FloatDto> ReadFloatDto(RemotePluginServer kernels)
                     => await kernels.InvokeAsync(async (IGameWorldAccess world) => { return new FloatDto(1.5f); });

@@ -140,6 +140,12 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                 continue;
             }
 
+            if (!DotBoxDRpcTypeMapper.IsReadableFromGeneratedCode(fields[i], compilation))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO field '{fields[i].Name}' is private or read-only and could not be reconstructed.");
+            }
+
             builder.Append("        if (!global::System.Collections.Generic.EqualityComparer<")
                 .Append(TypeName(fields[i].Type)).Append(">.Default.Equals(__result.")
                 .Append(Identifier(fields[i].Name)).Append(", ")

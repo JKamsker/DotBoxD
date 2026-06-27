@@ -208,6 +208,45 @@ public sealed class ServerExtensionReceiverAuthoritySurpriseTests
             d => d.Id == "DBXK117" || d.Id.StartsWith("CS", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Private_base_receiver_field_is_not_grafted()
+    {
+        var package = PluginAnalyzerGeneratedPackageFactory.Create("""
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Sample;
+
+            [DotBoxDService]
+            public interface IRemoteMonster
+            {
+                string Id { get; }
+            }
+
+            public abstract class HiddenReceiverBase
+            {
+                private readonly IRemoteMonster _monster;
+
+                protected HiddenReceiverBase(IRemoteMonster monster) => _monster = monster;
+            }
+
+            [ServerExtension(typeof(IRemoteMonster), "hidden-base")]
+            public sealed partial class HiddenBaseKernel : HiddenReceiverBase
+            {
+                public HiddenBaseKernel(IRemoteMonster monster) : base(monster)
+                {
+                }
+
+                public int Read(HookContext ctx) => 1;
+            }
+            """, "Sample.HiddenBasePluginPackage");
+
+        Assert.DoesNotContain(
+            Assert.Single(package.Module.Functions).Parameters,
+            parameter => parameter.Name == "__receiverId");
+    }
+
     private static void AssertReceiverIdThreadedToHostCall(PluginPackage package)
     {
         var function = Assert.Single(package.Module.Functions);

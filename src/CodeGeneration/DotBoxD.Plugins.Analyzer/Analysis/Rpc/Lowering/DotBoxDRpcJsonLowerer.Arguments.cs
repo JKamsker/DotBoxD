@@ -34,6 +34,13 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 continue;
             }
 
+            if (parameters[i].ExplicitDefaultValue is null &&
+                parameters[i].Type.IsReferenceType)
+            {
+                throw new NotSupportedException(
+                    $"{description} call cannot omit reference parameter '{parameters[i].Name}' because null cannot be represented in server extension payloads.");
+            }
+
             lowered[i] = LiteralJson(parameters[i], parameters[i].ExplicitDefaultValue);
         }
 

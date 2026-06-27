@@ -48,5 +48,6 @@ public sealed class ServerExtensionEnumOverflowRegressionTests
 
         Assert.Contains("KernelRpcValue.Int64(unchecked((long)", generated, StringComparison.Ordinal);
         Assert.Contains("unchecked((global::Sample.Huge)", generated, StringComparison.Ordinal);
+        Assert.Contains("__value < 0L", generated, StringComparison.Ordinal);
     }
 }

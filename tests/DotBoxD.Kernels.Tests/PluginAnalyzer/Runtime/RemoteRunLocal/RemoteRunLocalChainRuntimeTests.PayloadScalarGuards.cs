@@ -41,6 +41,20 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         }
         """;
 
+    private const string MapPayloadGuardSource = Prelude + """
+        public sealed record MapPayloadEvent(System.Collections.Generic.Dictionary<string, int> Scores);
+
+        public static class MapPayloadGuardUsage
+        {
+            public static readonly System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>> Received = new();
+
+            public static void Configure(RemoteHookRegistry hooks)
+                => hooks.On<MapPayloadEvent>()
+                    .Select(e => e.Scores)
+                    .RunLocal((scores, ctx) => Received.Add(scores));
+        }
+        """;
+
     [Fact]
     public async Task Generated_payload_reader_rejects_float_overflow_projection()
         => await AssertGeneratedPayloadReaderRejects(
@@ -55,10 +69,36 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
             "ChainSample.EnumPayloadGuardUsage",
             KernelRpcValue.Int32(300));
 
+    [Fact]
+    public async Task Generated_payload_reader_rejects_odd_map_entry_count()
+        => await AssertGeneratedPayloadReaderRejects<FormatException>(
+            MapPayloadGuardSource,
+            "ChainSample.MapPayloadGuardUsage",
+            [(byte)KernelRpcValueKind.Map, 1]);
+
     private static async Task AssertGeneratedPayloadReaderRejects(
         string source,
         string usageTypeName,
         KernelRpcValue payload)
+        => await AssertGeneratedPayloadReaderRejects(
+            source,
+            usageTypeName,
+            KernelRpcBinaryCodec.EncodeValue(payload));
+
+    private static async Task AssertGeneratedPayloadReaderRejects(
+        string source,
+        string usageTypeName,
+        byte[] payload)
+        => await AssertGeneratedPayloadReaderRejects<NotSupportedException>(
+            source,
+            usageTypeName,
+            payload);
+
+    private static async Task AssertGeneratedPayloadReaderRejects<TException>(
+        string source,
+        string usageTypeName,
+        byte[] payload)
+        where TException : Exception
     {
         var assembly = Compile(source, enableInterceptors: true);
         string? subscriptionId = null;
@@ -75,10 +115,10 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
         usage.GetMethod("Configure", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [registry]);
 
         Assert.NotNull(subscriptionId);
-        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        await Assert.ThrowsAsync<TException>(async () =>
             await localHandlers.DispatchAsync(
                 subscriptionId!,
-                KernelRpcBinaryCodec.EncodeValue(payload),
+                payload,
                 new HookContext(new InMemoryPluginMessageSink(), CancellationToken.None)));
     }
 }

@@ -155,22 +155,26 @@ public sealed partial class PluginAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeFieldReference(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
+        var field = ((IFieldReferenceOperation)context.Operation).Field;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
+            ReportForbiddenInInitializer(context, field.ContainingType);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, ((IFieldReferenceOperation)context.Operation).Field.ContainingType);
+        ReportAndRecordIfForbidden(context, helperGraph, method, field.ContainingType);
     }
 
     private static void AnalyzeTypeOf(OperationAnalysisContext context, ForbiddenHelperCallGraph helperGraph)
     {
+        var type = ((ITypeOfOperation)context.Operation).Type;
         if (context.ContainingSymbol is not IMethodSymbol method)
         {
+            ReportForbiddenInInitializer(context, type);
             return;
         }
 
-        ReportAndRecordIfForbidden(context, helperGraph, method, ((ITypeOfOperation)context.Operation).Type);
+        ReportAndRecordIfForbidden(context, helperGraph, method, type);
     }
 
     // A method group / delegate reference to a helper (e.g. items.Select(Helper.Danger)) is an

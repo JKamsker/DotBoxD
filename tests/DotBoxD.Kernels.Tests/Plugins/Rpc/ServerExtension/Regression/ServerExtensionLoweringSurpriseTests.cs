@@ -53,6 +53,7 @@ public sealed class ServerExtensionLoweringSurpriseTests
         var returned = Assert.IsType<ReturnStatement>(Assert.Single(Assert.Single(package.Module.Functions).Body));
         var cast = Assert.IsType<CallExpression>(returned.Value);
         Assert.Equal("numeric.toI64", cast.Name);
+        Assert.IsType<VariableExpression>(Assert.Single(cast.Arguments));
     }
 
     [Fact]

@@ -78,15 +78,27 @@ public static partial class KernelRpcMarshaller
     }
 
     private static DateTimeOffset DateTimeToOffset(DateTime value)
-        => value.Kind == DateTimeKind.Local
-            ? new DateTimeOffset(value)
-            : new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), TimeSpan.Zero);
+    {
+        if (value.Kind != DateTimeKind.Unspecified)
+        {
+            throw new NotSupportedException(
+                "Server extension DateTime values must use DateTimeKind.Unspecified; use DateTimeOffset to preserve offset or UTC/local semantics.");
+        }
+
+        return new DateTimeOffset(value, TimeSpan.Zero);
+    }
 
     private static object DateTimeFromOffset(DateTimeOffset value, Type type)
     {
         if (type == typeof(DateTimeOffset))
         {
             return value;
+        }
+
+        if (value.Offset != TimeSpan.Zero)
+        {
+            throw new NotSupportedException(
+                "Server extension DateTime wire value must use a zero offset; use DateTimeOffset to preserve offsets.");
         }
 
         return value.DateTime;

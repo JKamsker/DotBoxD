@@ -17,8 +17,9 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         _helpers.Append("    private static float ").Append(method)
             .AppendLine("(ref global::DotBoxD.Plugins.KernelRpcPayloadReader reader)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        var __result = (float)reader.ReadDouble();");
-        _helpers.AppendLine("        if (!global::System.Single.IsFinite(__result))");
+        _helpers.AppendLine("        var __value = reader.ReadDouble();");
+        _helpers.AppendLine("        var __result = (float)__value;");
+        _helpers.AppendLine("        if (global::System.Double.IsFinite(__value) && !global::System.Single.IsFinite(__result))");
         _helpers.AppendLine("        {");
         _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension F64 payload cannot be represented as System.Single without overflow.\");");
         _helpers.AppendLine("        }");

@@ -108,7 +108,8 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             return mapCall;
         }
 
-        if (_model.GetSymbolInfo(invocation, _cancellationToken).Symbol is IMethodSymbol method &&
+        var symbolInfo = _model.GetSymbolInfo(invocation, _cancellationToken);
+        if (symbolInfo.Symbol is IMethodSymbol method &&
             DotBoxDHostBindingExpressionLowerer.HostBinding(method, _model.Compilation) is { } binding)
         {
             AddBindingMetadata(binding);
@@ -118,7 +119,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 $"Host binding '{binding.BindingId}'");
             return Call(binding.BindingId, null, args);
         }
-        if (TryLowerServerContextHostBinding(invocation) is { } serverContextCall)
+        if (TryLowerServerContextHostBinding(invocation, symbolInfo.Symbol as IMethodSymbol) is { } serverContextCall)
         {
             return serverContextCall;
         }
@@ -130,8 +131,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         throw new NotSupportedException($"Server extension call '{invocation}' is not a host binding.");
     }
 
-    private string? TryLowerServerContextHostBinding(InvocationExpressionSyntax invocation)
+    private string? TryLowerServerContextHostBinding(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol? resolvedMethod)
     {
+        if (resolvedMethod is not null)
+        {
+            return null;
+        }
+
         if (invocation.Expression is not MemberAccessExpressionSyntax member ||
             !IsServerContextExpression(member.Expression) ||
             ServerContextHostBindingCandidates(member.Name.Identifier.ValueText, invocation.ArgumentList.Arguments) is not { Count: > 0 } candidates)

@@ -96,9 +96,9 @@ internal static class InvokeAsyncArgumentWriterSource
 
     private static string WriteDateTimeExpression(string expression)
         => "((global::System.Func<global::System.DateTime, global::DotBoxD.Plugins.KernelRpcValue>)(static __value => " +
-           "{ var __offset = __value.Kind == global::System.DateTimeKind.Local ? " +
-           "new global::System.DateTimeOffset(__value) : " +
-           "new global::System.DateTimeOffset(global::System.DateTime.SpecifyKind(__value, global::System.DateTimeKind.Unspecified), global::System.TimeSpan.Zero); " +
+           "{ if (__value.Kind != global::System.DateTimeKind.Unspecified) { " +
+           "throw new global::System.NotSupportedException(\"InvokeAsync DateTime values must use DateTimeKind.Unspecified; use System.DateTimeOffset to preserve offset or UTC/local semantics.\"); } " +
+           "var __offset = new global::System.DateTimeOffset(__value, global::System.TimeSpan.Zero); " +
            "return " + DateTimeOffsetRecordExpression("__offset") + "; }))(" +
            expression + ")";
 

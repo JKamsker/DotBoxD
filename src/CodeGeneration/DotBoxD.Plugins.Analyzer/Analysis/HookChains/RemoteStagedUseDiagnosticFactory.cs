@@ -71,11 +71,23 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken)
     {
         var transparentExpression = UnwrapTransparentParent(invocation);
+        ExpressionSyntax discardedExpression = transparentExpression;
         if (transparentExpression.Parent is AssignmentExpressionSyntax assignment &&
             assignment.Right == transparentExpression &&
             assignment.Parent is ExpressionStatementSyntax)
         {
-            return CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken);
+            var assignsLocal = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol;
+            if (CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken) is { } assigned)
+            {
+                return assigned;
+            }
+
+            if (assignsLocal)
+            {
+                return null;
+            }
+
+            discardedExpression = assignment;
         }
 
         if (transparentExpression.Parent is EqualsValueClauseSyntax
@@ -87,7 +99,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return CreateStagedLocalDiagnostic(invocation, access, model, local, cancellationToken);
         }
 
-        if (transparentExpression.Parent is not ExpressionStatementSyntax)
+        if (discardedExpression.Parent is not ExpressionStatementSyntax)
         {
             return null;
         }

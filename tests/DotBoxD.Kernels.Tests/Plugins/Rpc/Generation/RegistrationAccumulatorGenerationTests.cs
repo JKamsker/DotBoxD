@@ -222,4 +222,36 @@ public sealed class RegistrationAccumulatorGenerationTests
             diagnostics,
             diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Generated_accumulator_name_allows_generic_sibling_with_same_metadata_name()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            internal sealed class ServiceRegistrationAccumulator<T>
+            {
+            }
+
+            [GeneratePluginRegistrationAccumulator("ServiceRegistrationAccumulator", "Replace")]
+            internal sealed class RemoteServiceControl
+            {
+                public ValueTask<string> Replace<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => ValueTask.FromResult("service");
+            }
+            """);
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("collides", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal));
+    }
 }

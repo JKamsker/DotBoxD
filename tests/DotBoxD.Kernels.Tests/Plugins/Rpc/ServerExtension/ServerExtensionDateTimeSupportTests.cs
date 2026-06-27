@@ -104,6 +104,33 @@ public sealed class ServerExtensionDateTimeSupportTests
         Assert.Equal(SandboxType.Record([SandboxType.I64, SandboxType.I64]), KernelRpcMarshaller.SandboxTypeOf(typeof(DateTimeOffset)));
     }
 
+    [Theory]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Utc)]
+    public void Marshaller_rejects_DateTime_values_with_non_unspecified_kind(DateTimeKind kind)
+    {
+        var value = new DateTime(2026, 6, 27, 14, 15, 16, 789, kind);
+
+        var ex = Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.ToSandboxValue(value, typeof(DateTime)));
+
+        Assert.Contains("DateTimeKind.Unspecified", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Marshaller_rejects_DateTime_wire_value_with_non_zero_offset()
+    {
+        var offsetTicks = TimeSpan.FromHours(1).Ticks;
+        var sandbox = SandboxValue.FromRecord(
+            [SandboxValue.FromInt64(0), SandboxValue.FromInt64(offsetTicks)]);
+        var wire = KernelRpcValue.Record([KernelRpcValue.Int64(0), KernelRpcValue.Int64(offsetTicks)]);
+
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(sandbox, typeof(DateTime)));
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromKernelRpcValue(wire, typeof(DateTime)));
+    }
+
     [Fact]
     public async Task Generated_client_round_trips_DateTimeOffset_parameters_and_returns()
     {
@@ -118,6 +145,7 @@ public sealed class ServerExtensionDateTimeSupportTests
         var result = await InvokeEchoAsync<DateTimeOffset>(assembly, client, input);
 
         Assert.Equal(response, result);
+        Assert.Equal(response.Offset, result.Offset);
         var argument = Assert.Single(KernelRpcBinaryCodec.DecodeArguments(registry.LastArguments));
         AssertDateTimeWire(argument, input.UtcTicks, input.Offset.Ticks);
     }
@@ -138,6 +166,23 @@ public sealed class ServerExtensionDateTimeSupportTests
         AssertDateTimeWire(argument, input.Ticks, 0L);
     }
 
+    [Theory]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Utc)]
+    public async Task Generated_client_rejects_DateTime_parameters_with_non_unspecified_kind(DateTimeKind kind)
+    {
+        var input = new DateTime(2026, 6, 27, 14, 15, 16, 789, kind);
+        var response = new DateTime(2027, 1, 2, 3, 4, 5, 6, DateTimeKind.Unspecified);
+        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(DateTimeEchoSource);
+        var registry = new RecordingServerExtensionsRegistry(DateTimeWireValue(response));
+        var client = CreateClient(assembly, registry);
+
+        var ex = await Assert.ThrowsAsync<NotSupportedException>(
+            () => InvokeEchoAsync<DateTime>(assembly, client, input));
+
+        Assert.Contains("DateTimeKind.Unspecified", ex.Message, StringComparison.Ordinal);
+    }
+
     private static object CreateClient(Assembly assembly, RecordingServerExtensionsRegistry registry)
     {
         var clientType = assembly.GetType("Sample.ClockKernelServerExtensionClient", throwOnError: true)!;
@@ -147,9 +192,19 @@ public sealed class ServerExtensionDateTimeSupportTests
 
     private static async Task<T> InvokeEchoAsync<T>(Assembly assembly, object client, T value)
     {
-        var valueTask = assembly.GetType("Sample.Probe", throwOnError: true)!
-            .GetMethod("Echo", BindingFlags.Public | BindingFlags.Static)!
-            .Invoke(null, [client, value])!;
+        object valueTask;
+        try
+        {
+            valueTask = assembly.GetType("Sample.Probe", throwOnError: true)!
+                .GetMethod("Echo", BindingFlags.Public | BindingFlags.Static)!
+                .Invoke(null, [client, value])!;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
         var asTask = valueTask.GetType().GetMethod("AsTask", Type.EmptyTypes)!;
         var task = (Task)asTask.Invoke(valueTask, null)!;
         await task.ConfigureAwait(false);

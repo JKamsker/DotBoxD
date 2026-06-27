@@ -48,12 +48,13 @@ internal sealed partial class RpcKernelValueConversionEmitter
         }
 
         var offsetReader = EnsureDateTimeOffsetValueReader();
+        var dateTimeReader = EnsureDateTimeValueFromWireHelper();
         var dateTimeMethod = NextHelperName("Read");
         _readers[key] = dateTimeMethod;
         _helpers.Append("    private static global::System.DateTime ").Append(dateTimeMethod)
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        return " + offsetReader + "(value).DateTime;");
+        _helpers.AppendLine("        return " + dateTimeReader + "(" + offsetReader + "(value));");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
         return dateTimeMethod;
@@ -129,13 +130,37 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _writers[key] = key;
         _helpers.AppendLine("    private static global::System.DateTimeOffset DateTimeToWireOffset(global::System.DateTime value)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        return value.Kind == global::System.DateTimeKind.Local");
-        _helpers.AppendLine("            ? new global::System.DateTimeOffset(value)");
-        _helpers.AppendLine("            : new global::System.DateTimeOffset(");
-        _helpers.AppendLine("                global::System.DateTime.SpecifyKind(value, global::System.DateTimeKind.Unspecified),");
-        _helpers.AppendLine("                global::System.TimeSpan.Zero);");
+        _helpers.AppendLine("        if (value.Kind != global::System.DateTimeKind.Unspecified)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension DateTime values must use DateTimeKind.Unspecified; use System.DateTimeOffset to preserve offset or UTC/local semantics.\");");
+        _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        _helpers.AppendLine("        return new global::System.DateTimeOffset(value, global::System.TimeSpan.Zero);");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
+    }
+
+    private string EnsureDateTimeValueFromWireHelper()
+    {
+        const string key = "datetime-helper:from-offset";
+        if (_readers.TryGetValue(key, out var existing))
+        {
+            return existing;
+        }
+
+        const string method = "DateTimeFromWireOffset";
+        _readers[key] = method;
+        _helpers.AppendLine("    private static global::System.DateTime DateTimeFromWireOffset(global::System.DateTimeOffset value)");
+        _helpers.AppendLine("    {");
+        _helpers.AppendLine("        if (value.Offset != global::System.TimeSpan.Zero)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension DateTime wire value must use a zero offset; use System.DateTimeOffset to preserve offsets.\");");
+        _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        _helpers.AppendLine("        return value.DateTime;");
+        _helpers.AppendLine("    }");
+        _helpers.AppendLine();
+        return method;
     }
 
     private string EnsureDateTimeOffsetFromWireHelper()

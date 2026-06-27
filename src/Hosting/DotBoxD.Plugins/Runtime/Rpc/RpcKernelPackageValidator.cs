@@ -89,7 +89,7 @@ internal static class RpcKernelPackageValidator
             }
 
             if ((analysis.Effects & SandboxEffect.Concurrency) != 0 &&
-                !plan.Policy.GrantsCapability(RuntimeCapabilityIds.Async))
+                !installPolicy.GrantsCapability(RuntimeCapabilityIds.Async))
             {
                 diagnostics.Add(new SandboxDiagnostic(
                     "DBXK043",

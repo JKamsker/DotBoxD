@@ -127,6 +127,12 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must be a named type.");
         }
 
+        if (!IsAccessibleFromGeneratedServer(named))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.Name}' live-setting update type '{liveSettingUpdateType.ToDisplayString()}' must be accessible from the generated facade.");
+        }
+
         foreach (var constructor in named.InstanceConstructors)
         {
             if (constructor.Parameters.Length == 2 &&
@@ -146,6 +152,19 @@ internal static partial class PluginServerFacadeModelFactory
 
     private static bool IsAccessibleFromGeneratedServer(Accessibility accessibility)
         => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
+
+    private static bool IsAccessibleFromGeneratedServer(INamedTypeSymbol type)
+    {
+        for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
+        {
+            if (!IsAccessibleFromGeneratedServer(current.DeclaredAccessibility))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static void ValidatePublicFacadeSignatureTypes(
         INamedTypeSymbol serverType,

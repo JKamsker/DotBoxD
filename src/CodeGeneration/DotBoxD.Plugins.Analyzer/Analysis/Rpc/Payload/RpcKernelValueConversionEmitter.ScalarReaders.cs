@@ -17,8 +17,9 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.Append("    private static float ").Append(method)
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        var __result = (float)value.DoubleValue;");
-        _helpers.AppendLine("        if (!global::System.Single.IsFinite(__result))");
+        _helpers.AppendLine("        var __value = value.DoubleValue;");
+        _helpers.AppendLine("        var __result = (float)__value;");
+        _helpers.AppendLine("        if (global::System.Double.IsFinite(__value) && !global::System.Single.IsFinite(__result))");
         _helpers.AppendLine("        {");
         _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension F64 result cannot be represented as System.Single without overflow.\");");
         _helpers.AppendLine("        }");
@@ -85,6 +86,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
         if (enumType.EnumUnderlyingType?.SpecialType == SpecialType.System_UInt32)
         {
             AppendEnumRangeGuard("uint.MinValue", "uint.MaxValue");
+            return;
+        }
+
+        if (enumType.EnumUnderlyingType?.SpecialType == SpecialType.System_UInt64)
+        {
+            AppendEnumRangeGuard("0L", "long.MaxValue");
         }
     }
 

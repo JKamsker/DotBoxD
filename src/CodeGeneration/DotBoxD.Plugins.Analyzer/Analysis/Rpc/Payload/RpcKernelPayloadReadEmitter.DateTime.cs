@@ -20,12 +20,13 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         }
 
         var offsetReader = EnsureDateTimeOffsetPayloadReader();
+        var dateTimeReader = EnsureDateTimeValueFromWireHelper();
         var dateTimeMethod = NextHelperName();
         _readers[key] = dateTimeMethod;
         _helpers.Append("    private static global::System.DateTime ").Append(dateTimeMethod)
             .AppendLine("(ref global::DotBoxD.Plugins.KernelRpcPayloadReader reader)");
         _helpers.AppendLine("    {");
-        _helpers.AppendLine("        return " + offsetReader + "(ref reader).DateTime;");
+        _helpers.AppendLine("        return " + dateTimeReader + "(" + offsetReader + "(ref reader));");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
         return dateTimeMethod;
@@ -52,6 +53,29 @@ internal sealed partial class RpcKernelPayloadReadEmitter
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         _helpers.AppendLine("        return " + fromWire + "(reader.ReadInt64(), reader.ReadInt64());");
+        _helpers.AppendLine("    }");
+        _helpers.AppendLine();
+        return method;
+    }
+
+    private string EnsureDateTimeValueFromWireHelper()
+    {
+        const string key = "datetime-helper:from-offset";
+        if (_readers.TryGetValue(key, out var existing))
+        {
+            return existing;
+        }
+
+        const string method = "DateTimeFromWireOffset";
+        _readers[key] = method;
+        _helpers.AppendLine("    private static global::System.DateTime DateTimeFromWireOffset(global::System.DateTimeOffset value)");
+        _helpers.AppendLine("    {");
+        _helpers.AppendLine("        if (value.Offset != global::System.TimeSpan.Zero)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension DateTime wire value must use a zero offset; use System.DateTimeOffset to preserve offsets.\");");
+        _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        _helpers.AppendLine("        return value.DateTime;");
         _helpers.AppendLine("    }");
         _helpers.AppendLine();
         return method;

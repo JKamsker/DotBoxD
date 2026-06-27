@@ -23,6 +23,7 @@ public sealed class InvokeAsyncDateTimeRuntimeTests
             DateTimeWireValue(response));
 
         Assert.Equal(response, result);
+        Assert.Equal(response.Offset, result.Offset);
         var capture = Assert.Single(arguments);
         capture.RequireKind(KernelRpcValueKind.Record);
         AssertDateTimeWire(Assert.Single(capture.Items), input.UtcTicks, input.Offset.Ticks);
@@ -45,6 +46,20 @@ public sealed class InvokeAsyncDateTimeRuntimeTests
         var capture = Assert.Single(arguments);
         capture.RequireKind(KernelRpcValueKind.Record);
         AssertDateTimeWire(Assert.Single(capture.Items), input.Ticks, 0L);
+    }
+
+    [Theory]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Utc)]
+    public async Task Generated_InvokeAsync_rejects_DateTime_capture_with_non_unspecified_kind(DateTimeKind kind)
+    {
+        var input = new DateTime(2026, 6, 27, 14, 15, 16, 789, kind);
+        var response = new DateTime(2027, 1, 2, 3, 4, 5, 6, DateTimeKind.Unspecified);
+
+        var ex = await Assert.ThrowsAsync<NotSupportedException>(
+            () => InvokeAsyncReturns<DateTime>("EchoDate", input, DateTimeWireValue(response)));
+
+        Assert.Contains("DateTimeKind.Unspecified", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

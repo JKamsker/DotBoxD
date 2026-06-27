@@ -93,9 +93,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             IdentifierNameSyntax identifier
                 when _serviceHandleLocals.TryGetValue(identifier.Identifier.ValueText, out var localHandleId)
                 => localHandleId,
-            MemberAccessExpressionSyntax member
-                when IsThisOrBaseExpression(member.Expression) &&
-                     _serviceHandleLocals.TryGetValue(member.Name.Identifier.ValueText, out var memberHandleId)
+            MemberAccessExpressionSyntax member when TryResolveServiceHandleMember(member) is { } memberHandleId
                 => memberHandleId,
             InvocationExpressionSyntax accessor when TryGetServiceHandleAccessor(accessor, out var inlineHandleId)
                 => inlineHandleId,
@@ -110,12 +108,21 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             IdentifierNameSyntax identifier
                 when _serviceHandleLocals.TryGetValue(identifier.Identifier.ValueText, out var localHandleId)
                 => localHandleId,
-            MemberAccessExpressionSyntax member
-                when IsThisOrBaseExpression(member.Expression) &&
-                     _serviceHandleLocals.TryGetValue(member.Name.Identifier.ValueText, out var memberHandleId)
+            MemberAccessExpressionSyntax member when TryResolveServiceHandleMember(member) is { } memberHandleId
                 => memberHandleId,
             _ => null
         };
+
+    private string? TryResolveServiceHandleMember(MemberAccessExpressionSyntax member)
+    {
+        if (!IsThisOrBaseExpression(member.Expression) ||
+            _model.GetSymbolInfo(member, _cancellationToken).Symbol is not { } symbol)
+        {
+            return null;
+        }
+
+        return _serviceHandleMembers.TryGetValue(symbol, out var handleId) ? handleId : null;
+    }
 
     /// <summary>
     /// Recognizes a scoped-handle accessor call — <c>control.Get(key)</c> whose return type is a

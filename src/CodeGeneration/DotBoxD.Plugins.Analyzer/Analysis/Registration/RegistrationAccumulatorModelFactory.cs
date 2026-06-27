@@ -234,7 +234,7 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static void ValidateGeneratedTypeName(INamedTypeSymbol receiverType, string generatedName)
     {
-        foreach (var existing in receiverType.ContainingNamespace.GetTypeMembers(generatedName))
+        foreach (var existing in receiverType.ContainingNamespace.GetTypeMembers(generatedName, 0))
         {
             throw new NotSupportedException(
                 $"Generated registration accumulator type '{existing.Name}' collides with an existing type in namespace " +

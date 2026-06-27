@@ -187,6 +187,55 @@ public sealed class PluginAnalyzerForbiddenApiReachabilityTests
         Assert.Contains(diagnostics, d => d.Id == "DBXK001");
     }
 
+    [Fact]
+    public async Task Reports_forbidden_field_reference_in_field_initializer()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using DotBoxD.Plugins;
+                using DotBoxD.Abstractions;
+
+                [Plugin("field-ref-init-leak")]
+                public sealed class FieldRefInitKernel : IEventKernel<string>
+                {
+                    private static readonly object Leaked = System.Reflection.BindingFlags.Public;
+
+                    public bool ShouldHandle(string e, HookContext context) => Leaked is not null;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """);
+
+        Assert.Contains(diagnostics, d => d.Id == "DBXK001");
+    }
+
+    [Fact]
+    public async Task Reports_forbidden_typeof_in_field_initializer()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            namespace Sample
+            {
+                using System;
+                using DotBoxD.Plugins;
+                using DotBoxD.Abstractions;
+
+                [Plugin("typeof-init-leak")]
+                public sealed class TypeOfInitKernel : IEventKernel<string>
+                {
+                    private static readonly Type Leaked = typeof(System.IO.File);
+
+                    public bool ShouldHandle(string e, HookContext context) => Leaked is not null;
+
+                    public void Handle(string e, HookContext context) { }
+                }
+            }
+            """);
+
+        Assert.Contains(diagnostics, d => d.Id == "DBXK001");
+    }
+
     // A benign helper used in a field initializer (no forbidden API anywhere in its transitive body) must NOT
     // be reported: modeling initializers as roots must not turn every helper call into a false positive.
     [Fact]

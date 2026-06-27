@@ -67,11 +67,12 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.Append("        var __result = new ").Append(dictionaryType).AppendLine("(__count / 2);");
         _helpers.AppendLine("        for (var i = 0; i < __count; i += 2)");
         _helpers.AppendLine("        {");
-        _helpers.Append("            if (!__result.TryAdd(").Append(keyExpression).Append(", ").Append(valueExpression)
-            .AppendLine("))");
+        _helpers.Append("            var __key = ").Append(keyExpression).AppendLine(";");
+        _helpers.AppendLine("            if (__result.ContainsKey(__key))");
         _helpers.AppendLine("            {");
         _helpers.AppendLine("                throw new global::System.FormatException(\"Server extension map payload contains a duplicate key.\");");
         _helpers.AppendLine("            }");
+        _helpers.Append("            __result.Add(__key, ").Append(valueExpression).AppendLine(");");
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         _helpers.AppendLine("        return __result;");

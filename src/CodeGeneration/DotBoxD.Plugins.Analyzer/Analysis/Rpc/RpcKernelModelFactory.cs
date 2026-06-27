@@ -92,7 +92,7 @@ internal static partial class RpcKernelModelFactory
                 cancellationToken,
                 serverContextParameterName: contextParameter.Name,
                 serverContextType: contextParameter.Type);
-            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
+            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graft);
             var bodyJson = body.Block is { } block
                 ? lowerer.LowerBody(block)
                 : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);

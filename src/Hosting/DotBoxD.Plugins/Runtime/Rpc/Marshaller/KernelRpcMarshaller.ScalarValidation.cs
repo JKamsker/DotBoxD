@@ -5,7 +5,7 @@ public static partial class KernelRpcMarshaller
     private static float DoubleToSingle(double value)
     {
         var result = (float)value;
-        if (!float.IsFinite(result))
+        if (double.IsFinite(value) && !float.IsFinite(result))
         {
             throw new NotSupportedException(
                 $"Server extension cannot marshal finite F64 value '{value}' to System.Single without overflow.");

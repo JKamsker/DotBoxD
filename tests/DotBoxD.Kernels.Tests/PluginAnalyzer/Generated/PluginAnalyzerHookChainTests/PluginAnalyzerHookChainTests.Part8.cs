@@ -115,6 +115,32 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Remote_discarded_assignment_staged_hook_reports_DBXK100_error()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                {
+                    var pipeline = hooks.On<DamageEvent>();
+                    _ = pipeline.Where(e => e.TargetId == "monster-1");
+                    pipeline.Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                }
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Non_hook_Where_on_receiver_expression_does_not_block_Run_lowering()
     {
         var result = RunGenerator("""

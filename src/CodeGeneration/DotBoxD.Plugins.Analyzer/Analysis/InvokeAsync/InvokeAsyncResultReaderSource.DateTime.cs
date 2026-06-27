@@ -20,12 +20,13 @@ internal sealed partial class InvokeAsyncResultReaderSource
         }
 
         var offsetReader = EnsureDateTimeOffsetValueReader();
+        var dateTimeReader = EnsureDateTimeValueFromWireHelper();
         var dateTimeMethod = NextHelperName();
         _readers[key] = dateTimeMethod;
         _helpers.Append("        private static global::System.DateTime ").Append(dateTimeMethod)
             .AppendLine("(global::DotBoxD.Plugins.KernelRpcValue value)");
         _helpers.AppendLine("        {");
-        _helpers.AppendLine("            return " + offsetReader + "(value).DateTime;");
+        _helpers.AppendLine("            return " + dateTimeReader + "(" + offsetReader + "(value));");
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         return dateTimeMethod;
@@ -52,6 +53,30 @@ internal sealed partial class InvokeAsyncResultReaderSource
         _helpers.AppendLine("            }");
         _helpers.AppendLine();
         _helpers.AppendLine("            return " + fromWire + "(value.GetItem(0).Int64Value, value.GetItem(1).Int64Value);");
+        _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        return method;
+    }
+
+    private string EnsureDateTimeValueFromWireHelper()
+    {
+        const string key = "datetime-helper:from-offset";
+        if (_readers.TryGetValue(key, out var existing))
+        {
+            return existing;
+        }
+
+        var method = NextHelperName();
+        _readers[key] = method;
+        _helpers.Append("        private static global::System.DateTime ").Append(method)
+            .AppendLine("(global::System.DateTimeOffset value)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            if (value.Offset != global::System.TimeSpan.Zero)");
+        _helpers.AppendLine("            {");
+        _helpers.AppendLine("                throw new global::System.NotSupportedException(\"InvokeAsync DateTime wire value must use a zero offset; use System.DateTimeOffset to preserve offsets.\");");
+        _helpers.AppendLine("            }");
+        _helpers.AppendLine();
+        _helpers.AppendLine("            return value.DateTime;");
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         return method;

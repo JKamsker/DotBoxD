@@ -41,6 +41,7 @@ internal sealed record RpcServerExtensionGraft(
             foreach (var member in current.GetMembers())
             {
                 if (member is IFieldSymbol { IsStatic: false } field &&
+                    IsVisibleReceiverMember(field, kernelType) &&
                     CanStoreReceiver(field.Type, receiverType) &&
                     seen.Add(field.Name))
                 {
@@ -52,6 +53,7 @@ internal sealed record RpcServerExtensionGraft(
                     GetMethod: not null,
                     SetMethod: null
                 } property &&
+                    IsVisibleReceiverMember(property, kernelType) &&
                     CanStoreReceiver(property.Type, receiverType) &&
                     seen.Add(property.Name))
                 {
@@ -60,6 +62,10 @@ internal sealed record RpcServerExtensionGraft(
             }
         }
     }
+
+    private static bool IsVisibleReceiverMember(ISymbol member, INamedTypeSymbol kernelType)
+        => SymbolEqualityComparer.Default.Equals(member.ContainingType, kernelType) ||
+           member.DeclaredAccessibility != Accessibility.Private;
 
     private static bool CanStoreReceiver(ITypeSymbol fieldType, INamedTypeSymbol receiverType)
     {

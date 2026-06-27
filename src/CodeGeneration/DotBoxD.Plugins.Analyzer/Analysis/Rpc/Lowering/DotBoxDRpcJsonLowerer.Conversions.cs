@@ -45,9 +45,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         string lowered,
         string description)
     {
-        var sourceType = _model.GetTypeInfo(expression, _cancellationToken).Type;
+        var typeInfo = _model.GetTypeInfo(expression, _cancellationToken);
+        var sourceType = typeInfo.Type;
         if (sourceType is null ||
             SymbolEqualityComparer.Default.Equals(sourceType, targetType))
+        {
+            return lowered;
+        }
+
+        if (typeInfo.ConvertedType is not null &&
+            SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, targetType))
         {
             return lowered;
         }

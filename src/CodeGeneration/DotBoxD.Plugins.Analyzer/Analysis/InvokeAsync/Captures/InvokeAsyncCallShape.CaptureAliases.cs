@@ -16,7 +16,7 @@ internal sealed partial class InvokeAsyncCallShape
         while (changed)
         {
             changed = false;
-            foreach (var declarator in block.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+            foreach (var declarator in CurrentBlockNodes<VariableDeclaratorSyntax>(block))
             {
                 if (declarator.Initializer?.Value is { } initializer &&
                     IsCaptureBagExpression(initializer, captureParameterName, aliases, model) &&
@@ -26,7 +26,7 @@ internal sealed partial class InvokeAsyncCallShape
                 }
             }
 
-            foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            foreach (var assignment in CurrentBlockNodes<AssignmentExpressionSyntax>(block))
             {
                 if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
                     assignment.Left is IdentifierNameSyntax left &&
@@ -48,7 +48,7 @@ internal sealed partial class InvokeAsyncCallShape
         ISet<ISymbol> captureAliases,
         SemanticModel model)
     {
-        foreach (var assignment in block.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        foreach (var assignment in CurrentBlockNodes<AssignmentExpressionSyntax>(block))
         {
             if (assignment.Kind() == SyntaxKind.SimpleAssignmentExpression &&
                 assignment.Left is IdentifierNameSyntax left &&
@@ -78,4 +78,22 @@ internal sealed partial class InvokeAsyncCallShape
                 string.Equals(parameter.Name, captureParameterName, StringComparison.Ordinal)) ||
                captureAliases.Contains(symbol);
     }
+
+    private static IEnumerable<TNode> CurrentBlockNodes<TNode>(BlockSyntax block)
+        where TNode : SyntaxNode
+    {
+        foreach (var statement in block.Statements)
+        {
+            foreach (var node in statement.DescendantNodesAndSelf(DescendIntoCurrentScope))
+            {
+                if (node is TNode typed)
+                {
+                    yield return typed;
+                }
+            }
+        }
+    }
+
+    private static bool DescendIntoCurrentScope(SyntaxNode node)
+        => node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax;
 }

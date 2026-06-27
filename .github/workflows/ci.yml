@@ -410,7 +410,8 @@ jobs:
             -Configuration Release `
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
-              "RpcEnvelopeValidationTests"
+              "RpcEnvelopeValidationTests",
+              "EnvelopeRoundTripTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `

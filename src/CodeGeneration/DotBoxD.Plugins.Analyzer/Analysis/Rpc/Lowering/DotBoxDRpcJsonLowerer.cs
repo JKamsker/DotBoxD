@@ -25,6 +25,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     private readonly string? _serverContextParameterName;
     private readonly ITypeSymbol? _serverContextType;
     private readonly Dictionary<string, string> _serviceHandleLocals = new(StringComparer.Ordinal);
+    private readonly Dictionary<ISymbol, string> _serviceHandleMembers = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _reservedNames = new(StringComparer.Ordinal);
     private Func<AssignmentExpressionSyntax, Func<ExpressionSyntax, string>, string?>? _assignmentOverride;
     private Func<ExpressionSyntax, string?>? _expressionOverride;
@@ -40,6 +41,12 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     public string LowerBody(BlockSyntax block) => LowerBody(block, [], [], returnRecordType: null, assignmentOverride: null);
     internal void AddServiceHandleLocal(string name, string handleIdJson)
         => _serviceHandleLocals[name] = handleIdJson;
+    internal void AddServiceHandleMember(ISymbol member, string handleIdJson)
+    {
+        _serviceHandleLocals[member.Name] = handleIdJson;
+        _serviceHandleMembers[member] = handleIdJson;
+    }
+
     internal string LowerBody(
         BlockSyntax block,
         IReadOnlyList<(string Name, string Value)> leadingLocals,
@@ -137,6 +144,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             if (declarator.Initializer is not { } initializer)
             {
+                RejectUninitializedServiceHandleLocal(declarator);
                 continue;
             }
 
@@ -147,6 +155,16 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             }
 
             output.Add(SetStatement(localName, LowerExpressionWithPrelude(initializer.Value, output)));
+        }
+    }
+
+    private void RejectUninitializedServiceHandleLocal(VariableDeclaratorSyntax declarator)
+    {
+        var localSymbol = _model.GetDeclaredSymbol(declarator, _cancellationToken);
+        if (localSymbol is ILocalSymbol { Type: { } localType } && HasDotBoxDServiceAttribute(localType))
+        {
+            throw new NotSupportedException(
+                $"Scoped service handle local '{declarator.Identifier.ValueText}' must be initialized at declaration.");
         }
     }
 
