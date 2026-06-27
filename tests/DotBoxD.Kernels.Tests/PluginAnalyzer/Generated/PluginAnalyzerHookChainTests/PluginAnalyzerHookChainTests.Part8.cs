@@ -31,6 +31,35 @@ public sealed partial class PluginAnalyzerHookChainTests
     }
 
     [Fact]
+    public void Remote_conditional_staged_Where_then_Use_reports_DBXK100()
+    {
+        var result = RunGenerator("""
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public sealed record DamageEvent(string TargetId);
+            public sealed class DamageKernel;
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks, bool filter)
+                {
+                    var pipeline = filter
+                        ? hooks.On<DamageEvent>().Where(e => e.TargetId == "monster-1")
+                        : hooks.On<DamageEvent>();
+                    pipeline.Use<DamageKernel>();
+                }
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d => d.Id == "DBXK100"));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Where/Select", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("Use", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Remote_staged_local_reassigned_before_Use_reports_DBXK100()
     {
         var result = RunGenerator("""
