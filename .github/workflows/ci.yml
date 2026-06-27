@@ -374,6 +374,7 @@ jobs:
               "KernelRpcValueTests",
               "KernelRpcBinaryCodecTests",
               "ServerExtensionMapTypeSupportTests",
+              "ServerExtensionMapBodyLoweringTests",
               "HookResultBuilderHintNameRegressionTests",
               "ServerExtensionEnumOverflowRegressionTests",
               "Computed_dto_projection_round_trips",
