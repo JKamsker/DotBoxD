@@ -50,6 +50,44 @@ public sealed class ServerExtensionClientContractSurpriseTests
         }
         """;
 
+    private const string DirectCancellationTokenClientSource = """
+        using System.Threading;
+        using DotBoxD.Kernels;
+        using DotBoxD.Kernels.Sandbox;
+        using DotBoxD.Plugins;
+        using DotBoxD.Plugins.Runtime;
+        using DotBoxD.Services.Attributes;
+        using DotBoxD.Abstractions;
+
+        namespace Sample;
+
+        [DotBoxDService]
+        public interface IRemoteControl
+        {
+        }
+
+        public sealed class RemoteControl : IRemoteControl, IServerExtensionClientAccessor
+        {
+            public RemoteControl(DotBoxD.Abstractions.IServerExtensionClientRegistry serverExtensions)
+                => ServerExtensions = serverExtensions;
+
+            public DotBoxD.Abstractions.IServerExtensionClientRegistry ServerExtensions { get; }
+        }
+
+        [ServerExtension(typeof(IRemoteControl), "direct-counter")]
+        public sealed partial class CounterKernel
+        {
+            [ServerExtensionMethod(typeof(IRemoteControl))]
+            public int Count(int id, HookContext ctx) => id;
+        }
+
+        public static class Probe
+        {
+            public static int Count(RemoteControl control, int id, CancellationToken cancellationToken)
+                => control.Count(id, cancellationToken);
+        }
+        """;
+
     [Fact]
     public async Task Generated_client_forwards_service_cancellation_tokens()
     {
@@ -65,6 +103,28 @@ public sealed class ServerExtensionClientContractSurpriseTests
             .GetMethod("Count", BindingFlags.Public | BindingFlags.Static)!
             .Invoke(null, [control, 7, cts.Token])!;
         var result = await AwaitValueTaskResult(valueTask);
+
+        Assert.Equal(42, result);
+        Assert.Equal(cts.Token, registry.LastCancellationToken);
+        var arguments = KernelRpcBinaryCodec.DecodeArguments(registry.LastArguments);
+        var argument = Assert.Single(arguments);
+        Assert.Equal(7, argument.Int32Value);
+    }
+
+    [Fact]
+    public void Generated_direct_receiver_client_forwards_cancellation_tokens()
+    {
+        var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(DirectCancellationTokenClientSource);
+        var registry = new RecordingRegistry(
+            "direct-counter",
+            KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.Int32(42)));
+        var controlType = assembly.GetType("Sample.RemoteControl", throwOnError: true)!;
+        var control = Activator.CreateInstance(controlType, [registry])!;
+        using var cts = new CancellationTokenSource();
+
+        var result = assembly.GetType("Sample.Probe", throwOnError: true)!
+            .GetMethod("Count", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [control, 7, cts.Token]);
 
         Assert.Equal(42, result);
         Assert.Equal(cts.Token, registry.LastCancellationToken);
