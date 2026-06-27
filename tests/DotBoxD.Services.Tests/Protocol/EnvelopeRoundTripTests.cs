@@ -259,6 +259,53 @@ public class EnvelopeRoundTripTests
     }
 
     [Fact]
+    public void RpcResponse_RemainsReadableByContractlessResolver()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var response = new RpcResponse
+        {
+            MessageId = 44,
+            IsSuccess = false,
+            ErrorMessage = "compat-error",
+            ErrorType = "CompatException",
+        };
+        var writer = new ArrayBufferWriter<byte>();
+        serializer.Serialize(writer, response);
+
+        var result = MessagePackSerializer.Deserialize<RpcResponse>(
+            writer.WrittenMemory,
+            MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolver.Instance));
+
+        Assert.Equal(response.MessageId, result.MessageId);
+        Assert.Equal(response.IsSuccess, result.IsSuccess);
+        Assert.Equal(response.ErrorMessage, result.ErrorMessage);
+        Assert.Equal(response.ErrorType, result.ErrorType);
+    }
+
+    [Fact]
+    public void RpcResponse_ReadsContractlessResolverBytes()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var response = new RpcResponse
+        {
+            MessageId = 45,
+            IsSuccess = false,
+            ErrorMessage = "compat-error",
+            ErrorType = "CompatException",
+        };
+        var bytes = MessagePackSerializer.Serialize(
+            response,
+            MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolver.Instance));
+
+        var result = serializer.Deserialize<RpcResponse>(bytes);
+
+        Assert.Equal(response.MessageId, result.MessageId);
+        Assert.Equal(response.IsSuccess, result.IsSuccess);
+        Assert.Equal(response.ErrorMessage, result.ErrorMessage);
+        Assert.Equal(response.ErrorType, result.ErrorType);
+    }
+
+    [Fact]
     public void ServiceHandle_RoundTrips()
     {
         var serializer = new MessagePackRpcSerializer();

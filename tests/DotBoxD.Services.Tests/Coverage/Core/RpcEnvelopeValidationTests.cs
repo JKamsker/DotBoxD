@@ -48,6 +48,16 @@ public sealed class RpcEnvelopeValidationTests
             () => serializer.Deserialize<RpcResponse>(payload));
     }
 
+    [Fact]
+    public void RpcResponse_missing_success_flag_throws()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteResponseWithoutIsSuccess();
+
+        Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize<RpcResponse>(payload));
+    }
+
     private static byte[] WriteRequestWithDuplicateServiceName()
     {
         var writer = new ArrayBufferWriter<byte>();
@@ -100,6 +110,17 @@ public sealed class RpcEnvelopeValidationTests
         message.WriteMapHeader(1);
         message.Write("IsSuccess");
         message.Write(true);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
+    }
+
+    private static byte[] WriteResponseWithoutIsSuccess()
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(1);
+        message.Write("MessageId");
+        message.Write(42);
         message.Flush();
         return writer.WrittenMemory.ToArray();
     }

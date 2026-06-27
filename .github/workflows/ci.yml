@@ -383,6 +383,13 @@ jobs:
               "DifferentialFuzzTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.Services.Tests/DotBoxD.Services.Tests.csproj `
+            -Configuration Release `
+            -NoBuild `
+            -RequiredFullyQualifiedNameContains @(
+              "RpcEnvelopeValidationTests"
+            )
+          ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `
             -Configuration Release `
             -NoBuild `
