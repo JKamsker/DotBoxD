@@ -68,6 +68,7 @@ public static partial class KernelRpcMarshaller
 
     private static RecordShape? FindDtoShape(Type type)
     {
+        ThrowIfUnsupportedFrameworkStruct(type);
         if (type == typeof(string) ||
             type.IsPrimitive ||
             type.IsEnum ||
@@ -80,6 +81,17 @@ public static partial class KernelRpcMarshaller
 
         var shape = GetRecordShape(type);
         return shape.Fields.Count > 0 ? shape : null;
+    }
+
+    private static void ThrowIfUnsupportedFrameworkStruct(Type type)
+    {
+        if (type == typeof(DateTime) ||
+            type == typeof(DateTimeOffset) ||
+            type == typeof(TimeSpan))
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' is not supported; convert it to a supported scalar or DTO type.");
+        }
     }
 
     private static IList CreateList(Type elementType)

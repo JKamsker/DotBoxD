@@ -239,6 +239,7 @@ public static partial class KernelRpcMarshaller
         if (type.IsEnum)
             return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
+        ThrowIfUnsupportedFrameworkStruct(type);
         if (depth >= MaxTypeNestingDepth)
         {
             throw new NotSupportedException(
