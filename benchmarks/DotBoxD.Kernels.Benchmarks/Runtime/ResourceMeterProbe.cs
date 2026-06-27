@@ -26,15 +26,29 @@ internal static class ResourceMeterProbe
                 SandboxValue.FromInt32(100)
             ],
             SandboxType.String);
+        var flatRecord = SandboxValue.FromRecord(
+            [
+                SandboxValue.FromString("fire"),
+                SandboxValue.FromInt32(120),
+                SandboxValue.FromString("player-1"),
+                SandboxValue.FromString("fire"),
+                SandboxValue.FromInt32(100)
+            ]);
         var nestedInput = CreateNestedValue();
 
         _ = Measure(warmup, limits, pluginInput);
+        _ = Measure(warmup, limits, flatRecord);
+        _ = MeasureFreshFlatRecord(warmup, limits);
         _ = Measure(warmup, limits, nestedInput);
 
         var flat = Measure(flatIterations, limits, pluginInput);
+        var record = Measure(flatIterations, limits, flatRecord);
+        var freshRecord = MeasureFreshFlatRecord(flatIterations, limits);
         var nested = Measure(nestedIterations, limits, nestedInput);
         Console.WriteLine($"flat iterations = {flatIterations:N0}");
         Write("ChargeValue(plugin flat scalar input)", flat, flatIterations);
+        Write("ChargeValue(flat scalar record)", record, flatIterations);
+        Write("ChargeValue(fresh flat scalar record)", freshRecord, flatIterations);
         Console.WriteLine($"nested iterations = {nestedIterations:N0}");
         Write("ChargeValue(nested structural input)", nested, nestedIterations);
     }
@@ -82,6 +96,36 @@ internal static class ResourceMeterProbe
         for (var i = 0; i < iterations; i++)
         {
             meter.ChargeValue(value);
+        }
+
+        sw.Stop();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new Measurement(
+            sw.Elapsed.TotalMilliseconds,
+            allocated,
+            meter.CollectionElements,
+            meter.StringBytes);
+    }
+
+    private static Measurement MeasureFreshFlatRecord(int iterations, ResourceLimits limits)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var meter = new ResourceMeter(limits);
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sw = Stopwatch.StartNew();
+        for (var i = 0; i < iterations; i++)
+        {
+            meter.ChargeValue(SandboxValue.FromRecord(
+                [
+                    SandboxValue.FromString("fire"),
+                    SandboxValue.FromInt32(120),
+                    SandboxValue.FromString("player-1"),
+                    SandboxValue.FromString("fire"),
+                    SandboxValue.FromInt32(100)
+                ]));
         }
 
         sw.Stop();

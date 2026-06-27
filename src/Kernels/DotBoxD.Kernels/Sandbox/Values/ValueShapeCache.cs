@@ -44,6 +44,18 @@ internal static class ValueShapeCache
         return info;
     }
 
+    public static bool TryGet(SandboxValue value, out ShapeInfo info)
+    {
+        if (Cache.TryGetValue(value, out var box))
+        {
+            info = box.Value;
+            return true;
+        }
+
+        info = default;
+        return false;
+    }
+
     private static ValueShape MeasureScalar(SandboxValue value)
         => value switch
         {

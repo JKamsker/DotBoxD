@@ -107,6 +107,32 @@ public sealed partial class ResourceMeter
             return true;
         }
 
+        if (value is RecordValue record)
+        {
+            var fields = record.Fields;
+            if (fields.Count > MaxUnchargedShapeScanValues)
+            {
+                return false;
+            }
+
+            shape = shape with
+            {
+                Elements = fields.Count,
+                MaxListLength = fields.Count,
+                Depth = 1
+            };
+            for (var i = 0; i < fields.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryAddScalarShape(fields[i], ref shape))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         return TryAddScalarShape(value, ref shape);
     }
 

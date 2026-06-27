@@ -93,6 +93,13 @@ public sealed partial class ResourceMeter
     public void ChargeValue(SandboxValue value) => ChargeValue(value, CancellationToken.None);
     public void ChargeValue(SandboxValue value, CancellationToken cancellationToken)
     {
+        if (value is RecordValue && ValueShapeCache.TryGet(value, out var cachedRecordShape))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ChargeMeasuredShape(cachedRecordShape);
+            return;
+        }
+
         if (TryChargeFlatScalarValue(value, cancellationToken))
         {
             return;
