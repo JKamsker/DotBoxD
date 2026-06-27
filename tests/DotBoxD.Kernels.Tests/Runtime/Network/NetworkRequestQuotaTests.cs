@@ -35,6 +35,7 @@ public sealed class NetworkRequestQuotaTests
     public async Task Http_get_request_byte_limit_matches_get_line_byte_count()
     {
         const string uri = "https://api.example.com/config?tenant=alpha&mode=full";
+        // 4 = "GET " request-line prefix.
         var expectedBytes = 4 + Encoding.UTF8.GetByteCount(uri);
         var allowed = NetworkPolicyBuilder()
             .GrantHttpGet(["api.example.com"], maxResponseBytes: 1024, maxRequestBytes: expectedBytes)

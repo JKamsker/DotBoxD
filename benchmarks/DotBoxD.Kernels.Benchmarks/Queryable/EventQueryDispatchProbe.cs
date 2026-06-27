@@ -18,10 +18,6 @@ internal static class EventQueryDispatchProbe
         _ = Measure(indexedHit, Warmup);
         _ = Measure(indexedMiss, Warmup);
 
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
         Console.WriteLine("Event query dispatch probe");
         Write("Broad single subscriber", Measure(broad, Iterations));
         Write("Indexed hit", Measure(indexedHit, Iterations));
@@ -30,6 +26,10 @@ internal static class EventQueryDispatchProbe
 
     private static Measurement Measure(Scenario scenario, int iterations)
     {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)

@@ -112,6 +112,8 @@ internal static class LiteralCollectionConstructionProbe
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < iterations; i++)
         {
+            // Emitted literal code allocates fresh owned arrays immediately before the runtime call.
+            // Keep them in the measured path because the optimization removes a second defensive copy.
             var values = CreateValues(arity, i);
             var value = build(context, values);
             checksum += value switch

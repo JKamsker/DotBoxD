@@ -46,10 +46,11 @@ internal static class SafeHttpBodyReader
                         throw QuotaExceeded();
                     }
 
+                    var requiredBodyLength = CheckedLength((long)bodyLength + read);
                     context.ChargeAllocation(read);
-                    EnsureBodyCapacity(ref bodyBuffer, bodyLength + read);
+                    EnsureBodyCapacity(ref bodyBuffer, requiredBodyLength);
                     Buffer.BlockCopy(readBuffer, 0, bodyBuffer, bodyLength, read);
-                    bodyLength += read;
+                    bodyLength = requiredBodyLength;
                 }
 
                 context.ChargeFuel(bodyLength);
@@ -76,17 +77,11 @@ internal static class SafeHttpBodyReader
 
     private static void EnsureBodyCapacity(ref byte[] buffer, int required)
     {
-        if (required <= buffer.Length)
+        var nextLength = NextBodyCapacity(buffer.Length, required);
+        if (nextLength == buffer.Length)
         {
             return;
         }
-
-        var nextLength = buffer.Length;
-        do
-        {
-            nextLength *= 2;
-        }
-        while (nextLength < required);
 
         var next = ArrayPool<byte>.Shared.Rent(nextLength);
         Buffer.BlockCopy(buffer, 0, next, 0, buffer.Length);
@@ -94,9 +89,26 @@ internal static class SafeHttpBodyReader
         buffer = next;
     }
 
+    private static int NextBodyCapacity(int currentLength, int required)
+    {
+        if (required <= currentLength)
+        {
+            return currentLength;
+        }
+
+        var nextLength = currentLength;
+        while (nextLength < required)
+        {
+            var doubled = (long)nextLength * 2;
+            nextLength = doubled > Array.MaxLength ? required : (int)doubled;
+        }
+
+        return nextLength;
+    }
+
     private static int CheckedLength(long length)
     {
-        if (length > int.MaxValue)
+        if (length < 0 || length > Array.MaxLength)
         {
             throw QuotaExceeded();
         }

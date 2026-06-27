@@ -6,10 +6,19 @@ namespace DotBoxD.Kernels.Serialization.Json.Internal;
 
 internal sealed class JsonSourceMap
 {
+    private readonly JsonElement _root;
+    private readonly IReadOnlyList<SourceSpan> _tokenSpans;
     private readonly Dictionary<JsonElement, SourceSpan> _spansByElement;
 
-    private JsonSourceMap(Dictionary<JsonElement, SourceSpan> spansByElement)
-        => _spansByElement = spansByElement;
+    private JsonSourceMap(
+        JsonElement root,
+        IReadOnlyList<SourceSpan> tokenSpans,
+        Dictionary<JsonElement, SourceSpan> spansByElement)
+    {
+        _root = root;
+        _tokenSpans = tokenSpans;
+        _spansByElement = spansByElement;
+    }
 
     public static JsonSourceMap Create(string json, JsonElement root)
     {
@@ -22,11 +31,19 @@ internal sealed class JsonSourceMap
 #pragma warning restore MA0066
         var index = 0;
         Visit(root, tokenSpans, spansByElement, ref index);
-        return new JsonSourceMap(spansByElement);
+        return new JsonSourceMap(root, tokenSpans, spansByElement);
     }
 
     public SourceSpan SpanFor(JsonElement element)
-        => _spansByElement.TryGetValue(element, out var span) ? span : JsonImport.JsonSpan;
+    {
+        if (_spansByElement.TryGetValue(element, out var span))
+        {
+            return span;
+        }
+
+        var index = 0;
+        return TryFindSpan(_root, _tokenSpans, element, ref index, out span) ? span : JsonImport.JsonSpan;
+    }
 
     private static void Visit(
         JsonElement element,
@@ -56,6 +73,51 @@ internal sealed class JsonSourceMap
 
                 break;
         }
+    }
+
+    private static bool TryFindSpan(
+        JsonElement current,
+        IReadOnlyList<SourceSpan> tokenSpans,
+        JsonElement target,
+        ref int index,
+        out SourceSpan span)
+    {
+        var currentSpan = index < tokenSpans.Count ? tokenSpans[index] : JsonImport.JsonSpan;
+        index++;
+#pragma warning disable MA0065
+        if (current.Equals(target))
+#pragma warning restore MA0065
+        {
+            span = currentSpan;
+            return true;
+        }
+
+        switch (current.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in current.EnumerateObject())
+                {
+                    if (TryFindSpan(property.Value, tokenSpans, target, ref index, out span))
+                    {
+                        return true;
+                    }
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in current.EnumerateArray())
+                {
+                    if (TryFindSpan(item, tokenSpans, target, ref index, out span))
+                    {
+                        return true;
+                    }
+                }
+
+                break;
+        }
+
+        span = JsonImport.JsonSpan;
+        return false;
     }
 
     private sealed class JsonElementIdentityComparer : IEqualityComparer<JsonElement>
