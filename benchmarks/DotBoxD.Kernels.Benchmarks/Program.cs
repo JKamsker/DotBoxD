@@ -253,6 +253,12 @@ if (args.Contains("--probe-subscription-dispatch", StringComparer.OrdinalIgnoreC
     return;
 }
 
+if (args.Contains("--probe-event-query-dispatch", StringComparer.OrdinalIgnoreCase))
+{
+    DotBoxD.Kernels.Benchmarks.Queryable.EventQueryDispatchProbe.Run();
+    return;
+}
+
 if (args.Contains("--probe-literal-scalar-safety", StringComparer.OrdinalIgnoreCase))
 {
     DotBoxD.Kernels.Benchmarks.Validation.LiteralScalarSafetyProbe.Run();
