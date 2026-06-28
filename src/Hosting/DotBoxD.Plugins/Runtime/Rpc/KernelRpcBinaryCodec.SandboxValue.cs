@@ -92,7 +92,7 @@ public static partial class KernelRpcBinaryCodec
         WriteByte(writer, (byte)KernelRpcValueKind.Guid);
         WriteGuid(writer, value);
     }
-    
+
     private static void WriteSandboxValue(
         SandboxValue value,
         IBufferWriter<byte> writer,

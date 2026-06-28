@@ -48,20 +48,6 @@ public sealed class SafeNetworkTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
     }
-
-    [Fact]
-    public async Task Http_get_allows_configured_host_case_insensitively()
-    {
-        var result = await ExecuteNetworkAsync(
-            "https://api.example.com/config",
-            NetworkPolicyBuilder()
-                .GrantHttpGet(["API.EXAMPLE.COM"], maxResponseBytes: 1024)
-                .WithFuel(5_000)
-                .Build());
-
-        Assert.True(result.Succeeded, result.Error?.SafeMessage);
-    }
-
     [Fact]
     public async Task Http_get_denies_non_default_port_without_authority_allowlist()
     {

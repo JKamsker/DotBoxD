@@ -123,7 +123,7 @@ public static partial class KernelRpcMarshaller
                 return true;
             }
         }
- 
+
         return false;
     }
 
