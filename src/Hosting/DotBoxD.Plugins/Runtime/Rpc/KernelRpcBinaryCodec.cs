@@ -34,10 +34,12 @@ public static partial class KernelRpcBinaryCodec
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(writer);
+        var itemCount = 0;
+        ReserveEncodeItems(arguments.Count, ref itemCount);
         WriteLength(writer, arguments.Count);
         for (var i = 0; i < arguments.Count; i++)
         {
-            WriteValue(writer, arguments[i]);
+            WriteValue(writer, arguments[i], 0, ref itemCount);
         }
     }
 
@@ -67,7 +69,8 @@ public static partial class KernelRpcBinaryCodec
     public static void EncodeValue(KernelRpcValue value, IBufferWriter<byte> writer)
     {
         ArgumentNullException.ThrowIfNull(writer);
-        WriteValue(writer, value);
+        var itemCount = 0;
+        WriteValue(writer, value, 0, ref itemCount);
     }
 
     public static KernelRpcValue DecodeValue(ReadOnlyMemory<byte> payload)
@@ -78,7 +81,7 @@ public static partial class KernelRpcBinaryCodec
         return value;
     }
 
-    private static void WriteValue(IBufferWriter<byte> writer, KernelRpcValue value)
+    private static void WriteValue(IBufferWriter<byte> writer, KernelRpcValue value, int depth, ref int itemCount)
     {
         WriteByte(writer, (byte)value.Kind);
         switch (value.Kind)
@@ -106,7 +109,7 @@ public static partial class KernelRpcBinaryCodec
             case KernelRpcValueKind.List:
             case KernelRpcValueKind.Record:
             case KernelRpcValueKind.Map:
-                WriteItems(writer, value.ItemSpan);
+                WriteItems(writer, value.ItemSpan, depth, ref itemCount);
                 return;
             default:
                 throw new NotSupportedException($"Server extension value kind '{value.Kind}' is not supported.");
@@ -152,15 +155,6 @@ public static partial class KernelRpcBinaryCodec
         }
 
         return KernelRpcValue.Double(value);
-    }
-
-    private static void WriteItems(IBufferWriter<byte> writer, ReadOnlySpan<KernelRpcValue> items)
-    {
-        WriteLength(writer, items.Length);
-        foreach (var item in items)
-        {
-            WriteValue(writer, item);
-        }
     }
 
     private static KernelRpcValue[] ReadItems(ref Reader reader, int depth)

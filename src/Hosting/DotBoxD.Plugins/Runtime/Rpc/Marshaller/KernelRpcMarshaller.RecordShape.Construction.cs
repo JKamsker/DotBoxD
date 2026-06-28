@@ -10,18 +10,19 @@ public static partial class KernelRpcMarshaller
             var instance = ConstructInstance(arguments, assigned);
             for (var i = 0; i < Fields.Count; i++)
             {
-                if (assigned[i])
-                {
-                    continue;
-                }
-
-                if (Fields[i].IsSettable)
+                if (!assigned[i] && Fields[i].IsSettable)
                 {
                     Fields[i].SetValue(instance, arguments[i]);
-                    continue;
+                    assigned[i] = true;
                 }
+            }
 
-                VerifyReadOnlyField(instance, Fields[i], arguments[i]);
+            for (var i = 0; i < Fields.Count; i++)
+            {
+                if (!assigned[i])
+                {
+                    VerifyReadOnlyField(instance, Fields[i], arguments[i]);
+                }
             }
 
             return instance;
@@ -40,6 +41,12 @@ public static partial class KernelRpcMarshaller
             for (var i = 0; i < parameters.Length; i++)
             {
                 var fieldIndex = _constructorMap[i];
+                if (fieldIndex < 0)
+                {
+                    constructorArguments[i] = DefaultParameterValue(parameters[i]);
+                    continue;
+                }
+
                 constructorArguments[i] = arguments[fieldIndex];
                 assigned[fieldIndex] = true;
             }
@@ -54,7 +61,7 @@ public static partial class KernelRpcMarshaller
             if (!Equals(actual, expected))
             {
                 throw new NotSupportedException(
-                    $"Server extension DTO '{_type}' field '{field.Name}' is read-only and could not be reconstructed.");
+                    $"Server extension DTO '{_type}' field '{field.Name}' is private or read-only and could not be reconstructed.");
             }
         }
     }

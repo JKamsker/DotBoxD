@@ -38,19 +38,9 @@ internal static partial class RpcKernelClientProxyEmitter
     }
 
     private static void EnsureAccessibleFromGeneratedClient(INamedTypeSymbol serviceType)
-    {
-        for (INamedTypeSymbol? current = serviceType; current is not null; current = current.ContainingType)
-        {
-            if (!IsAccessibleFromGeneratedClient(current.DeclaredAccessibility))
-            {
-                throw new NotSupportedException(
-                    $"Server extension interface '{serviceType.ToDisplayString()}' must be accessible from generated client code.");
-            }
-        }
-    }
-
-    private static bool IsAccessibleFromGeneratedClient(Accessibility accessibility)
-        => accessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
+        => RpcGeneratedClientAccessibility.EnsureAccessible(
+            serviceType,
+            $"Server extension interface '{serviceType.ToDisplayString()}'");
 
     private static bool IsGenericTask(ITypeSymbol type, out ITypeSymbol inner)
         => TryGenericTaskLike(type, "Task", out inner);
@@ -139,11 +129,12 @@ internal static partial class RpcKernelClientProxyEmitter
 
         private void AppendServiceMethod(StringBuilder builder)
         {
-            var locals = new GeneratedLocalNames(_serviceMethod);
+            var locals = new RpcGeneratedLocalNames(_serviceMethod);
             var arguments = locals.Next("__arguments");
             var request = locals.Next("__request");
             var response = locals.Next("__response");
             var result = locals.Next("__result");
+            var payloadParameterCount = RpcKernelClientParameters.PayloadParameterCount(_serviceMethod);
 
             builder.Append("    public ");
             if (_returnShape != ReturnShape.Direct)
@@ -156,8 +147,8 @@ internal static partial class RpcKernelClientProxyEmitter
                 .Append(ParameterList(_serviceMethod)).AppendLine(")");
             builder.AppendLine("    {");
             builder.Append("        var ").Append(arguments).Append(" = new global::DotBoxD.Plugins.KernelRpcValue[")
-                .Append(_serviceMethod.Parameters.Length).AppendLine("];");
-            for (var i = 0; i < _serviceMethod.Parameters.Length; i++)
+                .Append(payloadParameterCount).AppendLine("];");
+            for (var i = 0; i < payloadParameterCount; i++)
             {
                 var parameter = _serviceMethod.Parameters[i];
                 builder.Append("        ").Append(arguments).Append('[').Append(i).Append("] = ")
@@ -171,17 +162,24 @@ internal static partial class RpcKernelClientProxyEmitter
             {
                 builder.Append("        var ").Append(response)
                     .Append(" = _client.InvokeServerExtensionAsync(_pluginId, ")
-                    .Append(request).AppendLine(").AsTask().GetAwaiter().GetResult();");
+                    .Append(request).Append(", ")
+                    .Append(RpcKernelClientParameters.CancellationTokenArgument(_serviceMethod))
+                    .AppendLine(").AsTask().GetAwaiter().GetResult();");
             }
             else
             {
                 builder.Append("        var ").Append(response)
                     .Append(" = await _client.InvokeServerExtensionAsync(_pluginId, ")
-                    .Append(request).AppendLine(").ConfigureAwait(false);");
+                    .Append(request).Append(", ")
+                    .Append(RpcKernelClientParameters.CancellationTokenArgument(_serviceMethod))
+                    .AppendLine(").ConfigureAwait(false);");
             }
 
             if (_payloadReturnType is null)
             {
+                builder.Append("        global::DotBoxD.Plugins.KernelRpcBinaryCodec.DecodeValue(")
+                    .Append(response)
+                    .AppendLine(").RequireKind(global::DotBoxD.Plugins.KernelRpcValueKind.Unit);");
                 builder.AppendLine("        return;");
             }
             else
@@ -237,30 +235,6 @@ internal static partial class RpcKernelClientProxyEmitter
             }
 
             return string.Join(", ", parts);
-        }
-
-        private sealed class GeneratedLocalNames
-        {
-            private readonly HashSet<string> _used = new(StringComparer.Ordinal);
-
-            public GeneratedLocalNames(IMethodSymbol serviceMethod)
-            {
-                foreach (var parameter in serviceMethod.Parameters)
-                {
-                    _used.Add(parameter.Name);
-                }
-            }
-
-            public string Next(string baseName)
-            {
-                var name = baseName;
-                for (var suffix = 0; !_used.Add(name); suffix++)
-                {
-                    name = baseName + suffix.ToString(global::System.Globalization.CultureInfo.InvariantCulture);
-                }
-
-                return name;
-            }
         }
 
         private static string TypeName(ITypeSymbol type)

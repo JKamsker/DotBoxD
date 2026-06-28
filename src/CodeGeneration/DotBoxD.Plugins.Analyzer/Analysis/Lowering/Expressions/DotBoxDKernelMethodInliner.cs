@@ -181,6 +181,20 @@ internal static partial class DotBoxDKernelMethodInliner
         IParameterSymbol parameter)
     {
         var type = DotBoxDTypeNameReader.KernelMethodTypeName(parameterType);
+        if (parameterType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType && value is not null)
+        {
+            var raw = EnumDefaultValue(enumType, value);
+            return DotBoxDRpcTypeMapper.EnumUsesI64(enumType)
+                ? new DotBoxDExpressionModel(
+                    $"{DotBoxDGenerationNames.Helpers.I64}({LiteralReader.ObjectLiteral(raw)})",
+                    type,
+                    false)
+                : new DotBoxDExpressionModel(
+                    $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(unchecked((int)raw))})",
+                    type,
+                    false);
+        }
+
         return type switch
         {
             DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean => new(
@@ -226,6 +240,21 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static bool IsFinite(double value)
         => !double.IsNaN(value) && !double.IsInfinity(value);
+
+    private static long EnumDefaultValue(INamedTypeSymbol enumType, object value)
+        => enumType.EnumUnderlyingType?.SpecialType switch
+        {
+            SpecialType.System_UInt64 => unchecked((long)(ulong)value),
+            SpecialType.System_UInt32 => (uint)value,
+            SpecialType.System_Int64 => (long)value,
+            SpecialType.System_Int32 => (int)value,
+            SpecialType.System_UInt16 => (ushort)value,
+            SpecialType.System_Int16 => (short)value,
+            SpecialType.System_Byte => (byte)value,
+            SpecialType.System_SByte => (sbyte)value,
+            _ => throw new NotSupportedException(
+                $"[KernelMethod] '{enumType.ToDisplayString()}' enum default value is not supported.")
+        };
 
     private static ExpressionSyntax? TryKernelMethodBody(IMethodSymbol method, CancellationToken cancellationToken)
     {

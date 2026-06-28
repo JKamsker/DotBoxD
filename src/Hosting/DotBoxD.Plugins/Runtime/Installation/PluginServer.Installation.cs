@@ -57,7 +57,7 @@ public sealed partial class PluginServer
         var (sandboxModule, sandboxPolicy) = PrepareSandboxInputs(package, installPolicy);
         var plan = await _host.PrepareAsync(sandboxModule, sandboxPolicy, cancellationToken)
             .ConfigureAwait(false);
-        RpcKernelPackageValidator.ValidatePrepared(package, plan);
+        RpcKernelPackageValidator.ValidatePrepared(package, plan, installPolicy);
         var kernel = new InstalledKernel(_host, plan, package, _executionMode, owner);
         var replaced = AddKernel(kernel);
         if (replaced is not null)

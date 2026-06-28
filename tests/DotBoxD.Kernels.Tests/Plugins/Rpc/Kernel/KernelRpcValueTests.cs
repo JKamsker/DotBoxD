@@ -1,3 +1,4 @@
+using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
 
@@ -124,6 +125,25 @@ public sealed class KernelRpcValueTests
             source,
             StringComparison.Ordinal);
         Assert.Contains("foreach (var __item in value)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToSandboxValue_rejects_duplicate_map_keys()
+    {
+        var wire = KernelRpcValue.Map(
+        [
+            KernelRpcValue.String("same"),
+            KernelRpcValue.Int32(1),
+            KernelRpcValue.String("same"),
+            KernelRpcValue.Int32(2)
+        ]);
+
+        var ex = Assert.Throws<FormatException>(
+            () => KernelRpcValueConverter.ToSandboxValue(
+                wire,
+                SandboxType.Map(SandboxType.String, SandboxType.I32)));
+
+        Assert.Contains("duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AssertGeneratedReaderUsesIndexedItems(string testSource)

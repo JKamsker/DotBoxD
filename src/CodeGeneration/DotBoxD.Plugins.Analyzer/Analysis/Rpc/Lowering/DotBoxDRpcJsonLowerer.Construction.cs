@@ -29,7 +29,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         _serverContextType = serverContextType;
     }
 
-    private string LowerRecordCreation(ObjectCreationExpressionSyntax creation)
+    private string LowerRecordCreation(BaseObjectCreationExpressionSyntax creation)
     {
         var created = TypeOf(creation);
         if (DotBoxDRpcTypeMapper.ListElementType(created) is { } elementType &&
@@ -39,13 +39,15 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             Allocates = true;
             return Call("list.empty", DotBoxDRpcTypeMapper.JsonType(elementType));
         }
-        if (TryLowerEmptyMapCreation(creation, created) is { } emptyMap)
+        if (creation is ObjectCreationExpressionSyntax explicitCreation &&
+            TryLowerEmptyMapCreation(explicitCreation, created) is { } emptyMap)
         {
             return emptyMap;
         }
         if (created is not INamedTypeSymbol named || !DotBoxDRpcTypeMapper.IsRecordDto(named))
         {
-            throw new NotSupportedException($"Server extension 'new {creation.Type}' must construct a supported DTO or empty list.");
+            throw new NotSupportedException(
+                $"Server extension '{CreationText(creation)}' must construct a supported DTO or empty list.");
         }
         Allocates = true;
         var fields = DotBoxDRpcTypeMapper.RecordFields(named);
@@ -53,10 +55,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         if (creation.ArgumentList is { Arguments.Count: > 0 } argumentList)
         {
             if (_model.GetSymbolInfo(creation, _cancellationToken).Symbol is not IMethodSymbol constructor ||
-                argumentList.Arguments.Count != constructor.Parameters.Length ||
                 constructor.Parameters.Length > fields.Count)
             {
-                throw new NotSupportedException($"Server extension constructor for '{named.Name}' must pass one argument per constructor parameter, and the constructor must not have more parameters than the record has fields.");
+                throw new NotSupportedException($"Server extension constructor for '{named.Name}' must map each constructor parameter to a record field.");
             }
             var lowered = LowerArgumentsInParameterOrder(
                 argumentList.Arguments,
@@ -101,6 +102,11 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         return Call("record.new", DotBoxDRpcTypeMapper.JsonType(named), args);
     }
 
+    private static string CreationText(BaseObjectCreationExpressionSyntax creation)
+        => creation is ObjectCreationExpressionSyntax explicitCreation
+            ? "new " + explicitCreation.Type
+            : creation.ToString();
+
     private void BindInitializer(
         InitializerExpressionSyntax initializer,
         IReadOnlyList<RecordMember> fields,
@@ -117,7 +123,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must assign named fields.");
             }
             var index = IndexOfField(fields, fieldName.Identifier.ValueText, named);
-            args[index] = LowerExpression(assignment.Right);
+            args[index] = HoistInitializerMember(LowerExpression(assignment.Right));
             assigned[index] = true;
         }
         if (!requireAllFields)
@@ -136,6 +142,18 @@ internal sealed partial class DotBoxDRpcJsonLowerer
                 throw new NotSupportedException($"Server extension initializer for '{named.Name}' must set field '{fields[i].Name}'.");
             }
         }
+    }
+
+    private string HoistInitializerMember(string value)
+    {
+        if (_expressionPrelude is null)
+        {
+            return value;
+        }
+
+        var localName = ReserveGeneratedLocal("__sir_arg");
+        AddExpressionPrelude(SetStatement(localName, value));
+        return Var(localName);
     }
 
     private static int IndexOfField(IReadOnlyList<RecordMember> fields, string name, INamedTypeSymbol named)

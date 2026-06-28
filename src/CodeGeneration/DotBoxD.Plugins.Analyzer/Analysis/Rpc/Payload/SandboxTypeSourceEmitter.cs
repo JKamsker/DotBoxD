@@ -69,6 +69,16 @@ internal static class SandboxTypeSourceEmitter
             return ManifestTypes.Guid;
         }
 
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return ManifestTypes.Record;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            return ManifestTypes.Long;
+        }
+
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
             return DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? ManifestTypes.Long : ManifestTypes.Int;
@@ -110,6 +120,16 @@ internal static class SandboxTypeSourceEmitter
             return SandboxType + ".Guid";
         }
 
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I64, {SandboxType}.I64 }})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            return SandboxType + ".I64";
+        }
+
         if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
         {
             if (depth >= MaxDepth)
@@ -149,9 +169,9 @@ internal static class SandboxTypeSourceEmitter
 
         if (type is INamedTypeSymbol named && DotBoxDRpcTypeMapper.IsRecordDto(named))
         {
-            // A DTO that inherits public instance properties would silently drop them: RecordFields (and the
+            // A DTO that inherits public instance data members would silently drop them: RecordFields (and the
             // runtime marshaller's GetRecordShape) see only declared members. Fail safe instead of emitting a
-            // partial record shape — same rule the server-extension JsonType path enforces.
+            // partial record shape -- same rule the server-extension JsonType path enforces.
             DotBoxDRpcTypeMapper.RejectInheritedDtoProperties(named);
             var fields = DotBoxDRpcTypeMapper.RecordFields(named);
             var fieldTypes = new string[fields.Count];

@@ -28,6 +28,32 @@ public sealed class ServerExtensionProxyNullableContractTests
             () => ServerExtensionProxy.Create<IInheritedNullableEchoService>(kernel));
     }
 
+    [Fact]
+    public async Task Runtime_proxy_rejects_property_accessors_in_service_contracts()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ServerExtensionProxy.Create<IPropertyOnlyService>(kernel));
+        Assert.Contains("method", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Runtime_proxy_rejects_nested_task_like_return_payloads()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ServerExtensionProxy.Create<INestedTaskLikeReturnService>(kernel));
+        Assert.Contains("task-like", exception.Message, StringComparison.Ordinal);
+    }
+
     private interface INullableEchoService
     {
         int Echo(int? value);
@@ -39,4 +65,14 @@ public sealed class ServerExtensionProxyNullableContractTests
     }
 
     private interface IInheritedNullableEchoService : INullableEchoBaseService;
+
+    private interface IPropertyOnlyService
+    {
+        int Value { get; }
+    }
+
+    private interface INestedTaskLikeReturnService
+    {
+        ValueTask<ValueTask<int>> EchoAsync(int value);
+    }
 }

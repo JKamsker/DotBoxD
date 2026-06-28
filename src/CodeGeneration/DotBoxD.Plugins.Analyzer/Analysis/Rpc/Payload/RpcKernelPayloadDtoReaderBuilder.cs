@@ -28,13 +28,13 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
-            return BuildInitializer("        return " + construction, fields, constructor.Assigned, constructor.Symbol, compilation);
+            return BuildInitializer(construction, fields, constructor.Assigned, constructor.Symbol, compilation);
         }
 
         if (DotBoxDRpcTypeMapper.CanReconstructWithObjectInitializer(type, fields, compilation))
         {
             return BuildInitializer(
-                "        return new " + TypeName(type),
+                "new " + TypeName(type),
                 fields,
                 assigned: new bool[fields.Count],
                 constructor: null,
@@ -54,7 +54,18 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         foreach (var parameter in constructor.Parameters)
         {
             var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            arguments.Add(FieldLocal(fieldIndex));
+            if (fieldIndex >= 0)
+            {
+                arguments.Add(Identifier(parameter.Name) + ": " + FieldLocal(fieldIndex));
+                continue;
+            }
+
+            if (!parameter.HasExplicitDefaultValue)
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+            }
         }
 
         return arguments;
@@ -68,8 +79,38 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         Compilation? compilation)
     {
         var initializer = new StringBuilder();
-        initializer.Append(construction).AppendLine();
-        initializer.AppendLine("        {");
+        var initialized = InitializerFieldIndexes(fields, assigned, constructor, compilation);
+        initializer.Append("        var __result = ").Append(construction);
+        if (initialized.Count == 0)
+        {
+            initializer.AppendLine(";");
+        }
+        else
+        {
+            initializer.AppendLine();
+            initializer.AppendLine("        {");
+            foreach (var i in initialized)
+            {
+                initializer.Append("            ").Append(Identifier(fields[i].Name)).Append(" = ")
+                    .Append(FieldLocal(i)).AppendLine(",");
+            }
+
+            initializer.AppendLine("        };");
+        }
+
+        AppendReadOnlyFieldVerifications(initializer, fields, assigned, compilation);
+        initializer.AppendLine();
+        initializer.Append("        return __result;");
+        return initializer.ToString();
+    }
+
+    private static List<int> InitializerFieldIndexes(
+        IReadOnlyList<RecordMember> fields,
+        bool[]? assigned,
+        IMethodSymbol? constructor,
+        Compilation? compilation)
+    {
+        var initialized = new List<int>();
         for (var i = 0; i < fields.Count; i++)
         {
             if (assigned is not null &&
@@ -79,12 +120,42 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                 continue;
             }
 
-            initializer.Append("            ").Append(Identifier(fields[i].Name)).Append(" = ")
-                .Append(FieldLocal(i)).AppendLine(",");
+            initialized.Add(i);
         }
 
-        initializer.Append("        };");
-        return initializer.ToString();
+        return initialized;
+    }
+
+    private static void AppendReadOnlyFieldVerifications(
+        StringBuilder builder,
+        IReadOnlyList<RecordMember> fields,
+        bool[]? assigned,
+        Compilation? compilation)
+    {
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (assigned is not null &&
+                (assigned[i] || DotBoxDRpcTypeMapper.IsObjectInitializerWritable(fields[i], compilation)))
+            {
+                continue;
+            }
+
+            if (!DotBoxDRpcTypeMapper.IsReadableFromGeneratedCode(fields[i], compilation))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO field '{fields[i].Name}' is private or read-only and could not be reconstructed.");
+            }
+
+            builder.Append("        if (!global::System.Collections.Generic.EqualityComparer<")
+                .Append(TypeName(fields[i].Type)).Append(">.Default.Equals(__result.")
+                .Append(Identifier(fields[i].Name)).Append(", ")
+                .Append(FieldLocal(i)).AppendLine("))");
+            builder.AppendLine("        {");
+            builder.Append("            throw new global::System.NotSupportedException(\"Server extension DTO field '")
+                .Append(fields[i].Name)
+                .AppendLine("' is private or read-only and could not be reconstructed.\");");
+            builder.AppendLine("        }");
+        }
     }
 
     private static ResolvedDtoConstructor? TryResolveConstructor(
@@ -96,7 +167,6 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation) ||
-                constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
                 continue;
@@ -107,7 +177,18 @@ internal static class RpcKernelPayloadDtoReaderBuilder
             foreach (var parameter in constructor.Parameters)
             {
                 var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0 || assigned[fieldIndex])
+                if (fieldIndex < 0)
+                {
+                    if (parameter.HasExplicitDefaultValue)
+                    {
+                        continue;
+                    }
+
+                    matched = false;
+                    break;
+                }
+
+                if (assigned[fieldIndex])
                 {
                     matched = false;
                     break;
@@ -118,6 +199,10 @@ internal static class RpcKernelPayloadDtoReaderBuilder
 
             if (matched)
             {
+                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
+                    constructor,
+                    $"Server extension DTO '{type.ToDisplayString()}'");
+
                 var assignedCount = AssignedCount(assigned);
                 var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
                 if (assignedCount == fields.Count)
