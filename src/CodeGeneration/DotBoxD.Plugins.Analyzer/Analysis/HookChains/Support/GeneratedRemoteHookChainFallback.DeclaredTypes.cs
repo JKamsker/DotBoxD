@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -13,6 +14,13 @@ internal static partial class GeneratedRemoteHookChainFallback
         if (expression is CastExpressionSyntax { Type: { } castType })
         {
             return castType;
+        }
+
+        if (expression is BinaryExpressionSyntax asExpression &&
+            asExpression.IsKind(SyntaxKind.AsExpression) &&
+            asExpression.Right is TypeSyntax asType)
+        {
+            return asType;
         }
 
         var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
