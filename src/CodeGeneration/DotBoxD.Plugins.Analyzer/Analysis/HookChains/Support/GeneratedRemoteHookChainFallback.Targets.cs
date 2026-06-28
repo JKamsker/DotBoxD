@@ -137,6 +137,7 @@ internal static partial class GeneratedRemoteHookChainFallback
             ILocalSymbol local => LocalTypeSyntax(local, cancellationToken),
             IFieldSymbol field => FieldTypeSyntax(field, cancellationToken),
             IPropertySymbol property => PropertyTypeSyntax(property, cancellationToken),
+            IMethodSymbol method => MethodReturnTypeSyntax(method, cancellationToken),
             _ => null
         };
     }
@@ -148,6 +149,22 @@ internal static partial class GeneratedRemoteHookChainFallback
             if (reference.GetSyntax(cancellationToken) is ParameterSyntax { Type: { } typeSyntax })
             {
                 return typeSyntax;
+            }
+        }
+
+        return null;
+    }
+
+    private static TypeSyntax? MethodReturnTypeSyntax(IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        foreach (var reference in method.DeclaringSyntaxReferences)
+        {
+            switch (reference.GetSyntax(cancellationToken))
+            {
+                case MethodDeclarationSyntax { ReturnType: { } returnType }:
+                    return returnType;
+                case LocalFunctionStatementSyntax { ReturnType: { } returnType }:
+                    return returnType;
             }
         }
 
