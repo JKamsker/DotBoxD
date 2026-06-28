@@ -33,6 +33,16 @@ public sealed partial class PluginServerContextContractTests
         "Messages")]
     [InlineData(
         """
+        private readonly HookContext _raw = null!;
+        """,
+        "_raw")]
+    [InlineData(
+        """
+        public CancellationToken CancellationToken => default;
+        """,
+        "CancellationToken")]
+    [InlineData(
+        """
         public bool HasCancelableDispatch => false;
         """,
         "HasCancelableDispatch")]
@@ -56,6 +66,62 @@ public sealed partial class PluginServerContextContractTests
                  d.Severity == DiagnosticSeverity.Error &&
                  d.GetMessage().Contains(expectedName, StringComparison.Ordinal) &&
                  d.GetMessage().Contains("collides with the generated context surface", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Inherited_context_member_colliding_with_generated_surface_reports_generation_diagnostic()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(MinimalServer("""
+            [GeneratePluginServer(Context = typeof(GameContext))]
+            public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+            public class BaseContext
+            {
+                public HookContext Raw => throw new System.NotSupportedException();
+            }
+
+            public sealed partial class GameContext : BaseContext;
+            """));
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.Severity == DiagnosticSeverity.Error &&
+                 d.GetMessage().Contains("Raw", StringComparison.Ordinal) &&
+                 d.GetMessage().Contains("collides with the generated context surface", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        public void OnCreated()
+        {
+        }
+        """)]
+    [InlineData(
+        """
+        public void OnCreated(HookContext raw)
+        {
+        }
+        """)]
+    public void Context_OnCreated_wrong_shape_reports_generation_diagnostic(string onCreated)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics(MinimalServer($$"""
+            [GeneratePluginServer(Context = typeof(GameContext))]
+            public partial class RemotePluginServer : Sample.Game.IGameWorld;
+
+            public sealed partial class GameContext
+            {
+                {{onCreated}}
+            }
+            """));
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                 d.Severity == DiagnosticSeverity.Error &&
+                 d.GetMessage().Contains("OnCreated", StringComparison.Ordinal) &&
+                 d.GetMessage().Contains("partial void", StringComparison.Ordinal));
     }
 
     [Fact]

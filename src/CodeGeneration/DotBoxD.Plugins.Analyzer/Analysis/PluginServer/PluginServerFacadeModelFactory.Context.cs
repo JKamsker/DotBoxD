@@ -25,7 +25,7 @@ internal static partial class PluginServerFacadeModelFactory
                 $"Generated plugin server '{serverType.Name}' must declare Context = typeof(TContext).");
 
         ValidateContextShape(serverType, contextType, cancellationToken);
-        ValidateContextMembers(contextType);
+        ValidateContextMembers(contextType, cancellationToken);
         EnsureSingleServerOwnsContext(serverType, contextType, compilation, cancellationToken);
 
         var factoryName = ContextFactoryName(attribute);
@@ -186,77 +186,6 @@ internal static partial class PluginServerFacadeModelFactory
         {
             throw new NotSupportedException(
                 $"ContextFactory '{factoryName}' on '{contextType.ToDisplayString()}' must be static and have signature {contextType.Name} {factoryName}(HookContext raw).");
-        }
-    }
-
-    private static void ValidateContextMembers(INamedTypeSymbol contextType)
-    {
-        foreach (var member in contextType.GetMembers())
-        {
-            if (member.IsImplicitlyDeclared)
-            {
-                continue;
-            }
-
-            if (member is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor)
-            {
-                ValidateNoGeneratedContextConstructorCollision(contextType, constructor);
-                continue;
-            }
-
-            if (member is IMethodSymbol or IPropertySymbol)
-            {
-                ValidateNoContextHostBinding(contextType, member);
-            }
-
-            if (GeneratedContextMemberCollides(member.Name))
-            {
-                throw GeneratedContextCollision(contextType, member.Name);
-            }
-        }
-    }
-
-    private static void ValidateNoGeneratedContextConstructorCollision(
-        INamedTypeSymbol contextType,
-        IMethodSymbol constructor)
-    {
-        if (constructor.Parameters.Length == 1 &&
-            string.Equals(
-                constructor.Parameters[0].Type.ToDisplayString(),
-                DotBoxDMetadataNames.HookContextType,
-                StringComparison.Ordinal))
-        {
-            throw GeneratedContextCollision(contextType, "constructor");
-        }
-    }
-
-    private static bool GeneratedContextMemberCollides(string name)
-        => name is "_raw" or
-            "Raw" or
-            "World" or
-            "Messages" or
-            "CancellationToken" or
-            "HasCancelableDispatch" or
-            "FromHookContext";
-
-    private static NotSupportedException GeneratedContextCollision(
-        INamedTypeSymbol contextType,
-        string memberName)
-        => new(
-            $"Generated plugin server context '{contextType.ToDisplayString()}' member '{memberName}' collides with the generated context surface.");
-
-    private static void ValidateNoContextHostBinding(INamedTypeSymbol contextType, ISymbol member)
-    {
-        foreach (var attribute in member.GetAttributes())
-        {
-            if (string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
-                    DotBoxDMetadataNames.HostBindingAttribute,
-                    StringComparison.Ordinal))
-            {
-                throw new NotSupportedException(
-                    $"Generated plugin server context '{contextType.ToDisplayString()}' must not declare [HostBinding] members; expose host services through [DotBoxDService] selectors.");
-            }
         }
     }
 }
