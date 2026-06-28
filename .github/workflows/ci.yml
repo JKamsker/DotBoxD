@@ -372,6 +372,7 @@ jobs:
               "ServerExtensionProxyCancellationTests",
               "ServerExtensionProxyNullableContractTests",
               "RpcKernelGenerationTests",
+              "RpcKernelPackageValidationTests",
               "RpcKernelLiveSettingRuntimeTests",
               "RpcKernelMethodGenerationTests",
               "RpcKernelMethodContextHelperRegressionTests",

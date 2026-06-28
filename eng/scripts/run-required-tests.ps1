@@ -97,6 +97,7 @@ $defaultMinimums = @{
     ServerExtensionProxyCancellationTests = 1
     ServerExtensionProxyNullableContractTests = 4
     RpcKernelGenerationTests = 13
+    RpcKernelPackageValidationTests = 3
     RpcKernelLiveSettingRuntimeTests = 2
     RpcKernelMethodGenerationTests = 7
     RpcKernelMethodContextHelperRegressionTests = 1
