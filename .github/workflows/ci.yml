@@ -432,7 +432,8 @@ jobs:
               "NullableSubServiceTests",
               "FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface",
               "ParamsParameters_ArePreservedInGeneratedProxySurface",
-              "CallerInfoAttributes_ArePreservedInGeneratedServiceSurface"
+              "CallerInfoAttributes_ArePreservedInGeneratedServiceSurface",
+              "GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `
