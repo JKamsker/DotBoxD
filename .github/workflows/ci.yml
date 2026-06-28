@@ -319,6 +319,7 @@ jobs:
               "CompiledCacheMetadataTests",
               "CompiledCacheRootGuardTests",
               "CompiledCacheTests",
+              "BranchMergeScopeTests",
               "CacheKeyIdentityTests",
               "VerifierAttackMatrixTests",
               "VerifierDocumentedAttackMatrixTests",
@@ -415,6 +416,14 @@ jobs:
               "RpcEnvelopeValidationTests",
               "EnvelopeRoundTripTests",
               "ClientTransportConnectionLifecycleTests"
+            )
+          ./eng/scripts/run-required-tests.ps1 `
+            -Project tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj `
+            -Configuration Release `
+            -NoBuild `
+            -RequiredFullyQualifiedNameContains @(
+              "UnsupportedShapeCoverageTests",
+              "FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `
