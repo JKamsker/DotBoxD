@@ -4,22 +4,37 @@ namespace DotBoxD.Kernels.Tests.Hosting.Regression;
 
 public sealed class Fix_API_0027_Tests
 {
+    private static readonly string[] CurrentServerExtensionDocumentation =
+    [
+        "README.md",
+        Path.Combine("docs", "index.md"),
+        Path.Combine("docs", "getting-started", "README.md"),
+        Path.Combine("docs", "concepts", "pushdown.md"),
+        Path.Combine("docs", "Specs", "Addendum", "Examples.md"),
+        Path.Combine("docs", "design", "plugin-fluent-hooks-api", "followups.md"),
+        Path.Combine("docs", "design", "remote-plugin-server-builder", "invoke-async.md"),
+    ];
+
     [Fact]
-    public void Readme_pushdown_sample_uses_current_server_extension_surface()
+    public void Documented_pushdown_samples_use_current_server_extension_surface()
     {
         var readme = ReadRepositoryText("README.md");
         var concepts = ReadRepositoryText(Path.Combine("docs", "concepts", "pushdown.md"));
-        var docs = readme + Environment.NewLine + concepts;
+        var addendum = ReadRepositoryText(Path.Combine("docs", "Specs", "Addendum", "Examples.md"));
+        var docs = string.Join(Environment.NewLine, CurrentServerExtensionDocumentation.Select(ReadRepositoryText));
 
         Assert.Contains("[ServerExtension(\"monster-killer\", typeof(IMonsterKillerService))]", readme, StringComparison.Ordinal);
         Assert.Contains("RegisterServerExtensionAsync<IMonsterKillerService, MonsterKillerKernel>", readme, StringComparison.Ordinal);
         Assert.Contains("ServerExtension<IMonsterKillerService>().KillMonsters(ids)", readme, StringComparison.Ordinal);
         Assert.Contains("[ServerExtension", concepts, StringComparison.Ordinal);
-        Assert.DoesNotContain("KernelRpcService", docs, StringComparison.Ordinal);
-        Assert.DoesNotContain("RegisterRpcServiceAsync", docs, StringComparison.Ordinal);
-        Assert.DoesNotContain("RpcService<IMonsterKillerService>", docs, StringComparison.Ordinal);
-        Assert.DoesNotContain("kernel RPC over the plugin IPC", docs, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("kernel RPC path", docs, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("### 5. Use Server Extensions For Pushdown", addendum, StringComparison.Ordinal);
+
+        foreach (var staleToken in StaleServerExtensionTokens())
+        {
+            Assert.DoesNotContain(staleToken, docs, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("kernel RPC", docs, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -74,6 +89,20 @@ public sealed class Fix_API_0027_Tests
         Assert.True(File.Exists(path), $"Missing repository file: {path}");
         return File.ReadAllText(path);
     }
+
+    private static string[] StaleServerExtensionTokens()
+        =>
+        [
+            "KernelRpcService",
+            "KernelRpcClientMethod",
+            "RegisterKernelRpcService",
+            "RegisterRpcServiceAsync",
+            "RpcService<",
+            "server.KernelRpc",
+            "SetupKernelRpc",
+            "RemoteKernelRpcControl",
+            "KernelRpcRegistrationAccumulator",
+        ];
 
     private static string RepositoryRoot()
     {

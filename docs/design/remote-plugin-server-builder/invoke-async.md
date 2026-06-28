@@ -37,7 +37,7 @@ var monsterName = await server.InvokeAsync(
     });
 ```
 
-The lambda body is lowered to the same verified IR a `[KernelRpcService]` method produces. The explicit bag
+The lambda body is lowered to the same verified IR a `[ServerExtension]` method produces. The explicit bag
 is encoded as one record argument, and assigned bag properties are returned in a response record and written
 back to the same object after the await.
 

@@ -25,7 +25,7 @@ The Kernels and Pushdown stack targets `net10.0`.
 
 The snippets below use the real, compiling API. The maintained runnable example is the GameServer
 sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
-which combines service IPC, event kernels, live settings, host bindings, policies, and kernel RPC.
+which combines service IPC, event kernels, live settings, host bindings, policies, and server extensions.
 Features that used to be split across removed samples are tracked in
 [`docs/examples/coverage-gaps.md`](docs/examples/coverage-gaps.md).
 
