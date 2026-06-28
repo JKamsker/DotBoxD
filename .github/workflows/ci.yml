@@ -401,6 +401,7 @@ jobs:
               "ServerExtensionMapTypeSupportTests",
               "ServerExtensionMapBodyLoweringTests",
               "HookResultBuilderHintNameRegressionTests",
+              "HookResultBuilderKeywordFieldTests",
               "ServerExtensionEnumOverflowRegressionTests",
               "Computed_dto_projection_round_trips",
               "PluginRevocationTests",

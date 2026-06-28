@@ -135,6 +135,7 @@ $defaultMinimums = @{
     ServerExtensionMapTypeSupportTests = 8
     ServerExtensionMapBodyLoweringTests = 3
     HookResultBuilderHintNameRegressionTests = 1
+    HookResultBuilderKeywordFieldTests = 1
     ServerExtensionEnumOverflowRegressionTests = 1
     Computed_dto_projection_round_trips = 1
     PluginRevocationTests = 4
