@@ -110,13 +110,18 @@ internal static partial class GeneratedRemoteHookChainFallback
     {
         foreach (var reference in local.DeclaringSyntaxReferences)
         {
-            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+            switch (reference.GetSyntax(cancellationToken))
+            {
+                case VariableDeclaratorSyntax
                 {
                     Parent: VariableDeclarationSyntax { Type: { } typeSyntax }
-                } &&
-                !typeSyntax.IsVar)
-            {
-                return typeSyntax;
+                } when !typeSyntax.IsVar:
+                    return typeSyntax;
+                case SingleVariableDesignationSyntax
+                {
+                    Parent: DeclarationPatternSyntax { Type: { } typeSyntax }
+                }:
+                    return typeSyntax;
             }
         }
 
