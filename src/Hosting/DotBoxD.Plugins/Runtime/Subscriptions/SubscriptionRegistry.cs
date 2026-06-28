@@ -13,7 +13,7 @@ public sealed class SubscriptionRegistry
 {
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
-    private readonly Dictionary<Type, object[]> _pipelineFanout = [];
+    private readonly Dictionary<Type, CachedPipelineFanout> _pipelineFanout = [];
     private readonly HashSet<Type> _pipelineEventTypes = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
@@ -152,7 +152,7 @@ public sealed class SubscriptionRegistry
 
     public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
-        object[] pipelines;
+        CachedPipelineFanout pipelines;
         lock (_gate)
         {
             pipelines = PipelinesForEventLocked<TEvent>();
@@ -203,12 +203,12 @@ public sealed class SubscriptionRegistry
         ]);
     }
 
-    private object[] PipelinesForEventLocked<TEvent>()
+    private CachedPipelineFanout PipelinesForEventLocked<TEvent>()
     {
         var eventType = typeof(TEvent);
         if (!_pipelineEventTypes.Contains(eventType))
         {
-            return [];
+            return CachedPipelineFanout.Empty;
         }
 
         if (_pipelineFanout.TryGetValue(eventType, out var cached))
@@ -226,7 +226,7 @@ public sealed class SubscriptionRegistry
             }
         }
 
-        var fanout = pipelines is null ? [] : pipelines.ToArray();
+        var fanout = CachedPipelineFanout.From(pipelines);
         _pipelineFanout[eventType] = fanout;
         return fanout;
     }

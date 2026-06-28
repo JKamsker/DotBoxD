@@ -87,11 +87,11 @@ public static partial class KernelRpcMarshaller
             }
 
             var valueType = SandboxTypeOf(mapTypes.Value);
-            var entries = new Dictionary<SandboxValue, SandboxValue>();
+            var entries = new MapValueBuilder(value is ICollection collection ? collection.Count : 0);
             foreach (var entry in MapEntries(enumerable, mapTypes.Key, mapTypes.Value))
             {
                 var key = MarshalChild(entry.Key, mapTypes.Key, "Map key");
-                entries[key] = MarshalChild(entry.Value, mapTypes.Value, "Map value");
+                entries.Set(key, MarshalChild(entry.Value, mapTypes.Value, "Map value"));
             }
 
             return SandboxValue.FromOwnedMap(entries, keyType, valueType);

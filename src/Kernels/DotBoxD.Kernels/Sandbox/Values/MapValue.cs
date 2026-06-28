@@ -20,10 +20,13 @@ public sealed record MapValue(
     /// fully populated, and will not retain or mutate.
     /// </summary>
     internal static MapValue FromOwnedValues(
-        Dictionary<SandboxValue, SandboxValue> values,
+        MapValueBuilder values,
         SandboxType keyType,
         SandboxType valueType)
-        => new(new DictionarySnapshot(values), keyType, valueType);
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return new MapValue(new DictionarySnapshot(values.Consume()), keyType, valueType);
+    }
 
     private static IReadOnlyDictionary<SandboxValue, SandboxValue> Snapshot(IReadOnlyDictionary<SandboxValue, SandboxValue> values)
     {

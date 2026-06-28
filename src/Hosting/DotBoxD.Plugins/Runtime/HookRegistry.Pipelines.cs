@@ -37,12 +37,12 @@ public sealed partial class HookRegistry
         ]);
     }
 
-    private (object? Single, object[]? Multiple) PipelinesForEventLocked<TEvent>()
+    private (object? Single, CachedPipelineFanout Multiple) PipelinesForEventLocked<TEvent>()
     {
         var eventType = typeof(TEvent);
         if (!_pipelineEventTypes.Contains(eventType))
         {
-            return (null, null);
+            return (null, CachedPipelineFanout.Empty);
         }
 
         if (_pipelineFanout.TryGetValue(eventType, out var cached))
@@ -70,9 +70,9 @@ public sealed partial class HookRegistry
             multiple.Add(pipeline);
         }
 
-        (object? Single, object[]? Multiple) fanout = multiple is null
-            ? (single, null)
-            : (null, multiple.ToArray());
+        (object? Single, CachedPipelineFanout Multiple) fanout = multiple is null
+            ? (single, CachedPipelineFanout.Empty)
+            : (null, CachedPipelineFanout.From(multiple));
         _pipelineFanout[eventType] = fanout;
         return fanout;
     }
@@ -85,18 +85,18 @@ public sealed partial class HookRegistry
     }
 
     private static async ValueTask PublishManyAsync<TEvent>(
-        object[] pipelines,
+        CachedPipelineFanout pipelines,
         TEvent e,
         CancellationToken cancellationToken)
     {
-        foreach (var pipeline in pipelines)
+        for (var i = 0; i < pipelines.Count; i++)
         {
-            await ((IHookPipeline<TEvent>)pipeline).PublishAsync(e, cancellationToken).ConfigureAwait(false);
+            await ((IHookPipeline<TEvent>)pipelines[i]).PublishAsync(e, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private static async ValueTask<TResult?> FireManyAsync<TEvent, TResult>(
-        object[] pipelines,
+        CachedPipelineFanout pipelines,
         TEvent e,
         CancellationToken cancellationToken)
         where TResult : struct, IHookResult
@@ -117,7 +117,7 @@ public sealed partial class HookRegistry
     }
 
     private static async ValueTask<TResult?> FireManyAsync<TEvent, TResult>(
-        object[] pipelines,
+        CachedPipelineFanout pipelines,
         TEvent e,
         ResultHookDispatchOptions<TResult> options,
         CancellationToken cancellationToken)
@@ -138,12 +138,13 @@ public sealed partial class HookRegistry
         return null;
     }
 
-    private static Hooks.IResultHookRegistration<TEvent>[] OrderedResultRegistrations<TEvent>(object[] pipelines)
+    private static Hooks.IResultHookRegistration<TEvent>[] OrderedResultRegistrations<TEvent>(
+        CachedPipelineFanout pipelines)
     {
         var registrations = new List<Hooks.IResultHookRegistration<TEvent>>();
-        foreach (var pipeline in pipelines)
+        for (var i = 0; i < pipelines.Count; i++)
         {
-            registrations.AddRange(((IHookPipeline<TEvent>)pipeline).ResultRegistrations());
+            registrations.AddRange(((IHookPipeline<TEvent>)pipelines[i]).ResultRegistrations());
         }
 
         registrations.Sort(static (left, right) => left.Priority != right.Priority

@@ -99,19 +99,17 @@ public sealed class CompiledLiteralCoverageTests
     }
 
     [Fact]
-    public void Owned_map_wraps_runtime_owned_dictionary()
+    public void Owned_map_consumes_runtime_owned_builder()
     {
         var key = SandboxValue.FromString("first");
-        var owned = new Dictionary<SandboxValue, SandboxValue>
-        {
-            [key] = SandboxValue.FromInt32(1)
-        };
+        var builder = new MapValueBuilder(1);
+        builder.Set(key, SandboxValue.FromInt32(1));
 
         var map = Assert.IsType<MapValue>(
-            SandboxValue.FromOwnedMap(owned, SandboxType.String, SandboxType.I32));
+            SandboxValue.FromOwnedMap(builder, SandboxType.String, SandboxType.I32));
 
-        owned[key] = SandboxValue.FromInt32(99);
-        Assert.Equal(SandboxValue.FromInt32(99), map.Values[key]);
+        Assert.Throws<InvalidOperationException>(() => builder.Set(key, SandboxValue.FromInt32(99)));
+        Assert.Equal(SandboxValue.FromInt32(1), map.Values[key]);
     }
 
     [Fact]

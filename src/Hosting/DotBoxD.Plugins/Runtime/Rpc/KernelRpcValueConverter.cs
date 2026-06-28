@@ -94,11 +94,11 @@ public static class KernelRpcValueConverter
             var keyType = expectedType.Arguments[0];
             var valueType = expectedType.Arguments[1];
             var source = value.ItemSpan;
-            var entries = new Dictionary<SandboxValue, SandboxValue>(source.Length / 2);
+            var entries = new MapValueBuilder(source.Length / 2);
             for (var i = 0; i + 1 < source.Length; i += 2)
             {
                 var key = ToSandboxValue(source[i], keyType);
-                entries[key] = ToSandboxValue(source[i + 1], valueType);
+                entries.Set(key, ToSandboxValue(source[i + 1], valueType));
             }
 
             return SandboxValue.FromOwnedMap(entries, keyType, valueType);

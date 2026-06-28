@@ -78,7 +78,7 @@ public abstract record SandboxValue
         => new MapValue(values, keyType, valueType);
 
     internal static SandboxValue FromOwnedMap(
-        Dictionary<SandboxValue, SandboxValue> values,
+        MapValueBuilder values,
         SandboxType keyType,
         SandboxType valueType)
         => MapValue.FromOwnedValues(values, keyType, valueType);

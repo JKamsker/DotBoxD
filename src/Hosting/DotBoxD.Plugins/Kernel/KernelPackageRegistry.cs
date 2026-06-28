@@ -1,4 +1,5 @@
 using System.Reflection;
+using DotBoxD.Plugins.Runtime;
 
 namespace DotBoxD.Plugins.Kernel;
 
@@ -90,7 +91,7 @@ public static class KernelPackageRegistry
         }
 
         var factory = create.CreateDelegate<Func<PluginPackage>>();
-        var package = new Lazy<PluginPackage>(factory);
+        var package = new Lazy<PluginPackage>(() => PluginModelCopy.Package(factory()));
         return () => package.Value;
     }
 }

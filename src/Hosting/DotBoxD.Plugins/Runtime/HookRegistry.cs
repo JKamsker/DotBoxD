@@ -27,7 +27,7 @@ public sealed partial class HookRegistry
 {
     private readonly object _gate = new();
     private readonly Dictionary<PipelineKey, object> _pipelines = [];
-    private readonly Dictionary<Type, (object? Single, object[]? Multiple)> _pipelineFanout = [];
+    private readonly Dictionary<Type, (object? Single, CachedPipelineFanout Multiple)> _pipelineFanout = [];
     private readonly HashSet<Type> _pipelineEventTypes = [];
     private readonly IPluginMessageSink _messages;
     private readonly PluginEventAdapterRegistry _events;
@@ -171,13 +171,13 @@ public sealed partial class HookRegistry
     public ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
         object? single;
-        object[]? multiple;
+        CachedPipelineFanout multiple;
         lock (_gate)
         {
             (single, multiple) = PipelinesForEventLocked<TEvent>();
         }
 
-        if (multiple is not null)
+        if (multiple.Count > 0)
         {
             return PublishManyAsync(multiple, e, cancellationToken);
         }
@@ -201,14 +201,14 @@ public sealed partial class HookRegistry
         where TResult : struct, IHookResult
     {
         object? single;
-        object[]? multiple;
+        CachedPipelineFanout multiple;
         lock (_gate)
         {
             (single, multiple) = PipelinesForEventLocked<TContext>();
         }
 
         ValidateResultType<TContext, TResult>();
-        if (multiple is not null)
+        if (multiple.Count > 0)
         {
             return FireManyAsync<TContext, TResult>(multiple, context, cancellationToken);
         }
@@ -227,14 +227,14 @@ public sealed partial class HookRegistry
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
         object? single;
-        object[]? multiple;
+        CachedPipelineFanout multiple;
         lock (_gate)
         {
             (single, multiple) = PipelinesForEventLocked<TContext>();
         }
 
         ValidateResultType<TContext, TResult>();
-        if (multiple is not null)
+        if (multiple.Count > 0)
         {
             return FireManyAsync(multiple, context, options, cancellationToken);
         }
