@@ -430,7 +430,8 @@ jobs:
               "SubServiceAvailabilityTests",
               "SubServicePropertyInheritanceTests",
               "NullableSubServiceTests",
-              "FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface"
+              "FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface",
+              "ParamsParameters_ArePreservedInGeneratedProxySurface"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `

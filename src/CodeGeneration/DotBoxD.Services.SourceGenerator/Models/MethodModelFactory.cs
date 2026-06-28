@@ -166,6 +166,7 @@ internal static partial class MethodModelFactory
                 param.Type.ToDisplayString(s_qualifiedFormat),
                 MethodSignatureFacts.GetCanonicalType(param.Type, methodSymbol, ct),
                 ParameterRefKindKeyword(param.RefKind),
+                param.IsParams,
                 isCancellationToken,
                 param.HasExplicitDefaultValue,
                 defaultValueLiteral,

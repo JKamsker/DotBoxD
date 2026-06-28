@@ -50,4 +50,42 @@ public partial class CodegenRegressionTests
         factory.Should().Contain("global::System.Single.NegativeInfinity),");
         factory.Should().Contain("global::System.Double.PositiveInfinity),");
     }
+
+    [Fact]
+    public void ParamsParameters_ArePreservedInGeneratedProxySurface()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.ParamsSurface
+            {
+                [DotBoxDService]
+                public interface IParamsSurface
+                {
+                    Task SubmitAsync(params string[] names);
+                    int Sum(params int[] values);
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        var generated = runResult.Results.Single().GeneratedSources;
+        var proxy = generated
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.ParamsSurface", "IParamsSurface", GeneratorTestHelper.GeneratedKind.Proxy))
+            .SourceText.ToString();
+        proxy.Should().Contain("SubmitAsync(params string[] names)");
+        proxy.Should().Contain("Sum(params int[] values)");
+
+        var asyncSibling = generated
+            .Single(g => g.HintName.EndsWith("IParamsSurface.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
+            .SourceText.ToString();
+        asyncSibling.Should().Contain(
+            "SubmitAsync(string[] names, global::System.Threading.CancellationToken ct = default)");
+        asyncSibling.Should().Contain(
+            "SumAsync(int[] values, global::System.Threading.CancellationToken ct = default)");
+    }
 }

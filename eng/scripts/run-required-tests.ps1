@@ -133,6 +133,7 @@ $defaultMinimums = @{
     SubServicePropertyInheritanceTests = 8
     NullableSubServiceTests = 5
     FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface = 1
+    ParamsParameters_ArePreservedInGeneratedProxySurface = 1
     ServerExtensionMapTypeSupportTests = 8
     ServerExtensionMapBodyLoweringTests = 3
     HookResultBuilderHintNameRegressionTests = 1

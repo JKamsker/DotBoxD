@@ -114,6 +114,8 @@ internal sealed record MethodModel(
 /// signature but are not serialized into the RPC payload.
 /// <see cref="RefKindKeyword"/> holds the C# modifier text (<c>""</c>, <c>"ref "</c>,
 /// <c>"in "</c>, or <c>"out "</c>).
+/// <see cref="IsParams"/> preserves a user-authored <c>params</c> modifier for generated public
+/// signatures when the parameter is still the final parameter.
 /// <see cref="DefaultValueLiteral"/> holds the C# literal text of a non-cancellation-token
 /// parameter's explicit default value (e.g. <c>"\"x\""</c>, <c>"5"</c>, <c>"null"</c>), so the
 /// generated proxy and async-sibling signatures preserve it; empty when there is no default or it
@@ -124,6 +126,7 @@ internal sealed record ParameterModel(
     string Type,
     string SignatureType,
     string RefKindKeyword = "",
+    bool IsParams = false,
     bool IsCancellationToken = false,
     bool HasDefaultValue = false,
     string DefaultValueLiteral = "",
