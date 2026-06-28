@@ -41,13 +41,13 @@ public class ServerExtensionProxy : DispatchProxy
         }
 
         var method = MethodCache.GetOrAdd(targetMethod, static target => new ServerExtensionMethod(target));
-        var arguments = new SandboxValue[method.ParameterTypes.Length];
-        for (var i = 0; i < method.ParameterTypes.Length; i++)
+        var arguments = new SandboxValue[method.PayloadParameterTypes.Length];
+        for (var i = 0; i < method.PayloadParameterTypes.Length; i++)
         {
-            arguments[i] = KernelRpcMarshaller.ToSandboxValue(args?[i], method.ParameterTypes[i]);
+            arguments[i] = KernelRpcMarshaller.ToSandboxValue(args?[i], method.PayloadParameterTypes[i]);
         }
 
-        return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments));
+        return method.Materialize(_kernel.InvokeServerExtensionAsync(arguments, method.CancellationToken(args)));
     }
 
     private static Func<ValueTask<SandboxValue>, object?> CreateMaterializer(Type returnType)
@@ -110,6 +110,12 @@ public class ServerExtensionProxy : DispatchProxy
         }
 
         var methods = ContractMethods(serviceType).ToArray();
+        if (methods.Any(static method => method.IsSpecialName))
+        {
+            throw new NotSupportedException(
+                "Server extension proxy service type must declare exactly one ordinary method.");
+        }
+
         if (methods.Length != 1)
         {
             throw new NotSupportedException(
@@ -118,16 +124,42 @@ public class ServerExtensionProxy : DispatchProxy
 
         foreach (var method in methods)
         {
-            foreach (var parameter in method.GetParameters())
+            var parameters = method.GetParameters();
+            for (var i = 0; i < parameters.Length; i++)
             {
-                KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(parameter.ParameterType);
+                var parameterType = parameters[i].ParameterType;
+                if (IsCancellationToken(parameterType))
+                {
+                    if (i != parameters.Length - 1)
+                    {
+                        throw new NotSupportedException(
+                            "Server extension proxy cancellation tokens must be the final method parameter.");
+                    }
+
+                    continue;
+                }
+
+                ValidatePayloadType(parameterType);
             }
 
             if (UnwrapReturnType(method.ReturnType) is { } payloadType)
             {
-                KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(payloadType);
+                ValidatePayloadType(payloadType);
             }
         }
+    }
+
+    private static void ValidatePayloadType(Type type)
+    {
+        if (IsTaskLike(type))
+        {
+            throw new NotSupportedException(
+                $"Server extension proxy task-like payload type '{type}' is not supported; " +
+                "Task and ValueTask are only supported as top-level return types.");
+        }
+
+        KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(type);
+        _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 
     private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)
@@ -170,6 +202,25 @@ public class ServerExtensionProxy : DispatchProxy
         return type;
     }
 
+    private static bool IsCancellationToken(Type type)
+        => type == typeof(CancellationToken);
+
+    private static bool IsTaskLike(Type type)
+    {
+        if (type == typeof(Task) || type == typeof(ValueTask))
+        {
+            return true;
+        }
+
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(Task<>) || definition == typeof(ValueTask<>);
+    }
+
     private static object BoxTaskAsync<T>(ValueTask<SandboxValue> pending)
         => InvokeTaskAsync<T>(pending);
 
@@ -193,17 +244,43 @@ public class ServerExtensionProxy : DispatchProxy
 
     private sealed class ServerExtensionMethod
     {
+        private readonly int _cancellationTokenIndex;
         private readonly Func<ValueTask<SandboxValue>, object?> _materializer;
 
         public ServerExtensionMethod(MethodInfo method)
         {
-            ParameterTypes = method.GetParameters()
-                .Select(static parameter => parameter.ParameterType)
-                .ToArray();
+            var parameters = method.GetParameters();
+            _cancellationTokenIndex = parameters.Length > 0 &&
+                IsCancellationToken(parameters[^1].ParameterType)
+                    ? parameters.Length - 1
+                    : -1;
+
+            var payloadParameterCount = _cancellationTokenIndex >= 0
+                ? _cancellationTokenIndex
+                : parameters.Length;
+            PayloadParameterTypes = new Type[payloadParameterCount];
+            for (var i = 0; i < payloadParameterCount; i++)
+            {
+                PayloadParameterTypes[i] = parameters[i].ParameterType;
+            }
+
             _materializer = CreateMaterializer(method.ReturnType);
         }
 
-        public Type[] ParameterTypes { get; }
+        public Type[] PayloadParameterTypes { get; }
+
+        public CancellationToken CancellationToken(object?[]? args)
+        {
+            if (_cancellationTokenIndex < 0 ||
+                args is null ||
+                args.Length <= _cancellationTokenIndex ||
+                args[_cancellationTokenIndex] is not CancellationToken cancellationToken)
+            {
+                return default;
+            }
+
+            return cancellationToken;
+        }
 
         public object? Materialize(ValueTask<SandboxValue> pending)
             => _materializer(pending);

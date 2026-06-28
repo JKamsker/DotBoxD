@@ -1,18 +1,27 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static class HookChainAliasResolver
 {
-    public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
+    public static ExpressionSyntax UnwrapTransparentExpression(ExpressionSyntax expression)
     {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        while (true)
         {
-            expression = parenthesized.Expression;
+            switch (expression)
+            {
+                case ParenthesizedExpressionSyntax parenthesized:
+                    expression = parenthesized.Expression;
+                    continue;
+                case PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                    expression = postfix.Operand;
+                    continue;
+                default:
+                    return expression;
+            }
         }
-
-        return expression;
     }
 
     public static ExpressionSyntax? Initializer(
@@ -20,7 +29,7 @@ internal static class HookChainAliasResolver
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapParentheses(expression);
+        expression = UnwrapTransparentExpression(expression);
 
         if (expression is not IdentifierNameSyntax identifier ||
             model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
@@ -34,7 +43,7 @@ internal static class HookChainAliasResolver
                 {
                     Initializer.Value: { } initializer
                 } declarator &&
-                !IsAssignedAfterDeclaration(local, declarator, model, cancellationToken))
+                !IsAssignedBetweenDeclarationAndUse(local, declarator, expression.SpanStart, model, cancellationToken))
             {
                 return initializer;
             }
@@ -43,9 +52,10 @@ internal static class HookChainAliasResolver
         return null;
     }
 
-    private static bool IsAssignedAfterDeclaration(
+    private static bool IsAssignedBetweenDeclarationAndUse(
         ILocalSymbol local,
         VariableDeclaratorSyntax declarator,
+        int useStart,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
@@ -54,6 +64,7 @@ internal static class HookChainAliasResolver
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (assignment.SpanStart <= declarator.SpanStart ||
+                assignment.SpanStart >= useStart ||
                 model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol assigned ||
                 !SymbolEqualityComparer.Default.Equals(local, assigned))
             {

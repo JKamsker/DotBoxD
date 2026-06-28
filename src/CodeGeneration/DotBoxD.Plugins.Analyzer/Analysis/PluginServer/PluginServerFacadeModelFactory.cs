@@ -33,6 +33,8 @@ internal static partial class PluginServerFacadeModelFactory
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        ValidateServerTargetShape(type, cancellationToken);
+
         var worldType = ResolveWorldType(type)
             ?? throw new NotSupportedException(
                 $"Generated plugin server '{type.Name}' must directly implement one [DotBoxDService] world interface.");
@@ -55,9 +57,9 @@ internal static partial class PluginServerFacadeModelFactory
             worldType,
             worldServiceWrappers,
             cancellationToken);
-        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls);
-        var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
+        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls, eventCallback is not null);
+        var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var context = ResolveContext(type, compilation, cancellationToken);
         return new PluginServerFacadeModel(
             ns,
@@ -102,8 +104,19 @@ internal static partial class PluginServerFacadeModelFactory
         foreach (var member in MembersIncludingInherited(controlType))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method &&
-                !IsControlPlaneMember(method.ContainingType))
+            if (member.ContainingType is not null &&
+                IsControlPlaneMember(member.ContainingType))
+            {
+                continue;
+            }
+
+            if (member is IEventSymbol eventSymbol)
+            {
+                throw new NotSupportedException(
+                    $"Generated plugin server member '{eventSymbol.ToDisplayString()}' is an event; events are not supported on generated plugin server facades.");
+            }
+
+            if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
             {
                 ValidateForwardedMethod(method);
                 var (returnWrapperName, returnWrapperKind) = ResolveReturnWrapper(
@@ -152,6 +165,12 @@ internal static partial class PluginServerFacadeModelFactory
         {
             throw new NotSupportedException(
                 $"Generated plugin server member '{method.ToDisplayString()}' must not be generic.");
+        }
+
+        if (method.RefKind != RefKind.None)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' must not declare ref returns.");
         }
 
         foreach (var parameter in method.Parameters)

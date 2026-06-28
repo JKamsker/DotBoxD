@@ -29,6 +29,11 @@ public static partial class KernelRpcMarshaller
             return scalar;
         }
 
+        if (TryDateTimeToSandboxValue(value, type, out var dateTime))
+        {
+            return dateTime;
+        }
+
         if (type.IsEnum)
         {
             return EnumUsesI64(type)
@@ -139,15 +144,23 @@ public static partial class KernelRpcMarshaller
             return scalar;
         }
 
+        if (TryDateTimeFromSandboxValue(value, type, out var dateTime))
+        {
+            return dateTime;
+        }
+
         if (type.IsEnum)
         {
-            return value switch
+            if (EnumUsesI64(type))
             {
-                I32Value i => Enum.ToObject(type, i.Value),
-                I64Value l => Enum.ToObject(type, l.Value),
-                _ => throw new NotSupportedException(
-                    $"Server extension cannot marshal a sandbox value to enum '{type}'.")
-            };
+                return value is I64Value longValue
+                    ? EnumFromInt64(type, longValue.Value)
+                    : throw CannotMarshalEnum(value, type, SandboxType.I64);
+            }
+
+            return value is I32Value intValue
+                ? EnumFromInt32(type, intValue.Value)
+                : throw CannotMarshalEnum(value, type, SandboxType.I32);
         }
 
         if (value is RecordValue record && DtoShape(type) is { } shape)
@@ -193,6 +206,12 @@ public static partial class KernelRpcMarshaller
         throw new NotSupportedException($"Server extension cannot marshal a sandbox value to type '{type}'.");
     }
 
+    private static NotSupportedException CannotMarshalEnum(
+        SandboxValue value,
+        Type type,
+        SandboxType expected)
+        => new($"Server extension cannot marshal sandbox value '{value.Type}' to enum '{type}'; expected '{expected}'.");
+
     public static SandboxType SandboxTypeOf(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -227,9 +246,14 @@ public static partial class KernelRpcMarshaller
             return SandboxType.String;
         if (type == typeof(Guid))
             return SandboxType.Guid;
+        if (type == typeof(TimeSpan))
+            return SandboxType.I64;
+        if (IsDateTimeWireType(type))
+            return DateTimeWireSandboxType();
         if (type.IsEnum)
             return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
+        ThrowIfUnsupportedFrameworkStruct(type);
         if (depth >= MaxTypeNestingDepth)
         {
             throw new NotSupportedException(

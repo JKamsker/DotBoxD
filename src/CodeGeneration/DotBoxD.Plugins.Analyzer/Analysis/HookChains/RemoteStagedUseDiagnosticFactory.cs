@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -69,14 +70,27 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (invocation.Parent is AssignmentExpressionSyntax assignment &&
-            assignment.Right == invocation &&
+        var transparentExpression = UnwrapTransparentParent(invocation);
+        ExpressionSyntax discardedExpression = transparentExpression;
+        if (transparentExpression.Parent is AssignmentExpressionSyntax assignment &&
+            assignment.Right == transparentExpression &&
             assignment.Parent is ExpressionStatementSyntax)
         {
-            return CreateAssignedStageDiagnostic(access, model, cancellationToken);
+            var assignsLocal = model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is ILocalSymbol;
+            if (CreateAssignedStageDiagnostic(invocation, assignment, access, model, cancellationToken) is { } assigned)
+            {
+                return assigned;
+            }
+
+            if (assignsLocal)
+            {
+                return null;
+            }
+
+            discardedExpression = assignment;
         }
 
-        if (invocation.Parent is EqualsValueClauseSyntax
+        if (transparentExpression.Parent is EqualsValueClauseSyntax
             {
                 Parent: VariableDeclaratorSyntax declarator
             } &&
@@ -85,7 +99,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return CreateStagedLocalDiagnostic(invocation, access, model, local, cancellationToken);
         }
 
-        if (invocation.Parent is not ExpressionStatementSyntax)
+        if (discardedExpression.Parent is not ExpressionStatementSyntax)
         {
             return null;
         }
@@ -123,6 +137,8 @@ internal static partial class RemoteStagedUseDiagnosticFactory
     }
 
     private static PluginKernelDiagnostic? CreateAssignedStageDiagnostic(
+        InvocationExpressionSyntax invocation,
+        AssignmentExpressionSyntax assignment,
         MemberAccessExpressionSyntax access,
         SemanticModel model,
         CancellationToken cancellationToken)
@@ -130,6 +146,12 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         var receiverType = model.GetTypeInfo(access.Expression, cancellationToken).Type;
         if (!IsRemoteChainOrStageType(receiverType) &&
             !IsGeneratedRemoteChain(access.Expression, model, cancellationToken))
+        {
+            return null;
+        }
+
+        if (model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol local ||
+            !LocalFlowsIntoTerminalOrUse(invocation, local, model, cancellationToken))
         {
             return null;
         }
@@ -151,7 +173,9 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        foreach (var terminal in block.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        foreach (var terminal in block.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (terminal == invocation ||
@@ -169,10 +193,49 @@ internal static partial class RemoteStagedUseDiagnosticFactory
                 continue;
             }
 
+            if (IsAssignedBetween(local, invocation.SpanStart, terminal.SpanStart, model, cancellationToken))
+            {
+                continue;
+            }
+
             if (ExpressionReferencesLocal(access.Expression, local, model, cancellationToken, depth: 0))
             {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private static bool IsAssignedBetween(
+        ILocalSymbol local,
+        int start,
+        int end,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var block = local.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken).FirstAncestorOrSelf<BlockSyntax>())
+            .FirstOrDefault(candidate => candidate is not null);
+        if (block is null)
+        {
+            return false;
+        }
+
+        foreach (var assignment in block.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<AssignmentExpressionSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (assignment.SpanStart <= start ||
+                assignment.SpanStart >= end ||
+                model.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not ILocalSymbol assigned ||
+                !SymbolEqualityComparer.Default.Equals(local, assigned))
+            {
+                continue;
+            }
+
+            return true;
         }
 
         return false;
@@ -190,7 +253,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
             return false;
         }
 
-        expression = HookChainAliasResolver.UnwrapParentheses(expression);
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
         if (expression is IdentifierNameSyntax identifier &&
             SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, local))
         {
@@ -217,7 +280,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
 
     private static bool ContainsStageInvocation(ExpressionSyntax expression)
     {
-        expression = HookChainAliasResolver.UnwrapParentheses(expression);
+        expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
 
         if (expression is InvocationExpressionSyntax
             {
@@ -232,5 +295,4 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         return expression is MemberAccessExpressionSyntax access &&
             ContainsStageInvocation(access.Expression);
     }
-
 }

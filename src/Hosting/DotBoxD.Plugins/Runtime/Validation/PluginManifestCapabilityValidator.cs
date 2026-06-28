@@ -1,9 +1,6 @@
 using DotBoxD.Kernels.Model;
-using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Runtime.Validation;
-
-using DotBoxD.Kernels;
 
 internal static class PluginManifestCapabilityValidator
 {
@@ -15,23 +12,22 @@ internal static class PluginManifestCapabilityValidator
     {
         var declared = new HashSet<string>(manifest.RequiredCapabilities, StringComparer.Ordinal);
         var expected = RequiredCapabilities(plan, entrypoints);
-        var comparableDeclared = declared
-            .Where(capability => expected.Contains(capability) || IsKnownSandboxCapability(capability, plan))
-            .ToHashSet(StringComparer.Ordinal);
+        var missing = expected
+            .Except(declared, StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var extra = declared
+            .Except(expected, StringComparer.Ordinal)
+            .Where(static capability => !IsKnownNonBindingCapability(capability))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         if (declared.Count == manifest.RequiredCapabilities.Count &&
-            comparableDeclared.SetEquals(expected))
+            missing.Length == 0 &&
+            extra.Length == 0)
         {
             return;
         }
 
-        var missing = expected
-            .Except(comparableDeclared, StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        var extra = comparableDeclared
-            .Except(expected, StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
         var details = new List<string>();
         if (missing.Length > 0)
         {
@@ -58,55 +54,40 @@ internal static class PluginManifestCapabilityValidator
             message));
     }
 
+    public static IEnumerable<string> NonBindingRequiredCapabilities(PluginManifest manifest)
+        => manifest.RequiredCapabilities.Where(IsKnownNonBindingCapability);
+
+    public static void ValidateRequiredCapabilityGrants(
+        PluginManifest manifest,
+        SandboxPolicy installPolicy,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        var now = installPolicy.GrantClock;
+        foreach (var capability in manifest.RequiredCapabilities.Distinct(StringComparer.Ordinal))
+        {
+            if (string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
+                installPolicy.GrantsCapability(capability, now))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new SandboxDiagnostic(
+                "E-POLICY-CAP",
+                $"required capability '{capability}' is not granted"));
+        }
+    }
+
     private static HashSet<string> RequiredCapabilities(ExecutionPlan plan, IReadOnlyList<string> entrypoints)
     {
         var required = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entrypoint in entrypoints)
         {
-            if (!plan.BindingReferences.TryGetValue(entrypoint, out var references))
-            {
-                continue;
-            }
-
-            foreach (var bindingId in references)
-            {
-                if (!plan.Bindings.TryGet(bindingId, out var binding))
-                {
-                    continue;
-                }
-
-                if (binding.RequiredCapability is not null)
-                {
-                    required.Add(binding.RequiredCapability);
-                }
-
-                if (binding.IsAsync || (binding.Effects & SandboxEffect.Concurrency) != 0)
-                {
-                    required.Add(RuntimeCapabilityIds.Async);
-                }
-            }
+            required.UnionWith(plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities);
         }
 
         return required;
     }
 
-    private static bool IsKnownSandboxCapability(string capability, ExecutionPlan plan)
-    {
-        if (capability is "file.read" or "file.write" or "time.now" or "random" or "log.write" ||
-            string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
-            string.Equals(capability, RuntimeCapabilityIds.Reentrant, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        foreach (var binding in plan.Bindings.Signatures)
-        {
-            if (string.Equals(binding.RequiredCapability, capability, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    private static bool IsKnownNonBindingCapability(string capability)
+        => capability.StartsWith("event.read.", StringComparison.Ordinal);
 }

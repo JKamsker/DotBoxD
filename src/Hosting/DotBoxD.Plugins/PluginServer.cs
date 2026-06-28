@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Policies;
 using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Runtime;
 using DotBoxD.Plugins.Runtime.Rpc;
+using DotBoxD.Plugins.Runtime.Validation;
 
 namespace DotBoxD.Plugins;
 
@@ -95,7 +96,10 @@ public sealed partial class PluginServer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(package);
         ThrowIfDisposed();
-        return _host.GetRequiredCapabilities(package.Module);
+        var required = _host.GetRequiredCapabilities(package.Module)
+            .ToHashSet(StringComparer.Ordinal);
+        required.UnionWith(PluginManifestCapabilityValidator.NonBindingRequiredCapabilities(package.Manifest));
+        return required.Order(StringComparer.Ordinal).ToArray();
     }
 
     public LiveValue<T> BindValue<T>(string name, T initialValue)

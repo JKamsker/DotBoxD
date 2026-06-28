@@ -17,11 +17,16 @@ public static partial class KernelRpcMarshaller
             return scalar;
         }
 
+        if (TryDateTimeFromKernelRpcValue(value, type, out var dateTime))
+        {
+            return dateTime;
+        }
+
         if (type.IsEnum)
         {
-            return Enum.ToObject(
-                type,
-                EnumUsesI64(type) ? value.Int64Value : value.Int32Value);
+            return EnumUsesI64(type)
+                ? EnumFromInt64(type, value.Int64Value)
+                : EnumFromInt32(type, value.Int32Value);
         }
 
         if (value.Kind == KernelRpcValueKind.Record && DtoShape(type) is { } shape)
@@ -59,10 +64,11 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(bool) => value.BoolValue,
             var t when t == typeof(int) => value.Int32Value,
             var t when t == typeof(long) => value.Int64Value,
-            var t when t == typeof(float) => (float)value.DoubleValue,
+            var t when t == typeof(float) => DoubleToSingle(value.DoubleValue),
             var t when t == typeof(double) => value.DoubleValue,
             var t when t == typeof(string) => value.TextValue,
             var t when t == typeof(Guid) => value.GuidValue,
+            var t when t == typeof(TimeSpan) => new TimeSpan(value.Int64Value),
             _ => null
         };
         return result is not null;
@@ -102,7 +108,12 @@ public static partial class KernelRpcMarshaller
         {
             var key = FromKernelRpcValue(values[i], keyType)
                 ?? throw new NotSupportedException("Server extension cannot marshal a null map key.");
-            result[key] = FromKernelRpcValue(values[i + 1], valueType);
+            if (result.Contains(key))
+            {
+                throw new FormatException("Server extension map payload contains a duplicate key.");
+            }
+
+            result.Add(key, FromKernelRpcValue(values[i + 1], valueType));
         }
 
         return result;

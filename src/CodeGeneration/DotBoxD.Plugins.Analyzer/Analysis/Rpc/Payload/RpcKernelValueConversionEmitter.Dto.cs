@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 
 /// <summary>
 /// DTO marshalling for <see cref="RpcKernelValueConversionEmitter"/>: a DTO is written as a positional
-/// <c>Record</c> of its public instance properties (declaration order) and read back through a constructor
+/// <c>Record</c> of its public readable properties and fields, then read back through a constructor
 /// whose parameters match those fields by name and type. All field expressions are computed before the
 /// owning helper method is appended, so nested list/DTO helpers never interleave with the body being built.
 /// </summary>
@@ -26,6 +26,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.Append("    private static global::DotBoxD.Plugins.KernelRpcValue ").Append(method)
             .Append('(').Append(TypeName(type)).AppendLine(" value)");
         _helpers.AppendLine("    {");
+        _helpers.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(value);");
         _helpers.AppendLine("        return global::DotBoxD.Plugins.KernelRpcValue.Record(new global::DotBoxD.Plugins.KernelRpcValue[]");
         _helpers.AppendLine("        {");
         foreach (var fieldExpression in fieldExpressions)
@@ -50,6 +51,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
         var method = NextHelperName("Read");
         _readers[key] = method;
         var fields = DotBoxDRpcTypeMapper.RecordFields(type);
+        var fieldReads = new string[fields.Count];
+        for (var i = 0; i < fields.Count; i++)
+        {
+            fieldReads[i] = ReadExpression(fields[i].Type, "value.GetItem(" + i + ")");
+        }
 
         // Compute the field expressions (which append nested list/DTO helpers) BEFORE writing this method's
         // body, so a nested helper is never spliced into the middle of the reconstruction statement.
@@ -63,6 +69,13 @@ internal sealed partial class RpcKernelValueConversionEmitter
         _helpers.AppendLine("        {");
         _helpers.AppendLine("            throw new global::System.NotSupportedException(\"Server extension record field count did not match the generated DTO shape.\");");
         _helpers.AppendLine("        }");
+        _helpers.AppendLine();
+        for (var i = 0; i < fields.Count; i++)
+        {
+            _helpers.Append("        var ").Append(FieldLocal(i)).Append(" = ")
+                .Append(fieldReads[i]).AppendLine(";");
+        }
+
         _helpers.AppendLine();
         _helpers.AppendLine(body);
         _helpers.AppendLine("    }");
@@ -94,13 +107,13 @@ internal sealed partial class RpcKernelValueConversionEmitter
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
-            return BuildDtoInitializer("        return " + construction, fields, constructor.Assigned, constructor.Symbol);
+            return BuildDtoInitializer(construction, fields, constructor.Assigned, constructor.Symbol);
         }
 
         if (DotBoxDRpcTypeMapper.CanReconstructWithObjectInitializer(type, fields, _compilation))
         {
             return BuildDtoInitializer(
-                "        return new " + TypeName(type),
+                "new " + TypeName(type),
                 fields,
                 assigned: new bool[fields.Count],
                 constructor: null);
@@ -130,22 +143,28 @@ internal sealed partial class RpcKernelValueConversionEmitter
         IMethodSymbol? constructor)
     {
         var initializer = new StringBuilder();
-        initializer.Append(construction).AppendLine();
-        initializer.AppendLine("        {");
-        for (var i = 0; i < fields.Count; i++)
+        var initialized = InitializerFieldIndexes(fields, assigned, constructor);
+        initializer.Append("        var __result = ").Append(construction);
+        if (initialized.Count == 0)
         {
-            if (assigned is not null &&
-                ((assigned[i] && !MustInitializeRequiredMember(fields[i], constructor)) ||
-                 (!assigned[i] && !DotBoxDRpcTypeMapper.IsObjectInitializerWritable(fields[i], _compilation))))
+            initializer.AppendLine(";");
+        }
+        else
+        {
+            initializer.AppendLine();
+            initializer.AppendLine("        {");
+            foreach (var i in initialized)
             {
-                continue;
+                initializer.Append("            ").Append(Identifier(fields[i].Name)).Append(" = ")
+                    .Append(FieldLocal(i)).AppendLine(",");
             }
 
-            initializer.Append("            ").Append(Identifier(fields[i].Name)).Append(" = ")
-                .Append(ReadExpression(fields[i].Type, "value.GetItem(" + i + ")")).AppendLine(",");
+            initializer.AppendLine("        };");
         }
 
-        initializer.Append("        };");
+        AppendReadOnlyFieldVerifications(initializer, fields, assigned);
+        initializer.AppendLine();
+        initializer.Append("        return __result;");
         return initializer.ToString();
     }
 
@@ -157,7 +176,18 @@ internal sealed partial class RpcKernelValueConversionEmitter
         foreach (var parameter in constructor.Parameters)
         {
             var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-            arguments.Add(ReadExpression(fields[fieldIndex].Type, "value.GetItem(" + fieldIndex + ")"));
+            if (fieldIndex >= 0)
+            {
+                arguments.Add(Identifier(parameter.Name) + ": " + FieldLocal(fieldIndex));
+                continue;
+            }
+
+            if (!parameter.HasExplicitDefaultValue)
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+            }
         }
 
         return arguments;
@@ -169,7 +199,6 @@ internal sealed partial class RpcKernelValueConversionEmitter
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
-                constructor.Parameters.Length > fields.Count ||
                 constructor.Parameters.Length == 0)
             {
                 continue;
@@ -180,7 +209,18 @@ internal sealed partial class RpcKernelValueConversionEmitter
             foreach (var parameter in constructor.Parameters)
             {
                 var fieldIndex = RpcDtoFieldMatcher.FieldIndex(fields, parameter);
-                if (fieldIndex < 0 || assigned[fieldIndex])
+                if (fieldIndex < 0)
+                {
+                    if (parameter.HasExplicitDefaultValue)
+                    {
+                        continue;
+                    }
+
+                    matched = false;
+                    break;
+                }
+
+                if (assigned[fieldIndex])
                 {
                     matched = false;
                     break;
@@ -191,6 +231,10 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
             if (matched)
             {
+                RpcDtoFieldMatcher.ValidateNoRefLikeParameters(
+                    constructor,
+                    $"Server extension DTO '{type.ToDisplayString()}'");
+
                 var assignedCount = AssignedCount(assigned);
                 var resolved = new ResolvedDtoConstructor(constructor, assigned, assignedCount);
                 if (assignedCount == fields.Count)

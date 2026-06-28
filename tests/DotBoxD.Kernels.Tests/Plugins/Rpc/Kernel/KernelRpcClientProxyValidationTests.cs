@@ -260,4 +260,5 @@ public sealed class ServerExtensionClientProxyValidationTests
             d => d.Id == "DBXK100" &&
                  d.GetMessage().Contains("cannot use ref, in, or out", StringComparison.Ordinal));
     }
+
 }

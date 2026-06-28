@@ -44,34 +44,51 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         var count = reader.ReadMapHeader();
         var request = new RpcRequest();
+        var seenMessageId = false;
         var seenServiceName = false;
         var seenMethodName = false;
+        var seenInstanceId = false;
+        var seenStreams = false;
 
         for (var i = 0; i < count; i++)
         {
             switch (ReadField(ref reader))
             {
                 case RpcRequestField.MessageId:
+                    ThrowIfDuplicate(seenMessageId, nameof(RpcRequest.MessageId));
+                    seenMessageId = true;
                     request.MessageId = reader.ReadInt32();
                     break;
                 case RpcRequestField.ServiceName:
+                    ThrowIfDuplicate(seenServiceName, nameof(RpcRequest.ServiceName));
                     seenServiceName = true;
                     request.ServiceName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.MethodName:
+                    ThrowIfDuplicate(seenMethodName, nameof(RpcRequest.MethodName));
                     seenMethodName = true;
                     request.MethodName = ReadCachedName(ref reader)!;
                     break;
                 case RpcRequestField.InstanceId:
+                    ThrowIfDuplicate(seenInstanceId, nameof(RpcRequest.InstanceId));
+                    seenInstanceId = true;
                     request.InstanceId = reader.ReadString();
                     break;
                 case RpcRequestField.Streams:
+                    ThrowIfDuplicate(seenStreams, nameof(RpcRequest.Streams));
+                    seenStreams = true;
                     request.Streams = GetStreamsFormatter(options).Deserialize(ref reader, options);
                     break;
                 default:
                     reader.Skip();
                     break;
             }
+        }
+
+        if (!seenMessageId)
+        {
+            throw new MessagePackSerializationException(
+                "RPC request is missing required MessageId.");
         }
 
         if (!seenServiceName || request.ServiceName is null)
@@ -94,7 +111,16 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         return options.Resolver.GetFormatter<RpcStreamHandle[]>()
             ?? throw new MessagePackSerializationException(
-                "No MessagePack formatter is registered for RPC stream handles.");
+            "No MessagePack formatter is registered for RPC stream handles.");
+    }
+
+    private static void ThrowIfDuplicate(bool alreadySeen, string fieldName)
+    {
+        if (alreadySeen)
+        {
+            throw new MessagePackSerializationException(
+                $"RPC request contains duplicate {fieldName}.");
+        }
     }
 
     private static void WriteNullableString(ref MessagePackWriter writer, string? value)

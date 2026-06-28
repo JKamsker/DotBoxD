@@ -89,7 +89,15 @@ public class SubscriptionStage<TEvent, TCurrent, TContext>
     }
 
     public SubscriptionPipeline<TEvent, TContext> UseGeneratedChain(PluginPackage package)
-        => _root.UseGeneratedChain(package);
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        var project = _project;
+        return _root.UseGeneratedChain(package, async (e, ctx) =>
+        {
+            var (ok, _) = await project(e, ctx).ConfigureAwait(false);
+            return ok;
+        });
+    }
 
     public SubscriptionPipeline<TEvent, TContext> Run(Func<TCurrent, TContext, ValueTask> handler)
         => throw HookLowering.NotLowered();

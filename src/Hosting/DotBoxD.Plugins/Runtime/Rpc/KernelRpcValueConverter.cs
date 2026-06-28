@@ -94,14 +94,18 @@ public static class KernelRpcValueConverter
             var keyType = expectedType.Arguments[0];
             var valueType = expectedType.Arguments[1];
             var source = value.ItemSpan;
-            var entries = new MapValueBuilder(source.Length / 2);
+            var entries = new Dictionary<SandboxValue, SandboxValue>(source.Length / 2);
             for (var i = 0; i + 1 < source.Length; i += 2)
             {
                 var key = ToSandboxValue(source[i], keyType);
-                entries.Set(key, ToSandboxValue(source[i + 1], valueType));
+                var item = ToSandboxValue(source[i + 1], valueType);
+                if (!entries.TryAdd(key, item))
+                {
+                    throw new FormatException("Server extension IPC map payload contains a duplicate key.");
+                }
             }
 
-            return SandboxValue.FromOwnedMap(entries, keyType, valueType);
+            return SandboxValue.FromMap(entries, keyType, valueType);
         }
 
         if (expectedType.IsRecord)

@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis;
 /// Generated <c>RunLocal</c> handlers use this to avoid materializing a full <c>KernelRpcValue</c> tree before
 /// invoking the native delegate.
 /// </summary>
-internal sealed class RpcKernelPayloadReadEmitter
+internal sealed partial class RpcKernelPayloadReadEmitter
 {
     private readonly StringBuilder _helpers = new();
     private readonly Dictionary<string, string> _readers = new(StringComparer.Ordinal);
@@ -30,7 +30,7 @@ internal sealed class RpcKernelPayloadReadEmitter
             SpecialType.System_Int32 => $"{reader}.ReadInt32()",
             SpecialType.System_Int64 => $"{reader}.ReadInt64()",
             SpecialType.System_Double => $"{reader}.ReadDouble()",
-            SpecialType.System_Single => $"(float){reader}.ReadDouble()",
+            SpecialType.System_Single => $"{EnsureSingleReader()}(ref {reader})",
             SpecialType.System_String => $"{reader}.ReadString()",
             _ => ReadComplexExpression(type, reader)
         };
@@ -42,10 +42,19 @@ internal sealed class RpcKernelPayloadReadEmitter
             return $"{reader}.ReadGuid()";
         }
 
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return $"{EnsureDateTimePayloadReader(type)}(ref {reader})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+        {
+            return $"new global::System.TimeSpan({reader}.ReadInt64())";
+        }
+
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
         {
-            var read = DotBoxDRpcTypeMapper.EnumUsesI64(enumType) ? "ReadInt64()" : "ReadInt32()";
-            return $"unchecked(({TypeName(type)}){reader}.{read})";
+            return $"{EnsureEnumReader(enumType)}(ref {reader})";
         }
 
         if (DotBoxDRpcTypeMapper.ListElementType(type) is not null)
@@ -133,11 +142,19 @@ internal sealed class RpcKernelPayloadReadEmitter
             .AppendLine("(ref global::DotBoxD.Plugins.KernelRpcPayloadReader reader)");
         _helpers.AppendLine("    {");
         _helpers.AppendLine("        var __count = reader.ReadMapHeader();");
+        _helpers.AppendLine("        if ((__count & 1) != 0)");
+        _helpers.AppendLine("        {");
+        _helpers.AppendLine("            throw new global::System.FormatException(\"Server extension map payload must contain key/value pairs.\");");
+        _helpers.AppendLine("        }");
         _helpers.Append("        var __result = new ").Append(dictionaryType).AppendLine("(__count / 2);");
         _helpers.AppendLine("        for (var i = 0; i < __count; i += 2)");
         _helpers.AppendLine("        {");
-        _helpers.Append("            __result[").Append(keyExpression).Append("] = ").Append(valueExpression)
-            .AppendLine(";");
+        _helpers.Append("            var __key = ").Append(keyExpression).AppendLine(";");
+        _helpers.AppendLine("            if (__result.ContainsKey(__key))");
+        _helpers.AppendLine("            {");
+        _helpers.AppendLine("                throw new global::System.FormatException(\"Server extension map payload contains a duplicate key.\");");
+        _helpers.AppendLine("            }");
+        _helpers.Append("            __result.Add(__key, ").Append(valueExpression).AppendLine(");");
         _helpers.AppendLine("        }");
         _helpers.AppendLine();
         _helpers.AppendLine("        return __result;");

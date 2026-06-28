@@ -218,6 +218,24 @@ public sealed class SubscriptionRuntimeTests
         Assert.Single(messages.Messages);
     }
 
+    [Fact]
+    public async Task Staged_UseGeneratedChain_honors_runtime_stage_filter()
+    {
+        var assembly = Compile(LoweredChainSource);
+        var package = HookChainRuntimeTestCompiler.PackageFrom(assembly);
+        var messages = new RecordingMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: ChainPolicy());
+        server.Subscriptions.On<ChainAggroEvent>()
+            .Select(e => e.MonsterId)
+            .Where(_ => false)
+            .UseGeneratedChain(package);
+
+        server.Subscriptions.Publish(new ChainAggroEvent("monster-1", 3));
+
+        await AssertNoFaultAsync(messages.FirstMessage);
+        Assert.Empty(messages.Messages);
+    }
+
     private static Assembly Compile(string source)
     {
         var parseOptions = CSharpParseOptions.Default

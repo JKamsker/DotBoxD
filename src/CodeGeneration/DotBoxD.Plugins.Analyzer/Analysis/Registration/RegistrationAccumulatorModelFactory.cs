@@ -35,6 +35,7 @@ internal static class RegistrationAccumulatorModelFactory
             var methodName = RequiredStringArgument(attribute, 1, "method name");
             ValidateIdentifier(accumulatorName, "Accumulator");
             ValidateIdentifier(methodName, "Registration method");
+            ValidateGeneratedTypeName(type, accumulatorName);
 
             var method = ResolveRegistrationMethod(type, methodName);
             var typeParameters = TypeParameters(method);
@@ -69,6 +70,7 @@ internal static class RegistrationAccumulatorModelFactory
             EnsureTopLevel(type);
             var accumulatorName = RequiredStringArgument(context.Attributes[0], 0, "accumulator name");
             ValidateIdentifier(accumulatorName, "Accumulator");
+            ValidateGeneratedTypeName(type, accumulatorName);
             var model = new RegistrationRootAccumulatorModel(
                 Namespace(type),
                 TypeName(type),
@@ -131,18 +133,20 @@ internal static class RegistrationAccumulatorModelFactory
                 $"Registration accumulator method '{methodName}' must not declare parameters.");
         }
 
-        if (!IsAwaitableRegistrationReturn(method.ReturnType))
+        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType))
         {
             throw new NotSupportedException(
-                $"Registration accumulator method '{methodName}' must return Task or ValueTask.");
+                $"Registration accumulator method '{methodName}' must return Task<T> or ValueTask<T>; " +
+                $"'{method.ReturnType.ToDisplayString()}' has no result payload.");
         }
 
         return method;
     }
 
-    private static bool IsAwaitableRegistrationReturn(ITypeSymbol type)
+    private static bool IsResultBearingAwaitableRegistrationReturn(ITypeSymbol type)
         => type is INamedTypeSymbol named &&
            named.Name is "Task" or "ValueTask" &&
+           named is { IsGenericType: true, TypeArguments.Length: 1 } &&
            string.Equals(named.ContainingNamespace.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
 
     private static EquatableArray<RegistrationTypeParameterModel> TypeParameters(IMethodSymbol method)
@@ -227,4 +231,17 @@ internal static class RegistrationAccumulatorModelFactory
 
         return kind == SyntaxKind.None ? name : "@" + name;
     }
+
+    private static void ValidateGeneratedTypeName(INamedTypeSymbol receiverType, string generatedName)
+    {
+        foreach (var existing in receiverType.ContainingNamespace.GetTypeMembers(generatedName, 0))
+        {
+            throw new NotSupportedException(
+                $"Generated registration accumulator type '{existing.Name}' collides with an existing type in namespace " +
+                $"'{NamespaceDisplay(receiverType.ContainingNamespace)}'.");
+        }
+    }
+
+    private static string NamespaceDisplay(INamespaceSymbol @namespace)
+        => @namespace.IsGlobalNamespace ? "<global namespace>" : @namespace.ToDisplayString();
 }

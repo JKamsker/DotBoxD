@@ -31,6 +31,11 @@ internal static partial class RpcKernelModelFactory
             return Fail(declaration, "Server extension id must be a non-empty string.");
         }
 
+        if (type.IsGenericType || type.TypeParameters.Length > 0)
+        {
+            return Fail(declaration, $"Generated server extension '{type.Name}' cannot be generic.");
+        }
+
         var serviceType = ServiceType(context.Attributes);
         var graftType = GraftType(context.Attributes);
 
@@ -45,7 +50,7 @@ internal static partial class RpcKernelModelFactory
                 throw new NotSupportedException("Live settings must use supported scalar types.");
             }
 
-            ValidateGeneratedParameterNames(method, liveSettings);
+            ValidateGeneratedParameterNames(method, liveSettings, graft);
             IMethodSymbol? serviceMethod = null;
             RpcKernelClientExtensions? clientExtensions = null;
             RpcKernelClientMethodExtension? directClientMethod = null;
@@ -53,6 +58,7 @@ internal static partial class RpcKernelModelFactory
             {
                 serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(serviceType, method);
                 clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
+                ValidateGeneratedClientTypeCollisions(type, clientExtensions);
             }
             else if (graft is not null)
             {
@@ -63,6 +69,11 @@ internal static partial class RpcKernelModelFactory
                     throw new NotSupportedException(
                         $"Server extension client method receiver '{directClientMethod.ReceiverType.ToDisplayString()}' " +
                         $"must match the class receiver '{graft.ReceiverType.ToDisplayString()}'.");
+                }
+
+                if (directClientMethod is not null)
+                {
+                    ValidateGeneratedTypeCollision(type, type.Name + "DirectServerExtensionClientExtensions");
                 }
             }
             else if (RpcKernelClientExtensionModelFactory.HasReceiverExtensionAttribute(method))
@@ -81,7 +92,7 @@ internal static partial class RpcKernelModelFactory
                 cancellationToken,
                 serverContextParameterName: contextParameter.Name,
                 serverContextType: contextParameter.Type);
-            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, graft);
+            var hasReceiverId = RpcKernelReceiverHandleSeeder.TrySeed(lowerer, type, graft);
             var bodyJson = body.Block is { } block
                 ? lowerer.LowerBody(block)
                 : lowerer.LowerExpressionBody(body.Expression!, method.ReturnsVoid);
@@ -278,6 +289,29 @@ internal static partial class RpcKernelModelFactory
 
     private static RpcKernelModelResult Fail(ClassDeclarationSyntax declaration, string message)
         => new(null, PluginKernelDiagnostic.Create(declaration.Identifier, message), default);
+
+    private static void ValidateGeneratedClientTypeCollisions(
+        INamedTypeSymbol type,
+        RpcKernelClientExtensions? clientExtensions)
+    {
+        ValidateGeneratedTypeCollision(type, type.Name + "ServerExtensionClient");
+        if (clientExtensions is { IsEmpty: false })
+        {
+            ValidateGeneratedTypeCollision(type, type.Name + "ServerExtensionClientExtensions");
+        }
+    }
+
+    private static void ValidateGeneratedTypeCollision(INamedTypeSymbol type, string generatedName)
+    {
+        foreach (var existing in type.ContainingNamespace.GetTypeMembers(generatedName))
+        {
+            if (!SymbolEqualityComparer.Default.Equals(existing, type))
+            {
+                throw new NotSupportedException(
+                    $"Generated server extension type '{generatedName}' collides with an existing type in namespace '{type.ContainingNamespace.ToDisplayString()}'.");
+            }
+        }
+    }
 }
 
 internal sealed record RpcKernelModelResult(
