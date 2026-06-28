@@ -11,12 +11,6 @@ internal static class ServiceModelFactory
 {
     private const string CancellationTokenFullName = ServicesGeneratorTypeNames.CancellationTokenMetadata;
 
-    private static readonly SymbolDisplayFormat s_qualifiedFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
-            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-
     public static ServiceResult GetServiceResult(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
         try
@@ -35,6 +29,7 @@ internal static class ServiceModelFactory
                 Error: new GeneratorError(name, ex.ToString()),
                 MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
                 MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
+                PropertyLocations: EquatableArray<DiagnosticLocation>.Empty,
                 ServiceLocation: default,
                 QualifiedInterfaceName: string.Empty,
                 ServiceDiagnostic: null);
@@ -116,6 +111,7 @@ internal static class ServiceModelFactory
         var methods = new List<MethodModel>();
         var properties = new List<ServicePropertyModel>();
         var methodLocations = new List<DiagnosticLocation>();
+        var propertyLocations = new List<DiagnosticLocation>();
         var methodDiagnostics = new List<MethodDiagnostic>();
         var seenSignatures = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
         var seenSignatureIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -206,29 +202,13 @@ internal static class ServiceModelFactory
 
         foreach (var propertySymbol in interfaceProperties)
         {
-            ct.ThrowIfCancellationRequested();
-            if (ServiceShapeValidator.IsInstanceIdProperty(propertySymbol))
-            {
-                properties.Add(new ServicePropertyModel(
-                    IdentifierHelpers.EscapeIdentifier(propertySymbol.Name),
-                    propertySymbol.Type.ToDisplayString(s_qualifiedFormat),
-                    ProxyType: null,
-                    IsInstanceId: true));
-                continue;
-            }
-
-            if (propertySymbol.Type is not INamedTypeSymbol propertyType)
+            if (!ServicePropertyModelFactory.TryBuild(propertySymbol, ct, out var property, out var propertyLocation))
             {
                 continue;
             }
 
-            var propertyNamespace = GetNamespace(propertyType.ContainingNamespace);
-            var proxyName = NamingHelpers.StripInterfacePrefix(propertyType.Name) + "Proxy";
-            properties.Add(new ServicePropertyModel(
-                IdentifierHelpers.EscapeIdentifier(propertySymbol.Name),
-                propertyType.ToDisplayString(s_qualifiedFormat),
-                IdentifierHelpers.QualifyTypeName(propertyNamespace, proxyName),
-                IsInstanceId: false));
+            properties.Add(property);
+            propertyLocations.Add(propertyLocation);
         }
 
         WireNameValidator.MarkDuplicateWireNames(displayName, methods, methodLocations, methodDiagnostics, ct);
@@ -244,6 +224,7 @@ internal static class ServiceModelFactory
             Error: null,
             MethodDiagnostics: methodDiagnostics.ToEquatableArray(),
             MethodLocations: methodLocations.ToEquatableArray(),
+            PropertyLocations: propertyLocations.ToEquatableArray(),
             ServiceLocation: serviceLocation,
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: null);
@@ -259,6 +240,7 @@ internal static class ServiceModelFactory
             Error: null,
             MethodDiagnostics: EquatableArray<MethodDiagnostic>.Empty,
             MethodLocations: EquatableArray<DiagnosticLocation>.Empty,
+            PropertyLocations: EquatableArray<DiagnosticLocation>.Empty,
             ServiceLocation: location,
             QualifiedInterfaceName: qualifiedInterfaceName,
             ServiceDiagnostic: new ServiceDiagnostic(displayName, reason, location));

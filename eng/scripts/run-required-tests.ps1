@@ -128,6 +128,7 @@ $defaultMinimums = @{
     SingleConnectionServerTransportLifecycleRegressionTests = 5
     NamedPipeServerTransportCancellationRegressionTests = 2
     UnsupportedShapeCoverageTests = 6
+    SubServiceAvailabilityTests = 5
     FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface = 1
     ServerExtensionMapTypeSupportTests = 8
     ServerExtensionMapBodyLoweringTests = 3
