@@ -122,6 +122,11 @@ internal static partial class GeneratedRemoteHookChainFallback
                     Parent: DeclarationPatternSyntax { Type: { } typeSyntax }
                 }:
                     return typeSyntax;
+                case SingleVariableDesignationSyntax
+                {
+                    Parent: DeclarationExpressionSyntax { Type: { } typeSyntax }
+                } when !typeSyntax.IsVar:
+                    return typeSyntax;
             }
         }
 
