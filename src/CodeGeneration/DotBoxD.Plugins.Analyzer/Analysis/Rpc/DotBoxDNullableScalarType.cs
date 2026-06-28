@@ -32,5 +32,6 @@ internal static class DotBoxDNullableScalarType
            || DotBoxDRpcTypeMapper.IsGuid(type)
            || DotBoxDRpcTypeMapper.IsDateOnlyWireType(type)
            || DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type)
-           || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type);
+           || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type)
+           || DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type);
 }

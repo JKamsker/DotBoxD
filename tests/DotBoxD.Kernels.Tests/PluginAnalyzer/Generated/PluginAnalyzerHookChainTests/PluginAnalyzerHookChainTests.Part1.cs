@@ -36,14 +36,13 @@ public sealed partial class PluginAnalyzerHookChainTests
     {
         var result = RunGenerator("""
             using System;
-            using System.Threading;
             using DotBoxD.Plugins;
             using DotBoxD.Plugins.Runtime;
             using DotBoxD.Abstractions;
 
             namespace Sample;
 
-            public sealed record MixedEvent(string TargetId, CancellationToken Cancel);
+            public sealed record MixedEvent(string TargetId, decimal Amount);
 
             public static class Usage
             {

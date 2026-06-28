@@ -200,14 +200,8 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
                 typeof(SetterEnumDto)));
 
     [Fact]
-    public void SandboxTypeOf_rejects_cancellation_token_before_dto_reflection()
-    {
-        var ex = Assert.Throws<NotSupportedException>(
-            () => KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken)));
-
-        Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("nests beyond", ex.Message, StringComparison.OrdinalIgnoreCase);
-    }
+    public void SandboxTypeOf_treats_cancellation_token_as_bool_not_dto()
+        => Assert.Equal(SandboxType.Bool, KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken)));
 
     [Fact]
     public void FromKernelRpcValue_uses_constructor_with_unmatched_optional_parameter()

@@ -130,13 +130,10 @@ public class ServerExtensionProxy : DispatchProxy
                 var parameterType = parameters[i].ParameterType;
                 if (IsCancellationToken(parameterType))
                 {
-                    if (i != parameters.Length - 1)
+                    if (i == parameters.Length - 1)
                     {
-                        throw new NotSupportedException(
-                            "Server extension proxy cancellation tokens must be the final method parameter.");
+                        continue;
                     }
-
-                    continue;
                 }
 
                 ValidatePayloadType(parameterType);

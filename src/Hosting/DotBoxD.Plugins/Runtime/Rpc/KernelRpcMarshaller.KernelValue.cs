@@ -76,6 +76,7 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(DateOnly) => DateOnlyFromDayNumber(value.Int32Value),
             var t when t == typeof(TimeOnly) => TimeOnlyFromTicks(value.Int64Value),
             var t when t == typeof(TimeSpan) => new TimeSpan(value.Int64Value),
+            var t when t == typeof(CancellationToken) => new CancellationToken(value.BoolValue),
             _ => null
         };
         return result is not null;

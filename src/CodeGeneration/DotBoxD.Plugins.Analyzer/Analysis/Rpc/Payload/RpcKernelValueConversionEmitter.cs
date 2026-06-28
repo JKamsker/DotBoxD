@@ -83,6 +83,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
             return $"global::DotBoxD.Plugins.KernelRpcValue.Int64({expression}.Ticks)";
         }
 
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return $"global::DotBoxD.Plugins.KernelRpcValue.Bool({expression}.IsCancellationRequested)";
+        }
+
         if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
         {
             return $"{EnsureIndexValueWriter()}({expression})";
@@ -143,6 +148,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
         if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
         {
             return $"new global::System.TimeSpan({expression}.Int64Value)";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return $"new global::System.Threading.CancellationToken({expression}.BoolValue)";
         }
 
         if (DotBoxDRpcTypeMapper.IsIndexWireType(type))

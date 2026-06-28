@@ -10,7 +10,8 @@ internal static partial class DotBoxDRpcTypeMapper
             or SpecialType.System_String ||
            IsDateOnlyWireType(type) ||
            IsTimeOnlyWireType(type) ||
-           IsTimeSpanWireType(type);
+           IsTimeSpanWireType(type) ||
+           IsCancellationTokenWireType(type);
 
     /// <summary>
     /// <see cref="System.Guid"/> is a first-class 16-byte scalar (sandbox <c>Guid</c> kind), distinct from
@@ -22,7 +23,8 @@ internal static partial class DotBoxDRpcTypeMapper
 
     /// <summary>
     /// A map key must lower to a scalar the kernel verifier accepts as a key: <c>bool</c>, <c>int</c>,
-    /// <c>long</c>, <c>string</c>, <c>DateOnly</c>, <c>TimeOnly</c>, <c>TimeSpan</c>, or an enum.
+    /// <c>long</c>, <c>string</c>, <c>DateOnly</c>, <c>TimeOnly</c>, <c>TimeSpan</c>,
+    /// <c>CancellationToken</c>, or an enum.
     /// </summary>
     public static bool IsSupportedMapKey(ITypeSymbol type)
         => type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Int32
@@ -30,7 +32,8 @@ internal static partial class DotBoxDRpcTypeMapper
            || type.TypeKind == TypeKind.Enum
            || IsDateOnlyWireType(type)
            || IsTimeOnlyWireType(type)
-           || IsTimeSpanWireType(type);
+           || IsTimeSpanWireType(type)
+           || IsCancellationTokenWireType(type);
 
     /// <summary>
     /// An enum marshals through its underlying integer; widths that overflow <c>I32</c> (<c>uint</c>,

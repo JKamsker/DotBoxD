@@ -68,6 +68,10 @@ internal static partial class DotBoxDRpcTypeMapper
         {
             return Scalar("I64");
         }
+        if (IsCancellationTokenWireType(type))
+        {
+            return Scalar("Bool");
+        }
         if (IsIndexWireType(type))
         {
             return IndexWireJsonType();
@@ -92,7 +96,7 @@ internal static partial class DotBoxDRpcTypeMapper
             {
                 throw new NotSupportedException(
                     $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
-                    "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, or an enum.");
+                    "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, CancellationToken, or an enum.");
             }
             return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, depth + 1, visiting)},{JsonType(map.Value, depth + 1, visiting)}]}}";
         }
@@ -203,7 +207,6 @@ internal static partial class DotBoxDRpcTypeMapper
         => type.TypeKind is TypeKind.Class or TypeKind.Struct &&
            !IsScalar(type) &&
            !IsFirstClassFrameworkWireStruct(type) &&
-           !IsUnsupportedFrameworkStruct(type) &&
            !DotBoxDNullableScalarType.IsNullableValueType(type) &&
            ListElementType(type) is null &&
            MapTypes(type) is null &&
@@ -278,10 +281,4 @@ internal static partial class DotBoxDRpcTypeMapper
     }
 
     private static string Scalar(string name) => "\"" + name + "\"";
-
-    private static bool IsUnsupportedFrameworkStruct(INamedTypeSymbol type)
-    {
-        var ns = type.ContainingNamespace.ToDisplayString();
-        return ns == "System.Threading" && type.Name == "CancellationToken";
-    }
 }

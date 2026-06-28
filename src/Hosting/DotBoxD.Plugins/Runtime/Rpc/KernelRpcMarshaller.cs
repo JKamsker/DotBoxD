@@ -262,6 +262,8 @@ public static partial class KernelRpcMarshaller
             return SandboxType.I64;
         if (type == typeof(TimeSpan))
             return SandboxType.I64;
+        if (type == typeof(CancellationToken))
+            return SandboxType.Bool;
         if (IsDateTimeWireType(type))
             return DateTimeWireSandboxType();
         if (type == typeof(Index))
@@ -271,7 +273,6 @@ public static partial class KernelRpcMarshaller
         if (type.IsEnum)
             return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
-        ThrowIfUnsupportedFrameworkStruct(type);
         if (depth >= MaxTypeNestingDepth)
         {
             throw new NotSupportedException(

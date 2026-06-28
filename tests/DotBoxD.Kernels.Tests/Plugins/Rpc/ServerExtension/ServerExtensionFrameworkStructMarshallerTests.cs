@@ -77,6 +77,33 @@ public sealed class ServerExtensionFrameworkStructMarshallerTests
             KernelRpcMarshaller.SandboxTypeOf(typeof(TimeOnly?)));
     }
 
+    [Fact]
+    public void Marshaller_round_trips_cancellation_tokens_as_bool_wire_values()
+    {
+        var canceled = new CancellationToken(canceled: true);
+        CancellationToken? optional = canceled;
+
+        var sandbox = Assert.IsType<BoolValue>(
+            KernelRpcMarshaller.ToSandboxValue(canceled, typeof(CancellationToken)));
+        var optionalSandbox = Assert.IsType<RecordValue>(
+            KernelRpcMarshaller.ToSandboxValue(optional, typeof(CancellationToken?)));
+
+        Assert.True(sandbox.Value);
+        var decoded = Assert.IsType<CancellationToken>(
+            KernelRpcMarshaller.FromSandboxValue(sandbox, typeof(CancellationToken)));
+        var kernelDecoded = Assert.IsType<CancellationToken>(
+            KernelRpcMarshaller.FromKernelRpcValue(KernelRpcValue.Bool(true), typeof(CancellationToken)));
+        Assert.True(decoded.IsCancellationRequested);
+        Assert.True(kernelDecoded.IsCancellationRequested);
+        Assert.Equal(
+            [SandboxValue.FromBool(true), SandboxValue.FromBool(true)],
+            optionalSandbox.Fields);
+        Assert.Equal(SandboxType.Bool, KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken)));
+        Assert.Equal(
+            SandboxType.Record([SandboxType.Bool, SandboxType.Bool]),
+            KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken?)));
+    }
+
     private static KernelRpcValue IndexWireValue(Index value)
         => KernelRpcValue.Record(
         [

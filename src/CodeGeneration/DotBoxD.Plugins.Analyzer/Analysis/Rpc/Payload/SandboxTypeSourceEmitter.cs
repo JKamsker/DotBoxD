@@ -89,6 +89,11 @@ internal static class SandboxTypeSourceEmitter
             return ManifestTypes.Long;
         }
 
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return ManifestTypes.Bool;
+        }
+
         if (DotBoxDRpcTypeMapper.IsIndexWireType(type) ||
             DotBoxDRpcTypeMapper.IsRangeWireType(type))
         {
@@ -154,6 +159,11 @@ internal static class SandboxTypeSourceEmitter
         if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
         {
             return SandboxType + ".I64";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return SandboxType + ".Bool";
         }
 
         if (DotBoxDRpcTypeMapper.IsIndexWireType(type))

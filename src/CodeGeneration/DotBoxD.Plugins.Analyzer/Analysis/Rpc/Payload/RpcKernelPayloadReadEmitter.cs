@@ -62,6 +62,11 @@ internal sealed partial class RpcKernelPayloadReadEmitter
             return $"new global::System.TimeSpan({reader}.ReadInt64())";
         }
 
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return $"new global::System.Threading.CancellationToken({reader}.ReadBool())";
+        }
+
         if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
         {
             return $"{EnsureIndexPayloadReader()}(ref {reader})";

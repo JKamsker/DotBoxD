@@ -106,6 +106,8 @@ public static partial class KernelRpcMarshaller
             return SandboxValue.FromInt64(0L);
         if (underlying == typeof(TimeSpan))
             return SandboxValue.FromInt64(0L);
+        if (underlying == typeof(CancellationToken))
+            return SandboxValue.FromBool(false);
         if (underlying.IsEnum)
             return EnumUsesI64(underlying) ? SandboxValue.FromInt64(0L) : SandboxValue.FromInt32(0);
 
@@ -123,6 +125,7 @@ public static partial class KernelRpcMarshaller
             underlying == typeof(DateOnly) ||
             underlying == typeof(TimeOnly) ||
             underlying == typeof(TimeSpan) ||
+            underlying == typeof(CancellationToken) ||
             underlying.IsEnum)
         {
             return;

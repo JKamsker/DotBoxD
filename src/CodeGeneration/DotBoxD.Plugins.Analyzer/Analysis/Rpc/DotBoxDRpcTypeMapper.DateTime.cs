@@ -28,13 +28,27 @@ internal static partial class DotBoxDRpcTypeMapper
         => type is INamedTypeSymbol { Name: "Range", ContainingNamespace: { Name: "System" } ns } &&
            ns.ContainingNamespace is { IsGlobalNamespace: true };
 
+    public static bool IsCancellationTokenWireType(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol { Name: "CancellationToken" } named)
+        {
+            return false;
+        }
+
+        var ns = named.ContainingNamespace;
+        return ns.Name == "Threading" &&
+               ns.ContainingNamespace.Name == "System" &&
+               ns.ContainingNamespace.ContainingNamespace.IsGlobalNamespace;
+    }
+
     public static bool IsFirstClassFrameworkWireStruct(ITypeSymbol type)
         => IsDateTimeWireType(type) ||
            IsTimeSpanWireType(type) ||
            IsDateOnlyWireType(type) ||
            IsTimeOnlyWireType(type) ||
            IsIndexWireType(type) ||
-           IsRangeWireType(type);
+           IsRangeWireType(type) ||
+           IsCancellationTokenWireType(type);
 
     public static string DateTimeWireJsonType()
         => "{\"name\":\"Record\",\"arguments\":[\"I64\",\"I64\"]}";

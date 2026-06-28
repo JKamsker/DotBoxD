@@ -8,7 +8,8 @@ public static partial class KernelRpcMarshaller
         => type == typeof(DateOnly) ||
            type == typeof(TimeOnly) ||
            type == typeof(Index) ||
-           type == typeof(Range);
+           type == typeof(Range) ||
+           type == typeof(CancellationToken);
 
     private static SandboxType IndexWireSandboxType()
         => SandboxType.Record([SandboxType.I32, SandboxType.Bool]);
