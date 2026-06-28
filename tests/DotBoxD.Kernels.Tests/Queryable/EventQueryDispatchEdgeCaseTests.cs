@@ -126,11 +126,16 @@ public sealed class EventQueryDispatchEdgeCaseTests
     public async Task Unreadable_routing_member_does_not_abort_dispatch_for_other_subscriptions()
     {
         var host = new EventQueryHost();
+        var hiddenHits = 0;
         var idHits = 0;
 
         await host.Query<IExplicitRoutingEvent>()
             .Where(e => e.Hidden == "never")
-            .SubscribeAsync((_, _) => ValueTask.CompletedTask);
+            .SubscribeAsync((_, _) =>
+            {
+                hiddenHits++;
+                return ValueTask.CompletedTask;
+            });
         await host.Query<IExplicitRoutingEvent>()
             .Where(e => e.Id == "x")
             .SubscribeAsync((_, _) =>
@@ -142,6 +147,7 @@ public sealed class EventQueryDispatchEdgeCaseTests
         var context = NewContext();
         await host.PublishAsync<IExplicitRoutingEvent>(new ExplicitRoutingEvent("x"), context);
 
+        Assert.Equal(0, hiddenHits);
         Assert.Equal(1, idHits);
     }
 
