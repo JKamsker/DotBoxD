@@ -26,6 +26,8 @@ internal static class ProxyGenerationHelpers
 
     public static void AppendParameter(StringBuilder sb, ParameterModel p, bool isLast)
     {
+        sb.Append(p.CallerInfoAttributePrefix);
+
         if (p.IsParams && isLast)
         {
             sb.Append("params ");

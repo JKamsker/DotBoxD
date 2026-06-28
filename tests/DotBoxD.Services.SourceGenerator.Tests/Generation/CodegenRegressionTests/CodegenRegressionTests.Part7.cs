@@ -88,4 +88,51 @@ public partial class CodegenRegressionTests
         asyncSibling.Should().Contain(
             "SumAsync(int[] values, global::System.Threading.CancellationToken ct = default)");
     }
+
+    [Fact]
+    public void CallerInfoAttributes_ArePreservedInGeneratedServiceSurface()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            namespace Regress.CallerInfoSurface
+            {
+                [DotBoxDService]
+                public interface ICallerInfoSurface
+                {
+                    Task TraceAsync(
+                        string value,
+                        [CallerMemberName] string member = "",
+                        [CallerFilePath] string file = "",
+                        [CallerLineNumber] int line = 0,
+                        [CallerArgumentExpression("value")] string expression = "");
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+        AssertCompiles(final);
+
+        const string callerInfoParameters =
+            "string value, " +
+            "[global::System.Runtime.CompilerServices.CallerMemberNameAttribute] string member = \"\", " +
+            "[global::System.Runtime.CompilerServices.CallerFilePathAttribute] string @file = \"\", " +
+            "[global::System.Runtime.CompilerServices.CallerLineNumberAttribute] int line = 0, " +
+            "[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(\"value\")] string expression = \"\"";
+
+        var generated = runResult.Results.Single().GeneratedSources;
+        var proxy = generated
+            .Single(g => g.HintName == GeneratorTestHelper.HintName(
+                "Regress.CallerInfoSurface", "ICallerInfoSurface", GeneratorTestHelper.GeneratedKind.Proxy))
+            .SourceText.ToString();
+        proxy.Should().Contain("TraceAsync(" + callerInfoParameters + ")");
+
+        var asyncSibling = generated
+            .Single(g => g.HintName.EndsWith("ICallerInfoSurface.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
+            .SourceText.ToString();
+        asyncSibling.Should().Contain(
+            "TraceAsync(" + callerInfoParameters + ", global::System.Threading.CancellationToken ct = default)");
+    }
 }
