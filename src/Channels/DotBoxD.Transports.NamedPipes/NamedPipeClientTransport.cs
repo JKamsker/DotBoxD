@@ -52,6 +52,9 @@ public sealed class NamedPipeClientTransport : ITransport
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
+        ct.ThrowIfCancellationRequested();
+        await ClearDisconnectedConnectionAsync().ConfigureAwait(false);
+
         if (_connection is not null)
         {
             throw new InvalidOperationException("Already connected.");
@@ -136,6 +139,28 @@ public sealed class NamedPipeClientTransport : ITransport
     /// in production.
     /// </summary>
     internal Func<Task>? _onConnectionPublishedForTest;
+
+    private async ValueTask ClearDisconnectedConnectionAsync()
+    {
+        var connection = _connection;
+        if (connection is null || connection.IsConnected)
+        {
+            return;
+        }
+
+        var stream = _stream;
+        await connection.DisposeAsync().ConfigureAwait(false);
+        if (ReferenceEquals(_connection, connection))
+        {
+            _connection = null;
+        }
+
+        if (ReferenceEquals(_stream, stream))
+        {
+            stream?.Dispose();
+            _stream = null;
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {

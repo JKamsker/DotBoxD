@@ -415,7 +415,9 @@ jobs:
             -RequiredFullyQualifiedNameContains @(
               "RpcEnvelopeValidationTests",
               "EnvelopeRoundTripTests",
-              "ClientTransportConnectionLifecycleTests"
+              "ClientTransportConnectionLifecycleTests",
+              "SingleConnectionServerTransportLifecycleRegressionTests",
+              "NamedPipeServerTransportCancellationRegressionTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Services.SourceGenerator.Tests/DotBoxD.Services.SourceGenerator.Tests.csproj `

@@ -44,6 +44,8 @@ public sealed class TcpTransport : ITransport
         // AcceptAsync, NamedPipeClientTransport.ConnectAsync).
         ct.ThrowIfCancellationRequested();
 
+        await ClearDisconnectedConnectionAsync().ConfigureAwait(false);
+
         if (_connection != null)
         {
             throw new InvalidOperationException("Already connected.");
@@ -128,6 +130,28 @@ public sealed class TcpTransport : ITransport
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+
+    private async ValueTask ClearDisconnectedConnectionAsync()
+    {
+        var connection = _connection;
+        if (connection is null || connection.IsConnected)
+        {
+            return;
+        }
+
+        var client = _client;
+        await connection.DisposeAsync().ConfigureAwait(false);
+        if (ReferenceEquals(_connection, connection))
+        {
+            _connection = null;
+        }
+
+        if (ReferenceEquals(_client, client))
+        {
+            client?.Dispose();
+            _client = null;
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {
