@@ -58,6 +58,12 @@ internal static partial class GeneratedRemoteHookChainFallback
             return coalesceTarget;
         }
 
+        if (expression is SwitchExpressionSyntax switchExpression &&
+            TargetFromSwitchRegistryExpression(switchExpression, model, cancellationToken, depth) is { } switchTarget)
+        {
+            return switchTarget;
+        }
+
         return TargetFromDeclaredRegistryExpression(expression, model, cancellationToken) ??
             TargetFromLocalAlias(expression, model, cancellationToken, depth);
     }

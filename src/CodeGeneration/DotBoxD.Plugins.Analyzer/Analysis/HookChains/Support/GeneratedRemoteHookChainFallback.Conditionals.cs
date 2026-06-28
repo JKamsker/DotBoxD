@@ -54,4 +54,35 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         return left;
     }
+
+    private static GeneratedRemoteHookChainTarget? TargetFromSwitchRegistryExpression(
+        SwitchExpressionSyntax switchExpression,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        int depth)
+    {
+        GeneratedRemoteHookChainTarget? target = null;
+        foreach (var arm in switchExpression.Arms)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var armTarget = RegistryTarget(arm.Expression, model, cancellationToken, depth + 1);
+            if (armTarget is null)
+            {
+                return null;
+            }
+
+            if (target is null)
+            {
+                target = armTarget;
+                continue;
+            }
+
+            if (!target.Value.Equals(armTarget.Value))
+            {
+                return null;
+            }
+        }
+
+        return target;
+    }
 }
