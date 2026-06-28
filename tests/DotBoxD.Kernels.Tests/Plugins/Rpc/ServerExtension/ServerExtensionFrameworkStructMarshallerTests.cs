@@ -104,6 +104,15 @@ public sealed class ServerExtensionFrameworkStructMarshallerTests
             KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken?)));
     }
 
+    [Fact]
+    public void Marshaller_rejects_cancellation_token_map_keys()
+    {
+        var ex = Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(typeof(Dictionary<CancellationToken, int>)));
+
+        Assert.Contains("CancellationToken", ex.Message, StringComparison.Ordinal);
+    }
+
     private static KernelRpcValue IndexWireValue(Index value)
         => KernelRpcValue.Record(
         [

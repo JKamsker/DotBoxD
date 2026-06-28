@@ -19,7 +19,7 @@ public sealed class ServerExtensionCancellationTokenSupportTests
         public sealed record TokenPayload(
             CancellationToken Token,
             List<CancellationToken> Tokens,
-            Dictionary<CancellationToken, int> Map);
+            Dictionary<string, CancellationToken> Map);
 
         public interface ICancellationTokenService
         {
@@ -51,11 +51,11 @@ public sealed class ServerExtensionCancellationTokenSupportTests
         var input = new TokenPayload(
             new CancellationToken(canceled: false),
             [new CancellationToken(canceled: true), new CancellationToken(canceled: false)],
-            TokenMap((new CancellationToken(canceled: true), 7), (new CancellationToken(canceled: false), 8)));
+            TokenMap(("canceled", new CancellationToken(canceled: true)), ("active", new CancellationToken(canceled: false))));
         var response = new TokenPayload(
             new CancellationToken(canceled: false),
             [new CancellationToken(canceled: false), new CancellationToken(canceled: true)],
-            TokenMap((new CancellationToken(canceled: true), 11)));
+            TokenMap(("returned", new CancellationToken(canceled: true))));
         var assembly = PluginAnalyzerGeneratedPackageFactory.CreateAssembly(CancellationTokenEchoSource);
         var registry = new RecordingServerExtensionsRegistry(PayloadWireBytes(response));
         var client = CreateClient(assembly, registry);
@@ -112,13 +112,13 @@ public sealed class ServerExtensionCancellationTokenSupportTests
     private static KernelRpcValue ListWireValue(List<CancellationToken> tokens)
         => KernelRpcValue.List([.. tokens.Select(token => KernelRpcValue.Bool(token.IsCancellationRequested))]);
 
-    private static KernelRpcValue MapWireValue(Dictionary<CancellationToken, int> map)
+    private static KernelRpcValue MapWireValue(Dictionary<string, CancellationToken> map)
     {
         var entries = new List<KernelRpcValue>(map.Count * 2);
         foreach (var pair in map)
         {
-            entries.Add(KernelRpcValue.Bool(pair.Key.IsCancellationRequested));
-            entries.Add(KernelRpcValue.Int32(pair.Value));
+            entries.Add(KernelRpcValue.String(pair.Key));
+            entries.Add(KernelRpcValue.Bool(pair.Value.IsCancellationRequested));
         }
 
         return KernelRpcValue.Map([.. entries]);
@@ -129,7 +129,7 @@ public sealed class ServerExtensionCancellationTokenSupportTests
         AssertToken(expected.Token, type.GetProperty("Token")!.GetValue(value));
         var tokens = Assert.IsType<List<CancellationToken>>(type.GetProperty("Tokens")!.GetValue(value));
         AssertTokens(expected.Tokens, tokens);
-        var map = Assert.IsType<Dictionary<CancellationToken, int>>(type.GetProperty("Map")!.GetValue(value));
+        var map = Assert.IsType<Dictionary<string, CancellationToken>>(type.GetProperty("Map")!.GetValue(value));
         AssertTokenMap(expected.Map, map);
     }
 
@@ -152,17 +152,17 @@ public sealed class ServerExtensionCancellationTokenSupportTests
         }
     }
 
-    private static void AssertMapWire(KernelRpcValue value, Dictionary<CancellationToken, int> expected)
+    private static void AssertMapWire(KernelRpcValue value, Dictionary<string, CancellationToken> expected)
     {
         value.RequireKind(KernelRpcValueKind.Map);
         Assert.Equal(expected.Count * 2, value.ItemCount);
-        var actual = new Dictionary<bool, int>(expected.Count);
+        var actual = new Dictionary<string, bool>(expected.Count);
         for (var i = 0; i < value.ItemCount; i += 2)
         {
-            actual[value.GetItem(i).BoolValue] = value.GetItem(i + 1).Int32Value;
+            actual[value.GetItem(i).TextValue] = value.GetItem(i + 1).BoolValue;
         }
 
-        Assert.Equal(ToBoolMap(expected), actual);
+        Assert.Equal(ToCancellationStateMap(expected), actual);
     }
 
     private static void AssertToken(CancellationToken expected, object? actual)
@@ -181,28 +181,28 @@ public sealed class ServerExtensionCancellationTokenSupportTests
     }
 
     private static void AssertTokenMap(
-        Dictionary<CancellationToken, int> expected,
-        Dictionary<CancellationToken, int> actual)
-        => Assert.Equal(ToBoolMap(expected), ToBoolMap(actual));
+        Dictionary<string, CancellationToken> expected,
+        Dictionary<string, CancellationToken> actual)
+        => Assert.Equal(ToCancellationStateMap(expected), ToCancellationStateMap(actual));
 
-    private static Dictionary<CancellationToken, int> TokenMap(params (CancellationToken Token, int Value)[] entries)
+    private static Dictionary<string, CancellationToken> TokenMap(params (string Key, CancellationToken Token)[] entries)
     {
-        var result = new Dictionary<CancellationToken, int>(entries.Length);
+        var result = new Dictionary<string, CancellationToken>(entries.Length);
         foreach (var entry in entries)
         {
-            result.Add(entry.Token, entry.Value);
+            result.Add(entry.Key, entry.Token);
         }
 
         return result;
     }
 
-    private static Dictionary<bool, int> ToBoolMap(Dictionary<CancellationToken, int> map)
-        => map.ToDictionary(pair => pair.Key.IsCancellationRequested, pair => pair.Value);
+    private static Dictionary<string, bool> ToCancellationStateMap(Dictionary<string, CancellationToken> map)
+        => map.ToDictionary(pair => pair.Key, pair => pair.Value.IsCancellationRequested);
 
     private sealed record TokenPayload(
         CancellationToken Token,
         List<CancellationToken> Tokens,
-        Dictionary<CancellationToken, int> Map);
+        Dictionary<string, CancellationToken> Map);
 
     private sealed class RecordingServerExtensionsRegistry(byte[] response) : DotBoxD.Plugins.IServerExtensionClientRegistry
     {

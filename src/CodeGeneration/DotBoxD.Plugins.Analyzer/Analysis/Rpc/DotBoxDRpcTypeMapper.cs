@@ -96,7 +96,7 @@ internal static partial class DotBoxDRpcTypeMapper
             {
                 throw new NotSupportedException(
                     $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
-                    "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, CancellationToken, or an enum.");
+                    "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, or an enum.");
             }
             return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, depth + 1, visiting)},{JsonType(map.Value, depth + 1, visiting)}]}}";
         }

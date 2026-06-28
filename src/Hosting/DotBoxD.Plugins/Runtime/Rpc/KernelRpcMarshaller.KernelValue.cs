@@ -56,6 +56,7 @@ public static partial class KernelRpcMarshaller
         if (MapTypes(type) is { } mapTypes)
         {
             value.RequireKind(KernelRpcValueKind.Map);
+            RejectUnsupportedMapKeyType(mapTypes.Key);
             return ToDictionary(value.ItemSpan, mapTypes.Key, mapTypes.Value);
         }
 
