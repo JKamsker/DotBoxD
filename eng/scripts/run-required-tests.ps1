@@ -127,6 +127,7 @@ $defaultMinimums = @{
     RpcEnvelopeValidationTests = 5
     RequestEnvelopeMessageIdMismatch_ReturnsProtocolError = 1
     InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException = 1
+    InstanceRegistryTests = 8
     ClientTransportConnectionLifecycleTests = 4
     SingleConnectionServerTransportLifecycleRegressionTests = 5
     NamedPipeServerTransportCancellationRegressionTests = 2

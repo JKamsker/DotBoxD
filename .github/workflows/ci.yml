@@ -419,6 +419,7 @@ jobs:
               "EnvelopeRoundTripTests",
               "RequestEnvelopeMessageIdMismatch_ReturnsProtocolError",
               "InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException",
+              "InstanceRegistryTests",
               "ClientTransportConnectionLifecycleTests",
               "SingleConnectionServerTransportLifecycleRegressionTests",
               "NamedPipeServerTransportCancellationRegressionTests"
