@@ -79,6 +79,7 @@ $defaultMinimums = @{
     InvokeAsyncCaptureBagRuntimeTests = 2
     InvokeAsyncMapReturnRuntimeTests = 1
     InvokeAsyncObjectInitializerOrderTests = 1
+    HostServiceBindingContractTests = 1
     PluginAnalyzerForbiddenApiReachabilityTests = 7
     PluginAnalyzerForbiddenApiConstructorReachabilityTests = 3
     PluginAnalyzerKernelMethodTests = 10

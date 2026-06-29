@@ -30,6 +30,12 @@ public static class HostServiceBindingExtensions
         HashSet<Type> visited,
         HashSet<string> registeredBindings)
     {
+        if (!serviceType.IsInterface)
+        {
+            throw new InvalidOperationException(
+                $"Host service contract '{serviceType.FullName}' must be an interface.");
+        }
+
         if (!visited.Add(serviceType))
         {
             return;
