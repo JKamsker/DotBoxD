@@ -177,6 +177,12 @@ internal static partial class GeneratedRemoteHookChainFallback
                     Parent: VariableDeclarationSyntax { Type: { } typeSyntax }
                 } when !typeSyntax.IsVar:
                     return typeSyntax;
+                case VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer,
+                    Parent: VariableDeclarationSyntax { Type: { } typeSyntax }
+                } when typeSyntax.IsVar:
+                    return InferredInitializerTypeSyntax(initializer, model, cancellationToken);
                 case SingleVariableDesignationSyntax
                 {
                     Parent: DeclarationPatternSyntax { Type: { } typeSyntax }
@@ -191,11 +197,41 @@ internal static partial class GeneratedRemoteHookChainFallback
                 {
                     Parent: DeclarationExpressionSyntax { Type: { } typeSyntax } declaration
                 } when typeSyntax.IsVar:
-                    return OutDeclarationParameterTypeSyntax(declaration, model, cancellationToken);
+                    return OutDeclarationParameterTypeSyntax(declaration, model, cancellationToken) ??
+                        SymbolTypeSyntax(local.Type);
             }
         }
 
-        return null;
+        return SymbolTypeSyntax(local.Type);
+    }
+
+    private static TypeSyntax? InferredInitializerTypeSyntax(
+        ExpressionSyntax initializer,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var expression = HookChainAliasResolver.UnwrapTransparentExpression(initializer);
+        return DeclaredTypeSyntax(expression, model, cancellationToken) ??
+            SemanticExpressionTypeSyntax(expression, model, cancellationToken);
+    }
+
+    private static TypeSyntax? SemanticExpressionTypeSyntax(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var typeInfo = model.GetTypeInfo(expression, cancellationToken);
+        return SymbolTypeSyntax(typeInfo.ConvertedType ?? typeInfo.Type);
+    }
+
+    private static TypeSyntax? SymbolTypeSyntax(ITypeSymbol? type)
+    {
+        if (type is null || type.TypeKind == TypeKind.Error)
+        {
+            return null;
+        }
+
+        return SyntaxFactory.ParseTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
     private static TypeSyntax? OutDeclarationParameterTypeSyntax(

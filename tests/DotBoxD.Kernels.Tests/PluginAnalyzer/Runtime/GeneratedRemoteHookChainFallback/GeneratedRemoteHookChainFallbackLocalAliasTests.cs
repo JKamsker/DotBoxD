@@ -180,6 +180,35 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
     }
 
     [Fact]
+    public void Same_compilation_generated_registry_awaited_var_receiver_lowers()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class AwaitedVarReceiverUsage
+            {
+                private static System.Threading.Tasks.Task<AlphaPluginHookRegistry> HooksAsync(
+                    AlphaPluginServer server)
+                    => System.Threading.Tasks.Task.FromResult(server.Hooks);
+
+                public static async System.Threading.Tasks.Task Configure(AlphaPluginServer server)
+                {
+                    var hooksTask = HooksAsync(server);
+                    (await hooksTask)
+                        .On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "awaited-var-receiver"));
+                }
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("awaited-var-receiver", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Same_compilation_generated_registry_task_result_receiver_lowers()
     {
         var result = RunGenerator(GeneratedServerSource + """
@@ -206,6 +235,36 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
         var generated = string.Join("\n", GeneratedSources(result));
 
         Assert.Contains("task-result-receiver", generated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Same_compilation_generated_registry_task_result_var_receiver_lowers()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class TaskResultVarReceiverUsage
+            {
+                private static System.Threading.Tasks.Task<AlphaPluginHookRegistry> HooksAsync(
+                    AlphaPluginServer server)
+                    => System.Threading.Tasks.Task.FromResult(server.Hooks);
+
+                public static void Configure(AlphaPluginServer server)
+                {
+                    var hooksTask = HooksAsync(server);
+                    hooksTask
+                        .Result
+                        .On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "task-result-var-receiver"));
+                }
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("task-result-var-receiver", generated, StringComparison.Ordinal);
     }
 
 }

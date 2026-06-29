@@ -26,7 +26,13 @@ internal static partial class GeneratedRemoteHookChainFallback
             return false;
         }
 
-        if (model.GetAliasInfo(identifier, cancellationToken)?.Target is not INamedTypeSymbol target)
+        var semanticModel = SemanticModelFor(identifier, model);
+        if (semanticModel is null)
+        {
+            return false;
+        }
+
+        if (semanticModel.GetAliasInfo(identifier, cancellationToken)?.Target is not INamedTypeSymbol target)
         {
             return AliasSyntaxTargetMatches(identifier, simpleName, fullName, cancellationToken);
         }
