@@ -179,4 +179,33 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
         Assert.Contains("awaited-receiver", generated, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Same_compilation_generated_registry_task_result_receiver_lowers()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class TaskResultReceiverUsage
+            {
+                private static System.Threading.Tasks.Task<AlphaPluginHookRegistry> HooksAsync(
+                    AlphaPluginServer server)
+                    => System.Threading.Tasks.Task.FromResult(server.Hooks);
+
+                public static void Configure(AlphaPluginServer server)
+                {
+                    HooksAsync(server)
+                        .Result
+                        .On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "task-result-receiver"));
+                }
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("task-result-receiver", generated, StringComparison.Ordinal);
+    }
+
 }

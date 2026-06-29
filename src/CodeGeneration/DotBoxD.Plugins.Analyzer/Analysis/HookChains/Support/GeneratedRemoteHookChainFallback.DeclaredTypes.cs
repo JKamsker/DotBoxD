@@ -29,6 +29,11 @@ internal static partial class GeneratedRemoteHookChainFallback
             return AwaitedTypeSyntax(awaitExpression, model, cancellationToken);
         }
 
+        if (expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Result" } resultAccess)
+        {
+            return TaskResultTypeSyntax(resultAccess, model, cancellationToken);
+        }
+
         var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
         if (symbol is null &&
             expression is MemberAccessExpressionSyntax { Name: SimpleNameSyntax name })
@@ -121,6 +126,17 @@ internal static partial class GeneratedRemoteHookChainFallback
     {
         var awaitedExpression = HookChainAliasResolver.UnwrapTransparentExpression(awaitExpression.Expression);
         return DeclaredTypeSyntax(awaitedExpression, model, cancellationToken) is { } typeSyntax
+            ? AwaitedTypeArgumentSyntax(typeSyntax)
+            : null;
+    }
+
+    private static TypeSyntax? TaskResultTypeSyntax(
+        MemberAccessExpressionSyntax resultAccess,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var taskExpression = HookChainAliasResolver.UnwrapTransparentExpression(resultAccess.Expression);
+        return DeclaredTypeSyntax(taskExpression, model, cancellationToken) is { } typeSyntax
             ? AwaitedTypeArgumentSyntax(typeSyntax)
             : null;
     }
