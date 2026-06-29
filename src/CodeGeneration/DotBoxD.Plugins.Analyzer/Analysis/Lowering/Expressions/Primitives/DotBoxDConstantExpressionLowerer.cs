@@ -20,9 +20,9 @@ internal static class DotBoxDConstantExpressionLowerer
         CancellationToken cancellationToken,
         string? targetType)
     {
-        if (TryLowerGuidDefault(expression, semanticModel, cancellationToken, targetType) is { } guidDefault)
+        if (TryLowerDefaultValue(expression, semanticModel, cancellationToken, targetType) is { } defaultValue)
         {
-            return guidDefault;
+            return defaultValue;
         }
 
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
@@ -67,7 +67,7 @@ internal static class DotBoxDConstantExpressionLowerer
             _ => throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.")
         };
 
-    private static DotBoxDExpressionModel? TryLowerGuidDefault(
+    private static DotBoxDExpressionModel? TryLowerDefaultValue(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -79,18 +79,46 @@ internal static class DotBoxDConstantExpressionLowerer
             return null;
         }
 
-        if (targetType is not null &&
-            !string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Guid, StringComparison.Ordinal))
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+        var type = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (type is null)
         {
             return null;
         }
 
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return (typeInfo.ConvertedType ?? typeInfo.Type) is { } type &&
-            DotBoxDRpcTypeMapper.IsGuid(type)
-            ? GuidDefault()
-            : null;
+        var manifestTag = SandboxTypeSourceEmitter.ManifestTag(type);
+        if (targetType is not null && !string.Equals(targetType, manifestTag, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return LowerDefault(type, manifestTag);
     }
+
+    private static DotBoxDExpressionModel? LowerDefault(ITypeSymbol type, string manifestTag)
+        => manifestTag switch
+        {
+            DotBoxDGenerationNames.ManifestTypes.Guid when DotBoxDRpcTypeMapper.IsGuid(type) => GuidDefault(),
+            DotBoxDGenerationNames.ManifestTypes.Record when DotBoxDRpcTypeMapper.IsDateTimeWireType(type) =>
+                DateTimeRecordDefault(type),
+            DotBoxDGenerationNames.ManifestTypes.Int when DotBoxDRpcTypeMapper.IsDateOnlyWireType(type) =>
+                Int32(0),
+            DotBoxDGenerationNames.ManifestTypes.Long when
+                DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type) ||
+                DotBoxDRpcTypeMapper.IsTimeSpanWireType(type) => Int64(0),
+            _ => null
+        };
+
+    private static DotBoxDExpressionModel DateTimeRecordDefault(ITypeSymbol type)
+        => new(
+            DotBoxDRecordCreationExpressionLowerer.RecordNew(
+                [
+                    $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})",
+                    $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
+                ],
+            SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException()),
+            DotBoxDGenerationNames.ManifestTypes.Record,
+            true);
 
     private static DotBoxDExpressionModel Bool(bool value)
         => new(

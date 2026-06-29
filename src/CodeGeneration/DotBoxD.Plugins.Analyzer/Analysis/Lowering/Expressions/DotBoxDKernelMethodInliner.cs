@@ -195,12 +195,9 @@ internal static partial class DotBoxDKernelMethodInliner
                     false);
         }
 
-        if (DotBoxDRpcTypeMapper.IsGuid(parameterType) && value is null)
+        if (value is null && TryLowerFrameworkDefault(parameterType) is { } frameworkDefault)
         {
-            return new DotBoxDExpressionModel(
-                $"new {DotBoxDGenerationNames.TypeNames.GlobalLiteralExpression}({DotBoxDGenerationNames.TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
-                DotBoxDGenerationNames.ManifestTypes.Guid,
-                false);
+            return frameworkDefault;
         }
 
         return type switch
@@ -245,6 +242,44 @@ internal static partial class DotBoxDKernelMethodInliner
                 $"[KernelMethod] '{parameter.ContainingSymbol.Name}' optional parameter '{parameter.Name}' has an unsupported default value.")
         };
     }
+
+    private static DotBoxDExpressionModel? TryLowerFrameworkDefault(ITypeSymbol type)
+    {
+        if (DotBoxDRpcTypeMapper.IsGuid(type))
+        {
+            return new(
+                $"new {DotBoxDGenerationNames.TypeNames.GlobalLiteralExpression}({DotBoxDGenerationNames.TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
+                DotBoxDGenerationNames.ManifestTypes.Guid,
+                false);
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
+        {
+            return new(DateTimeRecordDefault(type), DotBoxDGenerationNames.ManifestTypes.Record, true);
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+            return new(
+                $"{DotBoxDGenerationNames.Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
+                DotBoxDGenerationNames.ManifestTypes.Int,
+                false);
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type) || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
+            return new(
+                $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})",
+                DotBoxDGenerationNames.ManifestTypes.Long,
+                false);
+
+        return null;
+    }
+
+    private static string DateTimeRecordDefault(ITypeSymbol type)
+        => DotBoxDRecordCreationExpressionLowerer.RecordNew(
+            [
+                $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})",
+                $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
+            ],
+            SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException());
 
     private static bool IsFinite(double value)
         => !double.IsNaN(value) && !double.IsInfinity(value);
