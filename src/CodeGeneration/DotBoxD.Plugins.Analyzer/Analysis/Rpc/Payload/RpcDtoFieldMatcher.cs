@@ -1,6 +1,7 @@
-using Microsoft.CodeAnalysis;
-
 namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
+
+using DotBoxD.Plugins.Analyzer.Analysis;
+using Microsoft.CodeAnalysis;
 
 internal static class RpcDtoFieldMatcher
 {
@@ -49,4 +50,8 @@ internal static class RpcDtoFieldMatcher
 
         return match;
     }
+
+    public static string DefaultConstructorArgument(IParameterSymbol parameter)
+        => "@" + parameter.Name + ": " +
+           LiteralReader.ObjectDefaultLiteral(parameter.Type, parameter.ExplicitDefaultValue);
 }

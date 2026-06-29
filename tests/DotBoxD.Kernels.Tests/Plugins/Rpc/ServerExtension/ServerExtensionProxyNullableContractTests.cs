@@ -54,6 +54,32 @@ public sealed class ServerExtensionProxyNullableContractTests
         Assert.Contains("task-like", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Runtime_proxy_rejects_generic_service_methods_even_when_the_type_parameter_is_unused()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ServerExtensionProxy.Create<IUnusedGenericMonsterKillerService>(kernel));
+        Assert.Contains("non-generic", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Runtime_proxy_rejects_service_null_reference_defaults()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ServerExtensionProxy.Create<INullDefaultEchoService>(kernel));
+        Assert.Contains("default to null", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private interface INullableEchoService
     {
         int Echo(int? value);
@@ -74,5 +100,15 @@ public sealed class ServerExtensionProxyNullableContractTests
     private interface INestedTaskLikeReturnService
     {
         ValueTask<ValueTask<int>> EchoAsync(int value);
+    }
+
+    private interface IUnusedGenericMonsterKillerService
+    {
+        List<KillResult> KillMonsters<T>(List<int> monsterIds);
+    }
+
+    private interface INullDefaultEchoService
+    {
+        int Echo(string value = null!);
     }
 }
