@@ -7,9 +7,9 @@ using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding
 {
-public sealed class PluginAnalyzerHostBindingNestedHandleTests
-{
-    private const string NestedHandleSource = """
+    public sealed class PluginAnalyzerHostBindingNestedHandleTests
+    {
+        private const string NestedHandleSource = """
         using DotBoxD.Abstractions;
         using DotBoxD.Kernels;
         using DotBoxD.Plugins;
@@ -45,80 +45,80 @@ public sealed class PluginAnalyzerHostBindingNestedHandleTests
         }
         """;
 
-    [Fact]
-    public async Task Host_binding_call_on_a_returned_service_handle_round_trips_through_AddBindingsFrom()
-    {
-        var package = PluginAnalyzerGeneratedPackageFactory.Create(
-            NestedHandleSource,
-            "Sample.ProbePluginPackage");
+        [Fact]
+        public async Task Host_binding_call_on_a_returned_service_handle_round_trips_through_AddBindingsFrom()
+        {
+            var package = PluginAnalyzerGeneratedPackageFactory.Create(
+                NestedHandleSource,
+                "Sample.ProbePluginPackage");
 
-        using var server = PluginServer.Create(
-            configureHost: builder => builder.AddBindingsFrom<Sample.IProbeWorld>(new Sample.ProbeWorld()),
-            defaultPolicy: ProbeReadPolicy());
+            using var server = PluginServer.Create(
+                configureHost: builder => builder.AddBindingsFrom<Sample.IProbeWorld>(new Sample.ProbeWorld()),
+                defaultPolicy: ProbeReadPolicy());
 
-        var kernel = await server.InstallAsync(package);
-        var adapter = new ProbeEventAdapter();
+            var kernel = await server.InstallAsync(package);
+            var adapter = new ProbeEventAdapter();
 
-        Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("monster-42", 40)));
-    }
+            Assert.True(await kernel.ShouldHandleAsync(adapter, new ProbeEvent("monster-42", 40)));
+        }
 
-    private static SandboxPolicy ProbeReadPolicy()
-        => SandboxPolicyBuilder.Create()
-            .GrantLogging()
-            .GrantHostMessageWrite()
-            .Grant("probe.read.*", new { }, SandboxEffect.HostStateRead)
-            .WithFuel(100_000)
-            .WithMaxHostCalls(1_000)
-            .WithWallTime(TimeSpan.FromSeconds(10))
-            .Build();
+        private static SandboxPolicy ProbeReadPolicy()
+            => SandboxPolicyBuilder.Create()
+                .GrantLogging()
+                .GrantHostMessageWrite()
+                .Grant("probe.read.*", new { }, SandboxEffect.HostStateRead)
+                .WithFuel(100_000)
+                .WithMaxHostCalls(1_000)
+                .WithWallTime(TimeSpan.FromSeconds(10))
+                .Build();
 
-    private sealed record ProbeEvent(string TargetId, int Threshold);
+        private sealed record ProbeEvent(string TargetId, int Threshold);
 
-    private sealed class ProbeEventAdapter : IPluginEventAdapter<ProbeEvent>
-    {
-        public string EventName => "ProbeEvent";
+        private sealed class ProbeEventAdapter : IPluginEventAdapter<ProbeEvent>
+        {
+            public string EventName => "ProbeEvent";
 
-        public IReadOnlyList<Parameter> Parameters { get; } =
-        [
-            new("e_TargetId", SandboxType.String),
-            new("e_Threshold", SandboxType.I32)
-        ];
-
-        public IReadOnlyList<SandboxValue> ToSandboxValues(ProbeEvent e)
-            =>
+            public IReadOnlyList<Parameter> Parameters { get; } =
             [
-                SandboxValue.FromString(e.TargetId),
-                SandboxValue.FromInt32(e.Threshold)
+                new("e_TargetId", SandboxType.String),
+            new("e_Threshold", SandboxType.I32)
             ];
+
+            public IReadOnlyList<SandboxValue> ToSandboxValues(ProbeEvent e)
+                =>
+                [
+                    SandboxValue.FromString(e.TargetId),
+                SandboxValue.FromInt32(e.Threshold)
+                ];
+        }
     }
-}
 }
 
 namespace Sample
 {
-using DotBoxD.Abstractions;
+    using DotBoxD.Abstractions;
 
-[DotBoxDService]
-public interface IMonsterHandle
-{
-    [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
-    int GetThreat();
-}
+    [DotBoxDService]
+    public interface IMonsterHandle
+    {
+        [HostCapability("probe.read.monster.threat", HostBindingEffect.HostStateRead)]
+        int GetThreat();
+    }
 
-[DotBoxDService]
-public interface IProbeWorld
-{
-    [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
-    IMonsterHandle GetMonster(string id);
-}
+    [DotBoxDService]
+    public interface IProbeWorld
+    {
+        [HostCapability("probe.read.monster", HostBindingEffect.HostStateRead)]
+        IMonsterHandle GetMonster(string id);
+    }
 
-public sealed class MonsterHandle(string id) : IMonsterHandle
-{
-    public int GetThreat() => id == "monster-42" ? 42 : 0;
-}
+    public sealed class MonsterHandle(string id) : IMonsterHandle
+    {
+        public int GetThreat() => id == "monster-42" ? 42 : 0;
+    }
 
-public sealed class ProbeWorld : IProbeWorld
-{
-    public IMonsterHandle GetMonster(string id) => new MonsterHandle(id);
-}
+    public sealed class ProbeWorld : IProbeWorld
+    {
+        public IMonsterHandle GetMonster(string id) => new MonsterHandle(id);
+    }
 }
