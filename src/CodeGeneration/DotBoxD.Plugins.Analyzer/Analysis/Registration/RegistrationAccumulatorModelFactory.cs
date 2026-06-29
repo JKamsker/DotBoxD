@@ -210,15 +210,27 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static EquatableArray<RegistrationRootPropertyModel> PublicInstanceProperties(INamedTypeSymbol type)
     {
-        var properties = type.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(static property =>
-                property is { IsStatic: false, DeclaredAccessibility: Accessibility.Public } &&
-                property.GetMethod is not null &&
-                property.Parameters.Length == 0)
-            .Select(static property => new RegistrationRootPropertyModel(property.Name, TypeName(property.Type)))
-            .ToArray();
-        return EquatableArray<RegistrationRootPropertyModel>.FromOwned(properties);
+        var properties = new List<RegistrationRootPropertyModel>();
+        var seenNames = new HashSet<string>(StringComparer.Ordinal);
+        for (INamedTypeSymbol? current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (!seenNames.Add(property.Name))
+                {
+                    continue;
+                }
+
+                if (property is { IsStatic: false, DeclaredAccessibility: Accessibility.Public } &&
+                    property.GetMethod is not null &&
+                    property.Parameters.Length == 0)
+                {
+                    properties.Add(new RegistrationRootPropertyModel(property.Name, TypeName(property.Type)));
+                }
+            }
+        }
+
+        return EquatableArray<RegistrationRootPropertyModel>.FromOwned(properties.ToArray());
     }
 
     private static RegistrationAccumulatorGenerationResult Fail(TypeDeclarationSyntax declaration, string message)
