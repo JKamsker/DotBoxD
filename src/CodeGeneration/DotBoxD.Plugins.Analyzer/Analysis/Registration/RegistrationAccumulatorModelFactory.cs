@@ -136,6 +136,12 @@ internal static class RegistrationAccumulatorModelFactory
                 $"Registration accumulator method '{methodName}' must not declare parameters.");
         }
 
+        if (!IsCallableFromGeneratedAccumulator(method))
+        {
+            throw new NotSupportedException(
+                $"Registration accumulator method '{methodName}' must be accessible from generated accumulator code.");
+        }
+
         if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType, compilation))
         {
             throw new NotSupportedException(
@@ -151,6 +157,11 @@ internal static class RegistrationAccumulatorModelFactory
         Compilation compilation)
         => DotBoxDWellKnownTaskTypes.IsGenericTask(type, compilation, out _) ||
            DotBoxDWellKnownTaskTypes.IsGenericValueTask(type, compilation, out _);
+
+    private static bool IsCallableFromGeneratedAccumulator(IMethodSymbol method)
+        => method.DeclaredAccessibility is Accessibility.Public
+            or Accessibility.Internal
+            or Accessibility.ProtectedOrInternal;
 
     private static EquatableArray<RegistrationTypeParameterModel> TypeParameters(IMethodSymbol method)
     {

@@ -164,6 +164,37 @@ public sealed class RegistrationAccumulatorGenerationTests
     }
 
     [Theory]
+    [InlineData("private")]
+    [InlineData("protected")]
+    [InlineData("private protected")]
+    public void Inaccessible_registration_method_reports_diagnostic(string accessibility)
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics($$"""
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [GeneratePluginRegistrationAccumulator("ServiceRegistrationAccumulator", "Replace")]
+            internal class RemoteServiceControl
+            {
+                {{accessibility}} ValueTask<string> Replace<TService, TKernel>()
+                    where TService : class
+                    where TKernel : class, TService
+                    => ValueTask.FromResult("service");
+            }
+            """);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Id == "DBXK100" &&
+                          diagnostic.GetMessage().Contains("must be accessible", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Id.StartsWith("CS", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData("target")]
     [InlineData("root")]
     public void Generated_accumulator_name_collision_reports_diagnostic(string kind)
