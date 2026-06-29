@@ -176,12 +176,15 @@ internal sealed partial class RpcKernelValueConversionEmitter
                 continue;
             }
 
-            if (!parameter.HasExplicitDefaultValue)
+            if (parameter.HasExplicitDefaultValue)
             {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
-                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+                arguments.Add(RpcDtoFieldMatcher.DefaultConstructorArgument(parameter));
+                continue;
             }
+
+            throw new NotSupportedException(
+                $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
         }
 
         return arguments;
@@ -190,6 +193,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         ResolvedDtoConstructor? partial = null;
+        ResolvedDtoConstructor? rejectedPartial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
@@ -236,15 +240,21 @@ internal sealed partial class RpcKernelValueConversionEmitter
                     return resolved;
                 }
 
-                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, _compilation) &&
-                    (partial is null || assignedCount > partial.AssignedCount))
+                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, _compilation))
                 {
-                    partial = resolved;
+                    if (partial is null || assignedCount > partial.AssignedCount)
+                    {
+                        partial = resolved;
+                    }
+                }
+                else if (rejectedPartial is null || assignedCount > rejectedPartial.AssignedCount)
+                {
+                    rejectedPartial = resolved;
                 }
             }
         }
 
-        return partial;
+        return partial ?? rejectedPartial;
     }
 
     private static int AssignedCount(bool[] assigned)

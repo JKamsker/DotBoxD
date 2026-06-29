@@ -55,12 +55,15 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                 continue;
             }
 
-            if (!parameter.HasExplicitDefaultValue)
+            if (parameter.HasExplicitDefaultValue)
             {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
-                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+                arguments.Add(RpcDtoFieldMatcher.DefaultConstructorArgument(parameter));
+                continue;
             }
+
+            throw new NotSupportedException(
+                $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
         }
 
         return arguments;
@@ -154,6 +157,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
         Compilation? compilation)
     {
         ResolvedDtoConstructor? partial = null;
+        ResolvedDtoConstructor? rejectedPartial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, compilation) ||
@@ -200,15 +204,21 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                     return resolved;
                 }
 
-                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, compilation) &&
-                    (partial is null || assignedCount > partial.AssignedCount))
+                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, compilation))
                 {
-                    partial = resolved;
+                    if (partial is null || assignedCount > partial.AssignedCount)
+                    {
+                        partial = resolved;
+                    }
+                }
+                else if (rejectedPartial is null || assignedCount > rejectedPartial.AssignedCount)
+                {
+                    rejectedPartial = resolved;
                 }
             }
         }
 
-        return partial;
+        return partial ?? rejectedPartial;
     }
 
     private static string FieldLocal(int index)

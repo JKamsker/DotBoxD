@@ -209,6 +209,14 @@ public class InheritedExplicitProxyTests
 
         runResult.Diagnostics.Should().NotContain(d => d.Id == "DBXS003");
         AssertCompiles(final);
+
+        var extensions = runResult.Results.Single().GeneratedSources
+            .Single(g => g.HintName == "DotBoxDRpcExtensions.g.cs")
+            .SourceText.ToString();
+        System.Text.RegularExpressions.Regex.Matches(extensions, @"peer\.ProvideSub\(")
+            .Should().HaveCount(1);
+        System.Text.RegularExpressions.Regex.Matches(extensions, @"\.Child\b")
+            .Should().HaveCount(1);
     }
 
     [Fact]

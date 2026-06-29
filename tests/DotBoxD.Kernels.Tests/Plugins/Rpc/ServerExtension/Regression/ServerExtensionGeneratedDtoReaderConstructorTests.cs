@@ -238,7 +238,7 @@ public sealed partial class ServerExtensionGeneratedDtoReaderRegressionTests
         Assert.Contains(
             diagnostics,
             d => d.Id == "DBXK100" &&
-                 d.GetMessage().Contains("must expose either a constructor", StringComparison.Ordinal));
+                 d.GetMessage().Contains("does not assign every public field", StringComparison.Ordinal));
     }
 
     [Fact]
