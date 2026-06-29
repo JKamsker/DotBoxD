@@ -27,10 +27,7 @@ internal static partial class PluginServerFacadeModelFactory
                 continue;
             }
 
-            if (member is IMethodSymbol or IPropertySymbol)
-            {
-                ValidateNoContextHostBinding(contextType, member);
-            }
+            ValidateNoContextHostBinding(contextType, member);
 
             if (string.Equals(member.Name, "OnCreated", StringComparison.Ordinal))
             {

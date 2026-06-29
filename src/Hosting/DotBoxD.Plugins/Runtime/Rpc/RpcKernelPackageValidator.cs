@@ -64,7 +64,7 @@ internal static class RpcKernelPackageValidator
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK073",
-                "Kernel RPC service manifests must not declare hook subscriptions."));
+                "Server extension manifests must not declare hook subscriptions."));
         }
 
         ValidateMode(package.Manifest, diagnostics);
@@ -85,8 +85,8 @@ internal static class RpcKernelPackageValidator
         }
 
         diagnostics.Add(new SandboxDiagnostic(
-            "DBXK073",
-            "Server extension entrypoints must match rpcEntrypoint."));
+            "DBXK074",
+            "Server extension ShouldHandle and Handle entrypoint aliases must match rpcEntrypoint."));
     }
 
     public static void ValidatePrepared(PluginPackage package, ExecutionPlan plan, SandboxPolicy installPolicy)

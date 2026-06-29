@@ -46,6 +46,11 @@ public sealed class TcpTransport : ITransport
 
         await ClearDisconnectedConnectionAsync().ConfigureAwait(false);
 
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            throw new ObjectDisposedException(nameof(TcpTransport));
+        }
+
         if (_connection != null)
         {
             throw new InvalidOperationException("Already connected.");

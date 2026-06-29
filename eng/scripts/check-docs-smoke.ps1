@@ -181,6 +181,9 @@ Assert-DocumentsDoNotContain $currentServerExtensionDocs "SetupKernelRpc" "build
 Assert-DocumentsDoNotContain $currentServerExtensionDocs "RemoteKernelRpcControl" "builder docs use RemoteServerExtensionControl"
 Assert-DocumentsDoNotContain $currentServerExtensionDocs "KernelRpcRegistrationAccumulator" "builder docs use ServerExtensionRegistrationAccumulator"
 Assert-DocumentsDoNotContain $currentServerExtensionDocs "kernel RPC" "current docs call this server extensions"
+Assert-DocumentsDoNotContain $currentServerExtensionDocs "KernelRpcMarshaller" "current server-extension docs avoid legacy KernelRpcMarshaller terminology"
+Assert-DocumentsDoNotContain $currentServerExtensionDocs "KernelRpcValue" "current server-extension docs avoid legacy KernelRpcValue terminology"
+Assert-DocumentsDoNotContain $currentServerExtensionDocs "KernelRpcBinaryCodec" "current server-extension docs avoid legacy KernelRpcBinaryCodec terminology"
 
 if (-not $IsWindows) {
     Write-Host "Skipping GameServer runtime smoke on non-Windows runners."

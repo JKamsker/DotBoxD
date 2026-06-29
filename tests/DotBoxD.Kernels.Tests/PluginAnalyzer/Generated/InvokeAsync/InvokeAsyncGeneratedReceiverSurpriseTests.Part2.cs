@@ -68,6 +68,30 @@ public sealed partial class InvokeAsyncGeneratedReceiverSurpriseTests
     }
 
     [Fact]
+    public void Generated_services_receiver_on_subclass_lowers_InvokeAsync()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public sealed class DerivedServer : RemotePluginServer
+            {
+                public DerivedServer(DotBoxD.Kernels.Game.Server.Abstractions.Ipc.IGamePluginControlService control)
+                    : base(control)
+                {
+                }
+            }
+
+            public static ValueTask<int> Run(DerivedServer kernels)
+                => kernels.Services.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    return world.GetHealth("monster-1");
+                });
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Generated_builder_tuple_receiver_lowers_InvokeAsync()
     {
         var result = RunGeneratorAndAssertCompiles(UsageSource("""

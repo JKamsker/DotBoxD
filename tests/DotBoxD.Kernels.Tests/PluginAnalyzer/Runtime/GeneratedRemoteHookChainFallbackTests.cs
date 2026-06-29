@@ -115,8 +115,11 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             }
             """);
         var generated = string.Join("\n", GeneratedSources(result));
+        const string Pipeline = "RemoteHookPipeline<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent, " +
+                                "global::ChainSample.Plugin.AlphaPluginContext>";
 
         Assert.Contains("field-alias", generated, StringComparison.Ordinal);
+        Assert.Contains(Pipeline, generated, StringComparison.Ordinal);
     }
 
     [Fact]

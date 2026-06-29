@@ -128,7 +128,8 @@ public partial class CodegenRegressionTests
             }
             """;
 
-        var (_, runResult) = Run(source);
+        var (final, runResult) = RunWithPreviewByRefLikeGenerics(source);
+        AssertCompiles(final);
 
         runResult.Diagnostics.Should().Contain(d => d.Id == "DBXS002" &&
             d.GetMessage().Contains("generic service methods are not supported"));

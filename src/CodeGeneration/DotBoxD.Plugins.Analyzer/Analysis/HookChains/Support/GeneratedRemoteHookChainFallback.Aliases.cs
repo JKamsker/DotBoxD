@@ -12,6 +12,11 @@ internal static partial class GeneratedRemoteHookChainFallback
         CancellationToken cancellationToken,
         int depth)
     {
+        if (HookChainAliasResolver.Initializer(expression, model, cancellationToken) is { } initializer)
+        {
+            return RegistryTarget(initializer, model, cancellationToken, depth + 1);
+        }
+
         if (expression is not IdentifierNameSyntax identifier ||
             model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
         {
@@ -22,11 +27,6 @@ internal static partial class GeneratedRemoteHookChainFallback
         {
             switch (reference.GetSyntax(cancellationToken))
             {
-                case VariableDeclaratorSyntax
-                {
-                    Initializer.Value: { } initializer
-                }:
-                    return RegistryTarget(initializer, model, cancellationToken, depth + 1);
                 case SingleVariableDesignationSyntax designation
                     when TargetFromDeconstructionAlias(
                         designation,

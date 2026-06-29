@@ -43,7 +43,7 @@ internal static class HookChainAliasResolver
                 {
                     Initializer.Value: { } initializer
                 } declarator &&
-                !IsMutatedBetweenDeclarationAndUse(local, declarator, expression.SpanStart, model, cancellationToken))
+                !IsMutatedBetweenDeclarationAndUse(local, declarator, identifier, model, cancellationToken))
             {
                 return initializer;
             }
@@ -59,7 +59,8 @@ internal static class HookChainAliasResolver
         SemanticModel model,
         CancellationToken cancellationToken,
         SyntaxNode? root = null,
-        bool descendIntoNestedFunctions = false)
+        bool descendIntoNestedFunctions = false,
+        SyntaxNode? nestedFunctionPathNode = null)
     {
         root ??= LocalDeclarationBlock(local, cancellationToken);
         if (root is null)
@@ -67,9 +68,13 @@ internal static class HookChainAliasResolver
             return false;
         }
 
+        var nestedFunctionPath = nestedFunctionPathNode is null
+            ? null
+            : new HashSet<SyntaxNode>(nestedFunctionPathNode.AncestorsAndSelf());
         foreach (var node in root.DescendantNodes(node =>
             descendIntoNestedFunctions ||
-            node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax))
+            node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax ||
+            (nestedFunctionPath is not null && nestedFunctionPath.Contains(node))))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (node.SpanStart <= start || node.SpanStart >= end)
@@ -89,7 +94,7 @@ internal static class HookChainAliasResolver
     private static bool IsMutatedBetweenDeclarationAndUse(
         ILocalSymbol local,
         VariableDeclaratorSyntax declarator,
-        int useStart,
+        IdentifierNameSyntax use,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
@@ -97,11 +102,11 @@ internal static class HookChainAliasResolver
         return HasMutationBetween(
             local,
             declarator.SpanStart,
-            useStart,
+            use.SpanStart,
             model,
             cancellationToken,
             root,
-            descendIntoNestedFunctions: true);
+            nestedFunctionPathNode: use);
     }
 
     private static SyntaxNode? LocalDeclarationBlock(ILocalSymbol local, CancellationToken cancellationToken)

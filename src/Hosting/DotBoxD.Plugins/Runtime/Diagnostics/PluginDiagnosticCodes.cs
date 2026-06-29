@@ -239,6 +239,10 @@ public static class PluginDiagnosticCodes
             "A package manifest mixes hook and RPC entrypoint shapes.",
             "RPC packages are request/response entrypoints, hook packages are event subscriptions, and a single manifest cannot be both.",
             "Remove subscriptions from the RPC manifest, or package the event hook kernel separately without rpcEntrypoint."),
+        new("DBXK074", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A server extension package has entrypoint aliases that do not match rpcEntrypoint.",
+            "The package manifest names one rpcEntrypoint, but the package entrypoint aliases still point at hook-style ShouldHandle/Handle functions.",
+            "Regenerate the server-extension package so ShouldHandle and Handle both alias the manifest rpcEntrypoint."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =

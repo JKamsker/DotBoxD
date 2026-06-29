@@ -17,19 +17,28 @@ internal static partial class InvokeAsyncReceiverResolver
         serverAccessType = null;
         worldType = null!;
 
+        INamedTypeSymbol serverFacadeType;
         if (receiver is not MemberAccessExpressionSyntax
             {
                 Name.Identifier.ValueText: "Services",
                 Expression: { } facadeExpression
             } ||
-            model.GetTypeInfo(facadeExpression, cancellationToken).Type is not INamedTypeSymbol facadeType ||
-            !TryResolveWorld(facadeType, out worldType))
+            model.GetTypeInfo(facadeExpression, cancellationToken).Type is not INamedTypeSymbol facadeType)
+        {
+            return false;
+        }
+
+        if (TryResolveWorld(facadeType, out worldType))
+        {
+            serverFacadeType = facadeType;
+        }
+        else if (!TryResolveGeneratedFacadeBase(facadeType, out serverFacadeType, out worldType))
         {
             return false;
         }
 
         receiverType = PluginServerInterfaceTypeName(worldType);
-        serverAccessType = ServerInterfaceTypeName(facadeType, worldType);
+        serverAccessType = ServerInterfaceTypeName(serverFacadeType, worldType);
         return true;
     }
 }

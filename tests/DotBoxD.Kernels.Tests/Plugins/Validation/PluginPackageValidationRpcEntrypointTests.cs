@@ -8,7 +8,7 @@ public sealed partial class PluginPackageValidationTests
     [Fact]
     public async Task Install_rejects_event_manifest_with_rpc_entrypoint()
     {
-        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
         var package = FireDamagePluginPackage.Create();
         var invalid = package with { Manifest = package.Manifest with { RpcEntrypoint = package.Entrypoints.Handle } };
 

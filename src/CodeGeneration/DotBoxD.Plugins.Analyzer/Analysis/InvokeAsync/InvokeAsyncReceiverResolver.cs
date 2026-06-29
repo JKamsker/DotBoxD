@@ -84,15 +84,23 @@ internal static partial class InvokeAsyncReceiverResolver
     private static bool TryResolveGeneratedFacadeBase(
         INamedTypeSymbol type,
         out INamedTypeSymbol worldType)
+        => TryResolveGeneratedFacadeBase(type, out _, out worldType);
+
+    private static bool TryResolveGeneratedFacadeBase(
+        INamedTypeSymbol type,
+        out INamedTypeSymbol facadeBaseType,
+        out INamedTypeSymbol worldType)
     {
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
             if (TryResolveWorld(current, out worldType))
             {
+                facadeBaseType = current;
                 return true;
             }
         }
 
+        facadeBaseType = null!;
         worldType = null!;
         return false;
     }
