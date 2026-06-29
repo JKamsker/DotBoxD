@@ -14,7 +14,7 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 /// The service is expected to declare a single batch method; synchronous, <c>Task&lt;T&gt;</c>, and
 /// <c>ValueTask&lt;T&gt;</c> return shapes are supported.
 /// </summary>
-public partial class ServerExtensionProxy : DispatchProxy
+public class ServerExtensionProxy : DispatchProxy
 {
     private static readonly ConcurrentDictionary<MethodInfo, ServerExtensionMethod> MethodCache = new();
     private static readonly MethodInfo BoxTaskAsyncMethod =
@@ -144,13 +144,13 @@ public partial class ServerExtensionProxy : DispatchProxy
                     continue;
                 }
 
-                RejectNullReferenceDefault(parameters[i]);
-                ValidatePayloadType(parameterType);
+                ServerExtensionProxyValidation.RejectNullReferenceDefault(parameters[i]);
+                ServerExtensionProxyValidation.ValidatePayloadType(parameterType);
             }
 
             if (UnwrapReturnType(method.ReturnType) is { } payloadType)
             {
-                ValidatePayloadType(payloadType);
+                ServerExtensionProxyValidation.ValidatePayloadType(payloadType);
             }
         }
     }

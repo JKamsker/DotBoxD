@@ -2,9 +2,9 @@ using System.Reflection;
 
 namespace DotBoxD.Plugins.Runtime.Rpc;
 
-public partial class ServerExtensionProxy
+internal static class ServerExtensionProxyValidation
 {
-    private static void ValidatePayloadType(Type type)
+    public static void ValidatePayloadType(Type type)
     {
         if (IsTaskLike(type))
         {
@@ -17,7 +17,7 @@ public partial class ServerExtensionProxy
         _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 
-    private static void RejectNullReferenceDefault(ParameterInfo parameter)
+    public static void RejectNullReferenceDefault(ParameterInfo parameter)
     {
         if (parameter.HasDefaultValue &&
             parameter.DefaultValue is null &&
