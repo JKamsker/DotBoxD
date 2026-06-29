@@ -131,14 +131,13 @@ public sealed class StreamConnectionCoverageTests
     }
 
     [Fact]
-    public async Task ReceiveAsync_ReturnsEmpty_WhenPrefixTruncated()
+    public async Task ReceiveAsync_Throws_WhenPrefixTruncated()
     {
-        // Fewer than 4 bytes available: ReadExactAsync returns < 4 and the receive returns Empty.
         await using var connection = new StreamConnection(new MemoryStream(new byte[] { 1, 2 }));
 
-        using var received = await connection.ReceiveAsync().WaitAsync(Timeout);
-
-        Assert.Same(Payload.Empty, received);
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(
+            () => connection.ReceiveAsync().WaitAsync(Timeout));
+        Assert.Contains("frame length bytes", ex.Message);
     }
 
     [Fact]

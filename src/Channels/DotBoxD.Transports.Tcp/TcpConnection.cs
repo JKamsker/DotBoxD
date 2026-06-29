@@ -120,9 +120,14 @@ public sealed class TcpConnection : IRpcFrameChannel
         var lengthBuffer = _lengthBuffer;
         var bytesRead = await ReadExactAsync(lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false)
             .ConfigureAwait(false);
-        if (bytesRead < 4)
+        if (bytesRead == 0)
         {
             return Payload.Empty; // Connection closed
+        }
+
+        if (bytesRead < 4)
+        {
+            throw new InvalidDataException($"Connection closed after {bytesRead} of 4 frame length bytes.");
         }
 
         var totalLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBuffer.AsSpan(0, 4));

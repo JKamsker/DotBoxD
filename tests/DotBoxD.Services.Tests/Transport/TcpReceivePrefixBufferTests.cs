@@ -47,6 +47,26 @@ public sealed class TcpReceivePrefixBufferTests
         Assert.Same(Payload.Empty, eof);
     }
 
+    [Fact]
+    public async Task ReceiveAsync_rejects_truncated_length_prefix()
+    {
+        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
+        await server.StartAsync().WaitAsync(Timeout);
+        var port = server.LocalEndpoint?.Port ?? throw new InvalidOperationException("no bound port");
+
+        using var rawClient = new TcpClient();
+        var acceptTask = server.AcceptAsync();
+        await rawClient.ConnectAsync(IPAddress.Loopback, port).WaitAsync(Timeout);
+        await using var serverConnection = await acceptTask.WaitAsync(Timeout);
+
+        await rawClient.GetStream().WriteAsync(new byte[] { 1, 2 }).AsTask().WaitAsync(Timeout);
+        rawClient.Client.Shutdown(SocketShutdown.Send);
+
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(
+            () => serverConnection.ReceiveAsync().WaitAsync(Timeout));
+        Assert.Contains("frame length bytes", ex.Message);
+    }
+
     private static void AssertFrame(RpcFrame frame, int expectedMessageId)
     {
         Assert.True(MessageFramer.TryReadFrameHeader(frame.Memory, out var messageId, out var type));

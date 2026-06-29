@@ -17,9 +17,15 @@ internal static class MessageStreamFramer
                 stream,
                 headerBuffer.AsMemory(0, MessageFramer.HeaderSize),
                 ct).ConfigureAwait(false);
-            if (bytesRead < MessageFramer.HeaderSize)
+            if (bytesRead == 0)
             {
                 return null;
+            }
+
+            if (bytesRead < MessageFramer.HeaderSize)
+            {
+                throw new InvalidDataException(
+                    $"Connection closed after {bytesRead} of {MessageFramer.HeaderSize} frame header bytes.");
             }
 
             var totalLength = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(0, 4));

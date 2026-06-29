@@ -114,9 +114,14 @@ public sealed class StreamConnection : IRpcFrameChannel
 
             var read = await ReadExactAsync(_lengthBuffer.AsMemory(0, 4), ct, timeFirstRead: false)
                 .ConfigureAwait(false);
-            if (read < 4)
+            if (read == 0)
             {
                 return Payload.Empty;
+            }
+
+            if (read < 4)
+            {
+                throw new InvalidDataException($"Connection closed after {read} of 4 frame length bytes.");
             }
 
             var totalLength = BinaryPrimitives.ReadInt32LittleEndian(_lengthBuffer.AsSpan(0, 4));
