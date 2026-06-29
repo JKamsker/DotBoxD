@@ -102,11 +102,7 @@ public sealed class StreamConnection : IRpcFrameChannel
 
     public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {
-        var trackActiveReceive = !_ownsStream;
-        if (trackActiveReceive)
-        {
-            Interlocked.Increment(ref _activeReceives);
-        }
+        ReceiveConcurrencyGuard.Enter(ref _activeReceives, nameof(StreamConnection));
 
         try
         {
@@ -150,10 +146,7 @@ public sealed class StreamConnection : IRpcFrameChannel
         }
         finally
         {
-            if (trackActiveReceive)
-            {
-                Interlocked.Decrement(ref _activeReceives);
-            }
+            ReceiveConcurrencyGuard.Exit(ref _activeReceives);
         }
     }
 

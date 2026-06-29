@@ -227,6 +227,23 @@ public sealed class StreamConnectionCoverageTests
     }
 
     [Fact]
+    public async Task ReceiveAsync_ConcurrentCall_ThrowsInvalidOperation()
+    {
+        await using var stream = new NeverReturnsStream();
+        await using var connection = new StreamConnection(stream, ownsStream: false);
+        using var cts = new CancellationTokenSource();
+        var firstReceive = connection.ReceiveAsync(cts.Token);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => connection.ReceiveAsync().WaitAsync(Timeout));
+
+        Assert.Contains("one pending receive", ex.Message);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => firstReceive.WaitAsync(Timeout));
+    }
+
+    [Fact]
     public async Task CloseAsync_DisposesOwnedStream_AndIsIdempotent()
     {
         var stream = new TrackingDisposeStream();
