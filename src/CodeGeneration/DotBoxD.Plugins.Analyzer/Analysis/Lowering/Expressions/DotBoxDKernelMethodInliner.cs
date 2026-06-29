@@ -195,6 +195,14 @@ internal static partial class DotBoxDKernelMethodInliner
                     false);
         }
 
+        if (DotBoxDRpcTypeMapper.IsGuid(parameterType) && value is null)
+        {
+            return new DotBoxDExpressionModel(
+                $"new {DotBoxDGenerationNames.TypeNames.GlobalLiteralExpression}({DotBoxDGenerationNames.TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
+                DotBoxDGenerationNames.ManifestTypes.Guid,
+                false);
+        }
+
         return type switch
         {
             DotBoxDGenerationNames.ManifestTypes.Bool when value is bool boolean => new(

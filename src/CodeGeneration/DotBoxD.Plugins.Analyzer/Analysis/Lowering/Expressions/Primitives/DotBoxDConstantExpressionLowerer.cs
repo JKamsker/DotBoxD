@@ -1,6 +1,7 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
@@ -19,6 +20,11 @@ internal static class DotBoxDConstantExpressionLowerer
         CancellationToken cancellationToken,
         string? targetType)
     {
+        if (TryLowerGuidDefault(expression, semanticModel, cancellationToken, targetType) is { } guidDefault)
+        {
+            return guidDefault;
+        }
+
         var constant = semanticModel.GetConstantValue(expression, cancellationToken);
         if (!constant.HasValue)
         {
@@ -61,6 +67,31 @@ internal static class DotBoxDConstantExpressionLowerer
             _ => throw new NotSupportedException($"Unsupported plugin constant expression '{expression}'.")
         };
 
+    private static DotBoxDExpressionModel? TryLowerGuidDefault(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string? targetType)
+    {
+        if (!expression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+            expression is not DefaultExpressionSyntax)
+        {
+            return null;
+        }
+
+        if (targetType is not null &&
+            !string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Guid, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+        return (typeInfo.ConvertedType ?? typeInfo.Type) is { } type &&
+            DotBoxDRpcTypeMapper.IsGuid(type)
+            ? GuidDefault()
+            : null;
+    }
+
     private static DotBoxDExpressionModel Bool(bool value)
         => new(
             $"{DotBoxDGenerationNames.Helpers.Bool}({LiteralReader.ObjectLiteral(value)})",
@@ -97,6 +128,12 @@ internal static class DotBoxDConstantExpressionLowerer
             $"{DotBoxDGenerationNames.Helpers.Str}({LiteralReader.StringLiteral(value)})",
             DotBoxDGenerationNames.ManifestTypes.String,
             true);
+
+    private static DotBoxDExpressionModel GuidDefault()
+        => new(
+            $"new {DotBoxDGenerationNames.TypeNames.GlobalLiteralExpression}({DotBoxDGenerationNames.TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
+            DotBoxDGenerationNames.ManifestTypes.Guid,
+            false);
 
     private static bool IsFinite(double value)
         => !double.IsNaN(value) && !double.IsInfinity(value);
