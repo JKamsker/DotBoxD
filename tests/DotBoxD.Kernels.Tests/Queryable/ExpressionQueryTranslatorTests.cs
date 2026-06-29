@@ -114,6 +114,15 @@ public sealed class ExpressionQueryTranslatorTests
     }
 
     [Fact]
+    public void TranslateFilter_rejects_lossy_member_path_casts()
+    {
+        var ex = Assert.Throws<QueryTranslationException>(
+            () => ExpressionQueryTranslator.TranslateFilter<MetricTestEvent>(e => (int)e.Score == 1));
+
+        Assert.Contains("cast", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TranslateFilter_maps_string_methods_with_case_sensitivity()
     {
         var contains = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => e.TargetId.Contains("pl"));
@@ -205,6 +214,15 @@ public sealed class ExpressionQueryTranslatorTests
     {
         Assert.Throws<QueryTranslationException>(
             () => ExpressionQueryTranslator.TranslateProjection<AttackTestEvent, int>(e => e.Damage + 1));
+    }
+
+    [Fact]
+    public void TranslateProjection_rejects_lossy_member_path_casts()
+    {
+        var ex = Assert.Throws<QueryTranslationException>(
+            () => ExpressionQueryTranslator.TranslateProjection<MetricTestEvent, int>(e => (int)e.Score));
+
+        Assert.Contains("cast", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

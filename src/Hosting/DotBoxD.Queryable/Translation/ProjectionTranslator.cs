@@ -16,7 +16,7 @@ internal sealed class ProjectionTranslator(ParameterExpression parameter)
     /// <summary>Translates a projection body into a projection AST.</summary>
     public QueryProjection Translate(Expression body)
     {
-        var expression = MemberPathReader.StripConvert(body);
+        var expression = MemberPathReader.StripPathConvert(body, parameter);
         if (expression == parameter)
         {
             return QueryProjection.Identity;
