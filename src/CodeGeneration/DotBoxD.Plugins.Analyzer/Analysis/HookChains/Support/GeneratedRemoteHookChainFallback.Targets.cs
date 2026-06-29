@@ -99,12 +99,17 @@ internal static partial class GeneratedRemoteHookChainFallback
         CancellationToken cancellationToken,
         int depth)
     {
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
         {
-            return null;
+            return RegistryTarget(assignment.Right, model, cancellationToken, depth + 1);
         }
 
-        return RegistryTarget(assignment.Right, model, cancellationToken, depth + 1);
+        if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
+        {
+            return RegistryTarget(assignment.Right, model, cancellationToken, depth + 1);
+        }
+
+        return null;
     }
 
     private static GeneratedRemoteHookChainTarget? TargetFromGeneratedServerMember(
