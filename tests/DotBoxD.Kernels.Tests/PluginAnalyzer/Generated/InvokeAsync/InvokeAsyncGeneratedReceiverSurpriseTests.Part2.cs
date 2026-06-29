@@ -66,4 +66,24 @@ public sealed partial class InvokeAsyncGeneratedReceiverSurpriseTests
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
         Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Generated_builder_tuple_receiver_lowers_InvokeAsync()
+    {
+        var result = RunGeneratorAndAssertCompiles(UsageSource("""
+            public static ValueTask<int> Run(
+                DotBoxD.Kernels.Game.Server.Abstractions.Ipc.IGamePluginControlService control)
+            {
+                var pair = (Server: RemotePluginServerBuilder.FromConnection(control).Build(), Ignored: 0);
+                return pair.Server.InvokeAsync(async (IGameWorldAccess world) =>
+                {
+                    return world.GetHealth("monster-1");
+                });
+            }
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+    }
 }

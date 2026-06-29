@@ -167,6 +167,11 @@ internal static partial class InvokeAsyncReceiverResolver
         out INamedTypeSymbol receiverType)
     {
         receiverType = null!;
+        if (TryResolveGeneratedBuilderProjection(model, receiver, cancellationToken, out receiverType))
+        {
+            return true;
+        }
+
         if (receiver is not IdentifierNameSyntax identifier ||
             model.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local)
         {
