@@ -74,4 +74,31 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         Assert.Contains("assignment-expression-alias", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Same_compilation_generated_registry_tuple_return_deconstruction_alias_lowers()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class TupleReturnDeconstructionAliasUsage
+            {
+                private static (AlphaPluginHookRegistry Hooks, int Ignored) Pair(AlphaPluginServer server)
+                    => (server.Hooks, 0);
+
+                public static void Configure(AlphaPluginServer server)
+                {
+                    var (hooks, _) = Pair(server);
+                    hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "tuple-return-deconstruction-alias"));
+                }
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("tuple-return-deconstruction-alias", generated, StringComparison.Ordinal);
+    }
 }

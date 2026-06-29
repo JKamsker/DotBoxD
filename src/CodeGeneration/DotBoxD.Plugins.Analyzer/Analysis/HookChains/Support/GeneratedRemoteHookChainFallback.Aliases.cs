@@ -28,12 +28,33 @@ internal static partial class GeneratedRemoteHookChainFallback
                 }:
                     return RegistryTarget(initializer, model, cancellationToken, depth + 1);
                 case SingleVariableDesignationSyntax designation
-                    when DeconstructionInitializer(designation, cancellationToken) is { } initializer:
-                    return RegistryTarget(initializer, model, cancellationToken, depth + 1);
+                    when TargetFromDeconstructionAlias(
+                        designation,
+                        model,
+                        cancellationToken,
+                        depth) is { } target:
+                    return target;
             }
         }
 
         return null;
+    }
+
+    private static GeneratedRemoteHookChainTarget? TargetFromDeconstructionAlias(
+        SingleVariableDesignationSyntax designation,
+        SemanticModel model,
+        CancellationToken cancellationToken,
+        int depth)
+    {
+        if (DeconstructionInitializer(designation, cancellationToken) is { } initializer &&
+            RegistryTarget(initializer, model, cancellationToken, depth + 1) is { } target)
+        {
+            return target;
+        }
+
+        return DeconstructionElementTypeSyntax(designation, model, cancellationToken) is { } typeSyntax
+            ? TargetFromOwnedGeneratedRegistryType(typeSyntax, model, cancellationToken)
+            : null;
     }
 
     private static ExpressionSyntax? DeconstructionInitializer(
@@ -61,6 +82,35 @@ internal static partial class GeneratedRemoteHookChainFallback
             }
 
             current = tuple.Arguments[index].Expression;
+        }
+
+        return current;
+    }
+
+    private static TypeSyntax? DeconstructionElementTypeSyntax(
+        SingleVariableDesignationSyntax designation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (!TryDeconstructionPath(designation, out var declaration, out var path) ||
+            declaration is null ||
+            declaration.Parent is not AssignmentExpressionSyntax assignment)
+        {
+            return null;
+        }
+
+        var current = DeclaredTypeSyntax(assignment.Right, model, cancellationToken);
+        for (var indexIndex = path.Count - 1; indexIndex >= 0; indexIndex--)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = path[indexIndex];
+            if (current is not TupleTypeSyntax tuple ||
+                index >= tuple.Elements.Count)
+            {
+                return null;
+            }
+
+            current = tuple.Elements[index].Type;
         }
 
         return current;
