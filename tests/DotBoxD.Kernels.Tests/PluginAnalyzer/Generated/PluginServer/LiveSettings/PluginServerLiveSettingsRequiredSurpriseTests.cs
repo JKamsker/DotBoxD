@@ -33,6 +33,35 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
         Assert.Contains("DamageType", invalid.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Generated_live_settings_handle_allows_required_value_type_default_in_SetValuesAsync()
+    {
+        var (_, outputCompilation) = PluginServerGenerationTestDriver.Run(Source);
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+
+        var assembly = Load(outputCompilation);
+        var wire = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
+        var serverType = assembly.GetType("Sample.Plugin.RemotePluginServer", throwOnError: true)!;
+        var server = Activator.CreateInstance(serverType, [wire, null])!;
+        var kernelType = assembly.GetType("Sample.Plugin.FireDamageKernel", throwOnError: true)!;
+
+        var handle = serverType.GetMethod("Get")!
+            .MakeGenericMethod(kernelType)
+            .Invoke(server, null)!;
+        var setValuesAsync = handle.GetType().GetMethod("SetValuesAsync")!;
+        var action = CreateSetRequiredDefaultsAction(kernelType);
+
+        var exception = await CaptureExceptionAsync(async () =>
+        {
+            var result = setValuesAsync.Invoke(handle, [action, false])!;
+            await AwaitValueTask(result);
+        });
+
+        var invalid = Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("installed", invalid.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("IsEnabled", invalid.Message, StringComparison.Ordinal);
+    }
+
     private const string Source = """
         using System;
         using System.Threading;
@@ -86,6 +115,9 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
             {
                 [LiveSetting]
                 public required string DamageType { get; set; }
+
+                [LiveSetting]
+                public required bool IsEnabled { get; set; }
 
                 [LiveSetting]
                 public int MinDamage { get; set; }
@@ -161,11 +193,29 @@ public sealed class PluginServerLiveSettingsRequiredSurpriseTests
         return Delegate.CreateDelegate(actionType, method);
     }
 
+    private static Delegate CreateSetRequiredDefaultsAction(Type kernelType)
+    {
+        var actionType = typeof(Action<>).MakeGenericType(kernelType);
+        var method = typeof(PluginServerLiveSettingsRequiredSurpriseTests)
+            .GetMethod(nameof(SetRequiredDefaults), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(kernelType);
+        return Delegate.CreateDelegate(actionType, method);
+    }
+
     private static void SetMinDamageOnly<TKernel>(TKernel kernel)
         where TKernel : class
     {
         typeof(TKernel).GetProperty("MinDamage", BindingFlags.Public | BindingFlags.Instance)!
             .SetValue(kernel, 250);
+    }
+
+    private static void SetRequiredDefaults<TKernel>(TKernel kernel)
+        where TKernel : class
+    {
+        typeof(TKernel).GetProperty("DamageType", BindingFlags.Public | BindingFlags.Instance)!
+            .SetValue(kernel, "fire");
+        typeof(TKernel).GetProperty("IsEnabled", BindingFlags.Public | BindingFlags.Instance)!
+            .SetValue(kernel, false);
     }
 
     private static async Task<Exception?> CaptureExceptionAsync(Func<Task> action)

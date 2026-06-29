@@ -21,6 +21,24 @@ public sealed class PluginServerLiveSettingsSurpriseTests
         Assert.Contains("ShadowDamage", invalid.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Generated_live_settings_handle_allows_computed_non_live_values_in_SetValuesAsync()
+    {
+        var assembly = Emit(TestSource);
+        var control = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
+        var serverType = assembly.GetType("Sample.RemotePluginServer", throwOnError: true)!;
+        var server = Activator.CreateInstance(serverType, [control, null])!;
+        var run = assembly.GetType("Sample.Usage", throwOnError: true)!
+            .GetMethod("SetLiveValue", BindingFlags.Public | BindingFlags.Static)!;
+
+        var exception = await Record.ExceptionAsync(
+            async () => await AwaitValueTask(run.Invoke(null, [server])!));
+
+        var invalid = Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("installed", invalid.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("EffectiveDamage", invalid.Message, StringComparison.Ordinal);
+    }
+
     private static Assembly Emit(string source)
     {
         var (_, outputCompilation) = PluginServerGenerationTestDriver.Run(source);
@@ -83,6 +101,8 @@ public sealed class PluginServerLiveSettingsSurpriseTests
 
                 public int ShadowDamage { get; set; } = 2;
 
+                public int EffectiveDamage => MinDamage + ShadowDamage;
+
                 public bool ShouldHandle(DamageEvent e, HookContext ctx) => e.Amount >= MinDamage;
 
                 public void Handle(DamageEvent e, HookContext ctx)
@@ -97,6 +117,9 @@ public sealed class PluginServerLiveSettingsSurpriseTests
                         kernel.MinDamage = 5;
                         kernel.ShadowDamage = 99;
                     }, atomic: true);
+
+                public static ValueTask SetLiveValue(RemotePluginServer server)
+                    => server.Get<FireDamageKernel>().SetValuesAsync(kernel => kernel.MinDamage = 5);
             }
 
             public sealed class RecordingControlService : IGamePluginControlService

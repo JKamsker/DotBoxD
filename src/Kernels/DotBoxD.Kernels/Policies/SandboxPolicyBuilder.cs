@@ -43,7 +43,7 @@ public sealed class SandboxPolicyBuilder
     public SandboxPolicyBuilder GrantFileRead(string root, long maxBytesPerRun)
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
-        var normalizedRoot = FileGrantRoot.NormalizeExistingDirectory(root, nameof(root));
+        var normalizedRoot = FileGrantRoot.NormalizeCanonicalDirectory(root, nameof(root));
         _allowedEffects |= SandboxEffect.FileRead;
         _grants.Add(new CapabilityGrant("file.read", new Dictionary<string, string>
         {
@@ -60,7 +60,7 @@ public sealed class SandboxPolicyBuilder
         bool allowOverwrite = false)
     {
         ThrowIfNegative(maxBytesPerRun, nameof(maxBytesPerRun));
-        var normalizedRoot = FileGrantRoot.NormalizeExistingDirectory(root, nameof(root));
+        var normalizedRoot = FileGrantRoot.NormalizeCanonicalDirectory(root, nameof(root));
         _allowedEffects |= SandboxEffect.FileWrite | SandboxEffect.Audit;
         _grants.Add(new CapabilityGrant("file.write", new Dictionary<string, string>
         {

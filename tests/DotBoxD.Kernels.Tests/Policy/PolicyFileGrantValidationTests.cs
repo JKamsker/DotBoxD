@@ -34,19 +34,19 @@ public sealed class PolicyFileGrantValidationTests
     }
 
     [Fact]
-    public void File_grant_builder_rejects_missing_root_directory()
+    public void File_grant_builder_allows_missing_root_directory()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotboxd-missing-" + Guid.NewGuid().ToString("N"));
 
-        var readEx = Assert.Throws<ArgumentException>(() =>
-            SandboxPolicyBuilder.Create().GrantFileRead(root, 1024));
-        var writeEx = Assert.Throws<ArgumentException>(() =>
-            SandboxPolicyBuilder.Create().GrantFileWrite(root, 1024));
+        var readPolicy = SandboxPolicyBuilder.Create().GrantFileRead(root, 1024).Build();
+        var writePolicy = SandboxPolicyBuilder.Create().GrantFileWrite(root, 1024).Build();
 
-        Assert.Equal("root", readEx.ParamName);
-        Assert.Equal("root", writeEx.ParamName);
-        Assert.Contains("existing directory", readEx.Message);
-        Assert.Contains("existing directory", writeEx.Message);
+        Assert.Contains(readPolicy.Grants, grant =>
+            grant.Id == "file.read" &&
+            string.Equals(grant.Parameters["root"], root, StringComparison.Ordinal));
+        Assert.Contains(writePolicy.Grants, grant =>
+            grant.Id == "file.write" &&
+            string.Equals(grant.Parameters["root"], root, StringComparison.Ordinal));
     }
 
     [Fact]

@@ -38,12 +38,12 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                .Where(static p => p.GetMethod is not null && p.GetIndexParameters().Length == 0)");
         builder.AppendLine("                .ToArray();");
         builder.AppendLine("            var nonLiveValues = properties");
-        builder.AppendLine("                .Where(static p => !IsLiveSetting(p))");
+        builder.AppendLine("                .Where(static p => p.SetMethod is not null && !IsLiveSetting(p))");
         builder.AppendLine("                .Select(p => new { Property = p, Value = p.GetValue(draft) })");
         builder.AppendLine("                .ToArray();");
         builder.AppendLine("            var requiredLiveValues = properties");
-        builder.AppendLine("                .Where(static p => IsLiveSetting(p) && IsRequired(p))");
-        builder.AppendLine("                .Select(p => new { Property = p, Value = p.GetValue(draft) })");
+        builder.AppendLine("                .Where(static p => IsLiveSetting(p) && IsRequired(p) && CanObserveMissingRequiredValue(p))");
+        builder.AppendLine("                .Select(static p => new { Property = p })");
         builder.AppendLine("                .ToArray();");
         builder.AppendLine("            set(draft);");
         builder.AppendLine("            foreach (var entry in nonLiveValues)");
@@ -55,9 +55,9 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            }");
         builder.AppendLine("            foreach (var entry in requiredLiveValues)");
         builder.AppendLine("            {");
-        builder.AppendLine("                if (global::System.Object.Equals(entry.Value, entry.Property.GetValue(draft)))");
+        builder.AppendLine("                if (entry.Property.GetValue(draft) is null)");
         builder.AppendLine("                {");
-        builder.AppendLine("                    throw new global::System.InvalidOperationException($\"Required live setting '{entry.Property.Name}' must be assigned by SetValuesAsync.\");");
+        builder.AppendLine("                    throw new global::System.InvalidOperationException($\"Required live setting '{entry.Property.Name}' must be assigned a non-null value by SetValuesAsync.\");");
         builder.AppendLine("                }");
         builder.AppendLine("            }");
         builder.AppendLine("            var updates = properties");
@@ -71,6 +71,8 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            => property.GetCustomAttributes(typeof(global::DotBoxD.Abstractions.LiveSettingAttribute), inherit: true).Length != 0;");
         builder.AppendLine("        private static bool IsRequired(global::System.Reflection.PropertyInfo property)");
         builder.AppendLine("            => property.GetCustomAttributes(inherit: true).Any(static attribute => string.Equals(attribute.GetType().FullName, \"System.Runtime.CompilerServices.RequiredMemberAttribute\", global::System.StringComparison.Ordinal));");
+        builder.AppendLine("        private static bool CanObserveMissingRequiredValue(global::System.Reflection.PropertyInfo property)");
+        builder.AppendLine("            => !property.PropertyType.IsValueType || global::System.Nullable.GetUnderlyingType(property.PropertyType) is not null;");
         builder.AppendLine("    }");
     }
 }

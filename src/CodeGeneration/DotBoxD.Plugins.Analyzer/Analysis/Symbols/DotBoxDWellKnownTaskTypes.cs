@@ -58,8 +58,7 @@ internal static class DotBoxDWellKnownTaskTypes
         INamedTypeSymbol candidate,
         Compilation compilation,
         string metadataName)
-        => compilation.GetSpecialType(SpecialType.System_Object)
-               .ContainingAssembly
-               .GetTypeByMetadataName(metadataName) is { } expected &&
+        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
+           expected.Locations.Any(static location => location.IsInMetadata) &&
            SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, expected);
 }
