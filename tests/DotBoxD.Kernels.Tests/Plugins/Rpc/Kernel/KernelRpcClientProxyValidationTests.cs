@@ -132,9 +132,10 @@ public sealed class ServerExtensionClientProxyValidationTests
     }
 
     [Fact]
-    public void Generated_client_rejects_nullable_scalar_parameters()
+    public void Generated_client_rejects_unsupported_nullable_value_type_parameters()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System;
             using System.Threading.Tasks;
             using DotBoxD.Kernels;
             using DotBoxD.Kernels.Sandbox;
@@ -145,13 +146,13 @@ public sealed class ServerExtensionClientProxyValidationTests
 
             public interface IEchoService
             {
-                ValueTask<int> EchoAsync(int? value);
+                ValueTask<int> EchoAsync(DateTime? value);
             }
 
             [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
-                public int Echo(int? value, HookContext ctx)
+                public int Echo(DateTime? value, HookContext ctx)
                 {
                     return 0;
                 }

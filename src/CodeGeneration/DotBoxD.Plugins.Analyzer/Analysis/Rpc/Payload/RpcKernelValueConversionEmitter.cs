@@ -58,6 +58,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
     private string WriteComplexExpression(ITypeSymbol type, string expression)
     {
+        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        {
+            return $"{EnsureNullableValueWriter(type, nullableUnderlying)}({expression})";
+        }
+
         if (DotBoxDRpcTypeMapper.IsGuid(type))
         {
             return $"global::DotBoxD.Plugins.KernelRpcValue.Guid({expression})";
@@ -125,6 +130,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
     private string ReadComplexExpression(ITypeSymbol type, string expression)
     {
+        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        {
+            return $"{EnsureNullableValueReader(type, nullableUnderlying)}({expression})";
+        }
+
         if (DotBoxDRpcTypeMapper.IsGuid(type))
         {
             return $"{expression}.GuidValue";

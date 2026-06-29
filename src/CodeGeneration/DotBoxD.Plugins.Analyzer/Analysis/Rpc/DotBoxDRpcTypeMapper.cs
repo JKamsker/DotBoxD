@@ -25,7 +25,13 @@ internal static partial class DotBoxDRpcTypeMapper
         }
         if (DotBoxDNullableScalarType.IsNullableValueType(type))
         {
-            throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
+            if (!DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+            {
+                throw new NotSupportedException($"Server extension nullable type '{type.ToDisplayString()}' is not supported.");
+            }
+
+            RejectTooDeep(type, depth);
+            return $"{{\"name\":\"Record\",\"arguments\":[\"Bool\",{JsonType(nullableUnderlying, depth + 1, visiting)}]}}";
         }
         if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
         {
@@ -54,6 +60,7 @@ internal static partial class DotBoxDRpcTypeMapper
         }
         if (IsDateTimeWireType(type))
         {
+            RejectTooDeep(type, depth);
             return DateTimeWireJsonType();
         }
         if (IsDateOnlyWireType(type))
@@ -74,10 +81,12 @@ internal static partial class DotBoxDRpcTypeMapper
         }
         if (IsIndexWireType(type))
         {
+            RejectTooDeep(type, depth);
             return IndexWireJsonType();
         }
         if (IsRangeWireType(type))
         {
+            RejectRangeTooDeep(type, depth);
             return RangeWireJsonType();
         }
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
@@ -131,6 +140,15 @@ internal static partial class DotBoxDRpcTypeMapper
     private static void RejectTooDeep(ITypeSymbol type, int depth)
     {
         if (depth >= MaxJsonTypeDepth)
+        {
+            throw new NotSupportedException(
+                $"Server extension type '{type.ToDisplayString()}' exceeds the supported RPC shape depth.");
+        }
+    }
+
+    private static void RejectRangeTooDeep(ITypeSymbol type, int depth)
+    {
+        if (depth + 1 >= MaxJsonTypeDepth)
         {
             throw new NotSupportedException(
                 $"Server extension type '{type.ToDisplayString()}' exceeds the supported RPC shape depth.");

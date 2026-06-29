@@ -37,6 +37,11 @@ internal sealed partial class RpcKernelPayloadReadEmitter
 
     private string ReadComplexExpression(ITypeSymbol type, string reader)
     {
+        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        {
+            return $"{EnsureNullablePayloadReader(type, nullableUnderlying)}(ref {reader})";
+        }
+
         if (DotBoxDRpcTypeMapper.IsGuid(type))
         {
             return $"{reader}.ReadGuid()";

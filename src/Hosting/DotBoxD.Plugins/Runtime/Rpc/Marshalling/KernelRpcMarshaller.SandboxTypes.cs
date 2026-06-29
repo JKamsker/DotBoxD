@@ -47,11 +47,20 @@ public static partial class KernelRpcMarshaller
         if (type == typeof(CancellationToken))
             return SandboxType.Bool;
         if (IsDateTimeWireType(type))
+        {
+            RejectRecordTypeTooDeep(type, depth);
             return DateTimeWireSandboxType();
+        }
         if (type == typeof(Index))
+        {
+            RejectRecordTypeTooDeep(type, depth);
             return IndexWireSandboxType();
+        }
         if (type == typeof(Range))
+        {
+            RejectRangeTypeTooDeep(type, depth);
             return RangeWireSandboxType();
+        }
         if (type.IsEnum)
             return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
@@ -101,6 +110,24 @@ public static partial class KernelRpcMarshaller
             throw new NotSupportedException(
                 "Kernel RPC service map key type 'System.Threading.CancellationToken' is not supported; " +
                 "CancellationToken marshals as a bool snapshot and would collapse distinct tokens.");
+        }
+    }
+
+    private static void RejectRecordTypeTooDeep(Type type, int depth)
+    {
+        if (depth >= MaxTypeNestingDepth)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
+        }
+    }
+
+    private static void RejectRangeTypeTooDeep(Type type, int depth)
+    {
+        if (depth + 1 >= MaxTypeNestingDepth)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
         }
     }
 }
