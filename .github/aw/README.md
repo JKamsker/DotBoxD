@@ -21,6 +21,8 @@ The currently compiled agentic workflows are:
 
 - `.github/workflows/gh-aw-smoke-test.md`
 - `.github/workflows/library-surprise-sweep.md`
+- `.github/workflows/library-surprise-red-test.md`
+- `.github/workflows/library-surprise-fix.md`
 
 ## Local Setup
 
@@ -84,6 +86,37 @@ engine:
 
 Use the repository secret name that matches the target workflow. Never commit
 token values.
+
+For GitHub write operations, gh-aw safe outputs keep the agent job read-only and
+perform the write in a separate handler job. DotBoxD relies on the standard
+gh-aw token secret names:
+
+- `GH_AW_GITHUB_TOKEN` can override the default GitHub token used by safe-output
+  GitHub operations.
+- `GH_AW_CI_TRIGGER_TOKEN` should be a repository-scoped token with Contents
+  read/write permission. gh-aw uses it for the extra empty commit that causes PR
+  CI to run after `create-pull-request` and `push-to-pull-request-branch`
+  outputs.
+
+## Library Surprise Automation
+
+The library-surprise automation is intentionally split across specialized
+agent runs:
+
+1. `.github/workflows/library-surprise-sweep.md` is the discovery agent. It
+   finds one candidate surprise, performs duplicate checks, and dispatches the
+   red-test worker with a compact handoff. It does not edit files.
+2. `.github/workflows/library-surprise-red-test.md` is the proof agent. It adds
+   only red regression tests, verifies the branch builds and the tests fail
+   locally, then creates a `[surprise-red-test]` PR.
+3. Repository CI runs on that PR and proves the bug exists by failing on the red
+   tests.
+4. `.github/workflows/library-surprise-fix.md` reacts to the failed `ci` run for
+   an eligible `[surprise-red-test]` PR, checks out the same PR branch, fixes the
+   production issue, addresses actionable CodeRabbit feedback, validates the
+   full build/test suite, and pushes the fix back to the PR branch.
+5. The configured `GH_AW_CI_TRIGGER_TOKEN` path causes CI to run again after the
+   fix push.
 
 ## Validation
 
