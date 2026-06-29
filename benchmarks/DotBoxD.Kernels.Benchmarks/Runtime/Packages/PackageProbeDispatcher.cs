@@ -16,6 +16,12 @@ internal static class PackageProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-host-service-arguments", StringComparer.OrdinalIgnoreCase))
+        {
+            HostServiceArgumentConversionProbe.Run();
+            return true;
+        }
+
         return false;
     }
 }
