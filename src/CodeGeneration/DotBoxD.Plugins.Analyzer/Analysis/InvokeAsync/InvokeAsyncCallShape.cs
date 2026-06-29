@@ -180,7 +180,8 @@ internal sealed partial class InvokeAsyncCallShape
         BlockSyntax block,
         ITypeSymbol worldType,
         string worldParameterName,
-        ITypeSymbol returnType)
+        ITypeSymbol returnType,
+        Compilation compilation)
         => new(
             block,
             worldType,
@@ -189,7 +190,7 @@ internal sealed partial class InvokeAsyncCallShape
             captureType: null,
             usesReflectionCaptures: false,
             parametersJson: "[]",
-            returnTypeJson: DotBoxDRpcReturnType.JsonType(returnType),
+            returnTypeJson: DotBoxDRpcReturnType.JsonType(returnType, compilation),
             argumentsExpression: "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
             argumentTypes: [],
             default,
@@ -207,7 +208,7 @@ internal sealed partial class InvokeAsyncCallShape
     {
         var captureAliases = CaptureBagAliases(block, captureParameter.Name, model);
         var syncOuts = FindSyncOuts(block, captureParameter, model, captureAliases);
-        var returnTypeJson = BuildReturnTypeJson(returnType, syncOuts);
+        var returnTypeJson = BuildReturnTypeJson(returnType, syncOuts, model.Compilation);
         return new InvokeAsyncCallShape(
             block,
             worldType,
@@ -215,7 +216,7 @@ internal sealed partial class InvokeAsyncCallShape
             returnType,
             captureParameter.Type,
             usesReflectionCaptures: false,
-            CaptureParametersJson(captureParameter),
+            CaptureParametersJson(captureParameter, model.Compilation),
             returnTypeJson,
             CaptureArgumentsExpression(captureParameter.Type),
             [captureParameter.Type],

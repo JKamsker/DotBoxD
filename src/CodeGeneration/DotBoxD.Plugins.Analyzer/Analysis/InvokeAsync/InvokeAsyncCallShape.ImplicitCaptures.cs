@@ -19,8 +19,8 @@ internal sealed partial class InvokeAsyncCallShape
         }
 
         return captures.HasExternalCaptures
-            ? FromImplicitCaptures(block, worldType, InvokeAsyncLambdaShape.WorldParameterName(lambda), returnType, captures)
-            : NoCapture(block, worldType, InvokeAsyncLambdaShape.WorldParameterName(lambda), returnType);
+            ? FromImplicitCaptures(block, worldType, InvokeAsyncLambdaShape.WorldParameterName(lambda), returnType, captures, model.Compilation)
+            : NoCapture(block, worldType, InvokeAsyncLambdaShape.WorldParameterName(lambda), returnType, model.Compilation);
     }
 
     private static InvokeAsyncCallShape FromImplicitCaptures(
@@ -28,7 +28,8 @@ internal sealed partial class InvokeAsyncCallShape
         ITypeSymbol worldType,
         string worldParameterName,
         ITypeSymbol returnType,
-        ImplicitCaptureSet captures)
+        ImplicitCaptureSet captures,
+        Compilation compilation)
     {
         var syncOuts = captures.SyncOuts
             .Select(capture => new InvokeAsyncSyncOut(capture.Name, capture.Type, capture.Name, Initializer: null))
@@ -40,8 +41,8 @@ internal sealed partial class InvokeAsyncCallShape
             returnType,
             captureType: null,
             usesReflectionCaptures: true,
-            ImplicitParametersJson(captures.All),
-            BuildReturnTypeJson(returnType, syncOuts),
+            ImplicitParametersJson(captures.All, compilation),
+            BuildReturnTypeJson(returnType, syncOuts, compilation),
             ImplicitArgumentsExpression(captures.All),
             captures.All.Select(static capture => capture.Type).ToArray(),
             new EquatableArray<InvokeAsyncSyncOut>(syncOuts),
@@ -50,13 +51,15 @@ internal sealed partial class InvokeAsyncCallShape
             expressionOverride: null);
     }
 
-    private static string ImplicitParametersJson(IReadOnlyList<ImplicitCapture> captures)
+    private static string ImplicitParametersJson(
+        IReadOnlyList<ImplicitCapture> captures,
+        Compilation compilation)
     {
         var parameters = new string[captures.Count];
         for (var i = 0; i < captures.Count; i++)
         {
             parameters[i] = "{\"name\":" + DotBoxDRpcJsonLowerer.Str(captures[i].Name) +
-                            ",\"type\":" + DotBoxDRpcTypeMapper.JsonType(captures[i].Type) + "}";
+                            ",\"type\":" + DotBoxDRpcTypeMapper.JsonType(captures[i].Type, compilation) + "}";
         }
 
         return "[" + string.Join(",", parameters) + "]";

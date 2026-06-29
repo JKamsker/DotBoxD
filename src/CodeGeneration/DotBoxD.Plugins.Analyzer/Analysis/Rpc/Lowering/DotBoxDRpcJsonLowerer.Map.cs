@@ -22,7 +22,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         }
 
         Allocates = true;
-        return Call("map.empty", DotBoxDRpcTypeMapper.JsonType(created));
+        return Call("map.empty", DotBoxDRpcTypeMapper.JsonType(created, _model.Compilation));
     }
 
     // dict[key] → map.get

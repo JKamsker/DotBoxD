@@ -13,12 +13,17 @@ internal static partial class DotBoxDRpcTypeMapper
 {
     private const int MaxJsonTypeDepth = 8;
 
-    public static string JsonType(ITypeSymbol type)
-        => JsonType(type, 0, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
+    public static string JsonType(ITypeSymbol type, Compilation compilation)
+        => JsonType(type, compilation, 0, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
 
-    private static string JsonType(ITypeSymbol type, int depth, HashSet<ITypeSymbol> visiting)
+    private static string JsonType(
+        ITypeSymbol type,
+        Compilation compilation,
+        int depth,
+        HashSet<ITypeSymbol> visiting)
     {
-        if (type.SpecialType == SpecialType.System_Void || DotBoxDRpcReturnType.IsTaskLike(type))
+        if (type.SpecialType == SpecialType.System_Void ||
+            DotBoxDRpcReturnType.IsTaskLike(type, compilation))
         {
             throw new NotSupportedException(
                 $"Server extension type '{type.ToDisplayString()}' is only supported as a top-level return type.");
@@ -31,7 +36,7 @@ internal static partial class DotBoxDRpcTypeMapper
             }
 
             RejectTooDeep(type, depth);
-            return $"{{\"name\":\"Record\",\"arguments\":[\"Bool\",{JsonType(nullableUnderlying, depth + 1, visiting)}]}}";
+            return $"{{\"name\":\"Record\",\"arguments\":[\"Bool\",{JsonType(nullableUnderlying, compilation, depth + 1, visiting)}]}}";
         }
         if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsReferenceType)
         {
@@ -96,7 +101,7 @@ internal static partial class DotBoxDRpcTypeMapper
         if (ListElementType(type) is { } elementType)
         {
             RejectTooDeep(type, depth);
-            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType, depth + 1, visiting)}]}}";
+            return $"{{\"name\":\"List\",\"arguments\":[{JsonType(elementType, compilation, depth + 1, visiting)}]}}";
         }
         if (MapTypes(type) is { } map)
         {
@@ -107,7 +112,7 @@ internal static partial class DotBoxDRpcTypeMapper
                     $"Server extension map key type '{map.Key.ToDisplayString()}' is not supported; " +
                     "map keys must be bool, int, long, string, DateOnly, TimeOnly, TimeSpan, or an enum.");
             }
-            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, depth + 1, visiting)},{JsonType(map.Value, depth + 1, visiting)}]}}";
+            return $"{{\"name\":\"Map\",\"arguments\":[{JsonType(map.Key, compilation, depth + 1, visiting)},{JsonType(map.Value, compilation, depth + 1, visiting)}]}}";
         }
         if (type is INamedTypeSymbol named && IsRecordDto(named))
         {
@@ -125,7 +130,7 @@ internal static partial class DotBoxDRpcTypeMapper
                 var fieldTypes = new List<string>(fields.Count);
                 foreach (var field in fields)
                 {
-                    fieldTypes.Add(JsonType(field.Type, depth + 1, visiting));
+                    fieldTypes.Add(JsonType(field.Type, compilation, depth + 1, visiting));
                 }
                 return $"{{\"name\":\"Record\",\"arguments\":[{string.Join(",", fieldTypes)}]}}";
             }

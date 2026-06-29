@@ -37,7 +37,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
             (creation.ArgumentList is null || creation.ArgumentList.Arguments.Count == 0))
         {
             Allocates = true;
-            return Call("list.empty", DotBoxDRpcTypeMapper.JsonType(elementType));
+            return Call("list.empty", DotBoxDRpcTypeMapper.JsonType(elementType, _model.Compilation));
         }
         if (creation is ObjectCreationExpressionSyntax explicitCreation &&
             TryLowerEmptyMapCreation(explicitCreation, created) is { } emptyMap)
@@ -99,7 +99,7 @@ internal sealed partial class DotBoxDRpcJsonLowerer
         {
             throw new NotSupportedException($"Server extension 'new {named.Name}' must use constructor arguments or an object initializer.");
         }
-        return Call("record.new", DotBoxDRpcTypeMapper.JsonType(named), args);
+        return Call("record.new", DotBoxDRpcTypeMapper.JsonType(named, _model.Compilation), args);
     }
 
     private static string CreationText(BaseObjectCreationExpressionSyntax creation)

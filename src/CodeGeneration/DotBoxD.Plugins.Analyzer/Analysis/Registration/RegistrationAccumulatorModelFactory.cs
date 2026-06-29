@@ -37,7 +37,7 @@ internal static class RegistrationAccumulatorModelFactory
             ValidateIdentifier(methodName, "Registration method");
             ValidateGeneratedTypeName(type, accumulatorName);
 
-            var method = ResolveRegistrationMethod(type, methodName);
+            var method = ResolveRegistrationMethod(type, methodName, context.SemanticModel.Compilation);
             var typeParameters = TypeParameters(method);
             var model = new RegistrationAccumulatorTargetModel(
                 Namespace(type),
@@ -114,7 +114,10 @@ internal static class RegistrationAccumulatorModelFactory
         }
     }
 
-    private static IMethodSymbol ResolveRegistrationMethod(INamedTypeSymbol type, string methodName)
+    private static IMethodSymbol ResolveRegistrationMethod(
+        INamedTypeSymbol type,
+        string methodName,
+        Compilation compilation)
     {
         var methods = type.GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -133,7 +136,7 @@ internal static class RegistrationAccumulatorModelFactory
                 $"Registration accumulator method '{methodName}' must not declare parameters.");
         }
 
-        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType))
+        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType, compilation))
         {
             throw new NotSupportedException(
                 $"Registration accumulator method '{methodName}' must return Task<T> or ValueTask<T>; " +
@@ -143,11 +146,11 @@ internal static class RegistrationAccumulatorModelFactory
         return method;
     }
 
-    private static bool IsResultBearingAwaitableRegistrationReturn(ITypeSymbol type)
-        => type is INamedTypeSymbol named &&
-           named.Name is "Task" or "ValueTask" &&
-           named is { IsGenericType: true, TypeArguments.Length: 1 } &&
-           string.Equals(named.ContainingNamespace.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
+    private static bool IsResultBearingAwaitableRegistrationReturn(
+        ITypeSymbol type,
+        Compilation compilation)
+        => DotBoxDWellKnownTaskTypes.IsGenericTask(type, compilation, out _) ||
+           DotBoxDWellKnownTaskTypes.IsGenericValueTask(type, compilation, out _);
 
     private static EquatableArray<RegistrationTypeParameterModel> TypeParameters(IMethodSymbol method)
     {

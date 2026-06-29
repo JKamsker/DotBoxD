@@ -6,7 +6,10 @@ using Microsoft.CodeAnalysis;
 
 internal static class RpcKernelClientServiceMethodResolver
 {
-    public static IMethodSymbol Resolve(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
+    public static IMethodSymbol Resolve(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
         if (serviceType.TypeKind != TypeKind.Interface)
         {
@@ -39,7 +42,7 @@ internal static class RpcKernelClientServiceMethodResolver
         ValidateNonGeneric(serviceMethod);
         ValidateName(serviceMethod, kernelMethod);
         ValidateParameters(serviceMethod, kernelMethod);
-        ValidateReturn(serviceMethod, kernelMethod);
+        ValidateReturn(serviceMethod, kernelMethod, compilation);
         return serviceMethod;
     }
 
@@ -136,10 +139,13 @@ internal static class RpcKernelClientServiceMethodResolver
             $"Server extension parameter '{serviceParameter.Name}' modifier '{DescribeParameterModifiers(serviceParameter)}' must match kernel parameter '{kernelParameter.Name}' modifier '{DescribeParameterModifiers(kernelParameter)}'.");
     }
 
-    private static void ValidateReturn(IMethodSymbol serviceMethod, IMethodSymbol kernelMethod)
+    private static void ValidateReturn(
+        IMethodSymbol serviceMethod,
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
-        var serviceReturn = DotBoxDRpcReturnType.PayloadType(serviceMethod.ReturnType);
-        var kernelReturn = DotBoxDRpcReturnType.PayloadType(kernelMethod.ReturnType);
+        var serviceReturn = DotBoxDRpcReturnType.PayloadType(serviceMethod.ReturnType, compilation);
+        var kernelReturn = DotBoxDRpcReturnType.PayloadType(kernelMethod.ReturnType, compilation);
         if (serviceReturn is null && kernelReturn is null)
         {
             return;
