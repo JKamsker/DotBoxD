@@ -8,12 +8,6 @@ on:
   workflow_run:
     workflows: [ci]
     types: [completed]
-  pull_request_review:
-    types: [submitted]
-  pull_request_review_comment:
-    types: [created]
-  issue_comment:
-    types: [created]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -106,7 +100,6 @@ pre-agent-steps:
           "head_ref": None,
           "head_sha": None,
           "ci_proof": None,
-          "coderabbit_trigger": False,
       }
 
       def run_json(args):
@@ -115,19 +108,6 @@ pre-agent-steps:
               print(result.stderr, file=sys.stderr)
               raise SystemExit(result.returncode)
           return json.loads(result.stdout or "null")
-
-      def is_coderabbit_trigger():
-          sender = event.get("sender") or {}
-          sender_text = " ".join(
-              str(value or "")
-              for value in [
-                  sender.get("login"),
-                  sender.get("type"),
-                  (event.get("comment") or {}).get("body"),
-                  (event.get("review") or {}).get("body"),
-              ]
-          ).lower()
-          return "coderabbit" in sender_text
 
       pr_number = None
       if event_name == "workflow_run":
@@ -154,26 +134,6 @@ pre-agent-steps:
               pr_number = dispatch_pr_number
           else:
               target["reason"] = "Manual dispatch did not provide pr_number."
-      elif event_name == "pull_request_review":
-          if is_coderabbit_trigger():
-              target["coderabbit_trigger"] = True
-              pr_number = ((event.get("pull_request") or {}).get("number"))
-          else:
-              target["reason"] = "Pull request review was not from CodeRabbit."
-      elif event_name == "pull_request_review_comment":
-          if is_coderabbit_trigger():
-              target["coderabbit_trigger"] = True
-              pr_number = ((event.get("pull_request") or {}).get("number"))
-          else:
-              target["reason"] = "Pull request review comment was not from CodeRabbit."
-      elif event_name == "issue_comment":
-          if not ((event.get("issue") or {}).get("pull_request")):
-              target["reason"] = "Issue comment was not on a pull request."
-          elif is_coderabbit_trigger():
-              target["coderabbit_trigger"] = True
-              pr_number = ((event.get("issue") or {}).get("number"))
-          else:
-              target["reason"] = "Issue comment was not from CodeRabbit."
       else:
           target["reason"] = f"Unsupported event: {event_name}"
 

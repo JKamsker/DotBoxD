@@ -324,10 +324,9 @@ before the PR is created. This is intentional; these PRs are supposed to be red
 test reports for confirmed bugs.
 
 After the PR is created, CI must run and fail for the red tests. The companion
-`library-surprise-fix` workflow is triggered by completed `ci` runs and by
-CodeRabbit review/comment events for `[surprise-red-test]` PRs. It is
-responsible for implementing the production fix on the same PR branch and
-folding in actionable CodeRabbit findings.
+`library-surprise-fix` workflow is triggered by completed `ci` runs for
+`[surprise-red-test]` PRs. It is responsible for implementing the production fix
+on the same PR branch and folding in actionable CodeRabbit findings.
 
 ## Pull Request Shape
 
