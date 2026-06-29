@@ -51,6 +51,42 @@ public sealed class PluginAnalyzerKernelMethodEnumDefaultRegressionTests
         Assert.Equal("enum", message.Message);
     }
 
+    [Fact]
+    public async Task KernelMethod_guid_default_argument_lowers_in_hook_chains()
+    {
+        var assembly = Compile("""
+            using System;
+            using DotBoxD.Kernels;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Plugins.Runtime;
+
+            namespace Sample;
+
+            public static class Usage
+            {
+                public static void Configure(RemoteHookRegistry hooks)
+                    => hooks.On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod.KernelMethodAggroEvent>()
+                        .Where(e => IsEmpty())
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "guid"));
+
+                [KernelMethod]
+                public static bool IsEmpty(Guid id = default)
+                    => id == default;
+            }
+            """);
+        var package = HookChainPackage(assembly);
+        var messages = new InMemoryPluginMessageSink();
+        using var server = DotBoxD.Plugins.PluginServer.Create(messages, defaultPolicy: SandboxedPolicy());
+        server.Hooks.On<KernelMethodAggroEvent>().UseGeneratedChain(package);
+
+        await server.Hooks.PublishAsync(new KernelMethodAggroEvent("monster-1", 3, 10, 5));
+
+        var message = Assert.Single(messages.Messages);
+        Assert.Equal("monster-1", message.TargetId);
+        Assert.Equal("guid", message.Message);
+    }
+
     private static PluginPackage HookChainPackage(Assembly assembly)
     {
         var packageType = Assert.Single(assembly.GetTypes(), type =>

@@ -89,19 +89,27 @@ internal static class PluginSymbolReader
         return EquatableArray<EventPropertyModel>.FromOwned(models);
     }
 
-    private static string? Capability(IPropertySymbol property)
+    public static string? Capability(IPropertySymbol property)
     {
         foreach (var attribute in property.GetAttributes())
         {
-            if (string.Equals(
+            if (!string.Equals(
                     attribute.AttributeClass?.ToDisplayString(),
                     DotBoxDMetadataNames.CapabilityAttribute,
-                    StringComparison.Ordinal) &&
-                attribute.ConstructorArguments.Length == 1 &&
-                attribute.ConstructorArguments[0].Value is string { Length: > 0 } id)
+                    StringComparison.Ordinal))
             {
-                return id;
+                continue;
             }
+
+            if (attribute.ConstructorArguments.Length != 1 ||
+                attribute.ConstructorArguments[0].Value is not string id ||
+                string.IsNullOrWhiteSpace(id))
+            {
+                throw new NotSupportedException(
+                    $"Capability on event property '{property.Name}' must not be empty or whitespace.");
+            }
+
+            return id;
         }
 
         return null;

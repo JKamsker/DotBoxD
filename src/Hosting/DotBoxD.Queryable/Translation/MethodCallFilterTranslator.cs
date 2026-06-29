@@ -67,7 +67,7 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
-        var ignoreCase = IsIgnoreCase(call, call.Arguments, parameter);
+        var ignoreCase = ReadIgnoreCase(call, op, call.Arguments, parameter);
         filter = QueryFilter.Compare(path, op, makeValue(raw, call.Arguments[0]), ignoreCase);
         return true;
     }
@@ -96,11 +96,11 @@ internal static class MethodCallFilterTranslator
 
         var unwrapped = UnwrapSpan(collection);
 
-        // An instance collection (HashSet/Dictionary/SortedSet) can carry a custom equality comparer that
-        // changes membership semantics; lowering it to a case-sensitive ordinal In would silently drop or add
-        // matches. Reject the case-insensitive / culture-sensitive comparers rather than mis-translate.
-        if (call.Object is not null &&
-            QueryValueFactory.TryEvaluateObject(unwrapped, parameter, out var collectionObject) &&
+        // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
+        // semantics even when written as static Enumerable.Contains(source, item); lowering that to a
+        // case-sensitive ordinal In would silently drop or add matches. Reject case-insensitive /
+        // culture-sensitive comparers rather than mis-translate.
+        if (QueryValueFactory.TryEvaluateObject(unwrapped, parameter, out var collectionObject) &&
             collectionObject is not null &&
             HasNonOrdinalComparer(collectionObject))
         {
@@ -131,27 +131,43 @@ internal static class MethodCallFilterTranslator
         return stripped;
     }
 
-    private static bool IsIgnoreCase(MethodCallExpression call, IReadOnlyList<Expression> arguments, ParameterExpression parameter)
+    private static bool ReadIgnoreCase(
+        MethodCallExpression call,
+        QueryComparisonOperator op,
+        IReadOnlyList<Expression> arguments,
+        ParameterExpression parameter)
     {
-        for (var i = 1; i < arguments.Count; i++)
+        if (arguments.Count == 1)
         {
-            if (QueryValueFactory.TryEvaluateObject(arguments[i], parameter, out var raw) &&
-                raw is StringComparison comparison)
+            if (op is QueryComparisonOperator.StringStartsWith or QueryComparisonOperator.StringEndsWith)
             {
-                // The evaluator compares ordinally, so only the ordinal modes can be honored faithfully. A
-                // culture-sensitive overload would silently change semantics — reject it instead of downgrading.
-                return comparison switch
-                {
-                    StringComparison.Ordinal => false,
-                    StringComparison.OrdinalIgnoreCase => true,
-                    _ => throw QueryTranslationException.Unsupported(
-                        call,
-                        $"StringComparison.{comparison} is culture-sensitive; only Ordinal and OrdinalIgnoreCase are supported."),
-                };
+                throw QueryTranslationException.Unsupported(
+                    call,
+                    $"string {call.Method.Name} one-argument overload is culture-sensitive; pass StringComparison.Ordinal or OrdinalIgnoreCase.");
             }
+
+            return false;
         }
 
-        return false;
+        if (arguments.Count == 2 &&
+            QueryValueFactory.TryEvaluateObject(arguments[1], parameter, out var raw) &&
+            raw is StringComparison comparison)
+        {
+            // The evaluator compares ordinally, so only the ordinal modes can be honored faithfully. A
+            // culture-sensitive overload would silently change semantics — reject it instead of downgrading.
+            return comparison switch
+            {
+                StringComparison.Ordinal => false,
+                StringComparison.OrdinalIgnoreCase => true,
+                _ => throw QueryTranslationException.Unsupported(
+                    call,
+                    $"StringComparison.{comparison} is culture-sensitive; only Ordinal and OrdinalIgnoreCase are supported."),
+            };
+        }
+
+        throw QueryTranslationException.Unsupported(
+            call,
+            "string filters support only ordinal overloads: one-argument Contains/Equals, or StringComparison.Ordinal/OrdinalIgnoreCase.");
     }
 
     private static bool HasNonOrdinalComparer(object collection)

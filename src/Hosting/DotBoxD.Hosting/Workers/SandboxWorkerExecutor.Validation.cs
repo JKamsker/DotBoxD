@@ -177,13 +177,16 @@ internal sealed partial class SandboxWorkerExecutor
         var observedLogEvents = 0;
         var observedBindingBaseFuel = 0L;
         Dictionary<string, int>? observedBindingCalls = null;
+        var expectedSequenceNumber = 1L;
         foreach (var auditEvent in result.AuditEvents)
         {
-            if (auditEvent.RunId != runId ||
+            if (auditEvent.SequenceNumber != expectedSequenceNumber ||
+                auditEvent.RunId != runId ||
                 !WorkerAuditValidator.Matches(plan, entrypoint, options, auditEvent))
             {
                 return false;
             }
+            expectedSequenceNumber++;
 
             if (IsBindingAudit(auditEvent.Kind))
             {

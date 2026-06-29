@@ -40,7 +40,7 @@ internal sealed partial class InvokeAsyncCallShape
         if (invocation.Parent is not ArrowExpressionClauseSyntax arrow ||
             arrow.Parent is not MethodDeclarationSyntax method ||
             model.GetTypeInfo(method.ReturnType, cancellationToken).Type is not { } methodReturn ||
-            DotBoxDRpcReturnType.PayloadType(methodReturn) is not { } payload)
+            DotBoxDRpcReturnType.PayloadType(methodReturn, model.Compilation) is not { } payload)
         {
             return false;
         }
@@ -84,18 +84,21 @@ internal sealed partial class InvokeAsyncCallShape
             _ => null,
         };
 
-    private static string BuildReturnTypeJson(ITypeSymbol returnType, IReadOnlyList<InvokeAsyncSyncOut> syncOuts)
+    private static string BuildReturnTypeJson(
+        ITypeSymbol returnType,
+        IReadOnlyList<InvokeAsyncSyncOut> syncOuts,
+        Compilation compilation)
     {
         if (syncOuts.Count == 0)
         {
-            return DotBoxDRpcReturnType.JsonType(returnType);
+            return DotBoxDRpcReturnType.JsonType(returnType, compilation);
         }
 
         var fields = new string[1 + syncOuts.Count];
-        fields[0] = DotBoxDRpcReturnType.JsonType(returnType);
+        fields[0] = DotBoxDRpcReturnType.JsonType(returnType, compilation);
         for (var i = 0; i < syncOuts.Count; i++)
         {
-            fields[i + 1] = DotBoxDRpcTypeMapper.JsonType(syncOuts[i].Type);
+            fields[i + 1] = DotBoxDRpcTypeMapper.JsonType(syncOuts[i].Type, compilation);
         }
 
         return "{\"name\":\"Record\",\"arguments\":[" + string.Join(",", fields) + "]}";

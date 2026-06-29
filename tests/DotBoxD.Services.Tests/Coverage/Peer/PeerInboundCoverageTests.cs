@@ -84,8 +84,11 @@ public sealed partial class PeerInboundCoverageTests
         // A well-formed header carrying a message type outside the defined enum range hits the switch
         // default in the frame processor, which raises an "Unknown message type." protocol error.
         const byte unknownType = 0x7F;
-        using var frame = MessageFramer.FrameToPayload(77, (MessageType)unknownType, ReadOnlySpan<byte>.Empty);
-        connection.Enqueue(CopyFrame(frame));
+        var frame = new byte[MessageFramer.HeaderSize];
+        BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(0, 4), frame.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(4, 4), 77);
+        frame[8] = unknownType;
+        connection.Enqueue(RentFrame(frame));
 
         // Subscribe BEFORE Start(): the frame is already enqueued, so the read loop can process it and
         // raise ProtocolError before the handler is attached if we start first (a race that flakes on CI).

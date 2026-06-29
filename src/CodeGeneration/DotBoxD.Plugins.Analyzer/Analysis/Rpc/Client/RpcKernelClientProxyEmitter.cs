@@ -11,7 +11,7 @@ internal static partial class RpcKernelClientProxyEmitter
         INamedTypeSymbol serviceType,
         Compilation compilation)
     {
-        var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod);
+        var serviceMethod = ResolveServiceMethod(serviceType, kernelMethod, compilation);
         return Emit(kernelType, serviceType, serviceMethod, compilation);
     }
 
@@ -30,42 +30,19 @@ internal static partial class RpcKernelClientProxyEmitter
         return new ProxySourceWriter(kernelType, serviceType, serviceMethod, compilation).Emit();
     }
 
-    internal static IMethodSymbol ResolveServiceMethod(INamedTypeSymbol serviceType, IMethodSymbol kernelMethod)
+    internal static IMethodSymbol ResolveServiceMethod(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol kernelMethod,
+        Compilation compilation)
     {
         EnsureAccessibleFromGeneratedClient(serviceType);
-        return RpcKernelClientServiceMethodResolver.Resolve(serviceType, kernelMethod);
+        return RpcKernelClientServiceMethodResolver.Resolve(serviceType, kernelMethod, compilation);
     }
 
     private static void EnsureAccessibleFromGeneratedClient(INamedTypeSymbol serviceType)
         => RpcGeneratedClientAccessibility.EnsureAccessible(
             serviceType,
             $"Server extension interface '{serviceType.ToDisplayString()}'");
-
-    private static bool IsGenericTask(ITypeSymbol type, out ITypeSymbol inner)
-        => TryGenericTaskLike(type, "Task", out inner);
-
-    private static bool IsGenericValueTask(ITypeSymbol type, out ITypeSymbol inner)
-        => TryGenericTaskLike(type, "ValueTask", out inner);
-
-    private static bool TryGenericTaskLike(ITypeSymbol type, string name, out ITypeSymbol inner)
-    {
-        if (type is INamedTypeSymbol
-            {
-                IsGenericType: true,
-                TypeArguments.Length: 1,
-                Name: var typeName,
-                ContainingNamespace: { } ns
-            } named &&
-            string.Equals(typeName, name, StringComparison.Ordinal) &&
-            string.Equals(ns.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal))
-        {
-            inner = named.TypeArguments[0];
-            return true;
-        }
-
-        inner = type;
-        return false;
-    }
 
     private enum ReturnShape
     {
@@ -93,7 +70,7 @@ internal static partial class RpcKernelClientProxyEmitter
             _serviceType = serviceType;
             _serviceMethod = serviceMethod;
             _conv = new RpcKernelValueConversionEmitter(compilation);
-            _returnShape = Shape(serviceMethod.ReturnType, out _payloadReturnType);
+            _returnShape = Shape(serviceMethod.ReturnType, compilation, out _payloadReturnType);
         }
 
         public string Emit()
@@ -193,7 +170,10 @@ internal static partial class RpcKernelClientProxyEmitter
             builder.AppendLine();
         }
 
-        private static ReturnShape Shape(ITypeSymbol type, out ITypeSymbol? payloadType)
+        private static ReturnShape Shape(
+            ITypeSymbol type,
+            Compilation compilation,
+            out ITypeSymbol? payloadType)
         {
             if (type.SpecialType == SpecialType.System_Void)
             {
@@ -201,21 +181,21 @@ internal static partial class RpcKernelClientProxyEmitter
                 return ReturnShape.Direct;
             }
 
-            if (DotBoxDRpcReturnType.PayloadType(type) is null)
+            if (DotBoxDRpcReturnType.PayloadType(type, compilation) is null)
             {
                 payloadType = null;
-                return type is INamedTypeSymbol { Name: "ValueTask" }
+                return DotBoxDWellKnownTaskTypes.IsValueTask(type, compilation)
                     ? ReturnShape.ValueTask
                     : ReturnShape.Task;
             }
 
-            if (IsGenericTask(type, out var taskPayloadType))
+            if (DotBoxDWellKnownTaskTypes.IsGenericTask(type, compilation, out var taskPayloadType))
             {
                 payloadType = taskPayloadType;
                 return ReturnShape.Task;
             }
 
-            if (IsGenericValueTask(type, out var valueTaskPayloadType))
+            if (DotBoxDWellKnownTaskTypes.IsGenericValueTask(type, compilation, out var valueTaskPayloadType))
             {
                 payloadType = valueTaskPayloadType;
                 return ReturnShape.ValueTask;

@@ -18,6 +18,28 @@ internal sealed partial class RpcPeerOutboundInvoker
         }
     }
 
+    private static string ValidateInstanceId(string instanceId)
+    {
+        if (instanceId is null)
+        {
+            throw new ArgumentNullException(nameof(instanceId));
+        }
+
+        return instanceId;
+    }
+
+    private static Task MissingInstanceIdTask() =>
+        Task.FromException(new ArgumentNullException("instanceId"));
+
+    private static Task<T> MissingInstanceIdTask<T>() =>
+        Task.FromException<T>(new ArgumentNullException("instanceId"));
+
+    private static ValueTask MissingInstanceIdValueTask() =>
+        new(MissingInstanceIdTask());
+
+    private static ValueTask<T> MissingInstanceIdValueTask<T>() =>
+        new(MissingInstanceIdTask<T>());
+
     private static RpcRequest CreateEnvelope(
         int messageId,
         string service,

@@ -57,11 +57,38 @@ public sealed class QueryReviewHardeningTests
                 e => e.TargetId.StartsWith("x", StringComparison.InvariantCultureIgnoreCase)));
 
     [Fact]
+    public void Legacy_culture_sensitive_string_overload_is_rejected()
+        => Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => e.TargetId.StartsWith("PL", ignoreCase: true, CultureInfo.InvariantCulture)));
+
+    [Fact]
+    public void One_argument_starts_with_is_rejected_because_it_is_culture_sensitive()
+        => Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => e.TargetId.StartsWith("caf\u00e9")));
+
+    [Fact]
+    public void One_argument_ends_with_is_rejected_because_it_is_culture_sensitive()
+        => Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => e.TargetId.EndsWith("caf\u00e9")));
+
+    [Fact]
     public void Contains_over_a_case_insensitive_collection_is_rejected()
     {
         var watched = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a", "b" };
         Assert.Throws<QueryTranslationException>(() =>
             ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId)));
+    }
+
+    [Fact]
+    public void Static_contains_over_a_case_insensitive_collection_is_rejected()
+    {
+        var watched = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a", "b" };
+        Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => Enumerable.Contains(watched, e.AttackerId)));
     }
 
     [Fact]

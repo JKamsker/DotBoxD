@@ -37,7 +37,7 @@ internal static class RegistrationAccumulatorModelFactory
             ValidateIdentifier(methodName, "Registration method");
             ValidateGeneratedTypeName(type, accumulatorName);
 
-            var method = ResolveRegistrationMethod(type, methodName);
+            var method = ResolveRegistrationMethod(type, methodName, context.SemanticModel.Compilation);
             var typeParameters = TypeParameters(method);
             var model = new RegistrationAccumulatorTargetModel(
                 Namespace(type),
@@ -114,7 +114,10 @@ internal static class RegistrationAccumulatorModelFactory
         }
     }
 
-    private static IMethodSymbol ResolveRegistrationMethod(INamedTypeSymbol type, string methodName)
+    private static IMethodSymbol ResolveRegistrationMethod(
+        INamedTypeSymbol type,
+        string methodName,
+        Compilation compilation)
     {
         var methods = type.GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -133,7 +136,13 @@ internal static class RegistrationAccumulatorModelFactory
                 $"Registration accumulator method '{methodName}' must not declare parameters.");
         }
 
-        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType))
+        if (!IsCallableFromGeneratedAccumulator(method))
+        {
+            throw new NotSupportedException(
+                $"Registration accumulator method '{methodName}' must be accessible from generated accumulator code.");
+        }
+
+        if (!IsResultBearingAwaitableRegistrationReturn(method.ReturnType, compilation))
         {
             throw new NotSupportedException(
                 $"Registration accumulator method '{methodName}' must return Task<T> or ValueTask<T>; " +
@@ -143,11 +152,16 @@ internal static class RegistrationAccumulatorModelFactory
         return method;
     }
 
-    private static bool IsResultBearingAwaitableRegistrationReturn(ITypeSymbol type)
-        => type is INamedTypeSymbol named &&
-           named.Name is "Task" or "ValueTask" &&
-           named is { IsGenericType: true, TypeArguments.Length: 1 } &&
-           string.Equals(named.ContainingNamespace.ToDisplayString(), "System.Threading.Tasks", StringComparison.Ordinal);
+    private static bool IsResultBearingAwaitableRegistrationReturn(
+        ITypeSymbol type,
+        Compilation compilation)
+        => DotBoxDWellKnownTaskTypes.IsGenericTask(type, compilation, out _) ||
+           DotBoxDWellKnownTaskTypes.IsGenericValueTask(type, compilation, out _);
+
+    private static bool IsCallableFromGeneratedAccumulator(IMethodSymbol method)
+        => method.DeclaredAccessibility is Accessibility.Public
+            or Accessibility.Internal
+            or Accessibility.ProtectedOrInternal;
 
     private static EquatableArray<RegistrationTypeParameterModel> TypeParameters(IMethodSymbol method)
     {
@@ -196,15 +210,27 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static EquatableArray<RegistrationRootPropertyModel> PublicInstanceProperties(INamedTypeSymbol type)
     {
-        var properties = type.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(static property =>
-                property is { IsStatic: false, DeclaredAccessibility: Accessibility.Public } &&
-                property.GetMethod is not null &&
-                property.Parameters.Length == 0)
-            .Select(static property => new RegistrationRootPropertyModel(property.Name, TypeName(property.Type)))
-            .ToArray();
-        return EquatableArray<RegistrationRootPropertyModel>.FromOwned(properties);
+        var properties = new List<RegistrationRootPropertyModel>();
+        var seenNames = new HashSet<string>(StringComparer.Ordinal);
+        for (INamedTypeSymbol? current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (!seenNames.Add(property.Name))
+                {
+                    continue;
+                }
+
+                if (property is { IsStatic: false, DeclaredAccessibility: Accessibility.Public } &&
+                    property.GetMethod is not null &&
+                    property.Parameters.Length == 0)
+                {
+                    properties.Add(new RegistrationRootPropertyModel(property.Name, TypeName(property.Type)));
+                }
+            }
+        }
+
+        return EquatableArray<RegistrationRootPropertyModel>.FromOwned(properties.ToArray());
     }
 
     private static RegistrationAccumulatorGenerationResult Fail(TypeDeclarationSyntax declaration, string message)

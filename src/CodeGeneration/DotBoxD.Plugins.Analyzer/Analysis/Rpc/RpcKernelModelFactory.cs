@@ -36,6 +36,11 @@ internal static partial class RpcKernelModelFactory
             return Fail(declaration, $"Generated server extension '{type.Name}' cannot be generic.");
         }
 
+        if (type.ContainingType is not null)
+        {
+            return Fail(declaration, $"Server extension kernels must be top-level types; '{type.ToDisplayString()}' is nested.");
+        }
+
         var serviceType = ServiceType(context.Attributes);
         var graftType = GraftType(context.Attributes);
 
@@ -56,7 +61,10 @@ internal static partial class RpcKernelModelFactory
             RpcKernelClientMethodExtension? directClientMethod = null;
             if (serviceType is not null)
             {
-                serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(serviceType, method);
+                serviceMethod = RpcKernelClientProxyEmitter.ResolveServiceMethod(
+                    serviceType,
+                    method,
+                    context.SemanticModel.Compilation);
                 clientExtensions = RpcKernelClientExtensionModelFactory.Resolve(type, method);
                 ValidateGeneratedClientTypeCollisions(type, clientExtensions);
             }
@@ -150,7 +158,7 @@ internal static partial class RpcKernelModelFactory
         Compilation compilation)
     {
         var methodName = method.Name;
-        var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType);
+        var returnType = DotBoxDRpcReturnType.JsonType(method.ReturnType, compilation);
         var parameters = new List<string>();
         if (hasReceiverId)
         {
@@ -160,7 +168,7 @@ internal static partial class RpcKernelModelFactory
         for (var i = 0; i < method.Parameters.Length - 1; i++)
         {
             var parameter = method.Parameters[i];
-            parameters.Add($"{{\"name\":{Str(parameter.Name)},\"type\":{DotBoxDRpcTypeMapper.JsonType(parameter.Type)}}}");
+            parameters.Add($"{{\"name\":{Str(parameter.Name)},\"type\":{DotBoxDRpcTypeMapper.JsonType(parameter.Type, compilation)}}}");
         }
 
         foreach (var setting in liveSettings)

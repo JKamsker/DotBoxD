@@ -6,29 +6,14 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
 {
-    private static List<MemberBinding>? RecordTailBindings(
-        IReadOnlyList<int> constructorMap,
+    private static List<MemberBinding>? RecordInitializerBindings(
         IReadOnlyList<RecordMember> fields,
         Func<int, LinqExpression> fieldExpression,
         Func<LinqExpression, Type, LinqExpression> readField)
     {
-        var assigned = new bool[fields.Count];
-        for (var i = 0; i < constructorMap.Count; i++)
-        {
-            if (constructorMap[i] >= 0)
-            {
-                assigned[constructorMap[i]] = true;
-            }
-        }
-
         var bindings = new List<MemberBinding>();
         for (var i = 0; i < fields.Count; i++)
         {
-            if (assigned[i])
-            {
-                continue;
-            }
-
             if (!CanBindInitializerMember(fields[i]))
             {
                 return null;

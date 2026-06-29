@@ -6,17 +6,10 @@ using DotBoxD.Services.SourceGenerator.Models;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
 
-internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInterfaceNames)
+internal static class ServiceAvailabilityIndexHelpers
 {
-    public static RejectedServiceIndex Create(ImmutableArray<RejectedServiceIdentity> services, CancellationToken ct)
+    public static List<string> SortedUnique(List<string> names, CancellationToken ct)
     {
-        var names = new List<string>(services.Length);
-        foreach (var service in services)
-        {
-            ct.ThrowIfCancellationRequested();
-            names.Add(service.QualifiedInterfaceName);
-        }
-
         names.Sort((left, right) =>
         {
             ct.ThrowIfCancellationRequested();
@@ -33,20 +26,23 @@ internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInte
             }
         }
 
-        return new RejectedServiceIndex(uniqueNames.ToEquatableArray());
+        return uniqueNames;
     }
 
-    public bool Contains(string qualifiedInterfaceName, CancellationToken ct)
+    public static bool ContainsSorted(
+        EquatableArray<string> qualifiedInterfaceNames,
+        string qualifiedInterfaceName,
+        CancellationToken ct)
     {
         var low = 0;
-        var high = QualifiedInterfaceNames.Count - 1;
+        var high = qualifiedInterfaceNames.Count - 1;
         while (low <= high)
         {
             ct.ThrowIfCancellationRequested();
 
             var mid = low + ((high - low) / 2);
             var comparison = string.Compare(
-                QualifiedInterfaceNames[mid],
+                qualifiedInterfaceNames[mid],
                 qualifiedInterfaceName,
                 System.StringComparison.Ordinal);
             if (comparison == 0)
@@ -68,10 +64,47 @@ internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInte
     }
 }
 
+internal sealed record RejectedServiceIndex(EquatableArray<string> QualifiedInterfaceNames)
+{
+    public static RejectedServiceIndex Create(ImmutableArray<RejectedServiceIdentity> services, CancellationToken ct)
+    {
+        var names = new List<string>(services.Length);
+        foreach (var service in services)
+        {
+            ct.ThrowIfCancellationRequested();
+            names.Add(service.QualifiedInterfaceName);
+        }
+
+        return new RejectedServiceIndex(ServiceAvailabilityIndexHelpers.SortedUnique(names, ct).ToEquatableArray());
+    }
+
+    public bool Contains(string qualifiedInterfaceName, CancellationToken ct)
+        => ServiceAvailabilityIndexHelpers.ContainsSorted(QualifiedInterfaceNames, qualifiedInterfaceName, ct);
+}
+
+internal sealed record GeneratedServiceIndex(EquatableArray<string> QualifiedInterfaceNames)
+{
+    public static GeneratedServiceIndex Create(ImmutableArray<ServiceIdentity> services, CancellationToken ct)
+    {
+        var names = new List<string>(services.Length);
+        foreach (var service in services)
+        {
+            ct.ThrowIfCancellationRequested();
+            names.Add(service.QualifiedInterfaceName);
+        }
+
+        return new GeneratedServiceIndex(ServiceAvailabilityIndexHelpers.SortedUnique(names, ct).ToEquatableArray());
+    }
+
+    public bool Contains(string qualifiedInterfaceName, CancellationToken ct)
+        => ServiceAvailabilityIndexHelpers.ContainsSorted(QualifiedInterfaceNames, qualifiedInterfaceName, ct);
+}
+
 internal static class SubServiceAvailabilityValidator
 {
     public static ServiceResult Apply(
         ServiceResult result,
+        GeneratedServiceIndex generatedServices,
         RejectedServiceIndex rejectedServices,
         CancellationToken ct)
     {
@@ -86,7 +119,7 @@ internal static class SubServiceAvailabilityValidator
 
             var property = result.Model.Properties[i];
             if (property.SubService is not null &&
-                rejectedServices.Contains(property.SubService.QualifiedInterfaceName, ct))
+                IsUnavailable(property.SubService, generatedServices, rejectedServices, ct))
             {
                 var reason =
                     $"sub-service property '{IdentifierHelpers.UnescapeIdentifier(property.Name)}' cannot be proxied because that service was not generated";
@@ -114,7 +147,7 @@ internal static class SubServiceAvailabilityValidator
             var method = result.Model.Methods[i];
             if (method.UnsupportedReason is null &&
                 method.SubService is not null &&
-                rejectedServices.Contains(method.SubService.QualifiedInterfaceName, ct))
+                IsUnavailable(method.SubService, generatedServices, rejectedServices, ct))
             {
                 var reason =
                     $"sub-service return type '{method.SubService.QualifiedInterfaceName}' cannot be proxied because that service was not generated";
@@ -159,4 +192,13 @@ internal static class SubServiceAvailabilityValidator
             ? IdentifierHelpers.EscapeIdentifier(model.InterfaceName)
             : IdentifierHelpers.EscapeNamespace(model.Namespace) + "." +
                 IdentifierHelpers.EscapeIdentifier(model.InterfaceName);
+
+    private static bool IsUnavailable(
+        SubServiceInfo subService,
+        GeneratedServiceIndex generatedServices,
+        RejectedServiceIndex rejectedServices,
+        CancellationToken ct)
+        => rejectedServices.Contains(subService.QualifiedInterfaceName, ct) ||
+            (!subService.HasProxyCompanion &&
+             !generatedServices.Contains(subService.QualifiedInterfaceName, ct));
 }

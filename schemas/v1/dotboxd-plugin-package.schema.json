@@ -14,6 +14,27 @@
     },
     "entrypoints": { "$ref": "#/$defs/entrypoints" }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "manifest": {
+            "type": "object",
+            "required": ["rpcEntrypoint"]
+          }
+        },
+        "required": ["manifest"]
+      },
+      "then": {
+        "required": ["entrypoints"],
+        "properties": {
+          "entrypoints": {
+            "required": ["shouldHandle", "handle"]
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "manifest": {
       "type": "object",
