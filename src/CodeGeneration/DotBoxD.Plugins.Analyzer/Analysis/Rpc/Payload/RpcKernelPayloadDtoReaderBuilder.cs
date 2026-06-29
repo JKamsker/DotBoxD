@@ -23,6 +23,7 @@ internal static class RpcKernelPayloadDtoReaderBuilder
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
+            ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(type, fields, constructor.Symbol, compilation);
             return BuildInitializer(construction, fields, constructor.Assigned, compilation);
         }
 
@@ -220,6 +221,43 @@ internal static class RpcKernelPayloadDtoReaderBuilder
 
     private static int AssignedCount(bool[] assigned)
         => assigned.Count(static item => item);
+
+    private static void ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        IMethodSymbol constructor,
+        Compilation? compilation)
+    {
+        if (HasSetsRequiredMembers(constructor))
+        {
+            return;
+        }
+
+        foreach (var field in fields)
+        {
+            if (IsRequiredMember(field) &&
+                !DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, compilation))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type.ToDisplayString()}' required field '{field.Name}' is read-only; " +
+                    "mark the constructor with SetsRequiredMembers or make the member settable.");
+            }
+        }
+    }
+
+    private static bool IsRequiredMember(RecordMember field)
+        => field.Symbol switch
+        {
+            IPropertySymbol property => property.IsRequired,
+            IFieldSymbol fieldSymbol => fieldSymbol.IsRequired,
+            _ => false,
+        };
+
+    private static bool HasSetsRequiredMembers(IMethodSymbol constructor)
+        => constructor.GetAttributes().Any(attribute => string.Equals(
+            attribute.AttributeClass?.ToDisplayString(),
+            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
+            StringComparison.Ordinal));
 
     private sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
 }

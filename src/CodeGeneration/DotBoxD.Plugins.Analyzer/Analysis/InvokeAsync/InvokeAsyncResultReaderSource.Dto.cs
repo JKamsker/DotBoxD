@@ -20,6 +20,7 @@ internal sealed partial class InvokeAsyncResultReaderSource
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
+            ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(type, fields, constructor.Symbol);
             return BuildDtoInitializer(construction, fields, constructor.Assigned);
         }
 
@@ -203,6 +204,42 @@ internal sealed partial class InvokeAsyncResultReaderSource
 
     private static int AssignedCount(bool[] assigned)
         => assigned.Count(static item => item);
+
+    private void ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        IMethodSymbol constructor)
+    {
+        if (HasSetsRequiredMembers(constructor))
+        {
+            return;
+        }
+
+        foreach (var field in fields)
+        {
+            if (IsRequiredMember(field) &&
+                !DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation))
+            {
+                throw new NotSupportedException(
+                    $"InvokeAsync DTO '{type.ToDisplayString()}' required field '{field.Name}' is read-only; " +
+                    "mark the constructor with SetsRequiredMembers or make the member settable.");
+            }
+        }
+    }
+
+    private static bool IsRequiredMember(RecordMember field)
+        => field.Symbol switch
+        {
+            IPropertySymbol property => property.IsRequired,
+            IFieldSymbol fieldSymbol => fieldSymbol.IsRequired,
+            _ => false,
+        };
+
+    private static bool HasSetsRequiredMembers(IMethodSymbol constructor)
+        => constructor.GetAttributes().Any(attribute => string.Equals(
+            attribute.AttributeClass?.ToDisplayString(),
+            "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
+            StringComparison.Ordinal));
 
     private sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
 }
