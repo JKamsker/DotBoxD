@@ -29,9 +29,10 @@ internal static partial class GeneratedRemoteHookChainFallback
             return AwaitedTypeSyntax(awaitExpression, model, cancellationToken);
         }
 
-        if (expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Result" } resultAccess)
+        if (expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Result" } resultAccess &&
+            TaskResultTypeSyntax(resultAccess, model, cancellationToken) is { } resultType)
         {
-            return TaskResultTypeSyntax(resultAccess, model, cancellationToken);
+            return resultType;
         }
 
         var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
