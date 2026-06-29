@@ -53,10 +53,11 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         var returnType = HostBindingReturnTag(method.ReturnType, bindingId);
 
         var allocates = HostBindingMetadataRules.ReturnAllocatesManifestTag(returnType);
-        var arguments = LowerHostBindingArguments(
-            invocation.ArgumentList.Arguments,
-            method.Parameters,
+        var arguments = LowerHostBindingCallArguments(
+            invocation,
+            method,
             bindingId,
+            context,
             lowerExpression);
         var loweredSources = new List<string>(arguments.Count);
         foreach (var argument in arguments)
