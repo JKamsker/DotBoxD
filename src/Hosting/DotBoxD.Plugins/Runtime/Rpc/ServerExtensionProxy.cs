@@ -124,6 +124,11 @@ public class ServerExtensionProxy : DispatchProxy
 
         foreach (var method in methods)
         {
+            if (method.IsGenericMethodDefinition || method.ContainsGenericParameters)
+            {
+                throw new NotSupportedException("Server extension proxy service methods must be non-generic.");
+            }
+
             var parameters = method.GetParameters();
             for (var i = 0; i < parameters.Length; i++)
             {
