@@ -24,6 +24,11 @@ internal static partial class GeneratedRemoteHookChainFallback
             return asType;
         }
 
+        if (expression is AwaitExpressionSyntax awaitExpression)
+        {
+            return AwaitedTypeSyntax(awaitExpression, model, cancellationToken);
+        }
+
         var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
         if (symbol is null &&
             expression is MemberAccessExpressionSyntax { Name: SimpleNameSyntax name })
@@ -108,6 +113,39 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         return null;
     }
+
+    private static TypeSyntax? AwaitedTypeSyntax(
+        AwaitExpressionSyntax awaitExpression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var awaitedExpression = HookChainAliasResolver.UnwrapTransparentExpression(awaitExpression.Expression);
+        return DeclaredTypeSyntax(awaitedExpression, model, cancellationToken) is { } typeSyntax
+            ? AwaitedTypeArgumentSyntax(typeSyntax)
+            : null;
+    }
+
+    private static TypeSyntax? AwaitedTypeArgumentSyntax(TypeSyntax typeSyntax)
+    {
+        if (typeSyntax is NullableTypeSyntax nullable)
+        {
+            typeSyntax = nullable.ElementType;
+        }
+
+        return typeSyntax switch
+        {
+            GenericNameSyntax generic => AwaitedTypeArgumentSyntax(generic),
+            QualifiedNameSyntax { Right: GenericNameSyntax generic } => AwaitedTypeArgumentSyntax(generic),
+            AliasQualifiedNameSyntax { Name: GenericNameSyntax generic } => AwaitedTypeArgumentSyntax(generic),
+            _ => null
+        };
+    }
+
+    private static TypeSyntax? AwaitedTypeArgumentSyntax(GenericNameSyntax generic)
+        => generic.TypeArgumentList.Arguments.Count == 1 &&
+           generic.Identifier.ValueText is "Task" or "ValueTask"
+            ? generic.TypeArgumentList.Arguments[0]
+            : null;
 
     private static TypeSyntax? LocalTypeSyntax(
         ILocalSymbol local,

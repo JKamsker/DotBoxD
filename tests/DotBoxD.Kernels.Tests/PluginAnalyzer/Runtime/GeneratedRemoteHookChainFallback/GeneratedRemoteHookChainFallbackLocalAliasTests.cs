@@ -125,4 +125,32 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
 
         Assert.Contains("tuple-element-alias", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Same_compilation_generated_registry_awaited_receiver_lowers()
+    {
+        var result = RunGenerator(GeneratedServerSource + """
+
+            namespace ChainSample.Plugin
+            {
+            public static class AwaitedReceiverUsage
+            {
+                private static System.Threading.Tasks.Task<AlphaPluginHookRegistry> HooksAsync(
+                    AlphaPluginServer server)
+                    => System.Threading.Tasks.Task.FromResult(server.Hooks);
+
+                public static async System.Threading.Tasks.Task Configure(AlphaPluginServer server)
+                {
+                    (await HooksAsync(server))
+                        .On<global::DotBoxD.Kernels.Tests.PluginAnalyzer.Runtime.ChainAggroEvent>()
+                        .Where(e => e.Distance <= 5)
+                        .Run((e, ctx) => ctx.Messages.Send(e.MonsterId, "awaited-receiver"));
+                }
+            }
+            }
+            """);
+        var generated = string.Join("\n", GeneratedSources(result));
+
+        Assert.Contains("awaited-receiver", generated, StringComparison.Ordinal);
+    }
 }
