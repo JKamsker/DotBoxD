@@ -334,6 +334,7 @@ jobs:
               "PublicModelImmutabilityTests",
               "PluginPackageValidationTests",
               "KernelRegistryLookupConsistencyTests",
+              "PluginTypedLiveSettingViewTests",
               "EventIndexTrustBoundaryTests",
               "CapabilityPolicySplitTests",
               "HookChainRuntimeTests",

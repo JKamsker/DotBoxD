@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Tests._TestSupport;
 
 namespace DotBoxD.Kernels.Tests.Plugins.LiveSettings;
@@ -23,10 +24,35 @@ public sealed class PluginTypedLiveSettingViewTests
         Assert.Equal(250, primary.Kernel.Value.Get<int>("MinDamage"));
     }
 
+    [Fact]
+    public async Task Class_typed_view_without_parameterless_constructor_fails_closed()
+    {
+        var server = PluginAddendumTestPolicies.CreateServer();
+        await server.InstallAsync(FireDamagePluginPackage.Create());
+
+        var ex = Assert.Throws<SandboxValidationException>(() =>
+            server.Kernels.Get<ConstructorOnlyFireDamageSettings>("fire-damage"));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK020");
+        Assert.Contains(
+            "must be non-abstract and expose a parameterless constructor",
+            ex.Message,
+            StringComparison.Ordinal);
+    }
+
     private sealed class AlternateFireDamageSettings
     {
         [LiveSetting]
         public string DamageType { get; set; } = "fire";
+
+        [LiveSetting]
+        public int MinDamage { get; set; } = 100;
+    }
+
+    private sealed class ConstructorOnlyFireDamageSettings(string damageType)
+    {
+        [LiveSetting]
+        public string DamageType { get; set; } = damageType;
 
         [LiveSetting]
         public int MinDamage { get; set; } = 100;

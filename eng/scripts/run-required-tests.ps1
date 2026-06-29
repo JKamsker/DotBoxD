@@ -59,6 +59,7 @@ $defaultMinimums = @{
     PublicModelImmutabilityTests = 5
     PluginPackageValidationTests = 19
     KernelRegistryLookupConsistencyTests = 1
+    PluginTypedLiveSettingViewTests = 2
     EventIndexTrustBoundaryTests = 7
     CapabilityPolicySplitTests = 7
     HookChainRuntimeTests = 11
