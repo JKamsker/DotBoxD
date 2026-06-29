@@ -6,6 +6,16 @@ public sealed record AttackTestEvent(string AttackerId, string TargetId, int Dam
 /// <summary>A projected payload mirroring the issue's <c>AttackNotice</c> DTO.</summary>
 public sealed record AttackNotice(string AttackerId, string TargetId, int Damage);
 
+/// <summary>A mutable projected payload with constructor arguments plus object-initializer assignments.</summary>
+public sealed class MutableAttackNotice(string attackerId)
+{
+    public string AttackerId { get; } = attackerId;
+
+    public string TargetId { get; set; } = string.Empty;
+
+    public int Damage { get; set; }
+}
+
 /// <summary>An event with a nested member, used to exercise dotted member paths.</summary>
 public sealed record SourcedTestEvent(NestedSource Source, int Value, bool Flagged);
 

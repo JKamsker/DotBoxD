@@ -186,6 +186,21 @@ public sealed class ExpressionQueryTranslatorTests
     }
 
     [Fact]
+    public void TranslateProjection_preserves_member_init_constructor_arguments()
+    {
+        var projection = ExpressionQueryTranslator.TranslateProjection<AttackTestEvent, MutableAttackNotice>(
+            e => new MutableAttackNotice(e.AttackerId)
+            {
+                TargetId = e.TargetId,
+                Damage = e.Damage,
+            });
+
+        Assert.Equal(QueryProjectionKind.Construct, projection.Kind);
+        Assert.Equal(new[] { "attackerId", "TargetId", "Damage" }, projection.Fields.Select(f => f.Name));
+        Assert.Equal(new[] { "AttackerId", "TargetId", "Damage" }, projection.Fields.Select(f => f.Path));
+    }
+
+    [Fact]
     public void TranslateProjection_rejects_unsupported_shape()
     {
         Assert.Throws<QueryTranslationException>(
