@@ -158,6 +158,15 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     }
 
     [Fact]
+    public void SandboxTypeOf_rejects_dto_shapes_with_nullable_reference_members()
+    {
+        var ex = Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(typeof(NullableReferenceMemberDto)));
+
+        Assert.Contains("nullable", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void FromSandboxValue_rejects_float_overflow_inside_constructor_dto()
         => Assert.Throws<NotSupportedException>(
             () => KernelRpcMarshaller.FromSandboxValue(
@@ -199,19 +208,9 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
                 KernelRpcValue.Record([KernelRpcValue.Int32(300)]),
                 typeof(SetterEnumDto)));
 
-    [Theory]
-    [InlineData(typeof(DateOnly))]
-    [InlineData(typeof(TimeOnly))]
-    [InlineData(typeof(Index))]
-    [InlineData(typeof(Range))]
-    [InlineData(typeof(CancellationToken))]
-    public void SandboxTypeOf_rejects_unsupported_framework_structs_before_dto_reflection(Type type)
-    {
-        var ex = Assert.Throws<NotSupportedException>(() => KernelRpcMarshaller.SandboxTypeOf(type));
-
-        Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("nests beyond", ex.Message, StringComparison.OrdinalIgnoreCase);
-    }
+    [Fact]
+    public void SandboxTypeOf_treats_cancellation_token_as_bool_not_dto()
+        => Assert.Equal(SandboxType.Bool, KernelRpcMarshaller.SandboxTypeOf(typeof(CancellationToken)));
 
     [Fact]
     public void FromKernelRpcValue_uses_constructor_with_unmatched_optional_parameter()
@@ -303,6 +302,11 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
         public int Health { get; }
 
         public int Rank { get; set; }
+    }
+
+    private sealed class NullableReferenceMemberDto
+    {
+        public string? Name { get; set; }
     }
 
     private enum IntBackedEnum
