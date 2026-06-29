@@ -47,10 +47,29 @@ public static partial class KernelRpcMarshaller
             return SandboxType.String;
         if (type == typeof(Guid))
             return SandboxType.Guid;
+        if (type == typeof(DateOnly))
+            return SandboxType.I32;
+        if (type == typeof(TimeOnly))
+            return SandboxType.I64;
         if (type == typeof(TimeSpan))
             return SandboxType.I64;
+        if (type == typeof(CancellationToken))
+            return SandboxType.Bool;
         if (IsDateTimeWireType(type))
+        {
+            RejectRecordTypeTooDeep(type, depth);
             return DateTimeWireSandboxType();
+        }
+        if (type == typeof(Index))
+        {
+            RejectRecordTypeTooDeep(type, depth);
+            return IndexWireSandboxType();
+        }
+        if (type == typeof(Range))
+        {
+            RejectRangeTypeTooDeep(type, depth);
+            return RangeWireSandboxType();
+        }
         if (type.IsEnum)
             return EnumUsesI64(type) ? SandboxType.I64 : SandboxType.I32;
 
@@ -65,6 +84,7 @@ public static partial class KernelRpcMarshaller
             return SandboxType.List(SandboxTypeOf(elementType, depth + 1, rejectNullableReferences));
         if (MapTypes(type) is { } mapTypes)
         {
+            RejectUnsupportedMapKeyType(mapTypes.Key);
             var keyType = SandboxTypeOf(mapTypes.Key, depth + 1, rejectNullableReferences);
             // The kernel verifier only accepts a fixed set of scalar map keys (bool/int/long/string/opaque-id, not
             // Guid or double). Reject an unsupported key here with a catchable NotSupportedException instead of
@@ -96,5 +116,41 @@ public static partial class KernelRpcMarshaller
         }
 
         throw new NotSupportedException($"Server extension has no sandbox type for '{type}'.");
+    }
+
+    private static void RejectUnsupportedMapKeyType(Type keyType)
+    {
+        if (keyType == typeof(CancellationToken))
+        {
+            throw new NotSupportedException(
+                "Kernel RPC service map key type 'System.Threading.CancellationToken' is not supported; " +
+                "CancellationToken marshals as a bool snapshot and would collapse distinct tokens.");
+        }
+    }
+
+    private static void ThrowIfUnsupportedFrameworkStruct(Type type)
+    {
+        if (IsFrameworkStructWireType(type))
+        {
+            throw new NotSupportedException($"Server extension has no sandbox type for '{type}'.");
+        }
+    }
+
+    private static void RejectRecordTypeTooDeep(Type type, int depth)
+    {
+        if (depth >= MaxTypeNestingDepth)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
+        }
+    }
+
+    private static void RejectRangeTypeTooDeep(Type type, int depth)
+    {
+        if (depth + 1 >= MaxTypeNestingDepth)
+        {
+            throw new NotSupportedException(
+                $"Kernel RPC service type '{type}' nests beyond the supported depth of {MaxTypeNestingDepth}.");
+        }
     }
 }

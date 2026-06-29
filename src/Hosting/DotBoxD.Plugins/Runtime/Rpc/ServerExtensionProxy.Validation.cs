@@ -13,7 +13,7 @@ internal static class ServerExtensionProxyValidation
                 "Task and ValueTask are only supported as top-level return types.");
         }
 
-        KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(type);
+        KernelRpcMarshaller.RejectUnsupportedNullableValueTypesForServerExtension(type);
         _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 

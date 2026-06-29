@@ -12,6 +12,14 @@ public static partial class KernelRpcMarshaller
         }
     }
 
+    internal static void RejectUnsupportedNullableValueTypesForServerExtension(Type type)
+    {
+        if (UnsupportedNullableValueType(type, []) is { } unsupported)
+        {
+            throw UnsupportedNullableUnderlying(unsupported);
+        }
+    }
+
     private static bool TryNullableToSandboxValue(object? value, Type type, out SandboxValue sandbox)
     {
         if (Nullable.GetUnderlyingType(type) is not { } underlying)
@@ -100,8 +108,14 @@ public static partial class KernelRpcMarshaller
             return SandboxValue.FromDouble(0D);
         if (underlying == typeof(Guid))
             return SandboxValue.FromGuid(Guid.Empty);
+        if (underlying == typeof(DateOnly))
+            return SandboxValue.FromInt32(0);
+        if (underlying == typeof(TimeOnly))
+            return SandboxValue.FromInt64(0L);
         if (underlying == typeof(TimeSpan))
             return SandboxValue.FromInt64(0L);
+        if (underlying == typeof(CancellationToken))
+            return SandboxValue.FromBool(false);
         if (underlying.IsEnum)
             return EnumUsesI64(underlying) ? SandboxValue.FromInt64(0L) : SandboxValue.FromInt32(0);
 
@@ -116,7 +130,10 @@ public static partial class KernelRpcMarshaller
             underlying == typeof(float) ||
             underlying == typeof(double) ||
             underlying == typeof(Guid) ||
+            underlying == typeof(DateOnly) ||
+            underlying == typeof(TimeOnly) ||
             underlying == typeof(TimeSpan) ||
+            underlying == typeof(CancellationToken) ||
             underlying.IsEnum)
         {
             return;
@@ -127,6 +144,51 @@ public static partial class KernelRpcMarshaller
 
     private static NotSupportedException UnsupportedNullableUnderlying(Type underlying)
         => new($"Kernel RPC service nullable type '{typeof(Nullable<>).MakeGenericType(underlying)}' is not supported.");
+
+    private static Type? UnsupportedNullableValueType(Type type, HashSet<Type> visited)
+    {
+        if (!visited.Add(type))
+        {
+            return null;
+        }
+
+        if (Nullable.GetUnderlyingType(type) is { } underlying)
+        {
+            return IsSupportedNullableUnderlying(underlying) ? null : underlying;
+        }
+
+        if (ElementType(type) is { } elementType &&
+            UnsupportedNullableValueType(elementType, visited) is { } unsupportedElement)
+        {
+            return unsupportedElement;
+        }
+
+        if (MapTypes(type) is { } mapTypes)
+        {
+            if (UnsupportedNullableValueType(mapTypes.Key, visited) is { } unsupportedKey)
+            {
+                return unsupportedKey;
+            }
+
+            if (UnsupportedNullableValueType(mapTypes.Value, visited) is { } unsupportedValue)
+            {
+                return unsupportedValue;
+            }
+        }
+
+        if (DtoShape(type) is { } shape)
+        {
+            foreach (var field in shape.Fields)
+            {
+                if (UnsupportedNullableValueType(field.Type, visited) is { } unsupportedField)
+                {
+                    return unsupportedField;
+                }
+            }
+        }
+
+        return null;
+    }
 
     private static bool ContainsNullableValueType(Type type, HashSet<Type> visited)
     {
@@ -164,5 +226,18 @@ public static partial class KernelRpcMarshaller
         }
 
         return false;
+    }
+
+    private static bool IsSupportedNullableUnderlying(Type underlying)
+    {
+        try
+        {
+            EnsureSupportedNullableUnderlying(underlying);
+            return true;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 }

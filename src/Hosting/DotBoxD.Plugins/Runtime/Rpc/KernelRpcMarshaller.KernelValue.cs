@@ -22,6 +22,11 @@ public static partial class KernelRpcMarshaller
             return dateTime;
         }
 
+        if (TryFrameworkStructFromKernelRpcValue(value, type, out var frameworkStruct))
+        {
+            return frameworkStruct;
+        }
+
         if (type.IsEnum)
         {
             return EnumUsesI64(type)
@@ -51,6 +56,7 @@ public static partial class KernelRpcMarshaller
         if (MapTypes(type) is { } mapTypes)
         {
             value.RequireKind(KernelRpcValueKind.Map);
+            RejectUnsupportedMapKeyType(mapTypes.Key);
             return ToDictionary(value.ItemSpan, mapTypes.Key, mapTypes.Value);
         }
 
@@ -68,7 +74,10 @@ public static partial class KernelRpcMarshaller
             var t when t == typeof(double) => value.DoubleValue,
             var t when t == typeof(string) => value.TextValue,
             var t when t == typeof(Guid) => value.GuidValue,
+            var t when t == typeof(DateOnly) => DateOnlyFromDayNumber(value.Int32Value),
+            var t when t == typeof(TimeOnly) => TimeOnlyFromTicks(value.Int64Value),
             var t when t == typeof(TimeSpan) => new TimeSpan(value.Int64Value),
+            var t when t == typeof(CancellationToken) => new CancellationToken(value.BoolValue),
             _ => null
         };
         return result is not null;

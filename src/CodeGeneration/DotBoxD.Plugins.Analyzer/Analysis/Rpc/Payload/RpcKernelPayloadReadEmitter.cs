@@ -37,6 +37,11 @@ internal sealed partial class RpcKernelPayloadReadEmitter
 
     private string ReadComplexExpression(ITypeSymbol type, string reader)
     {
+        if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
+        {
+            return $"{EnsureNullablePayloadReader(type, nullableUnderlying)}(ref {reader})";
+        }
+
         if (DotBoxDRpcTypeMapper.IsGuid(type))
         {
             return $"{reader}.ReadGuid()";
@@ -47,9 +52,34 @@ internal sealed partial class RpcKernelPayloadReadEmitter
             return $"{EnsureDateTimePayloadReader(type)}(ref {reader})";
         }
 
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            return $"{EnsureDateOnlyPayloadReader()}({reader}.ReadInt32())";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            return $"{EnsureTimeOnlyPayloadReader()}({reader}.ReadInt64())";
+        }
+
         if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
         {
             return $"new global::System.TimeSpan({reader}.ReadInt64())";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return $"new global::System.Threading.CancellationToken({reader}.ReadBool())";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
+        {
+            return $"{EnsureIndexPayloadReader()}(ref {reader})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
+        {
+            return $"{EnsureRangePayloadReader()}(ref {reader})";
         }
 
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)

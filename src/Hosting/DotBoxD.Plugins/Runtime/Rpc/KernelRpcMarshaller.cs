@@ -34,6 +34,11 @@ public static partial class KernelRpcMarshaller
             return dateTime;
         }
 
+        if (TryFrameworkStructToSandboxValue(value, type, out var frameworkStruct))
+        {
+            return frameworkStruct;
+        }
+
         if (type.IsEnum)
         {
             return EnumUsesI64(type)
@@ -81,6 +86,7 @@ public static partial class KernelRpcMarshaller
                     nameof(value));
             }
 
+            RejectUnsupportedMapKeyType(mapTypes.Key);
             var keyType = SandboxTypeOf(mapTypes.Key);
             // Mirror the SandboxTypeOf map-key guard: the kernel verifier only accepts a fixed set of scalar map
             // keys (bool/int/long/string/opaque-id, not Guid or double). Reject an unsupported key here with a
@@ -149,6 +155,11 @@ public static partial class KernelRpcMarshaller
             return dateTime;
         }
 
+        if (TryFrameworkStructFromSandboxValue(value, type, out var frameworkStruct))
+        {
+            return frameworkStruct;
+        }
+
         if (type.IsEnum)
         {
             if (EnumUsesI64(type))
@@ -192,6 +203,7 @@ public static partial class KernelRpcMarshaller
 
         if (MapTypes(type) is { } mapTypes && value is MapValue map)
         {
+            RejectUnsupportedMapKeyType(mapTypes.Key);
             var result = CreateDictionary(mapTypes.Key, mapTypes.Value, map.Values.Count);
             foreach (var pair in map.Entries)
             {
@@ -211,5 +223,4 @@ public static partial class KernelRpcMarshaller
         Type type,
         SandboxType expected)
         => new($"Server extension cannot marshal sandbox value '{value.Type}' to enum '{type}'; expected '{expected}'.");
-
 }

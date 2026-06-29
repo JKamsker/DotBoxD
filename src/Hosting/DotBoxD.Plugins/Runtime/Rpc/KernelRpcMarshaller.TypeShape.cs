@@ -70,8 +70,8 @@ public static partial class KernelRpcMarshaller
 
     private static RecordShape? FindDtoShape(Type type)
     {
-        ThrowIfUnsupportedFrameworkStruct(type);
         if (IsDateTimeWireType(type) ||
+            IsFrameworkStructWireType(type) ||
             type == typeof(TimeSpan) ||
             type == typeof(string) ||
             type.IsPrimitive ||
@@ -93,19 +93,6 @@ public static partial class KernelRpcMarshaller
 
     private static IDictionary CreateDictionary(Type keyType, Type valueType, int capacity)
         => DictionaryFactoryCache.GetOrAdd((keyType, valueType), CreateDictionaryFactory)(capacity);
-
-    private static void ThrowIfUnsupportedFrameworkStruct(Type type)
-    {
-        if (type == typeof(DateOnly) ||
-            type == typeof(TimeOnly) ||
-            type == typeof(Index) ||
-            type == typeof(Range) ||
-            type == typeof(CancellationToken))
-        {
-            throw new NotSupportedException(
-                $"Kernel RPC service type '{type}' is not supported; convert it to a supported scalar or DTO type.");
-        }
-    }
 
     // An IEnumerable<T> reaches here only after the recognized list/map shapes have been ruled out, so any
     // remaining one — e.g. ImmutableArray<T>, ImmutableList<T>, Queue<T> — exposes only scalar getters

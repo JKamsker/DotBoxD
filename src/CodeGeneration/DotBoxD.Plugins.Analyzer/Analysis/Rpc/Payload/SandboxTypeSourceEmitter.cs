@@ -74,9 +74,30 @@ internal static class SandboxTypeSourceEmitter
             return ManifestTypes.Record;
         }
 
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            return ManifestTypes.Int;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            return ManifestTypes.Long;
+        }
+
         if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
         {
             return ManifestTypes.Long;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return ManifestTypes.Bool;
+        }
+
+        if (DotBoxDRpcTypeMapper.IsIndexWireType(type) ||
+            DotBoxDRpcTypeMapper.IsRangeWireType(type))
+        {
+            return ManifestTypes.Record;
         }
 
         if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
@@ -122,13 +143,43 @@ internal static class SandboxTypeSourceEmitter
 
         if (DotBoxDRpcTypeMapper.IsDateTimeWireType(type))
         {
+            RejectNestedRecordAtDepth(depth);
             return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I64, {SandboxType}.I64 }})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsDateOnlyWireType(type))
+        {
+            return SandboxType + ".I32";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type))
+        {
+            return SandboxType + ".I64";
         }
 
         if (DotBoxDRpcTypeMapper.IsTimeSpanWireType(type))
         {
             return SandboxType + ".I64";
         }
+
+        if (DotBoxDRpcTypeMapper.IsCancellationTokenWireType(type))
+        {
+            return SandboxType + ".Bool";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsIndexWireType(type))
+        {
+            RejectNestedRecordAtDepth(depth);
+            return $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I32, {SandboxType}.Bool }})";
+        }
+
+        if (DotBoxDRpcTypeMapper.IsRangeWireType(type))
+        {
+            RejectRangeRecordAtDepth(depth);
+            var indexType = $"{SandboxType}.Record(new {SandboxType}[] {{ {SandboxType}.I32, {SandboxType}.Bool }})";
+            return $"{SandboxType}.Record(new {SandboxType}[] {{ {indexType}, {indexType} }})";
+        }
+
 
         if (DotBoxDNullableScalarType.TryGetSupportedUnderlying(type, out var nullableUnderlying))
         {
@@ -184,5 +235,21 @@ internal static class SandboxTypeSourceEmitter
         }
 
         throw new NotSupportedException();
+    }
+
+    private static void RejectNestedRecordAtDepth(int depth)
+    {
+        if (depth >= MaxDepth)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private static void RejectRangeRecordAtDepth(int depth)
+    {
+        if (depth + 1 >= MaxDepth)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

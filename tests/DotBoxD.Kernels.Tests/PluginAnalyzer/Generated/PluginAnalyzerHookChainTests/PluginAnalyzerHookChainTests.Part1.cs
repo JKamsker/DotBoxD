@@ -42,7 +42,7 @@ public sealed partial class PluginAnalyzerHookChainTests
 
             namespace Sample;
 
-            public sealed record MixedEvent(string TargetId, DateOnly When);
+            public sealed record MixedEvent(string TargetId, decimal Amount);
 
             public static class Usage
             {
@@ -68,7 +68,7 @@ public sealed partial class PluginAnalyzerHookChainTests
 
             namespace Sample;
 
-            public sealed record MixedEvent(string TargetId, DateTime When, TimeSpan Delay);
+            public sealed record MixedEvent(string TargetId, DateTime When, DateOnly Day, TimeOnly Time, TimeSpan Delay);
 
             public static class Usage
             {
@@ -84,6 +84,8 @@ public sealed partial class PluginAnalyzerHookChainTests
 
         Assert.Contains("HookChain_", generated, StringComparison.Ordinal);
         Assert.Contains("SandboxType.Record(new global::DotBoxD.Kernels.Sandbox.SandboxType[] { global::DotBoxD.Kernels.Sandbox.SandboxType.I64, global::DotBoxD.Kernels.Sandbox.SandboxType.I64 })", generated, StringComparison.Ordinal);
+        Assert.Contains("new global::DotBoxD.Kernels.Parameter(\"e_Day\", global::DotBoxD.Kernels.Sandbox.SandboxType.I32)", generated, StringComparison.Ordinal);
+        Assert.Contains("new global::DotBoxD.Kernels.Parameter(\"e_Time\", global::DotBoxD.Kernels.Sandbox.SandboxType.I64)", generated, StringComparison.Ordinal);
         Assert.Contains("new global::DotBoxD.Kernels.Parameter(\"e_Delay\", global::DotBoxD.Kernels.Sandbox.SandboxType.I64)", generated, StringComparison.Ordinal);
     }
 

@@ -82,6 +82,14 @@ public sealed class KernelRpcMarshallerDtoOrderTests
         => Assert.Throws<NotSupportedException>(
             () => KernelRpcMarshaller.SandboxTypeOf(typeof(int?[][][][][][][][])));
 
+    [Theory]
+    [InlineData(typeof(DateTime[][][][][][][][]))]
+    [InlineData(typeof(Index[][][][][][][][]))]
+    [InlineData(typeof(Range[][][][][][][]))]
+    public void SandboxTypeOf_rejects_record_shaped_framework_types_past_composite_depth(Type type)
+        => Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(type));
+
     [Fact]
     public void SandboxTypeOf_rejects_a_self_referential_dto_instead_of_stack_overflowing()
         => Assert.Throws<NotSupportedException>(

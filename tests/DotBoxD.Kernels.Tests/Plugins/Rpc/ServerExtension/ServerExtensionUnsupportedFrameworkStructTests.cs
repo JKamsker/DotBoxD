@@ -5,57 +5,52 @@ namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 public sealed class ServerExtensionUnsupportedFrameworkStructTests
 {
     [Fact]
-    public void Server_extension_rejects_unsupported_framework_struct_parameters()
+    public void Server_extension_accepts_cancellation_token_payload_parameters()
     {
         var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
-            using System;
-            using DotBoxD.Kernels;
+            using System.Threading;
             using DotBoxD.Kernels.Sandbox;
             using DotBoxD.Plugins;
             using DotBoxD.Abstractions;
 
             namespace Sample;
 
-            [ServerExtension("date-value")]
-            public sealed partial class DateValueKernel
-            {
-                public int UseDate(DateOnly value, HookContext ctx) => 0;
-            }
-
-            [ServerExtension("time-value")]
-            public sealed partial class TimeValueKernel
-            {
-                public int UseTime(TimeOnly value, HookContext ctx) => 0;
-            }
-
-            [ServerExtension("index-value")]
-            public sealed partial class IndexValueKernel
-            {
-                public int UseIndex(Index value, HookContext ctx) => 0;
-            }
-
-            [ServerExtension("range-value")]
-            public sealed partial class RangeValueKernel
-            {
-                public int UseRange(Range value, HookContext ctx) => 0;
-            }
-
             [ServerExtension("cancellation-token-value")]
             public sealed partial class CancellationTokenValueKernel
             {
-                public int UseCancellationToken(System.Threading.CancellationToken value, HookContext ctx) => 0;
+                public CancellationToken Echo(CancellationToken value, int marker, HookContext ctx) => value;
             }
             """);
 
-        AssertUnsupported(diagnostics, "System.DateOnly");
-        AssertUnsupported(diagnostics, "System.TimeOnly");
-        AssertUnsupported(diagnostics, "System.Index");
-        AssertUnsupported(diagnostics, "System.Range");
-        AssertUnsupported(diagnostics, "System.Threading.CancellationToken");
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Id == "DBXK100" &&
+                d.GetMessage().Contains("System.Threading.CancellationToken", StringComparison.Ordinal));
     }
 
-    private static void AssertUnsupported(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics, string typeName)
-        => Assert.Contains(
+    [Fact]
+    public void Server_extension_rejects_cancellation_token_map_keys()
+    {
+        var diagnostics = PluginAnalyzerGeneratedPackageFactory.Diagnostics("""
+            using System.Collections.Generic;
+            using System.Threading;
+            using DotBoxD.Kernels.Sandbox;
+            using DotBoxD.Plugins;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            [ServerExtension("cancellation-token-map-key")]
+            public sealed partial class CancellationTokenMapKeyKernel
+            {
+                public int Count(Dictionary<CancellationToken, int> values, HookContext ctx) => 0;
+            }
+            """);
+
+        Assert.Contains(
             diagnostics,
-            d => d.Id == "DBXK100" && d.GetMessage().Contains(typeName, StringComparison.Ordinal));
+            d => d.Id == "DBXK100" &&
+                d.GetMessage().Contains("System.Threading.CancellationToken", StringComparison.Ordinal) &&
+                d.GetMessage().Contains("map key", StringComparison.OrdinalIgnoreCase));
+    }
 }
