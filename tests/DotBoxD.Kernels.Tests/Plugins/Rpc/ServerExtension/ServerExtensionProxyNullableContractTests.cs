@@ -67,6 +67,19 @@ public sealed class ServerExtensionProxyNullableContractTests
         Assert.Contains("non-generic", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Runtime_proxy_rejects_service_null_reference_defaults()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var kernel = await server.InstallServerExtensionAsync(RpcKernelTestPackages.MonsterKiller());
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ServerExtensionProxy.Create<INullDefaultEchoService>(kernel));
+        Assert.Contains("default to null", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private interface INullableEchoService
     {
         int Echo(int? value);
@@ -92,5 +105,10 @@ public sealed class ServerExtensionProxyNullableContractTests
     private interface IUnusedGenericMonsterKillerService
     {
         List<KillResult> KillMonsters<T>(List<int> monsterIds);
+    }
+
+    private interface INullDefaultEchoService
+    {
+        int Echo(string value = null!);
     }
 }

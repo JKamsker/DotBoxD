@@ -14,7 +14,7 @@ namespace DotBoxD.Plugins.Runtime.Rpc;
 /// The service is expected to declare a single batch method; synchronous, <c>Task&lt;T&gt;</c>, and
 /// <c>ValueTask&lt;T&gt;</c> return shapes are supported.
 /// </summary>
-public class ServerExtensionProxy : DispatchProxy
+public partial class ServerExtensionProxy : DispatchProxy
 {
     private static readonly ConcurrentDictionary<MethodInfo, ServerExtensionMethod> MethodCache = new();
     private static readonly MethodInfo BoxTaskAsyncMethod =
@@ -144,6 +144,7 @@ public class ServerExtensionProxy : DispatchProxy
                     continue;
                 }
 
+                RejectNullReferenceDefault(parameters[i]);
                 ValidatePayloadType(parameterType);
             }
 
@@ -152,19 +153,6 @@ public class ServerExtensionProxy : DispatchProxy
                 ValidatePayloadType(payloadType);
             }
         }
-    }
-
-    private static void ValidatePayloadType(Type type)
-    {
-        if (IsTaskLike(type))
-        {
-            throw new NotSupportedException(
-                $"Server extension proxy task-like payload type '{type}' is not supported; " +
-                "Task and ValueTask are only supported as top-level return types.");
-        }
-
-        KernelRpcMarshaller.RejectNullableValueTypesForServerExtension(type);
-        _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 
     private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)
@@ -204,22 +192,6 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static bool IsCancellationToken(Type type)
         => type == typeof(CancellationToken);
-
-    private static bool IsTaskLike(Type type)
-    {
-        if (type == typeof(Task) || type == typeof(ValueTask))
-        {
-            return true;
-        }
-
-        if (!type.IsGenericType)
-        {
-            return false;
-        }
-
-        var definition = type.GetGenericTypeDefinition();
-        return definition == typeof(Task<>) || definition == typeof(ValueTask<>);
-    }
 
     private static object BoxTaskAsync<T>(ValueTask<SandboxValue> pending)
         => InvokeTaskAsync<T>(pending);
