@@ -133,8 +133,7 @@ public static partial class KernelRpcMarshaller
             }
 
             var created = LinqExpression.New(constructor, arguments);
-            if (RecordTailBindings(
-                    constructorMap,
+            if (RecordInitializerBindings(
                     fields,
                     fieldIndex => LinqExpression.Property(
                         recordFields,

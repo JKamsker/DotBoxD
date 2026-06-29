@@ -6,20 +6,18 @@ public static partial class KernelRpcMarshaller
     {
         private object ConstructFromArguments(object?[] arguments)
         {
-            var assigned = new bool[Fields.Count];
-            var instance = ConstructInstance(arguments, assigned);
+            var instance = ConstructInstance(arguments);
             for (var i = 0; i < Fields.Count; i++)
             {
-                if (!assigned[i] && Fields[i].IsSettable)
+                if (Fields[i].IsSettable)
                 {
                     Fields[i].SetValue(instance, arguments[i]);
-                    assigned[i] = true;
                 }
             }
 
             for (var i = 0; i < Fields.Count; i++)
             {
-                if (!assigned[i])
+                if (!Fields[i].IsSettable)
                 {
                     VerifyReadOnlyField(instance, Fields[i], arguments[i]);
                 }
@@ -28,7 +26,7 @@ public static partial class KernelRpcMarshaller
             return instance;
         }
 
-        private object ConstructInstance(object?[] arguments, bool[] assigned)
+        private object ConstructInstance(object?[] arguments)
         {
             if (_constructor is null)
             {
@@ -48,7 +46,6 @@ public static partial class KernelRpcMarshaller
                 }
 
                 constructorArguments[i] = arguments[fieldIndex];
-                assigned[fieldIndex] = true;
             }
 
             return _constructor.Invoke(constructorArguments)
