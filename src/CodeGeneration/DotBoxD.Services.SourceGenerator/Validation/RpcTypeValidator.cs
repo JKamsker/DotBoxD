@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Validation;
 
-internal static class RpcTypeValidator
+internal static partial class RpcTypeValidator
 {
     public static string? GetUnsupportedTypeReason(ITypeSymbol type, string role, CancellationToken ct)
         => GetUnsupportedTypeReason(type, role, ct, allowTopLevelAsyncWrapper: false);
@@ -13,7 +13,10 @@ internal static class RpcTypeValidator
         ITypeSymbol type,
         string role,
         CancellationToken ct,
-        bool allowTopLevelAsyncWrapper)
+        bool allowTopLevelAsyncWrapper,
+        bool allowCurrentTransportShape = false,
+        bool allowCurrentCancellationToken = false,
+        ITypeSymbol? cancellationTokenSymbol = null)
     {
         if (ContainsTaskLikePayloadType(type, ct, allowCurrent: allowTopLevelAsyncWrapper))
         {
@@ -23,6 +26,17 @@ internal static class RpcTypeValidator
         if (StreamingShapeTypeValidator.ContainsConcreteStreamingShape(type, ct, out var streamingReplacement))
         {
             return $"{role} uses a concrete streaming-compatible type; use {streamingReplacement} directly in RPC signatures";
+        }
+
+        if (ContainsStreamingOrControlPayloadType(
+                type,
+                ct,
+                allowCurrentTransportShape,
+                allowCurrentCancellationToken,
+                allowTopLevelAsyncWrapper,
+                cancellationTokenSymbol))
+        {
+            return $"{role} uses a streaming or control type as an RPC payload; Stream, Pipe, IAsyncEnumerable<T>, and CancellationToken are only supported as direct streaming/control RPC shapes";
         }
 
         if (ContainsOpenEndedPayloadType(type, ct))

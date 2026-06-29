@@ -64,7 +64,12 @@ internal static partial class MethodModelFactory
                 returnType,
                 "return type",
                 ct,
-                allowTopLevelAsyncWrapper: true),
+                allowTopLevelAsyncWrapper: true,
+                allowCurrentTransportShape:
+                    NamingHelpers.IsStreamReturn(returnKind) ||
+                    NamingHelpers.IsPipeReturn(returnKind) ||
+                    NamingHelpers.IsAsyncEnumerableReturn(returnKind),
+                cancellationTokenSymbol: cancellationTokenSymbol),
             methodLocation);
         SetUnsupported(
             ref unsupportedReason,
@@ -139,7 +144,14 @@ internal static partial class MethodModelFactory
             SetUnsupported(
                 ref unsupportedReason,
                 ref unsupportedLocation,
-                GetUnsupportedParameterTypeReason(param.Type, streamKind, streamItemType, param.Name, ct),
+                GetUnsupportedParameterTypeReason(
+                    param.Type,
+                    streamKind,
+                    streamItemType,
+                    param.Name,
+                    isCancellationToken,
+                    cancellationTokenSymbol,
+                    ct),
                 parameterLocation);
             SetUnsupported(
                 ref unsupportedReason,
