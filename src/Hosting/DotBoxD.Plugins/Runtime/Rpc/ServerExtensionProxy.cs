@@ -124,63 +124,54 @@ public class ServerExtensionProxy : DispatchProxy
 
         foreach (var method in methods)
         {
+            if (method.IsGenericMethodDefinition || method.ContainsGenericParameters)
+            {
+                throw new NotSupportedException("Server extension proxy service methods must be non-generic.");
+            }
+
             var parameters = method.GetParameters();
             for (var i = 0; i < parameters.Length; i++)
             {
                 var parameterType = parameters[i].ParameterType;
                 if (IsCancellationToken(parameterType))
                 {
-                    if (i == parameters.Length - 1)
+                    if (i != parameters.Length - 1)
                     {
-                        continue;
+                        throw new NotSupportedException(
+                            "Server extension proxy cancellation tokens must be the final method parameter.");
                     }
+
+                    continue;
                 }
 
-                ValidatePayloadType(parameterType);
+                ServerExtensionProxyValidation.RejectNullReferenceDefault(parameters[i]);
+                ServerExtensionProxyValidation.ValidatePayloadType(parameterType);
             }
 
             if (UnwrapReturnType(method.ReturnType) is { } payloadType)
             {
-                ValidatePayloadType(payloadType);
+                ServerExtensionProxyValidation.ValidatePayloadType(payloadType);
             }
         }
-    }
-
-    private static void ValidatePayloadType(Type type)
-    {
-        if (IsTaskLike(type))
-        {
-            throw new NotSupportedException(
-                $"Server extension proxy task-like payload type '{type}' is not supported; " +
-                "Task and ValueTask are only supported as top-level return types.");
-        }
-
-        KernelRpcMarshaller.RejectUnsupportedNullableValueTypesForServerExtension(type);
-        _ = KernelRpcMarshaller.SandboxTypeOf(type);
     }
 
     private static IEnumerable<MethodInfo> ContractMethods(Type serviceType)
     {
-        var seen = new HashSet<MethodInfo>();
-        foreach (var method in serviceType.GetMethods())
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var methods = serviceType.GetMethods()
+            .Concat(serviceType.GetInterfaces().SelectMany(static inherited => inherited.GetMethods()));
+        foreach (var method in methods)
         {
-            if (seen.Add(method))
+            if (seen.Add(ContractMethodKey(method)))
             {
                 yield return method;
             }
         }
-
-        foreach (var inherited in serviceType.GetInterfaces())
-        {
-            foreach (var method in inherited.GetMethods())
-            {
-                if (seen.Add(method))
-                {
-                    yield return method;
-                }
-            }
-        }
     }
+
+    private static string ContractMethodKey(MethodInfo method)
+        => method.Name + "|" + method.ReturnType.FullName + "|" +
+           string.Join("|", method.GetParameters().Select(static parameter => parameter.ParameterType.FullName));
 
     private static Type? UnwrapReturnType(Type type)
     {
@@ -201,22 +192,6 @@ public class ServerExtensionProxy : DispatchProxy
 
     private static bool IsCancellationToken(Type type)
         => type == typeof(CancellationToken);
-
-    private static bool IsTaskLike(Type type)
-    {
-        if (type == typeof(Task) || type == typeof(ValueTask))
-        {
-            return true;
-        }
-
-        if (!type.IsGenericType)
-        {
-            return false;
-        }
-
-        var definition = type.GetGenericTypeDefinition();
-        return definition == typeof(Task<>) || definition == typeof(ValueTask<>);
-    }
 
     private static object BoxTaskAsync<T>(ValueTask<SandboxValue> pending)
         => InvokeTaskAsync<T>(pending);

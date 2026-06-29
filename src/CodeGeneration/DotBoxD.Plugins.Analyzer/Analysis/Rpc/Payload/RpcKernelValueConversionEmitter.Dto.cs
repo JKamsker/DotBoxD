@@ -94,20 +94,16 @@ internal sealed partial class RpcKernelValueConversionEmitter
         {
             var construction = "new " + TypeName(type) + "(" +
                 string.Join(", ", DtoConstructorArguments(fields, constructor.Symbol)) + ")";
-            if (constructor.AssignedCount == fields.Count &&
-                !RequiresRequiredMemberInitializer(fields, constructor.Symbol))
-            {
-                return "        return " + construction + ";";
-            }
-
-            if (!DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, constructor.Assigned, _compilation))
+            if (constructor.AssignedCount < fields.Count &&
+                !DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, constructor.Assigned, _compilation))
             {
                 throw new NotSupportedException(
                     $"Server extension DTO '{type.ToDisplayString()}' constructor '{constructor.Symbol.ToDisplayString()}' " +
                     "does not assign every public field and the remaining fields are not settable.");
             }
 
-            return BuildDtoInitializer(construction, fields, constructor.Assigned, constructor.Symbol);
+            ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(type, fields, constructor.Symbol);
+            return BuildDtoInitializer(construction, fields, constructor.Assigned);
         }
 
         if (DotBoxDRpcTypeMapper.CanReconstructWithObjectInitializer(type, fields, _compilation))
@@ -115,8 +111,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
             return BuildDtoInitializer(
                 "new " + TypeName(type),
                 fields,
-                assigned: new bool[fields.Count],
-                constructor: null);
+                assigned: new bool[fields.Count]);
         }
 
         throw new NotSupportedException(
@@ -139,11 +134,10 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private string BuildDtoInitializer(
         string construction,
         IReadOnlyList<RecordMember> fields,
-        bool[]? assigned,
-        IMethodSymbol? constructor)
+        bool[]? assigned)
     {
         var initializer = new StringBuilder();
-        var initialized = InitializerFieldIndexes(fields, assigned, constructor);
+        var initialized = InitializerFieldIndexes(fields, assigned);
         initializer.Append("        var __result = ").Append(construction);
         if (initialized.Count == 0)
         {
@@ -162,7 +156,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
             initializer.AppendLine("        };");
         }
 
-        AppendReadOnlyFieldVerifications(initializer, fields, assigned);
+        AppendReadOnlyFieldVerifications(initializer, fields);
         initializer.AppendLine();
         initializer.Append("        return __result;");
         return initializer.ToString();
@@ -182,12 +176,15 @@ internal sealed partial class RpcKernelValueConversionEmitter
                 continue;
             }
 
-            if (!parameter.HasExplicitDefaultValue)
+            if (parameter.HasExplicitDefaultValue)
             {
-                throw new NotSupportedException(
-                    $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
-                    $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
+                arguments.Add(RpcDtoFieldMatcher.DefaultConstructorArgument(parameter));
+                continue;
             }
+
+            throw new NotSupportedException(
+                $"Server extension DTO '{constructor.ContainingType.ToDisplayString()}' constructor " +
+                $"'{constructor.ToDisplayString()}' has a parameter that does not match a public field.");
         }
 
         return arguments;
@@ -196,6 +193,7 @@ internal sealed partial class RpcKernelValueConversionEmitter
     private ResolvedDtoConstructor? TryResolveConstructor(INamedTypeSymbol type, IReadOnlyList<RecordMember> fields)
     {
         ResolvedDtoConstructor? partial = null;
+        ResolvedDtoConstructor? rejectedPartial = null;
         foreach (var constructor in type.InstanceConstructors)
         {
             if (!DotBoxDRpcTypeMapper.IsAccessibleFromGeneratedCode(constructor, _compilation) ||
@@ -242,27 +240,47 @@ internal sealed partial class RpcKernelValueConversionEmitter
                     return resolved;
                 }
 
-                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, _compilation) &&
-                    (partial is null || assignedCount > partial.AssignedCount))
+                if (DotBoxDRpcTypeMapper.CanReconstructFromAssignedFields(fields, assigned, _compilation))
                 {
-                    partial = resolved;
+                    if (partial is null || assignedCount > partial.AssignedCount)
+                    {
+                        partial = resolved;
+                    }
+                }
+                else if (rejectedPartial is null || assignedCount > rejectedPartial.AssignedCount)
+                {
+                    rejectedPartial = resolved;
                 }
             }
         }
 
-        return partial;
+        return partial ?? rejectedPartial;
     }
 
-    private bool RequiresRequiredMemberInitializer(IReadOnlyList<RecordMember> fields, IMethodSymbol constructor)
-        => !HasSetsRequiredMembers(constructor) &&
-           fields.Any(field => IsRequiredMember(field) &&
-                               DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation));
+    private static int AssignedCount(bool[] assigned)
+        => assigned.Count(static item => item);
 
-    private bool MustInitializeRequiredMember(RecordMember field, IMethodSymbol? constructor)
-        => constructor is not null &&
-           !HasSetsRequiredMembers(constructor) &&
-           IsRequiredMember(field) &&
-           DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation);
+    private void ThrowIfRequiredReadOnlyMembersNeedSetsRequiredMembers(
+        INamedTypeSymbol type,
+        IReadOnlyList<RecordMember> fields,
+        IMethodSymbol constructor)
+    {
+        if (HasSetsRequiredMembers(constructor))
+        {
+            return;
+        }
+
+        foreach (var field in fields)
+        {
+            if (IsRequiredMember(field) &&
+                !DotBoxDRpcTypeMapper.IsObjectInitializerWritable(field, _compilation))
+            {
+                throw new NotSupportedException(
+                    $"Server extension DTO '{type.ToDisplayString()}' required field '{field.Name}' is read-only; " +
+                    "mark the constructor with SetsRequiredMembers or make the member settable.");
+            }
+        }
+    }
 
     private static bool IsRequiredMember(RecordMember field)
         => field.Symbol switch
@@ -277,9 +295,6 @@ internal sealed partial class RpcKernelValueConversionEmitter
             attribute.AttributeClass?.ToDisplayString(),
             "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute",
             StringComparison.Ordinal));
-
-    private static int AssignedCount(bool[] assigned)
-        => assigned.Count(static item => item);
 
     private sealed record ResolvedDtoConstructor(IMethodSymbol Symbol, bool[] Assigned, int AssignedCount);
 }

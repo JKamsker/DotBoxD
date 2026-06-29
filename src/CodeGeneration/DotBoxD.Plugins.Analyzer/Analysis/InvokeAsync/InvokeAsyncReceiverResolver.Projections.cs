@@ -1,7 +1,7 @@
+using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Globalization;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 

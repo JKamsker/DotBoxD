@@ -132,6 +132,7 @@ internal static class ServiceShapeValidator
         if (property.GetMethod is null ||
             property.GetMethod.DeclaredAccessibility != Accessibility.Public ||
             property.GetMethod.IsStatic ||
+            property.Parameters.Length != 0 ||
             property.SetMethod is not null)
         {
             return CreateDiagnostic(
