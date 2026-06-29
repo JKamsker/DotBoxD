@@ -172,15 +172,20 @@ internal static class MethodCallFilterTranslator
 
     private static bool HasNonOrdinalComparer(object collection)
     {
-        if (collection.GetType().GetProperty("Comparer")?.GetValue(collection) is not IEqualityComparer<string> comparer)
+        // Behavioral probes rather than identity checks against public singletons: an ordinal/default
+        // comparer treats these pairs as distinct, while case-insensitive comparers consider them equal.
+        // SortedSet<T> exposes ordering comparers, so compare equality must be checked there too.
+        var comparer = collection.GetType().GetProperty("Comparer")?.GetValue(collection);
+        if (comparer is IEqualityComparer<string> equalityComparer)
         {
-            return false;
+            return equalityComparer.Equals("a", "A");
         }
 
-        // Behavioral probe rather than identity checks against the public singletons: an ordinal/default
-        // comparer treats these pairs as distinct, while any case-insensitive or culture-sensitive comparer —
-        // including factory-created ones via StringComparer.Create(...) — considers at least one pair equal, so
-        // an ordinal In cannot reproduce its membership semantics. A default HashSet<string> is ordinal -> safe.
-        return comparer.Equals("a", "A");
+        if (comparer is IComparer<string> orderingComparer)
+        {
+            return orderingComparer.Compare("a", "A") == 0;
+        }
+
+        return false;
     }
 }

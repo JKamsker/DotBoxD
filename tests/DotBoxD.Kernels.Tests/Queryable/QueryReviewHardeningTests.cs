@@ -174,10 +174,37 @@ public sealed class QueryReviewHardeningTests
     }
 
     [Fact]
+    public void Contains_over_a_sorted_set_with_non_ordinal_comparer_is_rejected()
+    {
+        var watched = new SortedSet<string>(
+            Comparer<string>.Create((left, right) =>
+                string.Equals(left, right, StringComparison.OrdinalIgnoreCase)
+                    ? 0
+                    : string.CompareOrdinal(left, right)))
+        {
+            "a",
+        };
+
+        Assert.True(watched.TryGetValue("A", out _));
+        Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId)));
+    }
+
+    [Fact]
     public void Contains_over_a_default_hashset_still_lowers_to_in()
     {
         var watched = new HashSet<string> { "a", "b" };
         var filter = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId));
+        Assert.Equal(QueryFilterKind.In, filter.Kind);
+    }
+
+    [Fact]
+    public void Contains_over_an_ordinal_sorted_set_still_lowers_to_in()
+    {
+        var watched = new SortedSet<string>(StringComparer.Ordinal) { "a", "b" };
+
+        var filter = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.AttackerId));
+
         Assert.Equal(QueryFilterKind.In, filter.Kind);
     }
 

@@ -409,6 +409,7 @@ jobs:
               "PluginRevocationTests",
               "Fix_API_0027_Tests",
               "PinnedHttpTransportTests",
+              "QueryReviewHardeningTests",
               "DifferentialFuzzTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
