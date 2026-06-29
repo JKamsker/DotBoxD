@@ -175,8 +175,8 @@ public sealed partial class PluginAnalyzerKernelMethodDescriptorTests
         var sdkReference = CompilePlainReference(
             ForgedDescriptorSdkSource(
                 mutatePayload: json => json.Replace(
-                    "\"type\":\"String\"}",
-                    "\"type\":\"String\",\"extra\":\"ignored\"}",
+                    "\"placeholder\":\"__dotboxd_kernel_method_arg_0__\"",
+                    "\"placeholder\":\"__dotboxd_kernel_method_arg_0__\",\"extra\":\"ignored\"",
                     StringComparison.Ordinal)),
             "ExtraParameterKernelMethodDescriptorSdk");
         var diagnostics = GeneratorDiagnostics(
