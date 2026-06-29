@@ -26,8 +26,11 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("            _updates.Add(new " + model.LiveSettingUpdateType + "(property.Name, global::System.Convert.ToString(value, global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty));");
         builder.AppendLine("            return this;");
         builder.AppendLine("        }");
-        builder.AppendLine("        public global::System.Threading.Tasks.ValueTask ApplyAsync(bool atomic = false)");
-        builder.AppendLine("            => _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic, default);");
+        builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask ApplyAsync(bool atomic = false)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
+        builder.AppendLine("            await _owner.RequireControl().UpdateSettingsAsync(_pluginId, _updates.ToArray(), atomic, default).ConfigureAwait(false);");
+        builder.AppendLine("        }");
         builder.AppendLine("        public async global::System.Threading.Tasks.ValueTask SetValuesAsync(global::System.Action<TKernel> set, bool atomic = false)");
         builder.AppendLine("        {");
         builder.AppendLine("            var draft = new TKernel();");
@@ -61,6 +64,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("                .Where(static p => IsLiveSetting(p))");
         builder.AppendLine("                .Select(p => new " + model.LiveSettingUpdateType + "(p.Name, global::System.Convert.ToString(p.GetValue(draft), global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty))");
         builder.AppendLine("                .ToArray();");
+        builder.AppendLine("            _owner.RequireInstalledKernel<TKernel>(_pluginId);");
         builder.AppendLine("            await _owner.RequireControl().UpdateSettingsAsync(_pluginId, updates, atomic, default).ConfigureAwait(false);");
         builder.AppendLine("        }");
         builder.AppendLine("        private static bool IsLiveSetting(global::System.Reflection.PropertyInfo property)");

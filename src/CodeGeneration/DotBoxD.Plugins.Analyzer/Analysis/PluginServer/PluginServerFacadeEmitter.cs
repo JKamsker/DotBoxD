@@ -87,6 +87,7 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    private const string NotStartedMessage = \"Call StartAsync() before using the server.\";");
         builder.AppendLine("    private readonly global::System.Func<global::System.Action<global::DotBoxD.Services.Peer.RpcPeer>?, global::System.Threading.CancellationToken, global::System.Threading.Tasks.ValueTask<global::DotBoxD.Services.Peer.RpcPeerSession>>? _connectionFactory;");
         builder.AppendLine("    private readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, global::System.Lazy<global::System.Threading.Tasks.Task<string>>> _anonymousKernels = new();");
+        builder.AppendLine("    private readonly global::System.Collections.Generic.HashSet<string> _installedPluginIds = new(global::System.StringComparer.Ordinal);");
         builder.AppendLine("    private readonly global::System.Collections.Generic.Dictionary<global::System.Type, string> _serverExtensions = new();");
         builder.AppendLine("    private readonly global::System.Collections.Generic.List<RecordedInstall> _setupInstalls;");
         builder.Append("    private ").Append(model.ControlServiceType).AppendLine("? _control;");
