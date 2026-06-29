@@ -130,7 +130,7 @@ internal static class PluginServerFacadeSurfaceEmitter
             "Installs the package produced by the factory at most once and returns the installed plugin id.");
         builder.AppendLine("    public global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
-        builder.AppendLine("        var install = _anonymousKernels.GetOrAdd(pluginId, id => new global::System.Lazy<global::System.Threading.Tasks.Task<string>>(() => InstallServerExtensionPackageAsync(factory(), cancellationToken).AsTask()));");
+        builder.AppendLine("        var install = _anonymousKernels.GetOrAdd(pluginId, id => new global::System.Lazy<global::System.Threading.Tasks.Task<string>>(() => InstallServerExtensionPackageAsync(factory(), default).AsTask()));");
         builder.AppendLine("        return AwaitAnonymousKernelAsync(pluginId, install, cancellationToken);");
         builder.AppendLine("    }");
         builder.AppendLine("    private async global::System.Threading.Tasks.Task<string> AwaitAnonymousKernelAsync(string pluginId, global::System.Lazy<global::System.Threading.Tasks.Task<string>> install, global::System.Threading.CancellationToken cancellationToken)");
