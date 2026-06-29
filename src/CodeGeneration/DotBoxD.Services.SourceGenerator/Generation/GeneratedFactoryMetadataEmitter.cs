@@ -103,6 +103,11 @@ internal static class GeneratedFactoryMetadataEmitter
             return "null";
         }
 
+        if (string.Equals(parameter.DefaultValueLiteral, "default", System.StringComparison.Ordinal))
+        {
+            return "default(" + parameter.MetadataType + ")";
+        }
+
         return parameter.DefaultValueLiteral;
     }
 
