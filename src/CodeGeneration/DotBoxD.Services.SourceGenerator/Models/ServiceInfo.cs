@@ -58,7 +58,11 @@ internal enum ParameterStreamKind
 /// interface name (so the proxy can construct a sibling proxy) and the RPC service name
 /// (so the wire instance dispatch hits the right registry slot).
 /// </summary>
-internal sealed record SubServiceInfo(string QualifiedInterfaceName, string ServiceName, bool AllowsNull);
+internal sealed record SubServiceInfo(
+    string QualifiedInterfaceName,
+    string ServiceName,
+    bool AllowsNull,
+    bool HasProxyCompanion);
 
 /// <summary>
 /// Immutable, value-equatable representation of a DotBoxD service.
