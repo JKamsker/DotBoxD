@@ -133,6 +133,7 @@ $defaultMinimums = @{
     UnknownStreamError_ReportsProtocolError = 1
     ForwardedRemoteStreamError_PreservesOriginalRemoteType = 1
     ClientTransportConnectionLifecycleTests = 4
+    SingleConnectionTransportCoverageTests = 8
     SingleConnectionServerTransportLifecycleRegressionTests = 5
     NamedPipeServerTransportCancellationRegressionTests = 2
     UnsupportedShapeCoverageTests = 6

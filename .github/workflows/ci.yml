@@ -425,6 +425,7 @@ jobs:
               "UnknownStreamError_ReportsProtocolError",
               "ForwardedRemoteStreamError_PreservesOriginalRemoteType",
               "ClientTransportConnectionLifecycleTests",
+              "SingleConnectionTransportCoverageTests",
               "SingleConnectionServerTransportLifecycleRegressionTests",
               "NamedPipeServerTransportCancellationRegressionTests"
             )
