@@ -19,6 +19,13 @@ internal static class MemberPathReader
         var current = StripConvert(expression);
         while (current is MemberExpression member)
         {
+            if (IsNullableValueMember(member))
+            {
+                throw QueryTranslationException.Unsupported(
+                    member,
+                    "Nullable<T>.HasValue and Nullable<T>.Value cannot be represented as portable query paths; compare the nullable member directly to null or a concrete value.");
+            }
+
             segments.Push(member.Member.Name);
             current = StripConvert(member.Expression);
         }
@@ -52,6 +59,11 @@ internal static class MemberPathReader
 
         return current ?? throw new ArgumentNullException(nameof(expression));
     }
+
+    private static bool IsNullableValueMember(MemberExpression member) =>
+        member.Expression?.Type is { } declaringType &&
+        Nullable.GetUnderlyingType(declaringType) is not null &&
+        (member.Member.Name == "HasValue" || member.Member.Name == "Value");
 
     private sealed class ParameterFinder(ParameterExpression parameter) : ExpressionVisitor
     {

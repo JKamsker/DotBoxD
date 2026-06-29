@@ -15,6 +15,9 @@ public sealed record NestedSource(string Id, string Region);
 /// <summary>An event with a nullable member, used to exercise <c>e.Key == null</c> routing.</summary>
 public sealed record NullableTestEvent(string? Key, int Value);
 
+/// <summary>An event with a nullable value member, used to exercise nullable query translation.</summary>
+public sealed record NullableValueTestEvent(int? Score);
+
 /// <summary>An event with a floating-point member, used to exercise numeric-kind routing-key matching.</summary>
 public sealed record MetricTestEvent(string Id, double Score);
 

@@ -82,6 +82,38 @@ public sealed class ExpressionQueryTranslatorTests
     }
 
     [Fact]
+    public void TranslateFilter_supports_direct_nullable_value_comparison()
+    {
+        var value = ExpressionQueryTranslator.TranslateFilter<NullableValueTestEvent>(e => e.Score == 5);
+
+        Assert.Equal("Score", value.Field);
+        Assert.Equal(QueryComparisonOperator.Equal, value.Operator);
+        Assert.Equal(QueryValueKind.Integer, value.Value!.Kind);
+        Assert.Equal(5, value.Value.Integer);
+
+        var nullValue = ExpressionQueryTranslator.TranslateFilter<NullableValueTestEvent>(e => e.Score == null);
+
+        Assert.Equal("Score", nullValue.Field);
+        Assert.Equal(QueryValueKind.Null, nullValue.Value!.Kind);
+    }
+
+    [Fact]
+    public void TranslateFilter_rejects_nullable_value_members()
+    {
+        var hasValue = Assert.Throws<QueryTranslationException>(
+            () => ExpressionQueryTranslator.TranslateFilter<NullableValueTestEvent>(e => e.Score.HasValue));
+        Assert.Contains("Nullable", hasValue.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("compare the nullable member directly", hasValue.Message, StringComparison.OrdinalIgnoreCase);
+
+#pragma warning disable CS8629 // Intentionally author .Value to verify translation rejects it before runtime.
+        var value = Assert.Throws<QueryTranslationException>(
+            () => ExpressionQueryTranslator.TranslateFilter<NullableValueTestEvent>(e => e.Score.Value == 5));
+#pragma warning restore CS8629
+        Assert.Contains("Nullable", value.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("compare the nullable member directly", value.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TranslateFilter_maps_string_methods_with_case_sensitivity()
     {
         var contains = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => e.TargetId.Contains("pl"));
