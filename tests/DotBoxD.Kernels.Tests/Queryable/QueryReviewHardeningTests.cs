@@ -57,6 +57,12 @@ public sealed class QueryReviewHardeningTests
                 e => e.TargetId.StartsWith("x", StringComparison.InvariantCultureIgnoreCase)));
 
     [Fact]
+    public void Legacy_culture_sensitive_string_overload_is_rejected()
+        => Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => e.TargetId.StartsWith("PL", ignoreCase: true, CultureInfo.InvariantCulture)));
+
+    [Fact]
     public void Contains_over_a_case_insensitive_collection_is_rejected()
     {
         var watched = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a", "b" };

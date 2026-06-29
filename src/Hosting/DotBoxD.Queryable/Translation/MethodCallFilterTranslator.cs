@@ -67,7 +67,7 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
-        var ignoreCase = IsIgnoreCase(call, call.Arguments, parameter);
+        var ignoreCase = ReadIgnoreCase(call, call.Arguments, parameter);
         filter = QueryFilter.Compare(path, op, makeValue(raw, call.Arguments[0]), ignoreCase);
         return true;
     }
@@ -131,27 +131,35 @@ internal static class MethodCallFilterTranslator
         return stripped;
     }
 
-    private static bool IsIgnoreCase(MethodCallExpression call, IReadOnlyList<Expression> arguments, ParameterExpression parameter)
+    private static bool ReadIgnoreCase(
+        MethodCallExpression call,
+        IReadOnlyList<Expression> arguments,
+        ParameterExpression parameter)
     {
-        for (var i = 1; i < arguments.Count; i++)
+        if (arguments.Count == 1)
         {
-            if (QueryValueFactory.TryEvaluateObject(arguments[i], parameter, out var raw) &&
-                raw is StringComparison comparison)
-            {
-                // The evaluator compares ordinally, so only the ordinal modes can be honored faithfully. A
-                // culture-sensitive overload would silently change semantics — reject it instead of downgrading.
-                return comparison switch
-                {
-                    StringComparison.Ordinal => false,
-                    StringComparison.OrdinalIgnoreCase => true,
-                    _ => throw QueryTranslationException.Unsupported(
-                        call,
-                        $"StringComparison.{comparison} is culture-sensitive; only Ordinal and OrdinalIgnoreCase are supported."),
-                };
-            }
+            return false;
         }
 
-        return false;
+        if (arguments.Count == 2 &&
+            QueryValueFactory.TryEvaluateObject(arguments[1], parameter, out var raw) &&
+            raw is StringComparison comparison)
+        {
+            // The evaluator compares ordinally, so only the ordinal modes can be honored faithfully. A
+            // culture-sensitive overload would silently change semantics — reject it instead of downgrading.
+            return comparison switch
+            {
+                StringComparison.Ordinal => false,
+                StringComparison.OrdinalIgnoreCase => true,
+                _ => throw QueryTranslationException.Unsupported(
+                    call,
+                    $"StringComparison.{comparison} is culture-sensitive; only Ordinal and OrdinalIgnoreCase are supported."),
+            };
+        }
+
+        throw QueryTranslationException.Unsupported(
+            call,
+            "string filters support only the one-string-argument overload or a StringComparison.Ordinal/OrdinalIgnoreCase overload.");
     }
 
     private static bool HasNonOrdinalComparer(object collection)
