@@ -47,12 +47,12 @@ internal static partial class MethodModelFactory
                 : "(" + underlyingType.ToDisplayString(s_qualifiedFormat) + ")" + underlyingLiteral;
         }
 
-        if (type.IsValueType && IsRuntimeDefaultValue(value))
+        if (FormatPrimitiveLiteral(value) is { } primitiveLiteral)
         {
-            return "default";
+            return primitiveLiteral;
         }
 
-        return FormatPrimitiveLiteral(value);
+        return type.IsValueType && IsRuntimeDefaultValue(value) ? "default" : null;
     }
 
     private static bool IsRuntimeDefaultValue(object value)
