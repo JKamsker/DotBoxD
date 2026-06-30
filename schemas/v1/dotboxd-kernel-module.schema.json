@@ -215,6 +215,7 @@
         "i64": { "type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807 },
         "f64": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
         "string": { "type": "string" },
+        "guid": { "type": "string" },
         "opaqueId": {
           "type": "object",
           "additionalProperties": false,

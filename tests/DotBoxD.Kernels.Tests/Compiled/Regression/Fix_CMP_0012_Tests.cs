@@ -202,6 +202,19 @@ public sealed class Fix_CMP_0012_Tests
         Assert.Equal(double.MaxValue, f64Maximum.GetDouble());
     }
 
+    [Fact]
+    public void Module_schema_literal_vocabulary_includes_guid()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath(ModuleSchemaRelative)));
+        var guid = document.RootElement
+            .GetProperty("$defs")
+            .GetProperty("literal")
+            .GetProperty("properties")
+            .GetProperty("guid");
+
+        Assert.Equal("string", guid.GetProperty("type").GetString());
+    }
+
     /// <summary>
     /// Extracts the property-name array passed to <c>RequireAllowedProperties(..., "name", [..])</c>
     /// for the given requirement name from the maintained importer source.
