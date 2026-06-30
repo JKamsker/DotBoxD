@@ -32,6 +32,37 @@ public sealed class RpcKernelPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_rpc_package_that_self_asserts_event_property_capability()
+    {
+        using var server = PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var package = RpcKernelTestPackages.MonsterKiller();
+        var invalid = WithEventReadCapability(package);
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallServerExtensionAsync(invalid, KillAndEventReadPolicy()).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK044" &&
+            d.Message.Contains("event.read.secret", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Server_required_capability_analysis_excludes_rpc_event_property_manifest_capabilities()
+    {
+        using var server = PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var package = WithEventReadCapability(RpcKernelTestPackages.MonsterKiller());
+
+        var required = server.GetRequiredCapabilities(package);
+
+        Assert.Contains(RpcKernelTestPackages.KillCapability, required);
+        Assert.DoesNotContain("event.read.secret", required);
+    }
+
+    [Fact]
     public async Task Install_rejects_rpc_package_with_entrypoints_that_do_not_match_rpc_entrypoint()
     {
         using var server = PluginServer.Create(
@@ -132,5 +163,24 @@ public sealed class RpcKernelPackageValidationTests
         => SandboxPolicyBuilder.Create()
             .WithFuel(10_000)
             .WithWallTime(TimeSpan.FromSeconds(5))
+            .Build();
+
+    private static PluginPackage WithEventReadCapability(PluginPackage package)
+        => package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = [.. package.Manifest.RequiredCapabilities, "event.read.secret"]
+            }
+        };
+
+    private static SandboxPolicy KillAndEventReadPolicy()
+        => SandboxPolicyBuilder.Create()
+            .GrantLogging()
+            .Grant("game.world.monster.write.*", new { }, SandboxEffect.HostStateWrite)
+            .Grant("event.read.*", new { }, SandboxEffect.None)
+            .WithFuel(100_000)
+            .WithMaxHostCalls(10_000)
+            .WithWallTime(TimeSpan.FromSeconds(10))
             .Build();
 }

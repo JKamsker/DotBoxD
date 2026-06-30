@@ -124,7 +124,12 @@ internal static class RpcKernelPackageValidator
             }
         }
 
-        PluginManifestCapabilityValidator.Validate(package.Manifest, plan, [entrypointId], diagnostics);
+        PluginManifestCapabilityValidator.Validate(
+            package.Manifest,
+            plan,
+            [entrypointId],
+            diagnostics,
+            allowNonBindingCapabilities: false);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
             installPolicy,
