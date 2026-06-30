@@ -107,10 +107,11 @@ internal static partial class MethodModelFactory
                 methodLocation);
         }
 
-        foreach (var param in methodSymbol.Parameters)
+        for (var parameterIndex = 0; parameterIndex < methodSymbol.Parameters.Length; parameterIndex++)
         {
             ct.ThrowIfCancellationRequested();
 
+            var param = methodSymbol.Parameters[parameterIndex];
             var parameterLocation = DiagnosticLocationFactory.FromSymbol(param);
             requiresUnsafeSignature |= RpcTypeValidator.RequiresUnsafeContext(param.Type, ct);
             var isCancellationToken = cancellationTokenSymbol is not null &&
@@ -172,7 +173,10 @@ internal static partial class MethodModelFactory
             // A cancellation-token default is always emitted as "= default"; capture the literal text of
             // any other optional/defaulted parameter so the generated proxy/async-sibling preserve it.
             var hasDefaultValue = HasDefaultParameterValue(param);
-            var defaultValueLiteral = isCancellationToken ? string.Empty : FormatDefaultValueLiteral(param, hasDefaultValue) ?? string.Empty;
+            var preserveOptionalAttributeDefault = ShouldPreserveOptionalAttributeDefault(methodSymbol, parameterIndex);
+            var defaultValueLiteral = isCancellationToken || preserveOptionalAttributeDefault
+                ? string.Empty
+                : FormatDefaultValueLiteral(param, hasDefaultValue) ?? string.Empty;
             var metadataDefaultValueExpression = isCancellationToken
                 ? string.Empty
                 : FormatMetadataDefaultValueExpression(param, hasDefaultValue, defaultValueLiteral);
@@ -190,7 +194,7 @@ internal static partial class MethodModelFactory
                 streamKind,
                 streamItemType?.ToDisplayString(s_qualifiedFormat),
                 MetadataType: TypeOfExpressionFormatter.Format(param.Type, ct),
-                CallerInfoAttributePrefix: BuildCallerInfoAttributePrefix(param, ct),
+                CallerInfoAttributePrefix: BuildCallerInfoAttributePrefix(param, ct, preserveOptionalAttributeDefault),
                 ScopeKeyword: ParameterScopeKeyword(param, ct)));
         }
 

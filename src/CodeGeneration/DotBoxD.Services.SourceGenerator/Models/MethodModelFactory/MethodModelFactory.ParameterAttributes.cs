@@ -9,10 +9,17 @@ internal static partial class MethodModelFactory
 {
     private static string BuildCallerInfoAttributePrefix(
         IParameterSymbol parameter,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preserveOptionalAttributeDefault)
     {
         var attributes = new StringBuilder();
         var hasDateTimeConstant = HasDateTimeConstantAttribute(parameter);
+        var preserveOptionalAttribute = preserveOptionalAttributeDefault || hasDateTimeConstant;
+        if (preserveOptionalAttribute)
+        {
+            attributes.Append("[global::System.Runtime.InteropServices.OptionalAttribute] ");
+        }
+
         foreach (var attr in parameter.GetAttributes())
         {
             ct.ThrowIfCancellationRequested();
@@ -33,10 +40,6 @@ internal static partial class MethodModelFactory
 
                 case "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute":
                     AppendCallerArgumentExpressionAttribute(attributes, attr);
-                    break;
-
-                case "System.Runtime.InteropServices.OptionalAttribute" when hasDateTimeConstant:
-                    attributes.Append("[global::System.Runtime.InteropServices.OptionalAttribute] ");
                     break;
 
                 case "System.Runtime.CompilerServices.DateTimeConstantAttribute":

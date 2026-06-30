@@ -148,6 +148,51 @@ public sealed class GeneratedFactoryRegistryDefaultValueTests
         Assert.Equal(new DateTime(ticks), method.Parameters[0].DefaultValue);
     }
 
+    [Fact]
+    public void GeneratedDefaultsPreserveOptionalAttributeBeforeRequiredParameters()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Runtime.InteropServices;
+            using System.Threading.Tasks;
+
+            namespace Metadata.OptionalBeforeRequired
+            {
+                [DotBoxDService]
+                public interface IOptionalBeforeRequired
+                {
+                    Task<int> CountAsync([Optional] int optional, int required);
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var runResult = GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
+
+        Assert.Empty(runResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        const string expectedParameter =
+            "[global::System.Runtime.InteropServices.OptionalAttribute] int optional, int @required";
+        Assert.Contains(expectedParameter, GeneratedSource(runResult, "DotBoxDRpcProxy"));
+        Assert.Contains(
+            expectedParameter + ", global::System.Threading.CancellationToken ct = default",
+            GeneratedSource(runResult, "DotBoxDRpcAsync"));
+
+        var assembly = CompileAndLoad(source);
+        var serviceType = assembly.GetType("Metadata.OptionalBeforeRequired.IOptionalBeforeRequired")!;
+        var generated = assembly.GetType("DotBoxD.Services.Generated.DotBoxDGenerated")
+            ?? throw new InvalidOperationException("Generated factory type not found.");
+        var services = Assert.IsAssignableFrom<IReadOnlyList<GeneratedService>>(
+            generated.GetProperty("Services")!.GetValue(null));
+
+        var service = services.Single(candidate => candidate.ServiceType == serviceType);
+        var method = service.Methods.Single(candidate => candidate.Name == "CountAsync");
+
+        Assert.True(method.Parameters[0].HasDefaultValue);
+        Assert.Equal(0, method.Parameters[0].DefaultValue);
+        Assert.False(method.Parameters[1].HasDefaultValue);
+    }
+
     private static string GeneratedSource(GeneratorDriverRunResult runResult, string hintFragment) =>
         runResult.GeneratedTrees.First(t => t.FilePath.Contains(hintFragment)).GetText().ToString();
 }

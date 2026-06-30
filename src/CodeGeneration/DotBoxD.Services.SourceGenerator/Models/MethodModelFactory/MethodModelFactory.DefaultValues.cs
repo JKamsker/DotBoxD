@@ -72,6 +72,11 @@ internal static partial class MethodModelFactory
                 "L)";
         }
 
+        if (defaultValueLiteral.Length == 0 && HasOptionalMetadata(param))
+        {
+            return "default";
+        }
+
         return defaultValueLiteral;
     }
 
@@ -156,8 +161,30 @@ internal static partial class MethodModelFactory
 
     private static bool HasDefaultParameterValue(IParameterSymbol param) =>
         param.HasExplicitDefaultValue ||
-        param.IsOptional ||
-        HasOptionalAttribute(param);
+        HasOptionalMetadata(param);
+
+    private static bool ShouldPreserveOptionalAttributeDefault(IMethodSymbol method, int parameterIndex)
+    {
+        var param = method.Parameters[parameterIndex];
+        if (HasDateTimeConstantAttribute(param) ||
+            !HasOptionalMetadata(param))
+        {
+            return false;
+        }
+
+        for (var i = parameterIndex + 1; i < method.Parameters.Length; i++)
+        {
+            if (!HasDefaultParameterValue(method.Parameters[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasOptionalMetadata(IParameterSymbol param) =>
+        param.IsOptional || HasOptionalAttribute(param);
 
     private static bool HasOptionalAttribute(IParameterSymbol param)
     {
