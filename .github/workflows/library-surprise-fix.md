@@ -235,43 +235,19 @@ pre-agent-steps:
           env_file.write(f"SURPRISE_FIX_PR_NUMBER={target.get('pr_number') or ''}\n")
           env_file.write(f"SURPRISE_FIX_PR_URL={target.get('pr_url') or ''}\n")
 
+      with open("/tmp/gh-aw/surprise-fix-target.env", "w", encoding="utf-8") as env_file:
+          env_file.write(f"surprise_should_run={str(target['should_run']).lower()}\n")
+          env_file.write(f"surprise_pr_number={target.get('pr_number') or ''}\n")
+
       print(json.dumps(target, indent=2, sort_keys=True))
       PY
 
-      surprise_should_run="$(
-        python3 - <<'PY'
-        import json
+      . /tmp/gh-aw/surprise-fix-target.env
 
-        with open("/tmp/gh-aw/surprise-fix-target.json", encoding="utf-8") as handle:
-            target = json.load(handle)
-        print("true" if target.get("should_run") else "false")
-        PY
-      )"
-      surprise_pr_number="$(
-        python3 - <<'PY'
-        import json
-
-        with open("/tmp/gh-aw/surprise-fix-target.json", encoding="utf-8") as handle:
-            target = json.load(handle)
-        print(target.get("pr_number") or "")
-        PY
-      )"
-
-      if [ "$surprise_should_run" = "true" ]; then
+      if [ "${surprise_should_run:-false}" = "true" ]; then
         gh pr checkout "$surprise_pr_number" --repo "$GITHUB_REPOSITORY"
         original_head="$(git rev-parse HEAD)"
         echo "SURPRISE_FIX_ORIGINAL_HEAD=${original_head}" >> "$GITHUB_ENV"
-        python3 - <<'PY'
-        import json
-        import os
-
-        path = "/tmp/gh-aw/surprise-fix-target.json"
-        with open(path, encoding="utf-8") as handle:
-            target = json.load(handle)
-        target["checkout_head"] = os.popen("git rev-parse HEAD").read().strip()
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(target, handle, indent=2, sort_keys=True)
-        PY
       fi
 
 post-steps:
