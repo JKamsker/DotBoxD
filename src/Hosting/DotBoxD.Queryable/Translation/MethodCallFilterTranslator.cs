@@ -99,16 +99,16 @@ internal static class MethodCallFilterTranslator
         var unwrapped = UnwrapSpan(collection);
 
         // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
-        // semantics even when written as static Enumerable.Contains(source, item); lowering that to a
-        // case-sensitive ordinal In would silently drop or add matches. Reject case-insensitive /
-        // culture-sensitive comparers rather than mis-translate.
+        // semantics even when written as static Enumerable.Contains(source, item); lowering that to a plain
+        // In would silently drop or add matches. Reject custom/culture-sensitive comparers rather than
+        // mis-translate.
         if (QueryValueFactory.TryEvaluateObject(unwrapped, parameter, out var collectionObject) &&
             collectionObject is not null &&
-            HasNonOrdinalComparer(collectionObject))
+            HasUnsupportedComparer(collectionObject))
         {
             throw QueryTranslationException.Unsupported(
                 call,
-                "Contains over a collection with a case-insensitive or culture-sensitive equality comparer is not supported; use a default/ordinal collection.");
+                "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection.");
         }
 
         filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
@@ -172,13 +172,18 @@ internal static class MethodCallFilterTranslator
             "string filters support only ordinal overloads: one-argument Contains/Equals, or StringComparison.Ordinal/OrdinalIgnoreCase.");
     }
 
-    private static bool HasNonOrdinalComparer(object collection)
+    private static bool HasUnsupportedComparer(object collection)
     {
-        // Behavioral probes rather than identity checks against public singletons: an ordinal/default
+        var comparer = GetComparer(collection, depth: 0);
+        if (comparer is null)
+        {
+            return false;
+        }
+
+        // Behavioral probes rather than identity checks against public singletons: an ordinal/default string
         // comparer treats these pairs as distinct. Case-insensitive comparers match "a"/"A"; culture-sensitive
         // case-sensitive comparers can match "a\0"/"a" because some cultures ignore embedded nulls.
         // SortedSet<T> exposes ordering comparers, so compare equality must be checked there too.
-        var comparer = GetComparer(collection, depth: 0);
         if (comparer is IEqualityComparer<string> equalityComparer)
         {
             return equalityComparer.Equals("a", "A") || equalityComparer.Equals("a\0", "a");
@@ -189,7 +194,46 @@ internal static class MethodCallFilterTranslator
             return orderingComparer.Compare("a", "A") == 0 || orderingComparer.Compare("a\0", "a") == 0;
         }
 
+        return HasCustomGenericComparer(comparer);
+    }
+
+    private static bool HasCustomGenericComparer(object comparer)
+    {
+        foreach (var interfaceType in comparer.GetType().GetInterfaces())
+        {
+            if (!interfaceType.IsGenericType)
+            {
+                continue;
+            }
+
+            var interfaceDefinition = interfaceType.GetGenericTypeDefinition();
+            var elementType = interfaceType.GetGenericArguments()[0];
+            if (elementType == typeof(string))
+            {
+                continue;
+            }
+
+            if (interfaceDefinition == typeof(IEqualityComparer<>))
+            {
+                return !IsDefaultComparer(comparer, typeof(EqualityComparer<>), elementType);
+            }
+
+            if (interfaceDefinition == typeof(IComparer<>))
+            {
+                return !IsDefaultComparer(comparer, typeof(Comparer<>), elementType);
+            }
+        }
+
         return false;
+    }
+
+    private static bool IsDefaultComparer(object comparer, Type openComparerType, Type elementType)
+    {
+        var defaultComparer = openComparerType
+            .MakeGenericType(elementType)
+            .GetProperty(nameof(EqualityComparer<int>.Default))
+            ?.GetValue(null);
+        return ReferenceEquals(comparer, defaultComparer);
     }
 
     private static object? GetComparer(object collection, int depth)

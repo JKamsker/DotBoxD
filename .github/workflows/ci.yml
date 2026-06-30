@@ -421,6 +421,7 @@ jobs:
               "PluginRevocationTests",
               "Fix_API_0027_Tests",
               "PinnedHttpTransportTests",
+              "QueryComparerHardeningTests",
               "QueryReviewHardeningTests",
               "DifferentialFuzzTests"
             )
