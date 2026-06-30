@@ -64,6 +64,13 @@ internal static class GeneratedFactoryMetadataEmitter
         sb.AppendLine($"                {TypeExpression(method.MetadataResultType)},");
         sb.AppendLine($"                {ReturnKindExpression(method.ReturnKind)},");
         sb.AppendLine($"                {BoolLiteral(NamingHelpers.IsSubServiceReturn(method.ReturnKind))},");
+
+        if (method.Parameters.Count == 0)
+        {
+            sb.AppendLine($"                {EmptyParameterArrayExpression()}),");
+            return;
+        }
+
         sb.AppendLine($"                new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedParameter)}");
         sb.AppendLine("                {");
         AppendParameters(sb, method.Parameters, ct);
@@ -88,6 +95,9 @@ internal static class GeneratedFactoryMetadataEmitter
             sb.AppendLine($"                        {DefaultValueExpression(parameter)}),");
         }
     }
+
+    private static string EmptyParameterArrayExpression()
+        => "global::System.Array.Empty<" + ServicesGeneratorTypeNames.GlobalGeneratedParameter + ">()";
 
     private static string TypeExpression(string? type) =>
         string.IsNullOrEmpty(type)

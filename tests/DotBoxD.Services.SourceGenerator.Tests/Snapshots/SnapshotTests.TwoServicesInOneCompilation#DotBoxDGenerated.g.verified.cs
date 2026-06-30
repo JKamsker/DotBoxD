@@ -39,9 +39,7 @@ namespace DotBoxD.Services.Generated
                 typeof(string),
                 global::DotBoxD.Services.Generated.GeneratedReturnKind.TaskOfT,
                 false,
-                new global::DotBoxD.Services.Generated.GeneratedParameter[]
-                {
-                }),
+                global::System.Array.Empty<global::DotBoxD.Services.Generated.GeneratedParameter>()),
         };
 
         private static readonly global::DotBoxD.Services.Generated.GeneratedService[] s_services =
