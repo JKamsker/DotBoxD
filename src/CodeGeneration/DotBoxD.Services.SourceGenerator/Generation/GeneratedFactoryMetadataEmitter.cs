@@ -15,6 +15,12 @@ internal static class GeneratedFactoryMetadataEmitter
         EquatableArray<ServiceModel> services,
         CancellationToken ct)
     {
+        if (HasParameterlessSupportedMethod(services, ct))
+        {
+            AppendEmptyParameterList(sb);
+            sb.AppendLine();
+        }
+
         for (var i = 0; i < services.Array.Length; i++)
         {
             ct.ThrowIfCancellationRequested();
@@ -65,10 +71,45 @@ internal static class GeneratedFactoryMetadataEmitter
         sb.AppendLine($"                {TypeExpression(method.MetadataResultType)},");
         sb.AppendLine($"                {ReturnKindExpression(method.ReturnKind)},");
         sb.AppendLine($"                {BoolLiteral(NamingHelpers.IsSubServiceReturn(method.ReturnKind))},");
+
+        if (method.Parameters.Count == 0)
+        {
+            sb.AppendLine("                s_emptyParameters),");
+            return;
+        }
+
         sb.AppendLine($"                {ServicesGeneratorTypeNames.GlobalArray}.AsReadOnly(new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedParameter)}");
         sb.AppendLine("                {");
         AppendParameters(sb, method.Parameters, ct);
         sb.AppendLine("                })),");
+    }
+
+    private static bool HasParameterlessSupportedMethod(
+        EquatableArray<ServiceModel> services,
+        CancellationToken ct)
+    {
+        foreach (var service in services.Array)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            foreach (var method in service.Methods.Array)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (method.UnsupportedReason is null && method.Parameters.Count == 0)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static void AppendEmptyParameterList(StringBuilder sb)
+    {
+        sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyList, ServicesGeneratorTypeNames.GlobalGeneratedParameter)} s_emptyParameters =");
+        sb.AppendLine($"            {ServicesGeneratorTypeNames.GlobalArray}.AsReadOnly({EmptyParameterArrayExpression()});");
     }
 
     private static void AppendParameters(
@@ -89,6 +130,9 @@ internal static class GeneratedFactoryMetadataEmitter
             sb.AppendLine($"                        {DefaultValueExpression(parameter)}),");
         }
     }
+
+    private static string EmptyParameterArrayExpression()
+        => "global::System.Array.Empty<" + ServicesGeneratorTypeNames.GlobalGeneratedParameter + ">()";
 
     private static string TypeExpression(string? type) =>
         string.IsNullOrEmpty(type)

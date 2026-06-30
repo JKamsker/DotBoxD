@@ -9,6 +9,9 @@ namespace DotBoxD.Services.Generated
     /// </summary>
     public static class DotBoxDGenerated
     {
+        private static readonly global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.GeneratedParameter> s_emptyParameters =
+            global::System.Array.AsReadOnly(global::System.Array.Empty<global::DotBoxD.Services.Generated.GeneratedParameter>());
+
         private static readonly global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.GeneratedMethod> s_service0Methods =
             global::System.Array.AsReadOnly(new global::DotBoxD.Services.Generated.GeneratedMethod[]
         {
@@ -43,9 +46,7 @@ namespace DotBoxD.Services.Generated
                 null,
                 global::DotBoxD.Services.Generated.GeneratedReturnKind.ValueTask,
                 false,
-                global::System.Array.AsReadOnly(new global::DotBoxD.Services.Generated.GeneratedParameter[]
-                {
-                })),
+                s_emptyParameters),
         });
 
         private static readonly global::System.Collections.Generic.IReadOnlyList<global::DotBoxD.Services.Generated.GeneratedService> s_services =

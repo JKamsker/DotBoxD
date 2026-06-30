@@ -126,6 +126,36 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         string? instanceId,
         RpcStreamAttachment[]? streams,
         CancellationToken ct)
+        => SendRequestAsync(
+            service,
+            method,
+            request,
+            instanceId,
+            RpcStreamAttachmentSet.FromArray(streams),
+            ct);
+
+    private Task<ReceivedResponse> SendRequestAsync<TRequest>(
+        string service,
+        string method,
+        TRequest request,
+        string? instanceId,
+        RpcStreamAttachment stream,
+        CancellationToken ct)
+        => SendRequestAsync(
+            service,
+            method,
+            request,
+            instanceId,
+            RpcStreamAttachmentSet.FromSingle(stream),
+            ct);
+
+    private Task<ReceivedResponse> SendRequestAsync<TRequest>(
+        string service,
+        string method,
+        TRequest request,
+        string? instanceId,
+        RpcStreamAttachmentSet streams,
+        CancellationToken ct)
     {
         try
         {

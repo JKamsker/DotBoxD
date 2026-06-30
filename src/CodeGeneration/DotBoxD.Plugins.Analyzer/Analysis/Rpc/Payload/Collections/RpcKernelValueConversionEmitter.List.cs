@@ -31,9 +31,11 @@ internal sealed partial class RpcKernelValueConversionEmitter
         if (DotBoxDRpcTypeMapper.SupportsIndexedListWrite(type))
         {
             var countExpression = type is IArrayTypeSymbol ? "value.Length" : "value.Count";
-            _helpers.Append("        var __items = new global::DotBoxD.Plugins.KernelRpcValue[")
-                .Append(countExpression).AppendLine("];");
-            _helpers.Append("        for (var i = 0; i < ").Append(countExpression).AppendLine("; i++)");
+            _helpers.Append("        var __count = ").Append(countExpression).AppendLine(";");
+            _helpers.AppendLine("        var __items = __count == 0")
+                .AppendLine("            ? global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()")
+                .AppendLine("            : new global::DotBoxD.Plugins.KernelRpcValue[__count];");
+            _helpers.AppendLine("        for (var i = 0; i < __count; i++)");
             _helpers.AppendLine("        {")
                 .AppendLine("            var __item = value[i];");
             _helpers.Append("            __items[i] = ").Append(itemExpression).AppendLine(";");
@@ -45,7 +47,9 @@ internal sealed partial class RpcKernelValueConversionEmitter
 
         _helpers.AppendLine("        if (global::System.Linq.Enumerable.TryGetNonEnumeratedCount(value, out var __count))")
             .AppendLine("        {")
-            .AppendLine("            var __items = new global::DotBoxD.Plugins.KernelRpcValue[__count];")
+            .AppendLine("            var __items = __count == 0")
+            .AppendLine("                ? global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()")
+            .AppendLine("                : new global::DotBoxD.Plugins.KernelRpcValue[__count];")
             .AppendLine("            var __index = 0;")
             .AppendLine("            foreach (var __item in value)")
             .AppendLine("            {")

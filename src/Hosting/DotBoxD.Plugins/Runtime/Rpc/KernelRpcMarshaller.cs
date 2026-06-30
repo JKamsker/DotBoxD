@@ -58,7 +58,9 @@ public static partial class KernelRpcMarshaller
             var itemType = SandboxTypeOf(elementType);
             if (value is ICollection collection)
             {
-                var items = new SandboxValue[collection.Count];
+                var items = collection.Count == 0
+                    ? Array.Empty<SandboxValue>()
+                    : new SandboxValue[collection.Count];
                 var index = 0;
                 foreach (var item in enumerable)
                 {
