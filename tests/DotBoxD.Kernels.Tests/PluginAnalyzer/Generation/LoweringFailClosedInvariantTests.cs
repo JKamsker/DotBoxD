@@ -7,14 +7,29 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generation;
 
 public sealed class LoweringFailClosedInvariantTests
 {
-    private static readonly HashSet<string> AllowedNullSwitchFallbackMethods = new(StringComparer.Ordinal)
-    {
-        "InitializerName",
-        "LowerDefault",
-        "SandboxTypeExpressionShape",
-        "SandboxTypeInvocationShape",
-        "SandboxTypeMemberShape",
-    };
+    private static readonly NullSwitchFallbackExemption[] AllowedNullSwitchFallbacks =
+    [
+        new(
+            "Lowering/Expressions/DotBoxDAnonymousObjectCreationExpressionLowerer.cs",
+            "InitializerName",
+            "Anonymous member-name inference returns null so the caller can reject unnameable fields with context."),
+        new(
+            "Lowering/Expressions/Primitives/DotBoxDConstantExpressionLowerer.cs",
+            "LowerDefault",
+            "Default-literal lowering returns null for normal scalar defaults that are handled by the generic path."),
+        new(
+            "Lowering/Expressions/KernelMethods/DotBoxDKernelMethodInliner.DescriptorShape.Helpers.cs",
+            "SandboxTypeExpressionShape",
+            "Descriptor shape probing returns null for absent or non-shape metadata before the caller rejects stale descriptors."),
+        new(
+            "Lowering/Expressions/KernelMethods/DotBoxDKernelMethodInliner.DescriptorShape.Helpers.cs",
+            "SandboxTypeInvocationShape",
+            "Descriptor shape probing returns null when the invocation is not a recognized SandboxType factory."),
+        new(
+            "Lowering/Expressions/KernelMethods/DotBoxDKernelMethodInliner.DescriptorShape.Helpers.cs",
+            "SandboxTypeMemberShape",
+            "Descriptor shape probing returns null when the member is not a recognized SandboxType singleton."),
+    ];
 
     [Fact]
     public void Lowering_diagnostic_catalog_entries_are_documented_DBXK_rules()
@@ -75,8 +90,10 @@ public sealed class LoweringFailClosedInvariantTests
     public void Lowering_switch_fallbacks_do_not_return_null_from_dispatch_methods()
     {
         var offenders = new List<string>();
+        var seenExemptions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in LoweringSourceFiles())
         {
+            var relativePath = AnalysisRelativePath(file);
             var text = File.ReadAllText(file);
             var tree = CSharpSyntaxTree.ParseText(text);
             var root = tree.GetRoot();
@@ -89,7 +106,7 @@ public sealed class LoweringFailClosedInvariantTests
 
                 var methodName = EnclosingMethodName(arm);
                 if (methodName.StartsWith("Try", StringComparison.Ordinal) ||
-                    AllowedNullSwitchFallbackMethods.Contains(methodName))
+                    IsAllowedNullSwitchFallback(relativePath, methodName, seenExemptions))
                 {
                     continue;
                 }
@@ -97,6 +114,18 @@ public sealed class LoweringFailClosedInvariantTests
                 offenders.Add(FormatLocation(file, tree, arm, methodName));
             }
         }
+
+        var staleExemptions = AllowedNullSwitchFallbacks
+            .Where(exemption => !seenExemptions.Contains(exemption.Key))
+            .Select(exemption => exemption.Key)
+            .ToArray();
+        Assert.Empty(staleExemptions);
+
+        var unjustifiedExemptions = AllowedNullSwitchFallbacks
+            .Where(exemption => string.IsNullOrWhiteSpace(exemption.Reason))
+            .Select(exemption => exemption.Key)
+            .ToArray();
+        Assert.Empty(unjustifiedExemptions);
 
         Assert.True(
             offenders.Count == 0,
@@ -112,7 +141,7 @@ public sealed class LoweringFailClosedInvariantTests
             var root = CSharpSyntaxTree.ParseText(text).GetRoot();
             foreach (var catchClause in root.DescendantNodes().OfType<CatchClauseSyntax>())
             {
-                if (!string.Equals(catchClause.Declaration?.Type.ToString(), "NotSupportedException", StringComparison.Ordinal))
+                if (!IsNotSupportedExceptionCatch(catchClause))
                 {
                     continue;
                 }
@@ -140,6 +169,39 @@ public sealed class LoweringFailClosedInvariantTests
            string.Equals(methodName, "CreateTarget", StringComparison.Ordinal) ||
            string.Equals(methodName, "CreateRoot", StringComparison.Ordinal);
 
+    private static bool IsNotSupportedExceptionCatch(CatchClauseSyntax catchClause)
+        => catchClause.Declaration?.Type is NameSyntax name && IsNotSupportedExceptionName(name);
+
+    private static bool IsNotSupportedExceptionName(NameSyntax name)
+        => name switch
+        {
+            IdentifierNameSyntax identifier => string.Equals(
+                identifier.Identifier.ValueText,
+                nameof(NotSupportedException),
+                StringComparison.Ordinal),
+            QualifiedNameSyntax qualified => IsNotSupportedExceptionName(qualified.Right),
+            AliasQualifiedNameSyntax aliasQualified => IsNotSupportedExceptionName(aliasQualified.Name),
+            _ => false,
+        };
+
+    private static bool IsAllowedNullSwitchFallback(
+        string relativePath,
+        string methodName,
+        HashSet<string> seenExemptions)
+    {
+        foreach (var exemption in AllowedNullSwitchFallbacks)
+        {
+            if (string.Equals(exemption.RelativePath, relativePath, StringComparison.Ordinal) &&
+                string.Equals(exemption.MethodName, methodName, StringComparison.Ordinal))
+            {
+                seenExemptions.Add(exemption.Key);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static IEnumerable<string> LoweringSourceFiles()
     {
         var root = AnalysisRoot();
@@ -163,6 +225,9 @@ public sealed class LoweringFailClosedInvariantTests
 
     private static string AnalysisRoot()
         => Path.Combine(RepositoryRoot(), "src", "CodeGeneration", "DotBoxD.Plugins.Analyzer", "Analysis");
+
+    private static string AnalysisRelativePath(string file)
+        => Path.GetRelativePath(AnalysisRoot(), file).Replace(Path.DirectorySeparatorChar, '/');
 
     private static string RepositoryRoot()
     {
@@ -198,4 +263,12 @@ public sealed class LoweringFailClosedInvariantTests
         string MethodName,
         string MethodText,
         string CatchText);
+
+    private sealed record NullSwitchFallbackExemption(
+        string RelativePath,
+        string MethodName,
+        string Reason)
+    {
+        public string Key => RelativePath + "#" + MethodName;
+    }
 }
