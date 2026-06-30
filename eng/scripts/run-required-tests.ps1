@@ -160,6 +160,7 @@ $defaultMinimums = @{
     FloatingPointSpecialDefaults_ArePreservedInGeneratedSurface = 1
     ParamsParameters_ArePreservedInGeneratedProxySurface = 1
     CallerInfoAttributes_ArePreservedInGeneratedServiceSurface = 1
+    CallerArgumentExpression_TargetingCancellationToken_RemainsValidOnAsyncSibling = 1
     GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub = 1
     GeneratedFactoryRegistryDefaultValueTests = 2
     GeneratedDispatcherSurfaceTests = 1

@@ -135,4 +135,39 @@ public partial class CodegenRegressionTests
         asyncSibling.Should().Contain(
             "TraceAsync(" + callerInfoParameters + ", global::System.Threading.CancellationToken ct = default)");
     }
+
+    [Fact]
+    public void CallerArgumentExpression_TargetingCancellationToken_RemainsValidOnAsyncSibling()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Runtime.CompilerServices;
+            using System.Threading;
+
+            namespace Regress.CallerExpressionCancellation
+            {
+                [DotBoxDService]
+                public interface ICallerExpressionCancellation
+                {
+                    int Measure(
+                        CancellationToken token = default,
+                        [CallerArgumentExpression("token")] string expression = "");
+                }
+            }
+            """;
+
+        var (final, runResult) = Run(source);
+
+        using var ms = new MemoryStream();
+        var emit = final.Emit(ms);
+        emit.Diagnostics.Should().NotContain(d => d.Id == "CS8963");
+
+        var asyncSibling = runResult.Results.Single()
+            .GeneratedSources
+            .Single(g => g.HintName.EndsWith("ICallerExpressionCancellation.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
+            .SourceText
+            .ToString();
+        asyncSibling.Should().Contain(
+            "[global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute(\"token\")] string expression = \"\", global::System.Threading.CancellationToken token = default");
+    }
 }
