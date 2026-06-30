@@ -74,6 +74,30 @@ public sealed class Fix_CMP_0026_Tests
     }
 
     [Fact]
+    public void Plugin_package_schema_subscription_cardinality_matches_kernel_kind()
+    {
+        using var document = JsonDocument.Parse(PluginPackageJsonSchemas.PackageEnvelope);
+        var rules = document.RootElement
+            .GetProperty("$defs")
+            .GetProperty("manifest")
+            .GetProperty("allOf")
+            .EnumerateArray()
+            .ToArray();
+
+        var rule = Assert.Single(rules, RuleTestsManifestRpcEntrypoint);
+        var rpcSubscriptions = rule.GetProperty("then")
+            .GetProperty("properties")
+            .GetProperty("subscriptions");
+        var eventSubscriptions = rule.GetProperty("else")
+            .GetProperty("properties")
+            .GetProperty("subscriptions");
+
+        Assert.Equal(0, rpcSubscriptions.GetProperty("maxItems").GetInt32());
+        Assert.Equal(1, eventSubscriptions.GetProperty("minItems").GetInt32());
+        Assert.Equal(1, eventSubscriptions.GetProperty("maxItems").GetInt32());
+    }
+
+    [Fact]
     public void Drift_guard_rejects_same_property_set_when_required_properties_are_relaxed()
     {
         var contract = new JsonSchemaObjectContract(
@@ -209,4 +233,8 @@ public sealed class Fix_CMP_0026_Tests
            rule.GetProperty("then").GetProperty("required")
                .EnumerateArray()
                .Any(value => value.GetString() == "projectedType");
+
+    private static bool RuleTestsManifestRpcEntrypoint(JsonElement rule)
+        => rule.GetProperty("if").TryGetProperty("required", out var required) &&
+           required.EnumerateArray().Any(value => value.GetString() == "rpcEntrypoint");
 }

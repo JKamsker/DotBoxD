@@ -72,7 +72,22 @@
           "type": "string",
           "description": "For a kernel RPC service: the request/response batch entrypoint function id. Absent for event kernels."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["rpcEntrypoint"] },
+          "then": {
+            "properties": {
+              "subscriptions": { "maxItems": 0 }
+            }
+          },
+          "else": {
+            "properties": {
+              "subscriptions": { "minItems": 1, "maxItems": 1 }
+            }
+          }
+        }
+      ]
     },
     "liveSetting": {
       "type": "object",
