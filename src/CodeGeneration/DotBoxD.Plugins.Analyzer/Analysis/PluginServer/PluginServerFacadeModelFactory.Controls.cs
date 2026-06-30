@@ -92,6 +92,7 @@ internal static partial class PluginServerFacadeModelFactory
             "_subscriptions",
             "_localHandlers",
             "_session",
+            "_startGate",
             "_started",
             "_setupReplayed",
             "_setupReplayIndex",

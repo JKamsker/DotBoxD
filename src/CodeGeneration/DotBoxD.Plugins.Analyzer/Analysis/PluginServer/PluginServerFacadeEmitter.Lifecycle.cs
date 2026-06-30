@@ -14,29 +14,38 @@ internal static partial class PluginServerFacadeEmitter
         builder.AppendLine("    public async global::System.Threading.Tasks.ValueTask StartAsync(global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
         builder.AppendLine("        ThrowIfDisposed();");
-        builder.AppendLine("        if (!_started)");
+        builder.AppendLine("        await _startGate.WaitAsync(cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("        try");
         builder.AppendLine("        {");
-        builder.AppendLine("            if (_connectionFactory is null) { throw new global::System.InvalidOperationException(NotStartedMessage); }");
+        builder.AppendLine("            ThrowIfDisposed();");
+        builder.AppendLine("            if (!_started)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (_connectionFactory is null) { throw new global::System.InvalidOperationException(NotStartedMessage); }");
         if (model.EventCallbackType is not null)
         {
             // Provide the reverse event-callback sink during the connect before services start.
-            builder.AppendLine("            _session = await _connectionFactory(peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Provide" + model.EventCallbackProvideSuffix + "(peer, new RemoteLocalEventSink(_localHandlers)), cancellationToken).ConfigureAwait(false);");
+            builder.AppendLine("                _session = await _connectionFactory(peer => global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Provide" + model.EventCallbackProvideSuffix + "(peer, new RemoteLocalEventSink(_localHandlers)), cancellationToken).ConfigureAwait(false);");
         }
         else
         {
-            builder.AppendLine("            _session = await _connectionFactory(null, cancellationToken).ConfigureAwait(false);");
+            builder.AppendLine("                _session = await _connectionFactory(null, cancellationToken).ConfigureAwait(false);");
         }
 
-        builder.AppendLine("            var control = _session.Get<" + model.ControlServiceType + ">();");
-        builder.AppendLine("            var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(_session.Peer);");
-        builder.AppendLine("            Initialize(control, world);");
-        builder.AppendLine("            _started = true;");
+        builder.AppendLine("                var control = _session.Get<" + model.ControlServiceType + ">();");
+        builder.AppendLine("                var world = global::DotBoxD.Services.Generated.DotBoxDGeneratedExtensions.Get" + model.WorldExtensionSuffix + "(_session.Peer);");
+        builder.AppendLine("                Initialize(control, world);");
+        builder.AppendLine("                _started = true;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            await ReplaySetupAsync(cancellationToken).ConfigureAwait(false);");
+        builder.AppendLine("            if (!_configured)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                OnConfigured();");
+        builder.AppendLine("                _configured = true;");
+        builder.AppendLine("            }");
         builder.AppendLine("        }");
-        builder.AppendLine("        await ReplaySetupAsync(cancellationToken).ConfigureAwait(false);");
-        builder.AppendLine("        if (!_configured)");
+        builder.AppendLine("        finally");
         builder.AppendLine("        {");
-        builder.AppendLine("            OnConfigured();");
-        builder.AppendLine("            _configured = true;");
+        builder.AppendLine("            _startGate.Release();");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
         builder.AppendLine();

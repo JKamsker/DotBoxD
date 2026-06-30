@@ -106,6 +106,7 @@ internal static partial class PluginServerFacadeEmitter
             builder.Append("    private ").Append(control.WrapperName).Append("? ")
                 .Append(control.FieldName).AppendLine(";");
         }
+        builder.AppendLine("    private readonly global::System.Threading.SemaphoreSlim _startGate = new(1, 1);");
         builder.AppendLine("    private bool _started;");
         builder.AppendLine("    private bool _setupReplayed;");
         builder.AppendLine("    private int _setupReplayIndex;");
