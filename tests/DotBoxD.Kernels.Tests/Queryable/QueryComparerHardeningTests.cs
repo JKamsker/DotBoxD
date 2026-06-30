@@ -37,6 +37,19 @@ public sealed class QueryComparerHardeningTests
         Assert.Contains("comparer", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Contains_over_custom_instance_method_is_rejected()
+    {
+        var watched = new OddContainsCollection();
+        Assert.True(watched.Contains(1));
+        Assert.DoesNotContain(1, watched.ToArray());
+
+        var ex = Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => watched.Contains(e.Damage)));
+
+        Assert.Contains("instance Contains", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class ParityComparer : IEqualityComparer<int>
     {
         public bool Equals(int x, int y) => (x & 1) == (y & 1);
@@ -53,5 +66,17 @@ public sealed class QueryComparerHardeningTests
         public override bool Equals(object? obj) => ReferenceEquals(obj, EqualityComparer<int>.Default);
 
         public override int GetHashCode() => 0;
+    }
+
+    private sealed class OddContainsCollection : IEnumerable<int>
+    {
+        public bool Contains(int value) => (value & 1) == 1;
+
+        public IEnumerator<int> GetEnumerator()
+        {
+            yield return 2;
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

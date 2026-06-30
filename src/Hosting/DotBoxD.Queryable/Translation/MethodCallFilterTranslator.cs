@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 using DotBoxD.Queryable.Ast;
 
 namespace DotBoxD.Queryable.Translation;
@@ -157,6 +159,20 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
+        if (call.Object is not null && !IsSupportedInstanceContains(call.Method))
+        {
+            throw QueryTranslationException.Unsupported(
+                call,
+                "custom instance Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+        }
+
+        if (call.Object is null && !IsSupportedStaticContains(call.Method))
+        {
+            throw QueryTranslationException.Unsupported(
+                call,
+                "custom static Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
+        }
+
         var unwrapped = UnwrapSpan(collection);
 
         // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
@@ -174,6 +190,55 @@ internal static class MethodCallFilterTranslator
 
         filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
         return true;
+    }
+
+    private static bool IsSupportedStaticContains(MethodInfo method) =>
+        method.DeclaringType == typeof(Enumerable) ||
+        string.Equals(method.DeclaringType?.FullName, "System.MemoryExtensions", StringComparison.Ordinal);
+
+    private static bool IsSupportedInstanceContains(MethodInfo method)
+    {
+        var declaringType = method.DeclaringType;
+        if (declaringType is null)
+        {
+            return false;
+        }
+
+        if (declaringType.IsInterface)
+        {
+            return IsSupportedCollectionInterface(declaringType);
+        }
+
+        if (!declaringType.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = declaringType.GetGenericTypeDefinition();
+        return definition == typeof(Collection<>) ||
+            definition == typeof(Dictionary<,>.KeyCollection) ||
+            definition == typeof(HashSet<>) ||
+            definition == typeof(LinkedList<>) ||
+            definition == typeof(List<>) ||
+            definition == typeof(Queue<>) ||
+            definition == typeof(ReadOnlyCollection<>) ||
+            definition == typeof(ReadOnlyDictionary<,>.KeyCollection) ||
+            definition == typeof(SortedDictionary<,>.KeyCollection) ||
+            definition == typeof(SortedSet<>) ||
+            definition == typeof(Stack<>);
+    }
+
+    private static bool IsSupportedCollectionInterface(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(ICollection<>) ||
+            definition == typeof(IReadOnlySet<>) ||
+            definition == typeof(ISet<>);
     }
 
     // `array.Contains(x)` binds to MemoryExtensions.Contains(ReadOnlySpan<T>, T); the source then appears as

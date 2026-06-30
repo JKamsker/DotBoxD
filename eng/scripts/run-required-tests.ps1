@@ -177,7 +177,7 @@ $defaultMinimums = @{
     QuerySatisfiabilityTests = 16
     QueryTextTests = 21
     QueryReviewHardeningTests = 25
-    QueryComparerHardeningTests = 3
+    QueryComparerHardeningTests = 4
     DifferentialFuzzTests = 1
 }
 
