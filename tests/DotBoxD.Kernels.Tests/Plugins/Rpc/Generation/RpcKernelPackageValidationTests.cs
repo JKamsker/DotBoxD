@@ -3,6 +3,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Json;
 using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
@@ -43,6 +44,22 @@ public sealed class RpcKernelPackageValidationTests
             async () => await server.InstallServerExtensionAsync(invalid).AsTask());
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK074");
+    }
+
+    [Fact]
+    public void Import_rejects_rpc_package_with_missing_handle_entrypoint_alias()
+    {
+        var json = PluginPackageJsonSerializer.Export(RpcKernelTestPackages.MonsterKiller())
+            .Replace("\"KillMonsters\"", "\"Handle\"", StringComparison.Ordinal)
+            .Replace(
+                "\"entrypoints\":{\"shouldHandle\":\"Handle\",\"handle\":\"Handle\"}",
+                "\"entrypoints\":{\"shouldHandle\":\"Handle\"}",
+                StringComparison.Ordinal);
+
+        var ex = Assert.Throws<SandboxValidationException>(
+            () => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "E-JSON-MISSING");
     }
 
     [Fact]
