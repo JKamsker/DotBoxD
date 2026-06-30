@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Authoring;
 using DotBoxD.Queryable.Execution;
+using DotBoxD.Queryable.Planning;
 using DotBoxD.Queryable.Serialization;
 using DotBoxD.Queryable.Text;
 using DotBoxD.Queryable.Translation;
@@ -129,6 +130,10 @@ public sealed class QueryReviewHardeningTests
         var formatting = Assert.Throws<InvalidOperationException>(() => QueryText.Format(filter));
         Assert.Contains("Compare", formatting.Message, StringComparison.Ordinal);
         Assert.Contains("Value", formatting.Message, StringComparison.Ordinal);
+
+        Assert.Throws<InvalidOperationException>(() => QueryFilterCompiler.Compile(filter, new MemberValueReader()));
+        Assert.Throws<InvalidOperationException>(() => EventQueryPlanner.Plan(filter));
+        Assert.Throws<InvalidOperationException>(() => JsonSerializer.Serialize(filter, EventQueryJson.Options));
     }
 
     [Fact]
