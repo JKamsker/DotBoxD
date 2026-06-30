@@ -37,6 +37,10 @@ internal static partial class PluginServerFacadeModelFactory
             "InstallPluginPackageAsync",
             "InstallSubscriptionPackageAsync",
             "InstallServerExtensionPackageAsync",
+            "Equals",
+            "GetHashCode",
+            "GetType",
+            "ToString",
         };
 
     private static void ValidateGeneratedSiblingTypeCollisions(
