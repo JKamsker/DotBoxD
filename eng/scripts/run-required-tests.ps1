@@ -158,6 +158,7 @@ $defaultMinimums = @{
     CallerInfoAttributes_ArePreservedInGeneratedServiceSurface = 1
     GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub = 1
     GeneratedFactoryRegistryDefaultValueTests = 1
+    GeneratedDispatcherSurfaceTests = 1
     ServerExtensionMapTypeSupportTests = 8
     ServerExtensionMapBodyLoweringTests = 3
     HookResultBuilderHintNameRegressionTests = 1

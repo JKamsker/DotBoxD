@@ -11,7 +11,7 @@ namespace Snap.Vt
     {
         private readonly global::Snap.Vt.IVtSnap? _service;
 
-        internal VtSnapDispatcher()
+        public VtSnapDispatcher()
         {
         }
 

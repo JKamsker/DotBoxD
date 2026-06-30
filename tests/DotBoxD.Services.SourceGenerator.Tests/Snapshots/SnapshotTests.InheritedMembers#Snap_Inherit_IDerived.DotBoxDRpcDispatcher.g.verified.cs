@@ -11,7 +11,7 @@ namespace Snap.Inherit
     {
         private readonly global::Snap.Inherit.IDerived? _service;
 
-        internal DerivedDispatcher()
+        public DerivedDispatcher()
         {
         }
 

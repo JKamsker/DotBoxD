@@ -11,7 +11,7 @@ namespace Snap.Nested
     {
         private readonly global::Snap.Nested.ISubSnap? _service;
 
-        internal SubSnapDispatcher()
+        public SubSnapDispatcher()
         {
         }
 

@@ -456,7 +456,8 @@ jobs:
               "ParamsParameters_ArePreservedInGeneratedProxySurface",
               "CallerInfoAttributes_ArePreservedInGeneratedServiceSurface",
               "GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub",
-              "GeneratedFactoryRegistryDefaultValueTests"
+              "GeneratedFactoryRegistryDefaultValueTests",
+              "GeneratedDispatcherSurfaceTests"
             )
           ./eng/scripts/run-required-tests.ps1 `
             -Project tests/DotBoxD.Plugins.Generated.Tests/DotBoxD.Plugins.Generated.Tests.csproj `

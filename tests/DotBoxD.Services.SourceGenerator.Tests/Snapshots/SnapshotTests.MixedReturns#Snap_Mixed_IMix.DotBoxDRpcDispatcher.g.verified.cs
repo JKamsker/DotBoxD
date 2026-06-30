@@ -11,7 +11,7 @@ namespace Snap.Mixed
     {
         private readonly global::Snap.Mixed.IMix? _service;
 
-        internal MixDispatcher()
+        public MixDispatcher()
         {
         }
 
