@@ -1,3 +1,7 @@
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Plugins.Runtime.Rpc;
+using DotBoxD.Plugins.Runtime.Validation;
+
 namespace DotBoxD.Plugins.Runtime;
 
 internal static class LocalTerminalManifestValidator
@@ -22,6 +26,26 @@ internal static class LocalTerminalManifestValidator
             throw new InvalidOperationException(
                 $"Hook package '{package.Manifest.PluginId}' projectedType '{subscription.ProjectedType}' does not match " +
                 $"handler type '{typeof(TProjected).FullName ?? typeof(TProjected).Name}'.");
+        }
+
+        ValidateHandleReturnType<TProjected>(package);
+    }
+
+    private static void ValidateHandleReturnType<TProjected>(PluginPackage package)
+    {
+        if (!PluginEntrypointIndex.Build(package).TryGet(package.Entrypoints.Handle, out var handle) ||
+            handle.ReturnType == SandboxType.Unit)
+        {
+            return;
+        }
+
+        var expected = KernelRpcMarshaller.SandboxTypeOf(typeof(TProjected));
+        if (handle.ReturnType != expected)
+        {
+            throw new InvalidOperationException(
+                $"Hook package '{package.Manifest.PluginId}' projectedType '{package.Manifest.Subscriptions[0].ProjectedType}' " +
+                $"declares handler type '{typeof(TProjected).FullName ?? typeof(TProjected).Name}', but Handle returns " +
+                $"'{handle.ReturnType}' instead of '{expected}'.");
         }
     }
 

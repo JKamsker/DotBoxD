@@ -54,6 +54,26 @@ public sealed partial class RemoteRunLocalChainRuntimeTests
     }
 
     [Fact]
+    public void Remote_RunLocal_rejects_list_projection_handler_element_type_mismatch_before_install()
+    {
+        var package = LowerToPackage(ListProjectionSource);
+        var installed = false;
+        var registry = new RemoteHookRegistry(_ =>
+        {
+            installed = true;
+            return ValueTask.FromResult("unused");
+        }, new RemoteLocalHandlerRegistry());
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            registry.On<ScoreEvent>()
+                .Select(_ => new List<string>())
+                .UseGeneratedLocalChain(package, (List<string> _, HookContext _) => ValueTask.CompletedTask));
+
+        Assert.False(installed);
+        Assert.Contains("projectedType", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Remote_whole_event_RunLocal_rejects_direct_projected_type_tamper()
     {
         var package = WithSubscription(
