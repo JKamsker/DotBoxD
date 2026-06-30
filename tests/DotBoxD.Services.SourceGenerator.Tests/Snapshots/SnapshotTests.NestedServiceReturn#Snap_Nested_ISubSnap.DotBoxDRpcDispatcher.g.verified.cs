@@ -56,6 +56,10 @@ namespace Snap.Nested
             {
                 case "CountAsync":
                 {
+                    if (payload.Length != 0)
+                    {
+                        throw new global::DotBoxD.Services.Exceptions.ServiceProtocolException("Request payload is not allowed for a parameterless RPC method.");
+                    }
                     var __dotboxd_task = receiver.CountAsync();
                     var __dotboxd_result = __dotboxd_task.IsCompletedSuccessfully
                         ? __dotboxd_task.Result

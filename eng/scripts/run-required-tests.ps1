@@ -130,6 +130,7 @@ $defaultMinimums = @{
     KernelRpcValueTests = 15
     KernelRpcBinaryCodecTests = 22
     RpcEnvelopeValidationTests = 5
+    NoPayloadProtocolSurpriseTests = 4
     RequestEnvelopeMessageIdMismatch_ReturnsProtocolError = 1
     InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException = 1
     InstanceRegistryTests = 8

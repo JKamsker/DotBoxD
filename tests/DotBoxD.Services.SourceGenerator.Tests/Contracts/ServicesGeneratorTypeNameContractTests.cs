@@ -104,6 +104,8 @@ public sealed class ServicesGeneratorTypeNameContractTests
                 GlobalTypeName(typeof(ServiceNotFoundException)),
             [nameof(ServicesGeneratorTypeNames.GlobalServiceNotFoundKind)] =
                 GlobalTypeName(typeof(ServiceNotFoundException)) + ".NotFoundKind",
+            [nameof(ServicesGeneratorTypeNames.GlobalServiceProtocolException)] =
+                GlobalTypeName(typeof(ServiceProtocolException)),
         };
 
     private static string GlobalTypeName(Type type) => ServicesGeneratorTypeNames.GlobalPrefix + TypeName(type);

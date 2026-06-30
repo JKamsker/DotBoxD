@@ -422,6 +422,7 @@ jobs:
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
               "RpcEnvelopeValidationTests",
+              "NoPayloadProtocolSurpriseTests",
               "EnvelopeRoundTripTests",
               "RequestEnvelopeMessageIdMismatch_ReturnsProtocolError",
               "InvokeAsync_ResponseEnvelopeMessageIdMismatch_FaultsRequestWithProtocolException",

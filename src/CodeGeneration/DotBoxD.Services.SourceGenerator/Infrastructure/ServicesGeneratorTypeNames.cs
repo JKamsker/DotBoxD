@@ -68,6 +68,8 @@ internal static class ServicesGeneratorTypeNames
     public const string GlobalServiceNotFoundException =
         GlobalPrefix + "DotBoxD.Services.Exceptions.ServiceNotFoundException";
     public const string GlobalServiceNotFoundKind = GlobalServiceNotFoundException + ".NotFoundKind";
+    public const string GlobalServiceProtocolException =
+        GlobalPrefix + "DotBoxD.Services.Exceptions.ServiceProtocolException";
 
     public static string ArrayOf(string typeName) => typeName + "[]";
 
