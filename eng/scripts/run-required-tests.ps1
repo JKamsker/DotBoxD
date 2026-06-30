@@ -115,6 +115,7 @@ $defaultMinimums = @{
     RegistrationAccumulatorAssignableChildTests = 2
     RegistrationAccumulatorGenerationTests = 7
     RegistrationAccumulatorInheritedChildTests = 3
+    RegistrationAccumulatorNullableConstraintTests = 1
     ServerExtensionInlineScopedHandleTests = 6
     ServerExtensionReceiverAuthoritySurpriseTests = 5
     ServerExtensionClientAccessibilityTests = 5

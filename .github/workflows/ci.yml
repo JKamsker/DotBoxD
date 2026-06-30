@@ -390,6 +390,7 @@ jobs:
               "RegistrationAccumulatorAssignableChildTests",
               "RegistrationAccumulatorGenerationTests",
               "RegistrationAccumulatorInheritedChildTests",
+              "RegistrationAccumulatorNullableConstraintTests",
               "ServerExtensionInlineScopedHandleTests",
               "ServerExtensionReceiverAuthoritySurpriseTests",
               "ServerExtensionClientAccessibilityTests",

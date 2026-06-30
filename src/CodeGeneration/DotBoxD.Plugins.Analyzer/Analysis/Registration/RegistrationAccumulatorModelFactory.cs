@@ -189,7 +189,9 @@ internal static class RegistrationAccumulatorModelFactory
         }
         else if (parameter.HasReferenceTypeConstraint)
         {
-            yield return "class";
+            yield return parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated
+                ? "class?"
+                : "class";
         }
 
         if (parameter.HasNotNullConstraint)
