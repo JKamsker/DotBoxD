@@ -14,13 +14,14 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
             """));
 
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        var normalized = NormalizeLineEndings(generated);
         Assert.Contains(
             "[global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute]\n    public string CurrentTarget",
-            generated,
+            normalized,
             StringComparison.Ordinal);
         Assert.Contains(
             "[return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute(\"value\")]\n    public string Echo",
-            generated,
+            normalized,
             StringComparison.Ordinal);
     }
 
@@ -56,27 +57,31 @@ public sealed class PluginServerReturnFlowAttributeSurpriseTests
             """));
 
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        var normalized = NormalizeLineEndings(generated);
         Assert.Contains(
             "[global::System.Diagnostics.CodeAnalysis.NotNullAttribute]\n    public global::Regression.Game.IMonsterControl Monsters",
-            generated,
+            normalized,
             StringComparison.Ordinal);
         Assert.Contains(
             "[global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute]\n        public string CurrentTarget",
-            generated,
+            normalized,
             StringComparison.Ordinal);
         Assert.Contains(
             "[return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute(\"value\")]\n        public string Echo",
-            generated,
+            normalized,
             StringComparison.Ordinal);
         Assert.Contains(
             "[global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute]\n            public string Label",
-            generated,
+            normalized,
             StringComparison.Ordinal);
         Assert.Contains(
             "[return: global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute]\n            public string Find",
-            generated,
+            normalized,
             StringComparison.Ordinal);
     }
+
+    private static string NormalizeLineEndings(string value)
+        => value.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string ServerSource(string worldMembers, string extraGameTypes = "")
         => $$"""

@@ -110,6 +110,12 @@ public static class HostServiceBindingExtensions
             return false;
         }
 
+        if (!handleServiceType.IsInterface)
+        {
+            throw new InvalidOperationException(
+                $"Host service contract '{handleServiceType.FullName}' must be an interface.");
+        }
+
         var factoryDeclaringType = factoryMethod.DeclaringType ?? parentServiceType;
         var targetFactory = ResolveTargetMethod(factoryDeclaringType, parentImplementation.GetType(), factoryMethod);
         foreach (var handleMethod in ServiceMethods(handleServiceType))

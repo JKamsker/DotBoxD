@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Services.Attributes;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
 
@@ -13,6 +14,18 @@ public sealed class HostServiceBindingContractTests
             () => builder.AddBindingsFrom<ConcreteProbeWorld>(new ConcreteProbeWorld()));
 
         Assert.Contains("must be an interface", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddBindingsFrom_rejects_concrete_service_handles_returned_from_factories()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IConcreteHandleProbeWorld>(new ConcreteHandleProbeWorld()));
+
+        Assert.Contains("must be an interface", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ConcreteProbeHandle), ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -70,6 +83,22 @@ public sealed class HostServiceBindingContractTests
     {
         [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
         public int Read() => 1;
+    }
+
+    private interface IConcreteHandleProbeWorld
+    {
+        [HostCapability("probe.read.handle", HostBindingEffect.HostStateRead)]
+        ConcreteProbeHandle GetHandle(string id);
+    }
+
+    private sealed class ConcreteHandleProbeWorld : IConcreteHandleProbeWorld
+    {
+        public ConcreteProbeHandle GetHandle(string id) => new();
+    }
+
+    private sealed class ConcreteProbeHandle : IConcreteProbeHandle
+    {
+        public int GetValue() => 1;
     }
 
     private interface IOverloadedProbeWorld
@@ -149,4 +178,11 @@ public sealed class HostServiceBindingContractTests
 
         public int PreviousValue => 2;
     }
+}
+
+[DotBoxDService]
+public interface IConcreteProbeHandle
+{
+    [HostCapability("probe.read.handle.value", HostBindingEffect.HostStateRead)]
+    int GetValue();
 }
