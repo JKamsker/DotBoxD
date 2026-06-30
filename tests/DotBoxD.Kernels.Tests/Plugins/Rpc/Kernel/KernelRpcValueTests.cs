@@ -102,8 +102,13 @@ public sealed class KernelRpcValueTests
             PluginAnalyzerGeneratedPackageFactory.GeneratedSources(
                 ServerExtensionProxyTests.MonsterKillerWithGeneratedClientSource));
 
+        Assert.Contains("var __count = value.Count;", source, StringComparison.Ordinal);
         Assert.Contains(
-            "new global::DotBoxD.Plugins.KernelRpcValue[value.Count]",
+            "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::DotBoxD.Plugins.KernelRpcValue[__count]",
             source,
             StringComparison.Ordinal);
         Assert.Contains("var __item = value[i];", source, StringComparison.Ordinal);
@@ -122,6 +127,10 @@ public sealed class KernelRpcValueTests
 
         Assert.Contains(
             "global::System.Linq.Enumerable.TryGetNonEnumeratedCount(value, out var __count)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::System.Array.Empty<global::DotBoxD.Plugins.KernelRpcValue>()",
             source,
             StringComparison.Ordinal);
         Assert.Contains(

@@ -10,22 +10,48 @@ internal static class KernelRpcValueListWriterProbe
     public static void Run()
     {
         var values = new List<int> { 4, 5, 6, 7 };
+        var empty = new List<int>();
         var legacy = Measure("List writer via List<T> + ToArray", values, useLegacy: true);
-        var direct = Measure("List writer via direct array fill", values, useLegacy: false);
+        var direct = MeasureDirect("List writer via direct array fill", values, useEmptyFastPath: false);
+        var emptyIndexedLegacy = MeasureDirect(
+            "Empty indexed writer via zero array",
+            empty,
+            useEmptyFastPath: false);
+        var emptyIndexedCurrent = MeasureDirect(
+            "Empty indexed writer via Array.Empty",
+            empty,
+            useEmptyFastPath: true);
         IEnumerable<int> enumerable = values;
+        IEnumerable<int> emptyEnumerable = empty;
         var enumerableFallback = MeasureEnumerable(
             "IEnumerable writer via List<T> + ToArray",
             enumerable,
-            useCountedBranch: false);
+            useCountedBranch: false,
+            useEmptyFastPath: false);
         var enumerableCounted = MeasureEnumerable(
             "IEnumerable writer via counted array fill",
             enumerable,
-            useCountedBranch: true);
+            useCountedBranch: true,
+            useEmptyFastPath: false);
+        var emptyEnumerableLegacy = MeasureEnumerable(
+            "Empty counted IEnumerable via zero array",
+            emptyEnumerable,
+            useCountedBranch: true,
+            useEmptyFastPath: false);
+        var emptyEnumerableCurrent = MeasureEnumerable(
+            "Empty counted IEnumerable via Array.Empty",
+            emptyEnumerable,
+            useCountedBranch: true,
+            useEmptyFastPath: true);
 
         Write(legacy);
         Write(direct);
+        Write(emptyIndexedLegacy);
+        Write(emptyIndexedCurrent);
         Write(enumerableFallback);
         Write(enumerableCounted);
+        Write(emptyEnumerableLegacy);
+        Write(emptyEnumerableCurrent);
     }
 
     private static Measurement Measure(string name, List<int> values, bool useLegacy)
@@ -36,14 +62,14 @@ internal static class KernelRpcValueListWriterProbe
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
-        var checksum = useLegacy ? WriteLegacy(values) : WriteDirect(values);
+        var checksum = useLegacy ? WriteLegacy(values) : WriteDirect(values, useEmptyFastPath: false);
         watch.Stop();
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         GC.KeepAlive(checksum);
         return new Measurement(name, watch.Elapsed.TotalMilliseconds, allocated, checksum);
     }
 
-    private static Measurement MeasureEnumerable(string name, IEnumerable<int> values, bool useCountedBranch)
+    private static Measurement MeasureDirect(string name, List<int> values, bool useEmptyFastPath)
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -51,7 +77,28 @@ internal static class KernelRpcValueListWriterProbe
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
-        var checksum = useCountedBranch ? WriteCountedEnumerable(values) : WriteEnumerableFallback(values);
+        var checksum = WriteDirect(values, useEmptyFastPath);
+        watch.Stop();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        GC.KeepAlive(checksum);
+        return new Measurement(name, watch.Elapsed.TotalMilliseconds, allocated, checksum);
+    }
+
+    private static Measurement MeasureEnumerable(
+        string name,
+        IEnumerable<int> values,
+        bool useCountedBranch,
+        bool useEmptyFastPath)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var watch = Stopwatch.StartNew();
+        var checksum = useCountedBranch
+            ? WriteCountedEnumerable(values, useEmptyFastPath)
+            : WriteEnumerableFallback(values);
         watch.Stop();
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         GC.KeepAlive(checksum);
@@ -86,7 +133,7 @@ internal static class KernelRpcValueListWriterProbe
         return checksum;
     }
 
-    private static long WriteCountedEnumerable(IEnumerable<int> values)
+    private static long WriteCountedEnumerable(IEnumerable<int> values, bool useEmptyFastPath)
     {
         long checksum = 0;
         for (var iteration = 0; iteration < Iterations; iteration++)
@@ -97,7 +144,9 @@ internal static class KernelRpcValueListWriterProbe
                 continue;
             }
 
-            var items = new KernelRpcValue[count];
+            var items = useEmptyFastPath && count == 0
+                ? Array.Empty<KernelRpcValue>()
+                : new KernelRpcValue[count];
             var index = 0;
             foreach (var item in values)
             {
@@ -131,12 +180,14 @@ internal static class KernelRpcValueListWriterProbe
         return KernelRpcValue.List(items.ToArray()).ItemCount;
     }
 
-    private static long WriteDirect(List<int> values)
+    private static long WriteDirect(List<int> values, bool useEmptyFastPath)
     {
         long checksum = 0;
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            var items = new KernelRpcValue[values.Count];
+            var items = useEmptyFastPath && values.Count == 0
+                ? Array.Empty<KernelRpcValue>()
+                : new KernelRpcValue[values.Count];
             for (var i = 0; i < values.Count; i++)
             {
                 items[i] = KernelRpcValue.Int32(values[i]);
