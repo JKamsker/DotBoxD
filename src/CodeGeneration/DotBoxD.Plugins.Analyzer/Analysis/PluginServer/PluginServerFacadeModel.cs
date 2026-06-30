@@ -22,6 +22,7 @@ internal sealed record PluginServerFacadeModel(
     bool EmitPipeBuilder,
     EquatableArray<PluginServerForwardedProperty> WorldProperties,
     EquatableArray<PluginServerForwardedMethod> WorldMethods,
+    EquatableArray<PluginServerServiceWrapper> WorldServiceWrappers,
     EquatableArray<PluginServerControlProperty> Controls,
     // Reverse server->plugin event-callback contract for remote RunLocal chains, discovered by the
     // {worldNs}.Ipc.IPluginEventCallback convention (null when the world declares none). When set, the facade

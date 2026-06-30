@@ -76,22 +76,41 @@ internal static partial class PluginServerFacadeModelFactory
 
     private static void AddGeneratedNestedTypeNames(
         HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        IReadOnlyList<PluginServerServiceWrapper> worldServiceWrappers,
         IReadOnlyList<PluginServerControlProperty> controls,
         bool emitsRemoteLocalEventSink)
     {
-        generatedMembers.Add("RecordedInstallKind");
-        generatedMembers.Add("RecordedInstall");
-        generatedMembers.Add("SetupRecorder");
-        generatedMembers.Add("LiveSettingsHandle");
+        AddGeneratedNestedTypeName(generatedMembers, worldType, "RecordedInstallKind");
+        AddGeneratedNestedTypeName(generatedMembers, worldType, "RecordedInstall");
+        AddGeneratedNestedTypeName(generatedMembers, worldType, "SetupRecorder");
+        AddGeneratedNestedTypeName(generatedMembers, worldType, "LiveSettingsHandle");
         if (emitsRemoteLocalEventSink)
         {
-            generatedMembers.Add("RemoteLocalEventSink");
+            AddGeneratedNestedTypeName(generatedMembers, worldType, "RemoteLocalEventSink");
+        }
+
+        foreach (var wrapper in worldServiceWrappers)
+        {
+            AddGeneratedNestedTypeName(generatedMembers, worldType, wrapper.WrapperName);
         }
 
         foreach (var control in controls)
         {
-            generatedMembers.Add(control.WrapperName);
-            generatedMembers.Add(control.Name + "SetupAccumulator");
+            AddGeneratedNestedTypeName(generatedMembers, worldType, control.WrapperName);
+            AddGeneratedNestedTypeName(generatedMembers, worldType, control.Name + "SetupAccumulator");
+        }
+    }
+
+    private static void AddGeneratedNestedTypeName(
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        string name)
+    {
+        if (!generatedMembers.Add(name))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server world '{worldType.ToDisplayString()}' generated type '{name}' collides with the generated facade surface.");
         }
     }
 

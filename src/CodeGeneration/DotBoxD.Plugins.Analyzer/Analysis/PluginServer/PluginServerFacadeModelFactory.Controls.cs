@@ -65,15 +65,7 @@ internal static partial class PluginServerFacadeModelFactory
                         propertyType,
                         serviceWrappers,
                         cancellationToken)),
-                new EquatableArray<PluginServerServiceWrapper>(
-                    serviceWrappers.Values
-                        .Select(static wrapper => new PluginServerServiceWrapper(
-                            wrapper.Type,
-                            wrapper.WrapperName,
-                            wrapper.Documentation,
-                            new EquatableArray<PluginServerForwardedProperty>(wrapper.Properties.ToArray()),
-                            new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
-                        .ToArray())));
+                new EquatableArray<PluginServerServiceWrapper>(BuildServiceWrappers(serviceWrappers))));
         }
 
         return controls.ToArray();

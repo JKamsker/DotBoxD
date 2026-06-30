@@ -58,7 +58,15 @@ internal static partial class PluginServerFacadeModelFactory
             worldServiceWrappers,
             cancellationToken);
         var eventCallback = PluginServerEventCallbackResolver.Resolve(compilation, worldType, cancellationToken);
-        ValidateGeneratedSurfaceCollisions(type, worldType, worldProperties, worldMethods, controls, eventCallback is not null);
+        var worldServiceWrapperModels = BuildServiceWrappers(worldServiceWrappers);
+        ValidateGeneratedSurfaceCollisions(
+            type,
+            worldType,
+            worldProperties,
+            worldMethods,
+            worldServiceWrapperModels,
+            controls,
+            eventCallback is not null);
         var ns = type.ContainingNamespace.IsGlobalNamespace ? string.Empty : type.ContainingNamespace.ToDisplayString();
         var context = ResolveContext(type, compilation, cancellationToken);
         return new PluginServerFacadeModel(
@@ -87,6 +95,7 @@ internal static partial class PluginServerFacadeModelFactory
             compilation.GetTypeByMetadataName("DotBoxD.Pushdown.Services.RpcMessagePackIpc") is not null,
             new EquatableArray<PluginServerForwardedProperty>(worldProperties),
             new EquatableArray<PluginServerForwardedMethod>(worldMethods),
+            new EquatableArray<PluginServerServiceWrapper>(worldServiceWrapperModels),
             new EquatableArray<PluginServerControlProperty>(controls),
             eventCallback is null ? null : TypeName(eventCallback.Value.Type),
             eventCallback?.ProvideSuffix,
@@ -136,6 +145,18 @@ internal static partial class PluginServerFacadeModelFactory
         }
         return (EnsureServiceWrapper(namedServiceType, serviceWrappers, cancellationToken), wrapperKind);
     }
+
+    private static PluginServerServiceWrapper[] BuildServiceWrappers(
+        Dictionary<string, ServiceWrapperBuilder> serviceWrappers)
+        => serviceWrappers.Values
+            .Select(static wrapper => new PluginServerServiceWrapper(
+                wrapper.Type,
+                wrapper.WrapperName,
+                wrapper.Documentation,
+                new EquatableArray<PluginServerForwardedProperty>(wrapper.Properties.ToArray()),
+                new EquatableArray<PluginServerForwardedMethod>(wrapper.Methods.ToArray())))
+            .ToArray();
+
     private static void PopulateServiceWrapper(
         INamedTypeSymbol serviceType,
         ServiceWrapperBuilder wrapper,

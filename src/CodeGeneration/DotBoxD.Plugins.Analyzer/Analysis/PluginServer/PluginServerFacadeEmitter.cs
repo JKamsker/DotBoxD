@@ -157,6 +157,11 @@ internal static partial class PluginServerFacadeEmitter
         PluginServerFacadeSurfaceEmitter.AppendProperties(builder, model);
         AppendLifecycle(builder, model);
         AppendWorldForwarders(builder, model);
+        foreach (var wrapper in model.WorldServiceWrappers)
+        {
+            PluginServerWrapperEmitter.AppendServiceWrapper(builder, model, wrapper, "    ");
+        }
+
         PluginServerFacadeSurfaceEmitter.AppendInstallSurface(builder, model);
         PluginServerSetupEmitter.AppendSetupMembers(builder, model);
         AppendLiveSettingsHandle(builder, model);
@@ -184,18 +189,47 @@ internal static partial class PluginServerFacadeEmitter
         {
             PluginServerXmlDocumentation.Append(builder, "    ", method.Documentation);
             PluginServerFlowAttributeSource.Append(builder, "    ", method.ReturnAttributes);
-            builder.Append("    public ").Append(method.ReturnType).Append(' ')
+            builder.Append("    public ");
+            if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
+            {
+                builder.Append("async ");
+            }
+
+            builder.Append(method.ReturnType).Append(' ')
                 .Append(PluginServerIdentifier.Escape(method.Name))
-                .Append('(').Append(ParameterList(method)).Append(") => ((")
-                .Append(method.ReceiverType).Append(")RequireWorld()).")
-                .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
-                .Append(ArgumentList(method)).AppendLine(");");
+                .Append('(').Append(ParameterList(method)).Append(") => ");
+            AppendWorldMethodBody(builder, method);
         }
 
         if (model.WorldProperties.Count > 0 || model.WorldMethods.Count > 0)
         {
             builder.AppendLine();
         }
+    }
+
+    private static void AppendWorldMethodBody(StringBuilder builder, PluginServerForwardedMethod method)
+    {
+        if (method.ReturnWrapperName is null)
+        {
+            builder.Append("((").Append(method.ReceiverType).Append(")RequireWorld()).")
+                .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
+                .Append(ArgumentList(method)).AppendLine(");");
+            return;
+        }
+
+        if (method.ReturnWrapperKind is PluginServerReturnWrapperKind.Task or PluginServerReturnWrapperKind.ValueTask)
+        {
+            builder.Append("new ").Append(method.ReturnWrapperName).Append("(this, await ((")
+                .Append(method.ReceiverType).Append(")RequireWorld()).")
+                .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
+                .Append(ArgumentList(method)).AppendLine(").ConfigureAwait(false));");
+            return;
+        }
+
+        builder.Append("new ").Append(method.ReturnWrapperName).Append("(this, ((")
+            .Append(method.ReceiverType).Append(")RequireWorld()).")
+            .Append(PluginServerIdentifier.Escape(method.Name)).Append('(')
+            .Append(ArgumentList(method)).AppendLine("));");
     }
 
     private static string ParameterList(PluginServerForwardedMethod method)
