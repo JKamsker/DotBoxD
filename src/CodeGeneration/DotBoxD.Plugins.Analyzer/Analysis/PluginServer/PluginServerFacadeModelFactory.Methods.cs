@@ -74,6 +74,12 @@ internal static partial class PluginServerFacadeModelFactory
 
     private static void ValidateForwardedMethod(IMethodSymbol method)
     {
+        if (method.DeclaredAccessibility != Accessibility.Public)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{method.ToDisplayString()}' is a non-public interface method '{method.Name}'; generated plugin server facades may forward public members only.");
+        }
+
         if (method.IsStatic)
         {
             throw new NotSupportedException(

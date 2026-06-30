@@ -65,6 +65,19 @@ internal static partial class PluginServerFacadeModelFactory
 
     private static void ValidateForwardedProperty(IPropertySymbol property)
     {
+        if (property.DeclaredAccessibility != Accessibility.Public)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{property.ToDisplayString()}' is interface property '{property.Name}' with non-public access; generated plugin server facades may forward public get-only properties only.");
+        }
+
+        if (property.GetMethod is not null &&
+            property.GetMethod.DeclaredAccessibility != Accessibility.Public)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server member '{property.ToDisplayString()}' is interface property '{property.Name}' with a non-public getter; generated plugin server facades may forward public get-only properties only.");
+        }
+
         if (property.IsStatic ||
             property.GetMethod is null ||
             property.SetMethod is not null ||
