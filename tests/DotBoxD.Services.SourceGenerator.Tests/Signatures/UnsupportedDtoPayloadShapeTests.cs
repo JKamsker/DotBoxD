@@ -157,6 +157,56 @@ public sealed class UnsupportedDtoPayloadShapeTests
         dispatcher.Should().NotContain("case \"SendAsync\":");
     }
 
+    [Fact]
+    public void DtoMembersSplitAcrossConstructors_ProduceDBXS002_AndSkipDispatch()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedDtoPayloads
+            {
+                public sealed class SplitConstructorRequest
+                {
+                    public SplitConstructorRequest(int id)
+                    {
+                        Id = id;
+                        Name = "";
+                    }
+
+                    public SplitConstructorRequest(string name)
+                    {
+                        Id = -1;
+                        Name = name;
+                    }
+
+                    public int Id { get; }
+                    public string Name { get; }
+                }
+
+                [DotBoxDService]
+                public interface ISplitConstructorDto
+                {
+                    Task<int> SendAsync(SplitConstructorRequest request);
+                }
+            }
+            """;
+
+        var runResult = Compile(source);
+
+        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
+        diagnostic.GetMessage().Should().Contain("single public constructor");
+        diagnostic.GetMessage().Should().Contain("Id");
+        diagnostic.GetMessage().Should().Contain("Name");
+
+        var dispatcher = runResult.Results.Single()
+            .GeneratedSources
+            .Single(g => g.HintName.EndsWith("ISplitConstructorDto.DotBoxDRpcDispatcher.g.cs"))
+            .SourceText
+            .ToString();
+        dispatcher.Should().NotContain("case \"SendAsync\":");
+    }
+
     private static GeneratorDriverRunResult Compile(string source)
     {
         var compilation = GeneratorTestHelper.CreateCompilation(source);
