@@ -424,6 +424,7 @@ jobs:
               "PinnedHttpTransportTests",
               "ExpressionQueryTranslatorTests",
               "QuerySatisfiabilityTests",
+              "QueryTextTests",
               "QueryComparerHardeningTests",
               "QueryReviewHardeningTests",
               "DifferentialFuzzTests"

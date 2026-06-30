@@ -175,6 +175,7 @@ $defaultMinimums = @{
     PinnedHttpTransportTests = 3
     ExpressionQueryTranslatorTests = 23
     QuerySatisfiabilityTests = 16
+    QueryTextTests = 21
     QueryReviewHardeningTests = 25
     QueryComparerHardeningTests = 3
     DifferentialFuzzTests = 1
