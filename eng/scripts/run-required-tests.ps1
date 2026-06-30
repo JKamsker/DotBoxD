@@ -172,7 +172,7 @@ $defaultMinimums = @{
     PluginRevocationTests = 4
     Fix_API_0027_Tests = 2
     PinnedHttpTransportTests = 3
-    QueryReviewHardeningTests = 22
+    QueryReviewHardeningTests = 25
     DifferentialFuzzTests = 1
 }
 

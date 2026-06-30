@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -92,10 +93,54 @@ public sealed class QueryReviewHardeningTests
     }
 
     [Fact]
+    public void Contains_over_case_insensitive_dictionary_keys_is_rejected()
+    {
+        var watched = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+        };
+
+        Assert.Equal(1, watched["A"]);
+        Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => watched.Keys.Contains(e.AttackerId)));
+    }
+
+    [Fact]
+    public void Contains_over_case_insensitive_read_only_dictionary_keys_is_rejected()
+    {
+        var inner = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["a"] = 1,
+        };
+        var watched = new ReadOnlyDictionary<string, int>(inner);
+
+        Assert.Equal(1, watched["A"]);
+        Assert.Throws<QueryTranslationException>(() =>
+            ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+                e => watched.Keys.Contains(e.AttackerId)));
+    }
+
+    [Fact]
     public void Contains_over_a_default_collection_still_lowers_to_in()
     {
         var ids = new[] { "a", "b" };
         var filter = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(e => ids.Contains(e.AttackerId));
+        Assert.Equal(QueryFilterKind.In, filter.Kind);
+    }
+
+    [Fact]
+    public void Contains_over_default_dictionary_keys_still_lowers_to_in()
+    {
+        var watched = new Dictionary<string, int>
+        {
+            ["a"] = 1,
+            ["b"] = 2,
+        };
+
+        var filter = ExpressionQueryTranslator.TranslateFilter<AttackTestEvent>(
+            e => watched.Keys.Contains(e.AttackerId));
+
         Assert.Equal(QueryFilterKind.In, filter.Kind);
     }
 

@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 using DotBoxD.Queryable.Ast;
 
 namespace DotBoxD.Queryable.Translation;
@@ -176,7 +178,7 @@ internal static class MethodCallFilterTranslator
         // comparer treats these pairs as distinct. Case-insensitive comparers match "a"/"A"; culture-sensitive
         // case-sensitive comparers can match "a\0"/"a" because some cultures ignore embedded nulls.
         // SortedSet<T> exposes ordering comparers, so compare equality must be checked there too.
-        var comparer = collection.GetType().GetProperty("Comparer")?.GetValue(collection);
+        var comparer = GetComparer(collection, depth: 0);
         if (comparer is IEqualityComparer<string> equalityComparer)
         {
             return equalityComparer.Equals("a", "A") || equalityComparer.Equals("a\0", "a");
@@ -189,4 +191,43 @@ internal static class MethodCallFilterTranslator
 
         return false;
     }
+
+    private static object? GetComparer(object collection, int depth)
+    {
+        var type = collection.GetType();
+        var comparer = type.GetProperty("Comparer")?.GetValue(collection);
+        if (comparer is not null)
+        {
+            return comparer;
+        }
+
+        if (depth >= 3)
+        {
+            return null;
+        }
+
+        if (!string.Equals(type.Name, "KeyCollection", StringComparison.Ordinal) ||
+            type.DeclaringType is not { IsGenericType: true } declaringType ||
+            !IsDictionaryKeyCollection(declaringType.GetGenericTypeDefinition()))
+        {
+            return null;
+        }
+
+        // Dictionary key views preserve their owner's comparer but do not expose it publicly.
+        return GetComparerFromField(collection, "_dictionary", depth) ??
+            GetComparerFromField(collection, "_collection", depth);
+    }
+
+    private static object? GetComparerFromField(object collection, string fieldName, int depth)
+    {
+        var inner = collection.GetType()
+            .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetValue(collection);
+        return inner is null ? null : GetComparer(inner, depth + 1);
+    }
+
+    private static bool IsDictionaryKeyCollection(Type type)
+        => type == typeof(Dictionary<,>) ||
+            type == typeof(SortedDictionary<,>) ||
+            type == typeof(ReadOnlyDictionary<,>);
 }
