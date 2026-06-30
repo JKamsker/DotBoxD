@@ -10,6 +10,12 @@ internal static class PackageProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-server-extension-proxy-arguments", StringComparer.OrdinalIgnoreCase))
+        {
+            ServerExtensionProxyArgumentsProbe.Run();
+            return true;
+        }
+
         if (args.Contains("--probe-kernel-package-registry-resolve", StringComparer.OrdinalIgnoreCase))
         {
             KernelPackageRegistryResolveProbe.Run();
