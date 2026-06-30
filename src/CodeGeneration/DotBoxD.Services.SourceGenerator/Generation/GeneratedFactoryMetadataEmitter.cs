@@ -34,7 +34,8 @@ internal static class GeneratedFactoryMetadataEmitter
         ServiceModel service,
         CancellationToken ct)
     {
-        sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedMethod)} {arrayName} =");
+        sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyList, ServicesGeneratorTypeNames.GlobalGeneratedMethod)} {arrayName} =");
+        sb.AppendLine($"            {ServicesGeneratorTypeNames.GlobalArray}.AsReadOnly(new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedMethod)}");
         sb.AppendLine("        {");
 
         foreach (var method in service.Methods.Array)
@@ -49,7 +50,7 @@ internal static class GeneratedFactoryMetadataEmitter
             AppendMethod(sb, method, ct);
         }
 
-        sb.AppendLine("        };");
+        sb.AppendLine("        });");
     }
 
     private static void AppendMethod(
@@ -64,10 +65,10 @@ internal static class GeneratedFactoryMetadataEmitter
         sb.AppendLine($"                {TypeExpression(method.MetadataResultType)},");
         sb.AppendLine($"                {ReturnKindExpression(method.ReturnKind)},");
         sb.AppendLine($"                {BoolLiteral(NamingHelpers.IsSubServiceReturn(method.ReturnKind))},");
-        sb.AppendLine($"                new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedParameter)}");
+        sb.AppendLine($"                {ServicesGeneratorTypeNames.GlobalArray}.AsReadOnly(new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedParameter)}");
         sb.AppendLine("                {");
         AppendParameters(sb, method.Parameters, ct);
-        sb.AppendLine("                }),");
+        sb.AppendLine("                })),");
     }
 
     private static void AppendParameters(
@@ -98,12 +99,17 @@ internal static class GeneratedFactoryMetadataEmitter
     {
         if (!parameter.HasDefaultValue ||
             parameter.IsCancellationToken ||
-            parameter.DefaultValueLiteral.Length == 0)
+            parameter.MetadataDefaultValueExpression.Length == 0)
         {
             return "null";
         }
 
-        return parameter.DefaultValueLiteral;
+        if (string.Equals(parameter.MetadataDefaultValueExpression, "default", System.StringComparison.Ordinal))
+        {
+            return "default(" + parameter.MetadataType + ")";
+        }
+
+        return parameter.MetadataDefaultValueExpression;
     }
 
     private static string ReturnKindExpression(MethodReturnKind returnKind) =>

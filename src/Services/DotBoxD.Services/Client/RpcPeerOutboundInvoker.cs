@@ -91,7 +91,7 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct = default)
     {
         using var received = await SendRequestAsync(service, method, request, instanceId: null, streams: null, ct).ConfigureAwait(false);
-        EnsureNonStreamingResponse(received);
+        EnsureNoResponsePayload(received);
     }
 
     public async Task InvokeAsync<TRequest>(
@@ -102,13 +102,13 @@ internal sealed partial class RpcPeerOutboundInvoker : IRpcInvoker
         CancellationToken ct = default)
     {
         using var received = await SendRequestAsync(service, method, request, instanceId: null, streams, ct).ConfigureAwait(false);
-        EnsureNonStreamingResponse(received);
+        EnsureNoResponsePayload(received);
     }
 
     public async Task InvokeAsync(string service, string method, CancellationToken ct = default)
     {
         using var received = await SendRequestAsync(service, method, instanceId: null, ct).ConfigureAwait(false);
-        EnsureNonStreamingResponse(received);
+        EnsureNoResponsePayload(received);
     }
 
     public void FailPending(Exception error) => _pending.FailAll(error);
