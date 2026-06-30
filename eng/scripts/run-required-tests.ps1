@@ -151,6 +151,7 @@ $defaultMinimums = @{
     SingleConnectionServerTransportLifecycleRegressionTests = 5
     NamedPipeServerTransportCancellationRegressionTests = 2
     UnsupportedShapeCoverageTests = 6
+    UnsupportedDtoConstructibilityTests = 1
     UnsupportedDtoPayloadShapeTests = 5
     UnsupportedTransportPayloadShapeTests = 3
     SubServiceAvailabilityTests = 5

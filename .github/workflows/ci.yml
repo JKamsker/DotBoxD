@@ -456,6 +456,7 @@ jobs:
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
               "UnsupportedShapeCoverageTests",
+              "UnsupportedDtoConstructibilityTests",
               "UnsupportedDtoPayloadShapeTests",
               "UnsupportedTransportPayloadShapeTests",
               "SubServiceAvailabilityTests",
