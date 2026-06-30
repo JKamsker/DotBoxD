@@ -45,7 +45,7 @@ gh aw version v0.82.0-jk.1
 Edit the `.md` source workflow, then regenerate the lock files:
 
 ```powershell
-gh aw compile --approve --force-refresh-action-pins
+gh aw compile --approve --force-refresh-action-pins --gh-aw-ref v0.82.0-jk.1
 ```
 
 The forked compiler should emit setup actions pinned to this repository:
@@ -55,6 +55,26 @@ uses: JKamsker/gh-aw/actions/setup@<commit-sha> # v0.82.0-jk.1
 ```
 
 It should not emit `github/gh-aw-actions/setup` for these workflows.
+
+## Codex Model
+
+DotBoxD's Codex workflows pin `gpt-5.5` in source and run with high reasoning
+effort:
+
+```yaml
+engine:
+  id: codex
+  model: gpt-5.5
+  args:
+    - " -c"
+    - model_reasoning_effort="high"
+```
+
+The leading space in the first `engine.args` entry is intentional for
+`JKamsker/gh-aw@v0.82.0-jk.1`. That compiler appends custom Codex args directly
+after the structured-output path in threat-detection runs; without the explicit
+separator it generates `detection_result.json-c ...`. Remove the leading space
+only after the fork emits that separator itself.
 
 ## Custom Endpoint and Tokens
 

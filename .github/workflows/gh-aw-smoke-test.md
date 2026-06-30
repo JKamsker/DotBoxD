@@ -19,7 +19,12 @@ sandbox:
       openai:
         base-url-secret: CODEX_LB_BASE_URL
 
-engine: codex
+engine:
+  id: codex
+  model: gpt-5.5
+  args:
+    - " -c"
+    - model_reasoning_effort="high"
 
 safe-outputs:
   scripts:

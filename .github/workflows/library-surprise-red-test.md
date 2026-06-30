@@ -59,7 +59,12 @@ safe-outputs:
   report-incomplete:
     create-issue: false
 
-engine: codex
+engine:
+  id: codex
+  model: gpt-5.5
+  args:
+    - " -c"
+    - model_reasoning_effort="high"
 
 pre-agent-steps:
   - name: Write surprise candidate handoff
