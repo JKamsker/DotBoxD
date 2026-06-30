@@ -85,9 +85,8 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
 
         if (arguments.Count != constructor.Parameters.Length || constructor.Parameters.Length > fields.Count)
         {
-            // Constructor arguments must bind one argument per declared constructor parameter, and the constructor
-            // cannot expose more fields than the DTO has. Missing DTO fields must be derived from assigned fields;
-            // stored fields can carry constructor bodies or property initializers that are not modeled here.
+            // Constructor arguments must bind one argument per declared constructor parameter and cannot expose more
+            // fields than the DTO has. Missing DTO fields must be derived from assigned fields.
             throw new System.NotSupportedException();
         }
 
@@ -154,15 +153,11 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
 
             if (fieldIndex != i)
             {
-                throw new NotSupportedException(
-                    "DTO constructor arguments must match DTO field order to preserve remote projection evaluation order.");
+                throw new NotSupportedException("DTO constructor arguments must match DTO field order to preserve remote projection evaluation order.");
             }
 
-            // record.new declares the FIELD's sandbox type, and the value comes from the constructor parameter that
-            // fills it. If that parameter is a different CLR type than the field (a converting ctor, e.g. an int
-            // arg into an enum field, or List<long> into a List<int> field), the coarse manifest-tag check below
-            // would still pass while the emitted record carried a value of the wrong shape. Require an exact type
-            // match so only a faithful positional construction lowers; anything else fails safe.
+            // record.new declares the field's sandbox type. Require the constructor parameter's value to carry the
+            // exact field shape; otherwise coarse manifest tags could hide a mismatched CLR payload type.
             var lowered = LowerFieldValue(
                 arguments[i].Expression,
                 fields[fieldIndex].Type,
@@ -203,10 +198,8 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
             $"[{string.Join(", ", fieldSources)}], {recordTypeSource}, Span)";
 
     // Lowers an object-initializer construction to record.new: each `Field = value` assignment lowers the value
-    // with the field's expected type. When Roslyn has a real RHS type, require an exact CLR match; generated
-    // remote fallback chains can have unresolved lambda parameters on the first pass, so those rely on the
-    // contextual lowerer's manifest-tag check. Omitted stored fields fail closed unless the caller opts into the
-    // hook-result zero-fill convention.
+    // with the field's expected type. Omitted stored fields fail closed unless the caller opts into the hook-result
+    // zero-fill convention.
     private static DotBoxDExpressionModel LowerInitializer(
         IReadOnlyList<RecordMember> fields,
         string recordTypeSource,
@@ -220,6 +213,7 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
     {
         fieldSources ??= new string?[fields.Count];
         assigned ??= new bool[fields.Count];
+        var previousInitializedField = -1;
         foreach (var expression in initializer.Expressions)
         {
             if (expression is not AssignmentExpressionSyntax assignment ||
@@ -235,6 +229,12 @@ internal static partial class DotBoxDRecordCreationExpressionLowerer
                 throw new System.NotSupportedException();
             }
 
+            if (index <= previousInitializedField)
+            {
+                throw new NotSupportedException("DTO object initializer assignments must match DTO field order to preserve remote projection evaluation order.");
+            }
+
+            previousInitializedField = index;
             var lowered = LowerFieldValue(assignment.Right, fields[index].Type, context, lowerExpression);
 
             fieldSources[index] = lowered.Source;
