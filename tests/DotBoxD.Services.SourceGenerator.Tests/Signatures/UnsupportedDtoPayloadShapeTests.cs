@@ -7,6 +7,53 @@ namespace DotBoxD.Services.SourceGenerator.Tests.Signatures;
 public sealed class UnsupportedDtoPayloadShapeTests
 {
     [Fact]
+    public void DtoMembersWithoutPublicSetters_ProduceDBXS002_AndSkipDispatch()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedDtoPayloads
+            {
+                public sealed class PrivateInitRequest
+                {
+                    public int Value { get; private init; }
+                }
+
+                public sealed class PrivateSetResponse
+                {
+                    public int Value { get; private set; }
+                }
+
+                [DotBoxDService]
+                public interface IDtoAccessors
+                {
+                    Task<int> SendAsync(PrivateInitRequest request);
+                    Task<PrivateSetResponse> GetAsync();
+                }
+            }
+            """;
+
+        var runResult = Compile(source);
+
+        var diagnostics = runResult.Diagnostics.Where(d => d.Id == "DBXS002").ToArray();
+        diagnostics.Should().HaveCount(2);
+        diagnostics.Should().OnlyContain(d => d.GetMessage().Contains("public setter or init"));
+
+        var generated = runResult.Results.Single().GeneratedSources;
+        var proxy = generated
+            .Single(g => g.HintName.EndsWith("IDtoAccessors.DotBoxDRpcProxy.g.cs"))
+            .SourceText.ToString();
+        proxy.Should().Contain("throw new global::System.NotSupportedException");
+
+        var dispatcher = generated
+            .Single(g => g.HintName.EndsWith("IDtoAccessors.DotBoxDRpcDispatcher.g.cs"))
+            .SourceText.ToString();
+        dispatcher.Should().NotContain("case \"SendAsync\":");
+        dispatcher.Should().NotContain("case \"GetAsync\":");
+    }
+
+    [Fact]
     public void DtoMembersWithUnsupportedPayloadShapes_ProduceDBXS002_AndSkipDispatch()
     {
         const string source = """

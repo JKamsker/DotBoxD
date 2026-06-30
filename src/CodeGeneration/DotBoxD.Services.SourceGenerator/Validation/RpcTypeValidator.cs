@@ -96,6 +96,12 @@ internal static partial class RpcTypeValidator
             return $"{role} uses a function pointer type, which cannot be serialized as an RPC payload";
         }
 
+        var reconstructibilityReason = RpcPayloadReconstructibilityInspector.GetUnsupportedReason(type, role, ct);
+        if (reconstructibilityReason is not null)
+        {
+            return reconstructibilityReason;
+        }
+
         return inspectDtoMembers
             ? RpcPayloadMemberInspector.GetUnsupportedPayloadMemberReason(
                 type,
