@@ -34,11 +34,11 @@ public sealed class DateTimeConstantDefaultParameterRegressionTests
         Assert.Empty(runResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var proxy = GeneratedSource(runResult, "DotBoxDRpcProxy");
-        Assert.Contains("void Ping(global::System.DateTime when = default)", proxy);
+        Assert.Contains("void Ping(global::System.DateTime @when = default)", proxy);
 
         var asyncSibling = GeneratedSource(runResult, "DotBoxDRpcAsync");
         Assert.Contains(
-            "global::System.Threading.Tasks.Task PingAsync(global::System.DateTime when = default, global::System.Threading.CancellationToken ct = default);",
+            "global::System.Threading.Tasks.Task PingAsync(global::System.DateTime @when = default, global::System.Threading.CancellationToken ct = default);",
             asyncSibling);
     }
 
