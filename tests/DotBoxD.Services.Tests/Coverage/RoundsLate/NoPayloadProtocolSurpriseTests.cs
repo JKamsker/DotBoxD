@@ -6,8 +6,8 @@ using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Tests.Support;
-using Xunit;
 using Shared;
+using Xunit;
 
 namespace DotBoxD.Services.Tests.Coverage.RoundsLate;
 
@@ -33,14 +33,8 @@ public sealed class NoPayloadProtocolSurpriseTests
             method: "GetServerStatusAsync");
         await client.SendAsync(requestFrame.Memory);
 
-        using var responseFrame = await client.ReceiveAsync().WaitAsync(Timeout);
-
-        Assert.True(MessageFramer.TryReadFrame(
-            responseFrame.Memory,
-            out var messageId,
-            out var messageType,
-            out var envelope,
-            out _));
+        using var responseFrame = await ReceiveRpcResponseAsync(client);
+        var (messageId, messageType, envelope) = ReadRpcResponse(responseFrame.Memory);
         var response = serializer.Deserialize<RpcResponse>(envelope);
 
         Assert.Equal(1, messageId);
@@ -48,6 +42,37 @@ public sealed class NoPayloadProtocolSurpriseTests
         Assert.False(response.IsSuccess);
         Assert.Equal(RpcErrorTypes.ProtocolError, response.ErrorType);
         Assert.Contains("payload", response.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Generated_no_request_dispatch_rejects_unclaimed_declared_streams()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var (clientConnection, serverConnection) = InMemoryPipe.CreateConnectionPair();
+        await using var client = clientConnection;
+        await using var server = RpcPeer
+            .Over(serverConnection, serializer, new RpcPeerOptions { RequestTimeout = Timeout })
+            .Provide<IGameService>(new TestGameService())
+            .Start();
+
+        using var requestFrame = BuildRequestFrameWithStreams(
+            serializer,
+            messageId: 2,
+            service: "IGameService",
+            method: "GetServerStatusAsync",
+            streams: new[] { new RpcStreamHandle(90_001, RpcStreamKind.Binary) });
+        await client.SendAsync(requestFrame.Memory);
+
+        using var responseFrame = await ReceiveRpcResponseAsync(client);
+        var (messageId, messageType, envelope) = ReadRpcResponse(responseFrame.Memory);
+        var response = serializer.Deserialize<RpcResponse>(envelope);
+
+        Assert.Equal(2, messageId);
+        Assert.Equal(MessageType.Error, messageType);
+        Assert.False(response.IsSuccess);
+        Assert.Equal(RpcErrorTypes.ProtocolError, response.ErrorType);
+        Assert.Contains("stream id '90001'", response.ErrorMessage);
+        Assert.Contains("not claimed", response.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -102,6 +127,40 @@ public sealed class NoPayloadProtocolSurpriseTests
         Assert.Contains("payload", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static async Task<Payload> ReceiveRpcResponseAsync(PipeConnection client)
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            var frame = await client.ReceiveAsync().WaitAsync(Timeout);
+            if (!MessageFramer.TryReadFrameHeader(frame.Memory, out _, out var messageType))
+            {
+                frame.Dispose();
+                continue;
+            }
+
+            if (messageType is MessageType.Response or MessageType.Error)
+            {
+                return frame;
+            }
+
+            frame.Dispose();
+        }
+
+        throw new TimeoutException("Timed out waiting for an RPC response frame.");
+    }
+
+    private static (int MessageId, MessageType MessageType, ReadOnlyMemory<byte> Envelope) ReadRpcResponse(
+        ReadOnlyMemory<byte> frame)
+    {
+        Assert.True(MessageFramer.TryReadFrame(
+            frame,
+            out var messageId,
+            out var messageType,
+            out var envelope,
+            out _));
+        return (messageId, messageType, envelope);
+    }
+
     private static Payload BuildRequestFrameWithPayload(
         MessagePackRpcSerializer serializer,
         int messageId,
@@ -121,6 +180,25 @@ public sealed class NoPayloadProtocolSurpriseTests
             },
             payload.WrittenSpan);
     }
+
+    private static Payload BuildRequestFrameWithStreams(
+        MessagePackRpcSerializer serializer,
+        int messageId,
+        string service,
+        string method,
+        RpcStreamHandle[] streams) =>
+        MessageFramer.FrameMessage(
+            serializer,
+            messageId,
+            MessageType.Request,
+            new RpcRequest
+            {
+                MessageId = messageId,
+                ServiceName = service,
+                MethodName = method,
+                Streams = streams,
+            },
+            ReadOnlySpan<byte>.Empty);
 
     private static Payload BuildResponseFrameWithPayload(
         MessagePackRpcSerializer serializer,
