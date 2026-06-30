@@ -343,6 +343,7 @@ jobs:
               "RemoteRunLocalChainRuntimeTests",
               "RemoteRunLocalValidationTests",
               "GeneratedRemoteHookChainFallbackTests",
+              "PluginAnalyzerEnumerableDtoValidationTests",
               "ServerExtensionGeneratedContextParameterTests",
               "PluginAnalyzerHookChainTests",
               "InvokeAsyncGenerationTests",
