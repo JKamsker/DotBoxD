@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Tests.PluginAnalyzer.KernelMethod;
 
 namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Defaults;
 
-public sealed class DefaultValueEmitterMatrixTests
+public sealed class AnalyzerDefaultValueEmitterMatrixTests
 {
     public static TheoryData<DefaultCase> AnalyzerDefaultCases { get; } = new()
     {

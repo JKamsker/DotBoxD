@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace DotBoxD.Services.SourceGenerator.Tests.Coverage;
 
-public sealed class DefaultValueEmitterMatrixTests
+public sealed class ServiceDefaultValueEmitterMatrixTests
 {
     public static TheoryData<string, string, string> ServiceDefaultCases { get; } = new()
     {
