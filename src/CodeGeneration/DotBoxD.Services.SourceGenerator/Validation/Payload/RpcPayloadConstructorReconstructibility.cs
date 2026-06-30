@@ -9,26 +9,29 @@ internal static class RpcPayloadConstructorReconstructibility
     public static string? GetUnsupportedReason(INamedTypeSymbol type, string role)
     {
         var immutableMembers = new List<ImmutableMember>();
-        foreach (var member in type.GetMembers())
+        for (var current = type; current is not null && CanInspectInheritedMembers(current); current = current.BaseType)
         {
-            switch (member)
+            foreach (var member in current.GetMembers())
             {
-                case IPropertySymbol property:
-                    var propertyReason = AddImmutableProperty(property, role, immutableMembers);
-                    if (propertyReason is not null)
-                    {
-                        return propertyReason;
-                    }
+                switch (member)
+                {
+                    case IPropertySymbol property:
+                        var propertyReason = AddImmutableProperty(property, role, immutableMembers);
+                        if (propertyReason is not null)
+                        {
+                            return propertyReason;
+                        }
 
-                    break;
-                case IFieldSymbol field:
-                    var fieldReason = AddImmutableField(field, role, immutableMembers);
-                    if (fieldReason is not null)
-                    {
-                        return fieldReason;
-                    }
+                        break;
+                    case IFieldSymbol field:
+                        var fieldReason = AddImmutableField(field, role, immutableMembers);
+                        if (fieldReason is not null)
+                        {
+                            return fieldReason;
+                        }
 
-                    break;
+                        break;
+                }
             }
         }
 
@@ -179,6 +182,33 @@ internal static class RpcPayloadConstructorReconstructibility
         }
 
         return string.Join(", ", names);
+    }
+
+    private static bool CanInspectInheritedMembers(INamedTypeSymbol type)
+    {
+        if (type.SpecialType != SpecialType.None ||
+            type.TypeKind is not (TypeKind.Class or TypeKind.Struct))
+        {
+            return false;
+        }
+
+        var ns = type.ContainingNamespace;
+        return ns is null || ns.IsGlobalNamespace || !IsSystemNamespace(ns);
+    }
+
+    private static bool IsSystemNamespace(INamespaceSymbol ns)
+    {
+        while (!ns.IsGlobalNamespace)
+        {
+            if (ns.ContainingNamespace.IsGlobalNamespace)
+            {
+                return ns.Name == "System";
+            }
+
+            ns = ns.ContainingNamespace;
+        }
+
+        return false;
     }
 
     private enum ConstructorParameterMatch

@@ -207,6 +207,59 @@ public sealed class UnsupportedDtoPayloadShapeTests
         dispatcher.Should().NotContain("case \"SendAsync\":");
     }
 
+    [Fact]
+    public void DtoInheritedMembersMissingFromDerivedConstructor_ProduceDBXS002_AndSkipDispatch()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedDtoPayloads
+            {
+                public class BaseRequest
+                {
+                    public BaseRequest(int id)
+                    {
+                        Id = id;
+                    }
+
+                    public int Id { get; }
+                }
+
+                public sealed class DerivedRequest : BaseRequest
+                {
+                    public DerivedRequest(string name)
+                        : base(-1)
+                    {
+                        Name = name;
+                    }
+
+                    public string Name { get; }
+                }
+
+                [DotBoxDService]
+                public interface IInheritedConstructorDto
+                {
+                    Task<int> SendAsync(DerivedRequest request);
+                }
+            }
+            """;
+
+        var runResult = Compile(source);
+
+        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
+        diagnostic.GetMessage().Should().Contain("single public constructor");
+        diagnostic.GetMessage().Should().Contain("Id");
+        diagnostic.GetMessage().Should().Contain("Name");
+
+        var dispatcher = runResult.Results.Single()
+            .GeneratedSources
+            .Single(g => g.HintName.EndsWith("IInheritedConstructorDto.DotBoxDRpcDispatcher.g.cs"))
+            .SourceText
+            .ToString();
+        dispatcher.Should().NotContain("case \"SendAsync\":");
+    }
+
     private static GeneratorDriverRunResult Compile(string source)
     {
         var compilation = GeneratorTestHelper.CreateCompilation(source);
