@@ -102,7 +102,10 @@ internal static class RegistrationAccumulatorBatchFactory
         {
             if (targetByReceiver.TryGetValue(property.TypeName, out var target))
             {
-                children.Add(new RegistrationChildAccumulatorModel(property.Name, target.AccumulatorName));
+                children.Add(new RegistrationChildAccumulatorModel(
+                    property.Name,
+                    property.DeclaringTypeName,
+                    target.AccumulatorName));
             }
         }
 

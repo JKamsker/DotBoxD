@@ -110,6 +110,7 @@ $defaultMinimums = @{
     RpcKernelNumericConversionGenerationTests = 4
     RpcKernelObjectCreationValidationTests = 2
     RegistrationAccumulatorGenerationTests = 7
+    RegistrationAccumulatorInheritedChildTests = 3
     ServerExtensionInlineScopedHandleTests = 6
     ServerExtensionReceiverAuthoritySurpriseTests = 5
     ServerExtensionClientAccessibilityTests = 5

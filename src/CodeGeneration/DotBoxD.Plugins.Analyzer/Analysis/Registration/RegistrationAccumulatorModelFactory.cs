@@ -216,16 +216,19 @@ internal static class RegistrationAccumulatorModelFactory
         {
             foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
             {
-                if (!seenNames.Add(property.Name))
-                {
-                    continue;
-                }
-
                 if (property is { IsStatic: false, DeclaredAccessibility: Accessibility.Public } &&
                     property.GetMethod is not null &&
                     property.Parameters.Length == 0)
                 {
-                    properties.Add(new RegistrationRootPropertyModel(property.Name, TypeName(property.Type)));
+                    if (!seenNames.Add(property.Name))
+                    {
+                        continue;
+                    }
+
+                    properties.Add(new RegistrationRootPropertyModel(
+                        property.Name,
+                        TypeName(property.Type),
+                        TypeName(property.ContainingType)));
                 }
             }
         }
