@@ -87,6 +87,22 @@ public sealed class PluginPackageJsonTests
             d.Message.Contains("'projectedType' must be a string", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Import_rejects_projected_type_without_local_terminal()
+    {
+        var json = JsonDamagePackage().Replace(
+            """{ "event": "DamageEvent", "kernel": "JsonDamageKernel" }""",
+            """{ "event": "DamageEvent", "kernel": "JsonDamageKernel", "projectedType": "string" }""",
+            StringComparison.Ordinal);
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(json));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK031" &&
+            d.Message.Contains("projectedType", StringComparison.Ordinal) &&
+            d.Message.Contains("localTerminal", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("3")]
     [InlineData("Cpu, Alloc")]

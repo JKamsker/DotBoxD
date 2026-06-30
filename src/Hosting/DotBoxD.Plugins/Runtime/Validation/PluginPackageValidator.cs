@@ -151,6 +151,17 @@ internal static class PluginPackageValidator
         HookSubscriptionManifest subscription,
         List<SandboxDiagnostic> diagnostics)
     {
+        if (subscription.ProjectedType is not null)
+        {
+            PluginManifestTextValidator.ValidateText(subscription.ProjectedType, "hook projected type", diagnostics);
+            if (!subscription.LocalTerminal)
+            {
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK031",
+                    "A hook subscription that declares projectedType must also declare localTerminal."));
+            }
+        }
+
         if (subscription.ResultType is null)
         {
             if (subscription.ResultLocalTerminal)
