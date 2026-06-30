@@ -47,7 +47,18 @@ internal static partial class MethodModelFactory
                 : "(" + underlyingType.ToDisplayString(s_qualifiedFormat) + ")" + underlyingLiteral;
         }
 
+        if (type.IsValueType && IsRuntimeDefaultValue(value))
+        {
+            return "default";
+        }
+
         return FormatPrimitiveLiteral(value);
+    }
+
+    private static bool IsRuntimeDefaultValue(object value)
+    {
+        var type = value.GetType();
+        return Equals(value, System.Activator.CreateInstance(type));
     }
 
     private static string? FormatPrimitiveLiteral(object value) => value switch

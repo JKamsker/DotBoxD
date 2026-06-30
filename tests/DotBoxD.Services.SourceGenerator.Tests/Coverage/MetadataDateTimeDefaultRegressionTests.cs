@@ -37,11 +37,12 @@ public sealed class MetadataDateTimeDefaultRegressionTests
             namespace Regress.MetadataDefaults
             {
                 [DotBoxDService]
-                public interface ISchedule : MetadataDefaults.IBaseSchedule
+                public interface ISchedule : global::MetadataDefaults.IBaseSchedule
                 {
                 }
             }
             """, reference);
+        compilation.GetDiagnostics().Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
 
         var driver = GeneratorTestHelper.CreateDriver().RunGenerators(compilation);
         var runResult = driver.GetRunResult();
@@ -55,13 +56,13 @@ public sealed class MetadataDateTimeDefaultRegressionTests
                 "ISchedule",
                 GeneratorTestHelper.GeneratedKind.Proxy))
             .SourceText.ToString();
-        proxy.Should().Contain("Ping(global::System.DateTime when = default)");
+        proxy.Should().Contain("Ping(global::System.DateTime @when = default)");
 
         var asyncSibling = generated
             .Single(g => g.HintName.EndsWith("ISchedule.DotBoxDRpcAsync.g.cs", StringComparison.Ordinal))
             .SourceText.ToString();
         asyncSibling.Should().Contain(
-            "PingAsync(global::System.DateTime when = default, global::System.Threading.CancellationToken ct = default)");
+            "PingAsync(global::System.DateTime @when = default, global::System.Threading.CancellationToken ct = default)");
 
         var finalCompilation = compilation.AddSyntaxTrees(runResult.GeneratedTrees);
         using var ms = new MemoryStream();
