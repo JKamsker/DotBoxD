@@ -164,6 +164,7 @@ $defaultMinimums = @{
     ParamsParameters_ArePreservedInGeneratedProxySurface = 1
     CallerInfoAttributes_ArePreservedInGeneratedServiceSurface = 1
     NullableFlowParameterAttributes_ArePreservedInGeneratedServiceSurface = 1
+    ReturnFlowAttributes_ArePreservedOnProxyMethods = 1
     CallerArgumentExpression_TargetingCancellationToken_RemainsValidOnAsyncSibling = 1
     GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub = 1
     GeneratedFactoryRegistryDefaultValueTests = 5

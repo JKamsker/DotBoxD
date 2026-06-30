@@ -217,6 +217,7 @@ internal static partial class MethodModelFactory
             DeclaredReturnType: declaredReturnType,
             UnwrappedReturnType: unwrappedReturnType,
             ReturnRefKindKeyword: ReturnRefKindKeyword(methodSymbol.RefKind),
+            ReturnAttributePrefix: BuildReturnFlowAttributePrefix(methodSymbol, ct),
             HasCancellationToken: hasCancellationToken,
             Parameters: parameters.ToEquatableArray(),
             AdditionalExplicitImplementationTypes: EquatableArray<string>.Empty,

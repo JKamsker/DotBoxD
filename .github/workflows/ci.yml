@@ -470,6 +470,7 @@ jobs:
               "ParamsParameters_ArePreservedInGeneratedProxySurface",
               "CallerInfoAttributes_ArePreservedInGeneratedServiceSurface",
               "NullableFlowParameterAttributes_ArePreservedInGeneratedServiceSurface",
+              "ReturnFlowAttributes_ArePreservedOnProxyMethods",
               "CallerArgumentExpression_TargetingCancellationToken_RemainsValidOnAsyncSibling",
               "GenericServiceMethod_WithRefStructAntiConstraint_PreservesConstraintOnProxyStub",
               "GeneratedFactoryRegistryDefaultValueTests",

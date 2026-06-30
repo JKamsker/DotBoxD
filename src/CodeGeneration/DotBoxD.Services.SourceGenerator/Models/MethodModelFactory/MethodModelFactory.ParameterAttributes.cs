@@ -104,6 +104,39 @@ internal static partial class MethodModelFactory
         return attributes.ToString();
     }
 
+    private static string BuildReturnFlowAttributePrefix(IMethodSymbol method, CancellationToken ct)
+    {
+        var attributes = new StringBuilder();
+        foreach (var attr in method.GetReturnTypeAttributes())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            switch (attr.AttributeClass?.ToDisplayString())
+            {
+                case "System.Diagnostics.CodeAnalysis.MaybeNullAttribute":
+                    AppendReturnSimpleAttribute(
+                        attributes,
+                        "global::System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
+                    AppendReturnSimpleAttribute(
+                        attributes,
+                        "global::System.Diagnostics.CodeAnalysis.NotNullAttribute");
+                    break;
+
+                case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute":
+                    AppendReturnStringArgumentAttribute(
+                        attributes,
+                        attr,
+                        "global::System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute");
+                    break;
+            }
+        }
+
+        return attributes.ToString();
+    }
+
     private static void AppendSimpleAttribute(StringBuilder sb, string attributeType)
     {
         sb.Append("[")
@@ -145,6 +178,31 @@ internal static partial class MethodModelFactory
             .Append("(\"")
             .Append(LiteralHelpers.EscapeStringLiteral(value))
             .Append("\")] ");
+    }
+
+    private static void AppendReturnSimpleAttribute(StringBuilder sb, string attributeType)
+    {
+        sb.Append("[return: ")
+            .Append(attributeType)
+            .AppendLine("]");
+    }
+
+    private static void AppendReturnStringArgumentAttribute(
+        StringBuilder sb,
+        AttributeData attr,
+        string attributeType)
+    {
+        if (attr.ConstructorArguments.Length != 1 ||
+            attr.ConstructorArguments[0].Value is not string value)
+        {
+            return;
+        }
+
+        sb.Append("[return: ")
+            .Append(attributeType)
+            .Append("(\"")
+            .Append(LiteralHelpers.EscapeStringLiteral(value))
+            .AppendLine("\")]");
     }
 
     private static void AppendCallerArgumentExpressionAttribute(StringBuilder sb, AttributeData attr)
