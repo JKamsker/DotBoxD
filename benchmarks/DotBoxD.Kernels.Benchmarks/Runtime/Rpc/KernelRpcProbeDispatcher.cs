@@ -16,6 +16,12 @@ internal static class KernelRpcProbeDispatcher
             return true;
         }
 
+        if (args.Contains("--probe-kernel-rpc-binary-codec-empty-decode", StringComparer.OrdinalIgnoreCase))
+        {
+            KernelRpcBinaryCodecEmptyDecodeProbe.Run();
+            return true;
+        }
+
         if (args.Contains("--probe-invokeasync-capture-argument-writer", StringComparer.OrdinalIgnoreCase))
         {
             InvokeAsyncCaptureArgumentWriterProbe.Run();
