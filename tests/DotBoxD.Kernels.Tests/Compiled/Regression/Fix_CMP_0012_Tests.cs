@@ -179,6 +179,18 @@ public sealed class Fix_CMP_0012_Tests
     }
 
     [Fact]
+    public void Module_schema_semver_domain_matches_importer()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath(ModuleSchemaRelative)));
+        var semver = document.RootElement
+            .GetProperty("$defs")
+            .GetProperty("semver");
+
+        Assert.Equal("string", semver.GetProperty("type").GetString());
+        AssertPattern(semver, "^v?[0-9]+(?:\\.[0-9]+\\.[0-9]+)?$");
+    }
+
+    [Fact]
     public void Module_schema_i64_and_f64_literal_ranges_match_importer()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath(ModuleSchemaRelative)));
