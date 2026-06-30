@@ -126,6 +126,7 @@ public sealed partial class InstalledKernel
             throw new ArgumentOutOfRangeException(nameof(mode), mode, "Live update mode is not supported.");
         }
 
+        PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
         lock (_updateModeGate)
         {
             _updateModes[stateType] = mode;
