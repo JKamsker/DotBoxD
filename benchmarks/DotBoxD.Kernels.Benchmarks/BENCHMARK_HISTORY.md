@@ -960,3 +960,23 @@ wire map -> sandbox (32 entries)          374.6 /3168.0    318.1 /2024.0
 
 The empty decode path is an allocation-only win; the non-empty map decode path improves both allocation and
 elapsed time by removing the extra dictionary snapshot.
+
+## Kernel RPC marshaller empty object-list fast path
+
+The CLR-to-sandbox marshaller now reuses `Array.Empty<SandboxValue>()` when an `ICollection` list has zero
+items instead of allocating a new zero-length array before calling the owned list factory.
+
+Command:
+
+```text
+dotnet run --project benchmarks\DotBoxD.Kernels.Benchmarks\DotBoxD.Kernels.Benchmarks.csproj -c Release -- --probe-kernel-rpc-marshaller-collections
+```
+
+Representative local run, 100k measured iterations for the isolated list construction branch:
+
+```text
+Case                                 Before ms/Bop    After ms/Bop
+empty object list -> sandbox           3.7 / 64.0      11.1 / 40.0
+```
+
+This is an allocation-only win on the empty collection branch; non-empty lists keep the existing array fill path.
