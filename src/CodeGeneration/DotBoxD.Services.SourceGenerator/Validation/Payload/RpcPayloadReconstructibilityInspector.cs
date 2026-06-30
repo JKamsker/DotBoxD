@@ -91,10 +91,15 @@ internal static class RpcPayloadReconstructibilityInspector
             return $"{role} member '{property.Name}' must expose a public getter so RPC payloads can be reconstructed";
         }
 
-        if (property.SetMethod?.DeclaredAccessibility != Accessibility.Public &&
-            !HasConstructorParameter(property.ContainingType, property.Name))
+        if (property.SetMethod?.DeclaredAccessibility != Accessibility.Public)
         {
-            return $"{role} member '{property.Name}' must expose a public setter or init, or match a public constructor parameter, so RPC payloads can be reconstructed";
+            var constructorMatch = GetConstructorParameterMatch(property.ContainingType, property.Name, property.Type);
+            if (constructorMatch != ConstructorParameterMatch.ExactType)
+            {
+                return constructorMatch == ConstructorParameterMatch.NameOnly
+                    ? $"{role} member '{property.Name}' must match a public constructor parameter with the same type so RPC payloads can be reconstructed"
+                    : $"{role} member '{property.Name}' must expose a public setter or init, or match a public constructor parameter, so RPC payloads can be reconstructed";
+            }
         }
 
         return Inspect(property.Type, $"{role} member '{property.Name}'", ct, visitedOriginalDefinitions);
@@ -113,16 +118,26 @@ internal static class RpcPayloadReconstructibilityInspector
             return null;
         }
 
-        if (field.IsReadOnly && !HasConstructorParameter(field.ContainingType, field.Name))
+        if (field.IsReadOnly)
         {
-            return $"{role} member '{field.Name}' is readonly and does not match a public constructor parameter; RPC DTO fields must be reconstructible";
+            var constructorMatch = GetConstructorParameterMatch(field.ContainingType, field.Name, field.Type);
+            if (constructorMatch != ConstructorParameterMatch.ExactType)
+            {
+                return constructorMatch == ConstructorParameterMatch.NameOnly
+                    ? $"{role} member '{field.Name}' is readonly and does not match a public constructor parameter with the same type; RPC DTO fields must be reconstructible"
+                    : $"{role} member '{field.Name}' is readonly and does not match a public constructor parameter; RPC DTO fields must be reconstructible";
+            }
         }
 
         return Inspect(field.Type, $"{role} member '{field.Name}'", ct, visitedOriginalDefinitions);
     }
 
-    private static bool HasConstructorParameter(INamedTypeSymbol type, string memberName)
+    private static ConstructorParameterMatch GetConstructorParameterMatch(
+        INamedTypeSymbol type,
+        string memberName,
+        ITypeSymbol memberType)
     {
+        var foundNameMatch = false;
         foreach (var constructor in type.InstanceConstructors)
         {
             if (constructor.DeclaredAccessibility != Accessibility.Public ||
@@ -135,12 +150,23 @@ internal static class RpcPayloadReconstructibilityInspector
             {
                 if (string.Equals(parameter.Name, memberName, StringComparison.OrdinalIgnoreCase))
                 {
-                    return true;
+                    foundNameMatch = true;
+                    if (SymbolEqualityComparer.Default.Equals(parameter.Type, memberType))
+                    {
+                        return ConstructorParameterMatch.ExactType;
+                    }
                 }
             }
         }
 
-        return false;
+        return foundNameMatch ? ConstructorParameterMatch.NameOnly : ConstructorParameterMatch.None;
+    }
+
+    private enum ConstructorParameterMatch
+    {
+        None,
+        NameOnly,
+        ExactType,
     }
 
     private static bool CanInspectDtoMembers(INamedTypeSymbol type)

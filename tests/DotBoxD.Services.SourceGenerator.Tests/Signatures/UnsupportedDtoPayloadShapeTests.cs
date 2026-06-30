@@ -115,6 +115,48 @@ public sealed class UnsupportedDtoPayloadShapeTests
         dispatcher.Should().NotContain("case \"GetTaskResponseAsync\":");
     }
 
+    [Fact]
+    public void DtoConstructorParametersWithDifferentMemberTypes_ProduceDBXS002_AndSkipDispatch()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Threading.Tasks;
+
+            namespace Regress.UnsupportedDtoPayloads
+            {
+                public sealed class MismatchedConstructorRequest
+                {
+                    public MismatchedConstructorRequest(string value)
+                    {
+                        Value = value.Length;
+                    }
+
+                    public int Value { get; }
+                }
+
+                [DotBoxDService]
+                public interface IMismatchedConstructorDto
+                {
+                    Task<int> SendAsync(MismatchedConstructorRequest request);
+                }
+            }
+            """;
+
+        var runResult = Compile(source);
+
+        var diagnostic = runResult.Diagnostics.Should().ContainSingle(d => d.Id == "DBXS002").Subject;
+        diagnostic.GetMessage().Should().Contain("member 'Value'");
+        diagnostic.GetMessage().Should().Contain("constructor parameter");
+        diagnostic.GetMessage().Should().Contain("same type");
+
+        var dispatcher = runResult.Results.Single()
+            .GeneratedSources
+            .Single(g => g.HintName.EndsWith("IMismatchedConstructorDto.DotBoxDRpcDispatcher.g.cs"))
+            .SourceText
+            .ToString();
+        dispatcher.Should().NotContain("case \"SendAsync\":");
+    }
+
     private static GeneratorDriverRunResult Compile(string source)
     {
         var compilation = GeneratorTestHelper.CreateCompilation(source);
