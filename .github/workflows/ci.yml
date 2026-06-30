@@ -406,6 +406,7 @@ jobs:
               "ServerExtensionClientContractSurpriseTests",
               "ServerExtensionClientDecodeSurpriseTests",
               "ServerExtensionClientProxySurpriseTests",
+              "ServerExtensionClientReturnAttributeSurpriseTests",
               "ServerExtensionClientProxyValidationTests",
               "ServerExtensionDateTimeSupportTests",
               "ServerExtensionTimeSpanSupportTests",

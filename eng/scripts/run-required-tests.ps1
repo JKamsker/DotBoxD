@@ -131,6 +131,7 @@ $defaultMinimums = @{
     ServerExtensionClientContractSurpriseTests = 5
     ServerExtensionClientDecodeSurpriseTests = 2
     ServerExtensionClientProxySurpriseTests = 6
+    ServerExtensionClientReturnAttributeSurpriseTests = 3
     ServerExtensionClientProxyValidationTests = 8
     ServerExtensionDateTimeSupportTests = 4
     ServerExtensionTimeSpanSupportTests = 6
