@@ -149,6 +149,56 @@ public sealed class GeneratedFactoryRegistryDefaultValueTests
     }
 
     [Fact]
+    public void GeneratedDefaultsPreserveDecimalConstantAttributeParameters()
+    {
+        const string source = """
+            using DotBoxD.Services.Attributes;
+            using System.Runtime.CompilerServices;
+            using System.Runtime.InteropServices;
+            using System.Threading.Tasks;
+
+            namespace Metadata.DecimalConstantDefaults
+            {
+                [DotBoxDService]
+                public interface IDecimalConstantDefaults
+                {
+                    Task<int> CountAsync(
+                        [Optional, DecimalConstant(2, 0, 0, 0, 1234)] decimal amount,
+                        int required);
+                }
+            }
+            """;
+
+        var compilation = GeneratorTestHelper.CreateCompilation(source);
+        var runResult = GeneratorTestHelper.CreateDriver().RunGenerators(compilation).GetRunResult();
+
+        Assert.Empty(runResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        const string expectedParameter =
+            "[global::System.Runtime.InteropServices.OptionalAttribute] " +
+            "[global::System.Runtime.CompilerServices.DecimalConstantAttribute(2, 0, 0, 0, 1234)] " +
+            "decimal amount, int @required";
+        Assert.Contains(expectedParameter, GeneratedSource(runResult, "DotBoxDRpcProxy"));
+        Assert.Contains(
+            expectedParameter + ", global::System.Threading.CancellationToken ct = default",
+            GeneratedSource(runResult, "DotBoxDRpcAsync"));
+
+        var assembly = CompileAndLoad(source);
+        var serviceType = assembly.GetType("Metadata.DecimalConstantDefaults.IDecimalConstantDefaults")!;
+        var generated = assembly.GetType("DotBoxD.Services.Generated.DotBoxDGenerated")
+            ?? throw new InvalidOperationException("Generated factory type not found.");
+        var services = Assert.IsAssignableFrom<IReadOnlyList<GeneratedService>>(
+            generated.GetProperty("Services")!.GetValue(null));
+
+        var service = services.Single(candidate => candidate.ServiceType == serviceType);
+        var method = service.Methods.Single(candidate => candidate.Name == "CountAsync");
+
+        Assert.True(method.Parameters[0].HasDefaultValue);
+        Assert.Equal(12.34m, method.Parameters[0].DefaultValue);
+        Assert.False(method.Parameters[1].HasDefaultValue);
+    }
+
+    [Fact]
     public void GeneratedDefaultsPreserveOptionalAttributeBeforeRequiredParameters()
     {
         const string source = """

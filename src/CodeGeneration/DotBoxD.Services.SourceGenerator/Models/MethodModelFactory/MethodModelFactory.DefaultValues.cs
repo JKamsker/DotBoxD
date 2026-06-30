@@ -18,6 +18,11 @@ internal static partial class MethodModelFactory
             return null;
         }
 
+        if (HasDecimalConstantAttribute(param))
+        {
+            return null;
+        }
+
         if (!param.HasExplicitDefaultValue)
         {
             return hasDefaultValue ? "default" : null;
@@ -70,6 +75,12 @@ internal static partial class MethodModelFactory
             return "new global::System.DateTime(" +
                 ticks.ToString(CultureInfo.InvariantCulture) +
                 "L)";
+        }
+
+        var decimalConstant = FormatDecimalConstantMetadataDefaultValueExpression(param);
+        if (decimalConstant.Length > 0)
+        {
+            return decimalConstant;
         }
 
         if (defaultValueLiteral.Length == 0 && HasOptionalMetadata(param))
@@ -167,6 +178,7 @@ internal static partial class MethodModelFactory
     {
         var param = method.Parameters[parameterIndex];
         if (HasDateTimeConstantAttribute(param) ||
+            HasDecimalConstantAttribute(param) ||
             !HasOptionalMetadata(param))
         {
             return false;

@@ -14,7 +14,11 @@ internal static partial class MethodModelFactory
     {
         var attributes = new StringBuilder();
         var hasDateTimeConstant = HasDateTimeConstantAttribute(parameter);
-        var preserveOptionalAttribute = preserveOptionalAttributeDefault || hasDateTimeConstant;
+        var hasDecimalConstant = HasDecimalConstantAttribute(parameter);
+        var preserveOptionalAttribute =
+            preserveOptionalAttributeDefault ||
+            hasDateTimeConstant ||
+            hasDecimalConstant;
         if (preserveOptionalAttribute)
         {
             attributes.Append("[global::System.Runtime.InteropServices.OptionalAttribute] ");
@@ -44,6 +48,10 @@ internal static partial class MethodModelFactory
 
                 case "System.Runtime.CompilerServices.DateTimeConstantAttribute":
                     AppendDateTimeConstantAttribute(attributes, parameter);
+                    break;
+
+                case "System.Runtime.CompilerServices.DecimalConstantAttribute":
+                    AppendDecimalConstantAttribute(attributes, parameter);
                     break;
             }
         }
