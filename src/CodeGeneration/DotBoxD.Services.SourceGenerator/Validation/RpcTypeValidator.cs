@@ -81,6 +81,11 @@ internal static partial class RpcTypeValidator
             return $"{role} uses object or dynamic as an RPC payload type; declare a concrete payload type so the wire contract can be reconstructed";
         }
 
+        if (ContainsDelegatePayloadType(type, ct))
+        {
+            return $"{role} uses a delegate type as an RPC payload; delegates are executable in-process callbacks and cannot be reconstructed across RPC peers";
+        }
+
         if (ContainsRefLikeType(type, ct))
         {
             return $"{role} uses a ref-like type, which cannot be serialized as an RPC payload";
