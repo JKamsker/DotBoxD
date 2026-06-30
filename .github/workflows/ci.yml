@@ -439,6 +439,7 @@ jobs:
             -NoBuild `
             -RequiredFullyQualifiedNameContains @(
               "UnsupportedShapeCoverageTests",
+              "UnsupportedDtoPayloadShapeTests",
               "SubServiceAvailabilityTests",
               "SubServicePropertyInheritanceTests",
               "NullableSubServiceTests",

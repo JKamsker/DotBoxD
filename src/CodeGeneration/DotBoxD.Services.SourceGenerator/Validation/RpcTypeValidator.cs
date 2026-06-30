@@ -16,7 +16,44 @@ internal static partial class RpcTypeValidator
         bool allowTopLevelAsyncWrapper,
         bool allowCurrentTransportShape = false,
         bool allowCurrentCancellationToken = false,
-        ITypeSymbol? cancellationTokenSymbol = null)
+        ITypeSymbol? cancellationTokenSymbol = null) =>
+        GetUnsupportedTypeReasonCore(
+            type,
+            role,
+            ct,
+            allowTopLevelAsyncWrapper,
+            allowCurrentTransportShape,
+            allowCurrentCancellationToken,
+            cancellationTokenSymbol,
+            inspectDtoMembers: true);
+
+    internal static string? GetUnsupportedDirectTypeReason(
+        ITypeSymbol type,
+        string role,
+        CancellationToken ct,
+        bool allowTopLevelAsyncWrapper,
+        bool allowCurrentTransportShape = false,
+        bool allowCurrentCancellationToken = false,
+        ITypeSymbol? cancellationTokenSymbol = null) =>
+        GetUnsupportedTypeReasonCore(
+            type,
+            role,
+            ct,
+            allowTopLevelAsyncWrapper,
+            allowCurrentTransportShape,
+            allowCurrentCancellationToken,
+            cancellationTokenSymbol,
+            inspectDtoMembers: false);
+
+    private static string? GetUnsupportedTypeReasonCore(
+        ITypeSymbol type,
+        string role,
+        CancellationToken ct,
+        bool allowTopLevelAsyncWrapper,
+        bool allowCurrentTransportShape = false,
+        bool allowCurrentCancellationToken = false,
+        ITypeSymbol? cancellationTokenSymbol = null,
+        bool inspectDtoMembers = true)
     {
         if (ContainsTaskLikePayloadType(type, ct, allowCurrent: allowTopLevelAsyncWrapper))
         {
@@ -59,7 +96,16 @@ internal static partial class RpcTypeValidator
             return $"{role} uses a function pointer type, which cannot be serialized as an RPC payload";
         }
 
-        return null;
+        return inspectDtoMembers
+            ? RpcPayloadMemberInspector.GetUnsupportedPayloadMemberReason(
+                type,
+                role,
+                ct,
+                allowTopLevelAsyncWrapper,
+                allowCurrentTransportShape,
+                allowCurrentCancellationToken,
+                cancellationTokenSymbol)
+            : null;
     }
 
     public static string? GetUnsupportedSubServicePayloadReason(
@@ -213,63 +259,4 @@ internal static partial class RpcTypeValidator
         return false;
     }
 
-    private static bool ContainsPointerType(ITypeSymbol type, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        if (type is IPointerTypeSymbol)
-        {
-            return true;
-        }
-
-        if (type is IArrayTypeSymbol array)
-        {
-            return ContainsPointerType(array.ElementType, ct);
-        }
-
-        if (type is INamedTypeSymbol named)
-        {
-            foreach (var arg in named.TypeArguments)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (ContainsPointerType(arg, ct))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsFunctionPointerType(ITypeSymbol type, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        if (type is IFunctionPointerTypeSymbol)
-        {
-            return true;
-        }
-
-        if (type is IArrayTypeSymbol array)
-        {
-            return ContainsFunctionPointerType(array.ElementType, ct);
-        }
-
-        if (type is INamedTypeSymbol named)
-        {
-            foreach (var arg in named.TypeArguments)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (ContainsFunctionPointerType(arg, ct))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
 }
