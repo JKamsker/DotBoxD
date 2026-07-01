@@ -61,6 +61,35 @@ public sealed class SafeNetworkGrantValidationTests
         Assert.True(result.Succeeded, result.Error?.SafeMessage);
     }
 
+    [Fact]
+    public async Task Direct_http_grant_uses_default_scheme_and_timeout()
+    {
+        var host = SandboxTestHost.Create(networkInvoker: FakeInvoker("ok"));
+        var module = await host.ImportJsonAsync(NetworkJson("https://api.example.com/config"));
+        var policy = new SandboxPolicy(
+            "direct-http-defaults",
+            SandboxEffects.Pure | SandboxEffect.Network | SandboxEffect.Concurrency,
+            [
+                new CapabilityGrant(RuntimeCapabilityIds.Async, new Dictionary<string, string>()),
+                new CapabilityGrant(
+                    "net.http.get",
+                    new Dictionary<string, string>
+                    {
+                        ["allowedHosts"] = "api.example.com",
+                        ["maxResponseBytes"] = "1024"
+                    })
+            ],
+            new ResourceLimits(
+                MaxFuel: 5_000,
+                MaxNetworkBytesRead: 1024,
+                MaxNetworkBytesWritten: 1024));
+
+        var plan = await host.PrepareAsync(module, policy);
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.True(result.Succeeded, result.Error?.SafeMessage);
+    }
+
     [Theory]
     [InlineData("api.example.com,,evil.example", "https")]
     [InlineData("https://api.example.com", "https")]
