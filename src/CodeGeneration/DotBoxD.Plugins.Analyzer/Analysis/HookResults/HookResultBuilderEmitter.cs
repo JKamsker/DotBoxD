@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -144,10 +145,51 @@ internal static class HookResultBuilderEmitter
 
             builder.Append(segment.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Append('_')
-                .Append(segment);
+                .Append(HintNameSegment(segment));
         }
 
         return builder.ToString();
+    }
+
+    private static string HintNameSegment(string segment)
+    {
+        var builder = new StringBuilder(segment.Length);
+        for (var i = 0; i < segment.Length; i++)
+        {
+            var character = segment[i];
+            var characterCount = IsSurrogatePair(segment, i) ? 2 : 1;
+            if ((characterCount == 1 && character == '_') || IsLetterOrDigit(segment, i))
+            {
+                builder.Append(segment, i, characterCount);
+                i += characterCount - 1;
+                continue;
+            }
+
+            var scalar = characterCount == 2
+                ? char.ConvertToUtf32(character, segment[i + 1])
+                : character;
+            builder.Append("_x")
+                .Append(scalar.ToString(scalar <= 0xFFFF ? "X4" : "X", CultureInfo.InvariantCulture));
+            i += characterCount - 1;
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool IsSurrogatePair(string value, int index)
+        => index + 1 < value.Length &&
+           char.IsHighSurrogate(value[index]) &&
+           char.IsLowSurrogate(value[index + 1]);
+
+    private static bool IsLetterOrDigit(string value, int index)
+    {
+        var category = CharUnicodeInfo.GetUnicodeCategory(value, index);
+        return category is UnicodeCategory.UppercaseLetter or
+            UnicodeCategory.LowercaseLetter or
+            UnicodeCategory.TitlecaseLetter or
+            UnicodeCategory.ModifierLetter or
+            UnicodeCategory.OtherLetter or
+            UnicodeCategory.DecimalDigitNumber;
     }
 }
 

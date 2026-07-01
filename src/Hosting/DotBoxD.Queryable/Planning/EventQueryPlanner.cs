@@ -24,7 +24,7 @@ public static class EventQueryPlanner
     public static EventQueryPlan Plan(QueryFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        QueryFilterInvariants.RequireCompareValues(filter);
+        QueryFilterInvariants.RequireValidShape(filter);
 
         if (filter.Kind == QueryFilterKind.MatchAll)
         {

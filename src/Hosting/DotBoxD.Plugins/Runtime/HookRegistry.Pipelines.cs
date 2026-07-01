@@ -89,8 +89,10 @@ public sealed partial class HookRegistry
         TEvent e,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         for (var i = 0; i < pipelines.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await ((IHookPipeline<TEvent>)pipelines[i]).PublishAsync(e, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -104,6 +106,7 @@ public sealed partial class HookRegistry
         var registrations = OrderedResultRegistrations<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var result = await registration
                 .InvokeAsync<TResult>(e, options: null, cancellationToken)
                 .ConfigureAwait(false);
@@ -126,6 +129,7 @@ public sealed partial class HookRegistry
         var registrations = OrderedResultRegistrations<TEvent>(pipelines);
         foreach (var registration in registrations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var result = await registration
                 .InvokeAsync(e, options, cancellationToken)
                 .ConfigureAwait(false);

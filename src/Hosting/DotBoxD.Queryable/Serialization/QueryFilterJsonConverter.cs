@@ -26,6 +26,7 @@ public sealed class QueryFilterJsonConverter : JsonConverter<QueryFilter>
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(options);
+        QueryFilterInvariants.RequireValidShape(value);
 
         writer.WriteStartObject();
         writer.WritePropertyName("kind");

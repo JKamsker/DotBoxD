@@ -24,6 +24,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         RpcResponse value,
         MessagePackSerializerOptions options)
     {
+        ValidateEnvelope(value);
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
         writer.Write(value.MessageId);
@@ -77,7 +78,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                     response.Stream = ReadNullableStream(ref reader, options);
                     break;
                 default:
-                    reader.Skip();
+                    MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC response");
                     break;
             }
         }
@@ -94,7 +95,24 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                 "RPC response is missing required IsSuccess.");
         }
 
+        ValidateEnvelope(response);
         return response;
+    }
+
+    private static void ValidateEnvelope(RpcResponse response)
+    {
+        if (response.IsSuccess &&
+            (response.ErrorMessage is not null || response.ErrorType is not null))
+        {
+            throw new MessagePackSerializationException(
+                "Successful RPC response must not contain error fields.");
+        }
+
+        if (!response.IsSuccess && response.Stream is not null)
+        {
+            throw new MessagePackSerializationException(
+                "Error RPC response must not contain a stream handle.");
+        }
     }
 
     private static IMessagePackFormatter<RpcStreamHandle> GetStreamFormatter(

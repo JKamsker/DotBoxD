@@ -16,6 +16,7 @@ public static class QueryFilterEvaluator
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(reader);
+        QueryFilterInvariants.RequireValidShape(filter);
         var budget = QueryEvaluationLimits.MaxNodes;
         return EvaluateNode(filter, target, reader, depth: 0, ref budget);
     }
@@ -24,6 +25,7 @@ public static class QueryFilterEvaluator
     public static void EnsureWithinLimits(QueryFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        QueryFilterInvariants.RequireValidShape(filter);
         var budget = QueryEvaluationLimits.MaxNodes;
         Measure(filter, depth: 0, ref budget);
     }
@@ -31,7 +33,7 @@ public static class QueryFilterEvaluator
     private static bool EvaluateNode(QueryFilter filter, object target, MemberValueReader reader, int depth, ref int budget)
     {
         CheckBudget(depth, ref budget);
-        switch (filter.Kind)
+        switch (QueryFilterInvariants.RequireKnownKind(filter))
         {
             case QueryFilterKind.MatchAll:
                 return true;
@@ -65,9 +67,9 @@ public static class QueryFilterEvaluator
                     filter.IgnoreCase);
             case QueryFilterKind.In:
                 return EvaluateIn(filter, target, reader);
-            default:
-                return false;
         }
+
+        throw new InvalidOperationException("Query filter evaluation reached an unreachable kind.");
     }
 
     private static bool EvaluateIn(QueryFilter filter, object target, MemberValueReader reader)
@@ -88,7 +90,8 @@ public static class QueryFilterEvaluator
     private static void Measure(QueryFilter filter, int depth, ref int budget)
     {
         CheckBudget(depth, ref budget);
-        if (filter.Kind == QueryFilterKind.Compare)
+        var kind = QueryFilterInvariants.RequireKnownKind(filter);
+        if (kind == QueryFilterKind.Compare)
         {
             _ = QueryFilterInvariants.CompareValue(filter);
         }
