@@ -20,7 +20,7 @@ all driven by Roslyn source generators, with no runtime reflection on the hot pa
 | Mode | What it does | Start here |
 |------|--------------|------------|
 | **Services** | The host implements a contract; clients call it remotely over RPC. | [Tutorial ›](docs/tutorials/first-service.md) |
-| **Kernels** | A client supplies validated logic the host runs safely inside a fuel-metered sandbox. | [Tutorial ›](docs/tutorials/first-kernel.md) |
+| **Kernels** | A client supplies validated logic (e.g. a `Where`/`Select` event filter) the host runs safely inside a fuel-metered sandbox. | [Tutorial ›](docs/tutorials/event-pipeline-runlocal.md) |
 | **Pushdown** | A plugin ships its *own* sandboxed batch operation that runs **server-side**, collapsing N round-trips into one. | [Tutorial ›](docs/tutorials/pushdown-server-extension.md) |
 
 The Services and channel libraries target `netstandard2.1`, so they run on **Unity / IL2CPP**.
@@ -42,7 +42,7 @@ Then follow [**Getting started**](docs/getting-started/README.md) or jump straig
 ## Explore the docs
 
 - 📘 **[Guide](docs/toc.yml)** — concepts (Services, Kernels, Pushdown, the runtime), security model, and reference (diagnostics, schemas).
-- 🎓 **[Tutorials](docs/tutorials/index.md)** — end-to-end walkthroughs for your first service, first kernel, and first pushdown extension.
+- 🎓 **[Tutorials](docs/tutorials/index.md)** — end-to-end walkthroughs: your first service, event pipelines with `RunLocal`, and a pushdown server extension.
 - 🧩 **[Examples](docs/examples/index.md)** — an annotated tour of the maintained GameServer sample.
 - 🔎 **[API reference](api/toc.yml)** — generated from the source of every published package.
 

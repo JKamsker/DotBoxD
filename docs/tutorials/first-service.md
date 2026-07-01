@@ -290,6 +290,8 @@ generated `[DotBoxDService]` proxy, dispatcher, and `Provide`/`Get` extensions a
 
 ## Next steps
 
+- [**Event pipelines (RunLocal)**](./event-pipeline-runlocal.md) — the next tutorial: subscribe to a
+  server event, push the `Where`/`Select` filter server-side, and react locally.
 - [Services concepts](../concepts/services.md) — the dispatch model, peers/hosts, and streaming.
 - [Kernels concept](../concepts/kernels.md) — run *validated client logic* inside a metered
   sandbox (the second of the three modes).

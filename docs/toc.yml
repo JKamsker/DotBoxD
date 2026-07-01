@@ -11,8 +11,8 @@
   items:
     - name: 1 · First Service (RPC)
       href: tutorials/first-service.md
-    - name: 2 · First Kernel (sandbox)
-      href: tutorials/first-kernel.md
+    - name: 2 · Event pipelines (RunLocal)
+      href: tutorials/event-pipeline-runlocal.md
     - name: 3 · Pushdown server extension
       href: tutorials/pushdown-server-extension.md
 - name: Concepts

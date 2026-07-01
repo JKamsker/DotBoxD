@@ -5,8 +5,9 @@ something you can run.
 
 1. **[First Service (RPC)](first-service.md)** — define a `[DotBoxDService]` contract, host it, and
    call it from a client over a typed proxy.
-2. **[First Kernel (sandbox)](first-kernel.md)** — import validated JSON IR and execute it inside a
-   fuel-metered sandbox with a hard resource budget.
+2. **[Event pipelines (RunLocal)](event-pipeline-runlocal.md)** — subscribe to a server event, push the
+   `Where`/`Select` filter server-side, and react locally with `RunLocal` so only matching, projected
+   data crosses the pipe.
 3. **[Pushdown server extension](pushdown-server-extension.md)** — ship a plugin-supplied, server-side
    batch operation that collapses N remote calls into one.
 

@@ -162,5 +162,6 @@ Across a process boundary, the same install + a compact binary IR invoke payload
 
 ## Next steps
 
+- [Event pipelines (RunLocal)](./event-pipeline-runlocal.md) — the sibling tutorial: the *other* way author logic runs server-side — a `Where`/`Select` filter lowered to the same verified IR, reacting locally instead of aggregating.
 - [Pushdown, in depth](../concepts/pushdown.md) — the concept, the round-trip diagrams, and the roadmap items (`DotBoxD.Pushdown.Linq`, fluent client API).
 - [Sandbox caveats](../security/sandbox-caveats.md) — what is and isn't a trust boundary before you deploy a server extension that runs author-supplied logic.
