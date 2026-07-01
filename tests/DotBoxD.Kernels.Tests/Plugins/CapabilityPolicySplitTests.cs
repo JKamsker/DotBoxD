@@ -126,6 +126,7 @@ public sealed class CapabilityPolicySplitTests
             () => server.InstallAsync(invalid, policy).AsTask());
 
         Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Code == "E-POLICY-CAP" &&
             diagnostic.Message.Contains("event.read.health", StringComparison.Ordinal));
     }
 

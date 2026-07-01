@@ -126,14 +126,18 @@ internal static class RpcKernelPackageValidator
 
         PluginManifestCapabilityValidator.Validate(
             package.Manifest,
+            package.Module,
             plan,
             [entrypointId],
             diagnostics,
-            allowNonBindingCapabilities: false);
+            allowNonBindingCapabilities: false,
+            includeModuleNonBindingCapabilities: false);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
+            package.Module,
             installPolicy,
-            diagnostics);
+            diagnostics,
+            includeModuleNonBindingCapabilities: false);
         ValidateLiveSettingSuffix(package.Manifest.LiveSettings, entrypoint, diagnostics);
         ThrowIfErrors(diagnostics);
     }

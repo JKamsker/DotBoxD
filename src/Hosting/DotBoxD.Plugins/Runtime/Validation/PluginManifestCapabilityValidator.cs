@@ -6,13 +6,16 @@ internal static class PluginManifestCapabilityValidator
 {
     public static void Validate(
         PluginManifest manifest,
+        SandboxModule module,
         ExecutionPlan plan,
         IReadOnlyList<string> entrypoints,
         List<SandboxDiagnostic> diagnostics,
-        bool allowNonBindingCapabilities = true)
+        bool allowNonBindingCapabilities = true,
+        bool includeModuleNonBindingCapabilities = true)
     {
         var declared = new HashSet<string>(manifest.RequiredCapabilities, StringComparer.Ordinal);
         var expected = RequiredCapabilities(plan, entrypoints);
+        AddModuleNonBindingRequiredCapabilities(module, expected, includeModuleNonBindingCapabilities);
         var missing = expected
             .Except(declared, StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
@@ -60,11 +63,15 @@ internal static class PluginManifestCapabilityValidator
 
     public static void ValidateRequiredCapabilityGrants(
         PluginManifest manifest,
+        SandboxModule module,
         SandboxPolicy installPolicy,
-        List<SandboxDiagnostic> diagnostics)
+        List<SandboxDiagnostic> diagnostics,
+        bool includeModuleNonBindingCapabilities = true)
     {
         var now = installPolicy.GrantClock;
-        foreach (var capability in manifest.RequiredCapabilities.Distinct(StringComparer.Ordinal))
+        var required = new HashSet<string>(manifest.RequiredCapabilities, StringComparer.Ordinal);
+        AddModuleNonBindingRequiredCapabilities(module, required, includeModuleNonBindingCapabilities);
+        foreach (var capability in required)
         {
             if (string.Equals(capability, RuntimeCapabilityIds.Async, StringComparison.Ordinal) ||
                 installPolicy.GrantsCapability(capability, now))
@@ -87,6 +94,27 @@ internal static class PluginManifestCapabilityValidator
         }
 
         return required;
+    }
+
+    private static void AddModuleNonBindingRequiredCapabilities(
+        SandboxModule module,
+        HashSet<string> capabilities,
+        bool include)
+    {
+        if (!include ||
+            !module.Metadata.TryGetValue(PluginManifestNames.ModuleMetadata.RequiredCapabilities, out var metadata) ||
+            string.IsNullOrWhiteSpace(metadata))
+        {
+            return;
+        }
+
+        foreach (var capability in metadata.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IsKnownNonBindingCapability(capability))
+            {
+                capabilities.Add(capability);
+            }
+        }
     }
 
     private static bool IsKnownNonBindingCapability(string capability)
