@@ -141,7 +141,7 @@ trampoline; generated kernel IL stays synchronous.</li>
 per-capability quotas. A buggy or hostile kernel cannot exhaust host resources or reach disallowed
 effects. Host capabilities (files, time, random, logging, HTTP via <code>DotBoxD.Hosting.Http</code>) are exposed
 only through explicit <strong>capability grants</strong> — see <a href="../security/sandbox-caveats.html">capabilities-and-bindings</a>
-and the full spec under <a href="../Specs/"><code>docs/Specs/</code></a>.</p>
+and the full spec under <a href="https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs"><code>docs/Specs/</code></a>.</p>
 <p>Async binding tails are also capability-gated. Policies must grant <code>dotboxd.runtime.async</code> via
 <code>AllowRuntimeAsync()</code> before kernels can call bindings that may complete asynchronously.</p>
 <blockquote>
@@ -149,7 +149,7 @@ and the full spec under <a href="../Specs/"><code>docs/Specs/</code></a>.</p>
 plugin assembly — see <a href="../security/sandbox-caveats.html">security/sandbox-caveats.md</a>.</p>
 </blockquote>
 <p>Diagnostics use the <code>DBXK###</code> prefix. <strong>See also:</strong> the GameServer sample under
-<a href="../../samples/GameServer"><code>samples/GameServer</code></a>, <a href="runtime.html">runtime</a>, and
+<a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer"><code>samples/GameServer</code></a>, <a href="runtime.html">runtime</a>, and
 <a href="../examples/coverage-gaps.html"><code>docs/examples/coverage-gaps.md</code></a> for kernel scenarios no longer shown
 by maintained samples.</p>
 

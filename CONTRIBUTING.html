@@ -98,7 +98,7 @@ To reproduce CI strictness locally, set the environment variable before building
 </blockquote>
 <h3 id="analyzers-and-formatting">Analyzers and formatting</h3>
 <p>The build runs the .NET analyzers (<code>AnalysisLevel</code> 10) plus <strong>Roslynator</strong> and <strong>Meziantou</strong>,
-with every rule severity configured centrally in <a href=".editorconfig"><code>.editorconfig</code></a>. Because warnings
+with every rule severity configured centrally in <a href="https://github.com/JKamsker/DotBoxD/blob/main/.editorconfig"><code>.editorconfig</code></a>. Because warnings
 are errors in CI, a new analyzer finding fails the build. The <code>.editorconfig</code> documents, per rule,
 which rules are enforced and which are deliberately disabled (with the reason). Format your changes
 with <code>dotnet format</code> before pushing — CI verifies formatting with
@@ -171,7 +171,7 @@ workflow reuses the full <code>ci</code> workflow before packing, attesting prov
 <p>If you change a public API on purpose, update the baseline with
 <code>./eng/scripts/check-api-compat-baseline.ps1 -Update</code> and review the diff.</p>
 <h2 id="coding-standards">Coding standards</h2>
-<p>See <a href="AGENTS.md"><code>AGENTS.md</code></a> for repository expectations and the C# size guard (files under ~300
+<p>See <a href="https://github.com/JKamsker/DotBoxD/blob/main/AGENTS.md"><code>AGENTS.md</code></a> for repository expectations and the C# size guard (files under ~300
 lines where practical; folders containing a <code>.csproj</code> hold at most 5 tracked C# files unless
 justified). Prefer many small, focused files over a few large ones, and add or update tests for any
 behavior change.</p>

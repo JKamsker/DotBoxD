@@ -139,7 +139,7 @@ host   -&gt; returns List&lt;KillResult&gt;     (one compact result)
 <p>The mechanism: mark a <code>partial class</code> <code>[ServerExtension(&quot;id&quot;, typeof(TService))]</code> with one public batch
 method whose trailing <code>HookContext</code> parameter exposes host bindings (<code>ctx.Host&lt;T&gt;()</code> or an injected host
 service field); the
-<a href="../../src/CodeGeneration/DotBoxD.Plugins.Analyzer"><code>DotBoxD.Plugins.Analyzer</code></a> lowers it to verified IR
+<a href="https://github.com/JKamsker/DotBoxD/tree/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer"><code>DotBoxD.Plugins.Analyzer</code></a> lowers it to verified IR
 (supporting <code>foreach</code>, <code>if</code>/<code>else</code>, locals, host binding calls, DTO construction, and <code>List&lt;T&gt;</code>
 accumulation — complex objects ride the IR <code>Record</code> type). The host installs it with
 <code>server.RegisterServerExtensionAsync&lt;TService, TKernel&gt;()</code> and the caller invokes
@@ -149,10 +149,10 @@ accumulation — complex objects ride the IR <code>Record</code> type). The host
 host bindings the server already exposes, under the same capability + fuel/quota limits as event kernels.
 A method reachable via normal RPC is <strong>not</strong> automatically reachable from a kernel.</p>
 <p><strong>See also:</strong> the runnable GameServer sample under
-<a href="../../samples/GameServer"><code>samples/GameServer</code></a>, which demonstrates the
+<a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer"><code>samples/GameServer</code></a>, which demonstrates the
 <code>MonsterKillerKernel</code> server-extension path.
 Roadmap items (<code>DotBoxD.Pushdown.Linq</code>, fluent client API) are tracked in
-<a href="../architecture/follow-up-issues.md">follow-up-issues</a>.</p>
+<a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/architecture/follow-up-issues.md">follow-up-issues</a>.</p>
 
 </article>
 

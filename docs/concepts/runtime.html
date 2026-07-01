@@ -201,7 +201,7 @@ quotas,</li>
 pure computation, and only when the policy grants the matching capability. This is what makes
 author-supplied logic safe to run in-process. See
 <a href="../security/sandbox-caveats.html">security/sandbox-caveats.md</a> and the full specification under
-<a href="../Specs/"><code>docs/Specs/</code></a>.</p>
+<a href="https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs"><code>docs/Specs/</code></a>.</p>
 <p>Async-capable bindings are opt-in. A binding marked <code>BindingDescriptor.IsAsync</code> adds the
 <code>Concurrency</code> effect and requires the <code>dotboxd.runtime.async</code> runtime capability. Hosts grant it with
 <code>SandboxPolicyBuilder.AllowRuntimeAsync()</code>; without that grant, preparation fails closed and the
