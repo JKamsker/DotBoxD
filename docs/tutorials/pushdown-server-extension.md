@@ -6,6 +6,26 @@ The payoff: the batch method is plain C#, but the analyzer lowers it to the same
 
 Everything below uses the real, compiling API. The canonical snippet lives in [`README.md`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) (section "3. Pushdown"); the runnable example is the GameServer sample under [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer).
 
+## Why Pushdown? (and when to use it)
+
+**The problem it beats.** A client acting on many entities against a fine-grained host is forced into a client-side loop where *every iteration is a network hop* — for N monsters that is N remote calls, N serialization passes, and N chances for latency to dominate. The only other "fix" would be to bloat the host with every conceivable batch method, but the host is frozen at release and ships no batch operations, and a bespoke trusted per-plugin endpoint is impossible because the server cannot be recompiled ([`docs/concepts/pushdown.md`](../concepts/pushdown.md)). Pushdown replaces the chatty loop instead: the plugin ships a `[ServerExtension]` batch that loops the host's existing bindings server-side, so **N round-trips collapse into one**, and only one compact result crosses back.
+
+**The payoff, grounded:**
+
+- **Fewer round-trips, less serialization.** Each avoided hop removes one network RTT, one request+response serialization pair, and one opportunity for tail latency — the win grows the higher the link latency. The sample's `MonsterKillerKernel` does five reads/writes per entity inside one server-side loop; client-side that is ~5N round-trips, server-side it is one, because "the awaited calls are local (no real IPC hop)" ([`MonsterKillerKernel.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/MonsterKillerKernel.cs)).
+- **The host stays frozen, minimal, and trusted.** Fine-grained single-entity bindings are the safe primitives it exposes; the coarse batch lives in untrusted, sandboxed plugin code instead of enlarging the trusted host. New batch operations are added *after* deployment by installing a plugin — the server is never recompiled.
+- **Composability over existing primitives.** The batch composes bindings the host already exposes into an operation the host author never anticipated (`RangeMonsterKillerKernel` reuses the same reads/writes plus a spatial predicate and a result cap), using only the lowering surface: `foreach`, `if`/`else`, locals, host-binding calls, DTO construction, and `List<T>` accumulation.
+- **Untrusted-author code, real sandbox.** Because the batch lowers to verified, capability-gated, fuel-metered IR — reaching only registered `[HostBinding]`s, not everything reachable via normal RPC — you can accept batch logic from untrusted plugin authors safely; the boundary is the kernel, not a trusted assembly load ([`docs/security/sandbox-caveats.md`](../security/sandbox-caveats.md)).
+
+**When to use it.** The host is frozen and fine-grained, but a client needs a coarse operation over many entities and the workload is latency-bound; the batch fits the lowering surface and returns a single compact result.
+
+**When to prefer another mode:**
+
+- Need a one-way, no-return *push* of a filtered/shaped event stream to your plugin? Use the [event pipeline (RunLocal)](./event-pipeline-runlocal.md) — same "run author logic server-side" idea, but push-to-plugin instead of aggregate-and-return.
+- Just calling one already-coarse host capability request/response? Use a plain [Service (RPC)](../concepts/services.md) — there are no N round-trips to collapse.
+- You control the host and it isn't frozen? Add the batch method to the host directly — Pushdown's premise is the *inability* to recompile it.
+- Need streaming/incremental results, arbitrary CLR calls, or hard multi-tenant isolation against fully arbitrary .NET code? Those are outside the model — Pushdown returns a single value, only lowers the supported shapes, and defends the in-process boundary, not an OS one ([`docs/security/sandbox-caveats.md`](../security/sandbox-caveats.md)).
+
 ## What you'll build
 
 - A **host** interface `IGameWorld` that exposes exactly one fine-grained `[HostBinding]`: `Kill(int id)`.

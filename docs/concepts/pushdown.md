@@ -7,6 +7,42 @@ server-side batch aggregate** as a sandboxed **server extension**: the analyzer 
 method to verified IR that runs server-side, looping over the host's *existing* bindings. Only the
 plugin changes; the server is never recompiled.
 
+## Why Pushdown? (and when to use it)
+
+**The problem it beats.** A shipped host is usually frozen at release and exposes only the *safe*
+fine-grained primitives it wants to hand the sandbox (`Kill(id)` — one monster). A client acting on many
+entities is then forced into a chatty loop where every iteration is a network hop: for N monsters that is
+N remote calls, N serialization passes, and N chances for latency to dominate. You cannot add
+`KillMonsters(...)` to the host (it is already released), and a bespoke trusted per-plugin RPC endpoint is
+impossible because the server cannot be recompiled.
+
+**The payoff.** Pushdown collapses those N round-trips into **one**. The plugin ships a `[ServerExtension]`
+batch that runs *next to the host's data*, looping the host's existing bindings in-process — local calls,
+no IPC hop per entity — and returns one compact result. The GameServer `MonsterKillerKernel` does five
+reads/writes per entity server-side yet returns only the final `List<MonsterKillResult>`; client-side that
+would be ~5N round-trips.
+
+- **Host stays frozen and minimal.** New coarse operations arrive by installing a plugin, never by shipping
+  a new host build; the untrusted batch logic lives in the plugin, keeping the trusted host surface small.
+- **Composition the host never anticipated.** The batch recombines primitives the host already exposes — the
+  same reads/writes back `MonsterKillerKernel` (batch over a list), `RangeMonsterKillerKernel` (spatial
+  predicate + result cap), and `BlinkKernel` (per-instance graft).
+- **Untrusted-author code under a real sandbox.** The batch is plain C#, but the analyzer lowers it to the
+  same validated, capability-gated, fuel-metered [kernel IR](kernels.md) that event kernels run under (see
+  [sandbox caveats](../security/sandbox-caveats.md)) — not a trusted plugin with CLR access. It reaches only
+  registered bindings, and install fails (the code never runs) if the manifest requests a capability the host
+  policy did not grant.
+- **No lock-in.** `[ServerExtension]` is opt-in sugar over public IR primitives — everything it emits is
+  verified JSON IR plus a manifest you could hand-author and run through the same `SandboxHost` pipeline.
+
+**When to use it:** a client would otherwise loop with one round-trip per entity against a frozen host and
+the batch fits the lowering surface (`foreach`/`if`/locals/host-calls/DTO/`List<T>`).
+**When to prefer another mode:** for a one-way push of a filtered/shaped *event stream* with no return value,
+use the [event pipeline (RunLocal)](../tutorials/event-pipeline-runlocal.md); for a single request/response
+call to a host capability, use a [Service](services.md); if you control the host and it is not frozen, add
+the method to the host directly; if the body needs arbitrary CLR calls or streaming results, Pushdown's
+one-shot sandboxed model does not apply.
+
 Without pushdown (host has only `Kill(id)`):
 
 ```text

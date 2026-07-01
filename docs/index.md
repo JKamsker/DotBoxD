@@ -20,6 +20,32 @@ flowchart LR
     Pushdown --> Services
 ```
 
+## Choosing a mode
+
+Same contract, three delivery strategies. What differs is *where the author's logic runs* and
+*what crosses the wire*:
+
+| Mode | What it solves | Direction | Round-trips | Where the author's logic runs |
+|------|----------------|-----------|-------------|-------------------------------|
+| **[Services (RPC)](concepts/services.md)** | Easy interop — the interface is the single source of truth; the generator emits a typed proxy + dispatcher, so there is no hand-written marshaling and no runtime reflection on the hot path (it AOTs, runs on Unity/IL2CPP). | client → host, response back | **1 per call** | host runs the hand-written implementation; the client invokes the typed proxy |
+| **[Query (RunLocal)](tutorials/event-pipeline-runlocal.md)** | Server-side filter + projection so the plugin gets only the data it needs — `Where`/`Select` lower to verified IR, so only matching, projected values cross the pipe (fewer bytes, fewer wake-ups, no round-trips). | server → plugin, **one-way push** | **0** | `Where`/`Select` lower to server-side sandboxed IR; only the `RunLocal` delegate is native plugin C# |
+| **[Pushdown](concepts/pushdown.md)** | Collapse N fine-grained calls into one server-side batch — move the loop/aggregation next to the host's data so latency and chattiness collapse, while the host stays frozen and minimal. | client → host, **one submission** | **1, replacing N** | the author's batch method lowers to server-side sandboxed IR, looping the host's existing bindings |
+
+Decision rules:
+
+- **Services** — a one-shot request/response (fetch a price, compute a cart total). The interface is the
+  single source of truth, so proxy and impl cannot drift.
+- **Query (RunLocal)** — you react to a high-frequency server event stream but only need a subset/summary
+  locally. Because the filter runs as validated, fuel-metered IR, you can accept that logic from untrusted
+  plugins safely.
+- **Pushdown** — a chatty `for each id: Kill(id)` loop that should be one batch. The server is never
+  recompiled; the plugin ships the batch, which runs as verified, capability-gated, fuel-metered IR (real
+  sandbox, not a trusted plugin).
+
+Query and Pushdown **both** run author-supplied logic server-side as sandboxed
+[kernels](concepts/kernels.md) — the only difference is push-to-plugin (Query) vs aggregate-and-return
+(Pushdown). Services instead runs a hand-written host implementation, with no sandbox involved.
+
 ## Map
 
 - **Getting started** — [install, first service, first kernel, pushdown quickstart](getting-started/README.md).
