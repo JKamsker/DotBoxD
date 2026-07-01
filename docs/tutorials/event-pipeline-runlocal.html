@@ -200,8 +200,95 @@ await server.Hooks.PublishAsync(new MonsterAggroEvent(&quot;monster-9&quot;, &qu
 <li>Generator-emitted members such as <code>HasCancelableDispatch</code>, <code>Messages</code>, and <code>CancellationToken</code>.</li>
 </ul>
 <p>This delegate still runs in the plugin process — the <code>context</code> is your client-side context, distinct from the host-service selector used inside <code>Where</code>/<code>Select</code> on the server. It is the seam for local side effects: emitting messages, reading the cancellation token, or calling into your own plugin services.</p>
-<h2 id="step-6--contrast-run-server-side-terminal-registerlocal-result-hooks-usetkernel">Step 6 — Contrast: <code>.Run</code> (server-side terminal), <code>.RegisterLocal</code> (result hooks), <code>.Use&lt;TKernel&gt;</code></h2>
-<p><code>RunLocal</code> is one of several terminals on the same fluent shape. Pick by <em>where you want the terminal to execute</em> and <em>whether you need a value back</em>.</p>
+<h2 id="step-6--choosing-a-terminal">Step 6 — Choosing a terminal</h2>
+<p><code>RunLocal</code> is one of several <strong>terminals</strong> — the last call in the chain, which says what to <em>do</em> when an
+event matches. The others are <code>Run</code>, <code>RegisterLocal</code>, <code>Register</code>, and <code>Use&lt;TKernel&gt;</code>. They all sit on the
+same <code>.On&lt;T&gt;().Where(...).Select(...)</code> shape, so you pick one by answering just two questions:</p>
+<ol>
+<li><strong>Where should your reaction run</strong> — in <em>your plugin</em> as native C#, or <em>server-side</em> as sandboxed IR?</li>
+<li><strong>Does it need to return a decision</strong> the server acts on, or is it fire-and-forget?</li>
+</ol>
+<p>Those two axes give a 2×2 (plus <code>Use&lt;TKernel&gt;</code> for a reaction you authored as a separate kernel):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Reaction runs <strong>in your plugin</strong> (native C#)</th>
+<th>Reaction runs <strong>server-side</strong> (sandboxed IR)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fire-and-forget</strong> (react, return nothing)</td>
+<td><strong><code>RunLocal</code></strong></td>
+<td><strong><code>Run</code></strong></td>
+</tr>
+<tr>
+<td><strong>Return a decision</strong> (<code>IHookResult</code>)</td>
+<td><strong><code>RegisterLocal</code></strong></td>
+<td><strong><code>Register</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p>The same five terminals as a lookup:</p>
+<table>
+<thead>
+<tr>
+<th>Terminal</th>
+<th>Your handler runs…</th>
+<th>What crosses the pipe</th>
+<th>Returns a value?</th>
+<th>Valid on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RunLocal</code></td>
+<td>in your plugin (native C#)</td>
+<td>the projected value only, one-way push</td>
+<td>no</td>
+<td>Hooks + Subscriptions</td>
+</tr>
+<tr>
+<td><code>Run</code></td>
+<td>server-side (lowered to IR)</td>
+<td>nothing — runs on the host</td>
+<td>no</td>
+<td>Hooks + Subscriptions</td>
+</tr>
+<tr>
+<td><code>RegisterLocal</code></td>
+<td>in your plugin (native C#)</td>
+<td>projected value out, <code>IHookResult</code> back (round-trip)</td>
+<td>yes</td>
+<td>Hooks only</td>
+</tr>
+<tr>
+<td><code>Register</code></td>
+<td>server-side (lowered to IR)</td>
+<td>nothing — decided on the host</td>
+<td>yes</td>
+<td>Hooks only</td>
+</tr>
+<tr>
+<td><code>Use&lt;TKernel&gt;</code></td>
+<td>server-side, as an installed kernel</td>
+<td>nothing</td>
+<td>as the kernel defines</td>
+<td>Hooks + Subscriptions</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Two rules fall out of that table.</strong> <em>Result terminals</em> (<code>Register</code>, <code>RegisterLocal</code>) exist only on
+<strong><code>server.Hooks</code></strong> — the awaited decision points — because only a decision consumes a return value;
+<strong><code>server.Subscriptions</code></strong> are fire-and-forget, so they take just <code>RunLocal</code> / <code>Run</code> / <code>Use</code>. And <code>Run</code>,
+<code>Register</code>, and <code>RegisterLocal</code> are <strong>lowered by the analyzer at build time</strong>, so you author them in a
+plugin project that references the DotBoxD analyzer (a raw, un-lowered call throws <code>DBXK062</code>). With
+<code>RunLocal</code>, only the <code>Where</code> / <code>Select</code> lower — your terminal delegate stays native plugin code.</p>
+</blockquote>
+<p>The rest of this step shows each server-side and result terminal against the <code>RunLocal</code> baseline from
+Steps 1–5.</p>
 <p><strong><code>.Run((x, ctx) =&gt; ...)</code> — the terminal stays on the server.</strong> Swap <code>RunLocal</code> for <code>Run</code> and the filter, the projection, <em>and</em> the terminal all lower to verified IR and run fully server-side. There is no plugin-process delegate at all; the send happens on the host (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs"><code>Program.cs</code></a>):</p>
 <pre><code class="lang-csharp">server.Hooks.On&lt;MonsterAggroEvent&gt;()
     .Where(e =&gt; e.Distance &lt;= 4)
@@ -218,6 +305,13 @@ await server.Hooks.PublishAsync(new MonsterAggroEvent(&quot;monster-9&quot;, &qu
         priority: 7);
 </code></pre>
 <p>The event and its result are declared together (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/RemoteDamageDecisionEvent.cs"><code>RemoteDamageDecisionEvent.cs</code></a>); the result type is a <code>readonly partial record struct ... : IHookResult</code> (all <code>RegisterLocal</code> overloads constrain <code>TResult : struct, IHookResult</code>). The premise test proves the filter is still server-side: a <code>Damage == 5</code> event misses (the result path fires zero times), while <code>Damage == 12</code> hits and returns <code>Success</code> with the plugin-computed values back over the pipe.</p>
+<p><strong><code>.Register(...)</code> — return a decision, but decide on the server.</strong> <code>Register</code> is the server-side
+counterpart to <code>RegisterLocal</code>: the filter, the projection, <em>and</em> the <code>IHookResult</code> computation all lower
+into the sandbox and run on the host, so no event is pushed to the plugin and no value travels back over the
+pipe. Reach for it when the decision is pure host-data logic; choose <code>RegisterLocal</code> when computing the
+decision needs your plugin's own types or services. The shape is otherwise identical — an <code>int priority</code> and
+a <code>readonly record struct … : IHookResult</code> result — and, like every result terminal, it lives only on
+<code>server.Hooks</code>.</p>
 <p><strong><code>.Use&lt;TKernel&gt;()</code> — record a generated kernel at setup time.</strong> Instead of an inline lambda, <code>Use</code> resolves a generated kernel package and wires it as a decision hook. It is authored inside <code>Setup(...)</code> (Step 1) so <code>StartAsync()</code> can ship and install the kernel (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs"><code>Program.cs</code></a>):</p>
 <pre><code class="lang-csharp">s.Hooks.On&lt;MonsterAggroEvent&gt;().Use&lt;GuardianKernel&gt;();          // awaited decision kernel
 s.Subscriptions.On&lt;AttackEvent&gt;().Use&lt;RetaliationKernel&gt;();     // fire-and-forget notification kernel
