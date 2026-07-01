@@ -28,7 +28,7 @@ on:
       max:
         description: Max fix workers to dispatch this tick.
         required: false
-        default: "5"
+        default: "2"
         type: string
 
 permissions:
@@ -51,7 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          MAX_DISPATCH: ${{ inputs.max || '5' }}
+          MAX_DISPATCH: ${{ inputs.max || '2' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
