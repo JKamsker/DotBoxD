@@ -94,7 +94,18 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                 "RPC response is missing required IsSuccess.");
         }
 
+        ValidateEnvelope(response);
         return response;
+    }
+
+    private static void ValidateEnvelope(RpcResponse response)
+    {
+        if (response.IsSuccess &&
+            (response.ErrorMessage is not null || response.ErrorType is not null))
+        {
+            throw new MessagePackSerializationException(
+                "Successful RPC response must not contain error fields.");
+        }
     }
 
     private static IMessagePackFormatter<RpcStreamHandle> GetStreamFormatter(
