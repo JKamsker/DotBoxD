@@ -9,8 +9,8 @@ description: |
 on:
   workflow_dispatch:
   schedule:
-    # UTC. Hourly at :05, staggered off the CI and legacy sweep crons.
-    - cron: "5 * * * *"
+    # UTC. Every 30 min at :05/:35, staggered off the CI and legacy sweep crons.
+    - cron: "5,35 * * * *"
 
 permissions:
   contents: read
