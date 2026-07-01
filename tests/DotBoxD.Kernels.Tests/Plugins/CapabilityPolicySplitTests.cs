@@ -64,15 +64,7 @@ public sealed class CapabilityPolicySplitTests
         var package = PluginAnalyzerGeneratedPackageFactory.Create(
             GatedEventPropertyKernelSource,
             "Sample.GatedPluginPackage");
-        var invalid = package with
-        {
-            Manifest = package.Manifest with
-            {
-                RequiredCapabilities = package.Manifest.RequiredCapabilities
-                    .Where(capability => !string.Equals(capability, "event.read.health", StringComparison.Ordinal))
-                    .ToArray()
-            }
-        };
+        var invalid = WithoutRequiredCapability(package, "event.read.health");
 
         var required = server.GetRequiredCapabilities(invalid);
 
@@ -128,15 +120,7 @@ public sealed class CapabilityPolicySplitTests
             GatedEventPropertyKernelSource,
             "Sample.GatedPluginPackage");
         Assert.Contains("event.read.health", package.Manifest.RequiredCapabilities);
-        var invalid = package with
-        {
-            Manifest = package.Manifest with
-            {
-                RequiredCapabilities = package.Manifest.RequiredCapabilities
-                    .Where(capability => !string.Equals(capability, "event.read.health", StringComparison.Ordinal))
-                    .ToArray()
-            }
-        };
+        var invalid = WithoutRequiredCapability(package, "event.read.health");
         var policy = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .GrantHostMessageWrite()
@@ -196,6 +180,17 @@ public sealed class CapabilityPolicySplitTests
         };
         return package with { Module = package.Module with { Metadata = metadata } };
     }
+
+    private static PluginPackage WithoutRequiredCapability(PluginPackage package, string capabilityId)
+        => package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = package.Manifest.RequiredCapabilities
+                    .Where(capability => !string.Equals(capability, capabilityId, StringComparison.Ordinal))
+                    .ToArray()
+            }
+        };
 
     private const string GatedEventPropertyKernelSource = """
         using DotBoxD.Plugins;
