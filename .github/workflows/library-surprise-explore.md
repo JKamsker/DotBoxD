@@ -132,8 +132,9 @@ candidate MUST be recorded here or a future run will re-dispatch it. Keep it sho
 
 Exactly one of:
 
-- **Concrete, non-duplicate surprise found** — dispatch `library-surprise-red-test` via
-  `dispatch-workflow` with:
+- **Concrete, non-duplicate surprise found** — dispatch the red-test worker by calling the
+  **dedicated** `library_surprise_red_test` safe-output tool (NOT the generic `dispatch_workflow`
+  tool, which is a no-op in this runtime) with:
   - `candidate_title`: concise, PR-title-ready, without the `[surprise-red-test] ` prefix.
   - `candidate_payload`: compact JSON with `bug`, `expected_red_test`, `expected_failure`,
     `suggested_test_area`, `suggested_source_area`, `duplicate_check`, and

@@ -133,8 +133,10 @@ lens that already has an `explore` run in flight removed.
 
 Your only job is to fan out — do **not** read source, edit files, or open issues/PRs.
 
-For each entry in `frontier.json`, in the given order and up to the `dispatch-workflow` cap, emit one
-`dispatch-workflow` call for `library-surprise-explore` with inputs:
+For each entry in `frontier.json`, in the given order and up to the cap (5), call the **dedicated**
+`library_surprise_explore` safe-output tool **once per entry** — one call per lens. Do **not** use the
+generic `dispatch_workflow` tool: in this runtime it is a no-op (it returns success but produces no
+collectable safe output, so nothing is dispatched). Pass:
 
 - `lens_issue`: the entry's `lens_issue` (as a string)
 - `vein`: the entry's `vein`
