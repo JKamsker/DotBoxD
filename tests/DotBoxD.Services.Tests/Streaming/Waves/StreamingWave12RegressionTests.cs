@@ -60,6 +60,26 @@ public sealed class StreamingWave12RegressionTests
     }
 
     [Fact]
+    public async Task ZeroIdStreamItem_ReportsMalformedFrame()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var protocolErrors = new List<string>();
+        var processor = CreateProcessor(
+            serializer,
+            CreateStreamManager(serializer),
+            protocolErrors);
+        using var item = MessageFramer.FrameToPayload(
+            0,
+            MessageType.StreamItem,
+            new byte[] { 1, 2, 3 });
+
+        Assert.True(await processor.ShouldDisposeAsync(item, CancellationToken.None));
+
+        Assert.Single(protocolErrors, entry => entry.Contains("Malformed stream item frame."));
+        Assert.DoesNotContain(protocolErrors, entry => entry.Contains("Unknown stream id."));
+    }
+
+    [Fact]
     public async Task UnknownStreamComplete_ReportsProtocolError()
     {
         var serializer = new MessagePackRpcSerializer();
