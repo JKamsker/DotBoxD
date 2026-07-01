@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -94,6 +95,42 @@ public sealed class MergeableIrStepGeneratorTests
             """);
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBXK100");
+        Assert.DoesNotContain(
+            result.GeneratedTrees,
+            tree => tree.FilePath.Contains("LoweredPipelineStep_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Generator_reports_diagnostic_for_malformed_marked_call_without_crashing()
+    {
+        // A [LowerToIr(Filter)] parameter whose delegate does not return bool makes the marked-call
+        // reader throw NotSupportedException. That reader runs before the model factory's try/catch,
+        // so before the fix it escaped as an unhandled generator exception. It must instead surface as
+        // a DBXK100 diagnostic with no emitted step.
+        var result = RunGenerator("""
+            using System;
+            using DotBoxD.Abstractions;
+
+            namespace Sample;
+
+            public sealed class FilterPipeline<T>
+            {
+                public FilterPipeline<T> Where([LowerToIr(LoweredPipelineStepKind.Filter)] Func<T, int> predicate)
+                    => throw new InvalidOperationException("not lowered");
+
+                public FilterPipeline<T> Where(LoweredPipelineStep step)
+                    => this;
+            }
+
+            public static class Usage
+            {
+                public static FilterPipeline<int> Configure(FilterPipeline<int> pipeline)
+                    => pipeline.Where(value => value);
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics, candidate => candidate.Id == "DBXK100");
+        Assert.Contains("filter steps must return bool", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
         Assert.DoesNotContain(
             result.GeneratedTrees,
             tree => tree.FilePath.Contains("LoweredPipelineStep_", StringComparison.Ordinal));

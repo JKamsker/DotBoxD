@@ -17,14 +17,21 @@ internal static class MergeableIrStepModelFactory
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (context.Node is not InvocationExpressionSyntax invocation ||
-            MergeableIrMarkedCallReader.TryRead(invocation, context.SemanticModel, cancellationToken) is not { } call)
+        if (context.Node is not InvocationExpressionSyntax invocation)
         {
             return null;
         }
 
+        // TryRead throws NotSupportedException for malformed *marked* calls (wrong delegate type,
+        // filter not returning bool, out-of-range kind). Keep it inside the try so those surface as a
+        // PluginKernelDiagnostic instead of escaping and crashing the incremental generator.
         try
         {
+            if (MergeableIrMarkedCallReader.TryRead(invocation, context.SemanticModel, cancellationToken) is not { } call)
+            {
+                return null;
+            }
+
             return new MergeableIrStepCreateResult(
                 Create(invocation, context.SemanticModel, call, cancellationToken),
                 null);
