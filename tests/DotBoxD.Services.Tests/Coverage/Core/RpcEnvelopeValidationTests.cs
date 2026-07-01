@@ -58,6 +58,19 @@ public sealed class RpcEnvelopeValidationTests
             () => serializer.Deserialize<RpcResponse>(payload));
     }
 
+    [Theory]
+    [InlineData("boom", "RemoteServiceException")]
+    [InlineData("boom", null)]
+    [InlineData(null, "RemoteServiceException")]
+    public void RpcResponse_success_with_error_fields_throws(string? errorMessage, string? errorType)
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteSuccessfulResponseWithErrorFields(errorMessage, errorType);
+
+        Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize<RpcResponse>(payload));
+    }
+
     private static byte[] WriteRequestWithDuplicateServiceName()
     {
         var writer = new ArrayBufferWriter<byte>();
@@ -123,5 +136,33 @@ public sealed class RpcEnvelopeValidationTests
         message.Write(42);
         message.Flush();
         return writer.WrittenMemory.ToArray();
+    }
+
+    private static byte[] WriteSuccessfulResponseWithErrorFields(string? errorMessage, string? errorType)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(4);
+        message.Write("MessageId");
+        message.Write(7);
+        message.Write("IsSuccess");
+        message.Write(true);
+        message.Write("ErrorMessage");
+        WriteNullableString(ref message, errorMessage);
+        message.Write("ErrorType");
+        WriteNullableString(ref message, errorType);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
+    }
+
+    private static void WriteNullableString(ref MessagePackWriter message, string? value)
+    {
+        if (value is null)
+        {
+            message.WriteNil();
+            return;
+        }
+
+        message.Write(value);
     }
 }
