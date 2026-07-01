@@ -5727,19 +5727,6 @@
       "version": ""
     },
     {
-      "type": "Toc",
-      "source_relative_path": "docs/examples/toc.yml",
-      "output": {
-        ".html": {
-          "relative_path": "docs/examples/toc.html"
-        },
-        ".json": {
-          "relative_path": "docs/examples/toc.json"
-        }
-      },
-      "version": ""
-    },
-    {
       "type": "Conceptual",
       "source_relative_path": "docs/getting-started/README.md",
       "output": {
@@ -5838,19 +5825,6 @@
       "output": {
         ".html": {
           "relative_path": "docs/tutorials/pushdown-server-extension.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "Toc",
-      "source_relative_path": "docs/tutorials/toc.yml",
-      "output": {
-        ".html": {
-          "relative_path": "docs/tutorials/toc.html"
-        },
-        ".json": {
-          "relative_path": "docs/tutorials/toc.json"
         }
       },
       "version": ""
