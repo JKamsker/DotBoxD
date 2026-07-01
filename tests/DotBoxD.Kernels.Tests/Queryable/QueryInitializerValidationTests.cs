@@ -10,6 +10,9 @@ namespace DotBoxD.Kernels.Tests.Queryable;
 
 public sealed class QueryInitializerValidationTests
 {
+    private static readonly MemberValueReader Reader = new();
+    private static readonly NullableTestEvent SampleEvent = new("key", 1);
+
     [Fact]
     public void Public_compare_filter_initializer_without_value_is_rejected()
     {
@@ -81,6 +84,64 @@ public sealed class QueryInitializerValidationTests
         Assert.Contains("Operator", exception.Message, StringComparison.Ordinal);
         Assert.Contains("999", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_empty_field_is_rejected_by_formatter()
+        => AssertQueryFieldRejected(QueryText.Format, CompareWithEmptyField(), "Compare");
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_empty_field_is_rejected_by_json_writer()
+        => AssertQueryFieldRejected(
+            filter => JsonSerializer.Serialize(filter, EventQueryJson.Options),
+            CompareWithEmptyField(),
+            "Compare");
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_empty_field_is_rejected_by_planner()
+        => AssertQueryFieldRejected(EventQueryPlanner.Plan, CompareWithEmptyField(), "Compare");
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_empty_field_is_rejected_by_evaluator()
+        => AssertQueryFieldRejected(
+            filter => QueryFilterEvaluator.Evaluate(filter, SampleEvent, Reader),
+            CompareWithEmptyField(),
+            "Compare");
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_empty_field_is_rejected_by_compiler()
+        => AssertQueryFieldRejected(
+            filter => QueryFilterCompiler.Compile(filter, Reader),
+            CompareWithEmptyField(),
+            "Compare");
+
+    [Fact]
+    public void Public_in_filter_initializer_with_empty_field_is_rejected_by_formatter()
+        => AssertQueryFieldRejected(QueryText.Format, InWithEmptyField(), "In");
+
+    [Fact]
+    public void Public_in_filter_initializer_with_empty_field_is_rejected_by_json_writer()
+        => AssertQueryFieldRejected(
+            filter => JsonSerializer.Serialize(filter, EventQueryJson.Options),
+            InWithEmptyField(),
+            "In");
+
+    [Fact]
+    public void Public_in_filter_initializer_with_empty_field_is_rejected_by_planner()
+        => AssertQueryFieldRejected(EventQueryPlanner.Plan, InWithEmptyField(), "In");
+
+    [Fact]
+    public void Public_in_filter_initializer_with_empty_field_is_rejected_by_evaluator()
+        => AssertQueryFieldRejected(
+            filter => QueryFilterEvaluator.Evaluate(filter, SampleEvent, Reader),
+            InWithEmptyField(),
+            "In");
+
+    [Fact]
+    public void Public_in_filter_initializer_with_empty_field_is_rejected_by_compiler()
+        => AssertQueryFieldRejected(
+            filter => QueryFilterCompiler.Compile(filter, Reader),
+            InWithEmptyField(),
+            "In");
 
     [Fact]
     public void Public_member_projection_initializer_without_path_is_rejected_on_write()
@@ -159,6 +220,35 @@ public sealed class QueryInitializerValidationTests
     {
         Assert.Contains("Not", exception.Message, StringComparison.Ordinal);
         Assert.Contains("child", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static QueryFilter CompareWithEmptyField()
+        => new()
+        {
+            Kind = QueryFilterKind.Compare,
+            Operator = QueryComparisonOperator.Equal,
+            Value = QueryValue.FromInteger(5),
+        };
+
+    private static QueryFilter InWithEmptyField()
+        => new()
+        {
+            Kind = QueryFilterKind.In,
+            Values = [QueryValue.FromInteger(5)],
+        };
+
+    private static void AssertQueryFieldRejected<T>(
+        Func<QueryFilter, T> action,
+        QueryFilter filter,
+        string leafKind)
+    {
+        var exception = Assert.ThrowsAny<Exception>(() => action(filter));
+        Assert.Contains("QueryFilter", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(leafKind, exception.Message, StringComparison.Ordinal);
+        Assert.True(
+            exception.Message.Contains("field", StringComparison.OrdinalIgnoreCase) ||
+            exception.Message.Contains("path", StringComparison.OrdinalIgnoreCase),
+            $"Expected a field/path validation message, but got: {exception.Message}");
     }
 
     private static QueryFilter UndefinedOperatorCompareFilter() => new()
