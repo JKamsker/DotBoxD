@@ -2,6 +2,14 @@
 
 Get up and running with DotBoxD in 5 minutes.
 
+Reach for RPC channels when you want request/response host capabilities behind a shared contract:
+one C# interface compiles to a typed proxy plus dispatcher, so you get easy interop with no
+hand-written marshaling and no runtime reflection on the hot path (AOT-friendly, runs on
+Unity/IL2CPP) — the interface is the single source of truth. Prefer a
+[query/event pipeline](../tutorials/event-pipeline-runlocal.md) instead when the host should receive
+only server-side filtered and projected data over a one-way push, or
+[pushdown](../concepts/pushdown.md) when you need to collapse N round-trips into one server-side batch.
+
 ## 1. Define Your Service Contract
 
 Create a shared library with your service interface:

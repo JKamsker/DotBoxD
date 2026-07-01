@@ -1,7 +1,13 @@
 # Diagnostics reference
 
 DotBoxD's compile-time generators/analyzers and runtime emit namespaced diagnostic codes. Each family
-has a reserved prefix so codes never collide as the product grows:
+has a reserved prefix so codes never collide as the product grows.
+
+These diagnostics exist because the analyzer and kernel validators fail **closed**: an unsupported
+construct is rejected at build time (or at plugin import time) instead of being silently miscompiled or
+lowered into something that misbehaves at runtime. So a `DBXS`/`DBXK` code means "this construct isn't
+supported here" — it's telling you to express the intent a different way, not a bug in the generator to
+work around.
 
 | Prefix | Area | Source |
 |--------|------|--------|

@@ -11,6 +11,46 @@ maintained sample under
 [`samples/GameServer`](https://github.com/JKamsker/DotBoxD/blob/main/README.md); the pieces are shown in the README's
 ["1. Services"](https://github.com/JKamsker/DotBoxD/blob/main/README.md) section.
 
+## Why Services (RPC)? (and when to use it)
+
+Services exist to make interop easy. Hand-writing RPC marshaling — build a request envelope, serialize
+args, match a response to its call, deserialize, cast — is repetitive and easy to get subtly wrong. With
+DotBoxD you annotate one interface with `[DotBoxDService]` and a Roslyn source generator emits three
+artifacts at compile time: a **typed client proxy** (what `Get<T>()` returns), a **server dispatcher**
+that decodes a request and invokes your implementation, and the `Provide{Service}` / `Get<T>()`
+extensions
+([generator wiring](https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Services.SourceGenerator/EntryPoint/DotBoxDRpcGenerator.cs)).
+The payoff: your implementation is *just your logic* — nothing DotBoxD-specific leaks into it, and the
+client calls `connection.Get<ICatalogService>().GetUnitPriceAsync("sword")` as one typed round-trip.
+
+A few grounded reasons this design earns its place:
+
+- **The interface is the single source of truth, so proxy and impl can't drift.** Both are generated
+  from the same C# shape, so a rename or type change is a compile error, not a runtime wire fault.
+  Unsupported shapes surface as build-time diagnostics (`DBXS001`–`DBXS004`) — for example a
+  `ref`/`in`/`out` parameter or a generic/nested interface is rejected at compile time.
+- **No runtime reflection on the hot path.** Proxy/dispatcher lookup goes through a *generated* registry
+  rather than scanning assemblies, and the MessagePack codec uses generated formatters. That is why the
+  Services stack targets `netstandard2.1` and runs on **Unity / IL2CPP** and NativeAOT, where runtime
+  reflection and dynamic codegen are stripped or forbidden.
+- **Peer-based and bidirectional.** A connection is a symmetric `RpcPeer`: the same object can `Provide`
+  local services and `Get` proxies for remote ones over one read loop, so the host can call *back* into
+  a connecting plugin over the same wire — no separate client/server class on the hot path.
+- **Transport- and codec-neutral.** The same contract runs over named pipes, TCP, WebSocket, or an
+  in-process test channel, with MessagePack (or another `ISerializer`) as the codec — the generated
+  proxy, dispatcher, and `Provide`/`Get` extensions are identical either way.
+
+**When to use a Service:** the host owns a capability and the client needs a typed request→response it
+can `await`, the interaction is a bounded number of discrete calls (one method = one round-trip), you
+need host↔plugin callbacks on one connection, or you need Unity/IL2CPP reach.
+
+**When to prefer another mode:** if you're reacting to a high-frequency *server event* and only need a
+subset or summary, prefer the [query / event pipeline (RunLocal)](event-pipeline-runlocal.md) — its
+`Where`/`Select` lower to server-side IR so only matching, projected values push one-way to your plugin,
+no round-trips. If instead you face a *chatty N-call loop* against a frozen host, prefer
+[Pushdown](../concepts/pushdown.md), which collapses N round-trips into one server-side batch. Note that
+Services (RPC) is a *trusted* channel; the sandbox trust boundary lives in Kernels/Pushdown, not here.
+
 ## What you'll build
 
 Three pieces, mirroring how the GameServer sample is laid out (shared abstractions, server, client):
