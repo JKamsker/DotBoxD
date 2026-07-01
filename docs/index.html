@@ -89,10 +89,12 @@
 
 <p>DotBoxD is a source-generated, contract-first .NET extension runtime. One C# contract can be used in
 three ways:</p>
+<p>New here? Install via <a href="getting-started/README.html">Getting started</a>, then work through the three
+<a href="tutorials/index.html">Tutorials</a> — the mode links below go straight to the deep-dive concepts.</p>
 <ul>
 <li><strong><a href="concepts/services.html">Services</a></strong> — the host implements a contract; clients call it remotely (RPC).</li>
 <li><strong><a href="concepts/kernels.html">Kernels</a></strong> — a client supplies validated logic the host runs safely inside a
-metered sandbox (restricted IR — never C#/IL/reflection).</li>
+metered sandbox (restricted IR — an intermediate representation — never C#/IL/reflection).</li>
 <li><strong><a href="concepts/pushdown.html">Pushdown</a></strong> — a kernel composes the host's own services server-side, so many
 small remote calls collapse into one validated round-trip.</li>
 </ul>
@@ -121,21 +123,21 @@ small remote calls collapse into one validated round-trip.</li>
 <tbody>
 <tr>
 <td><strong><a href="concepts/services.html">Services (RPC)</a></strong></td>
-<td>Easy interop — the interface is the single source of truth; the generator emits a typed proxy + dispatcher, so there is no hand-written marshaling and no runtime reflection on the hot path (it AOTs, runs on Unity/IL2CPP).</td>
+<td>Typed request/response interop; no hand-written marshaling, and no runtime reflection on the hot path (it compiles ahead-of-time / AOT, so it runs on Unity's IL2CPP compiler).</td>
 <td>client → host, response back</td>
 <td><strong>1 per call</strong></td>
 <td>host runs the hand-written implementation; the client invokes the typed proxy</td>
 </tr>
 <tr>
 <td><strong><a href="tutorials/event-pipeline-runlocal.html">Query (RunLocal)</a></strong></td>
-<td>Server-side filter + projection so the plugin gets only the data it needs — <code>Where</code>/<code>Select</code> lower to verified IR, so only matching, projected values cross the pipe (fewer bytes, fewer wake-ups, no round-trips).</td>
+<td>Server-side filter + projection, so only the data you need is pushed to the plugin.</td>
 <td>server → plugin, <strong>one-way push</strong></td>
 <td><strong>0</strong></td>
-<td><code>Where</code>/<code>Select</code> lower to server-side sandboxed IR; only the <code>RunLocal</code> delegate is native plugin C#</td>
+<td><code>Where</code>/<code>Select</code> lower (compile down) to server-side sandboxed IR; only the <code>RunLocal</code> delegate is native plugin C#</td>
 </tr>
 <tr>
 <td><strong><a href="concepts/pushdown.html">Pushdown</a></strong></td>
-<td>Collapse N fine-grained calls into one server-side batch — move the loop/aggregation next to the host's data so latency and chattiness collapse, while the host stays frozen and minimal.</td>
+<td>Collapse N per-entity calls into one server-side batch, next to the host's data.</td>
 <td>client → host, <strong>one submission</strong></td>
 <td><strong>1, replacing N</strong></td>
 <td>the author's batch method lowers to server-side sandboxed IR, looping the host's existing bindings</td>
@@ -170,6 +172,7 @@ kernel <a href="concepts/runtime.html">runtime</a> (interpreted vs verified-IL, 
 <a href="../SECURITY.html"><code>SECURITY.md</code></a>.</li>
 <li><strong>Reference</strong> — <a href="reference/diagnostics.html"><code>reference/diagnostics.md</code></a> (DBXS/DBXK codes),
 <a href="reference/schemas.html"><code>reference/schemas.md</code></a> (kernel/plugin JSON schemas).</li>
+<li><strong>Glossary</strong> — <a href="reference/glossary.html">plain-language definitions of the core terms</a> (IR, kernel, pushdown, fuel, capabilities).</li>
 <li><strong>API reference</strong> — <a href="../api/index.html">generated from the source of every published package</a>.</li>
 <li><strong>Specifications</strong> — <a href="https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs">the full kernel sandbox spec</a>
 (IR language, type system, effects/capabilities, threat model, runtime).</li>
@@ -181,7 +184,7 @@ how this repo merges the former ShaRPC + Safe-IR projects and how to view their 
 <a href="channels/performance.html">performance</a>.</li>
 </ul>
 <h2 id="runnable-example">Runnable Example</h2>
-<p>The maintained GameServer sample demonstrates service IPC, event kernels, live settings, host
+<p>The maintained GameServer sample demonstrates service IPC (inter-process communication), event kernels, live settings, host
 bindings, policy-gated execution, server extensions, and unload-on-disconnect:</p>
 <pre><code class="lang-bash">dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 </code></pre>

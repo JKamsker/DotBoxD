@@ -135,12 +135,49 @@ work around.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="shipped-services-codes-dbxs">Shipped Services codes (<code>DBXS###</code>)</h2>
+<p>If you hit one of these while generating a <code>[DotBoxDService]</code> proxy, look it up here:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Severity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DBXS001</code></td>
+<td>Error</td>
+<td>DotBoxD source generator failure</td>
+</tr>
+<tr>
+<td><code>DBXS002</code></td>
+<td>Error</td>
+<td>Unsupported method shape (e.g. a <code>ref</code>/<code>in</code>/<code>out</code> parameter)</td>
+</tr>
+<tr>
+<td><code>DBXS003</code></td>
+<td>Error</td>
+<td>Unsupported service shape (e.g. a generic or nested interface)</td>
+</tr>
+<tr>
+<td><code>DBXS004</code></td>
+<td>Warning</td>
+<td>Async sibling interface method name collides with another method</td>
+</tr>
+</tbody>
+</table>
+<p>For <code>DBXS002</code>/<code>DBXS003</code>, adjust the contract (drop the <code>ref</code>/<code>in</code>/<code>out</code> parameter, or lift the interface
+out to a non-nested, non-generic top-level type) and rebuild. See
+<a href="../tutorials/first-service.html">tutorials/first-service.md</a> for a worked example.</p>
 <h2 id="authoritative-lists">Authoritative lists</h2>
-<p>The shipped/unshipped code lists are maintained alongside each generator and are CI-enforced:</p>
+<p>The shipped/unshipped code lists are maintained alongside each generator and are CI-enforced. These are
+the source of truth — including the full <code>DBXK###</code> set, which is not reproduced here:</p>
 <ul>
-<li>Services (<code>DBXS###</code>): <code>src/CodeGeneration/DotBoxD.Services.SourceGenerator/AnalyzerReleases.Shipped.md</code>
-and <code>AnalyzerReleases.Unshipped.md</code>.</li>
-<li>Kernels/plugins (<code>DBXK###</code>): <code>src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Shipped.md</code>
+<li>Services (<code>DBXS###</code>): <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Services.SourceGenerator/AnalyzerReleases.Shipped.md"><code>AnalyzerReleases.Shipped.md</code></a>
+and its <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Services.SourceGenerator/AnalyzerReleases.Unshipped.md"><code>AnalyzerReleases.Unshipped.md</code></a> sibling.</li>
+<li>Kernels/plugins (<code>DBXK###</code>): <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Shipped.md"><code>AnalyzerReleases.Shipped.md</code></a>
 (and the kernel runtime diagnostic-code source).</li>
 </ul>
 <blockquote>

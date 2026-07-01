@@ -87,6 +87,9 @@
         <article data-uid="">
 <h1 id="dotboxd-quick-start-guide">DotBoxD Quick Start Guide</h1>
 
+<blockquote>
+<p><strong>New to DotBoxD?</strong> Start with <a href="../getting-started/README.html">Getting started</a> and the <a href="../tutorials/index.html">Tutorials</a>. This page is a deeper reference for the RPC channel layer (transports, codecs, generated registry).</p>
+</blockquote>
 <p>Get up and running with DotBoxD in 5 minutes.</p>
 <p>Reach for RPC channels when you want request/response host capabilities behind a shared contract:
 one C# interface compiles to a typed proxy plus dispatcher, so you get easy interop with no
@@ -184,6 +187,9 @@ dotnet run --project Client
 </code></pre>
 <h2 id="project-references">Project References</h2>
 <p>Your shared project needs these references:</p>
+<blockquote>
+<p>These <code>ProjectReference</code>s assume you are building inside the cloned DotBoxD repo; if you installed from NuGet (<a href="../getting-started/README.html">getting started</a>), reference the packages instead — the <code>DotBoxD.Services</code> package bundles <code>DotBoxD.Services.SourceGenerator</code> as an analyzer automatically, so you never add the generator as a standalone reference.</p>
+</blockquote>
 <pre><code class="lang-xml">&lt;ItemGroup&gt;
   &lt;PackageReference Include=&quot;MessagePack&quot; Version=&quot;2.5.187&quot; /&gt;
   &lt;ProjectReference Include=&quot;../DotBoxD.Services/DotBoxD.Services.csproj&quot; /&gt;
@@ -199,7 +205,7 @@ dotnet run --project Client
 <li><code>DotBoxD.Codecs.MessagePack</code></li>
 </ul>
 <p>For process-local IPC, use the dedicated named-pipe package instead of TCP:</p>
-<pre><code class="lang-sh">dotnet add package DotBoxD.Transports.NamedPipes
+<pre><code class="lang-sh">dotnet add package DotBoxD.Transports.NamedPipes --prerelease
 </code></pre>
 <pre><code class="lang-csharp">using DotBoxD.Transports.NamedPipes;
 
@@ -232,7 +238,6 @@ foreach (var service in DotBoxDGenerated.Services)
 <p>For DI containers or host registries that need generic service/implementation pairs,
 implement <code>IDotBoxDServiceRegistrationSink</code> and pass it to the generated callback:</p>
 <pre><code class="lang-csharp">using DotBoxD.Services.Generated;
-using DotBoxD.Services.Generated;
 
 public sealed class MySink : IDotBoxDServiceRegistrationSink
 {
@@ -250,7 +255,6 @@ DotBoxDGenerated.RegisterServices(new MySink());
 <code>IDotBoxDGeneratedServiceRegistrationSink</code>:</p>
 <pre><code class="lang-csharp">using DotBoxD.Services.Generated;
 using DotBoxD.Services.Server;
-using DotBoxD.Services.Generated;
 
 public sealed class GeneratedSink : IDotBoxDGeneratedServiceRegistrationSink
 {

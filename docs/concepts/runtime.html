@@ -176,17 +176,30 @@ entrypoint is async/uncompilable
 You pay compilation cost only for kernels that are actually hot, while every kernel still runs
 immediately on the safe baseline.</li>
 </ul>
-<h2 id="two-execution-backends">Two execution backends</h2>
-<ul>
-<li><strong>Interpreter</strong> (<code>DotBoxD.Kernels.Interpreter</code>) — executes verified IR directly. Predictable
-semantics, easy quotas, great diagnostics, AOT-friendly, no codegen. This is the default and the
-safety baseline.</li>
-<li><strong>Compiler</strong> (<code>DotBoxD.Kernels.Compiler</code>) — emits verified IL for hot kernels and caches the artifact
-(content-addressed by module hash + entrypoint + policy hash + compiler version). The emitted assembly
-is checked by <code>DotBoxD.Kernels.Verifier</code> before it runs, so the compiled path enforces the same
-restrictions as the interpreter.</li>
-</ul>
-<h2 id="metering--policy">Metering &amp; policy</h2>
+<h2 id="reference-backends--metering">Reference: backends &amp; metering</h2>
+<p>The two sections above explain the <em>why</em>; this is the canonical quick reference. Both backends enforce
+identical guarantees — pick by performance, not safety.</p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Assembly</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Interpreter</strong></td>
+<td><code>DotBoxD.Kernels.Interpreter</code></td>
+<td>Default and safety baseline: walks verified IR directly, no codegen, AOT-friendly.</td>
+</tr>
+<tr>
+<td><strong>Compiler</strong></td>
+<td><code>DotBoxD.Kernels.Compiler</code></td>
+<td>Emits verified IL for hot kernels; the artifact is checked by <code>DotBoxD.Kernels.Verifier</code> before every run.</td>
+</tr>
+</tbody>
+</table>
 <p>Every run is bounded by a <code>SandboxPolicy</code>:</p>
 <ul>
 <li><strong>fuel</strong> (instruction budget), <strong>loop iteration</strong> and <strong>call-depth</strong> budgets,</li>
@@ -210,6 +223,8 @@ runtime backstop rejects genuinely pending <code>ValueTask</code> results.</p>
 <code>HostBindingAttribute.IsAsync</code> named property to mirror the registered descriptor's <code>IsAsync</code> value.
 The property defaults to <code>false</code>, so existing source remains compatible while async host bindings can
 derive <code>dotboxd.runtime.async</code> into generated manifests.</p>
+<h2 id="next">Next</h2>
+<p>See these runtime guarantees end-to-end in the <a href="../examples/gameserver-walkthrough.html">GameServer walkthrough</a>.</p>
 
 </article>
 

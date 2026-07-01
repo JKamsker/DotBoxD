@@ -92,12 +92,12 @@ all driven by Roslyn source generators, with no runtime reflection on the hot pa
 <tbody>
 <tr>
 <td><strong>Services</strong></td>
-<td>The host implements a contract; clients call it remotely over RPC.</td>
+<td>The host implements a contract; clients call it remotely over RPC (remote procedure call).</td>
 <td><a href="docs/tutorials/first-service.html">Tutorial ›</a></td>
 </tr>
 <tr>
-<td><strong>Kernels</strong></td>
-<td>A client supplies validated logic (e.g. a <code>Where</code>/<code>Select</code> event filter) the host runs safely inside a fuel-metered sandbox.</td>
+<td><strong>Kernels</strong> (Query / RunLocal)</td>
+<td>A client supplies validated logic (e.g. a <code>Where</code>/<code>Select</code> event filter) the host runs safely inside a fuel-metered sandbox (fuel = a metered instruction budget the host caps, so a plugin can't run away with CPU). Downstream this mode is called <em>Query (RunLocal)</em>.</td>
 <td><a href="docs/tutorials/event-pipeline-runlocal.html">Tutorial ›</a></td>
 </tr>
 <tr>
@@ -116,17 +116,18 @@ dotnet add package DotBoxD --prerelease
 # Unity / netstandard2.1 service bundle:
 dotnet add package DotBoxD.Services.All --prerelease
 </code></pre>
-<p>Then follow <a href="docs/getting-started/README.html"><strong>Getting started</strong></a> or jump straight into a
+<p>New here? Start with the <a href="docs/index.html"><strong>Overview &amp; 'Choosing a mode' guide</strong></a> to pick the right
+mode, then follow <a href="docs/getting-started/README.html"><strong>Getting started</strong></a> or jump straight into a
 <a href="docs/tutorials/index.html"><strong>Tutorial</strong></a>.</p>
 <h2 id="explore-the-docs">Explore the docs</h2>
 <ul>
-<li>📘 <strong><a href="docs/toc.html">Guide</a></strong> — concepts (Services, Kernels, Pushdown, the runtime), security model, and reference (diagnostics, schemas).</li>
+<li>📘 <strong><a href="docs/index.html">Guide</a></strong> — concepts (Services, Kernels, Pushdown, the runtime), security model, and reference (diagnostics, schemas).</li>
 <li>🎓 <strong><a href="docs/tutorials/index.html">Tutorials</a></strong> — end-to-end walkthroughs: your first service, event pipelines with <code>RunLocal</code>, and a pushdown server extension.</li>
 <li>🧩 <strong><a href="docs/examples/index.html">Examples</a></strong> — an annotated tour of the maintained GameServer sample.</li>
 <li>🔎 <strong><a href="api/toc.html">API reference</a></strong> — generated from the source of every published package.</li>
 </ul>
 <h2 id="security-in-one-line">Security in one line</h2>
-<p><strong>Safe mode is the real boundary:</strong> a kernel is restricted IR that is validated, capability-gated,
+<p><strong>Safe mode is the real boundary:</strong> a kernel is restricted IR (intermediate representation) that is validated, capability-gated,
 fuel/quota-metered, and (for compiled mode) verified before it runs — consumers never supply C#, IL,
 or arbitrary host calls. Trusted-plugin mode (<code>AssemblyLoadContext</code>) is <strong>not</strong> a sandbox. Read
 <a href="docs/security/sandbox-caveats.html"><strong>Sandbox caveats</strong></a> before deploying.</p>

@@ -87,9 +87,8 @@
         <article data-uid="">
 <h1 id="tutorials">Tutorials</h1>
 
-<p>Three end-to-end walkthroughs, one per mode. Each starts from an empty project and ends with
-something you can run. Each mode exists for a different reason — pick by what you need before you
-click in:</p>
+<p>Three end-to-end walkthroughs, one per mode. Each mode exists for a different reason — pick by what
+you need before you click in:</p>
 <ol>
 <li><strong><a href="first-service.html">First Service (RPC)</a></strong> — define a <code>[DotBoxDService]</code> contract, host it, and
 call it from a client over a typed proxy. <em>Why this mode:</em> easy interop — one C# contract compiles
@@ -107,6 +106,13 @@ loop/aggregation next to the data (N calls → 1 server-side batch); the host st
 plugins add batch ops without recompiling it, and the batch runs as verified, capability-gated,
 fuel-metered IR.</li>
 </ol>
+<blockquote>
+<p><strong>Note:</strong> First Service builds from an empty project. Pushdown and Event pipelines (RunLocal) instead
+run against the maintained <a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer">GameServer sample</a>:
+Pushdown's final step installs into the sample's <code>PluginServer</code>, and the event-pipeline snippets
+reference sample-only types that will not compile in an empty project — so for both, clone the repo
+and read/run along.</p>
+</blockquote>
 <p>New to the project? Read <a href="../getting-started/README.html">Getting started</a> first, then come back here.
 For the concepts behind each mode, see the <a href="../index.html">Guide</a>.</p>
 

@@ -95,44 +95,31 @@
 </ul>
 <h2 id="install">Install</h2>
 <pre><code class="lang-bash"># Full net10.0 stack (Services + Kernels + Pushdown):
-dotnet add package DotBoxD
+dotnet add package DotBoxD --prerelease
 
 # Service / Unity (netstandard2.1) bundle only:
-dotnet add package DotBoxD.Services.All
+dotnet add package DotBoxD.Services.All --prerelease
 </code></pre>
+<blockquote>
+<p><code>--prerelease</code> is required while the net10.0 stack is in preview; drop it once a stable tag ships.</p>
+</blockquote>
 <p>Or reference individual packages — see the table in the root <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md">README</a>.</p>
 <h2 id="why-dotboxd-and-which-mode-to-use-when">Why DotBoxD? (and which mode to use when)</h2>
-<p><strong>The problem it solves.</strong> Host↔plugin communication usually forces a choice between two bad options:
-hand-written marshaling (request envelopes, arg serialization, matching each response back to its call —
-repetitive and easy to get subtly wrong), or a chatty stream where the host ships every event / exposes
-only fine-grained calls and the client loops and filters after the fact. DotBoxD starts from <strong>one C#
-contract</strong> and lowers it at compile time — no runtime reflection on the hot path — into whichever of
-<strong>three delivery strategies</strong> fits the call shape. The interface stays the single source of truth: a
-contract-shape mismatch is a compile error, not a wire fault.</p>
-<p><strong>The payoff: pick the strategy by call shape, keep one authoring model.</strong></p>
+<p>Host↔plugin communication usually forces a choice between hand-written marshaling (request envelopes and
+matching each response back to its call — repetitive, easy to get subtly wrong) and a chatty stream the
+client has to filter after the fact. DotBoxD starts from <strong>one C# contract</strong> and lowers it (compiles it
+down to a restricted lower-level form) at compile time — no runtime reflection on the hot path — into
+whichever of <strong>three delivery strategies</strong> fits the call shape:</p>
 <ul>
-<li><strong>Services (RPC) = easy interop.</strong> One <code>[DotBoxDService]</code> interface compiles to a typed proxy plus a
-dispatcher, so there is no hand-written marshaling and no runtime reflection on the hot path — the
-netstandard2.1 stack AOTs and runs on Unity / IL2CPP. Reach for it for a discrete, typed
-request→response you can <code>await</code>, a bounded number of calls (one method = one round-trip), or
-host↔plugin callbacks over one connection. See <a href="../concepts/services.html">concepts/services.md</a>.</li>
-<li><strong>Query / event pipeline (RunLocal) = efficient server-side filtering + projection.</strong> <code>Where</code> /
-<code>Select</code> lower to verified IR that runs next to the data, so only matching, projected values cross the
-pipe — fewer bytes, fewer wake-ups, one-way push, no round-trips. Because that filter logic runs as
-validated, fuel-metered IR, it is safe to accept from untrusted plugins. Reach for it to react to a
-high-frequency server event but consume only a filtered/shaped subset. See
-<a href="../tutorials/event-pipeline-runlocal.html">tutorials/event-pipeline-runlocal.md</a>.</li>
-<li><strong>Pushdown = reduce round-trips.</strong> Move the loop/aggregation next to the data so N per-entity calls
-collapse into one server-side batch. The host stays frozen and minimal while plugins add batch ops
-without recompiling it, and the batch runs as verified, capability-gated, fuel-metered IR. Reach for
-it when a client would otherwise loop with one round-trip per entity against a frozen host. See
-<a href="../concepts/pushdown.html">concepts/pushdown.md</a>.</li>
+<li><strong>Services (RPC):</strong> typed request→response.</li>
+<li><strong>Query (RunLocal):</strong> server-side filter + projection, one-way push to the plugin.</li>
+<li><strong>Pushdown:</strong> collapse N per-entity round-trips into one server-side batch.</li>
 </ul>
-<p>RunLocal and Pushdown share the same sandbox foundation (<a href="../concepts/kernels.html">concepts/kernels.md</a>):
-untrusted author C# is lowered to validated, fuel-metered <strong>kernel IR</strong>, so plugin logic never runs as
-trusted CLR code. Services, by contrast, is a <strong>trusted channel</strong> — a provided service is callable by any
-peer, so enforce access control at the transport or application layer. The three quickstarts below map
-one-to-one onto these strategies.</p>
+<p>RunLocal and Pushdown run author logic as validated, fuel-metered <a href="../concepts/kernels.html">kernel IR</a> (never trusted CLR code);
+Services is a trusted channel you guard at the transport or application layer. See
+<a href="../index.html#choosing-a-mode">Choosing a mode</a> for the full comparison and the
+<a href="../reference/glossary.html">glossary</a> for unfamiliar terms — the three quickstarts below map one-to-one
+onto these strategies.</p>
 <h2 id="first-service-rpc">First Service (RPC)</h2>
 <ol>
 <li>Define a contract and annotate it with <code>[DotBoxDService]</code>.</li>
@@ -141,24 +128,37 @@ one-to-one onto these strategies.</p>
 </ol>
 <p>The maintained runnable sample uses the same generated service pattern for its plugin control plane:
 <a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer/Examples.GameServer.Server"><code>samples/GameServer/Examples.GameServer.Server</code></a>.
-See <a href="../concepts/services.html">concepts/services.md</a>.</p>
+See <a href="../concepts/services.html">concepts/services.md</a>, or <a href="../tutorials/first-service.html">build it step by step</a>.</p>
 <h2 id="first-kernel-sandbox">First Kernel (sandbox)</h2>
 <ol>
 <li>Create a <code>SandboxHost</code> with the bindings you want to expose.</li>
 <li>Build a <code>SandboxPolicy</code> (fuel, loop, list, capability budgets).</li>
 <li>Import the kernel JSON IR, <code>PrepareAsync</code>, then <code>ExecuteAsync</code>.</li>
 </ol>
-<p>See the GameServer sample and <a href="../concepts/kernels.html">concepts/kernels.md</a>.</p>
+<p>See the GameServer sample or <a href="../concepts/kernels.html">concepts/kernels.md</a>. For a concrete runnable version
+of this raw flow — <code>SandboxHost.Create</code> → <code>ImportJsonAsync</code> → <code>PrepareAsync</code> → <code>ExecuteAsync</code> under a policy —
+see section 2 (Kernels) of the root <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md">README</a>, or a
+real <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/Specs/Initial/dotboxd-sandbox-spec/examples/example-ir.md">JSON-IR example</a>.
+For the fluent event-pipeline equivalent — <code>server.Hooks</code> over a <code>GamePluginServerBuilder</code>, not the raw
+<code>SandboxHost</code> steps above — <a href="../tutorials/event-pipeline-runlocal.html">build it step by step</a>.</p>
 <h2 id="pushdown-quickstart">Pushdown quickstart</h2>
 <p>Expose a contract method that composes host data and runs a validated kernel server-side, so the client
 submits work in one round-trip instead of N. The GameServer sample demonstrates this with the
-<code>MonsterKillerKernel</code> server extension. See <a href="../concepts/pushdown.html">concepts/pushdown.md</a>.</p>
+<code>MonsterKillerKernel</code> server extension. See <a href="../concepts/pushdown.html">concepts/pushdown.md</a>, or
+<a href="../tutorials/pushdown-server-extension.html">build it step by step</a>.</p>
 <h2 id="run-the-maintained-example">Run the maintained example</h2>
+<p>The sample lives in the repo, not the NuGet package — <code>git clone https://github.com/JKamsker/DotBoxD</code> and
+run from the repo root:</p>
 <pre><code class="lang-bash">dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
 </code></pre>
+<p>You should see three phases print — a baseline run, a with-plugins run, and a summary confirming the
+plugin's kernels unloaded on disconnect. For the annotated output, see
+<a href="../examples/gameserver-walkthrough.html#what-the-run-prints">What the run prints</a>.</p>
 <p>It demonstrates service IPC, event kernels, live settings, host bindings, policy-gated execution,
 server extensions, and unload-on-disconnect. Features no longer covered by maintained samples are listed in
 <a href="../examples/coverage-gaps.html"><code>docs/examples/coverage-gaps.md</code></a>.</p>
+<h2 id="next-steps">Next steps</h2>
+<p>Ready for an end-to-end walkthrough? Work through the <a href="../tutorials/index.html">tutorials</a>.</p>
 
 </article>
 

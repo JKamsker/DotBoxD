@@ -5758,6 +5758,16 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "docs/reference/glossary.md",
+      "output": {
+        ".html": {
+          "relative_path": "docs/reference/glossary.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "docs/reference/schemas.md",
       "output": {
         ".html": {

@@ -118,7 +118,7 @@ marshaling — one method, one remote round-trip.</p>
 <ul>
 <li><strong>AOT / Unity / IL2CPP reach.</strong> There is no runtime reflection on the hot path and no assembly scan
 — proxy/dispatcher lookup goes through a <em>generated</em> registry — so the netstandard2.1 Services stack
-runs where IL2CPP and NativeAOT forbid dynamic reflection. The MessagePack codec is reflection-free
+runs where IL2CPP and NativeAOT (ahead-of-time compilation) forbid dynamic reflection. The MessagePack codec is reflection-free
 too (generated formatters).</li>
 <li><strong>Peer-based, bidirectional.</strong> Direction is configuration, not type: the same connection can both
 <code>Provide</code> and <code>Get</code>, so the host can call back into a connected plugin over one demuxed read loop —
@@ -141,7 +141,8 @@ server-side batch, prefer <a href="pushdown.html">Pushdown</a> — the batch run
 fuel-metered IR.</p>
 <p>Diagnostics from the generator use the <code>DBXS###</code> prefix — see
 <a href="../reference/diagnostics.html">reference/diagnostics.md</a>.</p>
-<p><strong>See also:</strong> the GameServer sample under
+<p><strong>See also:</strong> the annotated <a href="../examples/gameserver-walkthrough.html">GameServer walkthrough</a> for a
+guided tour, or the raw GameServer sample under
 <a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer"><code>samples/GameServer</code></a>, the legacy RPC docs under
 <a href="../channels/quick-start.html"><code>docs/channels/</code></a> (quick-start, API reference, Unity integration, transports,
 performance), <a href="pushdown.html">pushdown</a> for composing services server-side, and

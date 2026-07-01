@@ -94,7 +94,7 @@ path), and a MessagePack named-pipe transport carries the calls.</p>
 <p>By the end of this page you will have a host process that serves a contract and a client process that
 calls it over a named pipe in one round-trip per method. Every API used here is exercised by the
 maintained sample under
-<a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>samples/GameServer</code></a>; the pieces are shown in the README's
+<a href="https://github.com/JKamsker/DotBoxD/tree/main/samples/GameServer"><code>samples/GameServer</code></a>; the pieces are shown in the README's
 <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md">&quot;1. Services&quot;</a> section.</p>
 <h2 id="why-services-rpc-and-when-to-use-it">Why Services (RPC)? (and when to use it)</h2>
 <p>Services exist to make interop easy. Hand-writing RPC marshaling — build a request envelope, serialize
@@ -126,25 +126,27 @@ proxy, dispatcher, and <code>Provide</code>/<code>Get</code> extensions are iden
 <p><strong>When to use a Service:</strong> the host owns a capability and the client needs a typed request→response it
 can <code>await</code>, the interaction is a bounded number of discrete calls (one method = one round-trip), you
 need host↔plugin callbacks on one connection, or you need Unity/IL2CPP reach.</p>
-<p><strong>When to prefer another mode:</strong> if you're reacting to a high-frequency <em>server event</em> and only need a
-subset or summary, prefer the <a href="event-pipeline-runlocal.html">query / event pipeline (RunLocal)</a> — its
-<code>Where</code>/<code>Select</code> lower to server-side IR so only matching, projected values push one-way to your plugin,
-no round-trips. If instead you face a <em>chatty N-call loop</em> against a frozen host, prefer
-<a href="../concepts/pushdown.html">Pushdown</a>, which collapses N round-trips into one server-side batch. Note that
-Services (RPC) is a <em>trusted</em> channel; the sandbox trust boundary lives in Kernels/Pushdown, not here.</p>
+<p><strong>When to prefer another mode:</strong> reach for the <a href="event-pipeline-runlocal.html">event pipeline (RunLocal)</a>
+to react to high-frequency events, or <a href="../concepts/pushdown.html">Pushdown</a> to collapse a chatty N-call
+loop into one server-side batch. Services (RPC) is a <em>trusted</em> channel; the sandbox trust boundary lives
+in Kernels/Pushdown, not here.</p>
 <h2 id="what-youll-build">What you'll build</h2>
 <p>Three pieces, mirroring how the GameServer sample is laid out (shared abstractions, server, client):</p>
 <ul>
-<li>A <strong>shared contract</strong> project holding the <code>[DotBoxDService]</code> interface and its DTOs.</li>
+<li>A <strong>shared contract</strong> project holding the <code>[DotBoxDService]</code> interface and its DTOs (data transfer objects — the plain data types that cross the wire).</li>
 <li>A <strong>host</strong> that implements the contract and listens on a named pipe.</li>
 <li>A <strong>client</strong> that connects and calls the contract through a generated proxy.</li>
 </ul>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
-<li>.NET SDK 8, 9, or 10. The named-pipe IPC helper used below (<code>RpcMessagePackIpc</code>) ships in
-<code>DotBoxD.Pushdown.Services</code>, which targets <code>net10.0</code>, so target <code>net10.0</code> for the host and client in
-this tutorial. (The pure Services/channel stack is <code>netstandard2.1</code> and also runs on Unity/IL2CPP —
-see <a href="#unity-and-the-netstandard21-stack">Unity note</a> at the end.)</li>
+<li><strong>.NET SDK 10</strong> — required, because the host and client in this tutorial target <code>net10.0</code>. An SDK 8
+or 9 alone cannot build <code>net10.0</code> and fails the <code>dotnet add package DotBoxD</code> restore below with a
+cryptic <code>NU1202</code>/<code>NETSDK1045</code> error. (The .NET 8 and 9 <em>runtimes</em> only matter for the
+<code>netstandard2.1</code> Services stack or the full test suite — not for building this walkthrough.) The
+named-pipe IPC helper used below (<code>RpcMessagePackIpc</code>) ships in <code>DotBoxD.Pushdown.Services</code>, which
+targets <code>net10.0</code>, so target <code>net10.0</code> for the host and client in this tutorial. (The pure
+Services/channel stack is <code>netstandard2.1</code> and also runs on Unity/IL2CPP — see
+<a href="#unity-and-the-netstandard21-stack">Unity note</a> at the end.)</li>
 </ul>
 <h2 id="step-1--create-the-projects-and-install-the-package">Step 1 — Create the projects and install the package</h2>
 <pre><code class="lang-bash">dotnet new classlib -n MyApp.Contracts
@@ -155,6 +157,11 @@ dotnet new console  -n MyApp.Client
 dotnet add MyApp.Host    reference MyApp.Contracts
 dotnet add MyApp.Client  reference MyApp.Contracts
 </code></pre>
+<blockquote>
+<p><strong>Target <code>net10.0</code> in all three projects.</strong> <code>MyApp.Contracts</code>, <code>MyApp.Host</code>, and <code>MyApp.Client</code> each
+reference DotBoxD, so each must target <code>net10.0</code>. Set <code>&lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;</code> in
+every <code>.csproj</code>, or pass <code>-f net10.0</code> to each <code>dotnet new</code> command above.</p>
+</blockquote>
 <p>Add DotBoxD to each project. The meta-package <code>DotBoxD</code> pulls the full net10.0 stack (Services +
 Kernels + Pushdown), which includes the <code>RpcMessagePackIpc</code> named-pipe helper and the bundled
 <code>DotBoxD.Services.SourceGenerator</code>:</p>
@@ -319,6 +326,14 @@ pipe.</p>
 <pre><code class="lang-bash">dotnet run --project MyApp.Host
 # copy the printed pipe name, then in a second terminal:
 dotnet run --project MyApp.Client -- myapp-catalog-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+</code></pre>
+<p>You should now see the host terminal print:</p>
+<pre><code class="lang-text">Catalog host listening on pipe: myapp-catalog-…
+Press Enter to stop.
+</code></pre>
+<p>and the client terminal print (sword = 100, shield = 75):</p>
+<pre><code class="lang-text">sword unit price = 100
+cart: 2 items, total = 175
 </code></pre>
 <h2 id="step-6--what-the-source-generator-emits">Step 6 — What the source generator emits</h2>
 <p>The <code>[DotBoxDService]</code> attribute drives <code>DotBoxD.Services.SourceGenerator</code> (bundled inside the Services

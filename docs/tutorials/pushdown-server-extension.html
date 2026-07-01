@@ -114,6 +114,9 @@
 <li>A <strong>caller</strong> that installs the extension once and invokes the whole batch in a single round-trip.</li>
 </ul>
 <h2 id="prerequisites">Prerequisites</h2>
+<blockquote>
+<p>This tutorial teaches the <strong>plugin-side authoring shapes</strong>; the host <code>PluginServer</code> (the <code>server</code> used in Step 5) is not built here — run the pattern via the maintained GameServer sample (Step 7 below), or scaffold your own host project as in <a href="first-service.html">first-service</a> Step 1.</p>
+</blockquote>
 <p>Pushdown lives on the net10.0 Kernels/Plugins stack. Add the authoring contracts, the host runtime, and the generator/analyzer (and the IPC addon if the plugin and host are in separate processes):</p>
 <pre><code class="lang-bash"># Plugin-to-host authoring contracts: [HostBinding], [ServerExtension], HookContext
 dotnet add package DotBoxD.Abstractions --prerelease
@@ -206,7 +209,7 @@ public sealed partial class MonsterKillerKernel
 </ol>
 <p>The trust model is spelled out in the README: the batch logic &quot;runs as a validated sandboxed kernel under the same trust model as event kernels: it can reach only the host bindings the server already exposes, gated by capabilities and fuel/quota limits&quot; (<a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a>, section 3). Critically, <strong>a method reachable via normal RPC is not automatically reachable from a kernel</strong> (<a href="../concepts/pushdown.html"><code>docs/concepts/pushdown.md</code></a>) — the only surface the kernel can touch is the set of registered <code>[HostBinding]</code>s.</p>
 <h2 id="step-5--install-once-invoke-once-n-round-trips--1">Step 5 — Install once, invoke once (N round-trips → 1)</h2>
-<p>On the host side, <code>PluginServer</code> (from <code>DotBoxD.Plugins</code>) resolves the kernel's generated verified-IR package, installs it as a server extension, and binds it to the contract. Then any caller gets a typed proxy and calls the batch in <strong>one</strong> round-trip:</p>
+<p>On the host side, <code>PluginServer</code> (from <code>DotBoxD.Plugins</code>) resolves the kernel's generated verified-IR package, installs it as a server extension, and binds it to the contract. Then any caller gets a typed proxy and calls the batch in <strong>one</strong> round-trip. Here <code>server</code> is that <code>PluginServer</code> instance — the one built in the <a href="../examples/gameserver-walkthrough.html">GameServer walkthrough</a>:</p>
 <pre><code class="lang-csharp">using DotBoxD.Plugins;
 
 // The host's PluginServer already has the IGameWorld binding registered (same id/capability/effects).
@@ -214,6 +217,7 @@ public sealed partial class MonsterKillerKernel
 await server.RegisterServerExtensionAsync&lt;IMonsterKillerService, MonsterKillerKernel&gt;();
 
 // The caller invokes the whole batch in ONE round-trip, not N:
+var ids = new List&lt;int&gt; { 1, 2, 3 };
 List&lt;KillResult&gt; killed = server.ServerExtension&lt;IMonsterKillerService&gt;().KillMonsters(ids);
 </code></pre>
 <p>The signatures are exactly as declared in <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/Hosting/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs"><code>src/Hosting/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs</code></a>:</p>
@@ -226,11 +230,17 @@ List&lt;KillResult&gt; killed = server.ServerExtension&lt;IMonsterKillerService&
 <h2 id="step-6--diagnostics-and-the-no-lock-in-principle">Step 6 — Diagnostics and the no-lock-in principle</h2>
 <p><strong>Diagnostics.</strong> If your batch method uses a shape the lowering surface cannot represent, the analyzer fails the generation <em>safely</em> (it does not miscompile) and reports a diagnostic in the kernels/plugins namespace <strong><code>DBXK###</code></strong> (services diagnostics use <code>DBXS###</code>). For example, <code>DBXK115</code> rejects duplicate generated server-extension graft signatures, and <code>DBXK116</code> rejects <code>[Local]</code> context helpers reaching lowered server-side IR (see <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md"><code>src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md</code></a>). Treat a <code>DBXK###</code> error as &quot;the sandbox does not support this construct,&quot; not as a bug to work around.</p>
 <p><strong>No lock-in.</strong> The <code>[ServerExtension]</code> attribute and the generator are <strong>opt-in sugar over public primitives, never lock-in</strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a>, <a href="https://github.com/JKamsker/DotBoxD/blob/main/rules/design-guidelines.md"><code>rules/design-guidelines.md</code></a>). Everything the generator produces is verified JSON IR plus a manifest — both first-class, public artifacts. You could delete the attribute and hand-author the same IR, then import and run it through the same <code>SandboxHost</code> pipeline the Kernels quick-start uses (<code>ImportJsonAsync</code> → <code>PrepareAsync</code> under a <code>SandboxPolicy</code> → <code>ExecuteAsync</code>, as shown in <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a> section 2). The generator saves you from writing IR by hand; it does not grant your code any capability a hand-written kernel could not also request — and it never bypasses validation, capability gating, or metering. If you can't hand-write it against the public API, the generator won't emit it either.</p>
+<h2 id="step-7--run-the-maintained-example">Step 7 — Run the maintained example</h2>
+<p>The <code>server</code> from Step 5 lives in the maintained GameServer sample, which wires the <code>PluginServer</code>, registers the <code>IGameWorld</code> binding, and installs the <code>MonsterKillerKernel</code> server extension. Run it from the repo root:</p>
+<pre><code class="lang-bash">dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+</code></pre>
+<p>What you should see: the sample host boots, loads the plugin, and exercises the batch server extension end to end — the same install-once/invoke-once path from Step 5 — alongside the other modes (service IPC, event kernels, host bindings, policy-gated execution).</p>
 <h2 id="next-steps">Next steps</h2>
 <ul>
 <li><a href="event-pipeline-runlocal.html">Event pipelines (RunLocal)</a> — the sibling tutorial: the <em>other</em> way author logic runs server-side — a <code>Where</code>/<code>Select</code> filter lowered to the same verified IR, reacting locally instead of aggregating.</li>
 <li><a href="../concepts/pushdown.html">Pushdown, in depth</a> — the concept, the round-trip diagrams, and the roadmap items (<code>DotBoxD.Pushdown.Linq</code>, fluent client API).</li>
 <li><a href="../security/sandbox-caveats.html">Sandbox caveats</a> — what is and isn't a trust boundary before you deploy a server extension that runs author-supplied logic.</li>
+<li><a href="../examples/gameserver-walkthrough.html">GameServer walkthrough</a> — all three modes (Services, RunLocal, Pushdown) working together in one runnable program.</li>
 </ul>
 
 </article>
