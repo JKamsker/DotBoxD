@@ -1,6 +1,3 @@
-using DotBoxD.Plugins.Kernel;
-using DotBoxD.Plugins.Runtime.Hooks;
-
 namespace DotBoxD.Plugins.Runtime;
 
 public sealed partial class RemoteHookPipeline<TEvent>
