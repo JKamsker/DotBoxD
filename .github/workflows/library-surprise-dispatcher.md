@@ -68,10 +68,19 @@ pre-agent-steps:
 
       repo = os.environ["GITHUB_REPOSITORY"]
 
-      def gh_json(args):
-          # Fail closed: a transient gh failure aborts this dispatch tick (it retries next cron)
-          # rather than silently emptying the in-flight set and re-dispatching running lenses.
-          r = subprocess.run(["gh", *args], check=True, text=True, stdout=subprocess.PIPE)
+      def gh_json(args, tolerant=False):
+          # The frontier source (issue list) fails closed: if we cannot read the lenses we must not
+          # dispatch. The busy-check (run list) is a best-effort optimization layered over the
+          # per-lens `concurrency` lock, so it degrades to "unknown" on error (e.g. the explore
+          # workflow has no runs registered yet, or a transient API failure) instead of aborting
+          # the whole dispatch tick.
+          r = subprocess.run(["gh", *args], check=False, text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          if r.returncode != 0:
+              if tolerant:
+                  print(f"warning: gh {' '.join(args)} failed ({r.returncode}): {r.stderr.strip()}")
+                  return []
+              raise SystemExit(f"gh {' '.join(args)} failed: {r.stderr.strip()}")
           return json.loads(r.stdout or "[]")
 
       # Active lens roots; drop any also marked exhausted (nothing else retires sweep:active,
@@ -88,7 +97,7 @@ pre-agent-steps:
       # (a substring test would let #14 match "#140").
       runs = gh_json(["run", "list", "--repo", repo,
                       "--workflow", "library-surprise-explore.lock.yml",
-                      "--json", "status,displayTitle", "--limit", "60"])
+                      "--json", "status,displayTitle", "--limit", "60"], tolerant=True)
       IN_FLIGHT = ("in_progress", "queued", "requested", "waiting", "pending")
       busy_numbers = set()
       for run in runs:
