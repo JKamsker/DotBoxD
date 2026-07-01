@@ -63,6 +63,22 @@ A runtime or generated composer should process steps in order:
 The composer is responsible for validating that each step input shape matches the previous step output
 shape. It must also rewrite placeholder variable names to scoped variables in the final module.
 
+## Composition (implemented)
+
+`LoweredPipelineComposer.Compose(LoweredPipelineComposition)` in `DotBoxD.Abstractions` merges an ordered
+`LoweredPipelineStep` list into one verifiable `SandboxModule` with two entrypoints over the input record:
+
+- `ShouldHandle(input) -> Bool` threads the value through the chain, returning `false` as soon as any filter
+  fails; projections rebind the running value so later filters see the projected shape.
+- `Handle(input) -> ResultType` applies the projections in order (filters are already gated) and returns the
+  final projected value.
+
+Each fragment's `$dotboxd.current` placeholder is rewritten to the scoped variable holding the value flowing
+into that step, input/output shape tags are validated to chain, and the union of the steps' required
+capabilities and effects is surfaced in module metadata. The composed module verifies through the normal
+host validator and runs on the interpreter, so a consumer that collected steps from a custom pipeline surface
+can hand-assemble exactly what the build-time hook-chain fusion would have produced.
+
 ## Why Not Per-Step Modules
 
 A per-step `SandboxModule` would be expensive and awkward to merge. It would force each `Where` or `Select`
@@ -86,8 +102,12 @@ Unsupported in this first slice:
 - captured locals;
 - multi-parameter forwarding;
 - extension-method receivers;
-- context parameters and host-service selectors;
-- final module composition.
+- context parameters and host-service selectors.
 
-Those are separate design steps because each changes the trust boundary or overload shape.
+Those are separate design steps because each changes the trust boundary or overload shape. Final module
+composition is now provided by `LoweredPipelineComposer` (see [Composition](#composition-implemented) above).
+
+For the runtime-dynamic counterpart to this compile-time model — `EventQuery<TEvent>`, which uses runtime
+expression trees rather than source-lambda lowering and is deliberately not part of the `[PipelineStep]`
+vocabulary — see [event-query-vs-pipeline](../event-query-vs-pipeline/README.md).
 
