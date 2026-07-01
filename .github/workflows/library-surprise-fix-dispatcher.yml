@@ -15,11 +15,21 @@ name: Library Surprise Fix Dispatcher
 # See docs/Task/BugHunting/README.md.
 
 on:
-  # Primary trigger: a red-test worker just finished (it may have opened a new PR).
-  # Each tick re-scans ALL open unfixed red PRs, so a single missed tick self-heals
-  # on the next red-test completion — no separate schedule needed. (A `schedule:`
-  # can be added later for standalone backlog draining, but it is intentionally
-  # omitted here so enabling this workflow does not burst-fix the existing backlog.)
+  # PRIMARY, reliable trigger: a periodic scan of open unfixed red PRs.
+  #
+  # Why a schedule is REQUIRED and workflow_run alone is not enough: GitHub
+  # suppresses `workflow_run` events for runs dispatched with GITHUB_TOKEN
+  # (actor github-actions[bot]) as recursion prevention. The explore worker
+  # dispatches red-tests with GITHUB_TOKEN, so in autonomous operation their
+  # completion does NOT fire this dispatcher. Verified 2026-07-01: bot-dispatched
+  # red-tests 28523484435 / 28523516570 / 28523545465 (which opened PRs #170-172)
+  # did NOT fire it; only a JKamsker-dispatched red-test did. The schedule closes
+  # the loop regardless of who opened the red PR. max=2 + the per-PR busy-check
+  # and retry cap below keep any single tick from bursting the backlog.
+  schedule:
+    - cron: "15,45 * * * *"
+  # Kept for immediacy: fires instantly when a human/PAT dispatches a red-test
+  # (those DO emit workflow_run). Harmless for bot-dispatched ones (never fires).
   workflow_run:
     workflows: ["Library Surprise Red-Test Worker"]
     types: [completed]
@@ -52,6 +62,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           MAX_DISPATCH: ${{ inputs.max || '2' }}
+          MAX_ATTEMPTS: "3"
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -94,15 +105,32 @@ jobs:
           # one in flight (the worker's per-PR concurrency group would queue it, but
           # skipping here avoids the wasted run entirely).
           runs = json.loads(gh(["run", "list", "--repo", repo, "--workflow",
-                                "library-surprise-fix.lock.yml", "--limit", "60",
-                                "--json", "status,displayTitle"], tolerant=True) or "[]")
+                                "library-surprise-fix.lock.yml", "--limit", "80",
+                                "--json", "status,conclusion,displayTitle"], tolerant=True) or "[]")
           IN_FLIGHT = {"in_progress", "queued", "requested", "waiting", "pending"}
           busy = set()
+          attempts = {}
           for run in runs:
-              if run.get("status") in IN_FLIGHT:
-                  m = re.search(r"fix #(\d+)", run.get("displayTitle", ""))
-                  if m:
-                      busy.add(int(m.group(1)))
+              m = re.search(r"fix #(\d+)", run.get("displayTitle", ""))
+              if not m:
+                  continue
+              n = int(m.group(1))
+              status = run.get("status")
+              if status in IN_FLIGHT:
+                  busy.add(n)
+              elif status == "completed" and run.get("conclusion") != "cancelled":
+                  # A genuine, non-aborted attempt that still left the PR unfixed.
+                  attempts[n] = attempts.get(n, 0) + 1
+
+          # Retry cap: an unfixable bug (agent can't get it green within its timeout)
+          # would otherwise be re-dispatched every scheduled tick forever. Skip a
+          # candidate once it has burned MAX_ATTEMPTS genuine attempts — it needs a
+          # human. (Candidates are unfixed by definition: eligible() excludes
+          # sweep:fixed.)
+          try:
+              max_attempts = int(os.environ.get("MAX_ATTEMPTS") or "3")
+          except ValueError:
+              max_attempts = 3
 
           dispatched = 0
           for pr in candidates:
@@ -113,6 +141,10 @@ jobs:
               n = pr["number"]
               if n in busy:
                   print(f"skip #{n}: a fix run is already in flight")
+                  continue
+              if attempts.get(n, 0) >= max_attempts:
+                  print(f"skip #{n}: {attempts[n]} genuine fix attempt(s), still unfixed "
+                        f"(retry cap {max_attempts} reached; needs human attention)")
                   continue
               r = subprocess.run(["gh", "workflow", "run",
                                   "library-surprise-fix.lock.yml",
