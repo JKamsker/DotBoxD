@@ -34,6 +34,30 @@ public sealed class QueryInitializerValidationTests
     }
 
     [Fact]
+    public void Public_compare_filter_initializer_with_undefined_operator_is_rejected_by_evaluator()
+    {
+        var filter = UndefinedOperatorCompareFilter();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            QueryFilterEvaluator.Evaluate(filter, new AttackTestEvent("a", "t", 5, 1), new MemberValueReader()));
+        Assert.Contains("Compare", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Operator", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("999", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Public_compare_filter_initializer_with_undefined_operator_is_rejected_by_compiler()
+    {
+        var filter = UndefinedOperatorCompareFilter();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            QueryFilterCompiler.Compile(filter, new MemberValueReader()));
+        Assert.Contains("Compare", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Operator", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("999", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Public_member_projection_initializer_without_path_is_rejected_on_write()
     {
         var projection = new QueryProjection { Kind = QueryProjectionKind.Member };
@@ -44,4 +68,12 @@ public sealed class QueryInitializerValidationTests
         Assert.Contains("Member", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Path", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static QueryFilter UndefinedOperatorCompareFilter() => new()
+    {
+        Kind = QueryFilterKind.Compare,
+        Field = "Damage",
+        Operator = (QueryComparisonOperator)999,
+        Value = QueryValue.FromInteger(5),
+    };
 }
