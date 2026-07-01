@@ -19,11 +19,12 @@ internal static class GeneratedFactoryGenerator
         sb.AppendLine("    /// <summary>");
         sb.AppendLine("    /// Factory methods for DotBoxD-generated proxies and dispatchers.");
         sb.AppendLine("    /// </summary>");
-        sb.AppendLine("    internal static class DotBoxDGenerated");
+        sb.AppendLine("    public static class DotBoxDGenerated");
         sb.AppendLine("    {");
         GeneratedFactoryMetadataEmitter.AppendMethodArrays(sb, services, ct);
         sb.AppendLine();
-        sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedService)} s_services =");
+        sb.AppendLine($"        private static readonly {ServicesGeneratorTypeNames.Generic(ServicesGeneratorTypeNames.GlobalReadOnlyList, ServicesGeneratorTypeNames.GlobalGeneratedService)} s_services =");
+        sb.AppendLine($"            {ServicesGeneratorTypeNames.GlobalArray}.AsReadOnly(new {ServicesGeneratorTypeNames.ArrayOf(ServicesGeneratorTypeNames.GlobalGeneratedService)}");
         sb.AppendLine("        {");
 
         for (var i = 0; i < services.Array.Length; i++)
@@ -46,7 +47,7 @@ internal static class GeneratedFactoryGenerator
             sb.AppendLine($"                {GeneratedFactoryMetadataEmitter.MethodArrayName(i)}),");
         }
 
-        sb.AppendLine("        };");
+        sb.AppendLine("        });");
         sb.AppendLine();
         sb.AppendLine("        static DotBoxDGenerated()");
         sb.AppendLine("        {");

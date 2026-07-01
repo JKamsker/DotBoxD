@@ -23,15 +23,29 @@ internal sealed partial class RpcPeerOutboundInvoker
         string instanceId,
         string method,
         TRequest request,
-        CancellationToken ct = default) =>
-        SendUnaryValueRequestAsync<TRequest, TResponse>(service, method, request, instanceId, ct);
+        CancellationToken ct = default)
+    {
+        if (instanceId is null)
+        {
+            return MissingInstanceIdValueTask<TResponse>();
+        }
+
+        return SendUnaryValueRequestAsync<TRequest, TResponse>(service, method, request, instanceId, ct);
+    }
 
     public ValueTask<TResponse> InvokeValueOnInstanceAsync<TResponse>(
         string service,
         string instanceId,
         string method,
-        CancellationToken ct = default) =>
-        SendUnaryValueRequestAsync<TResponse>(service, method, instanceId, ct);
+        CancellationToken ct = default)
+    {
+        if (instanceId is null)
+        {
+            return MissingInstanceIdValueTask<TResponse>();
+        }
+
+        return SendUnaryValueRequestAsync<TResponse>(service, method, instanceId, ct);
+    }
 
     private ValueTask<TResponse> SendUnaryValueRequestAsync<TRequest, TResponse>(
         string service,

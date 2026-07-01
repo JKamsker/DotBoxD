@@ -45,6 +45,57 @@ If you must run third-party **compiled** code you do not trust, put a real bound
 
 In-process restrictions are not a substitute for an OS/hypervisor boundary for this case.
 
+## Why safe mode is the boundary — and why capabilities + metering
+
+The three modes are superficially symmetric — each "runs some logic the caller supplied" — so the
+load-bearing decision is **trust level, not convenience**. Only validated IR is a trust boundary: its
+guarantees are established *before* the logic runs and *bounded* while it runs. A loaded assembly's
+guarantees are established *never*.
+
+**The alternative it beats.** Running author-supplied logic as C#/IL — or loading it as a plugin
+assembly — hands it the full CLR (filesystem, sockets, P/Invoke, spawning processes) regardless of any
+DotBoxD API wrapped around it. The kernel replaces that with restricted IR the host inspects and rejects
+*before* execution, so a method reachable via normal RPC is **not** automatically reachable from a
+kernel (see [Kernels](../concepts/kernels.md)). That substrate is what makes accepting untrusted author
+logic safe in-process.
+
+**Why capabilities (least privilege).** A kernel starts with *no* ambient authority: every host
+operation it can reach — files, time, random, logging, HTTP — must be an explicit `[HostBinding]` the
+host exposed and a capability the policy granted. In the
+[`README`](https://github.com/JKamsker/DotBoxD/blob/main/README.md) example, `Kill` is pinned to
+capability `"game.world.monster.write.kill"` with effects `SandboxEffect.Cpu |
+SandboxEffect.HostStateWrite`; nothing outside that enumerated surface is reachable. Grants are
+**derived and fail closed** — the required set is the union of what the IR actually touches, and install
+is rejected unless the policy grants them, so bad code never runs. The reachable blast *surface* is what
+the host enumerates, not what the author discovers.
+
+**Why metering (bounded blast radius).** Capabilities bound *what* a kernel may touch; metering bounds
+*how much*. The policy is a hard budget — `WithFuel`, `WithMaxLoopIterations`, `WithMaxListLength`,
+per-capability quotas — and execution reports `ResourceUsage.FuelUsed` back to the host. Together they
+cap the blast radius even for *granted* operations: HTTP cannot become unbounded requests, a loop cannot
+spin forever, output cannot exhaust the output budget. Least privilege plus bounded consumption is why a
+*hostile* author, not just a *buggy* one, can be accepted in this mode.
+
+**Why `AssemblyLoadContext` isn't a boundary.** ALC provides assembly-versioning and unload isolation,
+not containment — it never inspects, restricts, or meters what the code does. So the two modes that look
+symmetric are not: a validated kernel can only do what the policy permits; a loaded assembly can do
+anything the process can. Conflating them is the exact mistake this page exists to prevent, which is why
+the [trust posture](https://github.com/JKamsker/DotBoxD/blob/main/SECURITY.md) is stated as a table, not
+a nuance.
+
+**Pushdown inherits this boundary — it does not widen it.** A plugin's server-side batch (Pushdown /
+server extensions) lowers to the *same* validated, capability-gated, fuel-metered IR as an event kernel
+and reaches only bindings the host already exposes. Moving the loop next to the data collapses N
+round-trips into one server-side batch **without** relaxing the trust model or recompiling the frozen
+host.
+
+**When to reach for each.** Untrusted author *logic* → **safe mode (Kernels)**. Logic that is a host
+capability *you* implement and trust → a plain [Service](../concepts/services.md) RPC, which needs no
+sandbox. Already-trusted first-party or vetted-partner *assemblies* → trusted plugin. Untrusted
+*compiled* .NET → an OS/process boundary (mode 3 above). One honest limit: the kernel boundary defends
+against buggy and *many* malicious authors — deliberately "many," not "all" — so for hard multi-tenant
+isolation of hostile compiled code, do not lean on safe mode.
+
 ## Summary
 
 | Mode | Input | Boundary | Use for |
@@ -54,4 +105,4 @@ In-process restrictions are not a substitute for an OS/hypervisor boundary for t
 | Untrusted assembly | .NET assembly | **OS-level only** | requires process/container/VM isolation |
 
 See [`SECURITY.md`](../../SECURITY.md) for reporting, and the full threat model under
-[`docs/Specs/`](../Specs/).
+[`docs/Specs/`](https://github.com/JKamsker/DotBoxD/tree/main/docs/Specs).

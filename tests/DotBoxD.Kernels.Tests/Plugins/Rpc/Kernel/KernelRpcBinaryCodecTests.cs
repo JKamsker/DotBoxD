@@ -121,6 +121,16 @@ public sealed class KernelRpcBinaryCodecTests
     }
 
     [Fact]
+    public void DecodeArguments_reuses_empty_array_for_empty_payload()
+    {
+        var payload = KernelRpcBinaryCodec.EncodeArguments(Array.Empty<KernelRpcValue>());
+
+        var arguments = KernelRpcBinaryCodec.DecodeArguments(payload);
+
+        Assert.Same(Array.Empty<KernelRpcValue>(), arguments);
+    }
+
+    [Fact]
     public void DecodeArguments_rejects_excessive_aggregate_item_count()
     {
         var payload = new List<byte>();
@@ -146,6 +156,60 @@ public sealed class KernelRpcBinaryCodecTests
         payload.AddRange(LengthPrefix(MaxDecodeItems + 1));
 
         var ex = Assert.Throws<FormatException>(() => KernelRpcBinaryCodec.DecodeValue(payload.ToArray()));
+
+        Assert.Contains("too many items", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncodeArguments_rejects_excessive_argument_count()
+    {
+        var arguments = new KernelRpcValue[MaxDecodeItems + 1];
+        Array.Fill(arguments, KernelRpcValue.Unit());
+
+        var ex = Assert.Throws<ArgumentException>(() => KernelRpcBinaryCodec.EncodeArguments(arguments));
+
+        Assert.Contains("too many items", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncodeValue_rejects_kernel_value_past_maximum_depth()
+    {
+        var value = NestedKernelList(MaxDecodeDepth + 1);
+
+        var ex = Assert.Throws<ArgumentException>(() => KernelRpcBinaryCodec.EncodeValue(value));
+
+        Assert.Contains("nesting depth", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncodeValue_rejects_kernel_value_with_excessive_nested_item_count()
+    {
+        var items = new KernelRpcValue[MaxDecodeItems + 1];
+        Array.Fill(items, KernelRpcValue.Unit());
+
+        var ex = Assert.Throws<ArgumentException>(() => KernelRpcBinaryCodec.EncodeValue(KernelRpcValue.List(items)));
+
+        Assert.Contains("too many items", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncodeValue_rejects_direct_sandbox_value_past_maximum_depth()
+    {
+        var value = NestedSandboxList(MaxDecodeDepth + 1);
+
+        var ex = Assert.Throws<ArgumentException>(() => KernelRpcBinaryCodec.EncodeValue(value));
+
+        Assert.Contains("nesting depth", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncodeValue_rejects_direct_sandbox_value_with_excessive_nested_item_count()
+    {
+        var items = new SandboxValue[MaxDecodeItems + 1];
+        Array.Fill(items, SandboxValue.Unit);
+        var value = SandboxValue.FromList(items, SandboxType.Unit);
+
+        var ex = Assert.Throws<ArgumentException>(() => KernelRpcBinaryCodec.EncodeValue(value));
 
         Assert.Contains("too many items", ex.Message, StringComparison.Ordinal);
     }
@@ -187,6 +251,22 @@ public sealed class KernelRpcBinaryCodecTests
         Assert.Contains("finite", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void EncodeValue_rejects_non_finite_direct_sandbox_f64(double value)
+    {
+        var sandbox = new F64Value(value);
+        var writer = new ArrayBufferWriter<byte>();
+
+        var bytesEx = Assert.Throws<ArgumentOutOfRangeException>(() => KernelRpcBinaryCodec.EncodeValue(sandbox));
+        var writerEx = Assert.Throws<ArgumentOutOfRangeException>(() => KernelRpcBinaryCodec.EncodeValue(sandbox, writer));
+
+        Assert.Contains("finite", bytesEx.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("finite", writerEx.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static byte[] NestedListPayload(int depth)
     {
         var bytes = new List<byte>((depth * 2) + 1);
@@ -198,6 +278,28 @@ public sealed class KernelRpcBinaryCodecTests
 
         bytes.Add((byte)KernelRpcValueKind.Unit);
         return bytes.ToArray();
+    }
+
+    private static KernelRpcValue NestedKernelList(int depth)
+    {
+        var value = KernelRpcValue.Unit();
+        for (var i = 0; i < depth; i++)
+        {
+            value = KernelRpcValue.List([value]);
+        }
+
+        return value;
+    }
+
+    private static SandboxValue NestedSandboxList(int depth)
+    {
+        var value = SandboxValue.Unit;
+        for (var i = 0; i < depth; i++)
+        {
+            value = SandboxValue.FromList([value], value.Type);
+        }
+
+        return value;
     }
 
     private static byte[] LengthPrefix(int value)

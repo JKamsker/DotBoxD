@@ -7,6 +7,10 @@
 [![NuGet packages](https://img.shields.io/badge/NuGet-packages-004880.svg?logo=nuget)](https://www.nuget.org/packages?q=DotBoxD)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg)](https://dotnet.microsoft.com/)
+[![Docs](https://img.shields.io/badge/docs-online-2ea44f.svg)](https://dotboxd.kamsker.at/)
+
+📖 **Documentation site:** <https://dotboxd.kamsker.at/> — guide, tutorials, examples, and the
+generated API reference.
 
 DotBoxD lets a host and its clients share **one C# contract** and use it in three different ways,
 all driven by Roslyn source generators (no runtime reflection on the hot path):
@@ -25,7 +29,7 @@ The Kernels and Pushdown stack targets `net10.0`.
 
 The snippets below use the real, compiling API. The maintained runnable example is the GameServer
 sample at [`samples/GameServer/Examples.GameServer.Server`](samples/GameServer/Examples.GameServer.Server),
-which combines service IPC, event kernels, live settings, host bindings, policies, and kernel RPC.
+which combines service IPC, event kernels, live settings, host bindings, policies, and server extensions.
 Features that used to be split across removed samples are tracked in
 [`docs/examples/coverage-gaps.md`](docs/examples/coverage-gaps.md).
 
@@ -108,7 +112,7 @@ if (result.Succeeded && result.Value is I32Value total)
 This is the payoff. The host is typically **frozen at release** and exposes only **fine-grained**
 bindings (e.g. "kill *one* monster"); it ships **no batch operations**. A client that needs to act on
 many entities would otherwise make **one remote call per entity**. With pushdown, a **plugin supplies its
-own server-side aggregate** as a sandboxed **kernel RPC service**: the analyzer lowers its C# batch method
+own server-side aggregate** as a sandboxed **server extension**: the analyzer lowers its C# batch method
 to verified IR that runs server-side, looping over the host's *existing* bindings. The server is never
 recompiled — only the plugin changes — and N round-trips collapse into **one**.
 
@@ -126,7 +130,7 @@ public interface IGameWorld
 public interface IMonsterKillerService { List<KillResult> KillMonsters(List<int> monsterIds); }
 public readonly record struct KillResult(int MonsterId, bool Success);
 
-[KernelRpcService("monster-killer")]
+[ServerExtension("monster-killer", typeof(IMonsterKillerService))]
 public sealed partial class MonsterKillerKernel
 {
     public List<KillResult> KillMonsters(List<int> monsterIds, HookContext ctx)
@@ -139,14 +143,14 @@ public sealed partial class MonsterKillerKernel
 }
 
 // Server installs the plugin's kernel; the caller invokes it in ONE round-trip:
-await server.RegisterRpcServiceAsync<IMonsterKillerService, MonsterKillerKernel>();
-List<KillResult> killed = server.RpcService<IMonsterKillerService>().KillMonsters(ids); // 1 round-trip, not N
+await server.RegisterServerExtensionAsync<IMonsterKillerService, MonsterKillerKernel>();
+List<KillResult> killed = server.ServerExtension<IMonsterKillerService>().KillMonsters(ids); // 1 round-trip, not N
 ```
 
 The batch logic is **author-supplied**, so it runs as a validated sandboxed kernel under the same trust
 model as event kernels: it can reach only the host bindings the server already exposes, gated by
 capabilities and fuel/quota limits, and it can take and return complex objects and lists of objects
-(via the IR `Record` type). The GameServer sample demonstrates kernel RPC over the plugin IPC
+(via the IR `Record` type). The GameServer sample demonstrates server extensions over the plugin IPC
 control plane; see
 [`docs/design/plugin-fluent-hooks-api/followups.md`](docs/design/plugin-fluent-hooks-api/followups.md)
 for the full design.

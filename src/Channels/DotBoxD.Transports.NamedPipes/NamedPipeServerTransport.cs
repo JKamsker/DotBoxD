@@ -79,6 +79,7 @@ public sealed class NamedPipeServerTransport : IServerTransport
     public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
+        ct.ThrowIfCancellationRequested();
         var stream = CreateStream();
         CancellationTokenSource linkedCts;
         try
@@ -158,10 +159,7 @@ public sealed class NamedPipeServerTransport : IServerTransport
         {
             return Task.CompletedTask;
         }
-        // Null and capture _stopCts under _sync (the same lock AcceptAsync reads it under) and dispose
-        // the pending stream, then cancel+dispose the captured source outside the lock. AcceptAsync
-        // that runs after this sees _stopCts == null and fails fast with "not started"; one already
-        // inside the lock captured a live linked token that the Cancel below still fires.
+        // Null and capture _stopCts under _sync, then cancel+dispose the captured source outside the lock.
         CancellationTokenSource? stopCts;
         lock (_sync)
         {
@@ -173,16 +171,11 @@ public sealed class NamedPipeServerTransport : IServerTransport
             // only when the (linked) token is already cancelled. The linked token derives from _stopCts,
             // so cancelling first closes the dispose-before-cancel window: a stopped pending accept always
             // surfaces as cancellation, never a raw disposal/socket exception.
-            // The cancellation callback only disposes the pipe stream (lock-free), so running it under
-            // _sync cannot deadlock.
             stopCts?.Cancel();
             _pendingStream?.Dispose();
             _pendingStream = null;
         }
-        // Test seam (null/no-op in production): fires OUTSIDE the lock so a blocked AcceptAsync can run
-        // its finally (which takes _sync) and complete. A test parks here until the woken accept has
-        // unwound, confirming it surfaced cancellation rather than the disposed stream. Never set in
-        // production.
+        // Test seam: fires outside _sync so a blocked AcceptAsync can run its finally and complete.
         var afterStopHook = _beforeStopCancelForTest;
         if (afterStopHook is not null)
         {
@@ -252,6 +245,10 @@ public sealed class NamedPipeServerTransport : IServerTransport
             throw new OperationCanceledException(ct);
         }
         catch (SocketException) when (ct.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(ct);
+        }
+        catch (NullReferenceException) when (ct.IsCancellationRequested)
         {
             throw new OperationCanceledException(ct);
         }
