@@ -58,6 +58,16 @@ public sealed class RpcEnvelopeValidationTests
             () => serializer.Deserialize<RpcResponse>(payload));
     }
 
+    [Fact]
+    public void RpcResponse_error_with_stream_throws()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteErrorResponseWithStream(serializer);
+
+        Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize<RpcResponse>(payload));
+    }
+
     private static byte[] WriteRequestWithDuplicateServiceName()
     {
         var writer = new ArrayBufferWriter<byte>();
@@ -121,6 +131,28 @@ public sealed class RpcEnvelopeValidationTests
         message.WriteMapHeader(1);
         message.Write("MessageId");
         message.Write(42);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
+    }
+
+    private static byte[] WriteErrorResponseWithStream(MessagePackRpcSerializer serializer)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(5);
+        message.Write("MessageId");
+        message.Write(42);
+        message.Write("IsSuccess");
+        message.Write(false);
+        message.Write("ErrorMessage");
+        message.Write("boom");
+        message.Write("ErrorType");
+        message.Write("RemoteServiceException");
+        message.Write("Stream");
+        MessagePackSerializer.Serialize(
+            ref message,
+            new RpcStreamHandle(701, RpcStreamKind.Binary),
+            serializer.Options);
         message.Flush();
         return writer.WrittenMemory.ToArray();
     }
