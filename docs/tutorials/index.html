@@ -92,8 +92,9 @@ something you can run.</p>
 <ol>
 <li><strong><a href="first-service.html">First Service (RPC)</a></strong> — define a <code>[DotBoxDService]</code> contract, host it, and
 call it from a client over a typed proxy.</li>
-<li><strong><a href="first-kernel.html">First Kernel (sandbox)</a></strong> — import validated JSON IR and execute it inside a
-fuel-metered sandbox with a hard resource budget.</li>
+<li><strong><a href="event-pipeline-runlocal.html">Event pipelines (RunLocal)</a></strong> — subscribe to a server event, push the
+<code>Where</code>/<code>Select</code> filter server-side, and react locally with <code>RunLocal</code> so only matching, projected
+data crosses the pipe.</li>
 <li><strong><a href="pushdown-server-extension.html">Pushdown server extension</a></strong> — ship a plugin-supplied, server-side
 batch operation that collapses N remote calls into one.</li>
 </ol>
