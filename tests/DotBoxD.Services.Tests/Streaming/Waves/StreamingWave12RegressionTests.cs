@@ -105,8 +105,7 @@ public sealed class StreamingWave12RegressionTests
         Assert.True(await processor.ShouldDisposeAsync(cancel, CancellationToken.None));
 
         Assert.Single(protocolErrors, error => error.Contains("Malformed stream cancel frame."));
-        var observed = await Task.WhenAny(canceled.Task, Task.Delay(TimeSpan.FromMilliseconds(250)));
-        Assert.NotSame(canceled.Task, observed);
+        Assert.False(canceled.Task.IsCompleted);
     }
 
     [Fact]
@@ -252,14 +251,10 @@ public sealed class StreamingWave12RegressionTests
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         started.TrySetResult();
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
-            yield return 1;
-        }
-        finally
-        {
-            canceled.TrySetResult();
-        }
+        using var registration = ct.Register(
+            static state => ((TaskCompletionSource)state!).TrySetResult(),
+            canceled);
+        await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+        yield break;
     }
 }
