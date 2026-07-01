@@ -78,7 +78,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
                     response.Stream = ReadNullableStream(ref reader, options);
                     break;
                 default:
-                    reader.Skip();
+                    MessagePackEnvelopeSkipper.SkipUnknownField(ref reader, "RPC response");
                     break;
             }
         }
