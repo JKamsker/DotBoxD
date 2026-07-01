@@ -303,7 +303,7 @@ dotnet test samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameSer
 Build the same pieces from scratch:
 
 - [Tutorial: your first Service](../tutorials/first-service.md)
-- [Tutorial: your first Kernel](../tutorials/first-kernel.md)
+- [Tutorial: event pipelines (RunLocal)](../tutorials/event-pipeline-runlocal.md)
 - [Tutorial: Pushdown server extension](../tutorials/pushdown-server-extension.md)
 
 Or go deeper on the concepts:

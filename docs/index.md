@@ -24,7 +24,7 @@ flowchart LR
 
 - **Getting started** — [install, first service, first kernel, pushdown quickstart](getting-started/README.md).
 - **Tutorials** — end-to-end walkthroughs: [first Service](tutorials/first-service.md),
-  [first Kernel](tutorials/first-kernel.md), [Pushdown server extension](tutorials/pushdown-server-extension.md).
+  [event pipelines (RunLocal)](tutorials/event-pipeline-runlocal.md), [Pushdown server extension](tutorials/pushdown-server-extension.md).
 - **Examples** — [an annotated tour of the GameServer sample](examples/gameserver-walkthrough.md).
 - **Concepts** — [Services](concepts/services.md), [Kernels](concepts/kernels.md),
   [Pushdown](concepts/pushdown.md), [Channels & transports](concepts/channels-transports.md), and the
