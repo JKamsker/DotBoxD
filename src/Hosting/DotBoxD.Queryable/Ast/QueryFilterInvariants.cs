@@ -54,7 +54,11 @@ internal static class QueryFilterInvariants
         switch (RequireKnownKind(filter))
         {
             case QueryFilterKind.Compare:
+                RequireFieldPath(filter, "Compare");
                 _ = CompareValue(filter);
+                break;
+            case QueryFilterKind.In:
+                RequireFieldPath(filter, "In");
                 break;
             case QueryFilterKind.Not:
                 RequireNotChild(filter);
@@ -73,6 +77,53 @@ internal static class QueryFilterInvariants
         {
             throw new InvalidOperationException("QueryFilter Not nodes require exactly one child.");
         }
+    }
+
+    private static void RequireFieldPath(QueryFilter filter, string kind)
+    {
+        if (IsValidFieldPath(filter.Field))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"QueryFilter {kind} nodes require a non-empty Field path with identifier segments.");
+    }
+
+    private static bool IsValidFieldPath(string field)
+    {
+        if (string.IsNullOrEmpty(field))
+        {
+            return false;
+        }
+
+        foreach (var segment in field.Split('.'))
+        {
+            if (!IsIdentifierSegment(segment))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIdentifierSegment(string segment)
+    {
+        if (segment.Length == 0 || !(char.IsLetter(segment[0]) || segment[0] == '_'))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < segment.Length; i++)
+        {
+            if (!char.IsLetterOrDigit(segment[i]) && segment[i] != '_')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static InvalidOperationException MissingCompareValue()
