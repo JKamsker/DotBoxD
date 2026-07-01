@@ -156,9 +156,41 @@ Here `context` is the plugin's `GamePluginContext` — the type you pinned with 
 
 This delegate still runs in the plugin process — the `context` is your client-side context, distinct from the host-service selector used inside `Where`/`Select` on the server. It is the seam for local side effects: emitting messages, reading the cancellation token, or calling into your own plugin services.
 
-## Step 6 — Contrast: `.Run` (server-side terminal), `.RegisterLocal` (result hooks), `.Use<TKernel>`
+## Step 6 — Choosing a terminal
 
-`RunLocal` is one of several terminals on the same fluent shape. Pick by *where you want the terminal to execute* and *whether you need a value back*.
+`RunLocal` is one of several **terminals** — the last call in the chain, which says what to *do* when an
+event matches. The others are `Run`, `RegisterLocal`, `Register`, and `Use<TKernel>`. They all sit on the
+same `.On<T>().Where(...).Select(...)` shape, so you pick one by answering just two questions:
+
+1. **Where should your reaction run** — in *your plugin* as native C#, or *server-side* as sandboxed IR?
+2. **Does it need to return a decision** the server acts on, or is it fire-and-forget?
+
+Those two axes give a 2×2 (plus `Use<TKernel>` for a reaction you authored as a separate kernel):
+
+| | Reaction runs **in your plugin** (native C#) | Reaction runs **server-side** (sandboxed IR) |
+|---|---|---|
+| **Fire-and-forget** (react, return nothing) | **`RunLocal`** | **`Run`** |
+| **Return a decision** (`IHookResult`) | **`RegisterLocal`** | **`Register`** |
+
+The same five terminals as a lookup:
+
+| Terminal | Your handler runs… | What crosses the pipe | Returns a value? | Valid on |
+|---|---|---|---|---|
+| `RunLocal` | in your plugin (native C#) | the projected value only, one-way push | no | Hooks + Subscriptions |
+| `Run` | server-side (lowered to IR) | nothing — runs on the host | no | Hooks + Subscriptions |
+| `RegisterLocal` | in your plugin (native C#) | projected value out, `IHookResult` back (round-trip) | yes | Hooks only |
+| `Register` | server-side (lowered to IR) | nothing — decided on the host | yes | Hooks only |
+| `Use<TKernel>` | server-side, as an installed kernel | nothing | as the kernel defines | Hooks + Subscriptions |
+
+> **Two rules fall out of that table.** *Result terminals* (`Register`, `RegisterLocal`) exist only on
+> **`server.Hooks`** — the awaited decision points — because only a decision consumes a return value;
+> **`server.Subscriptions`** are fire-and-forget, so they take just `RunLocal` / `Run` / `Use`. And `Run`,
+> `Register`, and `RegisterLocal` are **lowered by the analyzer at build time**, so you author them in a
+> plugin project that references the DotBoxD analyzer (a raw, un-lowered call throws `DBXK062`). With
+> `RunLocal`, only the `Where` / `Select` lower — your terminal delegate stays native plugin code.
+
+The rest of this step shows each server-side and result terminal against the `RunLocal` baseline from
+Steps 1–5.
 
 **`.Run((x, ctx) => ...)` — the terminal stays on the server.** Swap `RunLocal` for `Run` and the filter, the projection, *and* the terminal all lower to verified IR and run fully server-side. There is no plugin-process delegate at all; the send happens on the host ([`Program.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs)):
 
@@ -183,6 +215,14 @@ server.Hooks.On<RemoteDamageDecisionEvent>()
 ```
 
 The event and its result are declared together ([`RemoteDamageDecisionEvent.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/RemoteDamageDecisionEvent.cs)); the result type is a `readonly partial record struct ... : IHookResult` (all `RegisterLocal` overloads constrain `TResult : struct, IHookResult`). The premise test proves the filter is still server-side: a `Damage == 5` event misses (the result path fires zero times), while `Damage == 12` hits and returns `Success` with the plugin-computed values back over the pipe.
+
+**`.Register(...)` — return a decision, but decide on the server.** `Register` is the server-side
+counterpart to `RegisterLocal`: the filter, the projection, *and* the `IHookResult` computation all lower
+into the sandbox and run on the host, so no event is pushed to the plugin and no value travels back over the
+pipe. Reach for it when the decision is pure host-data logic; choose `RegisterLocal` when computing the
+decision needs your plugin's own types or services. The shape is otherwise identical — an `int priority` and
+a `readonly record struct … : IHookResult` result — and, like every result terminal, it lives only on
+`server.Hooks`.
 
 **`.Use<TKernel>()` — record a generated kernel at setup time.** Instead of an inline lambda, `Use` resolves a generated kernel package and wires it as a decision hook. It is authored inside `Setup(...)` (Step 1) so `StartAsync()` can ship and install the kernel ([`Program.cs`](https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs)):
 
