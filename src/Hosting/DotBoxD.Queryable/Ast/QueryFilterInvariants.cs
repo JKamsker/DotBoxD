@@ -49,6 +49,32 @@ internal static class QueryFilterInvariants
         }
     }
 
+    public static void RequireValidShape(QueryFilter filter)
+    {
+        switch (RequireKnownKind(filter))
+        {
+            case QueryFilterKind.Compare:
+                _ = CompareValue(filter);
+                break;
+            case QueryFilterKind.Not:
+                RequireNotChild(filter);
+                break;
+        }
+
+        foreach (var child in filter.Children)
+        {
+            RequireValidShape(child);
+        }
+    }
+
+    private static void RequireNotChild(QueryFilter filter)
+    {
+        if (filter.Children.Count != 1)
+        {
+            throw new InvalidOperationException("QueryFilter Not nodes require exactly one child.");
+        }
+    }
+
     private static InvalidOperationException MissingCompareValue()
         => new("QueryFilter Compare nodes require Value.");
 

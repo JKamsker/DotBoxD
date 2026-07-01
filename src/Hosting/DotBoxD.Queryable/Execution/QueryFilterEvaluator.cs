@@ -16,6 +16,7 @@ public static class QueryFilterEvaluator
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(reader);
+        QueryFilterInvariants.RequireValidShape(filter);
         var budget = QueryEvaluationLimits.MaxNodes;
         return EvaluateNode(filter, target, reader, depth: 0, ref budget);
     }
@@ -24,6 +25,7 @@ public static class QueryFilterEvaluator
     public static void EnsureWithinLimits(QueryFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        QueryFilterInvariants.RequireValidShape(filter);
         var budget = QueryEvaluationLimits.MaxNodes;
         Measure(filter, depth: 0, ref budget);
     }

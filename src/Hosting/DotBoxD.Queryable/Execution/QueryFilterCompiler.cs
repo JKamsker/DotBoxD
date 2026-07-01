@@ -27,6 +27,7 @@ public static class QueryFilterCompiler
     {
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(reader);
+        QueryFilterInvariants.RequireValidShape(filter);
         var parameter = Expression.Parameter(typeof(object), "e");
         var body = Build(filter, parameter, Expression.Constant(reader));
         return Expression.Lambda<Func<object, bool>>(body, parameter).Compile();
