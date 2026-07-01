@@ -31,11 +31,13 @@ internal static partial class PluginPreparedPackageValidator
         ValidateAsyncCapability(package, plan, diagnostics);
         PluginManifestCapabilityValidator.Validate(
             package.Manifest,
+            package.Module,
             plan,
             [package.Entrypoints.ShouldHandle, package.Entrypoints.Handle],
             diagnostics);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
+            package.Module,
             installPolicy,
             diagnostics);
         var contractEvent = ValidateContract(package, diagnostics);
