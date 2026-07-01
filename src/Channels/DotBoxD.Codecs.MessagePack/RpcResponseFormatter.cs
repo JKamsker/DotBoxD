@@ -24,6 +24,7 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         RpcResponse value,
         MessagePackSerializerOptions options)
     {
+        ValidateEnvelope(value);
         writer.WriteMapHeader(5);
         writer.WriteString(MessageIdKey);
         writer.Write(value.MessageId);
@@ -105,6 +106,12 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
         {
             throw new MessagePackSerializationException(
                 "Successful RPC response must not contain error fields.");
+        }
+
+        if (!response.IsSuccess && response.Stream is not null)
+        {
+            throw new MessagePackSerializationException(
+                "Error RPC response must not contain a stream handle.");
         }
     }
 

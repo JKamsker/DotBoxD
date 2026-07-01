@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Client;
@@ -5,6 +7,7 @@ using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Streaming.Core;
+using MessagePack;
 using Xunit;
 
 namespace DotBoxD.Services.Tests.Streaming.Waves;
@@ -153,28 +156,46 @@ public sealed class StreamingWave11RegressionTests
         RpcStreamHandle handle,
         MalformedStreamErrorKind kind)
     {
-        var response = new RpcResponse
-        {
-            MessageId = kind == MalformedStreamErrorKind.MismatchedMessageId
-                ? handle.StreamId + 1
-                : handle.StreamId,
-            IsSuccess = kind == MalformedStreamErrorKind.SuccessResponse,
-            ErrorMessage = "remote failed",
-            ErrorType = "Remote",
-            Stream = kind == MalformedStreamErrorKind.StreamResponse
-                ? new RpcStreamHandle(handle.StreamId + 10_000, RpcStreamKind.Binary)
-                : null,
-        };
+        var messageId = kind == MalformedStreamErrorKind.MismatchedMessageId
+            ? handle.StreamId + 1
+            : handle.StreamId;
+        var stream = kind == MalformedStreamErrorKind.StreamResponse
+            ? new RpcStreamHandle(handle.StreamId + 10_000, RpcStreamKind.Binary)
+            : (RpcStreamHandle?)null;
         var payload = kind == MalformedStreamErrorKind.TrailingPayload
             ? new byte[] { 1 }
             : ReadOnlySpan<byte>.Empty;
+        var envelopeWriter = new ArrayBufferWriter<byte>();
+        var envelope = new MessagePackWriter(envelopeWriter);
+        envelope.WriteMapHeader(5);
+        envelope.Write("MessageId");
+        envelope.Write(messageId);
+        envelope.Write("IsSuccess");
+        envelope.Write(kind == MalformedStreamErrorKind.SuccessResponse);
+        envelope.Write("ErrorMessage");
+        envelope.Write("remote failed");
+        envelope.Write("ErrorType");
+        envelope.Write("Remote");
+        envelope.Write("Stream");
+        if (stream is { } handleValue)
+        {
+            MessagePackSerializer.Serialize(ref envelope, handleValue, serializer.Options);
+        }
+        else
+        {
+            envelope.WriteNil();
+        }
 
-        return MessageFramer.FrameMessage(
-            serializer,
-            handle.StreamId,
-            MessageType.StreamError,
-            response,
-            payload);
+        envelope.Flush();
+
+        var body = new byte[MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount + payload.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(
+            body.AsSpan(0, MessageFramer.EnvelopeLengthSize),
+            envelopeWriter.WrittenCount);
+        envelopeWriter.WrittenSpan.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize));
+        payload.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount));
+
+        return MessageFramer.FrameToPayload(handle.StreamId, MessageType.StreamError, body);
     }
 
     private static RpcStreamManager CreateStreamManager(MessagePackRpcSerializer serializer) =>

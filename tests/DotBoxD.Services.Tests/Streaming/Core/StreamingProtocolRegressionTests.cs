@@ -1,4 +1,7 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Client;
 using DotBoxD.Services.Exceptions;
 using DotBoxD.Services.Peer;
@@ -6,6 +9,7 @@ using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Streaming.Frames;
 using DotBoxD.Services.Streaming.Remote;
+using MessagePack;
 using Xunit;
 using static DotBoxD.Services.Tests.Streaming.Core.StreamingProtocolRegressionTestSupport;
 
@@ -158,7 +162,7 @@ public sealed class StreamingProtocolRegressionTests
             SendAndCompleteErrorAsync,
             streams);
 
-        await Assert.ThrowsAsync<RemoteServiceException>(() =>
+        await Assert.ThrowsAsync<ServiceProtocolException>(() =>
             invoker.InvokeAsync<int>("Svc", "Bad", CancellationToken.None));
 
         Assert.Equal(0, streams.InboundReceiverCount);
@@ -171,19 +175,7 @@ public sealed class StreamingProtocolRegressionTests
                 return Task.CompletedTask;
             }
 
-            var response = MessageFramer.FrameMessage(
-                serializer,
-                messageId,
-                MessageType.Error,
-                new RpcResponse
-                {
-                    MessageId = messageId,
-                    IsSuccess = false,
-                    ErrorMessage = "failed",
-                    ErrorType = "Remote",
-                    Stream = new RpcStreamHandle(604, RpcStreamKind.Binary),
-                },
-                ReadOnlySpan<byte>.Empty);
+            var response = FrameErrorResponseWithStream(serializer, messageId);
             if (!invoker!.TryCompleteResponse(messageId, response))
             {
                 response.Dispose();
@@ -243,4 +235,31 @@ public sealed class StreamingProtocolRegressionTests
         streams.RemoveOutbound(existing.StreamId);
     }
 
+    private static Payload FrameErrorResponseWithStream(MessagePackRpcSerializer serializer, int messageId)
+    {
+        var envelopeWriter = new ArrayBufferWriter<byte>();
+        var envelope = new MessagePackWriter(envelopeWriter);
+        envelope.WriteMapHeader(5);
+        envelope.Write("MessageId");
+        envelope.Write(messageId);
+        envelope.Write("IsSuccess");
+        envelope.Write(false);
+        envelope.Write("ErrorMessage");
+        envelope.Write("failed");
+        envelope.Write("ErrorType");
+        envelope.Write("Remote");
+        envelope.Write("Stream");
+        MessagePackSerializer.Serialize(
+            ref envelope,
+            new RpcStreamHandle(604, RpcStreamKind.Binary),
+            serializer.Options);
+        envelope.Flush();
+
+        var body = new byte[MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount];
+        BinaryPrimitives.WriteInt32LittleEndian(
+            body.AsSpan(0, MessageFramer.EnvelopeLengthSize),
+            envelopeWriter.WrittenCount);
+        envelopeWriter.WrittenSpan.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize));
+        return MessageFramer.FrameToPayload(messageId, MessageType.Error, body);
+    }
 }
