@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace DotBoxD.Plugins.Indexing | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace DotBoxD.Plugins.Indexing | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Plugins.Indexing">
+
+  <h1 id="DotBoxD_Plugins_Indexing" data-uid="DotBoxD.Plugins.Indexing" class="text-break">Namespace DotBoxD.Plugins.Indexing</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexKeyAttribute.html">EventIndexKeyAttribute</a></dt>
+      <dd><p>Marks an event property the host keeps a dispatch index for. DotBoxD owns predicate lowering and
+exposes index metadata on the plugin manifest (<a class="xref" href="DotBoxD.Plugins.HookSubscriptionManifest.html#DotBoxD_Plugins_HookSubscriptionManifest_IndexedPredicates">IndexedPredicates</a>);
+this attribute is how a host declares which of those property paths it can actually serve from an
+equality/range bucket. <a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexMatcher-1.html">EventIndexMatcher&lt;TEvent&gt;</a> reads it (once, with a compiled getter)
+and ignores manifest predicates whose path is not an index key, leaving them to the verified IR.</p>
+<p>
+Promoted to the framework as the first-class declaration surface (issue #50) so any host can opt into
+index-based prefiltering without reimplementing the matcher. It stays purely declarative: a property
+the host does not mark is simply never served from the index.
+</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexMatcher-1.html">EventIndexMatcher&lt;TEvent&gt;</a></dt>
+      <dd><p>A host's compiled view of a subscription's <a class="xref" href="DotBoxD.Plugins.IndexedPredicate.html">IndexedPredicate</a> metadata — the
+&quot;compile the metadata into whatever dispatch/index structure is natural for the runtime&quot; half of
+issue #47, promoted to the framework by issue #50. It keeps only the predicates whose
+<a class="xref" href="DotBoxD.Plugins.IndexedPredicate.html#DotBoxD_Plugins_IndexedPredicate_Path">Path</a> is an <a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexKeyAttribute.html">EventIndexKeyAttribute</a> property of
+<code class="typeparamref">TEvent</code> (the fields the host indexes) and evaluates them cheaply against an event
+through <b>precompiled property getters</b> — no per-event reflection, so the index never costs more
+than it saves.</p>
+<p>
+Because every kept predicate is a <i>necessary</i> AND condition of the real predicate,
+<a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexMatcher-1.html#DotBoxD_Plugins_Indexing_EventIndexMatcher_1_CouldMatch__0_">CouldMatch(TEvent)</a> returning <code>false</code> is always a safe reject; returning <code>true</code> means
+the event passed the cheap index and the host should still run the verified IR unless the manifest
+reported full coverage. Conversely, the matcher never rejects on a comparison it cannot soundly decide
+(a value whose type cannot be reconciled to the property, a null reference, or an ordering it cannot
+evaluate): such a leaf is dropped or passed through so the verified IR stays the authority. This keeps
+the invariant "index-reject ⇒ verified-IR-reject" intact even for hand-built or imported manifests
+whose <a class="xref" href="DotBoxD.Plugins.IndexedPredicate.html#DotBoxD_Plugins_IndexedPredicate_ValueType">ValueType</a> disagrees with the property's CLR type.
+</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexRegistry.html">EventIndexRegistry</a></dt>
+      <dd><p>A first-class, reusable host dispatch index (issue #50). A host registers a subscription kernel together
+with its generated <a class="xref" href="DotBoxD.Plugins.IndexedPredicate.html">IndexedPredicate</a>s; the registry recomputes them from verified IR and
+compiles them into an
+<a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexMatcher-1.html">EventIndexMatcher&lt;TEvent&gt;</a> (precompiled getters, no per-event reflection) and, when the host
+publishes an event, runs the cheap index check <i>before</i> entering the sandbox. Events the index
+rejects never reach the verified IR; survivors are dispatched to <a class="xref" href="DotBoxD.Plugins.Kernel.InstalledKernel.html">InstalledKernel</a> as the
+correctness authority — the verified <code>ShouldHandle</code> still runs after a matching index check because
+package-supplied coverage metadata is not trusted across the manifest boundary.</p>
+<p>
+This is the "register a subscription and get index-based prefiltering without writing your own matcher"
+surface. Subscriptions whose predicates touch no indexed field are rejected by <a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexRegistry.html#DotBoxD_Plugins_Indexing_EventIndexRegistry_Register__1_DotBoxD_Abstractions_IPluginEventAdapter___0__DotBoxD_Plugins_Kernel_InstalledKernel_System_Collections_Generic_IReadOnlyList_DotBoxD_Plugins_IndexedPredicate__System_Boolean_">Register&lt;TEvent&gt;(IPluginEventAdapter&lt;TEvent&gt;, InstalledKernel, IReadOnlyList&lt;IndexedPredicate&gt;, bool)</a>
+(returns <code>false</code>) so the host can leave them on its broad pipeline.
+</p>
+</dd>
+    </dl>
+    <h3 id="structs">
+Structs
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexStats.html">EventIndexStats</a></dt>
+      <dd><p>Prefilter diagnostics for an <a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexRegistry.html">EventIndexRegistry</a>: how many indexed checks ran
+(<a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexStats.html#DotBoxD_Plugins_Indexing_EventIndexStats_Considered">Considered</a>), how many events the index rejected before any sandbox entry
+(<a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexStats.html#DotBoxD_Plugins_Indexing_EventIndexStats_Prefiltered">Prefiltered</a>), and how many survived to the verified IR (<a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexStats.html#DotBoxD_Plugins_Indexing_EventIndexStats_Dispatched">Dispatched</a>).
+<code>Considered == Prefiltered + Dispatched</code> holds once publishing is quiescent; a snapshot taken
+while <a class="xref" href="DotBoxD.Plugins.Indexing.EventIndexRegistry.html#DotBoxD_Plugins_Indexing_EventIndexRegistry_Publish__1___0_System_Threading_CancellationToken_">Publish&lt;TEvent&gt;(TEvent, CancellationToken)</a> is running concurrently may observe an in-flight
+increment between the three reads.</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

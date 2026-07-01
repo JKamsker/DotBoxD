@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Tutorial: your first Kernel (sandbox) | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Tutorial: your first Kernel (sandbox) | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/tutorials/first-kernel.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tutorial-your-first-kernel-sandbox">Tutorial: your first Kernel (sandbox)</h1>
+
+<p>This tutorial walks you through running a <strong>kernel</strong> end to end: importing restricted JSON IR,
+validating it against a hard resource policy, and executing it inside a fuel-metered sandbox. By the
+end you will have a small program that computes a value from untrusted logic and reports exactly how
+much fuel that logic burned — with a guarantee that a buggy or hostile kernel cannot run away with
+host resources.</p>
+<p>Every code and JSON snippet below is taken from, or verified against, the real DotBoxD source. Inline
+citations point at the exact files.</p>
+<h2 id="what-a-kernel-is-and-is-not">What a kernel is (and is not)</h2>
+<p>A <strong>kernel</strong> is a unit of logic a client hands to the host as <strong>restricted JSON IR</strong> — never C#, never
+IL, never CLR member names, assemblies, reflection, or arbitrary host calls. The host imports that IR,
+validates it against a capability/resource policy, and only then executes it inside a metered sandbox.</p>
+<blockquote>
+<p>A kernel is restricted JSON IR (never C#, IL, or arbitrary host calls). The host imports it,
+validates it against a capability/resource policy, and executes it inside a fuel-metered sandbox.
+— <code>README.md</code>, section &quot;2. Kernels&quot;</p>
+</blockquote>
+<p>This is the library's real trust boundary. From <code>README.md</code> (&quot;Security: what is and isn't a boundary&quot;):</p>
+<ul>
+<li><strong>Safe mode is the real boundary.</strong> A kernel is validated, capability-gated, fuel/quota-metered,
+and (for compiled mode) verified before it runs. Users never supply C#, raw IL, CLR member names,
+assemblies, or arbitrary host calls.</li>
+<li>Trusted-plugin mode (normal .NET assemblies via <code>AssemblyLoadContext</code>) is <strong>not</strong> a security
+boundary. Hard multi-tenant isolation of untrusted arbitrary .NET requires an out-of-process / OS
+boundary.</li>
+</ul>
+<p>The IR the sandbox actually accepts is a small, closed language: a module with functions, whose bodies
+are statements (<code>set</code>, <code>return</code>, <code>if</code>, <code>while</code>) over expressions (<code>var</code>, arithmetic ops like <code>add</code> /
+<code>mul</code>, and typed literals like <code>{ &quot;i32&quot;: 10 }</code>). Anything outside that closed set — for example a
+<code>System.IO.File.ReadAllText</code> call or a CLR-shaped type name — is rejected at import/prepare time, not
+at run time (see <a href="#safety-guarantees-at-a-glance">Safety guarantees</a> below).</p>
+<h2 id="what-you-will-build">What you will build</h2>
+<p>A host that runs a &quot;loot score&quot; kernel. The kernel takes two <code>I32</code> inputs — <code>level</code> and <code>rarity</code> —
+and returns <code>level * 10 + rarity * 25</code>. This is the real <code>loot-score</code> kernel used by the test suite
+(<code>tests/DotBoxD.Kernels.Tests/_TestSupport/SandboxTestHost.cs</code>), and the interpreter test asserts that
+inputs <code>(3, 2)</code> produce <code>80</code>
+(<code>tests/DotBoxD.Kernels.Tests/Interpreter/InterpreterAndPolicyTests.cs</code>).</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>The kernel stack targets <code>net10.0</code>. Install the pieces you need, or the <code>DotBoxD</code> meta-package for the
+whole stack (<code>README.md</code>, &quot;Installing from NuGet&quot;):</p>
+<pre><code class="lang-bash"># Everything (Services + Kernels + Pushdown):
+dotnet add package DotBoxD --prerelease
+
+# ...or just the kernel host, an execution backend, safe bindings, and the JSON importer:
+dotnet add package DotBoxD.Hosting --prerelease
+dotnet add package DotBoxD.Kernels.Interpreter --prerelease
+dotnet add package DotBoxD.Kernels.Runtime --prerelease
+dotnet add package DotBoxD.Kernels.Serialization.Json --prerelease
+</code></pre>
+<ul>
+<li><code>DotBoxD.Hosting</code> gives you <code>SandboxHost</code> (import, prepare, execute).</li>
+<li><code>DotBoxD.Kernels.Interpreter</code> is the direct IR execution backend (<code>UseInterpreter</code>).</li>
+<li><code>DotBoxD.Kernels.Runtime</code> supplies the safe host bindings, including <code>AddDefaultPureBindings</code>.</li>
+<li><code>DotBoxD.Kernels.Serialization.Json</code> provides the <code>ImportJsonAsync</code> / <code>JsonExporter</code> round-trip.</li>
+</ul>
+<h2 id="step-1--create-a-sandbox-host">Step 1 — Create a sandbox host</h2>
+<p><code>SandboxHost.Create</code> takes a builder callback. For a purely computational kernel you only need the
+default <strong>pure</strong> bindings (math, strings — nothing that touches the filesystem, clock, or network) and
+an execution backend. <code>UseInterpreter</code> selects the interpreter backend.</p>
+<pre><code class="lang-csharp">using DotBoxD.Hosting.Execution;   // SandboxHost, SandboxHostBuilder
+using DotBoxD.Kernels;             // ExecutionPlan, ExecutionMode, SandboxExecutionOptions
+using DotBoxD.Kernels.Policies;    // SandboxPolicyBuilder
+using DotBoxD.Kernels.Sandbox;     // SandboxValue, SandboxType, I32Value, SandboxErrorCode
+
+// A sandbox host with only the safe, pure bindings enabled.
+var host = SandboxHost.Create(builder =&gt;
+{
+    builder.AddDefaultPureBindings();
+    builder.UseInterpreter();
+});
+</code></pre>
+<p><code>SandboxHost.Create</code> and the <code>AddDefaultPureBindings</code> / <code>UseInterpreter</code> builder methods are the exact
+shapes used in <code>README.md</code> (section 2) and in
+<code>src/Hosting/DotBoxD.Hosting/Execution/Host/SandboxHostBuilder.cs</code>. <code>SandboxHost</code> lives in the
+<code>DotBoxD.Hosting.Execution</code> namespace (see <code>samples/GameServer/Examples.GameServer.Server/Simulation/GameWorldHost.cs</code>,
+which opens <code>using DotBoxD.Hosting.Execution;</code>).</p>
+<p><code>SandboxHost</code> is <code>IDisposable</code>, so in a real app wrap it in <code>using</code> or dispose it when you are done.</p>
+<h2 id="step-2--build-a-policy-the-hard-budget">Step 2 — Build a policy (the hard budget)</h2>
+<p>A <code>SandboxPolicy</code> is a <strong>hard budget</strong>: fuel, loop iterations, list length, and capability grants. The
+builder in <code>src/Kernels/DotBoxD.Kernels/Policies/SandboxPolicyBuilder.cs</code> exposes fluent <code>With*</code>
+methods; each returns a new limit on the underlying <code>ResourceLimits</code>.</p>
+<pre><code class="lang-csharp">// A policy is a hard budget: fuel, loop iterations, list length, capability grants.
+var policy = SandboxPolicyBuilder.Create()
+    .WithFuel(1_000_000)
+    .WithMaxLoopIterations(10_000)
+    .WithMaxListLength(10_000)
+    .Build();
+</code></pre>
+<ul>
+<li><code>WithFuel(long)</code> caps total execution &quot;fuel&quot;; when it runs out, execution stops with a quota error.</li>
+<li><code>WithMaxLoopIterations(long)</code> bounds <code>while</code>/loop iteration counts.</li>
+<li><code>WithMaxListLength(int)</code> bounds the size of any list value the kernel builds or receives.</li>
+</ul>
+<p>This is the verbatim policy shape from <code>README.md</code> section 2. The builder also offers grants such as
+<code>GrantFileRead</code>, <code>GrantTimeNow</code>, and <code>GrantRandom</code> for kernels that need side effects — our pure loot
+kernel needs none, so we grant nothing.</p>
+<h2 id="step-3--provide-the-kernel-json-ir">Step 3 — Provide the kernel JSON IR</h2>
+<p>Below is a real, complete kernel module — the <code>loot-score</code> kernel from
+<code>tests/DotBoxD.Kernels.Tests/_TestSupport/SandboxTestHost.cs</code>. It declares one entrypoint function
+<code>main</code> with two <code>I32</code> parameters and a body of three statements.</p>
+<pre><code class="lang-json">{
+  &quot;id&quot;: &quot;loot-score&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;targetSandboxVersion&quot;: &quot;1.0.0&quot;,
+  &quot;capabilityRequests&quot;: [],
+  &quot;functions&quot;: [
+    {
+      &quot;id&quot;: &quot;main&quot;,
+      &quot;visibility&quot;: &quot;entrypoint&quot;,
+      &quot;parameters&quot;: [
+        { &quot;name&quot;: &quot;level&quot;, &quot;type&quot;: &quot;I32&quot; },
+        { &quot;name&quot;: &quot;rarity&quot;, &quot;type&quot;: &quot;I32&quot; }
+      ],
+      &quot;returnType&quot;: &quot;I32&quot;,
+      &quot;body&quot;: [
+        {
+          &quot;op&quot;: &quot;set&quot;,
+          &quot;name&quot;: &quot;base&quot;,
+          &quot;value&quot;: { &quot;op&quot;: &quot;mul&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;level&quot; }, &quot;right&quot;: { &quot;i32&quot;: 10 } }
+        },
+        {
+          &quot;op&quot;: &quot;set&quot;,
+          &quot;name&quot;: &quot;bonus&quot;,
+          &quot;value&quot;: { &quot;op&quot;: &quot;mul&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;rarity&quot; }, &quot;right&quot;: { &quot;i32&quot;: 25 } }
+        },
+        {
+          &quot;op&quot;: &quot;return&quot;,
+          &quot;value&quot;: { &quot;op&quot;: &quot;add&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;base&quot; }, &quot;right&quot;: { &quot;var&quot;: &quot;bonus&quot; } }
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+<p>Reading the shape:</p>
+<ul>
+<li>The <strong>module</strong> has an <code>id</code>, a <code>version</code>, an optional <code>targetSandboxVersion</code>, a <code>capabilityRequests</code>
+list (empty here — a pure kernel needs no capabilities), and a <code>functions</code> array.</li>
+<li>A <strong>function</strong> with <code>&quot;visibility&quot;: &quot;entrypoint&quot;</code> can be invoked by name (here <code>&quot;main&quot;</code>). Its
+<code>parameters</code> are typed and positional; <code>returnType</code> is the value type it yields.</li>
+<li>The <strong>body</strong> is a list of statements. <code>set</code> binds a local (<code>base</code>, <code>bonus</code>); <code>return</code> yields an
+expression. Expressions are either a literal (<code>{ &quot;i32&quot;: 10 }</code>), a variable read (<code>{ &quot;var&quot;: &quot;level&quot; }</code>),
+or a binary op (<code>{ &quot;op&quot;: &quot;mul&quot;, &quot;left&quot;: ..., &quot;right&quot;: ... }</code>).</li>
+</ul>
+<p>The <code>op</code>/<code>left</code>/<code>right</code>/<code>var</code>/<code>i32</code> grammar here is exactly what the importer accepts; anything else
+(for example <code>{ &quot;op&quot;: &quot;pow&quot;, ... }</code> or a CLR type name) is rejected — see
+<code>tests/DotBoxD.Kernels.Tests/Serialization/JsonImporterTests.cs</code>.</p>
+<blockquote>
+<p><strong>How does a client obtain such JSON?</strong> You rarely hand-write it. The typical producer builds a
+<code>SandboxModule</code> (or lowers a C# method to IR via the analyzer) and serializes it with
+<code>JsonExporter.Export(module, indented: true)</code> from <code>DotBoxD.Kernels.Serialization.Json</code>
+(<code>src/Kernels/DotBoxD.Kernels.Serialization.Json/JsonExporter.cs</code>), which returns the JSON string
+shown above. Import and export are a round trip: <code>JsonImporter</code> reads it back into a <code>SandboxModule</code>.</p>
+</blockquote>
+<p>In C#, keep the JSON in a string (or read it from a file):</p>
+<pre><code class="lang-csharp">const string kernelJson = /* the JSON module above */;
+</code></pre>
+<h2 id="step-4--import-prepare-execute">Step 4 — Import, prepare, execute</h2>
+<p>Three calls take you from JSON to a result:</p>
+<ol>
+<li><code>ImportJsonAsync</code> parses the JSON into a <code>SandboxModule</code>. This method is an extension in
+<code>DotBoxD.Kernels.Serialization.Json.Hosting</code>
+(<code>src/Kernels/DotBoxD.Kernels.Serialization.Json/Hosting/SandboxHostJsonExtensions.cs</code>).</li>
+<li><code>PrepareAsync</code> <strong>validates</strong> the module against the policy and bindings, then builds a sealed
+<code>ExecutionPlan</code>. If validation fails it throws <code>SandboxValidationException</code>
+(<code>src/Hosting/DotBoxD.Hosting/Execution/Host/SandboxHost.cs</code>).</li>
+<li><code>ExecuteAsync</code> runs a named entrypoint with an input value and returns a <code>SandboxExecutionResult</code>.</li>
+</ol>
+<p>The entrypoint's parameters are supplied <strong>positionally</strong> as the elements of the input list: the loot
+kernel's <code>[level, rarity]</code> come from a two-element list <code>[3, 2]</code>, so <code>level = 3</code> and <code>rarity = 2</code>.
+This is the exact call the interpreter test makes
+(<code>tests/DotBoxD.Kernels.Tests/Interpreter/InterpreterAndPolicyTests.cs</code>).</p>
+<pre><code class="lang-csharp">using DotBoxD.Kernels.Serialization.Json.Hosting; // ImportJsonAsync
+
+var module = await host.ImportJsonAsync(kernelJson);
+var plan = await host.PrepareAsync(module, policy);
+
+// The entrypoint takes two I32 parameters; supply them positionally as a list.
+var input = SandboxValue.FromList(
+[
+    SandboxValue.FromInt32(3),  // level
+    SandboxValue.FromInt32(2),  // rarity
+]);
+
+var result = await host.ExecuteAsync(
+    plan,
+    &quot;main&quot;,
+    input,
+    new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+</code></pre>
+<p><code>SandboxValue.FromInt32</code> and <code>SandboxValue.FromList</code> are the real factories from
+<code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxValue.cs</code>. When you need an explicit item type — for
+example a list whose element type must be pinned even when empty — use the two-argument overload from
+<code>README.md</code> section 2:</p>
+<pre><code class="lang-csharp">// Same factory, with an explicit element type (README section 2).
+var typedInput = SandboxValue.FromList(
+    [.. new[] { 3, 2 }.Select(SandboxValue.FromInt32)],
+    SandboxType.I32);
+</code></pre>
+<p><code>SandboxType.I32</code> is a built-in scalar type from <code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxType.cs</code>.</p>
+<blockquote>
+<p>Passing execution options is optional: <code>host.ExecuteAsync(plan, &quot;main&quot;, input)</code> also compiles and
+uses the host's default options (<code>README.md</code> section 2). We pass <code>ExecutionMode.Interpreted</code>
+explicitly here to match the host we built.</p>
+</blockquote>
+<h2 id="step-5--read-the-result">Step 5 — Read the result</h2>
+<p><code>SandboxExecutionResult</code> (<code>src/Kernels/DotBoxD.Kernels/ExecutionPlan.cs</code>) carries success, the return
+value, any error, and a full <code>ResourceUsage</code> snapshot. Pattern-match the value to its concrete type:</p>
+<pre><code class="lang-csharp">if (result.Succeeded &amp;&amp; result.Value is I32Value total)
+{
+    // A buggy or hostile kernel cannot run away with host resources:
+    Console.WriteLine($&quot;total={total.Value}, fuel burned={result.ResourceUsage.FuelUsed}&quot;);
+    // For input (level: 3, rarity: 2): total = 3*10 + 2*25 = 80.
+}
+else
+{
+    Console.WriteLine($&quot;failed: {result.Error?.Code} — {result.Error?.SafeMessage}&quot;);
+}
+</code></pre>
+<ul>
+<li><code>result.Succeeded</code> — did the run complete without a policy/quota/validation failure?</li>
+<li><code>result.Value</code> — the returned <code>SandboxValue</code>; here it is an <code>I32Value</code>, whose <code>.Value</code> is the <code>int</code>
+(<code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxValue.cs</code>).</li>
+<li><code>result.ResourceUsage.FuelUsed</code> — the fuel this run actually consumed
+(<code>SandboxResourceUsage</code>, <code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxResourceUsage.cs</code>). The same
+record also exposes <code>LoopIterations</code>, <code>HostCalls</code>, <code>AllocatedBytes</code>, <code>CollectionElements</code>, and more.</li>
+<li>On failure, <code>result.Error</code> is a <code>SandboxError</code> with a <code>Code</code> (<code>SandboxErrorCode</code>) and a redaction-safe
+<code>SafeMessage</code> (<code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxError.cs</code>).</li>
+</ul>
+<p>For the loot kernel with <code>(3, 2)</code>, <code>total.Value</code> is <code>80</code> — exactly what the interpreter test asserts.</p>
+<h2 id="safety-guarantees-at-a-glance">Safety guarantees at a glance</h2>
+<p>The three defenses layer up, and the first two happen <strong>before your logic ever runs</strong>:</p>
+<h3 id="1-validation-import--prepare">1. Validation (import + prepare)</h3>
+<p><code>PrepareAsync</code> runs the module validator and refuses to build a plan for anything malformed or
+disallowed, throwing <code>SandboxValidationException</code>. This is where CLR escape hatches die: a kernel that
+tries to call <code>System.IO.File.ReadAllText</code> is rejected with diagnostic <code>E-IR-CLR-REF</code> <em>before</em>
+execution (<code>tests/DotBoxD.Kernels.Tests/Serialization/JsonImporterTests.cs</code>,
+<code>Forbidden_clr_call_is_rejected_before_execution</code>). Unknown operators (<code>E-JSON-OP</code>), wrong literal
+kinds (<code>E-JSON-TYPE</code>), and duplicate parameters (<code>E-STRUCT-DUP-PARAM</code>) are likewise caught here.</p>
+<h3 id="2-capabilities-least-privilege">2. Capabilities (least privilege)</h3>
+<p>Bindings with side effects are gated by explicit policy grants. Our host added only
+<code>AddDefaultPureBindings</code>, and our policy granted nothing, so a kernel that tried to read a file would
+fail preparation with <code>E-POLICY-CAP</code> — the host never granted <code>file.read</code>
+(<code>tests/DotBoxD.Kernels.Tests/Interpreter/InterpreterAndPolicyTests.cs</code>,
+<code>File_read_is_denied_without_host_grant</code>). To allow a side effect you must opt in deliberately, e.g.
+<code>SandboxPolicyBuilder.Create().GrantFileRead(root, maxBytesPerRun)</code>.</p>
+<h3 id="3-fuel-and-quotas-bounded-execution">3. Fuel and quotas (bounded execution)</h3>
+<p>Even valid, permitted logic runs under a hard budget. An infinite loop does not hang the host: fuel
+runs out and the run ends with <code>result.Succeeded == false</code> and
+<code>result.Error.Code == SandboxErrorCode.QuotaExceeded</code>
+(<code>tests/DotBoxD.Kernels.Tests/Interpreter/InterpreterAndPolicyTests.cs</code>,
+<code>Fuel_exhaustion_stops_infinite_loop</code>). <code>WithMaxLoopIterations</code>, <code>WithMaxListLength</code>,
+<code>WithMaxHostCalls</code>, <code>WithWallTime</code>, and the other <code>With*</code> limits give you independent hard ceilings on
+each dimension of resource use.</p>
+<p>Because those three layers are enforced by the host — not by the kernel author — you can accept
+kernels from clients you do not fully trust and still bound their blast radius. (For the strong
+multi-tenant isolation story and its limits, read the caveats page linked below.)</p>
+<h2 id="full-example">Full example</h2>
+<pre><code class="lang-csharp">using DotBoxD.Hosting.Execution;                   // SandboxHost
+using DotBoxD.Kernels;                             // ExecutionMode, SandboxExecutionOptions
+using DotBoxD.Kernels.Policies;                    // SandboxPolicyBuilder
+using DotBoxD.Kernels.Sandbox;                     // SandboxValue, I32Value
+using DotBoxD.Kernels.Serialization.Json.Hosting;  // ImportJsonAsync
+
+const string kernelJson = &quot;&quot;&quot;
+{
+  &quot;id&quot;: &quot;loot-score&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;targetSandboxVersion&quot;: &quot;1.0.0&quot;,
+  &quot;capabilityRequests&quot;: [],
+  &quot;functions&quot;: [
+    {
+      &quot;id&quot;: &quot;main&quot;,
+      &quot;visibility&quot;: &quot;entrypoint&quot;,
+      &quot;parameters&quot;: [
+        { &quot;name&quot;: &quot;level&quot;, &quot;type&quot;: &quot;I32&quot; },
+        { &quot;name&quot;: &quot;rarity&quot;, &quot;type&quot;: &quot;I32&quot; }
+      ],
+      &quot;returnType&quot;: &quot;I32&quot;,
+      &quot;body&quot;: [
+        { &quot;op&quot;: &quot;set&quot;, &quot;name&quot;: &quot;base&quot;,  &quot;value&quot;: { &quot;op&quot;: &quot;mul&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;level&quot; },  &quot;right&quot;: { &quot;i32&quot;: 10 } } },
+        { &quot;op&quot;: &quot;set&quot;, &quot;name&quot;: &quot;bonus&quot;, &quot;value&quot;: { &quot;op&quot;: &quot;mul&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;rarity&quot; }, &quot;right&quot;: { &quot;i32&quot;: 25 } } },
+        { &quot;op&quot;: &quot;return&quot;, &quot;value&quot;: { &quot;op&quot;: &quot;add&quot;, &quot;left&quot;: { &quot;var&quot;: &quot;base&quot; }, &quot;right&quot;: { &quot;var&quot;: &quot;bonus&quot; } } }
+      ]
+    }
+  ]
+}
+&quot;&quot;&quot;;
+
+using var host = SandboxHost.Create(builder =&gt;
+{
+    builder.AddDefaultPureBindings();
+    builder.UseInterpreter();
+});
+
+var policy = SandboxPolicyBuilder.Create()
+    .WithFuel(1_000_000)
+    .WithMaxLoopIterations(10_000)
+    .WithMaxListLength(10_000)
+    .Build();
+
+var module = await host.ImportJsonAsync(kernelJson);
+var plan = await host.PrepareAsync(module, policy);
+
+var input = SandboxValue.FromList(
+[
+    SandboxValue.FromInt32(3),  // level
+    SandboxValue.FromInt32(2),  // rarity
+]);
+
+var result = await host.ExecuteAsync(
+    plan,
+    &quot;main&quot;,
+    input,
+    new SandboxExecutionOptions { Mode = ExecutionMode.Interpreted });
+
+if (result.Succeeded &amp;&amp; result.Value is I32Value total)
+{
+    Console.WriteLine($&quot;total={total.Value}, fuel burned={result.ResourceUsage.FuelUsed}&quot;);
+}
+else
+{
+    Console.WriteLine($&quot;failed: {result.Error?.Code} — {result.Error?.SafeMessage}&quot;);
+}
+</code></pre>
+<p>Expected output (the value is deterministic; the exact fuel figure depends on the runtime version):</p>
+<pre><code class="lang-text">total=80, fuel burned=&lt;n&gt;
+</code></pre>
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li><a href="../concepts/kernels.html">Kernels — concepts</a> — the IR model, value types, and execution modes in
+depth.</li>
+<li><a href="../security/sandbox-caveats.html">Sandbox caveats &amp; the trust boundary</a> — what safe mode does and
+does not protect against, and when you need out-of-process isolation.</li>
+<li><a href="pushdown-server-extension.html">Pushing logic server-side (server extensions)</a> — let a plugin ship
+its own sandboxed batch operation so N round-trips collapse into one.</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/tutorials/first-kernel.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

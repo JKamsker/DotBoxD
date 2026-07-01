@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class CompiledArtifact | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class CompiledArtifact | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact">
+
+
+
+  <h1 id="DotBoxD_Kernels_Compiler_CompiledArtifact" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact" class="text-break">
+Class CompiledArtifact  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DotBoxD.html">DotBoxD</a>.<a class="xref" href="DotBoxD.Kernels.html">Kernels</a>.<a class="xref" href="DotBoxD.Kernels.Compiler.html">Compiler</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DotBoxD.Kernels.Compiler.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed record CompiledArtifact : IEquatable&lt;CompiledArtifact&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">CompiledArtifact</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="DotBoxD.Kernels.Compiler.CompiledArtifact.html">CompiledArtifact</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact__ctor_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.#ctor*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact__ctor_System_Byte___System_String_DotBoxD_Kernels_Verifier_Generated_ArtifactManifest_DotBoxD_Kernels_Verifier_Generated_VerificationResult_DotBoxD_Kernels_Compiler_SandboxCompiledEntrypoint_DotBoxD_Kernels_Compiler_CompiledRuntimeFormKind_DotBoxD_Kernels_Compiler_CompiledCacheStatus_System_String_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.#ctor(System.Byte[],System.String,DotBoxD.Kernels.Verifier.Generated.ArtifactManifest,DotBoxD.Kernels.Verifier.Generated.VerificationResult,DotBoxD.Kernels.Compiler.SandboxCompiledEntrypoint,DotBoxD.Kernels.Compiler.CompiledRuntimeFormKind,DotBoxD.Kernels.Compiler.CompiledCacheStatus,System.String)">
+  CompiledArtifact(byte[], string, ArtifactManifest, VerificationResult, SandboxCompiledEntrypoint, CompiledRuntimeFormKind, CompiledCacheStatus, string?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CompiledArtifact(byte[] assemblyBytes, string assemblyHash, ArtifactManifest manifest, VerificationResult verification, SandboxCompiledEntrypoint entrypoint, CompiledRuntimeFormKind runtimeForm, CompiledCacheStatus cacheStatus = CompiledCacheStatus.None, string? cacheInvalidReason = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>assemblyBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+    <dt><code>assemblyHash</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>manifest</code> <a class="xref" href="DotBoxD.Kernels.Verifier.Generated.ArtifactManifest.html">ArtifactManifest</a></dt>
+    <dd></dd>
+    <dt><code>verification</code> <a class="xref" href="DotBoxD.Kernels.Verifier.Generated.VerificationResult.html">VerificationResult</a></dt>
+    <dd></dd>
+    <dt><code>entrypoint</code> <a class="xref" href="DotBoxD.Kernels.Compiler.SandboxCompiledEntrypoint.html">SandboxCompiledEntrypoint</a></dt>
+    <dd></dd>
+    <dt><code>runtimeForm</code> <a class="xref" href="DotBoxD.Kernels.Compiler.CompiledRuntimeFormKind.html">CompiledRuntimeFormKind</a></dt>
+    <dd></dd>
+    <dt><code>cacheStatus</code> <a class="xref" href="DotBoxD.Kernels.Compiler.CompiledCacheStatus.html">CompiledCacheStatus</a></dt>
+    <dd></dd>
+    <dt><code>cacheInvalidReason</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_ArtifactHash_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.ArtifactHash*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_ArtifactHash" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.ArtifactHash">
+  ArtifactHash
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string ArtifactHash { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_AssemblyBytes_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.AssemblyBytes*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_AssemblyBytes" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.AssemblyBytes">
+  AssemblyBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] AssemblyBytes { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_AssemblyHash_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.AssemblyHash*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_AssemblyHash" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.AssemblyHash">
+  AssemblyHash
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string AssemblyHash { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_CacheInvalidReason_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.CacheInvalidReason*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_CacheInvalidReason" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.CacheInvalidReason">
+  CacheInvalidReason
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? CacheInvalidReason { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_CacheStatus_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.CacheStatus*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_CacheStatus" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.CacheStatus">
+  CacheStatus
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CompiledCacheStatus CacheStatus { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Kernels.Compiler.CompiledCacheStatus.html">CompiledCacheStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_Entrypoint_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Entrypoint*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_Entrypoint" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Entrypoint">
+  Entrypoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SandboxCompiledEntrypoint Entrypoint { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Kernels.Compiler.SandboxCompiledEntrypoint.html">SandboxCompiledEntrypoint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_Manifest_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Manifest*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_Manifest" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Manifest">
+  Manifest
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ArtifactManifest Manifest { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Kernels.Verifier.Generated.ArtifactManifest.html">ArtifactManifest</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_RuntimeForm_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.RuntimeForm*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_RuntimeForm" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.RuntimeForm">
+  RuntimeForm
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CompiledRuntimeFormKind RuntimeForm { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Kernels.Compiler.CompiledRuntimeFormKind.html">CompiledRuntimeFormKind</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Kernels_Compiler_CompiledArtifact_Verification_" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Verification*"></a>
+
+  <h3 id="DotBoxD_Kernels_Compiler_CompiledArtifact_Verification" data-uid="DotBoxD.Kernels.Compiler.CompiledArtifact.Verification">
+  Verification
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public VerificationResult Verification { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Kernels.Verifier.Generated.VerificationResult.html">VerificationResult</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

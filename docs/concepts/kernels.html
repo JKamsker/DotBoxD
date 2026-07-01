@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Kernels (validated sandbox logic) | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Kernels (validated sandbox logic) | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/concepts/kernels.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="kernels-validated-sandbox-logic">Kernels (validated sandbox logic)</h1>
+
+<p>A <strong>Kernel</strong> is client/plugin-supplied logic the host runs <strong>safely under policy</strong>. It is restricted
+<strong>IR</strong> (authored as JSON), never C#, IL, reflection, CLR member names, or arbitrary host calls.</p>
+<p>Lifecycle (via <code>SandboxHost</code> in <code>DotBoxD.Hosting</code>):</p>
+<ol>
+<li><strong>Import</strong> — parse JSON IR into a <code>SandboxModule</code>; reject anything outside the allowed shape.</li>
+<li><strong>Validate</strong> — structural, type, effect, capability, and binding checks (<code>DotBoxD.Kernels.Validation</code>).</li>
+<li><strong>Prepare</strong> — produce a sealed <code>ExecutionPlan</code>.</li>
+<li><strong>Execute</strong> — run on one of two backends:
+<ul>
+<li><strong>Interpreter</strong> (<code>DotBoxD.Kernels.Interpreter</code>) — flexible, async-friendly.</li>
+<li><strong>Compiler</strong> (<code>DotBoxD.Kernels.Compiler</code>) — emits verified IL; the generated assembly is checked by
+<code>DotBoxD.Kernels.Verifier</code> before it runs. Compiled async bindings run through a trusted runtime
+trampoline; generated kernel IL stays synchronous.</li>
+</ul>
+</li>
+</ol>
+<p>Everything is <strong>metered</strong>: fuel, loop iterations, call depth, list length, output bytes, and
+per-capability quotas. A buggy or hostile kernel cannot exhaust host resources or reach disallowed
+effects. Host capabilities (files, time, random, logging, HTTP via <code>DotBoxD.Hosting.Http</code>) are exposed
+only through explicit <strong>capability grants</strong> — see <a href="../security/sandbox-caveats.html">capabilities-and-bindings</a>
+and the full spec under <a href="../Specs/"><code>docs/Specs/</code></a>.</p>
+<p>Async binding tails are also capability-gated. Policies must grant <code>dotboxd.runtime.async</code> via
+<code>AllowRuntimeAsync()</code> before kernels can call bindings that may complete asynchronously.</p>
+<blockquote>
+<p><strong>Important:</strong> the kernel sandbox is the real boundary. It is <strong>not</strong> the same as loading a .NET
+plugin assembly — see <a href="../security/sandbox-caveats.html">security/sandbox-caveats.md</a>.</p>
+</blockquote>
+<p>Diagnostics use the <code>DBXK###</code> prefix. <strong>See also:</strong> the GameServer sample under
+<a href="../../samples/GameServer"><code>samples/GameServer</code></a>, <a href="runtime.html">runtime</a>, and
+<a href="../examples/coverage-gaps.html"><code>docs/examples/coverage-gaps.md</code></a> for kernel scenarios no longer shown
+by maintained samples.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/concepts/kernels.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

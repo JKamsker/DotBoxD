@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Tutorial: Pushdown — ship a server-side batch operation | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Tutorial: Pushdown — ship a server-side batch operation | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/tutorials/pushdown-server-extension.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tutorial-pushdown--ship-a-server-side-batch-operation">Tutorial: Pushdown — ship a server-side batch operation</h1>
+
+<p>This tutorial walks through <strong>Pushdown</strong>, the third way DotBoxD lets a host and its clients share one C# contract. You will take a host that exposes only a <em>fine-grained</em> binding (&quot;kill one monster&quot;) and, <strong>without recompiling the host</strong>, ship a plugin that adds a <em>batch</em> aggregate (&quot;kill these N monsters&quot;) which runs server-side and collapses N remote round-trips into <strong>one</strong>.</p>
+<p>The payoff: the batch method is plain C#, but the analyzer lowers it to the same verified, capability-gated, fuel-metered IR that event kernels run under. It is untrusted-author code running under a real sandbox — not a trusted plugin with full CLR access.</p>
+<p>Everything below uses the real, compiling API. The canonical snippet lives in <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a> (section &quot;3. Pushdown&quot;); the runnable example is the GameServer sample under <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer"><code>samples/GameServer</code></a>.</p>
+<h2 id="what-youll-build">What you'll build</h2>
+<ul>
+<li>A <strong>host</strong> interface <code>IGameWorld</code> that exposes exactly one fine-grained <code>[HostBinding]</code>: <code>Kill(int id)</code>.</li>
+<li>A <strong>plugin</strong> that declares a batch contract <code>IMonsterKillerService</code> and a <code>[ServerExtension(...)]</code> partial class <code>MonsterKillerKernel</code> whose method loops over the host binding.</li>
+<li>A <strong>caller</strong> that installs the extension once and invokes the whole batch in a single round-trip.</li>
+</ul>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>Pushdown lives on the net10.0 Kernels/Plugins stack. Add the authoring contracts, the host runtime, and the generator/analyzer (and the IPC addon if the plugin and host are in separate processes):</p>
+<pre><code class="lang-bash"># Plugin-to-host authoring contracts: [HostBinding], [ServerExtension], HookContext
+dotnet add package DotBoxD.Abstractions --prerelease
+
+# Host runtime that loads, validates, and dispatches plugins (PluginServer)
+dotnet add package DotBoxD.Plugins --prerelease
+
+# Source generator + analyzer that lowers [ServerExtension] kernels to verified IR
+dotnet add package DotBoxD.Plugins.Analyzer --prerelease
+
+# (Cross-process only) MessagePack IPC addon that runs kernels next to host services
+dotnet add package DotBoxD.Pushdown.Services --prerelease
+</code></pre>
+<p>Package names and purposes are from the README &quot;Installing from NuGet&quot; table (<a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a>).</p>
+<h2 id="step-1--the-problem-a-frozen-host-with-only-fine-grained-bindings">Step 1 — The problem: a frozen host with only fine-grained bindings</h2>
+<p>A shipped host is usually <strong>frozen at release</strong>. It exposes small, single-entity operations because those are the safe primitives it wants to expose to the sandbox — it deliberately ships <em>no</em> batch operations.</p>
+<p>A client that needs to act on many entities is then forced into a loop, and every iteration is a network hop:</p>
+<pre><code class="lang-text">client -&gt; Kill(1)
+client -&gt; Kill(2)
+...           (N round-trips)
+</code></pre>
+<p>For N monsters that is N remote calls, N serialization passes, and N chances for latency to dominate. You cannot add <code>KillMonsters(...)</code> to the host — it is already released. This is exactly the situation Pushdown is designed for (see <a href="../concepts/pushdown.html"><code>docs/concepts/pushdown.md</code></a>).</p>
+<h2 id="step-2--host-declares-a-fine-grained-hostbinding-with-capability--effect">Step 2 — Host declares a fine-grained <code>[HostBinding]</code> with capability + effect</h2>
+<p>The host exposes its single-entity primitive as a method marked with <code>[HostBinding]</code>. This attribute is the whole contract the sandbox sees: a binding id the call lowers to, the <strong>capability</strong> it requires, and the <strong><code>SandboxEffect</code></strong> it declares.</p>
+<pre><code class="lang-csharp">using DotBoxD.Abstractions;
+using DotBoxD.Kernels.Sandbox;
+
+// The host (frozen at release) exposes only a fine-grained binding — there is NO batch method here.
+public interface IGameWorld
+{
+    [HostBinding(&quot;host.world.kill&quot;, &quot;game.world.monster.write.kill&quot;,
+                 SandboxEffect.Cpu | SandboxEffect.HostStateWrite)]
+    bool Kill(int id);
+}
+</code></pre>
+<p>What each argument means (from the <code>HostBindingAttribute</code> docs in <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/Hosting/DotBoxD.Abstractions/Contracts.cs"><code>src/Hosting/DotBoxD.Abstractions/Contracts.cs</code></a>):</p>
+<ul>
+<li><strong><code>&quot;host.world.kill&quot;</code></strong> — the sandbox binding id. The generator lowers any <code>ctx.Host&lt;IGameWorld&gt;().Kill(id)</code> call to a <code>CallExpression(&quot;host.world.kill&quot;, …)</code>.</li>
+<li><strong><code>&quot;game.world.monster.write.kill&quot;</code></strong> — the capability recorded in the plugin manifest's required capabilities. A kernel that touches this binding only installs under a policy that grants that capability.</li>
+<li><strong><code>SandboxEffect.Cpu | SandboxEffect.HostStateWrite</code></strong> — the effect set added to the manifest. <code>SandboxEffect</code> is a <code>[Flags]</code> enum in <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/Kernels/DotBoxD.Kernels/Sandbox/SandboxEffect.cs"><code>src/Kernels/DotBoxD.Kernels/Sandbox/SandboxEffect.cs</code></a>; a write binding declares exactly one of <code>HostStateRead</code>/<code>HostStateWrite</code>.</li>
+</ul>
+<p>The host registers a matching binding at startup (same id, capability, and effects) so <strong>install-time policy and effect validation gate the call</strong>. If the plugin's manifest asks for a capability the host policy did not grant, install fails — the code never runs.</p>
+<h2 id="step-3--plugin-defines-a-batch-contract--a-serverextension-partial-class">Step 3 — Plugin defines a batch contract + a <code>[ServerExtension]</code> partial class</h2>
+<p>Now the plugin adds what the host never shipped. First the batch <strong>contract</strong> — an ordinary interface plus the DTO it returns:</p>
+<pre><code class="lang-csharp">using System.Collections.Generic;
+
+// A PLUGIN adds its own batch aggregate. KillMonsters does not exist on the host — the plugin ships it.
+public interface IMonsterKillerService
+{
+    List&lt;KillResult&gt; KillMonsters(List&lt;int&gt; monsterIds);
+}
+
+public readonly record struct KillResult(int MonsterId, bool Success);
+</code></pre>
+<p>Then the <strong>kernel</strong>: a <code>partial class</code> marked <code>[ServerExtension(&quot;id&quot;, typeof(TContract))]</code> with one public batch method. Its body loops over the list parameter and calls the host's existing binding through <code>ctx.Host&lt;IGameWorld&gt;()</code>:</p>
+<pre><code class="lang-csharp">using System.Collections.Generic;
+using DotBoxD.Abstractions;
+
+[ServerExtension(&quot;monster-killer&quot;, typeof(IMonsterKillerService))]
+public sealed partial class MonsterKillerKernel
+{
+    public List&lt;KillResult&gt; KillMonsters(List&lt;int&gt; monsterIds, HookContext ctx)
+    {
+        var results = new List&lt;KillResult&gt;();
+        foreach (var id in monsterIds)
+            results.Add(new KillResult(id, ctx.Host&lt;IGameWorld&gt;().Kill(id))); // calls the host's existing binding
+        return results;
+    }
+}
+</code></pre>
+<p>Notes that make this compile and lower correctly (all from the <code>ServerExtensionAttribute</code> and <code>HookContext</code> docs in <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/Hosting/DotBoxD.Abstractions/Contracts.cs"><code>src/Hosting/DotBoxD.Abstractions/Contracts.cs</code></a>):</p>
+<ul>
+<li>The trailing <strong><code>HookContext ctx</code></strong> parameter is the <em>lowering marker</em> for host bindings (exactly as in a kernel's <code>Handle</code>). It is <strong>not</strong> part of the wire signature — the contract method is just <code>KillMonsters(List&lt;int&gt;)</code>.</li>
+<li><strong><code>ctx.Host&lt;IGameWorld&gt;()</code></strong> is never actually invoked at runtime; calling it directly throws <code>NotSupportedException</code>. The generator replaces the call with the <code>host.world.kill</code> binding.</li>
+<li>The body may use locals, a <code>foreach</code> over a list parameter, host bindings, and may build and return complex objects (records/DTOs) and lists of them — complex values ride the IR <code>Record</code> type.</li>
+<li>Passing the optional <strong>service type</strong> (<code>typeof(IMonsterKillerService)</code>) lets the analyzer emit a source-generated plugin-side client that marshals directly to compact server-extension value bytes instead of using a reflection proxy.</li>
+</ul>
+<p>This exact shape is exercised as a compiling test fixture in <a href="https://github.com/JKamsker/DotBoxD/blob/main/tests/DotBoxD.Kernels.Tests/Plugins/Rpc/ServerExtension/ServerExtensionProxyTests.cs"><code>tests/DotBoxD.Kernels.Tests/Plugins/Rpc/ServerExtension/ServerExtensionProxyTests.cs</code></a>.</p>
+<blockquote>
+<p>The GameServer sample takes this one step further: its <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/MonsterKillerKernel.cs"><code>MonsterKillerKernel</code></a> grafts onto a domain control with <code>[ServerExtension(typeof(IMonsterControl))]</code> and injects the world as a constructor field (<code>_world.Monsters.Get(id)</code>) instead of <code>ctx.Host&lt;T&gt;()</code>. Constructor-injected host services and <code>ctx.Host&lt;T&gt;()</code> are two spellings of the same lowering marker — pick whichever reads best.</p>
+</blockquote>
+<h2 id="step-4--the-analyzer-lowers-your-c-to-verified-capability-gated-fuel-metered-ir">Step 4 — The analyzer lowers your C# to verified, capability-gated, fuel-metered IR</h2>
+<p>This is the part that makes Pushdown safe. Your <code>KillMonsters</code> method looks like ordinary C#, but it is <strong>not</strong> compiled to IL and run as trusted code. The <code>DotBoxD.Plugins.Analyzer</code> source generator lowers the method body into restricted <strong>kernel IR</strong> — the same JSON IR shape the Kernels stack validates and meters — and bakes it into the plugin package.</p>
+<p>At install and run time that IR goes through the identical pipeline as an event kernel:</p>
+<ol>
+<li><strong>Structural + type validation</strong> — only supported statements/expressions (<code>foreach</code>, <code>if</code>/<code>else</code>, locals, host-binding calls, DTO construction, <code>List&lt;T&gt;</code> accumulation) survive.</li>
+<li><strong>Capability gating</strong> — every <code>[HostBinding]</code> call and <code>[Capability]</code>-gated read the body touches contributes its capability to the manifest; install fails unless the host policy grants them.</li>
+<li><strong>Effect validation</strong> — the manifest's declared effects must match the verified entrypoint's effects (a <code>HostStateWrite</code> binding cannot masquerade as pure).</li>
+<li><strong>Fuel/quota metering</strong> — the loop runs under the host's fuel budget, max loop iterations, and max list length, so a hostile or buggy batch cannot run away with host resources.</li>
+</ol>
+<p>The trust model is spelled out in the README: the batch logic &quot;runs as a validated sandboxed kernel under the same trust model as event kernels: it can reach only the host bindings the server already exposes, gated by capabilities and fuel/quota limits&quot; (<a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a>, section 3). Critically, <strong>a method reachable via normal RPC is not automatically reachable from a kernel</strong> (<a href="../concepts/pushdown.html"><code>docs/concepts/pushdown.md</code></a>) — the only surface the kernel can touch is the set of registered <code>[HostBinding]</code>s.</p>
+<h2 id="step-5--install-once-invoke-once-n-round-trips--1">Step 5 — Install once, invoke once (N round-trips → 1)</h2>
+<p>On the host side, <code>PluginServer</code> (from <code>DotBoxD.Plugins</code>) resolves the kernel's generated verified-IR package, installs it as a server extension, and binds it to the contract. Then any caller gets a typed proxy and calls the batch in <strong>one</strong> round-trip:</p>
+<pre><code class="lang-csharp">using DotBoxD.Plugins;
+
+// The host's PluginServer already has the IGameWorld binding registered (same id/capability/effects).
+// Install the plugin's kernel under the IMonsterKillerService contract:
+await server.RegisterServerExtensionAsync&lt;IMonsterKillerService, MonsterKillerKernel&gt;();
+
+// The caller invokes the whole batch in ONE round-trip, not N:
+List&lt;KillResult&gt; killed = server.ServerExtension&lt;IMonsterKillerService&gt;().KillMonsters(ids);
+</code></pre>
+<p>The signatures are exactly as declared in <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/Hosting/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs"><code>src/Hosting/DotBoxD.Plugins/Runtime/Rpc/PluginServer.Rpc.cs</code></a>:</p>
+<ul>
+<li><code>ValueTask&lt;string&gt; RegisterServerExtensionAsync&lt;TService, TKernel&gt;(SandboxPolicy? policy = null, CancellationToken cancellationToken = default)</code> — resolves <code>TKernel</code>'s generated package, installs it, binds <code>TService</code> to it, and returns the plugin id. Pass an optional <code>SandboxPolicy</code> to tighten fuel/capability limits beyond the host default.</li>
+<li><code>TService ServerExtension&lt;TService&gt;()</code> — returns the typed proxy; it throws <code>InvalidOperationException</code> if you call it before registering.</li>
+</ul>
+<p>The two lines above are asserted verbatim against the README by a regression test (<a href="https://github.com/JKamsker/DotBoxD/blob/main/tests/DotBoxD.Kernels.Tests/Hosting/Regression/Fix_API_0027_Tests.cs"><code>tests/DotBoxD.Kernels.Tests/Hosting/Regression/Fix_API_0027_Tests.cs</code></a>), and the register-then-invoke round-trip is covered end to end in <code>ServerExtensionProxyTests.RegisterServerExtension_then_ServerExtension_invokes_the_batch_kernel_by_contract</code>.</p>
+<p>Across a process boundary, the same install + a compact binary IR invoke payload are forwarded by the <code>DotBoxD.Pushdown.Services</code> MessagePack IPC addon — the plugin authoring code is identical.</p>
+<h2 id="step-6--diagnostics-and-the-no-lock-in-principle">Step 6 — Diagnostics and the no-lock-in principle</h2>
+<p><strong>Diagnostics.</strong> If your batch method uses a shape the lowering surface cannot represent, the analyzer fails the generation <em>safely</em> (it does not miscompile) and reports a diagnostic in the kernels/plugins namespace <strong><code>DBXK###</code></strong> (services diagnostics use <code>DBXS###</code>). For example, <code>DBXK115</code> rejects duplicate generated server-extension graft signatures, and <code>DBXK116</code> rejects <code>[Local]</code> context helpers reaching lowered server-side IR (see <a href="https://github.com/JKamsker/DotBoxD/blob/main/src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md"><code>src/CodeGeneration/DotBoxD.Plugins.Analyzer/AnalyzerReleases.Unshipped.md</code></a>). Treat a <code>DBXK###</code> error as &quot;the sandbox does not support this construct,&quot; not as a bug to work around.</p>
+<p><strong>No lock-in.</strong> The <code>[ServerExtension]</code> attribute and the generator are <strong>opt-in sugar over public primitives, never lock-in</strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a>, <a href="https://github.com/JKamsker/DotBoxD/blob/main/rules/design-guidelines.md"><code>rules/design-guidelines.md</code></a>). Everything the generator produces is verified JSON IR plus a manifest — both first-class, public artifacts. You could delete the attribute and hand-author the same IR, then import and run it through the same <code>SandboxHost</code> pipeline the Kernels quick-start uses (<code>ImportJsonAsync</code> → <code>PrepareAsync</code> under a <code>SandboxPolicy</code> → <code>ExecuteAsync</code>, as shown in <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a> section 2). The generator saves you from writing IR by hand; it does not grant your code any capability a hand-written kernel could not also request — and it never bypasses validation, capability gating, or metering. If you can't hand-write it against the public API, the generator won't emit it either.</p>
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li><a href="../concepts/pushdown.html">Pushdown, in depth</a> — the concept, the round-trip diagrams, and the roadmap items (<code>DotBoxD.Pushdown.Linq</code>, fluent client API).</li>
+<li><a href="../security/sandbox-caveats.html">Sandbox caveats</a> — what is and isn't a trust boundary before you deploy a server extension that runs author-supplied logic.</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/tutorials/pushdown-server-extension.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

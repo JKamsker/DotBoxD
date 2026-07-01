@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>DotBoxD Peer Model | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="DotBoxD Peer Model | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../../../toc.html">
+      
+      <meta name="docfx:rel" content="../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/design/peer-model.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="dotboxd-peer-model">DotBoxD Peer Model</h1>
+
+<p>Status: implemented on <code>feature/peer-model</code>. The legacy <code>RpcClient</code> / <code>RpcServer</code> /
+<code>RpcPeer</code> and the <code>DuplexConnectionSplitter</code> have since been <strong>removed</strong> — <code>RpcPeer</code> and
+<code>RpcHost</code> are the only surface. The wire format is unchanged, so the removal is API-only.</p>
+<p>This document describes the move from a <code>client</code> / <code>server</code> mental model to a single,
+symmetric <strong>peer</strong> model: two sides connect over a transport, either side can <em>provide</em>
+implementations of <code>[DotBoxDService]</code> interfaces, and either side can <em>call</em> the
+implementations the other side provides. Bidirectional is the default capability;
+one-directional (&quot;I call you and get data back, you cannot call me&quot;) is just the
+asymmetric configuration of the same type.</p>
+<h2 id="principles">Principles</h2>
+<ol>
+<li><strong>One symmetric type.</strong> <code>RpcPeer</code> is <em>this side</em> of a connection. It can <code>Provide</code>
+interface implementations (callable by the other side) and <code>Get</code> proxies (to call the
+other side). Either, or both.</li>
+<li><strong>Direction is configuration, not type.</strong> A &quot;client&quot; is a peer that only <code>Get</code>s. A
+&quot;server&quot; is a peer that only <code>Provide</code>s. Bidirectional is a peer that does both. There
+is no separate client/server class on the hot path.</li>
+<li><strong>One read loop.</strong> The peer demuxes inbound frames by message type — <code>Response</code>/<code>Error</code>
+complete <em>my</em> pending calls; <code>Request</code>/<code>Cancel</code> hit <em>my</em> dispatchers. No connection
+splitter, no stacked server + client.</li>
+<li><strong>Transport-agnostic, duplex channel.</strong> The transport unit is a duplex <code>IRpcChannel</code>
+(responses must flow back). Accepting many connections is a separate <code>RpcHost</code> concern.</li>
+<li><strong>Wire-compatible.</strong> Frame format, envelopes (<code>RpcRequest</code>/<code>RpcResponse</code>), and
+sub-service handles are unchanged, so new peers interoperate with the legacy
+client/server and existing serializers/transports keep working.</li>
+</ol>
+<h2 id="why-the-existing-protocol-already-supports-symmetry">Why the existing protocol already supports symmetry</h2>
+<p>The four message types already encode <em>direction</em> independently of <em>who sent the frame</em>:</p>
+<ul>
+<li>A <code>Response</code>/<code>Error</code> is, by definition, &quot;an answer to a request <strong>I</strong> sent&quot; → it
+completes an entry in my pending-call table.</li>
+<li>A <code>Request</code>/<code>Cancel</code> is, by definition, &quot;something the <strong>other side</strong> asked of me&quot; → it
+is routed to my dispatcher.</li>
+</ul>
+<p>So message-id spaces never collide across directions even when both peers number their
+outbound requests from the same counter: the <em>type</em> tells you which way a frame flows. The
+old <code>DuplexConnectionSplitter</code> was an elaborate way of exploiting that fact by physically
+separating the two streams so a stock <code>RpcServer</code> and stock <code>RpcClient</code> could each
+pretend they owned the socket. <code>RpcPeer</code> exploits it directly with a single loop.</p>
+<h2 id="core-abstractions">Core abstractions</h2>
+<h3 id="irpcchannel--the-transport-unit"><code>IRpcChannel</code> — the transport unit</h3>
+<pre><code class="lang-csharp">namespace DotBoxD.Services.Transport;
+
+// A duplex, framed, bidirectional channel. One per peer.
+public interface IRpcChannel : IAsyncDisposable
+{
+    Task SendAsync(ReadOnlyMemory&lt;byte&gt; frame, CancellationToken ct = default);
+    Task&lt;Payload&gt; ReceiveAsync(CancellationToken ct = default);   // Length 0 == remote closed
+    bool IsConnected { get; }
+    string RemoteEndpoint { get; }
+}
+</code></pre>
+<p><code>IRpcChannel</code> is the sole transport unit. Every existing connection
+(<code>StreamConnection</code>, <code>TcpConnection</code>, named pipes) implements it directly. (The transitional
+<code>IConnection : IRpcChannel</code> alias has since been removed; transports return <code>IRpcChannel</code>.)</p>
+<blockquote>
+<p>The channel is always duplex because results flow back. The <em>call</em> asymmetry lives in
+the peer (provide vs. get), not in the transport. Genuinely send-only links
+(fire-and-forget / notifications) are an explicitly out-of-scope future addition.</p>
+</blockquote>
+<h3 id="irpcinvoker--what-generated-proxies-depend-on"><code>IRpcInvoker</code> — what generated proxies depend on</h3>
+<pre><code class="lang-csharp">namespace DotBoxD.Services;
+
+public interface IRpcInvoker
+{
+    Task&lt;TResponse&gt; InvokeAsync&lt;TRequest, TResponse&gt;(string service, string method, TRequest request, CancellationToken ct = default);
+    Task&lt;TResponse&gt; InvokeAsync&lt;TResponse&gt;(string service, string method, CancellationToken ct = default);
+    Task InvokeAsync&lt;TRequest&gt;(string service, string method, TRequest request, CancellationToken ct = default);
+    Task InvokeAsync(string service, string method, CancellationToken ct = default);
+
+    // Sub-service (capability handle) calls.
+    Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default);
+    Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TResponse&gt;(string service, string instanceId, string method, CancellationToken ct = default);
+    Task InvokeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default);
+    Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default);
+}
+</code></pre>
+<p>This is the transport-agnostic set of invoke verbs — no <code>Connect</code>/<code>IsConnected</code>/<code>Dispose</code>.
+Generated proxies depend on <code>IRpcInvoker</code>, which <code>RpcPeer</code> implements directly — no &quot;client&quot;
+required.</p>
+<h3 id="rpcpeer"><code>RpcPeer</code></h3>
+<pre><code class="lang-csharp">namespace DotBoxD.Services;
+
+public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker
+{
+    public static RpcPeer Over(IRpcChannel channel, ISerializer serializer, RpcPeerOptions? options = null);
+
+    // exports (what THIS side provides)
+    public RpcPeer Provide&lt;TService&gt;(TService implementation) where TService : class;
+    public RpcPeer Provide(IServiceDispatcher dispatcher);
+
+    // imports (what THIS side calls on the other)
+    public TService Get&lt;TService&gt;() where TService : class;
+
+    // lifecycle
+    public RpcPeer Start();                 // begins the single read loop; idempotent; returns this
+    public bool IsConnected { get; }
+    public string RemoteEndpoint { get; }
+    public Task CloseAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+
+    // observability
+    public event EventHandler&lt;RpcDisconnectedEventArgs&gt;? Disconnected; // handlers should not block
+    public event EventHandler&lt;RpcReadErrorEventArgs&gt;? ReadError;
+    public event EventHandler&lt;RpcProtocolErrorEventArgs&gt;? ProtocolError;
+}
+</code></pre>
+<p>Fluent so both ends read symmetrically:</p>
+<pre><code class="lang-csharp">await using var peer = RpcPeer
+    .Over(channel, serializer)
+    .Provide&lt;IChatRoom&gt;(new ChatRoom())
+    .Start();
+
+var participant = peer.Get&lt;IChatParticipant&gt;();
+await participant.JoinedAsync(&quot;Jonas&quot;);
+</code></pre>
+<h3 id="rpcpeeroptions"><code>RpcPeerOptions</code></h3>
+<p><code>RpcPeerOptions</code> is a sealed class with validating init-only properties (it is not a <code>record</code>:
+the init accessors reject invalid values such as a non-positive <code>InboundQueueCapacity</code>,
+<code>MaxPendingRequests</code>, or <code>RequestTimeout</code>, so it does not carry value-equality semantics).</p>
+<pre><code class="lang-csharp">public sealed class RpcPeerOptions
+{
+    // Validated: must be positive (&lt;= int.MaxValue ms) or Timeout.InfiniteTimeSpan.
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public IServiceProvider? ServiceProvider { get; init; }
+
+    // When true, inbound Request frames are answered with a clear &quot;this peer accepts no
+    // inbound calls&quot; error. Makes a get-only (&quot;client&quot;) peer's one-directional intent
+    // explicit instead of returning &quot;service not found&quot;. This is an intent signal, not
+    // an authentication or authorization boundary.
+    public bool RejectInboundCalls { get; init; }
+
+    // Backpressure for inbound dispatch. Defaults to a bounded queue (1024). Null dispatches
+    // immediately and does not cap concurrent dispatcher work; use it only with trusted
+    // peers or externally bounded transports. In Wait mode, queued requests are bounded
+    // and excess request frames apply read-side backpressure until dispatch queue space is
+    // available.
+    //
+    // Because a peer demuxes responses, cancels, and inbound requests over a single read
+    // loop, a full Wait-mode queue parks that loop — which also pauses reading responses to
+    // this peer's own outbound calls. A bidirectional peer whose inbound handlers call back
+    // into the same peer must size this above the number of inbound requests that can arrive
+    // ahead of those callbacks' responses, or use null / DropIncoming; otherwise an
+    // under-sized Wait queue can stall a reentrant response until RequestTimeout.
+    public int? InboundQueueCapacity { get; init; } = 1024;
+    public int MaxPendingRequests { get; init; } = 4096;
+    public QueueFullMode QueueFullMode { get; init; } = QueueFullMode.Wait;
+}
+</code></pre>
+<h3 id="rpchost--accepting-many-connections"><code>RpcHost</code> — accepting many connections</h3>
+<p>The accept loop that lived inside <code>RpcServer</code> moves into a host whose <em>output is peers</em>.
+Because each accepted connection is a full peer, the host can also call back into
+connecting peers.</p>
+<pre><code class="lang-csharp">namespace DotBoxD.Services;
+
+public sealed class RpcHost : IAsyncDisposable
+{
+    public static RpcHost Listen(IServerTransport listener, ISerializer serializer, RpcPeerOptions? options = null);
+
+    // Runs for every accepted connection, before its read loop starts.
+    public RpcHost ForEachPeer(Action&lt;RpcPeer&gt; configure);
+
+    public Task StartAsync(CancellationToken ct = default);
+    public Task StopAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+
+    public event EventHandler&lt;RpcPeerEventArgs&gt;? PeerConnected;
+    public event EventHandler&lt;RpcPeerEventArgs&gt;? PeerDisconnected;
+    public event EventHandler&lt;RpcHostErrorEventArgs&gt;? AcceptError;
+}
+</code></pre>
+<p><code>IServerTransport</code> is kept as the listener abstraction (it yields <code>IRpcChannel</code>).
+&quot;IChannelListener&quot; is the conceptual name for the same role.</p>
+<h2 id="generated-surface-per-dotboxdservice-igameservice">Generated surface (per <code>[DotBoxDService] IGameService</code>)</h2>
+<p>The generator emits the same proxy + dispatcher pair. The proxy's backing field is typed
+<code>IRpcInvoker</code> and named <code>_invoker</code> internally. The generated extension methods target
+<code>RpcPeer</code> (<code>Provide…</code> / <code>Get…</code>); the legacy <code>Create…Proxy</code> / <code>Add…</code> extensions were removed
+along with the client/server types.</p>
+<pre><code class="lang-csharp">public static class DotBoxDGeneratedExtensions
+{
+    public static RpcPeer ProvideGameService(this RpcPeer peer, IGameService impl);   // → Provide&lt;IGameService&gt;(impl)
+    public static IGameService GetGameService(this RpcPeer peer);                      // → Get&lt;IGameService&gt;()
+}
+</code></pre>
+<h2 id="usage-examples">Usage examples</h2>
+<h3 id="one-directional-client-calls-server">One-directional (&quot;client&quot; calls &quot;server&quot;)</h3>
+<pre><code class="lang-csharp">// Provider side.
+await using var host = RpcHost
+    .Listen(new TcpServerTransport(5050), new MessagePackRpcSerializer())
+    .ForEachPeer(peer =&gt; peer.ProvideGameService(new GameService()));
+await host.StartAsync();
+
+// Caller side — gets only; RejectInboundCalls makes the one-way intent explicit.
+var channel = /* connect a duplex IRpcChannel */;
+await using var peer = RpcPeer
+    .Over(channel, new MessagePackRpcSerializer(), new RpcPeerOptions { RejectInboundCalls = true })
+    .Start();
+
+var game = peer.GetGameService();
+var status = await game.GetServerStatusAsync();
+</code></pre>
+<h3 id="bidirectional">Bidirectional</h3>
+<pre><code class="lang-csharp">await using var a = RpcPeer.Over(channelA, serializer)
+    .Provide&lt;IChatParticipant&gt;(new ParticipantA())
+    .Start();
+var room = a.Get&lt;IChatRoom&gt;();
+await room.JoinAsync(&quot;A&quot;);
+
+await using var b = RpcPeer.Over(channelB, serializer)
+    .Provide&lt;IChatRoom&gt;(new ChatRoom())
+    .Start();
+var notifier = b.Get&lt;IChatParticipant&gt;();   // B calls back into A
+await notifier.MessageReceivedAsync(&quot;welcome&quot;);
+</code></pre>
+<h2 id="migration-map">Migration map</h2>
+<table>
+<thead>
+<tr>
+<th>Was</th>
+<th>Now</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RpcClient</code> / <code>IRpcClient</code></td>
+<td><code>RpcPeer</code> (get-only) / <code>IRpcInvoker</code></td>
+<td>legacy client <strong>removed</strong></td>
+</tr>
+<tr>
+<td><code>RpcServer</code> + accept loop</td>
+<td><code>RpcHost</code> + per-conn <code>RpcPeer</code></td>
+<td>legacy server <strong>removed</strong>; accept concern is <code>RpcHost</code></td>
+</tr>
+<tr>
+<td><code>RpcPeer</code> + <code>DuplexConnectionSplitter</code></td>
+<td><code>RpcPeer</code> (one loop)</td>
+<td>both <strong>removed</strong></td>
+</tr>
+<tr>
+<td><code>IConnection</code></td>
+<td><code>IRpcChannel</code></td>
+<td><code>IConnection</code> <strong>removed</strong>; transports return <code>IRpcChannel</code> directly (impls unchanged — <code>IConnection</code> added no members)</td>
+</tr>
+<tr>
+<td><code>serverBuilder.AddGameService(impl)</code></td>
+<td><code>peer.ProvideGameService(impl)</code></td>
+<td>generated <code>Add…</code> extension <strong>removed</strong></td>
+</tr>
+<tr>
+<td><code>client.CreateGameServiceProxy()</code></td>
+<td><code>peer.GetGameService()</code></td>
+<td>generated <code>Create…Proxy</code> extension <strong>removed</strong></td>
+</tr>
+<tr>
+<td><code>RpcRequest</code> / <code>RpcResponse</code> / <code>ServiceHandle</code> / <code>InstanceRegistry</code></td>
+<td><strong>unchanged</strong></td>
+<td>wire compatibility preserved</td>
+</tr>
+</tbody>
+</table>
+<p>The wire format never changes, so old and new peers interoperate throughout.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/design/peer-model.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

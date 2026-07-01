@@ -1,0 +1,3099 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RpcPeer | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RpcPeer | DotBoxD — contract-first .NET extension runtime ">
+      
+      <meta name="description" content="One symmetric side of a DotBoxD connection. A peer can provide local services and get proxies for remote services over one demuxed read loop.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Services.Peer.RpcPeer">
+
+
+
+  <h1 id="DotBoxD_Services_Peer_RpcPeer" data-uid="DotBoxD.Services.Peer.RpcPeer" class="text-break">
+Class RpcPeer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DotBoxD.html">DotBoxD</a>.<a class="xref" href="DotBoxD.Services.html">Services</a>.<a class="xref" href="DotBoxD.Services.Peer.html">Peer</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DotBoxD.Services.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>One symmetric side of a DotBoxD connection. A peer can provide local services and get proxies
+for remote services over one demuxed read loop.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class RpcPeer : IAsyncDisposable, IRpcInvoker</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RpcPeer</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+      <div><a class="xref" href="DotBoxD.Services.Server.IRpcInvoker.html">IRpcInvoker</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_IsConnected_" data-uid="DotBoxD.Services.Peer.RpcPeer.IsConnected*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_IsConnected" data-uid="DotBoxD.Services.Peer.RpcPeer.IsConnected">
+  IsConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Gets whether the underlying channel is still connected.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsConnected { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_RemoteEndpoint_" data-uid="DotBoxD.Services.Peer.RpcPeer.RemoteEndpoint*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_RemoteEndpoint" data-uid="DotBoxD.Services.Peer.RpcPeer.RemoteEndpoint">
+  RemoteEndpoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>The remote endpoint string of the underlying channel.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string RemoteEndpoint { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_CloseAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.CloseAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_CloseAsync_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.CloseAsync(System.Threading.CancellationToken)">
+  CloseAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Closes the peer by disposing it; closed peers cannot be restarted.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task CloseAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="DotBoxD_Services_Peer_RpcPeer_CloseAsync_System_Threading_CancellationToken__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>Disposal always runs to completion: <code class="paramref">ct</code> fails fast only before any teardown
+begins, and never abandons an in-progress dispose to finish in the background.</p>
+</div>
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_DisposeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.DisposeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_DisposeAsync" data-uid="DotBoxD.Services.Peer.RpcPeer.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources asynchronously.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>A task that represents the asynchronous dispose operation.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Get_" data-uid="DotBoxD.Services.Peer.RpcPeer.Get*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Get__1" data-uid="DotBoxD.Services.Peer.RpcPeer.Get``1">
+  Get&lt;TService&gt;()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates a proxy to call <code class="typeparamref">TService</code> on the other side.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TService Get&lt;TService&gt;() where TService : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TService</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TService</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsync(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method with neither a request nor a response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeAsync(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync__1_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync``1(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableAsync&lt;T&gt;(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableAsync&lt;T&gt;(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableAsync&lt;TRequest, T&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableAsync&lt;TRequest, T&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableAsync__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableAsync``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableAsync&lt;TRequest, T&gt;(string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableAsync&lt;TRequest, T&gt;(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync__1_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync``1(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstanceAsync&lt;T&gt;(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableOnInstanceAsync&lt;T&gt;(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstanceAsync&lt;TRequest, T&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableOnInstanceAsync&lt;TRequest, T&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstanceAsync__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstanceAsync``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstanceAsync&lt;TRequest, T&gt;(string, string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IAsyncEnumerable&lt;T&gt;&gt; InvokeAsyncEnumerableOnInstanceAsync&lt;TRequest, T&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance__1_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance``1(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstance&lt;T&gt;(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerableOnInstance&lt;T&gt;(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstance&lt;TRequest, T&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerableOnInstance&lt;TRequest, T&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerableOnInstance__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerableOnInstance``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsyncEnumerableOnInstance&lt;TRequest, T&gt;(string, string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerableOnInstance&lt;TRequest, T&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable__1_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable``1(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerable&lt;T&gt;(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerable&lt;T&gt;(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsyncEnumerable&lt;TRequest, T&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerable&lt;TRequest, T&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsyncEnumerable__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsyncEnumerable``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsyncEnumerable&lt;TRequest, T&gt;(string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;T&gt; InvokeAsyncEnumerable&lt;TRequest, T&gt;(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__1_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``1(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeAsync&lt;TResponse&gt;(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method with no request body and a response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeAsync&lt;TResponse&gt;(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment[], CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a no-response method with a request body that references streamed arguments.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__1_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``1(System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest&gt;(string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method with a request body and no response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeAsync&lt;TRequest&gt;(string service, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd><p>The request payload.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest, TResponse&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeAsync&lt;TRequest, TResponse&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__2_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``2(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest, TResponse&gt;(string, string, TRequest, RpcStreamAttachment[], CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method with a request body that references streamed arguments.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeAsync&lt;TRequest, TResponse&gt;(string service, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeAsync__2_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeAsync``2(System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeAsync&lt;TRequest, TResponse&gt;(string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method with a request body and a response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeAsync&lt;TRequest, TResponse&gt;(string service, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd><p>The request payload.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes an instance-scoped method with neither a request nor a response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The target instance identifier.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__1_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``1(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TResponse&gt;(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes an instance-scoped method with no request body and a response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TResponse&gt;(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The target instance identifier.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment[], CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__1_System_String_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``1(System.String,System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes an instance-scoped method with a request body and no response body.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task InvokeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The target instance identifier.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd><p>The request payload.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__2_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``2(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string, string, string, TRequest, RpcStreamAttachment[], CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[] streams, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeOnInstanceAsync__2_System_String_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeOnInstanceAsync``2(System.String,System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string, string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invokes a method on a specific remote sub-service instance.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResponse&gt; InvokeOnInstanceAsync&lt;TRequest, TResponse&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The remote service name.</p>
+</dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The target instance identifier.</p>
+</dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>The method to invoke.</p>
+</dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd><p>The request payload.</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync(System.String,System.String,System.Threading.CancellationToken)">
+  InvokePipeAsync(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeAsync(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokePipeAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokePipeAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokePipeOnInstanceAsync(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokePipeOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokePipeOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokePipeOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokePipeOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Pipe&gt; InvokePipeOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.pipelines.pipe">Pipe</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeStreamAsync(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamAsync(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeStreamAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamAsync__1_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamAsync``1(System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeStreamAsync&lt;TRequest&gt;(string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamAsync&lt;TRequest&gt;(string service, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeStreamOnInstanceAsync(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment,System.Threading.CancellationToken)">
+  InvokeStreamOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment stream, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>stream</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeStreamOnInstanceAsync__1_System_String_System_String_System_String___0_DotBoxD_Services_Streaming_Frames_RpcStreamAttachment___System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeStreamOnInstanceAsync``1(System.String,System.String,System.String,``0,DotBoxD.Services.Streaming.Frames.RpcStreamAttachment[],System.Threading.CancellationToken)">
+  InvokeStreamOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, RpcStreamAttachment[]?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;Stream&gt; InvokeStreamOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>streams</code> <a class="xref" href="DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html">RpcStreamAttachment</a>[]</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeValueAsync(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InvokeValueAsync(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync__1_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync``1(System.String,System.String,System.Threading.CancellationToken)">
+  InvokeValueAsync&lt;TResponse&gt;(string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResponse&gt; InvokeValueAsync&lt;TResponse&gt;(string service, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync__1_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync``1(System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeValueAsync&lt;TRequest&gt;(string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InvokeValueAsync&lt;TRequest&gt;(string service, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueAsync__2_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueAsync``2(System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeValueAsync&lt;TRequest, TResponse&gt;(string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResponse&gt; InvokeValueAsync&lt;TRequest, TResponse&gt;(string service, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeValueOnInstanceAsync(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InvokeValueOnInstanceAsync(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync__1_System_String_System_String_System_String_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync``1(System.String,System.String,System.String,System.Threading.CancellationToken)">
+  InvokeValueOnInstanceAsync&lt;TResponse&gt;(string, string, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResponse&gt; InvokeValueOnInstanceAsync&lt;TResponse&gt;(string service, string instanceId, string method, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync__1_System_String_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync``1(System.String,System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeValueOnInstanceAsync&lt;TRequest&gt;(string, string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InvokeValueOnInstanceAsync&lt;TRequest&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_InvokeValueOnInstanceAsync__2_System_String_System_String_System_String___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Services.Peer.RpcPeer.InvokeValueOnInstanceAsync``2(System.String,System.String,System.String,``0,System.Threading.CancellationToken)">
+  InvokeValueOnInstanceAsync&lt;TRequest, TResponse&gt;(string, string, string, TRequest, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResponse&gt; InvokeValueOnInstanceAsync&lt;TRequest, TResponse&gt;(string service, string instanceId, string method, TRequest request, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>instanceId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>request</code> <span class="xref">TRequest</span></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResponse&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TRequest</code></dt>
+    <dd></dd>
+    <dt><code>TResponse</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Over_" data-uid="DotBoxD.Services.Peer.RpcPeer.Over*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Over_DotBoxD_Services_Transport_IRpcChannel_DotBoxD_Services_Serialization_ISerializer_DotBoxD_Services_Peer_RpcPeerOptions_" data-uid="DotBoxD.Services.Peer.RpcPeer.Over(DotBoxD.Services.Transport.IRpcChannel,DotBoxD.Services.Serialization.ISerializer,DotBoxD.Services.Peer.RpcPeerOptions)">
+  Over(IRpcChannel, ISerializer, RpcPeerOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates a peer over <code class="paramref">channel</code>. Call <a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html#DotBoxD_Services_Peer_RpcPeer_Start">Start()</a> to begin
+the read loop (invoking a method also starts it implicitly).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static RpcPeer Over(IRpcChannel channel, ISerializer serializer, RpcPeerOptions? options = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DotBoxD.Services.Transport.IRpcChannel.html">IRpcChannel</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="DotBoxD.Services.Serialization.ISerializer.html">ISerializer</a></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="DotBoxD.Services.Peer.RpcPeerOptions.html">RpcPeerOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html">RpcPeer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Provide_" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Provide_DotBoxD_Services_Server_IServiceDispatcher_" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide(DotBoxD.Services.Server.IServiceDispatcher)">
+  Provide(IServiceDispatcher)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Provides a service via an explicit dispatcher.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RpcPeer Provide(IServiceDispatcher dispatcher)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>dispatcher</code> <a class="xref" href="DotBoxD.Services.Server.IServiceDispatcher.html">IServiceDispatcher</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html">RpcPeer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Provide_" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Provide__1" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide``1">
+  Provide&lt;TService&gt;()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Resolves and provides a local implementation of <code class="typeparamref">TService</code> from the configured service provider.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RpcPeer Provide&lt;TService&gt;() where TService : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html">RpcPeer</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TService</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Provide_" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Provide__1___0_" data-uid="DotBoxD.Services.Peer.RpcPeer.Provide``1(``0)">
+  Provide&lt;TService&gt;(TService)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Provides a local implementation of <code class="typeparamref">TService</code> for the other
+side to call.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RpcPeer Provide&lt;TService&gt;(TService implementation) where TService : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>implementation</code> <span class="xref">TService</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html">RpcPeer</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TService</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+  <h4 class="section" id="DotBoxD_Services_Peer_RpcPeer_Provide__1___0__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>Provided services are callable by any peer on this channel; enforce access
+control at the transport or application layer.</p>
+</div>
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_ReleaseStream_" data-uid="DotBoxD.Services.Peer.RpcPeer.ReleaseStream*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_ReleaseStream_DotBoxD_Services_Protocol_RpcStreamHandle_" data-uid="DotBoxD.Services.Peer.RpcPeer.ReleaseStream(DotBoxD.Services.Protocol.RpcStreamHandle)">
+  ReleaseStream(RpcStreamHandle)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Releases a stream id reservation that was never attached to an RPC request.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReleaseStream(RpcStreamHandle handle)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="DotBoxD.Services.Protocol.RpcStreamHandle.html">RpcStreamHandle</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_ReserveStream_" data-uid="DotBoxD.Services.Peer.RpcPeer.ReserveStream*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_ReserveStream_DotBoxD_Services_Protocol_RpcStreamKind_" data-uid="DotBoxD.Services.Peer.RpcPeer.ReserveStream(DotBoxD.Services.Protocol.RpcStreamKind)">
+  ReserveStream(RpcStreamKind)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Reserves a stream id for a streamed argument sent by this peer.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RpcStreamHandle ReserveStream(RpcStreamKind kind)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>kind</code> <a class="xref" href="DotBoxD.Services.Protocol.RpcStreamKind.html">RpcStreamKind</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Protocol.RpcStreamHandle.html">RpcStreamHandle</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Services_Peer_RpcPeer_Start_" data-uid="DotBoxD.Services.Peer.RpcPeer.Start*"></a>
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Start" data-uid="DotBoxD.Services.Peer.RpcPeer.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Begins the read loop. Idempotent; safe to call from a fluent chain.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RpcPeer Start()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Peer.RpcPeer.html">RpcPeer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_Disconnected" data-uid="DotBoxD.Services.Peer.RpcPeer.Disconnected">
+  Disconnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Raised when the read loop ends after a remote close or read error; local close/dispose does
+not raise it. Handlers run on the teardown path and should not block.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler&lt;RpcDisconnectedEventArgs&gt;? Disconnected</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="DotBoxD.Services.Diagnostics.RpcDisconnectedEventArgs.html">RpcDisconnectedEventArgs</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_DispatchError" data-uid="DotBoxD.Services.Peer.RpcPeer.DispatchError">
+  DispatchError
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Raised when an inbound request fails outside the service method itself — for example when
+the response or error frame cannot be sent. Exceptions thrown by a provided service method
+are not surfaced here; they are converted into an Error frame returned to the caller.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler&lt;RpcDispatchErrorEventArgs&gt;? DispatchError</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="DotBoxD.Services.Diagnostics.RpcDispatchErrorEventArgs.html">RpcDispatchErrorEventArgs</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_ProtocolError" data-uid="DotBoxD.Services.Peer.RpcPeer.ProtocolError">
+  ProtocolError
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Raised when a malformed or unsupported protocol frame is observed.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler&lt;RpcProtocolErrorEventArgs&gt;? ProtocolError</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="DotBoxD.Services.Diagnostics.RpcProtocolErrorEventArgs.html">RpcProtocolErrorEventArgs</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="DotBoxD_Services_Peer_RpcPeer_ReadError" data-uid="DotBoxD.Services.Peer.RpcPeer.ReadError">
+  ReadError
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Raised when the read loop fails with a non-cancellation exception.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler&lt;RpcReadErrorEventArgs&gt;? ReadError</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="DotBoxD.Services.Diagnostics.RpcReadErrorEventArgs.html">RpcReadErrorEventArgs</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

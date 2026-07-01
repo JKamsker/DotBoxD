@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class NamedPipeClientTransport | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class NamedPipeClientTransport | DotBoxD — contract-first .NET extension runtime ">
+      
+      <meta name="description" content="Client transport for connecting to a DotBoxD server over a named pipe.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport">
+
+
+
+  <h1 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport" class="text-break">
+Class NamedPipeClientTransport  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DotBoxD.html">DotBoxD</a>.<a class="xref" href="DotBoxD.Transports.html">Transports</a>.<a class="xref" href="DotBoxD.Transports.NamedPipes.html">NamedPipes</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DotBoxD.Transports.NamedPipes.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Client transport for connecting to a DotBoxD server over a named pipe.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class NamedPipeClientTransport : ITransport, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">NamedPipeClientTransport</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="DotBoxD.Services.Transport.ITransport.html">ITransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="DotBoxD.Services.Transport.RpcTransportExtensions.html#DotBoxD_Services_Transport_RpcTransportExtensions_ConnectPeerAsync_DotBoxD_Services_Transport_ITransport_DotBoxD_Services_Serialization_ISerializer_DotBoxD_Services_Peer_RpcPeerOptions_System_Threading_CancellationToken_">RpcTransportExtensions.ConnectPeerAsync(ITransport, ISerializer, RpcPeerOptions?, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="DotBoxD.Services.Transport.RpcTransportExtensions.html#DotBoxD_Services_Transport_RpcTransportExtensions_ConnectPeerAsync_DotBoxD_Services_Transport_ITransport_DotBoxD_Services_Serialization_ISerializer_System_Action_DotBoxD_Services_Peer_RpcPeer__DotBoxD_Services_Peer_RpcPeerOptions_System_Threading_CancellationToken_">RpcTransportExtensions.ConnectPeerAsync(ITransport, ISerializer, Action&lt;RpcPeer&gt;, RpcPeerOptions?, CancellationToken)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport__ctor_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.#ctor*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport__ctor_System_String_System_Int32_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.#ctor(System.String,System.Int32)">
+  NamedPipeClientTransport(string, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NamedPipeClientTransport(string pipeName, int maxMessageSize = 16777216)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>pipeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>maxMessageSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport__ctor_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.#ctor*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport__ctor_System_String_System_String_System_Int32_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.#ctor(System.String,System.String,System.Int32)">
+  NamedPipeClientTransport(string, string, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NamedPipeClientTransport(string serverName, string pipeName, int maxMessageSize = 16777216)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>serverName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>pipeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>maxMessageSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_DefaultFrameReadIdleTimeout" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.DefaultFrameReadIdleTimeout">
+  DefaultFrameReadIdleTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Default inter-read idle timeout applied to client connections' in-progress frame body reads.
+Mirrors <a class="xref" href="DotBoxD.Transports.NamedPipes.NamedPipeServerTransport.html#DotBoxD_Transports_NamedPipes_NamedPipeServerTransport_DefaultFrameReadIdleTimeout">DefaultFrameReadIdleTimeout</a>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly TimeSpan DefaultFrameReadIdleTimeout</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_Connection_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.Connection*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_Connection" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.Connection">
+  Connection
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Gets the active connection (client-side).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRpcChannel? Connection { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Services.Transport.IRpcChannel.html">IRpcChannel</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_FrameReadIdleTimeout_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.FrameReadIdleTimeout*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_FrameReadIdleTimeout" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.FrameReadIdleTimeout">
+  FrameReadIdleTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Inter-read idle timeout applied to the client connection's in-progress frame body reads.
+<a href="https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/null">null</a> uses <a class="xref" href="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.html#DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_DefaultFrameReadIdleTimeout">DefaultFrameReadIdleTimeout</a>;
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.timeout.infinitetimespan">InfiniteTimeSpan</a> disables it. See <a class="xref" href="DotBoxD.Services.Transport.StreamConnection.html">StreamConnection</a>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? FrameReadIdleTimeout { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_IsConnected_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.IsConnected*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_IsConnected" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.IsConnected">
+  IsConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Gets whether there is an active connection.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsConnected { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_ConnectAsync_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.ConnectAsync*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_ConnectAsync_System_Threading_CancellationToken_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.ConnectAsync(System.Threading.CancellationToken)">
+  ConnectAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Establishes a connection (client-side).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task ConnectAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_DisposeAsync_" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.DisposeAsync*"></a>
+
+  <h3 id="DotBoxD_Transports_NamedPipes_NamedPipeClientTransport_DisposeAsync" data-uid="DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources asynchronously.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>A task that represents the asynchronous dispose operation.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

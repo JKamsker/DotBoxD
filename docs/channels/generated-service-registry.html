@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Generated Service Registry | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Generated Service Registry | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/generated-service-registry.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="generated-service-registry">Generated Service Registry</h1>
+
+<p>DotBoxD emits a generated service registry for every compilation that contains valid
+<code>[DotBoxDService]</code> interfaces. This lets callers create typed proxies and dispatchers
+without scanning assemblies for generated types.</p>
+<h2 id="what-gets-generated">What Gets Generated</h2>
+<p>For a shared contract assembly like this:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services.Attributes;
+
+[DotBoxDService]
+public interface IChatService
+{
+    Task SendAsync(string message, CancellationToken ct = default);
+}
+</code></pre>
+<p>the generator emits:</p>
+<ul>
+<li><code>ChatServiceProxy</code> in the service namespace</li>
+<li><code>ChatServiceDispatcher</code> in the service namespace</li>
+<li>peer extension methods such as <code>ProvideChatService(...)</code> and <code>GetChatService()</code></li>
+<li><code>DotBoxD.Services.Generated.DotBoxDGenerated</code>, a public factory and registration type</li>
+<li><code>DotBoxDGenerated.Services</code>, an array-backed catalog of generated service descriptors</li>
+<li><code>DotBoxDGenerated.RegisterServices(...)</code>, a generic registration callback for generated proxy implementations</li>
+<li><code>DotBoxDGenerated.RegisterGeneratedServices(...)</code>, a generic callback for service/proxy/dispatcher triples</li>
+</ul>
+<p>The generated <code>DotBoxDGenerated</code> type registers the service with
+<code>DotBoxD.Services.Generated.GeneratedServiceRegistry</code> through generated delegates. No runtime
+type scan is needed.</p>
+<p>Each <code>GeneratedService</code> descriptor contains:</p>
+<ul>
+<li><code>ServiceType</code> - the <code>[DotBoxDService]</code> interface type</li>
+<li><code>ProxyType</code> - the generated client proxy implementation type</li>
+<li><code>DispatcherType</code> - the generated server dispatcher implementation type</li>
+<li><code>ServiceName</code> - the wire service name after <code>[DotBoxDService(Name = ...)]</code></li>
+</ul>
+<h2 id="typed-factory-usage">Typed Factory Usage</h2>
+<p>Use <code>DotBoxD.Services.Generated.DotBoxDGenerated</code> when you want a generic API that does not depend
+on the generated proxy or dispatcher type names:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services;
+using DotBoxD.Services.Server;
+using DotBoxD.Services.Generated;
+
+RpcPeer peer = /* connected peer */;
+IChatService proxy = DotBoxDGenerated.CreateProxy&lt;IChatService&gt;(peer);
+
+var implementation = new ChatService();
+IServiceDispatcher dispatcher =
+    DotBoxDGenerated.CreateDispatcher&lt;IChatService&gt;(implementation);
+peer.Provide(dispatcher);
+</code></pre>
+<p><code>CreateProxy&lt;TService&gt;</code> takes an <code>IRpcInvoker</code>; an <code>RpcPeer</code> implements it, so you pass
+the peer directly. This is the preferred shape for frameworks, plugin hosts, and sidecars
+that expose <code>Provide&lt;TService&gt;(...)</code> or <code>Remote&lt;TService&gt;()</code> style APIs.</p>
+<h2 id="generated-service-catalog">Generated Service Catalog</h2>
+<p>Use <code>DotBoxDGenerated.Services</code> when you need the list of generated services without
+scanning the assembly for generated proxy or dispatcher types:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services.Generated;
+
+var services = DotBoxDGenerated.Services;
+for (var i = 0; i &lt; services.Count; i++)
+{
+    var service = services[i];
+    Console.WriteLine(
+        $&quot;{service.ServiceType.FullName} -&gt; {service.ProxyType.FullName}, {service.DispatcherType.FullName}&quot;);
+}
+</code></pre>
+<p><code>Services</code> is backed by one generated static array per service assembly. Accessing it
+does not allocate another buffer and does not enumerate assembly types.</p>
+<h2 id="registration-sink">Registration Sink</h2>
+<p>Use <code>IDotBoxDServiceRegistrationSink</code> when a framework needs compile-time generic
+registrations instead of <code>Type</code> descriptors:</p>
+<pre><code class="lang-csharp">using Microsoft.Extensions.DependencyInjection;
+using DotBoxD.Services.Generated;
+using DotBoxD.Services.Generated;
+
+public sealed class MySink : IDotBoxDServiceRegistrationSink
+{
+    private readonly IServiceCollection _services;
+
+    public MySink(IServiceCollection services)
+    {
+        _services = services;
+    }
+
+    public void AddService&lt;TService, TImplementation&gt;()
+        where TService : class
+        where TImplementation : TService
+    {
+        _services.AddTransient&lt;TService, TImplementation&gt;();
+    }
+}
+
+DotBoxDGenerated.RegisterServices(new MySink(services));
+</code></pre>
+<p>For each valid <code>[DotBoxDService]</code> interface generated into the assembly,
+<code>RegisterServices</code> calls:</p>
+<pre><code class="lang-csharp">sink.AddService&lt;IChatService, ChatServiceProxy&gt;();
+</code></pre>
+<p><code>TService</code> is the service interface. <code>TImplementation</code> is the generated proxy type
+that implements that interface. The method is generated as direct generic calls, so it
+does not scan assembly types. The generated type initializer still publishes the shared
+descriptor catalog once per assembly.</p>
+<p>Use <code>IDotBoxDGeneratedServiceRegistrationSink</code> when the host needs both generated
+implementation types:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services.Generated;
+using DotBoxD.Services.Server;
+using DotBoxD.Services.Generated;
+
+public sealed class GeneratedSink : IDotBoxDGeneratedServiceRegistrationSink
+{
+    public void AddService&lt;TService, TProxy, TDispatcher&gt;()
+        where TService : class
+        where TProxy : TService
+        where TDispatcher : IServiceDispatcher
+    {
+        // Register TService -&gt; TProxy for clients and TDispatcher for server factories.
+    }
+}
+
+DotBoxDGenerated.RegisterGeneratedServices(new GeneratedSink());
+</code></pre>
+<p>For the same <code>IChatService</code>, the generated method emits a direct generic call:</p>
+<pre><code class="lang-csharp">sink.AddService&lt;IChatService, ChatServiceProxy, ChatServiceDispatcher&gt;();
+</code></pre>
+<p>The all-caps compatibility aliases <code>IDotBoxDServiceRegistrationSink</code> and
+<code>IDotBoxDGeneratedServiceRegistrationSink</code> are also available for callers that prefer
+the project acronym casing.</p>
+<h2 id="dynamic-factory-usage">Dynamic Factory Usage</h2>
+<p>When the service type is known only at runtime, use the non-generic overloads:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services;
+using DotBoxD.Services.Server;
+using DotBoxD.Services.Generated;
+
+Type serviceType = typeof(IChatService);
+RpcPeer peer = /* connected peer */;
+object proxy = DotBoxDGenerated.CreateProxy(serviceType, peer);
+
+object implementation = new ChatService();
+IServiceDispatcher dispatcher =
+    DotBoxDGenerated.CreateDispatcher(serviceType, implementation);
+peer.Provide(dispatcher);
+</code></pre>
+<p>The implementation passed to <code>CreateDispatcher(Type, object)</code> must implement the
+service interface, otherwise the registry throws an <code>ArgumentException</code>.</p>
+<p>When infrastructure only has an <code>Assembly</code>, use the runtime registry's targeted
+lookup helper. It looks up the known generated factory type by name and returns the
+same catalog that the generated static constructor published:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services.Generated;
+
+IReadOnlyList&lt;GeneratedService&gt; services =
+    GeneratedServiceRegistry.GetServices(contractAssembly);
+</code></pre>
+<p>This is useful for plugin hosts that load contract assemblies dynamically and want
+the service/proxy/dispatcher map without scanning all types in the assembly.</p>
+<p>For hosts that load several contract assemblies, pass the assembly set once:</p>
+<pre><code class="lang-csharp">Assembly[] contractAssemblies = pluginContracts.Select(p =&gt; p.Assembly).ToArray();
+
+IReadOnlyList&lt;GeneratedService&gt; allServices =
+    GeneratedServiceRegistry.GetServices(contractAssemblies);
+
+GeneratedServiceRegistry.RegisterServices(contractAssemblies, new MySink(services));
+GeneratedServiceRegistry.RegisterGeneratedServices(contractAssemblies, new GeneratedSink());
+</code></pre>
+<p>The multi-assembly helpers perform a targeted lookup for
+<code>DotBoxD.Services.Generated.DotBoxDGenerated</code> in each assembly. They do not enumerate assembly
+types or scan for attributes at runtime.</p>
+<h2 id="runtime-registry">Runtime Registry</h2>
+<p>The lower-level runtime registry is public for advanced hosts:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services.Generated;
+
+var service = GeneratedServiceRegistry.GetService&lt;IChatService&gt;();
+var proxy = GeneratedServiceRegistry.CreateProxy&lt;IChatService&gt;(peer);
+var dispatcher = GeneratedServiceRegistry.CreateDispatcher&lt;IChatService&gt;(implementation);
+</code></pre>
+<p>Like the typed factory, <code>CreateProxy&lt;IChatService&gt;</code> takes an <code>IRpcInvoker</code>, so pass the
+connected <code>RpcPeer</code>.</p>
+<p>Normally you should call <code>DotBoxD.Services.Generated.DotBoxDGenerated</code> from the service assembly.
+The runtime registry is useful when infrastructure code should not reference the
+generated namespace directly.</p>
+<h2 id="assembly-scope">Assembly Scope</h2>
+<p>The registry is generated per compilation. If a solution has multiple shared contract
+assemblies, each assembly gets its own <code>DotBoxD.Services.Generated.DotBoxDGenerated</code> type that
+registers the services declared in that assembly.</p>
+<p>When a registry lookup is requested and the service has not been registered yet,
+<code>GeneratedServiceRegistry</code> performs one targeted lookup for the generated registration type
+in the service interface's assembly and runs its static constructor. It does not enumerate
+all types in the assembly.</p>
+<p>If the source generator did not run, the registry throws a diagnostic exception that
+names the service interface and assembly and tells the caller to mark the interface with
+<code>[DotBoxDService]</code> and ensure the DotBoxD generator is referenced.</p>
+<h2 id="bidirectional-peer-example">Bidirectional Peer Example</h2>
+<p>The generated registry is what allows <code>RpcPeer</code> to expose a compact typed API. Each side
+is an <code>RpcPeer</code> over one duplex <code>IRpcChannel</code>; each side may <code>Provide</code> an implementation
+and <code>Get</code> a proxy to call the other side:</p>
+<pre><code class="lang-csharp">using DotBoxD.Services;
+using DotBoxD.Services.Generated;
+
+await using var peer = RpcPeer
+    .Over(channel, serializer)
+    .ProvideChatService(new ChatService())
+    .Start();
+
+IClientCallbacks callbacks = peer.GetClientCallbacks();
+</code></pre>
+<p>The generated <code>ProvideChatService</code> / <code>GetClientCallbacks</code> extension methods build on the
+factory and registry above: <code>ProvideChatService(impl)</code> calls <code>peer.Provide(...)</code> with the
+generated dispatcher, and <code>GetClientCallbacks()</code> returns the generated proxy over the peer.
+If you only have <code>Type</code> values at runtime, call
+<code>DotBoxDGenerated.CreateProxy(serviceType, peer)</code> and <code>peer.Provide(DotBoxDGenerated.CreateDispatcher(serviceType, impl))</code>
+instead. Both sides can use the same pattern over one duplex connection.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/generated-service-registry.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

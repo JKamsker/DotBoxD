@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>DotBoxD | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="DotBoxD | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/index.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="dotboxd">DotBoxD</h1>
+
+<p><strong>Source-generated, contract-first .NET extension runtime.</strong> One C# contract, used three ways —
+all driven by Roslyn source generators, with no runtime reflection on the hot path.</p>
+<p><a href="https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml"><img src="https://github.com/JKamsker/DotBoxD/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="https://www.nuget.org/packages?q=DotBoxD"><img src="https://img.shields.io/badge/NuGet-packages-004880.svg?logo=nuget" alt="NuGet packages"></a>
+<a href="https://github.com/JKamsker/DotBoxD/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+<a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512BD4.svg" alt=".NET"></a></p>
+<hr>
+<h2 id="the-three-ways-to-use-one-contract">The three ways to use one contract</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What it does</th>
+<th>Start here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Services</strong></td>
+<td>The host implements a contract; clients call it remotely over RPC.</td>
+<td><a href="docs/tutorials/first-service.html">Tutorial ›</a></td>
+</tr>
+<tr>
+<td><strong>Kernels</strong></td>
+<td>A client supplies validated logic the host runs safely inside a fuel-metered sandbox.</td>
+<td><a href="docs/tutorials/first-kernel.html">Tutorial ›</a></td>
+</tr>
+<tr>
+<td><strong>Pushdown</strong></td>
+<td>A plugin ships its <em>own</em> sandboxed batch operation that runs <strong>server-side</strong>, collapsing N round-trips into one.</td>
+<td><a href="docs/tutorials/pushdown-server-extension.html">Tutorial ›</a></td>
+</tr>
+</tbody>
+</table>
+<p>The Services and channel libraries target <code>netstandard2.1</code>, so they run on <strong>Unity / IL2CPP</strong>.
+The Kernels and Pushdown stack targets <code>net10.0</code>.</p>
+<h2 id="install">Install</h2>
+<pre><code class="lang-bash"># Full net10.0 stack (Services + Kernels + Pushdown):
+dotnet add package DotBoxD --prerelease
+
+# Unity / netstandard2.1 service bundle:
+dotnet add package DotBoxD.Services.All --prerelease
+</code></pre>
+<p>Then follow <a href="docs/getting-started/README.html"><strong>Getting started</strong></a> or jump straight into a
+<a href="docs/tutorials/toc.html"><strong>Tutorial</strong></a>.</p>
+<h2 id="explore-the-docs">Explore the docs</h2>
+<ul>
+<li>📘 <strong><a href="docs/toc.html">Guide</a></strong> — concepts (Services, Kernels, Pushdown, the runtime), security model, and reference (diagnostics, schemas).</li>
+<li>🎓 <strong><a href="docs/tutorials/toc.html">Tutorials</a></strong> — end-to-end walkthroughs for your first service, first kernel, and first pushdown extension.</li>
+<li>🧩 <strong><a href="docs/examples/toc.html">Examples</a></strong> — an annotated tour of the maintained GameServer sample.</li>
+<li>🔎 <strong><a href="api/toc.html">API reference</a></strong> — generated from the source of every published package.</li>
+</ul>
+<h2 id="security-in-one-line">Security in one line</h2>
+<p><strong>Safe mode is the real boundary:</strong> a kernel is restricted IR that is validated, capability-gated,
+fuel/quota-metered, and (for compiled mode) verified before it runs — consumers never supply C#, IL,
+or arbitrary host calls. Trusted-plugin mode (<code>AssemblyLoadContext</code>) is <strong>not</strong> a sandbox. Read
+<a href="docs/security/sandbox-caveats.html"><strong>Sandbox caveats</strong></a> before deploying.</p>
+<hr>
+<p>DotBoxD merges the former standalone <strong>ShaRPC</strong> (RPC) and <strong>Safe-IR</strong> (kernel sandbox) projects into
+one contract-first runtime. It is <a href="https://github.com/JKamsker/DotBoxD/blob/main/LICENSE">MIT licensed</a>.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/index.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

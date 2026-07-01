@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Example: the GameServer sample, end to end | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Example: the GameServer sample, end to end | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/examples/gameserver-walkthrough.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="example-the-gameserver-sample-end-to-end">Example: the GameServer sample, end to end</h1>
+
+<p>The GameServer sample is the maintained, runnable example that ties <strong>Services</strong>, <strong>Kernels</strong>, and <strong>Pushdown</strong> together in one program. A parent <em>server</em> process runs a small deterministic simulation; a child <em>plugin</em> process ships untrusted, sandboxed kernels to the server over a bidirectional named-pipe control plane. This page walks the sample feature by feature and maps each one to the concrete file that implements it, so you can jump straight into the real code.</p>
+<p>The sample lives under <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer"><code>samples/GameServer</code></a> and is the example the root <a href="https://github.com/JKamsker/DotBoxD/blob/main/README.md"><code>README.md</code></a> points at for &quot;service IPC, event kernels, live settings, host bindings, policies, and server extensions.&quot;</p>
+<h2 id="running-it">Running it</h2>
+<p>One command builds and runs everything. The server launches the plugin child process for you (see <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/PluginLauncher.cs"><code>Examples.GameServer.Server/Ipc/PluginLauncher.cs</code></a>), so you do not start the plugin separately:</p>
+<pre><code class="lang-bash">dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+</code></pre>
+<p>The server accepts one optional argument, <code>--use-builder</code>, which selects the fluent builder entrypoint on the plugin side; without it the plugin uses the same generated server through its default path. The argument is validated in <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Program.cs"><code>Examples.GameServer.Server/Program.cs</code></a>:</p>
+<pre><code class="lang-csharp">if (args.Length &gt; 1 || (args.Length == 1 &amp;&amp; args[0] != &quot;--use-builder&quot;))
+{
+    await Console.Error
+        .WriteLineAsync(&quot;Usage: Examples.GameServer.Server [--use-builder]&quot;)
+        .ConfigureAwait(false);
+    return 1;
+}
+</code></pre>
+<h3 id="what-the-run-prints">What the run prints</h3>
+<p><code>Program.Main</code> runs three phases so the effect of the plugin is visible:</p>
+<ol>
+<li><strong>Baseline</strong> — no plugins; lvl-8 monsters bully the low-level players for a few ticks.</li>
+<li><strong>With plugins</strong> — the plugin connects, installs its kernels, and the same simulation now shows guardian/retaliation effects.</li>
+<li><strong>Summary</strong> — per-tick damage before vs. after, plus proof that disconnect unloaded the plugin's kernels.</li>
+</ol>
+<p>The phase structure is driven by <code>BaselineTicks</code> / <code>PluginTicks</code> and the <code>world.TickAsync()</code> loop in <code>Program.cs</code>.</p>
+<h2 id="project-layout">Project layout</h2>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Role</th>
+<th>Key files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Examples.GameServer.Server</code></td>
+<td>The host/parent process: the 1D simulation, the IPC control plane, host bindings, and policies.</td>
+<td><code>Program.cs</code>, <code>ServerPolicy.cs</code>, <code>Ipc/</code>, <code>Simulation/</code></td>
+</tr>
+<tr>
+<td><code>Examples.GameServer.Server.Abstractions</code></td>
+<td>The shared contracts both sides compile against: the domain surface, events, IPC service interfaces, and the command DSL.</td>
+<td><code>IGameWorldAccess.cs</code>, <code>Events/</code>, <code>Ipc/</code>, <code>ServiceContracts.cs</code>, <code>GameCommands.cs</code></td>
+</tr>
+<tr>
+<td><code>Examples.GameServer.Plugin</code></td>
+<td>The untrusted plugin/child process: authored-in-C# kernels, server extensions, and the one-line generated plugin server.</td>
+<td><code>Program.cs</code>, <code>GamePluginServer.cs</code>, <code>Kernels/</code></td>
+</tr>
+<tr>
+<td><code>Examples.GameServer.Plugin.Tests</code></td>
+<td>xUnit coverage that exercises the plugin surface, IPC round-trips, and server-extension RPC without spawning processes.</td>
+<td><code>Regression/</code>, <code>RunLocal/</code>, <code>Routing/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Both <code>Server</code> and <code>Plugin</code> reference the <code>Server.Abstractions</code> project (see the two <code>.csproj</code> files); the plugin additionally references the analyzer as an <code>Analyzer</code> output so its C# kernels are lowered to verified IR at build time (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Examples.GameServer.Plugin.csproj"><code>Examples.GameServer.Plugin.csproj</code></a>).</p>
+<h2 id="the-shared-contract-serverabstractions">The shared contract (Server.Abstractions)</h2>
+<p>Everything hinges on <strong>one pure domain interface</strong> that has three consumers: the server implements it, the plugin gets an RPC proxy of it, and a kernel gets it injected. From <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/IGameWorldAccess.cs"><code>IGameWorldAccess.cs</code></a>:</p>
+<pre><code class="lang-csharp">[DotBoxDService]
+public interface IGameWorldAccess
+{
+    /// &lt;summary&gt;Monster-specific commands and scoped monster handles exposed by the game world.&lt;/summary&gt;
+    IMonsterControl Monsters { get; }
+
+    /// &lt;summary&gt;Entity-wide commands and scoped entity handles exposed by the game world.&lt;/summary&gt;
+    IEntityControl Entities { get; }
+}
+</code></pre>
+<p>Each method carries the capability and host-state effect it needs as metadata, so the analyzer and the runtime consume the same source of truth. For example, <code>IMonster.KillAsync</code> on the same file:</p>
+<pre><code class="lang-csharp">/// &lt;summary&gt;Kills this monster and returns whether the world changed.&lt;/summary&gt;
+[HostCapability(&quot;game.world.monster.write.kill&quot;, HostBindingEffect.HostStateWrite)]
+ValueTask&lt;bool&gt; KillAsync();
+</code></pre>
+<p>Supporting contracts in this project:</p>
+<ul>
+<li><strong>Events</strong> — <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/MonsterAggroEvent.cs"><code>Events/MonsterAggroEvent.cs</code></a> and <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Events/AttackEvent.cs"><code>Events/AttackEvent.cs</code></a>. Both are plain records; the framework infers the sandbox event shape from their properties. <code>AttackEvent</code> marks <code>AttackerId</code>, <code>TargetId</code>, and <code>Damage</code> with <code>[EventIndexKey]</code> so lowered <code>.Where(...)</code> predicates can be prefiltered through host dispatch indexes.</li>
+<li><strong>Named service contracts</strong> — <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/ServiceContracts.cs"><code>ServiceContracts.cs</code></a> exposes <code>IMonsterAggroService : IEventKernel&lt;MonsterAggroEvent&gt;</code> and <code>IAttackService : IEventKernel&lt;AttackEvent&gt;</code>, letting a kernel declare its behavior as a named domain service.</li>
+<li><strong>The IPC control plane</strong> — <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IGamePluginControlService.cs"><code>Ipc/IGamePluginControlService.cs</code></a> (install IR, update settings, hold the connection) and the reverse-direction <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/Ipc/IPluginEventCallback.cs"><code>Ipc/IPluginEventCallback.cs</code></a> (server → plugin push for remote <code>RunLocal</code> chains). Both are <code>[DotBoxDService]</code>.</li>
+<li><strong>The command DSL</strong> — <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server.Abstractions/GameCommands.cs"><code>GameCommands.cs</code></a> defines what a kernel's <code>host.message.write</code> messages <em>mean</em> (<code>calm:&lt;player&gt;:&lt;strength&gt;</code>, <code>taunt:&lt;target&gt;</code>); this meaning is defined in the example, never in the DotBoxD core.</li>
+</ul>
+<h2 id="the-server-parent-process">The server (parent process)</h2>
+<p>The server builds the world and the plugin server, then drives phases. From <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Program.cs"><code>Program.cs</code></a>:</p>
+<pre><code class="lang-csharp">var sink = new GameCommandSink();
+var worldHost = new GameWorldHost();
+using var server = PluginServer.Create(
+    sink,
+    configureHost: worldHost.AddBindings,
+    defaultPolicy: ServerPolicy.Create(),
+    executionMode: ExecutionMode.Compiled);
+</code></pre>
+<p>Three things are wired here: the <strong>command sink</strong> (the host capability that turns plugin messages into state changes), the <strong>host bindings</strong> for gated <code>IGameWorldAccess</code> reads, and the <strong>default sandbox policy</strong>. <code>ExecutionMode.Compiled</code> selects the compiled kernel backend.</p>
+<p>The simulation itself is a deterministic 1D line of players and monsters (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Simulation/GameWorld.cs"><code>Simulation/GameWorld.cs</code></a>). Each tick it publishes <code>MonsterAggroEvent</code> through hooks and <code>AttackEvent</code> through subscriptions (and the index registry), so plugin kernels get a chance to react before damage lands.</p>
+<p>The <code>host.message.write</code> capability is realized by <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Simulation/GameCommandSink.cs"><code>Simulation/GameCommandSink.cs</code></a>, which parses the DSL, validates it (known verb, real monster/player ids, clamped strength), and applies it — invalid commands are ignored safely and never throw back into the sandbox.</p>
+<h2 id="the-plugin-control-plane-service-ipc">The plugin control-plane service IPC</h2>
+<p>The per-connection IPC ceremony is wrapped by the framework's <code>PluginConnectionHost&lt;TConnection&gt;</code>; the sample only supplies the connection-specific work in <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginHost.cs"><code>Ipc/GamePluginHost.cs</code></a>:</p>
+<pre><code class="lang-csharp">public static Task&lt;PluginConnectionHost&lt;GamePluginControlService&gt;&gt; StartAsync(
+    PluginServer server,
+    GameCommandSink sink,
+    GameWorld world)
+    =&gt; PluginConnectionHost&lt;GamePluginControlService&gt;.StartAsync(
+        server,
+        &quot;dotboxd-game-&quot; + Guid.NewGuid().ToString(&quot;N&quot;),
+        (peer, session) =&gt;
+        {
+</code></pre>
+<p>Two <code>[DotBoxDService]</code> implementations are provided per connection (the control plane and the world surface), and the reverse <code>IPluginEventCallback</code> proxy is fetched from the peer.</p>
+<p>The control-plane implementation is <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs"><code>Ipc/GamePluginControlService.cs</code></a>. It never sees kernel <em>source</em> — the plugin ships opaque verified IR as <code>packageJson</code>, and the service installs and wires it through its owning <code>PluginSession</code>:</p>
+<pre><code class="lang-csharp">var package = PluginPackageJsonSerializer.Import(packageJson);
+Console.WriteLine($&quot;[server] installing plugin kernel '{package.Manifest.PluginId}'...&quot;);
+var kernel = await _session.InstallAndWireAsync(
+    package,
+    _kernelWiring.WireHook,
+    policy: pkg =&gt; ServerPolicy.ForKernel(_server.GetRequiredCapabilities(pkg)),
+    validate: _kernelWiring.ValidateRoute,
+    ct).ConfigureAwait(false);
+</code></pre>
+<p>The host's wiring <em>policy</em> — which events this server supports, how terminals route, and which callbacks/index to attach — lives in <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginKernelWiring.cs"><code>Ipc/GamePluginKernelWiring.cs</code></a>. It registers the supported event adapters so the framework router can resolve a kernel's subscribed event <em>by name</em>.</p>
+<p>On the plugin side, the whole facade is one partial class (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/GamePluginServer.cs"><code>GamePluginServer.cs</code></a>):</p>
+<pre><code class="lang-csharp">[GeneratePluginServer(Context = typeof(GamePluginContext))]
+public partial class GamePluginServer : IGameWorldAccess;
+</code></pre>
+<p>The generator emits the RPC proxy, the <code>StartAsync</code>/<code>HoldUntilShutdownAsync</code> lifecycle, the <code>Setup</code> install accumulator, live settings, and the <code>GamePluginServerBuilder</code> — all from <code>: IGameWorldAccess</code>.</p>
+<h2 id="event-kernels">Event kernels</h2>
+<p>Kernels are authored as ordinary C# and lowered to verified IR by the analyzer. The plugin records them at build time in <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs"><code>Examples.GameServer.Plugin/Program.cs</code></a>:</p>
+<pre><code class="lang-csharp">.Setup(s =&gt;
+{
+    // Build() is sync and does no I/O; StartAsync() ships the recorded IR.
+    s.Hooks.On&lt;MonsterAggroEvent&gt;().Use&lt;GuardianKernel&gt;();
+    s.Subscriptions.On&lt;AttackEvent&gt;().Use&lt;RetaliationKernel&gt;();
+</code></pre>
+<ul>
+<li><strong><code>GuardianKernel</code></strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/GuardianKernel.cs"><code>Kernels/GuardianKernel.cs</code></a>) is a <em>hook</em> (awaited decision) on <code>MonsterAggroEvent</code>. It calms a monster that is about to bully a low-level player. Its <code>[EventKernel]</code> install id derives from the type name (<code>&quot;guardian&quot;</code>) — nothing is hand-typed.</li>
+<li><strong><code>RetaliationKernel</code></strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/RetaliationKernel.cs"><code>Kernels/RetaliationKernel.cs</code></a>) is a fire-and-forget <em>subscription</em> on <code>AttackEvent</code> that taunts a strong attacker away.</li>
+</ul>
+<p><code>GuardianKernel</code> also factors its gate into a reusable, unit-testable <code>[KernelMethod]</code> that the generator inlines:</p>
+<pre><code class="lang-csharp">public void Handle(MonsterAggroEvent e, HookContext ctx)
+    =&gt; ctx.Messages.Send(e.MonsterId, $&quot;calm:{e.PlayerId}:{CalmStrength}&quot;);
+</code></pre>
+<p>After <code>StartAsync()</code>, the plugin also installs <strong>inline remote chains</strong> (<code>ConfigureRuntimeHooks</code> in <code>Program.cs</code>), whose <code>Where</code>/<code>Select</code>/<code>Run</code> are lowered to verified IR — including an indexed subscription whose two <code>.Where</code> leaves compare <code>[EventIndexKey]</code> fields to constants:</p>
+<pre><code class="lang-csharp">server.Subscriptions.On&lt;AttackEvent&gt;()
+    .Where(e =&gt; e.AttackerId == &quot;player-1&quot; &amp;&amp; e.Damage &gt;= 5)
+    .Select(e =&gt; e.TargetId)
+    .Run((targetId, ctx) =&gt; ctx.Messages.Send(targetId, &quot;indexed-taunt:inline&quot;));
+</code></pre>
+<h2 id="live-settings">Live settings</h2>
+<p>Members marked <code>[LiveSetting]</code> (with validation such as <code>[Range(0, 100)]</code>) can be re-tuned on an installed kernel without reinstalling it. From <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Program.cs"><code>Examples.GameServer.Plugin/Program.cs</code></a>:</p>
+<pre><code class="lang-csharp">await server.Get&lt;GuardianKernel&gt;()
+    .Set(k =&gt; k.CalmStrength, 35)
+    .Set(k =&gt; k.AggroRange, 6)
+    .ApplyAsync(atomic: true);
+</code></pre>
+<p>The setters are strongly typed member expressions; only <code>[LiveSetting]</code> members are settable, and <code>ApplyAsync</code> ships the batch. On the server this arrives as <code>UpdateSettingsAsync</code> on the control service, which the owning session applies (rejecting ids it does not own).</p>
+<h2 id="host-bindings">Host bindings</h2>
+<p>The server's real implementation of the domain surface is <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GameWorldAccess.cs"><code>Ipc/GameWorldAccess.cs</code></a>. Its calls are synchronous against the in-process world, returned as completed <code>ValueTask</code>s — the async shape exists only so the remote proxy and in-sandbox kernels share one contract. <code>Get(id)</code> returns a scoped handle that captures the id, and each method carries the same <code>[HostCapability]</code> metadata as the SDK contract:</p>
+<pre><code class="lang-csharp">[HostCapability(&quot;game.world.monster.write.kill&quot;, HostBindingEffect.HostStateWrite)]
+public ValueTask&lt;bool&gt; KillAsync()
+    =&gt; ValueTask.FromResult(_world().KillMonster(Id));
+</code></pre>
+<p>These bindings are registered onto the host by <code>GameWorldHost.AddBindings</code>, passed to <code>PluginServer.Create(configureHost: ...)</code> in the server's <code>Program.cs</code>.</p>
+<h2 id="policy-gated-execution-serverpolicy">Policy-gated execution (ServerPolicy)</h2>
+<p>Every kernel gets a <strong>least-privilege</strong> sandbox policy computed from what server-side package analysis says its verified IR actually needs. From <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/ServerPolicy.cs"><code>ServerPolicy.cs</code></a>:</p>
+<pre><code class="lang-csharp">var builder = SandboxPolicyBuilder.Create()
+    .GrantLogging()
+    .GrantHostMessageWrite()
+    .WithFuel(100_000)
+    .WithMaxHostCalls(1_000);
+
+if (RequiresPrefix(requiredCapabilities, MonsterReadPrefix))
+{
+    builder.Grant(&quot;game.world.monster.read.*&quot;, new { }, SandboxEffect.HostStateRead);
+}
+</code></pre>
+<p>The control service feeds this with <code>_server.GetRequiredCapabilities(pkg)</code> at install time, so a kernel that never declares a monster-write binding (the retaliation kernel) is never over-granted, and a kernel missing even the <code>host.message.write</code> grant fails closed during package preparation.</p>
+<h2 id="the-server-extension-pushdown">The server extension (pushdown)</h2>
+<p>A <strong>server extension</strong> is a kernel that runs on the <em>server</em> but is authored, shipped, and owned by the plugin — the pushdown story. Instead of round-tripping many small RPC reads, the plugin grafts a method onto the domain surface and the server executes it locally against the world. The plugin records extensions in <code>Setup</code>:</p>
+<pre><code class="lang-csharp">s.Monsters.Extend&lt;MonsterKillerKernel&gt;();        // grafts onto IMonsterControl (batch)
+s.Monsters.Extend&lt;RangeMonsterKillerKernel&gt;();   // batch with a value-object query parameter
+s.Monsters.Extend&lt;BlinkKernel&gt;();                // grafts onto IMonster handles (per-instance)
+</code></pre>
+<ul>
+<li><p><strong><code>MonsterKillerKernel</code></strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/MonsterKillerKernel.cs"><code>Kernels/MonsterKillerKernel.cs</code></a>) is a <code>[ServerExtension(typeof(IMonsterControl))]</code> <strong>batch</strong> grafted onto the collection. It is injected the same <code>IGameWorldAccess</code> the plugin uses remotely — but because it runs on the server, the awaited reads/writes are local (no real IPC hop):</p>
+<pre><code class="lang-csharp">[ServerExtensionMethod]   // grafted as IMonsterControl.KillMonstersAsync (name = the method's name)
+public async ValueTask&lt;List&lt;MonsterKillResult&gt;&gt; KillMonstersAsync(List&lt;string&gt; monsterIds, HookContext ctx)
+{
+    var results = new List&lt;MonsterKillResult&gt;();
+    foreach (var id in monsterIds)
+    {
+        var monster = _world.Monsters.Get(id);            // scoped handle — id captured once
+        var healthBefore = await monster.GetHealthAsync();
+</code></pre>
+</li>
+<li><p><strong><code>RangeMonsterKillerKernel</code></strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/RangeMonsterKillerKernel.cs"><code>Kernels/RangeMonsterKillerKernel.cs</code></a>) is the same batch shape but takes one <code>WorldRangeQuery</code> value object (with a nested <code>WorldPoint</code>) instead of loose primitives, exercising record/DTO parameter marshalling on an extension entrypoint.</p>
+</li>
+<li><p><strong><code>BlinkKernel</code></strong> (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/Kernels/BlinkKernel.cs"><code>Kernels/BlinkKernel.cs</code></a>) is a <code>[ServerExtension(typeof(IMonster))]</code> <strong>per-instance</strong> extension. When the caller does <code>Monsters.Get(&quot;monster-4&quot;).BlinkBehindAsync(...)</code>, the <code>Get(id)</code> captures the id, the server resolves that monster and injects it, and the body uses <code>_monster</code> directly:</p>
+<pre><code class="lang-csharp">public BlinkKernel(IMonster monster, IGameWorldAccess world)
+{
+    _monster = monster;
+    _world = world;
+}
+</code></pre>
+</li>
+</ul>
+<p>On the wire, the control service installs an extension via <code>InstallServerExtensionAsync</code> and invokes it via <code>InvokeServerExtensionAsync</code>, with ownership checked atomically before dispatch (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/GamePluginControlService.cs"><code>GamePluginControlService.cs</code></a>):</p>
+<pre><code class="lang-csharp">if (!_session.TryGetOwned(pluginId, out var kernel))
+{
+    throw new InvalidOperationException(
+        $&quot;Server extension '{pluginId}' is not owned by this plugin session.&quot;);
+}
+
+return await kernel.InvokeServerExtensionRpcAsync(arguments, ct).ConfigureAwait(false);
+</code></pre>
+<p>The plugin calls these grafted methods as if they were part of the world surface (<a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin/AdvancedUsage.cs"><code>AdvancedUsage.cs</code></a>):</p>
+<pre><code class="lang-csharp">var killResults = await server.Monsters.KillMonstersAsync([&quot;monster-3&quot;, &quot;monster-4&quot;, &quot;player-1&quot;]);
+</code></pre>
+<p><code>AdvancedUsage.cs</code> also demonstrates the throwaway <code>InvokeAsync</code> probe overloads (single-lambda read, and the explicit capture-bag for write-back).</p>
+<h2 id="unload-on-disconnect">Unload on disconnect</h2>
+<p>Kernel lifetime is tied to the connection. When the server's with-plugin phase finishes it signals shutdown; the plugin releases its <code>HoldUntilShutdownAsync</code> and disconnects. From <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Program.cs"><code>Examples.GameServer.Server/Program.cs</code></a>:</p>
+<pre><code class="lang-csharp">// (g) Release the plugin; it disconnects, and ownership unloads its kernels.
+control.SignalShutdown();
+</code></pre>
+<p><code>PluginConnectionHost</code> disposes the per-peer <code>PluginSession</code> on disconnect, and the session unloads every kernel it owned. The summary proves it by reporting the live kernel count, which returns to zero:</p>
+<pre><code class="lang-csharp">Console.WriteLine($&quot;On disconnect the plugin's kernels were unloaded (installed kernels now: {server.Kernels.Snapshot().Count}).&quot;);
+</code></pre>
+<p>The connect/ready/shutdown handshake is fail-fast: <a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Server/Ipc/PluginReadinessGate.cs"><code>Ipc/PluginReadinessGate.cs</code></a> races readiness against the plugin's early exit and a timeout so a plugin that never connects or crashes on install does not hang the server.</p>
+<h2 id="how-the-sample-is-exercised-plugintests">How the sample is exercised (Plugin.Tests)</h2>
+<p><a href="https://github.com/JKamsker/DotBoxD/blob/main/samples/GameServer/Examples.GameServer.Plugin.Tests"><code>Examples.GameServer.Plugin.Tests</code></a> is an xUnit project that drives the plugin surface in-process, without spawning the two executables:</p>
+<ul>
+<li><strong>Server-extension RPC</strong> — <code>Regression/MonsterKillerServerExtensionRegressionTests.cs</code> installs <code>MonsterKillerKernel</code> into a real <code>PluginServer</code>, encodes arguments with <code>KernelRpcBinaryCodec</code>, calls <code>InvokeServerExtensionRpcAsync</code>, and asserts the returned list of record-structs.</li>
+<li><strong>IPC round-trips</strong> — <code>Regression/GamePluginControlServiceIpcRegressionTests.cs</code> stands up the generated named-pipe service (<code>RpcMessagePackIpc.ListenNamedPipe</code>) and proves the inherited <code>InvokeServerExtensionAsync</code> wire method round-trips.</li>
+<li><strong>Builder, routing, RunLocal, and server context</strong> — <code>RemotePluginServerBuilder*Tests.cs</code>, <code>Routing/RouterParityTests.cs</code>, <code>RunLocal/RemoteRunLocalFacadeIpcTests.cs</code>, and <code>ServerContext/RemoteServerContextTests.cs</code> cover the generated builder, router parity, remote <code>RunLocal</code> chains, and the server context surface.</li>
+</ul>
+<p>Run them with:</p>
+<pre><code class="lang-bash">dotnet test samples/GameServer/Examples.GameServer.Plugin.Tests/Examples.GameServer.Plugin.Tests.csproj
+</code></pre>
+<h2 id="see-also">See also</h2>
+<p>Build the same pieces from scratch:</p>
+<ul>
+<li><a href="../tutorials/first-service.html">Tutorial: your first Service</a></li>
+<li><a href="../tutorials/first-kernel.html">Tutorial: your first Kernel</a></li>
+<li><a href="../tutorials/pushdown-server-extension.html">Tutorial: Pushdown server extension</a></li>
+</ul>
+<p>Or go deeper on the concepts:</p>
+<ul>
+<li><a href="../getting-started/README.html">Getting started</a></li>
+<li><a href="../concepts/services.html">Concepts: services</a></li>
+<li><a href="../concepts/kernels.html">Concepts: kernels</a></li>
+<li><a href="../concepts/pushdown.html">Concepts: pushdown</a></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/examples/gameserver-walkthrough.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

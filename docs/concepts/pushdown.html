@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Pushdown | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Pushdown | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/concepts/pushdown.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="pushdown">Pushdown</h1>
+
+<p><strong>Pushdown</strong> turns many small remote calls into <strong>one</strong> validated server-side execution. The host is
+typically <strong>frozen at release</strong> and exposes only <strong>fine-grained</strong> bindings — it ships no batch
+operations. Instead of the client looping (one round-trip per entity), a <strong>plugin ships its own
+server-side batch aggregate</strong> as a sandboxed <strong>server extension</strong>: the analyzer lowers a C# batch
+method to verified IR that runs server-side, looping over the host's <em>existing</em> bindings. Only the
+plugin changes; the server is never recompiled.</p>
+<p>Without pushdown (host has only <code>Kill(id)</code>):</p>
+<pre><code class="lang-text">client -&gt; Kill(1)
+client -&gt; Kill(2)
+...           (N round-trips)
+</code></pre>
+<p>With pushdown (plugin ships a <code>[ServerExtension]</code> batch aggregate):</p>
+<pre><code class="lang-text">client -&gt; KillMonsters([1..N])         (1 round-trip)
+host   -&gt; runs the plugin's verified kernel, looping ctx.Host&lt;IGameWorld&gt;().Kill(id) server-side
+host   -&gt; returns List&lt;KillResult&gt;     (one compact result)
+</code></pre>
+<p>The mechanism: mark a <code>partial class</code> <code>[ServerExtension(&quot;id&quot;, typeof(TService))]</code> with one public batch
+method whose trailing <code>HookContext</code> parameter exposes host bindings (<code>ctx.Host&lt;T&gt;()</code> or an injected host
+service field); the
+<a href="../../src/CodeGeneration/DotBoxD.Plugins.Analyzer"><code>DotBoxD.Plugins.Analyzer</code></a> lowers it to verified IR
+(supporting <code>foreach</code>, <code>if</code>/<code>else</code>, locals, host binding calls, DTO construction, and <code>List&lt;T&gt;</code>
+accumulation — complex objects ride the IR <code>Record</code> type). The host installs it with
+<code>server.RegisterServerExtensionAsync&lt;TService, TKernel&gt;()</code> and the caller invokes
+<code>server.ServerExtension&lt;TService&gt;().Method(args)</code>. Over a process boundary, the
+<code>DotBoxD.Pushdown.Services</code> MessagePack IPC addon forwards install + a compact binary IR invoke payload.</p>
+<p>Because the batch logic is author-supplied, it runs as a validated sandboxed kernel: it reaches only the
+host bindings the server already exposes, under the same capability + fuel/quota limits as event kernels.
+A method reachable via normal RPC is <strong>not</strong> automatically reachable from a kernel.</p>
+<p><strong>See also:</strong> the runnable GameServer sample under
+<a href="../../samples/GameServer"><code>samples/GameServer</code></a>, which demonstrates the
+<code>MonsterKillerKernel</code> server-extension path.
+Roadmap items (<code>DotBoxD.Pushdown.Linq</code>, fluent client API) are tracked in
+<a href="../architecture/follow-up-issues.md">follow-up-issues</a>.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/concepts/pushdown.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

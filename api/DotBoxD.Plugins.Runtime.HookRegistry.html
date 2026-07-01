@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class HookRegistry | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class HookRegistry | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Plugins.Runtime.HookRegistry">
+
+
+
+  <h1 id="DotBoxD_Plugins_Runtime_HookRegistry" data-uid="DotBoxD.Plugins.Runtime.HookRegistry" class="text-break">
+Class HookRegistry  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DotBoxD.html">DotBoxD</a>.<a class="xref" href="DotBoxD.Plugins.html">Plugins</a>.<a class="xref" href="DotBoxD.Plugins.Runtime.html">Runtime</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DotBoxD.Plugins.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class HookRegistry</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">HookRegistry</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_FireAsync_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.FireAsync*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_FireAsync__2___0_DotBoxD_Plugins_Runtime_ResultHookDispatchOptions___1__System_Threading_CancellationToken_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.FireAsync``2(``0,DotBoxD.Plugins.Runtime.ResultHookDispatchOptions{``1},System.Threading.CancellationToken)">
+  FireAsync&lt;TContext, TResult&gt;(TContext, ResultHookDispatchOptions&lt;TResult&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResult?&gt; FireAsync&lt;TContext, TResult&gt;(TContext context, ResultHookDispatchOptions&lt;TResult&gt; options, CancellationToken cancellationToken = default) where TResult : struct, IHookResult</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="DotBoxD.Plugins.Runtime.ResultHookDispatchOptions-1.html">ResultHookDispatchOptions</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResult?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_FireAsync_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.FireAsync*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_FireAsync__2___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.FireAsync``2(``0,System.Threading.CancellationToken)">
+  FireAsync&lt;TContext, TResult&gt;(TContext, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Dispatches the result-returning hooks (<code>.Register(...)</code> / <code>.RegisterLocal(...)</code>) installed for
+<code class="typeparamref">TContext</code> in descending priority order, returning the first successful
+<code class="typeparamref">TResult</code> or <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/null">null</a> when none is registered or none succeeds. The
+host applies the returned result to its live state. The result type is named explicitly here because the
+host — unlike the plugin authoring side, where it is inferred from the <code>[Hook]</code> context — already
+knows the type it will apply.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;TResult?&gt; FireAsync&lt;TContext, TResult&gt;(TContext context, CancellationToken cancellationToken = default) where TResult : struct, IHookResult</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd></dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;TResult?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_On_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_On__1" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On``1">
+  On&lt;TEvent&gt;()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HookPipeline&lt;TEvent, HookContext&gt; On&lt;TEvent&gt;()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Plugins.Runtime.HookPipeline-2.html">HookPipeline</a>&lt;TEvent, <a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TEvent</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_On_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_On__1_DotBoxD_Abstractions_IPluginEventAdapter___0__" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On``1(DotBoxD.Abstractions.IPluginEventAdapter{``0})">
+  On&lt;TEvent&gt;(IPluginEventAdapter&lt;TEvent&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HookPipeline&lt;TEvent, HookContext&gt; On&lt;TEvent&gt;(IPluginEventAdapter&lt;TEvent&gt; adapter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>adapter</code> <a class="xref" href="DotBoxD.Abstractions.IPluginEventAdapter-1.html">IPluginEventAdapter</a>&lt;TEvent&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Plugins.Runtime.HookPipeline-2.html">HookPipeline</a>&lt;TEvent, <a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TEvent</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_On_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_On__2_DotBoxD_Abstractions_IPluginEventAdapter___0__System_Func_DotBoxD_Abstractions_HookContext___1__" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On``2(DotBoxD.Abstractions.IPluginEventAdapter{``0},System.Func{DotBoxD.Abstractions.HookContext,``1})">
+  On&lt;TEvent, TContext&gt;(IPluginEventAdapter&lt;TEvent&gt;, Func&lt;HookContext, TContext&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HookPipeline&lt;TEvent, TContext&gt; On&lt;TEvent, TContext&gt;(IPluginEventAdapter&lt;TEvent&gt; adapter, Func&lt;HookContext, TContext&gt; createContext)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>adapter</code> <a class="xref" href="DotBoxD.Abstractions.IPluginEventAdapter-1.html">IPluginEventAdapter</a>&lt;TEvent&gt;</dt>
+    <dd></dd>
+    <dt><code>createContext</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a>, TContext&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Plugins.Runtime.HookPipeline-2.html">HookPipeline</a>&lt;TEvent, TContext&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TEvent</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_On_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_On__2_System_Func_DotBoxD_Abstractions_HookContext___1__" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.On``2(System.Func{DotBoxD.Abstractions.HookContext,``1})">
+  On&lt;TEvent, TContext&gt;(Func&lt;HookContext, TContext&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HookPipeline&lt;TEvent, TContext&gt; On&lt;TEvent, TContext&gt;(Func&lt;HookContext, TContext&gt; createContext)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>createContext</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a>, TContext&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DotBoxD.Plugins.Runtime.HookPipeline-2.html">HookPipeline</a>&lt;TEvent, TContext&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TEvent</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="DotBoxD_Plugins_Runtime_HookRegistry_PublishAsync_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.PublishAsync*"></a>
+
+  <h3 id="DotBoxD_Plugins_Runtime_HookRegistry_PublishAsync__1___0_System_Threading_CancellationToken_" data-uid="DotBoxD.Plugins.Runtime.HookRegistry.PublishAsync``1(``0,System.Threading.CancellationToken)">
+  PublishAsync&lt;TEvent&gt;(TEvent, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask PublishAsync&lt;TEvent&gt;(TEvent e, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>e</code> <span class="xref">TEvent</span></dt>
+    <dd></dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TEvent</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

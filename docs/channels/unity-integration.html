@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>DotBoxD Unity Integration Guide | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="DotBoxD Unity Integration Guide | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="../../toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/unity-integration.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="dotboxd-unity-integration-guide">DotBoxD Unity Integration Guide</h1>
+
+<p>A comprehensive guide to integrating DotBoxD into your Unity project for type-safe, high-performance client-server communication.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#project-setup">Project Setup</a></li>
+<li><a href="#defining-service-contracts">Defining Service Contracts</a></li>
+<li><a href="#server-implementation">Server Implementation</a></li>
+<li><a href="#unity-client-setup">Unity Client Setup</a></li>
+<li><a href="#connection-management">Connection Management</a></li>
+<li><a href="#error-handling">Error Handling</a></li>
+<li><a href="#il2cpp-and-aot-considerations">IL2CPP and AOT Considerations</a></li>
+<li><a href="#best-practices">Best Practices</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#advanced-topics">Advanced Topics</a></li>
+</ol>
+<hr>
+<h2 id="overview">Overview</h2>
+<p>DotBoxD is a transport-agnostic RPC framework designed with Unity compatibility as a primary goal. It uses compile-time source generation to create type-safe proxies and dispatchers, avoiding runtime reflection that causes issues with IL2CPP builds.</p>
+<h3 id="key-features-for-unity">Key Features for Unity</h3>
+<ul>
+<li><strong>IL2CPP Safe</strong>: No runtime reflection or dynamic code generation</li>
+<li><strong>Source Generators</strong>: Compile-time proxy generation</li>
+<li><strong>Shared Contracts</strong>: Same C# interfaces on client and server</li>
+<li><strong>MessagePack</strong>: Fast binary serialization with Unity support</li>
+<li><strong>Transport Agnostic</strong>: TCP, WebSocket, or custom transports</li>
+</ul>
+<h3 id="architecture">Architecture</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                         Shared Library                          │
+│  [DotBoxDService] IGameService + Models (PlayerId, PlayerState)  │
+└─────────────────────────────────────────────────────────────────┘
+                    │                           │
+                    ▼                           ▼
+┌─────────────────────────────┐   ┌─────────────────────────────┐
+│      Unity Client           │   │      .NET Server            │
+│  ┌───────────────────────┐  │   │  ┌───────────────────────┐  │
+│  │ GameServiceProxy (gen)│  │   │  │GameServiceDispatcher  │  │
+│  └───────────────────────┘  │   │  │       (generated)     │  │
+│  ┌───────────────────────┐  │   │  └───────────────────────┘  │
+│  │    RpcPeer            │  │   │  ┌───────────────────────┐  │
+│  └───────────────────────┘  │   │  │     RpcHost           │  │
+│  ┌───────────────────────┐  │   │  └───────────────────────┘  │
+│  │    TcpTransport       │◄─┼───┼─►│  TcpServerTransport   │  │
+│  └───────────────────────┘  │   │  └───────────────────────┘  │
+└─────────────────────────────┘   └─────────────────────────────┘
+</code></pre>
+<hr>
+<h2 id="prerequisites">Prerequisites</h2>
+<h3 id="unity-requirements">Unity Requirements</h3>
+<ul>
+<li>Unity 2021.3 LTS or newer (for .NET Standard 2.1 support)</li>
+<li>Scripting Backend: Mono or IL2CPP</li>
+<li>API Compatibility Level: .NET Standard 2.1</li>
+</ul>
+<h3 id="server-requirements">Server Requirements</h3>
+<ul>
+<li>.NET 6.0 or newer (recommended: .NET 8.0+)</li>
+</ul>
+<h3 id="nuget-packages">NuGet Packages</h3>
+<ul>
+<li><code>MessagePack</code> (2.5.x or newer)</li>
+</ul>
+<hr>
+<h2 id="project-setup">Project Setup</h2>
+<h3 id="step-1-solution-structure">Step 1: Solution Structure</h3>
+<p>Create a solution with shared contracts accessible to both Unity and server:</p>
+<pre><code>YourGame/
+├── src/
+│   ├── YourGame.Shared/           # Shared contracts (netstandard2.1)
+│   │   ├── IGameService.cs
+│   │   └── Models.cs
+│   └── YourGame.Server/           # Server (net8.0)
+│       ├── GameService.cs
+│       └── Program.cs
+├── unity/
+│   └── YourGameClient/            # Unity project
+│       └── Assets/
+│           ├── Plugins/
+│           │   ├── DotBoxD.Services.dll
+│           │   ├── DotBoxD.Transports.Tcp.dll
+│           │   ├── DotBoxD.Codecs.MessagePack.dll
+│           │   ├── YourGame.Shared.dll
+│           │   └── MessagePack.dll
+│           └── Scripts/
+│               └── Networking/
+└── YourGame.sln
+</code></pre>
+<h3 id="step-2-shared-library-project">Step 2: Shared Library Project</h3>
+<p>Create <code>YourGame.Shared.csproj</code>:</p>
+<pre><code class="lang-xml">&lt;Project Sdk=&quot;Microsoft.NET.Sdk&quot;&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;netstandard2.1&lt;/TargetFramework&gt;
+    &lt;LangVersion&gt;latest&lt;/LangVersion&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include=&quot;MessagePack&quot; Version=&quot;2.5.187&quot; /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;!-- Reference source generator for proxy/dispatcher generation --&gt;
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include=&quot;..\DotBoxD.Services\DotBoxD.Services.csproj&quot; /&gt;
+    &lt;ProjectReference Include=&quot;..\DotBoxD.Services.SourceGenerator\DotBoxD.Services.SourceGenerator.csproj&quot;
+                      OutputItemType=&quot;Analyzer&quot;
+                      ReferenceOutputAssembly=&quot;false&quot; /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;
+</code></pre>
+<h3 id="step-3-build-dlls-for-unity">Step 3: Build DLLs for Unity</h3>
+<p>Create a build script to copy DLLs to Unity:</p>
+<pre><code class="lang-bash">#!/bin/bash
+# build-for-unity.sh
+
+UNITY_PLUGINS=&quot;unity/YourGameClient/Assets/Plugins&quot;
+
+dotnet build src/YourGame.Shared/YourGame.Shared.csproj -c Release
+
+# Copy DotBoxD libraries
+cp src/DotBoxD.Services/bin/Release/netstandard2.1/DotBoxD.Services.dll &quot;$UNITY_PLUGINS/&quot;
+cp src/DotBoxD.Transports.Tcp/bin/Release/netstandard2.1/DotBoxD.Transports.Tcp.dll &quot;$UNITY_PLUGINS/&quot;
+cp src/DotBoxD.Codecs.MessagePack/bin/Release/netstandard2.1/DotBoxD.Codecs.MessagePack.dll &quot;$UNITY_PLUGINS/&quot;
+
+# Copy shared library
+cp src/YourGame.Shared/bin/Release/netstandard2.1/YourGame.Shared.dll &quot;$UNITY_PLUGINS/&quot;
+
+# Copy MessagePack (get from NuGet cache)
+cp ~/.nuget/packages/messagepack/2.5.187/lib/netstandard2.0/MessagePack.dll &quot;$UNITY_PLUGINS/&quot;
+
+echo &quot;DLLs copied to Unity&quot;
+</code></pre>
+<hr>
+<h2 id="defining-service-contracts">Defining Service Contracts</h2>
+<h3 id="basic-service-interface">Basic Service Interface</h3>
+<pre><code class="lang-csharp">// YourGame.Shared/IGameService.cs
+using DotBoxD.Services.Attributes;
+
+namespace YourGame.Shared;
+
+[DotBoxDService]
+public interface IGameService
+{
+    // Simple request/response
+    Task&lt;ServerInfo&gt; GetServerInfoAsync(CancellationToken ct = default);
+
+    // With parameters
+    Task&lt;PlayerState&gt; GetPlayerAsync(string playerId, CancellationToken ct = default);
+
+    // With complex request object
+    Task&lt;JoinResult&gt; JoinGameAsync(JoinRequest request, CancellationToken ct = default);
+
+    // Fire-and-forget style (still awaitable)
+    Task SendInputAsync(PlayerInput input, CancellationToken ct = default);
+}
+</code></pre>
+<h3 id="model-classes">Model Classes</h3>
+<p>Models must be serializable by MessagePack. Use attributes for best compatibility:</p>
+<pre><code class="lang-csharp">// YourGame.Shared/Models.cs
+using MessagePack;
+
+namespace YourGame.Shared;
+
+[MessagePackObject]
+public class ServerInfo
+{
+    [Key(0)] public string ServerName { get; set; } = &quot;&quot;;
+    [Key(1)] public int PlayerCount { get; set; }
+    [Key(2)] public int MaxPlayers { get; set; }
+    [Key(3)] public string Version { get; set; } = &quot;&quot;;
+}
+
+[MessagePackObject]
+public class PlayerState
+{
+    [Key(0)] public string PlayerId { get; set; } = &quot;&quot;;
+    [Key(1)] public string DisplayName { get; set; } = &quot;&quot;;
+    [Key(2)] public float PositionX { get; set; }
+    [Key(3)] public float PositionY { get; set; }
+    [Key(4)] public float PositionZ { get; set; }
+    [Key(5)] public float RotationY { get; set; }
+    [Key(6)] public int Health { get; set; }
+    [Key(7)] public int MaxHealth { get; set; }
+}
+
+[MessagePackObject]
+public class JoinRequest
+{
+    [Key(0)] public string DisplayName { get; set; } = &quot;&quot;;
+    [Key(1)] public string AuthToken { get; set; } = &quot;&quot;;
+}
+
+[MessagePackObject]
+public class JoinResult
+{
+    [Key(0)] public bool Success { get; set; }
+    [Key(1)] public string? PlayerId { get; set; }
+    [Key(2)] public string? ErrorMessage { get; set; }
+    [Key(3)] public PlayerState? InitialState { get; set; }
+}
+
+[MessagePackObject]
+public class PlayerInput
+{
+    [Key(0)] public float MoveX { get; set; }
+    [Key(1)] public float MoveY { get; set; }
+    [Key(2)] public bool Jump { get; set; }
+    [Key(3)] public bool Fire { get; set; }
+    [Key(4)] public float AimYaw { get; set; }
+    [Key(5)] public float AimPitch { get; set; }
+    [Key(6)] public long Timestamp { get; set; }
+}
+</code></pre>
+<h3 id="custom-method-names-optional">Custom Method Names (Optional)</h3>
+<pre><code class="lang-csharp">[DotBoxDService(Name = &quot;Game&quot;)]
+public interface IGameService
+{
+    [DotBoxDMethod(Name = &quot;Info&quot;)]
+    Task&lt;ServerInfo&gt; GetServerInfoAsync(CancellationToken ct = default);
+}
+</code></pre>
+<hr>
+<h2 id="server-implementation">Server Implementation</h2>
+<h3 id="service-implementation">Service Implementation</h3>
+<pre><code class="lang-csharp">// YourGame.Server/GameService.cs
+using YourGame.Shared;
+
+namespace YourGame.Server;
+
+public class GameService : IGameService
+{
+    private readonly GameState _gameState;
+
+    public GameService(GameState gameState)
+    {
+        _gameState = gameState;
+    }
+
+    public Task&lt;ServerInfo&gt; GetServerInfoAsync(CancellationToken ct = default)
+    {
+        return Task.FromResult(new ServerInfo
+        {
+            ServerName = _gameState.ServerName,
+            PlayerCount = _gameState.Players.Count,
+            MaxPlayers = _gameState.MaxPlayers,
+            Version = &quot;1.0.0&quot;
+        });
+    }
+
+    public Task&lt;PlayerState&gt; GetPlayerAsync(string playerId, CancellationToken ct = default)
+    {
+        if (!_gameState.Players.TryGetValue(playerId, out var player))
+        {
+            throw new KeyNotFoundException($&quot;Player '{playerId}' not found&quot;);
+        }
+        return Task.FromResult(player.ToPlayerState());
+    }
+
+    public Task&lt;JoinResult&gt; JoinGameAsync(JoinRequest request, CancellationToken ct = default)
+    {
+        // Validate auth token
+        if (!ValidateToken(request.AuthToken))
+        {
+            return Task.FromResult(new JoinResult
+            {
+                Success = false,
+                ErrorMessage = &quot;Invalid authentication&quot;
+            });
+        }
+
+        // Create player
+        var player = _gameState.CreatePlayer(request.DisplayName);
+
+        return Task.FromResult(new JoinResult
+        {
+            Success = true,
+            PlayerId = player.Id,
+            InitialState = player.ToPlayerState()
+        });
+    }
+
+    public Task SendInputAsync(PlayerInput input, CancellationToken ct = default)
+    {
+        _gameState.ProcessInput(input);
+        return Task.CompletedTask;
+    }
+
+    private bool ValidateToken(string token) =&gt; !string.IsNullOrEmpty(token);
+}
+</code></pre>
+<h3 id="server-startup">Server Startup</h3>
+<pre><code class="lang-csharp">// YourGame.Server/Program.cs
+using YourGame.Server;
+using YourGame.Shared;
+using DotBoxD.Services;
+using DotBoxD.Services.Generated;
+using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Transports.Tcp;
+
+const int Port = 7777;
+
+Console.WriteLine($&quot;Starting game server on port {Port}...&quot;);
+
+var gameState = new GameState();
+var gameService = new GameService(gameState);
+
+// RpcHost listens and turns every accepted connection into a peer. ForEachPeer
+// runs once per connection to provide the services that peer exposes.
+await using var host = RpcHost
+    .Listen(new TcpServerTransport(Port), new MessagePackRpcSerializer())
+    .ForEachPeer(peer =&gt; peer.ProvideGameService(gameService)); // Generated extension method
+
+await host.StartAsync();
+Console.WriteLine(&quot;Server started. Press Ctrl+C to stop.&quot;);
+
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =&gt; { e.Cancel = true; cts.Cancel(); };
+
+try
+{
+    await Task.Delay(Timeout.Infinite, cts.Token);
+}
+catch (OperationCanceledException) { }
+
+await host.StopAsync();
+Console.WriteLine(&quot;Server stopped.&quot;);
+</code></pre>
+<hr>
+<h2 id="unity-client-setup">Unity Client Setup</h2>
+<h3 id="networkmanager-component">NetworkManager Component</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/Networking/NetworkManager.cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+using DotBoxD.Services;
+using DotBoxD.Services.Generated;
+using DotBoxD.Codecs.MessagePack;
+using DotBoxD.Transports.Tcp;
+using YourGame.Shared;
+
+public class NetworkManager : MonoBehaviour
+{
+    public static NetworkManager Instance { get; private set; }
+
+    [Header(&quot;Connection Settings&quot;)]
+    [SerializeField] private string serverHost = &quot;localhost&quot;;
+    [SerializeField] private int serverPort = 7777;
+    [SerializeField] private float connectionTimeout = 10f;
+
+    public IGameService GameService { get; private set; }
+    public bool IsConnected =&gt; _peer?.IsConnected ?? false;
+
+    public event Action OnConnected;
+    public event Action OnDisconnected;
+    public event Action&lt;string&gt; OnConnectionError;
+
+    private RpcPeer _peer;
+    private TcpTransport _transport;
+    private CancellationTokenSource _cts;
+
+    private void Awake()
+    {
+        if (Instance != null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        Disconnect();
+    }
+
+    public async Task&lt;bool&gt; ConnectAsync(string host = null, int? port = null)
+    {
+        if (IsConnected)
+        {
+            Debug.LogWarning(&quot;Already connected&quot;);
+            return true;
+        }
+
+        host ??= serverHost;
+        port ??= serverPort;
+
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            Debug.Log($&quot;Connecting to {host}:{port}...&quot;);
+
+            _transport = new TcpTransport(host, port.Value);
+            var serializer = new MessagePackRpcSerializer();
+
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            connectCts.CancelAfter(TimeSpan.FromSeconds(connectionTimeout));
+
+            // Establish the underlying connection, then layer a peer over it.
+            await _transport.ConnectAsync(connectCts.Token);
+
+            _peer = RpcPeer
+                .Over(_transport.Connection!, serializer, new RpcPeerOptions
+                {
+                    RequestTimeout = TimeSpan.FromSeconds(connectionTimeout),
+                    // This client only calls out; it never serves inbound calls.
+                    RejectInboundCalls = true
+                })
+                .Start();
+
+            // Create the service proxy
+            GameService = _peer.GetGameService();
+
+            Debug.Log(&quot;Connected to server!&quot;);
+            OnConnected?.Invoke();
+
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.LogWarning(&quot;Connection cancelled&quot;);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($&quot;Connection failed: {ex.Message}&quot;);
+            OnConnectionError?.Invoke(ex.Message);
+            return false;
+        }
+    }
+
+    public void Disconnect()
+    {
+        if (_peer == null) return;
+
+        _cts?.Cancel();
+
+        try
+        {
+            // Disposing the peer stops its read loop; dispose the transport to close the socket.
+            _peer.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
+            _transport?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
+        }
+        catch { }
+
+        _peer = null;
+        _transport = null;
+        GameService = null;
+        _cts?.Dispose();
+        _cts = null;
+
+        Debug.Log(&quot;Disconnected from server&quot;);
+        OnDisconnected?.Invoke();
+    }
+
+    // Helper for fire-and-forget calls with error logging
+    public async void SendAsync(Func&lt;Task&gt; action)
+    {
+        if (!IsConnected)
+        {
+            Debug.LogWarning(&quot;Not connected&quot;);
+            return;
+        }
+
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($&quot;RPC call failed: {ex.Message}&quot;);
+        }
+    }
+}
+</code></pre>
+<h3 id="usage-in-game-scripts">Usage in Game Scripts</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/Game/GameClient.cs
+using System.Threading.Tasks;
+using UnityEngine;
+using YourGame.Shared;
+
+public class GameClient : MonoBehaviour
+{
+    [SerializeField] private string playerName = &quot;Player&quot;;
+
+    private string _playerId;
+
+    private async void Start()
+    {
+        var network = NetworkManager.Instance;
+
+        // Connect to server
+        if (!await network.ConnectAsync())
+        {
+            Debug.LogError(&quot;Failed to connect!&quot;);
+            return;
+        }
+
+        // Get server info
+        var serverInfo = await network.GameService.GetServerInfoAsync();
+        Debug.Log($&quot;Connected to '{serverInfo.ServerName}' ({serverInfo.PlayerCount}/{serverInfo.MaxPlayers})&quot;);
+
+        // Join the game
+        var joinResult = await network.GameService.JoinGameAsync(new JoinRequest
+        {
+            DisplayName = playerName,
+            AuthToken = GetAuthToken()
+        });
+
+        if (!joinResult.Success)
+        {
+            Debug.LogError($&quot;Failed to join: {joinResult.ErrorMessage}&quot;);
+            return;
+        }
+
+        _playerId = joinResult.PlayerId;
+        Debug.Log($&quot;Joined as {joinResult.InitialState.DisplayName} (ID: {_playerId})&quot;);
+
+        // Initialize player position
+        transform.position = new Vector3(
+            joinResult.InitialState.PositionX,
+            joinResult.InitialState.PositionY,
+            joinResult.InitialState.PositionZ
+        );
+    }
+
+    private void Update()
+    {
+        if (string.IsNullOrEmpty(_playerId)) return;
+
+        // Send input to server
+        var input = new PlayerInput
+        {
+            MoveX = Input.GetAxis(&quot;Horizontal&quot;),
+            MoveY = Input.GetAxis(&quot;Vertical&quot;),
+            Jump = Input.GetButtonDown(&quot;Jump&quot;),
+            Fire = Input.GetButton(&quot;Fire1&quot;),
+            AimYaw = transform.eulerAngles.y,
+            AimPitch = Camera.main.transform.eulerAngles.x,
+            Timestamp = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        };
+
+        // Fire-and-forget with error handling
+        NetworkManager.Instance.SendAsync(() =&gt;
+            NetworkManager.Instance.GameService.SendInputAsync(input));
+    }
+
+    private string GetAuthToken()
+    {
+        // Implement your authentication logic
+        return &quot;demo-token&quot;;
+    }
+}
+</code></pre>
+<h3 id="ui-integration">UI Integration</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/UI/ConnectionUI.cs
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class ConnectionUI : MonoBehaviour
+{
+    [SerializeField] private TMP_InputField hostInput;
+    [SerializeField] private TMP_InputField portInput;
+    [SerializeField] private Button connectButton;
+    [SerializeField] private Button disconnectButton;
+    [SerializeField] private TMP_Text statusText;
+
+    private void Start()
+    {
+        var network = NetworkManager.Instance;
+
+        network.OnConnected += () =&gt; UpdateUI(true);
+        network.OnDisconnected += () =&gt; UpdateUI(false);
+        network.OnConnectionError += error =&gt; statusText.text = $&quot;Error: {error}&quot;;
+
+        connectButton.onClick.AddListener(OnConnectClicked);
+        disconnectButton.onClick.AddListener(OnDisconnectClicked);
+
+        UpdateUI(false);
+    }
+
+    private async void OnConnectClicked()
+    {
+        connectButton.interactable = false;
+        statusText.text = &quot;Connecting...&quot;;
+
+        var host = string.IsNullOrEmpty(hostInput.text) ? &quot;localhost&quot; : hostInput.text;
+        var port = int.TryParse(portInput.text, out var p) ? p : 7777;
+
+        var success = await NetworkManager.Instance.ConnectAsync(host, port);
+
+        if (success)
+        {
+            statusText.text = &quot;Connected!&quot;;
+        }
+        else
+        {
+            connectButton.interactable = true;
+        }
+    }
+
+    private void OnDisconnectClicked()
+    {
+        NetworkManager.Instance.Disconnect();
+    }
+
+    private void UpdateUI(bool connected)
+    {
+        connectButton.gameObject.SetActive(!connected);
+        disconnectButton.gameObject.SetActive(connected);
+        hostInput.interactable = !connected;
+        portInput.interactable = !connected;
+
+        if (!connected)
+        {
+            statusText.text = &quot;Disconnected&quot;;
+            connectButton.interactable = true;
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2 id="connection-management">Connection Management</h2>
+<h3 id="automatic-reconnection">Automatic Reconnection</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/Networking/ReconnectionHandler.cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public class ReconnectionHandler : MonoBehaviour
+{
+    [SerializeField] private float reconnectDelay = 2f;
+    [SerializeField] private float maxReconnectDelay = 30f;
+    [SerializeField] private int maxAttempts = 10;
+
+    private CancellationTokenSource _cts;
+    private bool _shouldReconnect = true;
+
+    private void Start()
+    {
+        NetworkManager.Instance.OnDisconnected += OnDisconnected;
+    }
+
+    private void OnDestroy()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private async void OnDisconnected()
+    {
+        if (!_shouldReconnect) return;
+
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+
+        await AttemptReconnection(_cts.Token);
+    }
+
+    private async Task AttemptReconnection(CancellationToken ct)
+    {
+        var delay = reconnectDelay;
+
+        for (int attempt = 1; attempt &lt;= maxAttempts; attempt++)
+        {
+            if (ct.IsCancellationRequested) return;
+
+            Debug.Log($&quot;Reconnection attempt {attempt}/{maxAttempts}...&quot;);
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delay), ct);
+
+                if (await NetworkManager.Instance.ConnectAsync())
+                {
+                    Debug.Log(&quot;Reconnected successfully!&quot;);
+                    return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            // Exponential backoff
+            delay = Math.Min(delay * 1.5f, maxReconnectDelay);
+        }
+
+        Debug.LogError(&quot;Failed to reconnect after maximum attempts&quot;);
+    }
+
+    public void StopReconnection()
+    {
+        _shouldReconnect = false;
+        _cts?.Cancel();
+    }
+
+    public void EnableReconnection()
+    {
+        _shouldReconnect = true;
+    }
+}
+</code></pre>
+<h3 id="connection-health-monitoring">Connection Health Monitoring</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/Networking/ConnectionHealth.cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public class ConnectionHealth : MonoBehaviour
+{
+    [SerializeField] private float pingInterval = 5f;
+
+    public float LastPingMs { get; private set; }
+    public event Action&lt;float&gt; OnPingUpdated;
+
+    private CancellationTokenSource _cts;
+
+    private void Start()
+    {
+        NetworkManager.Instance.OnConnected += StartPinging;
+        NetworkManager.Instance.OnDisconnected += StopPinging;
+    }
+
+    private void OnDestroy()
+    {
+        StopPinging();
+    }
+
+    private async void StartPinging()
+    {
+        _cts = new CancellationTokenSource();
+
+        while (!_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pingInterval), _cts.Token);
+
+                var start = DateTime.UtcNow;
+                await NetworkManager.Instance.GameService.GetServerInfoAsync(_cts.Token);
+                LastPingMs = (float)(DateTime.UtcNow - start).TotalMilliseconds;
+
+                OnPingUpdated?.Invoke(LastPingMs);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($&quot;Ping failed: {ex.Message}&quot;);
+            }
+        }
+    }
+
+    private void StopPinging()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+}
+</code></pre>
+<hr>
+<h2 id="error-handling">Error Handling</h2>
+<h3 id="exception-types">Exception Types</h3>
+<pre><code class="lang-csharp">using DotBoxD.Services.Exceptions;
+
+try
+{
+    var result = await NetworkManager.Instance.GameService.GetPlayerAsync(playerId);
+}
+catch (ServiceTimeoutException)
+{
+    // Request timed out
+    Debug.LogWarning(&quot;Request timed out - server may be overloaded&quot;);
+}
+catch (RemoteServiceException ex)
+{
+    // Server threw an exception
+    Debug.LogError($&quot;Server error ({ex.RemoteExceptionType}): {ex.Message}&quot;);
+}
+catch (ServiceConnectionException)
+{
+    // Connection lost
+    Debug.LogError(&quot;Connection lost&quot;);
+    // Trigger reconnection logic
+}
+catch (ServiceException ex)
+{
+    // Other RPC errors
+    Debug.LogError($&quot;RPC error: {ex.Message}&quot;);
+}
+</code></pre>
+<h3 id="wrapper-for-safe-calls">Wrapper for Safe Calls</h3>
+<pre><code class="lang-csharp">// Assets/Scripts/Networking/RpcHelper.cs
+using System;
+using System.Threading.Tasks;
+using UnityEngine;
+using DotBoxD.Services.Exceptions;
+
+public static class RpcHelper
+{
+    public static async Task&lt;T&gt; SafeCallAsync&lt;T&gt;(
+        Func&lt;Task&lt;T&gt;&gt; call,
+        T defaultValue = default,
+        Action&lt;Exception&gt; onError = null)
+    {
+        try
+        {
+            return await call();
+        }
+        catch (ServiceTimeoutException ex)
+        {
+            Debug.LogWarning($&quot;RPC timeout: {ex.Message}&quot;);
+            onError?.Invoke(ex);
+            return defaultValue;
+        }
+        catch (RemoteServiceException ex)
+        {
+            Debug.LogError($&quot;Server error: {ex.Message}&quot;);
+            onError?.Invoke(ex);
+            return defaultValue;
+        }
+        catch (ServiceConnectionException ex)
+        {
+            Debug.LogError($&quot;Connection error: {ex.Message}&quot;);
+            onError?.Invoke(ex);
+            return defaultValue;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($&quot;Unexpected error: {ex}&quot;);
+            onError?.Invoke(ex);
+            return defaultValue;
+        }
+    }
+
+    public static async Task SafeCallAsync(
+        Func&lt;Task&gt; call,
+        Action&lt;Exception&gt; onError = null)
+    {
+        try
+        {
+            await call();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($&quot;RPC error: {ex.Message}&quot;);
+            onError?.Invoke(ex);
+        }
+    }
+}
+
+// Usage:
+var serverInfo = await RpcHelper.SafeCallAsync(
+    () =&gt; NetworkManager.Instance.GameService.GetServerInfoAsync(),
+    defaultValue: new ServerInfo { ServerName = &quot;Unknown&quot; },
+    onError: ex =&gt; ShowErrorPopup(ex.Message)
+);
+</code></pre>
+<hr>
+<h2 id="il2cpp-and-aot-considerations">IL2CPP and AOT Considerations</h2>
+<h3 id="messagepack-aot-configuration">MessagePack AOT Configuration</h3>
+<p>For IL2CPP builds, MessagePack needs AOT code generation hints:</p>
+<pre><code class="lang-csharp">// Assets/Scripts/AOT/MessagePackAOTSetup.cs
+using MessagePack;
+using MessagePack.Resolvers;
+using UnityEngine;
+
+public static class MessagePackAOTSetup
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Initialize()
+    {
+        // Configure MessagePack for AOT
+        StaticCompositeResolver.Instance.Register(
+            GeneratedResolver.Instance,  // Your generated resolver
+            StandardResolver.Instance
+        );
+
+        var options = MessagePackSerializerOptions.Standard
+            .WithResolver(StaticCompositeResolver.Instance)
+            .WithSecurity(MessagePackSecurity.UntrustedData);
+
+        MessagePackSerializer.DefaultOptions = options;
+    }
+}
+</code></pre>
+<h3 id="generate-messagepack-formatters">Generate MessagePack Formatters</h3>
+<p>Add to your shared project:</p>
+<pre><code class="lang-csharp">// YourGame.Shared/Generated/GeneratedResolver.cs
+// This file is auto-generated by MessagePack.Generator
+
+using MessagePack;
+using MessagePack.Formatters;
+
+public class GeneratedResolver : IFormatterResolver
+{
+    public static readonly GeneratedResolver Instance = new();
+
+    public IMessagePackFormatter&lt;T&gt; GetFormatter&lt;T&gt;()
+    {
+        return FormatterCache&lt;T&gt;.Formatter;
+    }
+
+    private static class FormatterCache&lt;T&gt;
+    {
+        public static readonly IMessagePackFormatter&lt;T&gt; Formatter;
+
+        static FormatterCache()
+        {
+            // Formatter lookup logic
+        }
+    }
+}
+</code></pre>
+<p>Use <code>mpc</code> (MessagePack Compiler) to generate formatters:</p>
+<pre><code class="lang-bash">dotnet tool install -g MessagePack.Generator
+mpc -i src/YourGame.Shared/YourGame.Shared.csproj -o src/YourGame.Shared/Generated
+</code></pre>
+<h3 id="linkxml-for-il2cpp">Link.xml for IL2CPP</h3>
+<p>Create <code>Assets/link.xml</code> to prevent code stripping:</p>
+<pre><code class="lang-xml">&lt;linker&gt;
+    &lt;!-- Preserve DotBoxD --&gt;
+    &lt;assembly fullname=&quot;DotBoxD.Services&quot; preserve=&quot;all&quot;/&gt;
+    &lt;assembly fullname=&quot;DotBoxD.Transports.Tcp&quot; preserve=&quot;all&quot;/&gt;
+    &lt;assembly fullname=&quot;DotBoxD.Codecs.MessagePack&quot; preserve=&quot;all&quot;/&gt;
+
+    &lt;!-- Preserve your shared library --&gt;
+    &lt;assembly fullname=&quot;YourGame.Shared&quot; preserve=&quot;all&quot;/&gt;
+
+    &lt;!-- Preserve MessagePack --&gt;
+    &lt;assembly fullname=&quot;MessagePack&quot; preserve=&quot;all&quot;/&gt;
+
+    &lt;!-- Preserve System.Buffers for ArrayPool --&gt;
+    &lt;assembly fullname=&quot;System.Buffers&quot; preserve=&quot;all&quot;/&gt;
+&lt;/linker&gt;
+</code></pre>
+<hr>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="1-main-thread-dispatching">1. Main Thread Dispatching</h3>
+<p>RPC callbacks may not be on the main thread. Use a dispatcher:</p>
+<pre><code class="lang-csharp">// Assets/Scripts/Util/MainThreadDispatcher.cs
+using System;
+using System.Collections.Concurrent;
+using UnityEngine;
+
+public class MainThreadDispatcher : MonoBehaviour
+{
+    public static MainThreadDispatcher Instance { get; private set; }
+
+    private readonly ConcurrentQueue&lt;Action&gt; _actions = new();
+
+    private void Awake()
+    {
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void Update()
+    {
+        while (_actions.TryDequeue(out var action))
+        {
+            action?.Invoke();
+        }
+    }
+
+    public void Enqueue(Action action)
+    {
+        _actions.Enqueue(action);
+    }
+
+    public static void RunOnMainThread(Action action)
+    {
+        Instance?.Enqueue(action);
+    }
+}
+
+// Usage in async code:
+var result = await service.GetPlayerAsync(id);
+MainThreadDispatcher.RunOnMainThread(() =&gt; {
+    // Safe to access Unity APIs here
+    playerObject.transform.position = new Vector3(result.PositionX, ...);
+});
+</code></pre>
+<h3 id="2-request-batching">2. Request Batching</h3>
+<p>Batch multiple requests to reduce overhead:</p>
+<pre><code class="lang-csharp">public class RequestBatcher
+{
+    private readonly List&lt;PlayerInput&gt; _pendingInputs = new();
+    private readonly object _lock = new();
+    private float _lastSendTime;
+    private const float SendInterval = 0.05f; // 20 times per second
+
+    public void QueueInput(PlayerInput input)
+    {
+        lock (_lock)
+        {
+            _pendingInputs.Add(input);
+        }
+    }
+
+    public void Update()
+    {
+        if (Time.time - _lastSendTime &lt; SendInterval) return;
+
+        PlayerInput[] toSend;
+        lock (_lock)
+        {
+            if (_pendingInputs.Count == 0) return;
+            toSend = _pendingInputs.ToArray();
+            _pendingInputs.Clear();
+        }
+
+        // Send batched inputs
+        NetworkManager.Instance.SendAsync(() =&gt;
+            NetworkManager.Instance.GameService.SendBatchedInputAsync(toSend));
+
+        _lastSendTime = Time.time;
+    }
+}
+</code></pre>
+<h3 id="3-cancellation-token-usage">3. Cancellation Token Usage</h3>
+<p>Always pass cancellation tokens for proper cleanup:</p>
+<pre><code class="lang-csharp">public class GameClient : MonoBehaviour
+{
+    private CancellationTokenSource _cts;
+
+    private void OnEnable()
+    {
+        _cts = new CancellationTokenSource();
+    }
+
+    private void OnDisable()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private async Task FetchDataAsync()
+    {
+        try
+        {
+            var data = await NetworkManager.Instance.GameService
+                .GetPlayerAsync(playerId, _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Component was disabled, ignore
+        }
+    }
+}
+</code></pre>
+<h3 id="4-connection-state-checks">4. Connection State Checks</h3>
+<p>Always verify connection before making calls:</p>
+<pre><code class="lang-csharp">public async Task&lt;bool&gt; TrySendInput(PlayerInput input)
+{
+    if (!NetworkManager.Instance.IsConnected)
+    {
+        Debug.LogWarning(&quot;Cannot send input: not connected&quot;);
+        return false;
+    }
+
+    try
+    {
+        await NetworkManager.Instance.GameService.SendInputAsync(input);
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
+}
+</code></pre>
+<hr>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<h4 id="typeloadexception-or-missingmethodexception-in-il2cpp">&quot;TypeLoadException&quot; or &quot;MissingMethodException&quot; in IL2CPP</h4>
+<p><strong>Cause</strong>: Code stripping removed required types.</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Add types to <code>link.xml</code></li>
+<li>Ensure MessagePack AOT generation is set up</li>
+<li>Use <code>[Preserve]</code> attribute on model classes</li>
+</ol>
+<h4 id="connection-refused-error">&quot;Connection refused&quot; error</h4>
+<p><strong>Cause</strong>: Server not running or wrong port/host.</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Verify server is running: <code>netstat -an | grep &lt;port&gt;</code></li>
+<li>Check firewall settings</li>
+<li>Use correct IP (not <code>localhost</code> for device builds)</li>
+</ol>
+<h4 id="timeout-on-all-requests">Timeout on all requests</h4>
+<p><strong>Cause</strong>: Serialization mismatch or protocol error.</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Ensure same MessagePack version on client and server</li>
+<li>Rebuild shared library and update Unity DLLs</li>
+<li>Check for model property mismatches</li>
+</ol>
+<h4 id="operation-cancelled-immediately">&quot;Operation cancelled&quot; immediately</h4>
+<p><strong>Cause</strong>: CancellationToken cancelled too early.</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Don't pass disposed/cancelled tokens</li>
+<li>Check component lifecycle (OnDisable cancelling tokens)</li>
+</ol>
+<h4 id="high-latency--slow-responses">High latency / slow responses</h4>
+<p><strong>Cause</strong>: Network issues or server overload.</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Use connection health monitoring</li>
+<li>Implement request timeouts</li>
+<li>Check for blocking operations on server</li>
+</ol>
+<h3 id="debug-logging">Debug Logging</h3>
+<p>Enable detailed logging:</p>
+<pre><code class="lang-csharp">// Add to NetworkManager
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+private void LogRpcCall(string method, object request = null)
+{
+    Debug.Log($&quot;[RPC] {method}&quot; + (request != null ? $&quot;: {JsonUtility.ToJson(request)}&quot; : &quot;&quot;));
+}
+#endif
+</code></pre>
+<hr>
+<h2 id="advanced-topics">Advanced Topics</h2>
+<h3 id="custom-transport">Custom Transport</h3>
+<p>Implement your own transport for platforms like Steam or Epic:</p>
+<pre><code class="lang-csharp">public class SteamTransport : ITransport
+{
+    private CSteamID _serverId;
+    private SteamConnection _connection;
+
+    public IRpcChannel Connection =&gt; _connection;
+    public bool IsConnected =&gt; _connection?.IsConnected ?? false;
+
+    public async Task ConnectAsync(CancellationToken ct = default)
+    {
+        // Implement Steam networking connection
+        var result = await SteamNetworking.ConnectP2P(_serverId);
+        _connection = new SteamConnection(result);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _connection?.Dispose();
+        return default;
+    }
+}
+</code></pre>
+<h3 id="multiple-services">Multiple Services</h3>
+<p>Register multiple services on the same server:</p>
+<pre><code class="lang-csharp">// Shared
+[DotBoxDService] public interface IGameService { ... }
+[DotBoxDService] public interface IChatService { ... }
+[DotBoxDService] public interface IInventoryService { ... }
+
+// Server: provide every service on each accepted peer
+await using var host = RpcHost
+    .Listen(serverTransport, serializer)
+    .ForEachPeer(peer =&gt;
+    {
+        peer.ProvideGameService(gameService);
+        peer.ProvideChatService(chatService);
+        peer.ProvideInventoryService(inventoryService);
+    });
+
+// Client: get a proxy per service from the same peer
+var game = peer.GetGameService();
+var chat = peer.GetChatService();
+var inventory = peer.GetInventoryService();
+</code></pre>
+<h3 id="server-to-client-notifications-future">Server-to-Client Notifications (Future)</h3>
+<p>While DotBoxD currently supports request/response patterns, you can implement push notifications using a polling pattern or extend the protocol:</p>
+<pre><code class="lang-csharp">// Polling approach
+public class NotificationPoller : MonoBehaviour
+{
+    private async void Start()
+    {
+        while (NetworkManager.Instance.IsConnected)
+        {
+            var notifications = await NetworkManager.Instance.GameService
+                .PollNotificationsAsync(_lastNotificationId);
+
+            foreach (var notification in notifications)
+            {
+                ProcessNotification(notification);
+                _lastNotificationId = notification.Id;
+            }
+
+            await Task.Delay(100); // Poll every 100ms
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2 id="version-compatibility">Version Compatibility</h2>
+<table>
+<thead>
+<tr>
+<th>DotBoxD Version</th>
+<th>Unity Version</th>
+<th>.NET Server</th>
+<th>MessagePack</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0.x</td>
+<td>2021.3+</td>
+<td>6.0+</td>
+<td>2.5.x</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="additional-resources">Additional Resources</h2>
+<ul>
+<li><a href="https://github.com/neuecc/MessagePack-CSharp">MessagePack-CSharp Documentation</a></li>
+<li><a href="https://docs.unity3d.com/Manual/dotnetProfileSupport.html">Unity .NET Profile</a></li>
+<li><a href="https://docs.unity3d.com/Manual/ManagedCodeStripping.html">IL2CPP Code Stripping</a></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/docs/channels/unity-integration.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

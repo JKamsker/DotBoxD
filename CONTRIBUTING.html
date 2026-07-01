@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Contributing to DotBoxD | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Contributing to DotBoxD | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/JKamsker/DotBoxD/blob/main/CONTRIBUTING.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="contributing-to-dotboxd">Contributing to DotBoxD</h1>
+
+<p>Thanks for your interest in DotBoxD. This guide covers building, testing, the CI gates your change
+must pass, and commit conventions.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li><strong>.NET SDK 10.0</strong> (the repo pins <code>10.0.204</code> with <code>latestFeature</code> roll-forward via <code>global.json</code>).</li>
+<li>The build targets multiple runtimes — CI installs the <strong>.NET 8, 9, and 10</strong> SDKs. Projects target
+<code>net10.0</code> (Kernels/Pushdown) and <code>netstandard2.1</code> (Services/channels, for Unity/IL2CPP).</li>
+<li>PowerShell 7+ is needed to run the gate scripts under <code>eng/scripts/</code> locally.</li>
+</ul>
+<h2 id="build--test">Build &amp; test</h2>
+<p>The solution file is <code>DotBoxD.slnx</code>.</p>
+<pre><code class="lang-bash">dotnet restore DotBoxD.slnx
+dotnet build   DotBoxD.slnx -c Release --no-restore
+dotnet test    DotBoxD.slnx -c Release --no-build
+</code></pre>
+<p>Run the maintained GameServer example:</p>
+<pre><code class="lang-bash">dotnet run -c Release --project samples/GameServer/Examples.GameServer.Server/Examples.GameServer.Server.csproj
+</code></pre>
+<blockquote>
+<p>Warnings are treated as errors in CI (<code>TreatWarningsAsErrors</code> is on when <code>GITHUB_ACTIONS=true</code>).
+To reproduce CI strictness locally, set the environment variable before building:
+<code>GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release</code>.</p>
+</blockquote>
+<h3 id="analyzers-and-formatting">Analyzers and formatting</h3>
+<p>The build runs the .NET analyzers (<code>AnalysisLevel</code> 10) plus <strong>Roslynator</strong> and <strong>Meziantou</strong>,
+with every rule severity configured centrally in <a href=".editorconfig"><code>.editorconfig</code></a>. Because warnings
+are errors in CI, a new analyzer finding fails the build. The <code>.editorconfig</code> documents, per rule,
+which rules are enforced and which are deliberately disabled (with the reason). Format your changes
+with <code>dotnet format</code> before pushing — CI verifies formatting with
+<code>dotnet format whitespace --verify-no-changes</code>.</p>
+<h2 id="ci-gates">CI gates</h2>
+<p>Every pull request runs the <code>ci</code> workflow (<code>.github/workflows/ci.yml</code>):</p>
+<p><strong>Build &amp; test</strong> — restore, build, and <code>dotnet test</code> on <code>ubuntu-latest</code> and <code>windows-latest</code> with
+the .NET 8/9/10 SDKs.</p>
+<p><strong>Security &amp; quality gates</strong> (<code>eng/scripts/</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Script</th>
+<th>Checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rebrand completeness</td>
+<td><code>check-rebrand-complete.ps1</code></td>
+<td>No legacy <code>ShaRPC</code>/<code>SafeIR</code>/<code>SGP#</code> tokens in active source</td>
+</tr>
+<tr>
+<td>Formatting</td>
+<td><code>dotnet format whitespace --verify-no-changes</code></td>
+<td>Code matches <code>.editorconfig</code></td>
+</tr>
+<tr>
+<td>C# file-length / layout</td>
+<td><code>check-csharp-file-lines.ps1</code></td>
+<td>File and folder size limits + a ratcheting soft-limit budget (see <code>AGENTS.md</code>)</td>
+</tr>
+<tr>
+<td>Spec manifest integrity</td>
+<td><code>check-spec-manifest.ps1</code></td>
+<td>The sandbox spec manifest is consistent</td>
+</tr>
+<tr>
+<td>Public API baseline</td>
+<td><code>check-api-compat-baseline.ps1</code></td>
+<td>Public package API matches <code>docs/api-baselines/*.txt</code></td>
+</tr>
+<tr>
+<td>Security-boundary tests</td>
+<td><code>run-required-tests.ps1</code></td>
+<td>A required allowlist of sandbox/security tests passes</td>
+</tr>
+<tr>
+<td>Coverage threshold</td>
+<td><code>check-coverage.ps1</code></td>
+<td>Line coverage over the <code>DotBoxD.*</code> assemblies stays above the floor in <code>.config/code-enforcer/coverage.json</code></td>
+</tr>
+<tr>
+<td>Docs &amp; examples smoke</td>
+<td><code>check-docs-smoke.ps1</code></td>
+<td>Doc commands point at real paths; the GameServer sample runs on Windows</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>tests/DotBoxD.Architecture.Tests</code> project additionally enforces layer dependencies, naming
+conventions, and that the analyzer configuration is not silently weakened; it runs as part of the
+test matrix.</p>
+<p><strong>Package validation</strong> — after build/test and gates pass, CI packs every product package, runs
+<code>check-package-metadata.ps1</code>, runs the package consumer smoke test, and uploads the package artifact.
+Pushes to <code>main</code> in <code>JKamsker/DotBoxD</code> then publish <code>0.1.0-ci.&lt;run&gt;</code> prerelease packages to NuGet.org.</p>
+<p>Additional workflows: <strong>CodeQL</strong> (<code>codeql.yml</code>, C# static analysis on push/PR + weekly) and
+<strong>benchmarks</strong> (<code>benchmarks.yml</code>, scheduled and on PRs labeled <code>benchmark</code>). The <strong>release</strong>
+workflow reuses the full <code>ci</code> workflow before packing, attesting provenance, and publishing.</p>
+<p>If you change a public API on purpose, update the baseline with
+<code>./eng/scripts/check-api-compat-baseline.ps1 -Update</code> and review the diff.</p>
+<h2 id="coding-standards">Coding standards</h2>
+<p>See <a href="AGENTS.md"><code>AGENTS.md</code></a> for repository expectations and the C# size guard (files under ~300
+lines where practical; folders containing a <code>.csproj</code> hold at most 5 tracked C# files unless
+justified). Prefer many small, focused files over a few large ones, and add or update tests for any
+behavior change.</p>
+<h2 id="commit-conventions">Commit conventions</h2>
+<p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a>:</p>
+<pre><code>&lt;type&gt;: &lt;description&gt;
+
+&lt;optional body&gt;
+</code></pre>
+<p>Types: <code>feat</code>, <code>fix</code>, <code>refactor</code>, <code>docs</code>, <code>test</code>, <code>chore</code>, <code>perf</code>, <code>ci</code>, <code>build</code>. Keep commits small
+and reviewable; prefer one logical change per commit.</p>
+<h2 id="reporting-security-issues">Reporting security issues</h2>
+<p>Do <strong>not</strong> open a public issue for security vulnerabilities. Follow the private disclosure process in
+<a href="SECURITY.html"><code>SECURITY.md</code></a>.</p>
+<h2 id="code-of-conduct">Code of Conduct</h2>
+<p>This project follows the <a href="CODE_OF_CONDUCT.html">Contributor Covenant</a>. By participating you agree to
+abide by it.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/JKamsker/DotBoxD/blob/main/CONTRIBUTING.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

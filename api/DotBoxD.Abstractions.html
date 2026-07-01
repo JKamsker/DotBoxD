@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace DotBoxD.Abstractions | DotBoxD — contract-first .NET extension runtime </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace DotBoxD.Abstractions | DotBoxD — contract-first .NET extension runtime ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="DotBoxD">
+            DotBoxD
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DotBoxD.Abstractions">
+
+  <h1 id="DotBoxD_Abstractions" data-uid="DotBoxD.Abstractions" class="text-break">Namespace DotBoxD.Abstractions</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.CapabilityAttribute.html">CapabilityAttribute</a></dt>
+      <dd><p>Gates an event property behind a capability. Reading the property from kernel IR contributes
+<code class="paramref">id</code> to the manifest's required capabilities, so a kernel that touches the property
+only installs under a policy granting it. Unannotated properties stay ungated (default-allow).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.EventKernelAttribute.html">EventKernelAttribute</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratePluginRegistrationAccumulatorAttribute.html">GeneratePluginRegistrationAccumulatorAttribute</a></dt>
+      <dd><p>Requests a generated client-side registration accumulator for a control type. The generated accumulator
+queues calls to <code class="paramref">methodName</code> and flushes them in order when the plugin builder starts.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratePluginRegistrationRootAccumulatorAttribute.html">GeneratePluginRegistrationRootAccumulatorAttribute</a></dt>
+      <dd><p>Requests a generated root registration accumulator that exposes child accumulators for annotated child
+control properties.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratePluginServerAttribute.html">GeneratePluginServerAttribute</a></dt>
+      <dd><p>Requests a generated plugin facade and builder for the annotated partial class.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratedKernelMethodDescriptorAttribute.html">GeneratedKernelMethodDescriptorAttribute</a></dt>
+      <dd><p>Analyzer-visible generated IR for server-authored SDK context <code>[KernelMethod]</code> helpers.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratedPluginServerRegistryAttribute.html">GeneratedPluginServerRegistryAttribute</a></dt>
+      <dd><p>Identifies a generated plugin-server hook or subscription registry and the context type its parameterless
+<code>On&lt;TEvent&gt;</code> method uses.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HandleSubtypeAttribute.html">HandleSubtypeAttribute</a></dt>
+      <dd><p>Declares one supported subtype for a <a class="xref" href="DotBoxD.Abstractions.PolymorphicHandleAttribute.html">PolymorphicHandleAttribute</a> handle. The analyzer lowers
+<code>handle is T local</code> to <code>{BindingPrefix}.is(key)</code>, and instance host-binding calls on
+the declared subtype receive that key as their leading sandbox argument.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HookAttribute.html">HookAttribute</a></dt>
+      <dd><p>Associates a hook <b>context</b> type with a stable hook name and exactly one result type, so
+<code>context.Server.Hooks.On&lt;TContext&gt;()</code> can resolve the result type from the context alone
+(rather than requiring a second generic argument at the call site). The analyzer reads this attribute
+to validate that a <code>.Register(...)</code> / <code>.RegisterLocal(...)</code> terminal produces
+<a class="xref" href="DotBoxD.Abstractions.HookAttribute.html#DotBoxD_Abstractions_HookAttribute_ResultType">ResultType</a>, and persists <a class="xref" href="DotBoxD.Abstractions.HookAttribute.html#DotBoxD_Abstractions_HookAttribute_Name">Name</a> as the runtime hook-point identity.</p>
+<p>
+The <a class="xref" href="DotBoxD.Abstractions.HookAttribute.html#DotBoxD_Abstractions_HookAttribute_ResultType">ResultType</a> must be a readonly partial record struct decorated with
+<a class="xref" href="DotBoxD.Abstractions.HookResultAttribute.html">HookResultAttribute</a> that declares a <code>bool Success</code> and a <code>string? Reason</code>
+field (see that attribute for the contract).
+</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HookResultAttribute.html">HookResultAttribute</a></dt>
+      <dd><p>Marks a readonly partial record struct as a hook <b>result</b>: a value a <code>.Register(...)</code> /
+<code>.RegisterLocal(...)</code> terminal returns and the host applies. The DotBoxD generator emits builder members
+the user did not
+declare manually — <code>Ok()</code>, <code>Reject(string? reason = null)</code>, and a <code>With&lt;Field&gt;(value)</code>
+per non-discriminator field — so result construction reads fluently and lowers to verified
+<code>record.new</code> IR.</p>
+<p>
+A hook result must be a top-level readonly partial record struct that declares a <code>bool Success</code>
+field and a <code>string? Reason</code> field.
+<code>Success = false</code> means "abstain, fall through to the next matching registration"; a successful
+result may still carry a domain veto such as <code>CanDie = false</code>, so abstain and veto never overload
+the same field.
+</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HostBindingAttribute.html">HostBindingAttribute</a></dt>
+      <dd><p>Marks a host-service method as a sandbox binding the DotBoxD.Kernels generator may call from verified kernel
+IR. A kernel reaches the service through <a class="xref" href="DotBoxD.Abstractions.HookContext.html#DotBoxD_Abstractions_HookContext_Host__1">Host&lt;THost&gt;()</a> or through a
+constructor-injected service field (e.g. <code>_world.GetHealth(id)</code>); the generator lowers that call to a
+<code>CallExpression(<code class="paramref">bindingId</code>, …)</code>, records <code class="paramref">capability</code> in the
+manifest's required capabilities, and adds <code class="paramref">effects</code> to the manifest's effects. The
+host registers a matching binding (same id, capability, and effects) so install-time policy and
+effect validation gate the call. Set <a class="xref" href="DotBoxD.Abstractions.HostBindingAttribute.html#DotBoxD_Abstractions_HostBindingAttribute_IsAsync">IsAsync</a> when that registered binding declares
+asynchronous host work.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HostCapabilityAttribute.html">HostCapabilityAttribute</a></dt>
+      <dd><p>Declares the capability and host-state effects required by an analyzer-visible host binding contract.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.InMemoryPluginMessageSink.html">InMemoryPluginMessageSink</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.KernelMethodAttribute.html">KernelMethodAttribute</a></dt>
+      <dd><p>Marks a reusable helper method whose body the DotBoxD.Kernels generator <b>inlines</b> into the kernel/hook IR
+at every call site, so plugin authors can factor shared gate/handler logic out of a
+<code>Where</code>/<code>Select</code>/<code>Run</code> lambda (or a kernel-class <code>ShouldHandle</code>/<code>Handle</code>)
+without leaving the sandbox. The helper can be a static method, or an instance method called on the generated
+server-context parameter. For example:</p>
+<pre><code class="lang-csharp">server.Hooks.On&lt;MonsterAggroEvent&gt;()
+    .Where((e, ctx) =&gt; IsBullying(e.MonsterLevel, e.PlayerLevel))
+    .Run((e, ctx) =&gt; ctx.Messages.Send(e.MonsterId, "calm"));
+
+[KernelMethod]
+public static bool IsBullying(int monsterLevel, int playerLevel) =&gt; monsterLevel - playerLevel &gt;= 3;</code></pre>
+<p>The call lowers exactly as if the body were written inline: each parameter is replaced by its
+already-lowered argument IR, and any <code>[HostBinding]</code> calls or <code>[Capability]</code>-gated reads
+inside the body contribute their capabilities to the calling kernel's manifest.</p>
+<p>
+Static helpers may be called through ordinary static-call syntax or extension-method syntax, and
+named arguments plus supported optional parameter defaults are bound before lowering.
+</p>
+<p>
+Constraints (verified at generation time; a violation fails the chain/kernel safely rather than
+miscompiling): the method must be static or called on the server-context parameter, have an expression body
+or a single <code>return</code> statement, and use types the kernel marshaller can represent in the current
+lowering surface (scalars, supported nullable scalars, enums, GUIDs, records/DTOs, lists, and maps where
+that surface supports them). Recursion, generic helpers, <code>ref</code>/<code>out</code>/<code>in</code> parameters, and
+<code>params</code> arrays are not allowed.
+</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.LiveSettingAttribute.html">LiveSettingAttribute</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.LocalAttribute.html">LocalAttribute</a></dt>
+      <dd><p>Marks a server-authored context helper as native-only and unavailable to lowered IR.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.PluginAttribute.html">PluginAttribute</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.PluginMessage.html">PluginMessage</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.PolymorphicHandleAttribute.html">PolymorphicHandleAttribute</a></dt>
+      <dd><p>Marks a polymorphic host handle type whose sandbox representation is the scalar value stored in
+the configured key member. Hook contexts may expose the handle type, while generated verified IR receives
+only the key and calls host bindings to discriminate or query the concrete host-side entity.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.ServerExtensionAttribute.html">ServerExtensionAttribute</a></dt>
+      <dd><p>Marks a class as a <b>server extension</b>: a batch operation the plugin ships as verified IR and
+the server runs request/response in a single roundtrip, so a loop over many entities executes
+server-side (calling the host's existing bindings) instead of one network call per entity. The
+generator lowers the class's single public batch method — its body may use locals, a <code>foreach</code>
+over a list parameter, host bindings via <code>ctx.Host&lt;T&gt;()</code> or constructor-injected service
+fields, and may build and return complex objects (records/DTOs) and lists of them. For example:</p>
+<pre><code class="lang-csharp">[ServerExtension("monster-killer", typeof(IMonsterKillerService))]
+public sealed partial class MonsterKillerKernel
+{
+    private readonly IGameWorld _world;
+    public MonsterKillerKernel(IGameWorld world) =&gt; _world = world;
+
+    public List&lt;KillResult&gt; KillMonsters(List&lt;int&gt; monsterIds, HookContext ctx)
+    {
+        var results = new List&lt;KillResult&gt;();
+        foreach (var id in monsterIds)
+            results.Add(new KillResult(id, _world.Kill(id)));
+        return results;
+    }
+}
+public readonly record struct KillResult(int MonsterId, bool Success);</code></pre>
+<p>The trailing <a class="xref" href="DotBoxD.Abstractions.HookContext.html">HookContext</a> parameter is the lowering marker for host bindings (as in a
+kernel's <code>Handle</code>) and is not part of the wire signature. Parameters, return type, and DTO
+fields must use the supported scalar types, lists, or nested DTOs. Supplying the optional service
+interface type lets the analyzer emit a source-generated plugin-side client that marshals directly to
+compact server-extension value bytes instead of using a reflection proxy.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.ServerExtensionClientAttribute.html">ServerExtensionClientAttribute</a></dt>
+      <dd><p>Requests a generated C# 14 extension property on <code class="paramref">receiverType</code> that resolves the
+source-generated server extension client for this service. The receiver type must expose a
+<code>ServerExtensions</code> property whose value can invoke server extensions and resolve the installed
+service id.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.ServerExtensionMethodAttribute.html">ServerExtensionMethodAttribute</a></dt>
+      <dd><p>Requests a generated C# 14 extension method on <code class="paramref">receiverType</code> that forwards to the
+source-generated server extension client. When <code class="paramref">name</code> is omitted, the kernel method name
+is used; supply a custom name to make the receiver's domain API read naturally or avoid conflicts.</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IEventKernel-1.html">IEventKernel&lt;TEvent&gt;</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IExtensibleControl.html">IExtensibleControl</a></dt>
+      <dd><p>A domain control that can host plugin-owned server extensions.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IHookResult.html">IHookResult</a></dt>
+      <dd><p>The runtime contract every hook result satisfies so dispatch can apply the abstain/fallthrough rule
+without reflecting on the concrete type: <code>Success == false</code> means &quot;abstain, fall through to the next
+matching registration&quot;. The DotBoxD generator adds this interface to every <a class="xref" href="DotBoxD.Abstractions.HookResultAttribute.html">HookResultAttribute</a>
+record (its <code>Success</code> field implements the member), so authors never write it by hand.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.ILiveSettingsHandle-1.html">ILiveSettingsHandle&lt;TKernel&gt;</a></dt>
+      <dd><p>Strongly typed live-settings tuner for an installed kernel.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IPluginEventAdapter-1.html">IPluginEventAdapter&lt;TEvent&gt;</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IPluginEventValueWriter-1.html">IPluginEventValueWriter&lt;TEvent&gt;</a></dt>
+      <dd><p>Optional low-allocation event adapter path. Implement this when event values can be written
+directly into the runtime input buffer; <a class="xref" href="DotBoxD.Abstractions.IPluginEventValueWriter-1.html#DotBoxD_Abstractions_IPluginEventValueWriter_1_EventValueCount">EventValueCount</a> must match
+<a class="xref" href="DotBoxD.Abstractions.IPluginEventAdapter-1.html#DotBoxD_Abstractions_IPluginEventAdapter_1_Parameters">Parameters</a>.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IPluginMessageSink.html">IPluginMessageSink</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IPluginServer-1.html">IPluginServer&lt;TWorld&gt;</a></dt>
+      <dd><p>Lifecycle and anonymous server-side invocation surface mixed into a generated plugin facade.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IServerExtensionClientAccessor.html">IServerExtensionClientAccessor</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IServerExtensionClientRegistry.html">IServerExtensionClientRegistry</a></dt>
+      <dd><p>Registry used by generated domain controls to resolve server-extension clients.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IServerExtensionWireClient.html">IServerExtensionWireClient</a></dt>
+      <dd><p>Wire client used by generated server-extension proxies.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.IServiceControl.html">IServiceControl</a></dt>
+      <dd><p>The root plugin-service control verbs exposed by a generated plugin facade.</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.GeneratedPluginServerRegistryKind.html">GeneratedPluginServerRegistryKind</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.HostBindingEffect.html">HostBindingEffect</a></dt>
+      <dd><p>Explicit host-service effects for analyzer-visible auto bindings.</p>
+</dd>
+    </dl>
+    <h3 id="delegates">
+Delegates
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="DotBoxD.Abstractions.RemoteServerInvocation-3.html">RemoteServerInvocation&lt;TWorld, TCaptures, TReturn&gt;</a></dt>
+      <dd><p>Lambda shape for the explicit capture-bag invoke overload on <a class="xref" href="DotBoxD.Abstractions.IPluginServer-1.html">IPluginServer&lt;TWorld&gt;</a>.</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          DotBoxD &middot; MIT licensed &middot; <a href="https://github.com/JKamsker/DotBoxD">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

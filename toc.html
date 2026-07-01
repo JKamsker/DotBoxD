@@ -1,0 +1,1559 @@
+
+<div id="sidetoggle">
+  <div>
+    <div class="sidefilter">
+      <form class="toc-filter">
+        <span class="glyphicon glyphicon-filter filter-icon"></span>
+        <span class="glyphicon glyphicon-remove clear-icon" id="toc_filter_clear"></span>
+        <input type="text" id="toc_filter_input" placeholder="Filter by title" onkeypress="if(event.keyCode==13) {return false;}">
+      </form>
+    </div>
+    <div class="sidetoc">
+      <div class="toc" id="toc">
+
+          <ul class="nav level1">
+                <li>
+                    <a href="index.html" name="" title="Home">Home</a>
+                </li>
+                <li>
+                    <span class="expand-stub"></span>
+                    <a>Guide</a>
+
+                    <ul class="nav level2">
+                          <li>
+                              <a href="docs/index.html" name="" title="Overview">Overview</a>
+                          </li>
+                          <li>
+                              <a href="docs/getting-started/README.html" name="" title="Getting started">Getting started</a>
+                          </li>
+                          <li>
+                              <span class="expand-stub"></span>
+                              <a>Concepts</a>
+
+                              <ul class="nav level3">
+                                    <li>
+                                        <a href="docs/concepts/services.html" name="" title="Services (RPC)">Services (RPC)</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/concepts/kernels.html" name="" title="Kernels (sandbox)">Kernels (sandbox)</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/concepts/pushdown.html" name="" title="Pushdown">Pushdown</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/concepts/runtime.html" name="" title="Kernel runtime">Kernel runtime</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/concepts/channels-transports.html" name="" title="Channels &amp; transports">Channels &amp; transports</a>
+                                    </li>
+                              </ul>
+                          </li>
+                          <li>
+                              <span class="expand-stub"></span>
+                              <a>Security</a>
+
+                              <ul class="nav level3">
+                                    <li>
+                                        <a href="docs/security/sandbox-caveats.html" name="" title="Sandbox caveats">Sandbox caveats</a>
+                                    </li>
+                              </ul>
+                          </li>
+                          <li>
+                              <span class="expand-stub"></span>
+                              <a>Reference</a>
+
+                              <ul class="nav level3">
+                                    <li>
+                                        <a href="docs/reference/diagnostics.html" name="" title="Diagnostics (DBXS / DBXK)">Diagnostics (DBXS / DBXK)</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/reference/schemas.html" name="" title="Schemas">Schemas</a>
+                                    </li>
+                              </ul>
+                          </li>
+                          <li>
+                              <span class="expand-stub"></span>
+                              <a>Channels (RPC) guide</a>
+
+                              <ul class="nav level3">
+                                    <li>
+                                        <a href="docs/channels/quick-start.html" name="" title="Quick start">Quick start</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/channels/api-reference.html" name="" title="API reference">API reference</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/channels/named-pipe-transport.html" name="" title="Named-pipe transport">Named-pipe transport</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/channels/websocket-setup.html" name="" title="WebSocket setup">WebSocket setup</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/channels/unity-integration.html" name="" title="Unity integration">Unity integration</a>
+                                    </li>
+                                    <li>
+                                        <a href="docs/channels/performance.html" name="" title="Performance">Performance</a>
+                                    </li>
+                              </ul>
+                          </li>
+                          <li>
+                              <a href="docs/contributing/migration-from-standalone-repos.html" name="" title="Contributing">Contributing</a>
+                          </li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="expand-stub"></span>
+                    <a>Tutorials</a>
+
+                    <ul class="nav level2">
+                          <li>
+                              <a href="docs/tutorials/index.html" name="" title="Overview">Overview</a>
+                          </li>
+                          <li>
+                              <a href="docs/tutorials/first-service.html" name="" title="1 &#183; First Service (RPC)">1 &#183; First Service (RPC)</a>
+                          </li>
+                          <li>
+                              <a href="docs/tutorials/first-kernel.html" name="" title="2 &#183; First Kernel (sandbox)">2 &#183; First Kernel (sandbox)</a>
+                          </li>
+                          <li>
+                              <a href="docs/tutorials/pushdown-server-extension.html" name="" title="3 &#183; Pushdown server extension">3 &#183; Pushdown server extension</a>
+                          </li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="expand-stub"></span>
+                    <a>Examples</a>
+
+                    <ul class="nav level2">
+                          <li>
+                              <a href="docs/examples/index.html" name="" title="Overview">Overview</a>
+                          </li>
+                          <li>
+                              <a href="docs/examples/gameserver-walkthrough.html" name="" title="GameServer walkthrough">GameServer walkthrough</a>
+                          </li>
+                          <li>
+                              <a href="docs/examples/coverage-gaps.html" name="" title="Coverage gaps">Coverage gaps</a>
+                          </li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="expand-stub"></span>
+                    <a>API</a>
+
+                    <ul class="nav level2">
+                          <li>
+                              <span class="expand-stub"></span>
+                              <a href="api/DotBoxD.html" name="" title="DotBoxD">DotBoxD</a>
+
+                              <ul class="nav level3">
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Abstractions.html" name="" title="Abstractions">Abstractions</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.CapabilityAttribute.html" name="" title="CapabilityAttribute">CapabilityAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.EventKernelAttribute.html" name="" title="EventKernelAttribute">EventKernelAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratePluginRegistrationAccumulatorAttribute.html" name="" title="GeneratePluginRegistrationAccumulatorAttribute">GeneratePluginRegistrationAccumulatorAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratePluginRegistrationRootAccumulatorAttribute.html" name="" title="GeneratePluginRegistrationRootAccumulatorAttribute">GeneratePluginRegistrationRootAccumulatorAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratePluginServerAttribute.html" name="" title="GeneratePluginServerAttribute">GeneratePluginServerAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratedKernelMethodDescriptorAttribute.html" name="" title="GeneratedKernelMethodDescriptorAttribute">GeneratedKernelMethodDescriptorAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratedPluginServerRegistryAttribute.html" name="" title="GeneratedPluginServerRegistryAttribute">GeneratedPluginServerRegistryAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.GeneratedPluginServerRegistryKind.html" name="" title="GeneratedPluginServerRegistryKind">GeneratedPluginServerRegistryKind</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HandleSubtypeAttribute.html" name="" title="HandleSubtypeAttribute">HandleSubtypeAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HookAttribute.html" name="" title="HookAttribute">HookAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HookContext.html" name="" title="HookContext">HookContext</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HookResultAttribute.html" name="" title="HookResultAttribute">HookResultAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HostBindingAttribute.html" name="" title="HostBindingAttribute">HostBindingAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HostBindingEffect.html" name="" title="HostBindingEffect">HostBindingEffect</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.HostCapabilityAttribute.html" name="" title="HostCapabilityAttribute">HostCapabilityAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IEventKernel-1.html" name="" title="IEventKernel&lt;TEvent&gt;">IEventKernel&lt;TEvent&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IExtensibleControl.html" name="" title="IExtensibleControl">IExtensibleControl</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IHookResult.html" name="" title="IHookResult">IHookResult</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.ILiveSettingsHandle-1.html" name="" title="ILiveSettingsHandle&lt;TKernel&gt;">ILiveSettingsHandle&lt;TKernel&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IPluginEventAdapter-1.html" name="" title="IPluginEventAdapter&lt;TEvent&gt;">IPluginEventAdapter&lt;TEvent&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IPluginEventValueWriter-1.html" name="" title="IPluginEventValueWriter&lt;TEvent&gt;">IPluginEventValueWriter&lt;TEvent&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IPluginMessageSink.html" name="" title="IPluginMessageSink">IPluginMessageSink</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IPluginServer-1.html" name="" title="IPluginServer&lt;TWorld&gt;">IPluginServer&lt;TWorld&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IServerExtensionClientAccessor.html" name="" title="IServerExtensionClientAccessor">IServerExtensionClientAccessor</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IServerExtensionClientRegistry.html" name="" title="IServerExtensionClientRegistry">IServerExtensionClientRegistry</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IServerExtensionWireClient.html" name="" title="IServerExtensionWireClient">IServerExtensionWireClient</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.IServiceControl.html" name="" title="IServiceControl">IServiceControl</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.InMemoryPluginMessageSink.html" name="" title="InMemoryPluginMessageSink">InMemoryPluginMessageSink</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.KernelMethodAttribute.html" name="" title="KernelMethodAttribute">KernelMethodAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.LiveSettingAttribute.html" name="" title="LiveSettingAttribute">LiveSettingAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.LocalAttribute.html" name="" title="LocalAttribute">LocalAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.PluginAttribute.html" name="" title="PluginAttribute">PluginAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.PluginMessage.html" name="" title="PluginMessage">PluginMessage</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.PolymorphicHandleAttribute.html" name="" title="PolymorphicHandleAttribute">PolymorphicHandleAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.RemoteServerInvocation-3.html" name="" title="RemoteServerInvocation&lt;TWorld, TCaptures, TReturn&gt;">RemoteServerInvocation&lt;TWorld, TCaptures, TReturn&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.ServerExtensionAttribute.html" name="" title="ServerExtensionAttribute">ServerExtensionAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.ServerExtensionClientAttribute.html" name="" title="ServerExtensionClientAttribute">ServerExtensionClientAttribute</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Abstractions.ServerExtensionMethodAttribute.html" name="" title="ServerExtensionMethodAttribute">ServerExtensionMethodAttribute</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Codecs.MessagePack.html" name="" title="Codecs.MessagePack">Codecs.MessagePack</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <a href="api/DotBoxD.Codecs.MessagePack.MessagePackRpcSerializer.html" name="" title="MessagePackRpcSerializer">MessagePackRpcSerializer</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Hosting.html" name="" title="Hosting">Hosting</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Hosting.Execution.html" name="" title="Execution">Execution</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.ExecutionModeDecision.html" name="" title="ExecutionModeDecision">ExecutionModeDecision</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.HostServiceBindingExtensions.html" name="" title="HostServiceBindingExtensions">HostServiceBindingExtensions</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.HotnessExecutionModeSelector.html" name="" title="HotnessExecutionModeSelector">HotnessExecutionModeSelector</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.IExecutionModeSelector.html" name="" title="IExecutionModeSelector">IExecutionModeSelector</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.ModuleHotnessStats.html" name="" title="ModuleHotnessStats">ModuleHotnessStats</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.SandboxHost.html" name="" title="SandboxHost">SandboxHost</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Execution.SandboxHostBuilder.html" name="" title="SandboxHostBuilder">SandboxHostBuilder</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Hosting.Http.html" name="" title="Http">Http</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Hosting.Http.Bindings.html" name="" title="Bindings">Bindings</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Bindings.SafeHttpBindingExtensions.html" name="" title="SafeHttpBindingExtensions">SafeHttpBindingExtensions</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Hosting.Http.Hosting.html" name="" title="Hosting">Hosting</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Hosting.SafeHttpHostBuilderExtensions.html" name="" title="SafeHttpHostBuilderExtensions">SafeHttpHostBuilderExtensions</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Hosting.Http.Internal.html" name="" title="Internal">Internal</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Internal.SafeHttpBindingExtensions.html" name="" title="SafeHttpBindingExtensions">SafeHttpBindingExtensions</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Internal.SafeHttpBindings.html" name="" title="SafeHttpBindings">SafeHttpBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Internal.SafeHttpHostBuilderExtensions.html" name="" title="SafeHttpHostBuilderExtensions">SafeHttpHostBuilderExtensions</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Internal.SafeHttpPolicyBuilderExtensions.html" name="" title="SafeHttpPolicyBuilderExtensions">SafeHttpPolicyBuilderExtensions</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Hosting.Http.Policy.html" name="" title="Policy">Policy</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Hosting.Http.Policy.SafeHttpPolicyBuilderExtensions.html" name="" title="SafeHttpPolicyBuilderExtensions">SafeHttpPolicyBuilderExtensions</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Http.SafeDnsResolver.html" name="" title="SafeDnsResolver">SafeDnsResolver</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Http.SafeHttpClient.html" name="" title="SafeHttpClient">SafeHttpClient</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Hosting.Http.SafeInMemoryHttpMessageInvoker.html" name="" title="SafeInMemoryHttpMessageInvoker">SafeInMemoryHttpMessageInvoker</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Hosting.ISandboxWorkerClient.html" name="" title="ISandboxWorkerClient">ISandboxWorkerClient</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Hosting.SandboxHostWorkerClient.html" name="" title="SandboxHostWorkerClient">SandboxHostWorkerClient</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Hosting.SandboxWorkerProfile.html" name="" title="SandboxWorkerProfile">SandboxWorkerProfile</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Kernels.html" name="" title="Kernels">Kernels</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Bindings.html" name="" title="Bindings">Bindings</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.AuditLevel.html" name="" title="AuditLevel">AuditLevel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingAuditFields.html" name="" title="BindingAuditFields">BindingAuditFields</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingCostModel.html" name="" title="BindingCostModel">BindingCostModel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingDescriptor.html" name="" title="BindingDescriptor">BindingDescriptor</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingInvoker.html" name="" title="BindingInvoker">BindingInvoker</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingReferenceCollector.html" name="" title="BindingReferenceCollector">BindingReferenceCollector</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingRegistry.html" name="" title="BindingRegistry">BindingRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingRegistryBuilder.html" name="" title="BindingRegistryBuilder">BindingRegistryBuilder</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingSafety.html" name="" title="BindingSafety">BindingSafety</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.BindingSignature.html" name="" title="BindingSignature">BindingSignature</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.CapabilityGrantValidator.html" name="" title="CapabilityGrantValidator">CapabilityGrantValidator</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.CompiledBinding.html" name="" title="CompiledBinding">CompiledBinding</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.IAuditSink.html" name="" title="IAuditSink">IAuditSink</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.IBindingCatalog.html" name="" title="IBindingCatalog">IBindingCatalog</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.InMemoryAuditSink.html" name="" title="InMemoryAuditSink">InMemoryAuditSink</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.SandboxAuditEvent.html" name="" title="SandboxAuditEvent">SandboxAuditEvent</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Bindings.SandboxRunId.html" name="" title="SandboxRunId">SandboxRunId</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Compiler.html" name="" title="Compiler">Compiler</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.Emitters.html" name="" title="Emitters">Emitters</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Compiler.Emitters.ReflectionEmitSandboxCompiler.html" name="" title="ReflectionEmitSandboxCompiler">ReflectionEmitSandboxCompiler</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CacheKeyBuilder.html" name="" title="CacheKeyBuilder">CacheKeyBuilder</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CompileOptions.html" name="" title="CompileOptions">CompileOptions</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CompiledArtifact.html" name="" title="CompiledArtifact">CompiledArtifact</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CompiledCacheLookup.html" name="" title="CompiledCacheLookup">CompiledCacheLookup</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CompiledCacheStatus.html" name="" title="CompiledCacheStatus">CompiledCacheStatus</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.CompiledRuntimeFormKind.html" name="" title="CompiledRuntimeFormKind">CompiledRuntimeFormKind</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.ISandboxCompiler.html" name="" title="ISandboxCompiler">ISandboxCompiler</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.PersistentCompiledArtifactCache.html" name="" title="PersistentCompiledArtifactCache">PersistentCompiledArtifactCache</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Compiler.SandboxCompiledEntrypoint.html" name="" title="SandboxCompiledEntrypoint">SandboxCompiledEntrypoint</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Interpreter.html" name="" title="Interpreter">Interpreter</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Interpreter.ISandboxInterpreter.html" name="" title="ISandboxInterpreter">ISandboxInterpreter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Interpreter.SandboxInterpreter.html" name="" title="SandboxInterpreter">SandboxInterpreter</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Model.html" name="" title="Model">Model</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.CanonicalModuleHasher.html" name="" title="CanonicalModuleHasher">CanonicalModuleHasher</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.DiagnosticSeverity.html" name="" title="DiagnosticSeverity">DiagnosticSeverity</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.EntrypointBinder.html" name="" title="EntrypointBinder">EntrypointBinder</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.ResourceLimitValidation.html" name="" title="ResourceLimitValidation">ResourceLimitValidation</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.ResourceLimits.html" name="" title="ResourceLimits">ResourceLimits</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.ResourceMeter.html" name="" title="ResourceMeter">ResourceMeter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.RunSummaryAuditFields.html" name="" title="RunSummaryAuditFields">RunSummaryAuditFields</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.SandboxDiagnostic.html" name="" title="SandboxDiagnostic">SandboxDiagnostic</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.SandboxRuntimeException.html" name="" title="SandboxRuntimeException">SandboxRuntimeException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.SandboxValidationException.html" name="" title="SandboxValidationException">SandboxValidationException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.SemVersion.html" name="" title="SemVersion">SemVersion</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.ShortCircuitExpressionOrder.html" name="" title="ShortCircuitExpressionOrder">ShortCircuitExpressionOrder</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.ShortCircuitOperands.html" name="" title="ShortCircuitOperands">ShortCircuitOperands</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Model.SourceSpan.html" name="" title="SourceSpan">SourceSpan</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Policies.html" name="" title="Policies">Policies</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Policies.CapabilityPattern.html" name="" title="CapabilityPattern">CapabilityPattern</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Policies.SandboxPolicyBuilder.html" name="" title="SandboxPolicyBuilder">SandboxPolicyBuilder</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Runtime.html" name="" title="Runtime">Runtime</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Runtime.Bindings.html" name="" title="Bindings">Bindings</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <span class="expand-stub"></span>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.FileSystem.html" name="" title="FileSystem">FileSystem</a>
+
+                                                                      <ul class="nav level7">
+                                                                            <li>
+                                                                                <a href="api/DotBoxD.Kernels.Runtime.Bindings.FileSystem.SafeFileSystem.html" name="" title="SafeFileSystem">SafeFileSystem</a>
+                                                                            </li>
+                                                                      </ul>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.DefaultSandboxBindings.html" name="" title="DefaultSandboxBindings">DefaultSandboxBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.MathBindings.html" name="" title="MathBindings">MathBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.SafeFileBindings.html" name="" title="SafeFileBindings">SafeFileBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.SafeFileSystem.html" name="" title="SafeFileSystem">SafeFileSystem</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.SafeLogBindings.html" name="" title="SafeLogBindings">SafeLogBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.SafeRandomBindings.html" name="" title="SafeRandomBindings">SafeRandomBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.SafeTimeBindings.html" name="" title="SafeTimeBindings">SafeTimeBindings</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Runtime.Bindings.StringBindings.html" name="" title="StringBindings">StringBindings</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Runtime.AuditTextSanitizer.html" name="" title="AuditTextSanitizer">AuditTextSanitizer</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Sandbox.html" name="" title="Sandbox">Sandbox</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.Values.html" name="" title="Values">Values</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Sandbox.Values.ListValue.html" name="" title="ListValue">ListValue</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Sandbox.Values.MapValue.html" name="" title="MapValue">MapValue</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.BoolValue.html" name="" title="BoolValue">BoolValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.F64Value.html" name="" title="F64Value">F64Value</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.GuidValue.html" name="" title="GuidValue">GuidValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.I32Value.html" name="" title="I32Value">I32Value</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.I64Value.html" name="" title="I64Value">I64Value</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.OpaqueIdValue.html" name="" title="OpaqueIdValue">OpaqueIdValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.RecordValue.html" name="" title="RecordValue">RecordValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxCollectionFuel.html" name="" title="SandboxCollectionFuel">SandboxCollectionFuel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxContext.html" name="" title="SandboxContext">SandboxContext</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxDescriptorGuards.html" name="" title="SandboxDescriptorGuards">SandboxDescriptorGuards</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxEffect.html" name="" title="SandboxEffect">SandboxEffect</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxEffects.html" name="" title="SandboxEffects">SandboxEffects</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxError.html" name="" title="SandboxError">SandboxError</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxErrorCode.html" name="" title="SandboxErrorCode">SandboxErrorCode</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxFloat64Math.html" name="" title="SandboxFloat64Math">SandboxFloat64Math</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxInt32Math.html" name="" title="SandboxInt32Math">SandboxInt32Math</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxInt64Math.html" name="" title="SandboxInt64Math">SandboxInt64Math</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxLanguage.html" name="" title="SandboxLanguage">SandboxLanguage</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxLiteralConstraints.html" name="" title="SandboxLiteralConstraints">SandboxLiteralConstraints</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxNumericOperations.html" name="" title="SandboxNumericOperations">SandboxNumericOperations</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxPath.html" name="" title="SandboxPath">SandboxPath</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxPathValue.html" name="" title="SandboxPathValue">SandboxPathValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxResourceUsage.html" name="" title="SandboxResourceUsage">SandboxResourceUsage</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxType.html" name="" title="SandboxType">SandboxType</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxUri.html" name="" title="SandboxUri">SandboxUri</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxUriValue.html" name="" title="SandboxUriValue">SandboxUriValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxValue.html" name="" title="SandboxValue">SandboxValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.SandboxValueValidator.html" name="" title="SandboxValueValidator">SandboxValueValidator</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.StringValue.html" name="" title="StringValue">StringValue</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Sandbox.UnitValue.html" name="" title="UnitValue">UnitValue</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Serialization.Json.html" name="" title="Serialization.Json">Serialization.Json</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Serialization.Json.Hosting.html" name="" title="Hosting">Hosting</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Serialization.Json.Hosting.SandboxHostJsonExtensions.html" name="" title="SandboxHostJsonExtensions">SandboxHostJsonExtensions</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Serialization.Json.Schema.html" name="" title="Schema">Schema</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Serialization.Json.Schema.JsonSchemas.html" name="" title="JsonSchemas">JsonSchemas</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Serialization.Json.JsonExporter.html" name="" title="JsonExporter">JsonExporter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Serialization.Json.JsonImporter.html" name="" title="JsonImporter">JsonImporter</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Validation.html" name="" title="Validation">Validation</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Validation.Model.html" name="" title="Model">Model</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Validation.Model.ModuleValidationResult.html" name="" title="ModuleValidationResult">ModuleValidationResult</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Validation.ModuleValidator.html" name="" title="ModuleValidator">ModuleValidator</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Kernels.Verifier.html" name="" title="Verifier">Verifier</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Verifier.Diagnostics.html" name="" title="Diagnostics">Diagnostics</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Diagnostics.VerifierDiagnosticCategory.html" name="" title="VerifierDiagnosticCategory">VerifierDiagnosticCategory</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Diagnostics.VerifierDiagnosticCodes.html" name="" title="VerifierDiagnosticCodes">VerifierDiagnosticCodes</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Diagnostics.VerifierDiagnosticReference.html" name="" title="VerifierDiagnosticReference">VerifierDiagnosticReference</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Kernels.Verifier.Generated.html" name="" title="Generated">Generated</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.ArtifactManifest.html" name="" title="ArtifactManifest">ArtifactManifest</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.GeneratedAssemblyVerifier.html" name="" title="GeneratedAssemblyVerifier">GeneratedAssemblyVerifier</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.IGeneratedAssemblyVerifier.html" name="" title="IGeneratedAssemblyVerifier">IGeneratedAssemblyVerifier</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.VerificationDiagnostic.html" name="" title="VerificationDiagnostic">VerificationDiagnostic</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.VerificationManifestIdentity.html" name="" title="VerificationManifestIdentity">VerificationManifestIdentity</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Kernels.Verifier.Generated.VerificationResult.html" name="" title="VerificationResult">VerificationResult</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Kernels.Verifier.VerificationPolicy.html" name="" title="VerificationPolicy">VerificationPolicy</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.AssignmentStatement.html" name="" title="AssignmentStatement">AssignmentStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.BinaryExpression.html" name="" title="BinaryExpression">BinaryExpression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.BreakStatement.html" name="" title="BreakStatement">BreakStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.CallExpression.html" name="" title="CallExpression">CallExpression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.CapabilityGrant.html" name="" title="CapabilityGrant">CapabilityGrant</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.CapabilityRequest.html" name="" title="CapabilityRequest">CapabilityRequest</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ContinueStatement.html" name="" title="ContinueStatement">ContinueStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ExecutionMode.html" name="" title="ExecutionMode">ExecutionMode</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ExecutionPlan.html" name="" title="ExecutionPlan">ExecutionPlan</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ExecutionPlanSeal.html" name="" title="ExecutionPlanSeal">ExecutionPlanSeal</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.Expression.html" name="" title="Expression">Expression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ExpressionStatement.html" name="" title="ExpressionStatement">ExpressionStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ForRangeStatement.html" name="" title="ForRangeStatement">ForRangeStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.FunctionAnalysis.html" name="" title="FunctionAnalysis">FunctionAnalysis</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.IfStatement.html" name="" title="IfStatement">IfStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.LiteralExpression.html" name="" title="LiteralExpression">LiteralExpression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.Parameter.html" name="" title="Parameter">Parameter</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.ReturnStatement.html" name="" title="ReturnStatement">ReturnStatement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.RuntimeCapabilityIds.html" name="" title="RuntimeCapabilityIds">RuntimeCapabilityIds</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxExecutionOptions.html" name="" title="SandboxExecutionOptions">SandboxExecutionOptions</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxExecutionResult.html" name="" title="SandboxExecutionResult">SandboxExecutionResult</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxFunction.html" name="" title="SandboxFunction">SandboxFunction</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxIsolation.html" name="" title="SandboxIsolation">SandboxIsolation</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxModule.html" name="" title="SandboxModule">SandboxModule</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.SandboxPolicy.html" name="" title="SandboxPolicy">SandboxPolicy</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.Statement.html" name="" title="Statement">Statement</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.UnaryExpression.html" name="" title="UnaryExpression">UnaryExpression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.VariableExpression.html" name="" title="VariableExpression">VariableExpression</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Kernels.WhileStatement.html" name="" title="WhileStatement">WhileStatement</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Plugins.html" name="" title="Plugins">Plugins</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Plugins.Indexing.html" name="" title="Indexing">Indexing</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Indexing.EventIndexKeyAttribute.html" name="" title="EventIndexKeyAttribute">EventIndexKeyAttribute</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Indexing.EventIndexMatcher-1.html" name="" title="EventIndexMatcher&lt;TEvent&gt;">EventIndexMatcher&lt;TEvent&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Indexing.EventIndexRegistry.html" name="" title="EventIndexRegistry">EventIndexRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Indexing.EventIndexStats.html" name="" title="EventIndexStats">EventIndexStats</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Plugins.Json.html" name="" title="Json">Json</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Json.PluginPackageJsonSchemas.html" name="" title="PluginPackageJsonSchemas">PluginPackageJsonSchemas</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Json.PluginPackageJsonSerializer.html" name="" title="PluginPackageJsonSerializer">PluginPackageJsonSerializer</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Json.PluginServerJsonExtensions.html" name="" title="PluginServerJsonExtensions">PluginServerJsonExtensions</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Plugins.Kernel.html" name="" title="Kernel">Kernel</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Kernel.InstalledKernel.html" name="" title="InstalledKernel">InstalledKernel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Kernel.InstalledKernelPool.html" name="" title="InstalledKernelPool">InstalledKernelPool</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Kernel.KernelPackageRegistry.html" name="" title="KernelPackageRegistry">KernelPackageRegistry</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Plugins.Policies.html" name="" title="Policies">Policies</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Policies.HostMessagePolicyBuilderExtensions.html" name="" title="HostMessagePolicyBuilderExtensions">HostMessagePolicyBuilderExtensions</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Plugins.Runtime.html" name="" title="Runtime">Runtime</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.Diagnostics.html" name="" title="Diagnostics">Diagnostics</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Diagnostics.PluginDiagnosticAudience.html" name="" title="PluginDiagnosticAudience">PluginDiagnosticAudience</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Diagnostics.PluginDiagnosticCodes.html" name="" title="PluginDiagnosticCodes">PluginDiagnosticCodes</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Diagnostics.PluginDiagnosticPhase.html" name="" title="PluginDiagnosticPhase">PluginDiagnosticPhase</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Diagnostics.PluginDiagnosticReference.html" name="" title="PluginDiagnosticReference">PluginDiagnosticReference</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.Hooks.html" name="" title="Hooks">Hooks</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.HookStage-3.html" name="" title="HookStage&lt;TEvent, TCurrent, TContext&gt;">HookStage&lt;TEvent, TCurrent, TContext&gt;</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage-2.html" name="" title="RemoteHookStage&lt;TEvent, TCurrent&gt;">RemoteHookStage&lt;TEvent, TCurrent&gt;</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.RemoteHookStage-3.html" name="" title="RemoteHookStage&lt;TEvent, TCurrent, TContext&gt;">RemoteHookStage&lt;TEvent, TCurrent, TContext&gt;</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.RemoteLocalHandlerRegistry.html" name="" title="RemoteLocalHandlerRegistry">RemoteLocalHandlerRegistry</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.RemoteLocalPush.html" name="" title="RemoteLocalPush">RemoteLocalPush</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Hooks.RemoteLocalResultRequest.html" name="" title="RemoteLocalResultRequest">RemoteLocalResultRequest</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.Lifecycle.html" name="" title="Lifecycle">Lifecycle</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Lifecycle.LiveUpdateMode.html" name="" title="LiveUpdateMode">LiveUpdateMode</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.Rpc.html" name="" title="Rpc">Rpc</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Rpc.KernelRpcMarshaller.html" name="" title="KernelRpcMarshaller">KernelRpcMarshaller</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Rpc.ServerExtensionProxy.html" name="" title="ServerExtensionProxy">ServerExtensionProxy</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.Subscriptions.html" name="" title="Subscriptions">Subscriptions</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage-2.html" name="" title="RemoteSubscriptionStage&lt;TEvent, TCurrent&gt;">RemoteSubscriptionStage&lt;TEvent, TCurrent&gt;</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Subscriptions.RemoteSubscriptionStage-3.html" name="" title="RemoteSubscriptionStage&lt;TEvent, TCurrent, TContext&gt;">RemoteSubscriptionStage&lt;TEvent, TCurrent, TContext&gt;</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Plugins.Runtime.Subscriptions.SubscriptionStage-3.html" name="" title="SubscriptionStage&lt;TEvent, TCurrent, TContext&gt;">SubscriptionStage&lt;TEvent, TCurrent, TContext&gt;</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.HookPipeline-2.html" name="" title="HookPipeline&lt;TEvent, TContext&gt;">HookPipeline&lt;TEvent, TContext&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.HookRegistry.html" name="" title="HookRegistry">HookRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.IErasedPluginEventAdapter.html" name="" title="IErasedPluginEventAdapter">IErasedPluginEventAdapter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.ILiveSetting.html" name="" title="ILiveSetting">ILiveSetting</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.LiveContext-1.html" name="" title="LiveContext&lt;T&gt;">LiveContext&lt;T&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.LiveSettingStore.html" name="" title="LiveSettingStore">LiveSettingStore</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.LiveValue-1.html" name="" title="LiveValue&lt;T&gt;">LiveValue&lt;T&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.PluginEventAdapterRegistry.html" name="" title="PluginEventAdapterRegistry">PluginEventAdapterRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.PluginExecutionObservation.html" name="" title="PluginExecutionObservation">PluginExecutionObservation</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.PluginMessageBindings.html" name="" title="PluginMessageBindings">PluginMessageBindings</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteHookPipeline-1.html" name="" title="RemoteHookPipeline&lt;TEvent&gt;">RemoteHookPipeline&lt;TEvent&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteHookPipeline-2.html" name="" title="RemoteHookPipeline&lt;TEvent, TContext&gt;">RemoteHookPipeline&lt;TEvent, TContext&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteHookRegistry.html" name="" title="RemoteHookRegistry">RemoteHookRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline-1.html" name="" title="RemoteSubscriptionPipeline&lt;TEvent&gt;">RemoteSubscriptionPipeline&lt;TEvent&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteSubscriptionPipeline-2.html" name="" title="RemoteSubscriptionPipeline&lt;TEvent, TContext&gt;">RemoteSubscriptionPipeline&lt;TEvent, TContext&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.RemoteSubscriptionRegistry.html" name="" title="RemoteSubscriptionRegistry">RemoteSubscriptionRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.ResultHookDispatchOptions-1.html" name="" title="ResultHookDispatchOptions&lt;TResult&gt;">ResultHookDispatchOptions&lt;TResult&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.ResultHookFault.html" name="" title="ResultHookFault">ResultHookFault</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.SubscriptionDeliveryFault.html" name="" title="SubscriptionDeliveryFault">SubscriptionDeliveryFault</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.SubscriptionDeliveryStage.html" name="" title="SubscriptionDeliveryStage">SubscriptionDeliveryStage</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.SubscriptionPipeline-2.html" name="" title="SubscriptionPipeline&lt;TEvent, TContext&gt;">SubscriptionPipeline&lt;TEvent, TContext&gt;</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.SubscriptionRegistry.html" name="" title="SubscriptionRegistry">SubscriptionRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Plugins.Runtime.TypedInstalledKernel-1.html" name="" title="TypedInstalledKernel&lt;TSettings&gt;">TypedInstalledKernel&lt;TSettings&gt;</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.HookSubscriptionManifest.html" name="" title="HookSubscriptionManifest">HookSubscriptionManifest</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.IServerExtensionClientRegistry.html" name="" title="IServerExtensionClientRegistry">IServerExtensionClientRegistry</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.IServerExtensionWireClient.html" name="" title="IServerExtensionWireClient">IServerExtensionWireClient</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.IndexPredicateOperator.html" name="" title="IndexPredicateOperator">IndexPredicateOperator</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.IndexedPredicate.html" name="" title="IndexedPredicate">IndexedPredicate</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelEntrypoints.html" name="" title="KernelEntrypoints">KernelEntrypoints</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelRegistry.html" name="" title="KernelRegistry">KernelRegistry</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelRpcBinaryCodec.html" name="" title="KernelRpcBinaryCodec">KernelRpcBinaryCodec</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelRpcValue.html" name="" title="KernelRpcValue">KernelRpcValue</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelRpcValueConverter.html" name="" title="KernelRpcValueConverter">KernelRpcValueConverter</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelRpcValueKind.html" name="" title="KernelRpcValueKind">KernelRpcValueKind</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelWireKind.html" name="" title="KernelWireKind">KernelWireKind</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.KernelWireTerminal.html" name="" title="KernelWireTerminal">KernelWireTerminal</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.LiveSettingDefinition.html" name="" title="LiveSettingDefinition">LiveSettingDefinition</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.PluginManifest.html" name="" title="PluginManifest">PluginManifest</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.PluginPackage.html" name="" title="PluginPackage">PluginPackage</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.PluginServer.html" name="" title="PluginServer">PluginServer</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.PluginSession.html" name="" title="PluginSession">PluginSession</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.WireCallbacks.html" name="" title="WireCallbacks">WireCallbacks</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.WireOptions.html" name="" title="WireOptions">WireOptions</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Plugins.WireResult.html" name="" title="WireResult">WireResult</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Pushdown.Services.html" name="" title="Pushdown.Services">Pushdown.Services</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <a href="api/DotBoxD.Pushdown.Services.NamedPipeTransportOptions.html" name="" title="NamedPipeTransportOptions">NamedPipeTransportOptions</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Pushdown.Services.PluginConnectionHost-1.html" name="" title="PluginConnectionHost&lt;TConnection&gt;">PluginConnectionHost&lt;TConnection&gt;</a>
+                                              </li>
+                                              <li>
+                                                  <a href="api/DotBoxD.Pushdown.Services.RpcMessagePackIpc.html" name="" title="RpcMessagePackIpc">RpcMessagePackIpc</a>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Services.html" name="" title="Services">Services</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Attributes.html" name="" title="Attributes">Attributes</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Attributes.DotBoxDMethodAttribute.html" name="" title="DotBoxDMethodAttribute">DotBoxDMethodAttribute</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Attributes.DotBoxDServiceAttribute.html" name="" title="DotBoxDServiceAttribute">DotBoxDServiceAttribute</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Buffers.html" name="" title="Buffers">Buffers</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Buffers.Payload.html" name="" title="Payload">Payload</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Buffers.PooledBufferWriter.html" name="" title="PooledBufferWriter">PooledBufferWriter</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Diagnostics.html" name="" title="Diagnostics">Diagnostics</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcDiagnosticErrorEventArgs.html" name="" title="RpcDiagnosticErrorEventArgs">RpcDiagnosticErrorEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcDiagnostics.html" name="" title="RpcDiagnostics">RpcDiagnostics</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcDisconnectedEventArgs.html" name="" title="RpcDisconnectedEventArgs">RpcDisconnectedEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcDispatchErrorEventArgs.html" name="" title="RpcDispatchErrorEventArgs">RpcDispatchErrorEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcErrorInfo.html" name="" title="RpcErrorInfo">RpcErrorInfo</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcErrorTypes.html" name="" title="RpcErrorTypes">RpcErrorTypes</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcHostErrorEventArgs.html" name="" title="RpcHostErrorEventArgs">RpcHostErrorEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcPeerEventArgs.html" name="" title="RpcPeerEventArgs">RpcPeerEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcProtocolErrorEventArgs.html" name="" title="RpcProtocolErrorEventArgs">RpcProtocolErrorEventArgs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Diagnostics.RpcReadErrorEventArgs.html" name="" title="RpcReadErrorEventArgs">RpcReadErrorEventArgs</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Exceptions.html" name="" title="Exceptions">Exceptions</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.RemoteServiceException.html" name="" title="RemoteServiceException">RemoteServiceException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceConnectionException.html" name="" title="ServiceConnectionException">ServiceConnectionException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceException.html" name="" title="ServiceException">ServiceException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceNotFoundException.html" name="" title="ServiceNotFoundException">ServiceNotFoundException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.html" name="" title="ServiceNotFoundException.NotFoundKind">ServiceNotFoundException.NotFoundKind</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceProtocolException.html" name="" title="ServiceProtocolException">ServiceProtocolException</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Exceptions.ServiceTimeoutException.html" name="" title="ServiceTimeoutException">ServiceTimeoutException</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Generated.html" name="" title="Generated">Generated</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.GeneratedMethod.html" name="" title="GeneratedMethod">GeneratedMethod</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.GeneratedParameter.html" name="" title="GeneratedParameter">GeneratedParameter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.GeneratedReturnKind.html" name="" title="GeneratedReturnKind">GeneratedReturnKind</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.GeneratedService.html" name="" title="GeneratedService">GeneratedService</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.GeneratedServiceRegistry.html" name="" title="GeneratedServiceRegistry">GeneratedServiceRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.IDotBoxDGeneratedServiceRegistrationSink.html" name="" title="IDotBoxDGeneratedServiceRegistrationSink">IDotBoxDGeneratedServiceRegistrationSink</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Generated.IDotBoxDServiceRegistrationSink.html" name="" title="IDotBoxDServiceRegistrationSink">IDotBoxDServiceRegistrationSink</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Peer.html" name="" title="Peer">Peer</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Peer.RpcPeer.html" name="" title="RpcPeer">RpcPeer</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Peer.RpcPeerOptions.html" name="" title="RpcPeerOptions">RpcPeerOptions</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Peer.RpcPeerSession.html" name="" title="RpcPeerSession">RpcPeerSession</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Protocol.html" name="" title="Protocol">Protocol</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.MessageFramer.html" name="" title="MessageFramer">MessageFramer</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.MessageFramer.FramedMessage.html" name="" title="MessageFramer.FramedMessage">MessageFramer.FramedMessage</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.MessageType.html" name="" title="MessageType">MessageType</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.RpcRequest.html" name="" title="RpcRequest">RpcRequest</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.RpcResponse.html" name="" title="RpcResponse">RpcResponse</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.RpcStreamHandle.html" name="" title="RpcStreamHandle">RpcStreamHandle</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.RpcStreamKind.html" name="" title="RpcStreamKind">RpcStreamKind</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Protocol.ServiceHandle.html" name="" title="ServiceHandle">ServiceHandle</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Serialization.html" name="" title="Serialization">Serialization</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Serialization.ISerializer.html" name="" title="ISerializer">ISerializer</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Serialization.SerializerExtensions.html" name="" title="SerializerExtensions">SerializerExtensions</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Server.html" name="" title="Server">Server</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.IInstanceRegistry.html" name="" title="IInstanceRegistry">IInstanceRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.INonStreamingServiceDispatcher.html" name="" title="INonStreamingServiceDispatcher">INonStreamingServiceDispatcher</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.IRpcInvoker.html" name="" title="IRpcInvoker">IRpcInvoker</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.IServiceDispatcher.html" name="" title="IServiceDispatcher">IServiceDispatcher</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.InstanceRegistry.html" name="" title="InstanceRegistry">InstanceRegistry</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Server.RpcHost.html" name="" title="RpcHost">RpcHost</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Streaming.html" name="" title="Streaming">Streaming</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Services.Streaming.Frames.html" name="" title="Frames">Frames</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Services.Streaming.Frames.RpcStreamAttachment.html" name="" title="RpcStreamAttachment">RpcStreamAttachment</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                        <li>
+                                                            <span class="expand-stub"></span>
+                                                            <a href="api/DotBoxD.Services.Streaming.Remote.html" name="" title="Remote">Remote</a>
+
+                                                            <ul class="nav level6">
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Services.Streaming.Remote.IRpcStreamingContext.html" name="" title="IRpcStreamingContext">IRpcStreamingContext</a>
+                                                                  </li>
+                                                                  <li>
+                                                                      <a href="api/DotBoxD.Services.Streaming.Remote.RpcStreamingContext.html" name="" title="RpcStreamingContext">RpcStreamingContext</a>
+                                                                  </li>
+                                                            </ul>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Services.Transport.html" name="" title="Transport">Transport</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.IRpcChannel.html" name="" title="IRpcChannel">IRpcChannel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.IRpcFrameChannel.html" name="" title="IRpcFrameChannel">IRpcFrameChannel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.IRpcValueTaskChannel.html" name="" title="IRpcValueTaskChannel">IRpcValueTaskChannel</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.IServerTransport.html" name="" title="IServerTransport">IServerTransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.ITransport.html" name="" title="ITransport">ITransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.QueueFullMode.html" name="" title="QueueFullMode">QueueFullMode</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.RpcFrame.html" name="" title="RpcFrame">RpcFrame</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.RpcTransportExtensions.html" name="" title="RpcTransportExtensions">RpcTransportExtensions</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.SingleConnectionServerTransport.html" name="" title="SingleConnectionServerTransport">SingleConnectionServerTransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.SingleConnectionTransport.html" name="" title="SingleConnectionTransport">SingleConnectionTransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Services.Transport.StreamConnection.html" name="" title="StreamConnection">StreamConnection</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="expand-stub"></span>
+                                        <a href="api/DotBoxD.Transports.html" name="" title="Transports">Transports</a>
+
+                                        <ul class="nav level4">
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Transports.NamedPipes.html" name="" title="NamedPipes">NamedPipes</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Transports.NamedPipes.NamedPipeClientTransport.html" name="" title="NamedPipeClientTransport">NamedPipeClientTransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Transports.NamedPipes.NamedPipeServerTransport.html" name="" title="NamedPipeServerTransport">NamedPipeServerTransport</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                              <li>
+                                                  <span class="expand-stub"></span>
+                                                  <a href="api/DotBoxD.Transports.Tcp.html" name="" title="Tcp">Tcp</a>
+
+                                                  <ul class="nav level5">
+                                                        <li>
+                                                            <a href="api/DotBoxD.Transports.Tcp.TcpConnection.html" name="" title="TcpConnection">TcpConnection</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Transports.Tcp.TcpServerTransport.html" name="" title="TcpServerTransport">TcpServerTransport</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="api/DotBoxD.Transports.Tcp.TcpTransport.html" name="" title="TcpTransport">TcpTransport</a>
+                                                        </li>
+                                                  </ul>
+                                              </li>
+                                        </ul>
+                                    </li>
+                              </ul>
+                          </li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="https://github.com/JKamsker/DotBoxD" name="" title="GitHub">GitHub</a>
+                </li>
+          </ul>
+      </div>
+    </div>
+  </div>
+</div>
