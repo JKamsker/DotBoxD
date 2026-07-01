@@ -88,6 +88,25 @@ public sealed partial class PeerInboundCoverageTests
         return copy;
     }
 
+    private static async Task WaitForPayloadDisposedAsync(Payload payload)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            try
+            {
+                _ = payload.Memory;
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10)).ConfigureAwait(false);
+        }
+
+        Assert.Throws<ObjectDisposedException>(() => payload.Memory);
+    }
+
     private sealed class EchoDispatcher : IServiceDispatcher
     {
         public const string Service = "Echo";
@@ -151,6 +170,9 @@ public sealed partial class PeerInboundCoverageTests
 
         public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource<CancellationToken> ObservedToken { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public async Task DispatchAsync(
             string method,
             ReadOnlyMemory<byte> payload,
@@ -159,6 +181,7 @@ public sealed partial class PeerInboundCoverageTests
             IBufferWriter<byte> output,
             CancellationToken ct = default)
         {
+            ObservedToken.TrySetResult(ct);
             Started.TrySetResult();
             try
             {
