@@ -48,6 +48,6 @@ public sealed class HookResultBuilderHintNameRegressionTests
             "partial record struct KeywordNamespaceResult : global::DotBoxD.Abstractions.IHookResult",
             generated,
             StringComparison.Ordinal);
-        Assert.Contains("public KeywordNamespaceResult WithDamage(int Damage)", generated, StringComparison.Ordinal);
+        Assert.Contains("public KeywordNamespaceResult WithDamage(int damage)", generated, StringComparison.Ordinal);
     }
 }

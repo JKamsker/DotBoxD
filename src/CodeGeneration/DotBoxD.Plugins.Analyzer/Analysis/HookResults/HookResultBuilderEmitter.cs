@@ -144,7 +144,25 @@ internal static class HookResultBuilderEmitter
 
             builder.Append(segment.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Append('_')
-                .Append(segment);
+                .Append(HintNameSegment(segment));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string HintNameSegment(string segment)
+    {
+        var builder = new StringBuilder(segment.Length);
+        foreach (var character in segment)
+        {
+            if (char.IsLetterOrDigit(character) || character == '_')
+            {
+                builder.Append(character);
+                continue;
+            }
+
+            builder.Append("_x")
+                .Append(((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         return builder.ToString();
