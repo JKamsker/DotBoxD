@@ -15,6 +15,13 @@ on:
         required: true
         type: string
 
+# Per-run group: distinct red-test dispatches must NOT cancel each other. The gh-aw default
+# (a shared `gh-aw-<workflow>` group with cancel-in-progress) dropped findings under the
+# dispatcher fan-out, since near-simultaneous dispatches killed each other's queued runs.
+concurrency:
+  group: surprise-red-test-${{ github.run_id }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   issues: read

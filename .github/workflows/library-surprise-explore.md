@@ -109,8 +109,11 @@ Before selecting a candidate, search broadly enough to catch semantic duplicates
 - the lens's own comment trail — including every candidate previously dispatched from this lens and
   every lead previously **refuted** here (refuted leads live in the comment trail, not as issues)
 
-If a lead is already covered by a PR/issue, was already **refuted** in the trail, or was already
-dispatched/proven/fixed per the trail, do not pursue it again.
+Treat a candidate as already covered only if it has a corresponding `[surprise-red-test]` PR
+(open OR merged/closed) or a `sweep:bug` issue — the PR/issue is the authority. If the comment trail
+shows a candidate was **dispatched but no matching PR exists** (its red-test run was cancelled or
+failed), re-dispatching it is correct — do not treat the bare "dispatched" log line as coverage.
+Never re-mine a lead already **refuted** in the trail.
 
 ## 3. Investigate one cohesive candidate
 

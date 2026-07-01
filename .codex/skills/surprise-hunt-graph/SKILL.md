@@ -35,8 +35,10 @@ companion to `library-surprise-sweep` (the technique for finding + proving one s
    - the lens comment log — every candidate previously dispatched from this lens and every lead
      previously **refuted** here (in the coarse model, refuted leads live in the comment trail, not
      as separate issues)
-   Skip anything already covered. Never re-mine a refuted lead, and never re-dispatch a candidate the
-   trail shows was already proven or fixed.
+   Treat a candidate as covered only if a `[surprise-red-test]` PR (open OR merged/closed) or a
+   `sweep:bug` issue exists for it — the PR/issue is the authority, NOT the bare "dispatched" log
+   line. If the trail shows a candidate was dispatched but no matching PR exists (a cancelled or
+   failed red-test), re-dispatching it is correct. Never re-mine a refuted lead.
 4. Pick ONE cohesive target inside the lens's scope: a charter sub-area not yet swept, or continue
    an open thread from the comments.
 5. Investigate read-only. You may restore/build to confirm a lead. Never edit files and never open a
