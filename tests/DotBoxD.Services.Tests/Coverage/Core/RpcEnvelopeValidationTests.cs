@@ -1,6 +1,7 @@
 using System.Buffers;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Protocol;
+using DotBoxD.Services.Tests.Support;
 using MessagePack;
 using Xunit;
 
@@ -132,7 +133,7 @@ public sealed class RpcEnvelopeValidationTests
         message.Write("MethodName");
         message.Write("Call");
         message.Write("Future");
-        WriteDeeplyNestedArrays(ref message);
+        RpcEnvelopeTestFrames.WriteDeeplyNestedArrays(ref message, DeepUnknownFieldDepth);
         message.Flush();
         return writer.WrittenMemory.ToArray();
     }
@@ -175,7 +176,7 @@ public sealed class RpcEnvelopeValidationTests
         message.Write("IsSuccess");
         message.Write(true);
         message.Write("Future");
-        WriteDeeplyNestedArrays(ref message);
+        RpcEnvelopeTestFrames.WriteDeeplyNestedArrays(ref message, DeepUnknownFieldDepth);
         message.Flush();
         return writer.WrittenMemory.ToArray();
     }
@@ -231,34 +232,11 @@ public sealed class RpcEnvelopeValidationTests
     }
 
     private static byte[] WriteErrorResponseWithStream(MessagePackRpcSerializer serializer)
-    {
-        var writer = new ArrayBufferWriter<byte>();
-        var message = new MessagePackWriter(writer);
-        message.WriteMapHeader(5);
-        message.Write("MessageId");
-        message.Write(42);
-        message.Write("IsSuccess");
-        message.Write(false);
-        message.Write("ErrorMessage");
-        message.Write("boom");
-        message.Write("ErrorType");
-        message.Write("RemoteServiceException");
-        message.Write("Stream");
-        MessagePackSerializer.Serialize(
-            ref message,
-            new RpcStreamHandle(701, RpcStreamKind.Binary),
-            serializer.Options);
-        message.Flush();
-        return writer.WrittenMemory.ToArray();
-    }
-
-    private static void WriteDeeplyNestedArrays(ref MessagePackWriter message)
-    {
-        for (var i = 0; i < DeepUnknownFieldDepth; i++)
-        {
-            message.WriteArrayHeader(1);
-        }
-
-        message.WriteNil();
-    }
+        => RpcEnvelopeTestFrames.WriteErrorResponseEnvelope(
+            serializer,
+            messageId: 42,
+            isSuccess: false,
+            errorMessage: "boom",
+            errorType: "RemoteServiceException",
+            stream: new RpcStreamHandle(701, RpcStreamKind.Binary));
 }

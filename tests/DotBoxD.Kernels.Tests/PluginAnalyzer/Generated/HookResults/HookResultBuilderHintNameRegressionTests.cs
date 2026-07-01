@@ -50,4 +50,27 @@ public sealed class HookResultBuilderHintNameRegressionTests
             StringComparison.Ordinal);
         Assert.Contains("public KeywordNamespaceResult WithDamage(int damage)", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void HookResult_hint_segments_treat_supplementary_scalars_as_single_units()
+    {
+        var deseretLetter = char.ConvertFromUtf32(0x10400);
+        var emoji = char.ConvertFromUtf32(0x1F600);
+
+        Assert.Equal(deseretLetter, InvokeHintNameSegment(deseretLetter));
+        Assert.Equal("_x1F600", InvokeHintNameSegment(emoji));
+    }
+
+    private static string InvokeHintNameSegment(string segment)
+    {
+        var emitter = typeof(DotBoxD.Plugins.Analyzer.Analysis.PluginPackageGenerator)
+            .Assembly
+            .GetType(
+                "DotBoxD.Plugins.Analyzer.Analysis.HookResults.HookResultBuilderEmitter",
+                throwOnError: true)!;
+        var method = emitter.GetMethod(
+            "HintNameSegment",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        return Assert.IsType<string>(method.Invoke(null, [segment]));
+    }
 }

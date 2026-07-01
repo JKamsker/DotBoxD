@@ -89,6 +89,7 @@ public sealed partial class HookRegistry
         TEvent e,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         for (var i = 0; i < pipelines.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -231,7 +231,6 @@ public partial class HookPipeline<TEvent, TContext> : IHookPipeline<TEvent>
         TContext context,
         int index)
     {
-        rawContext.CancellationToken.ThrowIfCancellationRequested();
         var matched = await pending.ConfigureAwait(false);
         rawContext.CancellationToken.ThrowIfCancellationRequested();
         if (!matched)

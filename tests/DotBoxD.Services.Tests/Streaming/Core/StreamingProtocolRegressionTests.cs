@@ -1,5 +1,3 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Client;
@@ -9,7 +7,7 @@ using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Streaming.Frames;
 using DotBoxD.Services.Streaming.Remote;
-using MessagePack;
+using DotBoxD.Services.Tests.Support;
 using Xunit;
 using static DotBoxD.Services.Tests.Streaming.Core.StreamingProtocolRegressionTestSupport;
 
@@ -236,30 +234,13 @@ public sealed class StreamingProtocolRegressionTests
     }
 
     private static Payload FrameErrorResponseWithStream(MessagePackRpcSerializer serializer, int messageId)
-    {
-        var envelopeWriter = new ArrayBufferWriter<byte>();
-        var envelope = new MessagePackWriter(envelopeWriter);
-        envelope.WriteMapHeader(5);
-        envelope.Write("MessageId");
-        envelope.Write(messageId);
-        envelope.Write("IsSuccess");
-        envelope.Write(false);
-        envelope.Write("ErrorMessage");
-        envelope.Write("failed");
-        envelope.Write("ErrorType");
-        envelope.Write("Remote");
-        envelope.Write("Stream");
-        MessagePackSerializer.Serialize(
-            ref envelope,
-            new RpcStreamHandle(604, RpcStreamKind.Binary),
-            serializer.Options);
-        envelope.Flush();
-
-        var body = new byte[MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount];
-        BinaryPrimitives.WriteInt32LittleEndian(
-            body.AsSpan(0, MessageFramer.EnvelopeLengthSize),
-            envelopeWriter.WrittenCount);
-        envelopeWriter.WrittenSpan.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize));
-        return MessageFramer.FrameToPayload(messageId, MessageType.Error, body);
-    }
+        => RpcEnvelopeTestFrames.FrameErrorResponse(
+            serializer,
+            frameMessageId: messageId,
+            messageType: MessageType.Error,
+            envelopeMessageId: messageId,
+            isSuccess: false,
+            errorMessage: "failed",
+            errorType: "Remote",
+            stream: new RpcStreamHandle(604, RpcStreamKind.Binary));
 }

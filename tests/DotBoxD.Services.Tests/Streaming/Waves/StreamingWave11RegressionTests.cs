@@ -1,5 +1,3 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Buffers;
 using DotBoxD.Services.Client;
@@ -7,7 +5,7 @@ using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Streaming.Core;
-using MessagePack;
+using DotBoxD.Services.Tests.Support;
 using Xunit;
 
 namespace DotBoxD.Services.Tests.Streaming.Waves;
@@ -165,37 +163,16 @@ public sealed class StreamingWave11RegressionTests
         var payload = kind == MalformedStreamErrorKind.TrailingPayload
             ? new byte[] { 1 }
             : ReadOnlySpan<byte>.Empty;
-        var envelopeWriter = new ArrayBufferWriter<byte>();
-        var envelope = new MessagePackWriter(envelopeWriter);
-        envelope.WriteMapHeader(5);
-        envelope.Write("MessageId");
-        envelope.Write(messageId);
-        envelope.Write("IsSuccess");
-        envelope.Write(kind == MalformedStreamErrorKind.SuccessResponse);
-        envelope.Write("ErrorMessage");
-        envelope.Write("remote failed");
-        envelope.Write("ErrorType");
-        envelope.Write("Remote");
-        envelope.Write("Stream");
-        if (stream is { } handleValue)
-        {
-            MessagePackSerializer.Serialize(ref envelope, handleValue, serializer.Options);
-        }
-        else
-        {
-            envelope.WriteNil();
-        }
-
-        envelope.Flush();
-
-        var body = new byte[MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount + payload.Length];
-        BinaryPrimitives.WriteInt32LittleEndian(
-            body.AsSpan(0, MessageFramer.EnvelopeLengthSize),
-            envelopeWriter.WrittenCount);
-        envelopeWriter.WrittenSpan.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize));
-        payload.CopyTo(body.AsSpan(MessageFramer.EnvelopeLengthSize + envelopeWriter.WrittenCount));
-
-        return MessageFramer.FrameToPayload(handle.StreamId, MessageType.StreamError, body);
+        return RpcEnvelopeTestFrames.FrameErrorResponse(
+            serializer,
+            frameMessageId: handle.StreamId,
+            messageType: MessageType.StreamError,
+            envelopeMessageId: messageId,
+            isSuccess: kind == MalformedStreamErrorKind.SuccessResponse,
+            errorMessage: "remote failed",
+            errorType: "Remote",
+            stream: stream,
+            trailingPayload: payload);
     }
 
     private static RpcStreamManager CreateStreamManager(MessagePackRpcSerializer serializer) =>

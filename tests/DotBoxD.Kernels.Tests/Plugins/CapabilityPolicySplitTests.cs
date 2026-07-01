@@ -128,6 +128,9 @@ public sealed class CapabilityPolicySplitTests
         Assert.Contains(exception.Diagnostics, diagnostic =>
             diagnostic.Code == "E-POLICY-CAP" &&
             diagnostic.Message.Contains("event.read.health", StringComparison.Ordinal));
+        Assert.Contains(exception.Diagnostics, diagnostic =>
+            diagnostic.Code == "DBXK044" &&
+            diagnostic.Message.Contains("missing: event.read.health", StringComparison.Ordinal));
     }
 
     [Fact]
