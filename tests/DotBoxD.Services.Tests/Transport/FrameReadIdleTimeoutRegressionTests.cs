@@ -88,6 +88,32 @@ public sealed class FrameReadIdleTimeoutRegressionTests
     }
 
     [Fact]
+    public void ServiceFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        source.Start(CancellationToken.None, IdleTimeout);
+        DisposeInnerCancellationTokenSource(source);
+
+        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task ServiceFrameReadTimeoutSource_ReadAsync_RecreatesDisposedCachedSource()
+    {
+        using var source = new ServiceFrameReadTimeoutSource();
+        source.Start(CancellationToken.None, IdleTimeout);
+        DisposeInnerCancellationTokenSource(source);
+        using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var buffer = new byte[3];
+
+        var count = await source.ReadAsync(stream, buffer, CancellationToken.None, IdleTimeout).AsTask().WaitAsync(Guard);
+
+        Assert.Equal(buffer.Length, count);
+    }
+
+    [Fact]
     public void TcpFrameReadTimeoutSource_CancelPendingTimeout_IgnoresDisposedSource()
     {
         using var source = new TcpFrameReadTimeoutSource();
@@ -95,6 +121,18 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         DisposeInnerCancellationTokenSource(source);
 
         var exception = Record.Exception(source.CancelPendingTimeout);
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void TcpFrameReadTimeoutSource_Start_RecreatesDisposedCachedSource()
+    {
+        using var source = new TcpFrameReadTimeoutSource();
+        source.Start(CancellationToken.None, IdleTimeout);
+        DisposeInnerCancellationTokenSource(source);
+
+        var exception = Record.Exception(() => source.Start(CancellationToken.None, IdleTimeout));
 
         Assert.Null(exception);
     }
