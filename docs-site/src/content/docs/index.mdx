@@ -30,17 +30,13 @@ import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
 ## What is DotBoxD?
 
-DotBoxD is a **plugin runtime for .NET hosts** — game servers, moddable apps, long-running
-services — that lets external code add behavior without recompiling the host and without
-hand-written wire plumbing.
+**A complete plugin system for .NET hosts.** .NET can't safely isolate arbitrary code in-process,
+so plugins live in a sidecar process behind IPC — safe, but every interaction becomes a
+round-trip. DotBoxD ships that whole architecture from one C# contract (transports, typed RPC,
+event pipelines) and fixes the latency: plugin logic runs *inside the host* as a validated,
+fuel-metered sandbox — restricted IR, never loaded C#/IL.
 
-Host↔plugin interop normally forces a choice between two bad options: write the marshaling
-yourself (request envelopes, matching responses back to calls — repetitive and easy to get subtly
-wrong), or load plugin assemblies in-process and simply trust them. DotBoxD starts from **one C#
-contract** instead: Roslyn source generators turn the interface into the typed proxy, dispatcher,
-and marshaling at compile time. And when a plugin's logic needs to run *inside the host* — an
-event filter, a batch over host data — it runs as validated, capability-gated, fuel-metered IR in
-a real sandbox, never as loaded C#/IL.
+[Why DotBoxD? The dilemma, in three diagrams ›](/why-dotboxd/)
 
 ## The three ways to use one contract
 
