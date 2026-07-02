@@ -1,6 +1,6 @@
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 
-internal static class DotBoxDGenerationNames
+internal static partial class DotBoxDGenerationNames
 {
     public const int GeneratedSpanLine = 1;
     public const int GeneratedSpanColumn = 1;
@@ -28,6 +28,9 @@ internal static class DotBoxDGenerationNames
         public const string HostBindingAttribute = "DotBoxD.Abstractions.HostBindingAttribute";
         public const string CapabilityAttribute = "DotBoxD.Abstractions.CapabilityAttribute";
         public const string KernelMethodAttribute = "DotBoxD.Abstractions.KernelMethodAttribute";
+        public const string LowerToIrAttribute = "DotBoxD.Abstractions.LowerToIrAttribute";
+        public const string PipelineStepAttribute = "DotBoxD.Abstractions.PipelineStepAttribute";
+        public const string PipelineSurfaceAttribute = "DotBoxD.Abstractions.PipelineSurfaceAttribute";
         public const string LocalAttribute = "DotBoxD.Abstractions.LocalAttribute";
         public const string ServerExtensionAttribute = "DotBoxD.Abstractions.ServerExtensionAttribute";
         public const string ServerExtensionClientAttribute = "DotBoxD.Abstractions.ServerExtensionClientAttribute";
@@ -279,21 +282,4 @@ internal static class DotBoxDGenerationNames
         public const string RequiredCapabilities = "requiredCapabilities";
     }
 
-    public static class Operators
-    {
-        public const string LogicalNot = "!";
-        public const string Minus = "-";
-        public const string EqualTo = "==";
-        public const string NotEqualTo = "!=";
-        public const string GreaterThanOrEqual = ">=";
-        public const string GreaterThan = ">";
-        public const string LessThanOrEqual = "<=";
-        public const string LessThan = "<";
-        public const string LogicalAnd = "&&";
-        public const string LogicalOr = "||";
-        public const string Add = "+";
-        public const string Multiply = "*";
-        public const string Divide = "/";
-        public const string Modulo = "%";
-    }
 }

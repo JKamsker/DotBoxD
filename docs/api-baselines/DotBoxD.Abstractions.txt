@@ -15,6 +15,20 @@ public enum HostBindingEffect.Allocates = 4
 public enum HostBindingEffect.HostStateRead = 1
 public enum HostBindingEffect.HostStateWrite = 2
 public enum HostBindingEffect.None = 0
+public enum LoweredPipelineStepKind
+public enum LoweredPipelineStepKind.Filter
+public enum LoweredPipelineStepKind.Projection
+public enum PipelineStepRole
+public enum PipelineStepRole.Filter = 1
+public enum PipelineStepRole.Projection = 2
+public enum PipelineStepRole.Register = 5
+public enum PipelineStepRole.RegisterLocal = 6
+public enum PipelineStepRole.Run = 3
+public enum PipelineStepRole.RunLocal = 4
+public enum PipelineStepRole.Seed = 0
+public enum PipelineTransport
+public enum PipelineTransport.Local = 0
+public enum PipelineTransport.Remote = 1
 public GeneratedPluginServerRegistryKind Kind { get; } = kind
 public HandleSubtypeAttribute( Type subtype, string discriminator, string bindingPrefix, string capability)
 public HookAttribute(string name, Type resultType)
@@ -35,7 +49,15 @@ public interface IServerExtensionClientRegistry : IServerExtensionWireClient
 public interface IServerExtensionWireClient
 public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
+public IReadOnlyList<LoweredPipelineStep> Steps
+public IReadOnlyList<Parameter> Parameters
 public IReadOnlyList<PluginMessage> Messages => _readOnlyMessages
+public IReadOnlyList<Statement> Prefix
+public IReadOnlyList<string> Effects
+public IReadOnlyList<string> RequiredCapabilities
+public LoweredPipelineStepKind Kind { get; } = kind
+public PipelineStepRole Role { get; } = role
+public PipelineTransport Transport { get; } = transport
 public PluginAttribute(string id) => Id = id
 public PolymorphicHandleAttribute(string keyMember)
 public SandboxEffect Effects { get; } = effects
@@ -56,42 +78,53 @@ public sealed class InMemoryPluginMessageSink : IPluginMessageSink
 public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LocalAttribute : Attribute
+public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
+public sealed class PipelineStepAttribute(PipelineStepRole role) : Attribute
+public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
 public sealed class PluginAttribute : Attribute
 public sealed class PolymorphicHandleAttribute : Attribute
 public sealed class ServerExtensionAttribute : Attribute
 public sealed class ServerExtensionClientAttribute(Type receiverType, string? name = null) : Attribute
 public sealed class ServerExtensionMethodAttribute(Type? receiverType = null, string? name = null) : Attribute
+public sealed record LoweredPipelineComposition( string ModuleId, IReadOnlyList<LoweredPipelineStep> Steps, SandboxType ResultType)
+public sealed record LoweredPipelineStep( LoweredPipelineStepKind Kind, string InputType, string OutputType, IReadOnlyList<Parameter> Parameters, IReadOnlyList<Statement> Prefix, Expression Value, IReadOnlyList<string> RequiredCapabilities, IReadOnlyList<string> Effects)
 public sealed record PluginMessage(string TargetId, string Message)
+public SemVersion TargetSandboxVersion { get; init; } = new(1, 0, 0)
+public SemVersion Version { get; init; } = new(1, 0, 0)
 public ServerExtensionAttribute(string id, Type serviceType)
 public ServerExtensionAttribute(string id) => Id = id
 public ServerExtensionAttribute(Type grafts, string? id = null)
+public static class LoweredPipelineComposer
+public static SandboxModule Compose(LoweredPipelineComposition composition)
 public string AccumulatorName { get; } = accumulatorName
 public string BindingId { get; } = bindingId
 public string BindingPrefix { get; }
 public string Capability { get; }
 public string Capability { get; } = capability
-public string? ContextFactory { get; set; }
 public string DescriptorHash { get; } = descriptorHash
 public string DescriptorPayload { get; } = descriptorPayload
 public string Discriminator { get; }
+public string HandleFunctionId { get; init; } = "Handle"
 public string Id { get; }
 public string Id { get; } = id
 public string KeyMember { get; }
-public string MethodName { get; } = methodName
 public string MethodMetadataName { get; } = methodMetadataName
+public string MethodName { get; } = methodName
 public string Name { get; }
 public string NormalizedSignature { get; } = normalizedSignature
+public string ShouldHandleFunctionId { get; init; } = "ShouldHandle"
+public string? ContextFactory { get; set; }
 public string? Id { get; }
 public string? Id { get; } = id
 public string? Name { get; } = name
 public THost Host<THost>() where THost : class
 public Type ContextType { get; } = contextType
-public Type? Context { get; set; }
-public Type? ControlService { get; set; }
 public Type ReceiverType { get; } = receiverType
 public Type ResultType { get; }
 public Type ServerType { get; } = serverType
 public Type Subtype { get; }
+public Type? Context { get; set; }
+public Type? ControlService { get; set; }
 public Type? Grafts { get; }
 public Type? ReceiverType { get; } = receiverType
 public Type? ServiceType { get; }
