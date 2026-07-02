@@ -31,8 +31,14 @@ public sealed partial class PluginServer : IDisposable
         _executionMode = executionMode;
         Events = new PluginEventAdapterRegistry();
         Kernels = new KernelRegistry();
-        Hooks = new HookRegistry(messages, Events, Kernels, InstallChainPackage, onResultHookFault);
-        Subscriptions = new SubscriptionRegistry(messages, Events, Kernels, InstallChainPackage, onSubscriptionFault);
+        Hooks = new HookRegistry(messages, Events, Kernels, InstallChainPackage, onResultHookFault, ThrowIfDisposed);
+        Subscriptions = new SubscriptionRegistry(
+            messages,
+            Events,
+            Kernels,
+            InstallChainPackage,
+            onSubscriptionFault,
+            ThrowIfDisposed);
     }
 
     // Synchronous installer the hook pipelines use to wire analyzer-generated chain packages at
@@ -115,6 +121,7 @@ public sealed partial class PluginServer : IDisposable
     public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
         ArgumentNullException.ThrowIfNull(adapter);
+        ThrowIfDisposed();
         Hooks.EnsureCanRegister(adapter);
         Subscriptions.EnsureCanRegister(adapter);
         Events.Register(adapter);

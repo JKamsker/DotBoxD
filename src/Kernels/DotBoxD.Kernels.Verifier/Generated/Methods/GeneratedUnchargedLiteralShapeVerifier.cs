@@ -11,7 +11,7 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         GeneratedMethodFlow analysis,
         List<VerificationDiagnostic> diagnostics)
     {
-        foreach (var instruction in analysis.Instructions.Where(i => IsUnchargedCollectionLiteralCall(i.CalledMember)))
+        foreach (var instruction in analysis.Instructions.Where(i => IsUnchargedLiteralCall(i.CalledMember)))
         {
             if (!IsReachable(analysis, instruction) ||
                 IsImmediatelyStoredIntoLiteralArray(analysis, instruction) ||
@@ -22,7 +22,7 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
 
             diagnostics.Add(new VerificationDiagnostic(
                 "V-COMPILED-SHAPE",
-                $"method '{methodName}' must store uncharged collection literal helper '{instruction.CalledMember}' directly into a literal array"));
+                $"method '{methodName}' must store uncharged literal helper '{instruction.CalledMember}' directly into a literal array"));
         }
     }
 

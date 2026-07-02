@@ -25,6 +25,7 @@ internal static class QueryProjectionInvariants
                 break;
             case QueryProjectionKind.Construct:
                 _ = ConstructTypeName(projection);
+                RequireConstructFields(projection);
                 RejectInactiveArmProperties(
                     projection,
                     QueryProjectionKind.Construct,
@@ -65,6 +66,18 @@ internal static class QueryProjectionInvariants
     public static QueryValue FieldConstant(QueryProjectionField field)
         => field.Constant ?? throw new InvalidOperationException(
             $"QueryProjection Construct field '{field.Name}' requires Constant.");
+
+    private static void RequireConstructFields(QueryProjection projection)
+    {
+        for (var i = 0; i < projection.Fields.Count; i++)
+        {
+            if (projection.Fields[i] is null)
+            {
+                throw new InvalidOperationException(
+                    $"QueryProjection Construct field at index {i} must not be null.");
+            }
+        }
+    }
 
     private static void RejectInactiveArmProperties(
         QueryProjection projection,

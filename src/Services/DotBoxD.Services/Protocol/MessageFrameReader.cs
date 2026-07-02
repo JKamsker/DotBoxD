@@ -82,7 +82,8 @@ internal static class MessageFrameReader
         var span = source.Span;
         var totalLength = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(0, 4));
         if (totalLength < MessageFramer.HeaderSize + MessageFramer.EnvelopeLengthSize ||
-            totalLength != source.Length)
+            totalLength != source.Length ||
+            totalLength > MessageFramer.MaxMessageSize)
         {
             return false;
         }
@@ -119,7 +120,9 @@ internal static class MessageFrameReader
 
         var span = source.Span;
         var totalLength = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(0, 4));
-        if (totalLength < MessageFramer.HeaderSize || totalLength != source.Length)
+        if (totalLength < MessageFramer.HeaderSize ||
+            totalLength != source.Length ||
+            totalLength > MessageFramer.MaxMessageSize)
         {
             return false;
         }
