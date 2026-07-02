@@ -171,15 +171,15 @@ public interface ILiveSetting
 public interface IServerExtensionClientRegistry :
 public interface IServerExtensionWireClient : DotBoxD.Abstractions.IServerExtensionWireClient
 public IPluginEventAdapter<TEvent> Resolve<TEvent>()
-public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value); }
+public IReadOnlyList<HookSubscriptionManifest> Subscriptions { get => _subscriptions; init => _subscriptions = PluginModelCopy.List(value, nameof(Subscriptions)); }
 public IReadOnlyList<IndexedPredicate> HonoredPredicates { get; }
 public IReadOnlyList<IndexedPredicate> IndexedPredicates
 public IReadOnlyList<InstalledKernel> Kernels { get; }
 public IReadOnlyList<InstalledKernel> Snapshot()
 public IReadOnlyList<LiveSettingDefinition> Definitions
-public IReadOnlyList<LiveSettingDefinition> LiveSettings { get => _liveSettings; init => _liveSettings = PluginModelCopy.List(value); }
+public IReadOnlyList<LiveSettingDefinition> LiveSettings { get => _liveSettings; init => _liveSettings = PluginModelCopy.List(value, nameof(LiveSettings)); }
 public IReadOnlyList<PluginExecutionObservation> ExecutionObservations => _executionObserver.Snapshot()
-public IReadOnlyList<string> Effects { get => _effects; init => _effects = PluginModelCopy.List(value); }
+public IReadOnlyList<string> Effects { get => _effects; init => _effects = PluginModelCopy.List(value, nameof(Effects)); }
 public IReadOnlyList<string> GetRequiredCapabilities(PluginPackage package)
 public IReadOnlyList<string> RequiredCapabilities
 public KernelRegistry Kernels { get; }

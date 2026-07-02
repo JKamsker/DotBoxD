@@ -46,6 +46,7 @@ public static int StringLengthRaw(SandboxValue value) => ((StringValue)value).Va
 public static IReadOnlyList<BindingDescriptor> All { get; } = [
 public static long AsI64(SandboxValue value) => ((I64Value)value).Value
 public static long ListReadFuelRaw(int count) => SandboxCollectionFuel.Read(count)
+public static object CreateMeteredListI32ReaderRaw(SandboxContext context, SandboxValue value)
 public static object ListI32ReaderRaw(SandboxValue value)
 public static partial class AuditTextSanitizer
 public static partial class CompiledRuntime
