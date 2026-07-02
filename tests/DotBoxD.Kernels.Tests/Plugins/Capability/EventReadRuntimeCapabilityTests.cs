@@ -1,8 +1,11 @@
+using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
+using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Runtime.Input;
 
 namespace DotBoxD.Kernels.Tests.Plugins;
 
@@ -43,6 +46,34 @@ public sealed class EventReadRuntimeCapabilityTests
 
         Assert.True(handled);
         Assert.Equal(1, adapter.MaterializedValues);
+    }
+
+    [Fact]
+    public void Event_capability_validation_requires_each_entrypoint_to_declare_gated_property()
+    {
+        var plan = SplitEntrypointCapabilityPlan();
+
+        var exception = Assert.Throws<SandboxValidationException>(
+            () => PluginEventCapabilityValidator.Validate<GatedRuntimeEvent>(
+                plan,
+                new KernelEntrypoints("ShouldHandle", "Handle"),
+                EventParameters()));
+
+        var diagnostic = Assert.Single(exception.Diagnostics);
+        Assert.Equal("DBXK044", diagnostic.Code);
+        Assert.Contains("Handle: event.read.health", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShouldHandle: event.read.health", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Event_capability_validation_keeps_derived_property_capability()
+    {
+        var plan = ModuleCapabilityPlan("event.read.derived-health");
+
+        PluginEventCapabilityValidator.Validate<DerivedGatedRuntimeEvent>(
+            plan,
+            new KernelEntrypoints("ShouldHandle", "Handle"),
+            [new Parameter("e_Health", SandboxType.I32)]);
     }
 
     private static PluginPackage GatedEventPackage(bool includeMetadata)
@@ -101,6 +132,84 @@ public sealed class EventReadRuntimeCapabilityTests
             SandboxType.Unit,
             [new ReturnStatement(new LiteralExpression(SandboxValue.Unit, Span), Span)]);
 
+    private static ExecutionPlan SplitEntrypointCapabilityPlan()
+    {
+        var binding = EventReadBinding();
+        var bindings = new BindingRegistry([binding]);
+        return new ExecutionPlan(
+            "module",
+            "plan",
+            new ExecutionPlanSeal("seal"),
+            "policy",
+            bindings.ManifestHash,
+            EmptyModule(),
+            PluginAddendumTestPolicies.LongWall(),
+            bindings,
+            new ResourceLimits(),
+            FunctionAnalysis(),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+            {
+                ["ShouldHandle"] = new HashSet<string>([binding.Id], StringComparer.Ordinal),
+                ["Handle"] = new HashSet<string>(StringComparer.Ordinal)
+            });
+    }
+
+    private static ExecutionPlan ModuleCapabilityPlan(string capability)
+    {
+        var bindings = new BindingRegistryBuilder().Build();
+        return new ExecutionPlan(
+            "module",
+            "plan",
+            new ExecutionPlanSeal("seal"),
+            "policy",
+            bindings.ManifestHash,
+            EmptyModule([new CapabilityRequest(capability, "test")]),
+            PluginAddendumTestPolicies.LongWall(),
+            bindings,
+            new ResourceLimits(),
+            FunctionAnalysis(),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+            {
+                ["ShouldHandle"] = new HashSet<string>(StringComparer.Ordinal),
+                ["Handle"] = new HashSet<string>(StringComparer.Ordinal)
+            });
+    }
+
+    private static SandboxModule EmptyModule(IReadOnlyList<CapabilityRequest>? capabilityRequests = null)
+        => new(
+            "gated-runtime",
+            SemVersion.One,
+            SemVersion.One,
+            capabilityRequests ?? [],
+            [ShouldHandle(), Handle()],
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["pluginId"] = "gated-runtime",
+                ["kernel"] = "GatedRuntimeKernel"
+            });
+
+    private static Dictionary<string, FunctionAnalysis> FunctionAnalysis()
+        => new(StringComparer.Ordinal)
+        {
+            ["ShouldHandle"] = new(SandboxType.Bool, SandboxEffect.Cpu, true),
+            ["Handle"] = new(SandboxType.Unit, SandboxEffect.Cpu, true)
+        };
+
+    private static BindingDescriptor EventReadBinding()
+        => new(
+            "test.event.read",
+            SemVersion.One,
+            [],
+            SandboxType.Unit,
+            SandboxEffect.HostStateRead | SandboxEffect.Audit,
+            "event.read.health",
+            BindingCostModel.Fixed(1),
+            AuditLevel.PerCall,
+            BindingSafety.ReadOnlyExternal,
+            static (_, _, _) => ValueTask.FromResult(SandboxValue.Unit),
+            CompiledBinding.RuntimeStub(typeof(CompiledRuntime).FullName!, nameof(CompiledRuntime.CallBinding)),
+            static (_, _) => { });
+
     private static Parameter[] EventParameters() =>
     [
         new("e_TargetId", SandboxType.String),
@@ -110,6 +219,18 @@ public sealed class EventReadRuntimeCapabilityTests
     private sealed record GatedRuntimeEvent(
         string TargetId,
         [property: Capability("event.read.health")] int Health);
+
+    private class BaseGatedRuntimeEvent
+    {
+        [Capability("event.read.base-health")]
+        public int Health { get; init; }
+    }
+
+    private sealed class DerivedGatedRuntimeEvent : BaseGatedRuntimeEvent
+    {
+        [Capability("event.read.derived-health")]
+        public new int Health { get; init; }
+    }
 
     private sealed class GatedRuntimeEventAdapter : IPluginEventAdapter<GatedRuntimeEvent>
     {

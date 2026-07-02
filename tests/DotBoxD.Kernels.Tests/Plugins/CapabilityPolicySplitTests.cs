@@ -1,8 +1,10 @@
+using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Policies;
 using DotBoxD.Plugins.Runtime;
 
@@ -72,8 +74,12 @@ public sealed class CapabilityPolicySplitTests
             .Build();
 
         var kernel = await server.InstallAsync(package, policy);
+        var plan = PreparedPlan(kernel);
 
         Assert.Equal(package.Manifest.PluginId, kernel.Manifest.PluginId);
+        Assert.Contains(plan.Module.CapabilityRequests, request =>
+            string.Equals(request.Id, "file.write", StringComparison.Ordinal) &&
+            string.Equals(request.Reason, "requested by plugin", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -164,6 +170,13 @@ public sealed class CapabilityPolicySplitTests
                 CapabilityRequests = [new CapabilityRequest(capabilityId, "requested by plugin")]
             }
         };
+
+    private static ExecutionPlan PreparedPlan(InstalledKernel kernel)
+    {
+        var field = typeof(InstalledKernel).GetField("_plan", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<ExecutionPlan>(field.GetValue(kernel));
+    }
 
     private static PluginPackage WithRequiredCapabilityMetadata(PluginPackage package, string capabilityId)
     {

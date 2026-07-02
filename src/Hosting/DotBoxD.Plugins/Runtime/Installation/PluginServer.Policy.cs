@@ -40,9 +40,13 @@ public sealed partial class PluginServer
                 MatchesRequiredCapability(grant.Id, requiredCapabilities) ||
                 MatchesRequiredCapability(grant.Id, requestedCapabilities))
             .ToArray();
-        var runtimeRequests = nonBindingCapabilities
-            .Order(StringComparer.Ordinal)
-            .Select(static capability => new CapabilityRequest(capability, "non-binding runtime capability"))
+        var runtimeRequests = package.Module.CapabilityRequests
+            .Where(request =>
+                !includeNonBindingCapabilities ||
+                !PluginManifestCapabilityValidator.IsKnownNonBindingCapability(request.Id))
+            .Concat(nonBindingCapabilities
+                .Order(StringComparer.Ordinal)
+                .Select(static capability => new CapabilityRequest(capability, "non-binding runtime capability")))
             .ToArray();
         return (package.Module with { CapabilityRequests = runtimeRequests }, installPolicy with { Grants = grants });
     }

@@ -34,7 +34,8 @@ internal static partial class PluginPreparedPackageValidator
             package.Module,
             plan,
             [package.Entrypoints.ShouldHandle, package.Entrypoints.Handle],
-            diagnostics);
+            diagnostics,
+            includeModuleCapabilityRequests: false);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
             package.Module,

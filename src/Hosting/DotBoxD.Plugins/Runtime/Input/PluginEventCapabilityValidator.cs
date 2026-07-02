@@ -19,13 +19,8 @@ internal static class PluginEventCapabilityValidator
             return;
         }
 
-        var declared = new HashSet<string>(
-            plan.GetEntrypointMetadata(entrypoints.ShouldHandle).RequiredCapabilities,
-            StringComparer.Ordinal);
-        declared.UnionWith(plan.GetEntrypointMetadata(entrypoints.Handle).RequiredCapabilities);
-
-        var missing = required
-            .Where(capability => !declared.Contains(capability))
+        var missing = new[] { entrypoints.ShouldHandle, entrypoints.Handle }
+            .SelectMany(entrypoint => MissingCapabilities(plan, entrypoint, required))
             .Order(StringComparer.Ordinal)
             .ToArray();
         if (missing.Length == 0)
@@ -63,6 +58,19 @@ internal static class PluginEventCapabilityValidator
         return required;
     }
 
+    private static IEnumerable<string> MissingCapabilities(
+        ExecutionPlan plan,
+        string entrypoint,
+        IReadOnlySet<string> required)
+    {
+        var declared = new HashSet<string>(
+            plan.GetEntrypointMetadata(entrypoint).RequiredCapabilities,
+            StringComparer.Ordinal);
+        return required
+            .Where(capability => !declared.Contains(capability))
+            .Select(capability => $"{entrypoint}: {capability}");
+    }
+
     private static IReadOnlyDictionary<string, string> BuildCapabilityParameters(Type eventType)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -71,7 +79,11 @@ internal static class PluginEventCapabilityValidator
             var capability = property.GetCustomAttribute<CapabilityAttribute>(inherit: false)?.Id;
             if (!string.IsNullOrWhiteSpace(capability))
             {
-                result[PluginManifestNames.EventParameters.Prefix + property.Name] = capability;
+                var parameterName = PluginManifestNames.EventParameters.Prefix + property.Name;
+                if (!result.ContainsKey(parameterName))
+                {
+                    result.Add(parameterName, capability);
+                }
             }
         }
 
