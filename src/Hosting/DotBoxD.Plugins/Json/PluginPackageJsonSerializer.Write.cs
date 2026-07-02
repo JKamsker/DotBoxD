@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Serialization.Json;
 
 namespace DotBoxD.Plugins.Json;
@@ -27,16 +28,16 @@ public static partial class PluginPackageJsonSerializer
     {
         writer.WritePropertyName("manifest");
         writer.WriteStartObject();
-        writer.WriteString("pluginId", manifest.PluginId);
-        writer.WriteString("contract", manifest.Contract);
-        writer.WriteString("mode", manifest.Mode.ToString());
+        WriteString(writer, "pluginId", manifest.PluginId);
+        WriteString(writer, "contract", manifest.Contract);
+        WriteString(writer, "mode", manifest.Mode.ToString());
         WriteStringArray(writer, "effects", manifest.Effects);
         WriteLiveSettings(writer, manifest.LiveSettings);
         WriteSubscriptions(writer, manifest.Subscriptions);
         WriteStringArray(writer, "requiredCapabilities", manifest.RequiredCapabilities);
         if (manifest.RpcEntrypoint is { } rpcEntrypoint)
         {
-            writer.WriteString("rpcEntrypoint", rpcEntrypoint);
+            WriteString(writer, "rpcEntrypoint", rpcEntrypoint);
         }
 
         writer.WriteEndObject();
@@ -46,9 +47,9 @@ public static partial class PluginPackageJsonSerializer
     {
         writer.WritePropertyName(name);
         writer.WriteStartArray();
-        foreach (var value in values)
+        for (var i = 0; i < values.Count; i++)
         {
-            writer.WriteStringValue(value);
+            WriteStringValue(writer, values[i], $"{name}[{i}]");
         }
 
         writer.WriteEndArray();
@@ -61,8 +62,8 @@ public static partial class PluginPackageJsonSerializer
         foreach (var setting in settings)
         {
             writer.WriteStartObject();
-            writer.WriteString("name", setting.Name);
-            writer.WriteString("type", setting.Type);
+            WriteString(writer, "name", setting.Name);
+            WriteString(writer, "type", setting.Type);
             writer.WritePropertyName("defaultValue");
             WriteLiveSettingValue(writer, setting.DefaultValue, "defaultValue");
             if (setting.Min is not null)
@@ -106,7 +107,7 @@ public static partial class PluginPackageJsonSerializer
                 writer.WriteNumberValue(number);
                 break;
             case string text:
-                writer.WriteStringValue(text);
+                WriteStringValue(writer, text, name);
                 break;
             default:
                 throw Error("E-JSON-EXPORT", $"live setting value '{name}' must be a JSON scalar");
@@ -120,8 +121,8 @@ public static partial class PluginPackageJsonSerializer
         foreach (var subscription in subscriptions)
         {
             writer.WriteStartObject();
-            writer.WriteString("event", subscription.Event);
-            writer.WriteString("kernel", subscription.Kernel);
+            WriteString(writer, "event", subscription.Event);
+            WriteString(writer, "kernel", subscription.Kernel);
             WriteIndexedPredicates(writer, subscription.IndexedPredicates);
             if (subscription.IndexCoversPredicate)
             {
@@ -136,7 +137,7 @@ public static partial class PluginPackageJsonSerializer
 
             if (subscription.ProjectedType is { } projectedType)
             {
-                writer.WriteString("projectedType", projectedType);
+                WriteString(writer, "projectedType", projectedType);
             }
 
             if (subscription.Priority != 0)
@@ -146,7 +147,7 @@ public static partial class PluginPackageJsonSerializer
 
             if (subscription.ResultType is { } resultType)
             {
-                writer.WriteString("resultType", resultType);
+                WriteString(writer, "resultType", resultType);
             }
 
             if (subscription.ResultLocalTerminal)
@@ -174,11 +175,11 @@ public static partial class PluginPackageJsonSerializer
         foreach (var predicate in predicates)
         {
             writer.WriteStartObject();
-            writer.WriteString("path", predicate.Path);
-            writer.WriteString("operator", predicate.Operator.ToString());
+            WriteString(writer, "path", predicate.Path);
+            WriteString(writer, "operator", predicate.Operator.ToString());
             writer.WritePropertyName("value");
             WriteLiveSettingValue(writer, predicate.Value, "indexed predicate value");
-            writer.WriteString("valueType", predicate.ValueType);
+            WriteString(writer, "valueType", predicate.ValueType);
             writer.WriteEndObject();
         }
 
@@ -188,8 +189,46 @@ public static partial class PluginPackageJsonSerializer
     private static void WriteEntrypoints(Utf8JsonWriter writer, KernelEntrypoints entrypoints)
     {
         writer.WriteStartObject();
-        writer.WriteString("shouldHandle", entrypoints.ShouldHandle);
-        writer.WriteString("handle", entrypoints.Handle);
+        WriteString(writer, "shouldHandle", entrypoints.ShouldHandle);
+        WriteString(writer, "handle", entrypoints.Handle);
         writer.WriteEndObject();
     }
+
+    private static void WriteString(Utf8JsonWriter writer, string name, string value)
+    {
+        RequireWellFormedUtf16(value, name);
+        writer.WriteString(name, value);
+    }
+
+    private static void WriteStringValue(Utf8JsonWriter writer, string value, string name)
+    {
+        RequireWellFormedUtf16(value, name);
+        writer.WriteStringValue(value);
+    }
+
+    private static void RequireWellFormedUtf16(string value, string name)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var current = value[i];
+            if (char.IsHighSurrogate(current))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                {
+                    i++;
+                    continue;
+                }
+
+                throw MalformedUtf16(name);
+            }
+
+            if (char.IsLowSurrogate(current))
+            {
+                throw MalformedUtf16(name);
+            }
+        }
+    }
+
+    private static SandboxValidationException MalformedUtf16(string name)
+        => Error("E-JSON-EXPORT", $"'{name}' contains malformed UTF-16 text with an unpaired surrogate");
 }
