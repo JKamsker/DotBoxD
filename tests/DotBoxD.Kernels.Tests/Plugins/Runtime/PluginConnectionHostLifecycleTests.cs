@@ -6,6 +6,8 @@ namespace DotBoxD.Kernels.Tests.Plugins;
 
 public sealed class PluginConnectionHostLifecycleTests
 {
+    private static readonly TimeSpan Timeout5s = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task StopAsync_completes_lifecycle_tasks_when_no_peer_connected()
     {
@@ -18,8 +20,28 @@ public sealed class PluginConnectionHostLifecycleTests
         await host.StopAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await host.Connected.WaitAsync(TimeSpan.FromSeconds(5)));
-        await host.Disconnected.WaitAsync(TimeSpan.FromSeconds(5));
+            async () => await host.Connected.WaitAsync(Timeout5s));
+        await host.Disconnected.WaitAsync(Timeout5s);
+    }
+
+    [Fact]
+    public async Task StopAsync_completes_lifecycle_tasks_when_transport_stop_throws()
+    {
+        using var server = PluginServer.Create();
+        var transport = new StopThrowingServerTransport();
+        var host = await PluginConnectionHost<object>.StartAsync(server, transport, Configure);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(host.StopAsync);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                async () => await host.Connected.WaitAsync(Timeout5s));
+            await host.Disconnected.WaitAsync(Timeout5s);
+        }
+        finally
+        {
+            await DisposeAfterFailedStopAsync(host);
+        }
     }
 
     [Fact]
@@ -31,8 +53,8 @@ public sealed class PluginConnectionHostLifecycleTests
         await host.DisposeAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await host.Connected.WaitAsync(TimeSpan.FromSeconds(5)));
-        await host.Disconnected.WaitAsync(TimeSpan.FromSeconds(5));
+            async () => await host.Connected.WaitAsync(Timeout5s));
+        await host.Disconnected.WaitAsync(Timeout5s);
     }
 
     [Fact]
@@ -53,6 +75,18 @@ public sealed class PluginConnectionHostLifecycleTests
     // validation without opting into unsafe development names.
     private static string FreshPipeName() => "dotboxd-lifecycle-test-" + Guid.NewGuid().ToString("N");
 
+    private static async ValueTask DisposeAfterFailedStopAsync(PluginConnectionHost<object> host)
+    {
+        try
+        {
+            await host.DisposeAsync();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "stop boom")
+        {
+            // The transport intentionally throws on stop; disposal still runs RpcHost's cleanup finally.
+        }
+    }
+
     private sealed class ThrowingStartTransport : IServerTransport
     {
         private int _disposeCount;
@@ -70,6 +104,36 @@ public sealed class PluginConnectionHostLifecycleTests
         public ValueTask DisposeAsync()
         {
             Interlocked.Increment(ref _disposeCount);
+            return default;
+        }
+    }
+
+    private sealed class StopThrowingServerTransport : IServerTransport
+    {
+        private readonly TaskCompletionSource<bool> _parked =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task StartAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+        public async Task<IRpcChannel> AcceptAsync(CancellationToken ct = default)
+        {
+            using (ct.Register(static s => ((TaskCompletionSource<bool>)s!).TrySetResult(true), _parked))
+            {
+                await _parked.Task.ConfigureAwait(false);
+            }
+
+            throw new OperationCanceledException(ct);
+        }
+
+        public Task StopAsync(CancellationToken ct = default)
+        {
+            _parked.TrySetResult(true);
+            throw new InvalidOperationException("stop boom");
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _parked.TrySetResult(true);
             return default;
         }
     }
