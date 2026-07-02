@@ -4,6 +4,35 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 
 public sealed partial class PluginServerSurpriseRegressionTests
 {
+    [Theory]
+    [InlineData("EnsureAnonymousDirect")]
+    [InlineData("EnsureAnonymousThroughInterface")]
+    public async Task Generated_plugin_server_anonymous_install_rejects_disposed_before_factory(string methodName)
+    {
+        var (_, outputCompilation) = PluginServerGenerationTestDriver.Run(DisposedSurfaceSource);
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+
+        var assembly = Emit(outputCompilation);
+        var control = Activator.CreateInstance(assembly.GetType("Sample.RecordingControlService", throwOnError: true)!)!;
+        var world = Activator.CreateInstance(assembly.GetType("Sample.RecordingWorld", throwOnError: true)!)!;
+        var serverType = assembly.GetType("Sample.RemotePluginServer", throwOnError: true)!;
+        var server = Activator.CreateInstance(serverType, [control, world])!;
+        var factoryCalls = 0;
+        Func<DotBoxD.Plugins.PluginPackage> factory = () =>
+        {
+            factoryCalls++;
+            return null!;
+        };
+
+        await DisposeAsync(server);
+
+        var method = assembly.GetType("Sample.Usage", throwOnError: true)!
+            .GetMethod(methodName, BindingFlags.Public | BindingFlags.Static)!;
+        var task = (Task)method.Invoke(null, [server, factory])!;
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => task);
+        Assert.Equal(0, factoryCalls);
+    }
+
     [Fact]
     public async Task Generated_plugin_server_disposal_closes_runtime_surfaces()
     {
@@ -220,6 +249,14 @@ public sealed partial class PluginServerSurpriseRegressionTests
                 public static object ReadInventory(RemotePluginServer server) => server.Inventory;
                 public static object ReadLiveSettings(RemotePluginServer server) => server.Get<LiveKernel>();
                 public static ValueTask Hold(RemotePluginServer server) => server.HoldUntilShutdownAsync();
+                public static Task<string> EnsureAnonymousDirect(
+                    RemotePluginServer server,
+                    Func<PluginPackage> factory)
+                    => server.EnsureAnonymousKernelAsync("probe", factory);
+                public static Task<string> EnsureAnonymousThroughInterface(
+                    RemotePluginServer server,
+                    Func<PluginPackage> factory)
+                    => ((IGameWorldServer)server).EnsureAnonymousKernelAsync("probe", factory);
             }
         }
 

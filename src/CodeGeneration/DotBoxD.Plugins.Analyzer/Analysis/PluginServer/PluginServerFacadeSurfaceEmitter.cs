@@ -135,6 +135,7 @@ internal static class PluginServerFacadeSurfaceEmitter
             "Installs the package produced by the factory at most once and returns the installed plugin id.");
         builder.AppendLine("    public async global::System.Threading.Tasks.Task<string> EnsureAnonymousKernelAsync(string pluginId, global::System.Func<global::DotBoxD.Plugins.PluginPackage> factory, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("    {");
+        builder.AppendLine("        ThrowIfDisposed();");
         builder.AppendLine("        while (true)");
         builder.AppendLine("        {");
         builder.AppendLine("            var created = false;");
@@ -172,6 +173,7 @@ internal static class PluginServerFacadeSurfaceEmitter
         builder.AppendLine("    {");
         builder.AppendLine("        try");
         builder.AppendLine("        {");
+        builder.AppendLine("            ThrowIfDisposed();");
         builder.AppendLine("            var installedId = await InstallServerExtensionPackageAsync(factory(), default).ConfigureAwait(false);");
         builder.AppendLine("            if (!global::System.StringComparer.Ordinal.Equals(installedId, pluginId))");
         builder.AppendLine("            {");
@@ -191,6 +193,7 @@ internal static class PluginServerFacadeSurfaceEmitter
         builder.AppendLine("        global::System.Threading.Tasks.Task<string>? installTask = null;");
         builder.AppendLine("        try");
         builder.AppendLine("        {");
+        builder.AppendLine("            ThrowIfDisposed();");
         builder.AppendLine("            installTask = install.Value;");
         builder.AppendLine("            var installedId = await installTask.WaitAsync(cancellationToken).ConfigureAwait(false);");
         builder.AppendLine("            return installedId;");
