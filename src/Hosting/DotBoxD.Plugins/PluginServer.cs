@@ -250,7 +250,12 @@ public sealed partial class PluginServer : IDisposable
             // into a disposed SandboxHost; revocation cancels each kernel's execution token first.
             foreach (var kernel in Kernels.Snapshot())
             {
-                kernel.Revoke();
+                var removed = Kernels.Remove(kernel);
+                if (removed is not null)
+                {
+                    RemoveKernelReferences(removed);
+                    ClearServerExtensionRegistrations(removed.Manifest.PluginId);
+                }
             }
 
             foreach (var pool in KernelPoolSnapshot())
