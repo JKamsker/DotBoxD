@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using DotBoxD.Services.SourceGenerator.Infrastructure;
 using DotBoxD.Services.SourceGenerator.Models;
@@ -46,5 +47,41 @@ internal static class WireNameValidator
             methods[i] = method with { UnsupportedReason = reason };
             methodDiagnostics.Add(new MethodDiagnostic(interfaceName, method.Name, reason, methodLocations[i]));
         }
+    }
+}
+
+internal static class RouteNameBudgetValidator
+{
+    private const int MaxNameUtf8Bytes = 256;
+
+    public static string? GetUnsupportedServiceNameReason(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "[DotBoxDService(Name = ...)] wire name must not be empty or whitespace";
+        }
+
+        return GetOverBudgetReason(name, "service", "ServiceName");
+    }
+
+    public static string? GetUnsupportedMethodNameReason(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "[DotBoxDMethod(Name = ...)] wire name must not be empty or whitespace";
+        }
+
+        return GetOverBudgetReason(name, "method", "MethodName");
+    }
+
+    private static string? GetOverBudgetReason(string name, string routeKind, string requestField)
+    {
+        var byteCount = Encoding.UTF8.GetByteCount(name);
+        if (byteCount <= MaxNameUtf8Bytes)
+        {
+            return null;
+        }
+
+        return $"wire {routeKind} routing key is {byteCount} UTF-8 bytes; the RPC request {requestField} limit is {MaxNameUtf8Bytes} bytes";
     }
 }

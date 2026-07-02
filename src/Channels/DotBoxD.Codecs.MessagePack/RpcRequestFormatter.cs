@@ -15,7 +15,6 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     private static readonly byte[] MethodNameKey = Encoding.UTF8.GetBytes("MethodName");
     private static readonly byte[] InstanceIdKey = Encoding.UTF8.GetBytes("InstanceId");
     private static readonly byte[] StreamsKey = Encoding.UTF8.GetBytes("Streams");
-    private const int MaxNameUtf8Bytes = 256;
 
     private RpcRequestFormatter()
     {
@@ -183,10 +182,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
 
     private static void ValidateNameBytes(long byteCount, string fieldName)
     {
-        if (byteCount > MaxNameUtf8Bytes)
+        if (byteCount > RpcRequestRouteNameLimits.MaxUtf8Bytes)
         {
             throw new MessagePackSerializationException(
-                $"RPC request {fieldName} exceeds the maximum encoded length of {MaxNameUtf8Bytes} bytes.");
+                $"RPC request {fieldName} exceeds the maximum encoded length of {RpcRequestRouteNameLimits.MaxUtf8Bytes} bytes.");
         }
     }
 

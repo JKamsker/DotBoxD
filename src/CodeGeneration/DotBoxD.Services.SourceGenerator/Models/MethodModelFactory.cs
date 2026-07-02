@@ -39,15 +39,15 @@ internal static partial class MethodModelFactory
         var unsupportedLocation = methodLocation;
         var requiresUnsafeSignature = RpcTypeValidator.RequiresUnsafeContext(returnType, ct);
 
-        // An explicit empty/whitespace [DotBoxDMethod(Name = "")] compiles but throws ArgumentException on
-        // the first call (the empty wire name fails validation), so reject it at build time.
         var configuredMethodName = GetConfiguredMethodName(methodSymbol);
-        if (configuredMethodName is not null && string.IsNullOrWhiteSpace(configuredMethodName))
+        var configuredRpcName = configuredMethodName ?? methodSymbol.Name;
+        var methodNameReason = RouteNameBudgetValidator.GetUnsupportedMethodNameReason(configuredRpcName);
+        if (methodNameReason is not null)
         {
             SetUnsupported(
                 ref unsupportedReason,
                 ref unsupportedLocation,
-                "[DotBoxDMethod(Name = ...)] wire name must not be empty or whitespace",
+                methodNameReason,
                 methodLocation);
         }
 
@@ -210,8 +210,6 @@ internal static partial class MethodModelFactory
                 unsupportedReason,
                 unsupportedLocation));
         }
-
-        var configuredRpcName = configuredMethodName ?? methodSymbol.Name;
 
         return new MethodModel(
             Name: IdentifierHelpers.EscapeIdentifier(methodSymbol.Name),
