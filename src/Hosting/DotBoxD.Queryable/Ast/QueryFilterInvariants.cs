@@ -16,6 +16,11 @@ internal static class QueryFilterInvariants
 
     public static QueryValue CompareValue(QueryFilter filter)
     {
+        if (!filter.HasOperator)
+        {
+            throw MissingCompareOperator();
+        }
+
         _ = RequireKnownCompareOperator(filter.Operator);
         return filter.Value ?? throw MissingCompareValue();
     }
@@ -152,7 +157,7 @@ internal static class QueryFilterInvariants
             inactive = AddInactive(inactive, nameof(QueryFilter.Field));
         }
 
-        if (hasOperator && filter.Operator != default)
+        if (hasOperator && filter.HasOperator)
         {
             inactive = AddInactive(inactive, nameof(QueryFilter.Operator));
         }
@@ -244,6 +249,9 @@ internal static class QueryFilterInvariants
 
     private static InvalidOperationException MissingCompareValue()
         => new("QueryFilter Compare nodes require Value.");
+
+    private static InvalidOperationException MissingCompareOperator()
+        => new("QueryFilter Compare nodes require Operator.");
 
     private static InvalidOperationException UnknownKind(QueryFilterKind kind)
         => new($"QueryFilter has unsupported Kind value '{(int)kind}'.");

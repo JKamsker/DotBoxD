@@ -24,6 +24,18 @@ public sealed class QueryFilterInactiveArmValidationTests
     }
 
     [Fact]
+    public void MatchAll_filter_initializer_with_default_operator_arm_is_rejected_on_write()
+    {
+        var filter = new QueryFilter
+        {
+            Kind = QueryFilterKind.MatchAll,
+            Operator = QueryComparisonOperator.Equal,
+        };
+
+        AssertInactiveArmRejection(() => JsonSerializer.Serialize(filter, EventQueryJson.Options));
+    }
+
+    [Fact]
     public void Compare_filter_initializer_with_inactive_arms_is_rejected_on_write()
     {
         var filter = new QueryFilter
@@ -73,6 +85,7 @@ public sealed class QueryFilterInactiveArmValidationTests
 
     [Theory]
     [InlineData("""{"kind":"all","value":"hidden"}""")]
+    [InlineData("""{"kind":"all","op":"eq"}""")]
     [InlineData("""{"kind":"compare","path":"Damage","op":"eq","value":5,"values":[7]}""")]
     [InlineData("""{"kind":"in","path":"Damage","values":[7],"term":{"kind":"all"}}""")]
     public void Filter_json_with_inactive_arms_is_rejected_on_read(string json)
