@@ -47,6 +47,7 @@ internal sealed class EventQueryDispatcher<TEvent>(MemberValueReader reader)
 
     public async ValueTask PublishAsync(TEvent e, HookContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _eventsObserved);
         var snapshot = _snapshot;
         if (snapshot.IsEmpty || e is null)
