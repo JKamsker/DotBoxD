@@ -10,7 +10,8 @@ internal static class FeedPolicy
         var builder = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .WithFuel(50_000)
-            .WithMaxHostCalls(250);
+            .WithMaxHostCalls(250)
+            .WithWallTime(TimeSpan.FromSeconds(10));
 
         if (requiredCapabilities.Contains("host.message.write", StringComparer.Ordinal))
         {

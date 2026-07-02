@@ -12,7 +12,8 @@ internal static class ClientPolicy
             .GrantLogging()
             .GrantHostMessageWrite()
             .WithFuel(50_000)
-            .WithMaxHostCalls(250);
+            .WithMaxHostCalls(250)
+            .WithWallTime(TimeSpan.FromSeconds(10));
 
         GrantIfRequired(builder, requiredCapabilities, "game.client.ui.write", SandboxEffect.HostStateWrite);
         GrantIfRequired(builder, requiredCapabilities, "game.client.fx.play", SandboxEffect.HostStateWrite);

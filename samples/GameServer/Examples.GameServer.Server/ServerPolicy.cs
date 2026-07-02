@@ -33,7 +33,8 @@ internal static class ServerPolicy
             .GrantLogging()
             .GrantHostMessageWrite()
             .WithFuel(100_000)
-            .WithMaxHostCalls(1_000);
+            .WithMaxHostCalls(1_000)
+            .WithWallTime(TimeSpan.FromSeconds(10));
 
         if (RequiresPrefix(requiredCapabilities, MonsterReadPrefix))
         {
