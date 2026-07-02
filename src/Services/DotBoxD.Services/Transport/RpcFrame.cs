@@ -18,39 +18,52 @@ public struct RpcFrame : IDisposable
 {
     private Payload? _payload;
     private PooledBufferWriter? _writer;
-    private ReadOnlyMemory<byte> _memory;
 
     public RpcFrame(Payload payload)
     {
         _payload = payload;
         _writer = null;
-        _memory = payload.Memory;
     }
 
     public RpcFrame(PooledBufferWriter writer)
     {
         _payload = null;
         _writer = writer;
-        _memory = writer.WrittenMemory;
     }
 
-    public ReadOnlyMemory<byte> Memory => _memory;
+    public ReadOnlyMemory<byte> Memory
+    {
+        get
+        {
+            if (_payload is { } payload)
+            {
+                return payload.Memory;
+            }
 
-    public int Length => _memory.Length;
+            if (_writer is { } writer)
+            {
+                return writer.WrittenMemory;
+            }
+
+            throw new ObjectDisposedException(nameof(RpcFrame));
+        }
+    }
+
+    public int Length => Memory.Length;
 
     public Payload DetachPayload()
     {
         if (_payload is { } payload)
         {
+            _ = payload.Memory;
             _payload = null;
-            _memory = ReadOnlyMemory<byte>.Empty;
             return payload;
         }
 
         if (_writer is { } writer)
         {
+            _ = writer.WrittenMemory;
             _writer = null;
-            _memory = ReadOnlyMemory<byte>.Empty;
             var detached = writer.DetachPayload();
             writer.Dispose();
             return detached;
@@ -65,6 +78,5 @@ public struct RpcFrame : IDisposable
         _payload = null;
         _writer?.Dispose();
         _writer = null;
-        _memory = ReadOnlyMemory<byte>.Empty;
     }
 }
