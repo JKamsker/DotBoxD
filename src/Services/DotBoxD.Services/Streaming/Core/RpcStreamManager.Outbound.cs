@@ -161,6 +161,7 @@ internal sealed partial class RpcStreamManager
         if (!MessageFramer.TryReadFrameHeader(frame, out var streamId, out _) ||
             streamId == 0 ||
             !RpcRawFrame.TryReadInt32(frame, out var count) ||
+            streamId == 0 ||
             count <= 0)
         {
             return false;
