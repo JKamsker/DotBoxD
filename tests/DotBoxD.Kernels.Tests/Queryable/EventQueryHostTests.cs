@@ -98,6 +98,25 @@ public sealed class EventQueryHostTests
     }
 
     [Fact]
+    public async Task Disposing_the_last_handle_clears_subscription_status()
+    {
+        var host = new EventQueryHost();
+
+        Assert.False(host.HasSubscriptions<AttackTestEvent>());
+
+        var handle = await host.Query<AttackTestEvent>()
+            .Where(e => e.AttackerId == "a")
+            .SubscribeAsync((_, _) => ValueTask.CompletedTask);
+
+        Assert.True(host.HasSubscriptions<AttackTestEvent>());
+
+        handle.Dispose();
+        handle.Dispose();
+
+        Assert.False(host.HasSubscriptions<AttackTestEvent>());
+    }
+
+    [Fact]
     public async Task Residual_filter_is_evaluated_on_indexed_candidates()
     {
         var host = new EventQueryHost();
