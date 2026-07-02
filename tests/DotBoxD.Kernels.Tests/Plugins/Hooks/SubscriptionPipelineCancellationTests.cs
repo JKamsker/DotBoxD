@@ -7,12 +7,8 @@ public sealed class SubscriptionPipelineCancellationTests
     [Fact]
     public void Precancelled_publish_does_not_run_filters_or_local_handlers()
     {
-        using var server = DotBoxD.Plugins.PluginServer.Create();
-        var filterInvoked = false;
-        var handlerInvoked = false;
-        server.Subscriptions.On<Ping>()
-            .Where((_, _) => { filterInvoked = true; return true; })
-            .RunLocal((_, _) => handlerInvoked = true);
+        var subscription = CreateSubscriptionProbe();
+        using var server = subscription.Server;
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -21,19 +17,15 @@ public sealed class SubscriptionPipelineCancellationTests
             () => server.Subscriptions.Publish(new Ping("monster-1", 21), cts.Token));
 
         Assert.IsType<OperationCanceledException>(exception);
-        Assert.False(filterInvoked);
-        Assert.False(handlerInvoked);
+        Assert.False(subscription.FilterInvoked());
+        Assert.False(subscription.HandlerInvoked());
     }
 
     [Fact]
     public async Task Precancelled_publish_async_does_not_run_filters_or_local_handlers()
     {
-        using var server = DotBoxD.Plugins.PluginServer.Create();
-        var filterInvoked = false;
-        var handlerInvoked = false;
-        server.Subscriptions.On<Ping>()
-            .Where((_, _) => { filterInvoked = true; return true; })
-            .RunLocal((_, _) => handlerInvoked = true);
+        var subscription = CreateSubscriptionProbe();
+        using var server = subscription.Server;
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -42,7 +34,22 @@ public sealed class SubscriptionPipelineCancellationTests
             async () => await server.Subscriptions.PublishAsync(new Ping("monster-1", 21), cts.Token).AsTask());
 
         Assert.IsType<OperationCanceledException>(exception);
-        Assert.False(filterInvoked);
-        Assert.False(handlerInvoked);
+        Assert.False(subscription.FilterInvoked());
+        Assert.False(subscription.HandlerInvoked());
+    }
+
+    private static (
+        DotBoxD.Plugins.PluginServer Server,
+        Func<bool> FilterInvoked,
+        Func<bool> HandlerInvoked) CreateSubscriptionProbe()
+    {
+        var server = DotBoxD.Plugins.PluginServer.Create();
+        var filterInvoked = false;
+        var handlerInvoked = false;
+        server.Subscriptions.On<Ping>()
+            .Where((_, _) => { filterInvoked = true; return true; })
+            .RunLocal((_, _) => handlerInvoked = true);
+
+        return (server, () => filterInvoked, () => handlerInvoked);
     }
 }

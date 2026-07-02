@@ -152,6 +152,8 @@ public sealed class SubscriptionRegistry
 
     public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         CachedPipelineFanout pipelines;
         lock (_gate)
         {
