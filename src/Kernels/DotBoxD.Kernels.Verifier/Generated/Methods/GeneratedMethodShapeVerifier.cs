@@ -55,6 +55,7 @@ internal static class GeneratedMethodShapeVerifier
         VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
         VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);
+        GeneratedUnchargedLiteralShapeVerifier.Verify(methodName, analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.IsLocalCall))
         {
             var state = analysis.EntryStates.TryGetValue(instruction.Offset, out var entryState)
