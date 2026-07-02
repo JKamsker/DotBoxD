@@ -33,13 +33,21 @@ public sealed class VerifierUnchargedStringLiteralHelperTests
     [Fact]
     public async Task Verifier_rejects_zero_count_bulk_charge_for_string_literal_helper()
     {
-        var result = await VerifierTestHelpers.VerifyAsync(ZeroCountBulkChargeStringLiteralAssembly());
+        var result = await VerifierTestHelpers.VerifyAsync(BulkChargeStringLiteralAssembly(count: 0));
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, d =>
             (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
             (d.Message.Contains(nameof(CompiledRuntime.StringLiteralValue), StringComparison.Ordinal) ||
                 d.Message.Contains(nameof(CompiledRuntime.ChargeSandboxValues), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Verifier_accepts_positive_count_bulk_charge_for_string_literal_helper()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(BulkChargeStringLiteralAssembly(count: 1));
+
+        Assert.True(result.Succeeded);
     }
 
     [Fact]
@@ -124,7 +132,7 @@ public sealed class VerifierUnchargedStringLiteralHelperTests
             il.Emit(OpCodes.Ret);
         });
 
-    private static byte[] ZeroCountBulkChargeStringLiteralAssembly()
+    private static byte[] BulkChargeStringLiteralAssembly(int count)
         => VerifierTestHelpers.BuildGeneratedAssembly(type =>
         {
             var fn = type.DefineMethod(
@@ -143,7 +151,7 @@ public sealed class VerifierUnchargedStringLiteralHelperTests
             fnIl.Emit(OpCodes.Stloc, value);
             fnIl.Emit(OpCodes.Ldarg_0);
             fnIl.Emit(OpCodes.Ldloc, value);
-            fnIl.Emit(OpCodes.Ldc_I4_0);
+            fnIl.Emit(OpCodes.Ldc_I4, count);
             fnIl.Emit(
                 OpCodes.Call,
                 typeof(CompiledRuntime).GetMethod(
