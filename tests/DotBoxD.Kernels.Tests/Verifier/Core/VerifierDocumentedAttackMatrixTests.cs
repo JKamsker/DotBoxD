@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.Verifier.Generated;
 using Microsoft.CodeAnalysis;
@@ -16,7 +17,8 @@ public sealed class VerifierDocumentedAttackMatrixTests
             { "Thread.Start", ThreadStartAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "raw Stream", StreamAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
             { "IServiceProvider.GetService", ServiceProviderAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
-            { "unmanaged function pointer signature", FunctionPointerSignatureAssembly, ["V-FUNCTION-SIGNATURE"] }
+            { "unmanaged function pointer signature", FunctionPointerSignatureAssembly, ["V-FUNCTION-SIGNATURE"] },
+            { "unmetered type array allocation", TypeArrayAllocationAssembly, ["V-COMPILED-SHAPE", "V-MEMBER"] }
         };
 
     [Theory]
@@ -29,7 +31,11 @@ public sealed class VerifierDocumentedAttackMatrixTests
         var result = await VerifierTestHelpers.VerifyAsync(build());
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => expectedCodes.Contains(d.Code));
+        Assert.Contains(result.Diagnostics, d =>
+            expectedCodes.Contains(d.Code) &&
+            (name != "unmetered type array allocation" ||
+             d.Message.Contains("CreateTypeArray", StringComparison.Ordinal) ||
+             d.Message.Contains("type array", StringComparison.OrdinalIgnoreCase)));
         Assert.NotEmpty(name);
     }
 
@@ -150,6 +156,38 @@ public sealed class VerifierDocumentedAttackMatrixTests
         return output.ToArray();
     }
 
+    private static byte[] TypeArrayAllocationAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldc_I4, 10_000_000);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.CreateTypeArray))!);
+            fnIl.Emit(OpCodes.Pop);
+            fnIl.Emit(OpCodes.Ldc_I4_0);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var execute = DefineExecute(type);
+            var executeIl = execute.GetILGenerator();
+            executeIl.Emit(OpCodes.Ldarg_1);
+            executeIl.Emit(OpCodes.Ldc_I4_0);
+            executeIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            executeIl.Emit(OpCodes.Ldarg_0);
+            executeIl.Emit(OpCodes.Call, fn);
+            executeIl.Emit(OpCodes.Ret);
+        });
+
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
@@ -165,6 +203,25 @@ public sealed class VerifierDocumentedAttackMatrixTests
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(SandboxValue),
             [typeof(SandboxContext), typeof(SandboxValue)]);
+
+    private static void EmitEnterCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+    }
+
+    private static void EmitChargeFuel(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+    }
+
+    private static void EmitExitCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+    }
 
     private static void ReturnInput(ILGenerator il)
     {
