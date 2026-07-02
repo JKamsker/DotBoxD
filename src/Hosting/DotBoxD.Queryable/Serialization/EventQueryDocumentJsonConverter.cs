@@ -42,6 +42,11 @@ public sealed class EventQueryDocumentJsonConverter : JsonConverter<EventQueryDo
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(options);
 
+        if (string.IsNullOrEmpty(value.EventName))
+        {
+            throw new JsonException("EventQueryDocument property 'event' must not be null or empty.");
+        }
+
         writer.WriteStartObject();
         writer.WriteNumber("version", CurrentVersion);
         writer.WriteString(
