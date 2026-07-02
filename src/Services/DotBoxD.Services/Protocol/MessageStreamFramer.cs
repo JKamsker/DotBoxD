@@ -34,8 +34,13 @@ internal static class MessageStreamFramer
                 throw new InvalidDataException($"Invalid DotBoxD frame length: {totalLength}.");
             }
 
-            var messageId = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(4, 4));
             var messageType = (MessageType)headerBuffer[8];
+            if (!MessageFrameReader.IsDefinedMessageType(messageType))
+            {
+                throw new InvalidDataException($"Invalid DotBoxD message type: 0x{headerBuffer[8]:X2}.");
+            }
+
+            var messageId = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(4, 4));
             var payload = await ReadPayloadAsync(stream, totalLength, ct).ConfigureAwait(false);
             return new MessageFramer.FramedMessage(messageId, messageType, payload);
         }

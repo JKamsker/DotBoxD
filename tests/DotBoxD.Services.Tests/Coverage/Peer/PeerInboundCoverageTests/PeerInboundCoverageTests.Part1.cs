@@ -88,9 +88,9 @@ public sealed partial class PeerInboundCoverageTests
                 connection,
                 serializer,
                 new RpcPeerOptions { InboundQueueCapacity = null, RequestTimeout = ShortTimeout })
-            .Provide((IServiceDispatcher)new ThrowingDispatcher("kaboom"))
-            .Start();
+            .Provide((IServiceDispatcher)new ThrowingDispatcher("kaboom"));
         peer.DispatchError += (_, args) => dispatchError.TrySetResult(args);
+        peer.Start();
 
         var args = await dispatchError.Task.WaitAsync(ShortTimeout);
 
