@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using DotBoxD.Kernels.Runtime;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Tests.Verifier.Generated;
 using Microsoft.CodeAnalysis;
@@ -31,6 +32,19 @@ public sealed class VerifierDocumentedAttackMatrixTests
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, d => expectedCodes.Contains(d.Code));
         Assert.NotEmpty(name);
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_initlocals_disabled_with_unassigned_local_read()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(InitLocalsDisabledAssembly());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            d.Code == "V-COMPILED-SHAPE" &&
+            d.Message.Contains("local", StringComparison.OrdinalIgnoreCase) &&
+            (d.Message.Contains("initlocals", StringComparison.OrdinalIgnoreCase) ||
+                d.Message.Contains("initializ", StringComparison.OrdinalIgnoreCase)));
     }
 
     private static byte[] ExceptionHandlerAssembly()
@@ -150,6 +164,35 @@ public sealed class VerifierDocumentedAttackMatrixTests
         return output.ToArray();
     }
 
+    private static byte[] InitLocalsDisabledAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var function = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            function.InitLocals = false;
+
+            var functionIl = function.GetILGenerator();
+            var local = functionIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(functionIl);
+            EmitChargeFuel(functionIl);
+            EmitExitCall(functionIl);
+            functionIl.Emit(OpCodes.Ldloc, local);
+            functionIl.Emit(OpCodes.Ret);
+
+            var executeIl = DefineExecute(type).GetILGenerator();
+            executeIl.Emit(OpCodes.Ldarg_1);
+            executeIl.Emit(OpCodes.Ldc_I4_0);
+            executeIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ValidateEntrypointInput))!);
+            executeIl.Emit(OpCodes.Ldarg_0);
+            executeIl.Emit(OpCodes.Call, function);
+            executeIl.Emit(OpCodes.Ret);
+        });
+
     private static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
@@ -170,5 +213,24 @@ public sealed class VerifierDocumentedAttackMatrixTests
     {
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ret);
+    }
+
+    private static void EmitEnterCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.EnterCall))!);
+    }
+
+    private static void EmitChargeFuel(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ChargeFuel))!);
+    }
+
+    private static void EmitExitCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
 }
