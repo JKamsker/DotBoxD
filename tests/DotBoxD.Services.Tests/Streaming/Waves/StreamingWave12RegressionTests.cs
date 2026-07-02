@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Client;
 using DotBoxD.Services.Exceptions;
@@ -5,6 +6,7 @@ using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
 using DotBoxD.Services.Streaming.Core;
+using DotBoxD.Services.Streaming.Frames;
 using Xunit;
 
 namespace DotBoxD.Services.Tests.Streaming.Waves;
@@ -57,6 +59,53 @@ public sealed class StreamingWave12RegressionTests
         Assert.True(await processor.ShouldDisposeAsync(error, CancellationToken.None));
 
         Assert.Single(protocolErrors, entry => entry.Contains("Malformed stream error frame."));
+    }
+
+    [Fact]
+    public async Task ZeroIdStreamCancel_ReportsProtocolErrorWithoutOutboundCancelLookup()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var protocolErrors = new List<string>();
+        var streams = CreateStreamManager(serializer);
+        var outboundCancelLookups = 0;
+        streams.AfterOutboundSenderMissForTest = _ => outboundCancelLookups++;
+        var processor = CreateProcessor(serializer, streams, protocolErrors);
+        using var cancel = MessageFramer.FrameToPayload(
+            0,
+            MessageType.StreamCancel,
+            ReadOnlySpan<byte>.Empty);
+
+        Assert.True(await processor.ShouldDisposeAsync(cancel, CancellationToken.None));
+
+        Assert.Single(protocolErrors, error => error.Contains("Malformed stream cancel frame."));
+        Assert.Equal(0, outboundCancelLookups);
+    }
+
+    [Fact]
+    public async Task StreamCancelWithTrailingPayload_ReportsProtocolErrorWithoutCancelingOutbound()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var protocolErrors = new List<string>();
+        var streams = CreateStreamManager(serializer);
+        var processor = CreateProcessor(serializer, streams, protocolErrors);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handle = new RpcStreamHandle(16_025, RpcStreamKind.Items);
+        streams.ReserveOutbound(handle.StreamId);
+        await using var outbound = streams.RegisterOutbound(
+            new[] { RpcStreamAttachment.FromAsyncEnumerable(handle, BlockingItems(started, canceled)) },
+            CancellationToken.None);
+        outbound.Start();
+        await started.Task.WaitAsync(TestTimeout);
+        using var cancel = MessageFramer.FrameToPayload(
+            handle.StreamId,
+            MessageType.StreamCancel,
+            new byte[] { 1 });
+
+        Assert.True(await processor.ShouldDisposeAsync(cancel, CancellationToken.None));
+
+        Assert.Single(protocolErrors, error => error.Contains("Malformed stream cancel frame."));
+        Assert.False(canceled.Task.IsCompleted);
     }
 
     [Fact]
@@ -195,4 +244,17 @@ public sealed class StreamingWave12RegressionTests
 
     private static Task SendNoopAsync(ReadOnlyMemory<byte> frame, CancellationToken ct) =>
         Task.CompletedTask;
+
+    private static async IAsyncEnumerable<int> BlockingItems(
+        TaskCompletionSource started,
+        TaskCompletionSource canceled,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        started.TrySetResult();
+        using var registration = ct.Register(
+            static state => ((TaskCompletionSource)state!).TrySetResult(),
+            canceled);
+        await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+        yield break;
+    }
 }

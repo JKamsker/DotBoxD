@@ -46,7 +46,16 @@ internal sealed class RpcPeerFrameProcessor
                 _inbound.Cancel(messageId);
                 return true;
             case MessageType.StreamCancel:
-                _streams.CancelOutbound(messageId);
+                if (!RpcStreamControlFrameReader.TryRead(
+                        frame.Memory,
+                        MessageType.StreamCancel,
+                        out var streamCancelId))
+                {
+                    _protocolError(messageId, messageType, "Malformed stream cancel frame.", null);
+                    return true;
+                }
+
+                _streams.CancelOutbound(streamCancelId);
                 return true;
             case MessageType.StreamItem:
                 var itemFrame = frame.DetachPayload();
