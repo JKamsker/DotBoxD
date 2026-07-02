@@ -44,6 +44,24 @@ public sealed class PeerInboundQueueOptionsCoverageTests
 
     [Theory]
     [InlineData(0)]
+    [InlineData(-1)]
+    public void MaxAcceptedPeers_NonPositive_Throws(int value)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RpcPeerOptions { MaxAcceptedPeers = value });
+        Assert.Equal("MaxAcceptedPeers", ex.ParamName);
+        Assert.Contains("greater than zero", ex.Message);
+    }
+
+    [Fact]
+    public void MaxAcceptedPeers_Null_DisablesBound()
+    {
+        var options = new RpcPeerOptions { MaxAcceptedPeers = null };
+        Assert.Null(options.MaxAcceptedPeers);
+    }
+
+    [Theory]
+    [InlineData(0)]
     [InlineData(-5)]
     public void InboundQueueCapacity_NonPositive_Throws(int value)
     {
