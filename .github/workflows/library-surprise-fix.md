@@ -61,7 +61,13 @@ safe-outputs:
     max-patch-size: 8192
     if-no-changes: "error"
     protected-files: fallback-to-issue
-    github-token-for-extra-empty-commit: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+    # Full token override: push the fix commit as the PAT's user (not github-actions[bot]) so
+    # the resulting pull_request CI runs execute without manual approval. A PAT push is not
+    # subject to recursion-prevention, so CI triggers directly — no extra empty commit needed.
+    # Mirrors library-surprise-red-test.md's create-pull-request override; without this the
+    # fix commit was bot-pushed and every fixed PR's final CI sat at action_required (#266).
+    # Requires the PAT to have Contents:R/W + Pull requests:R/W.
+    github-token: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
   add-labels:
     target: "*"
     max: 1
