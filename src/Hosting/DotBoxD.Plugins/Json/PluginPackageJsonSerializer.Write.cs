@@ -180,6 +180,7 @@ public static partial class PluginPackageJsonSerializer
                     [new SandboxDiagnostic("DBXK046", $"Indexed predicate operator '{predicate.Operator}' is not supported.")]);
             }
 
+            ValidateIndexedPredicateValue(predicate);
             writer.WriteStartObject();
             WriteString(writer, "path", predicate.Path);
             WriteString(writer, "operator", predicate.Operator.ToString());
@@ -191,6 +192,34 @@ public static partial class PluginPackageJsonSerializer
 
         writer.WriteEndArray();
     }
+
+    private static void ValidateIndexedPredicateValue(IndexedPredicate predicate)
+    {
+        if (predicate.ValueType is not ("bool" or "int" or "long" or "double" or "string"))
+        {
+            throw Error(
+                "DBXK047",
+                $"Indexed predicate value type '{predicate.ValueType}' is not supported.");
+        }
+
+        if (!IndexedPredicateValueMatchesType(predicate.Value, predicate.ValueType))
+        {
+            throw Error(
+                "DBXK049",
+                $"Indexed predicate value '{predicate.Value ?? "null"}' does not match its declared value type '{predicate.ValueType}'.");
+        }
+    }
+
+    private static bool IndexedPredicateValueMatchesType(object? value, string valueType)
+        => valueType switch
+        {
+            "bool" => value is bool,
+            "int" => value is int,
+            "long" => value is long,
+            "double" => value is double,
+            "string" => value is string,
+            _ => false
+        };
 
     private static void WriteEntrypoints(Utf8JsonWriter writer, KernelEntrypoints entrypoints)
     {
