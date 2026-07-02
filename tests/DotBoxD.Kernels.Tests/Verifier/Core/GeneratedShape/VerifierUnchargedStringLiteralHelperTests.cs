@@ -145,6 +145,8 @@ public sealed class VerifierUnchargedStringLiteralHelperTests
             fnIl.Emit(OpCodes.Ldc_I4_7);
             fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
             fnIl.Emit(OpCodes.Stloc, charged);
+            // Load and discard the literal local near the charge call so the verifier proves
+            // the actual call operand.
             fnIl.Emit(OpCodes.Ldarg_0);
             fnIl.Emit(OpCodes.Ldloc, charged);
             fnIl.Emit(OpCodes.Ldloc, uncharged);
