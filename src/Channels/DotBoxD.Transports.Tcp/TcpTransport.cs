@@ -26,7 +26,7 @@ public sealed class TcpTransport : ITransport
     public bool IsConnected => _connection?.IsConnected ?? false;
 
     /// <summary>
-    /// Inter-read idle timeout applied to this connection's in-progress frame reads (slow-loris
+    /// Idle timeout applied to this connection's frame reads (slow-loris
     /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
     /// </summary>

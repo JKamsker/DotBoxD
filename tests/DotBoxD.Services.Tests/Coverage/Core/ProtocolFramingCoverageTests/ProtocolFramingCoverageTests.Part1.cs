@@ -193,8 +193,8 @@ public sealed partial class MessageFramerCoverageTests
     }
 
     /// <summary>
-    /// A stream that returns a fixed header in full, then throws on the next read — used to drive
-    /// <see cref="MessageFramer.ReadMessageAsync"/> down its payload-read failure path.
+    /// A stream that returns a fixed header in full, then throws on the next read - used to drive
+    /// <see cref="MessageFramer.ReadMessageAsync(Stream, CancellationToken)"/> down its payload-read failure path.
     /// </summary>
     private sealed class ScriptedReadStream : Stream
     {
