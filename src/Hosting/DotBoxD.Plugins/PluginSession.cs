@@ -19,6 +19,12 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
 
     internal PluginSession(PluginServer server) => _server = server;
 
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        _server.ThrowIfDisposed();
+    }
+
     /// <summary>
     /// Updates live settings for a kernel this session owns. Rejects ids the session does not own so
     /// one plugin cannot tune another plugin's kernel.
