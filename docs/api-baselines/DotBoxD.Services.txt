@@ -202,6 +202,7 @@ public SingleConnectionTransport(IRpcChannel connection, bool ownsConnection = f
 public Span<byte> GetSpan(int sizeHint = 0)
 public static async Task WriteMessageAsync( Stream stream, int messageId, MessageType type, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
 public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, CancellationToken ct = default)
+public static async Task<FramedMessage?> ReadMessageAsync( Stream stream, TimeSpan frameReadIdleTimeout, CancellationToken ct = default)
 public static bool TryReadFrame( ReadOnlyMemory<byte> source, out int messageId, out MessageType type, out ReadOnlyMemory<byte> envelope, out ReadOnlyMemory<byte> payload)
 public static bool TryReadFrameHeader( ReadOnlyMemory<byte> source, out int messageId, out MessageType type)
 public static class GeneratedServiceRegistry

@@ -1,10 +1,54 @@
-namespace DotBoxD.Services.Transport;
+namespace DotBoxD.Services.Protocol;
 
 internal sealed class FrameReadTimeoutSource : IDisposable
 {
+    public static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(30);
+
     private CancellationTokenSource? _source;
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
+
+    public static TimeSpan Resolve(TimeSpan? timeout, string parameterName) =>
+        Validate(timeout ?? DefaultIdleTimeout, parameterName);
+
+    public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName) =>
+        Validate(timeout ?? defaultTimeout, parameterName);
+
+    public static TimeSpan Validate(TimeSpan timeout, string parameterName)
+    {
+        if (timeout == Timeout.InfiniteTimeSpan ||
+            (timeout > TimeSpan.Zero && timeout.TotalMilliseconds <= int.MaxValue))
+        {
+            return timeout;
+        }
+
+        throw new ArgumentOutOfRangeException(
+            parameterName,
+            timeout,
+            "Frame read idle timeout must be positive (at most int.MaxValue ms) or Timeout.InfiniteTimeSpan.");
+    }
+
+    public async ValueTask<int> ReadAsync(
+        Stream stream,
+        Memory<byte> buffer,
+        CancellationToken ownerToken,
+        TimeSpan timeout)
+    {
+        var readToken = Start(ownerToken, timeout);
+        try
+        {
+            return await stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
+        {
+            throw new IOException(
+                $"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+        }
+        finally
+        {
+            CancelPendingTimeout();
+        }
+    }
 
     public CancellationToken Start(CancellationToken ownerToken, TimeSpan timeout)
     {

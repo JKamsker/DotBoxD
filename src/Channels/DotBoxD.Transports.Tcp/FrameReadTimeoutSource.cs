@@ -6,6 +6,43 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
 
+    public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName)
+    {
+        var value = timeout ?? defaultTimeout;
+        if (value == Timeout.InfiniteTimeSpan ||
+            (value > TimeSpan.Zero && value.TotalMilliseconds <= int.MaxValue))
+        {
+            return value;
+        }
+
+        throw new ArgumentOutOfRangeException(
+            parameterName,
+            value,
+            "Frame read idle timeout must be positive (at most int.MaxValue ms) or Timeout.InfiniteTimeSpan.");
+    }
+
+    public async ValueTask<int> ReadAsync(
+        Stream stream,
+        Memory<byte> buffer,
+        CancellationToken ownerToken,
+        TimeSpan timeout)
+    {
+        var readToken = Start(ownerToken, timeout);
+        try
+        {
+            return await stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
+        {
+            throw new IOException(
+                $"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+        }
+        finally
+        {
+            CancelPendingTimeout();
+        }
+    }
+
     public CancellationToken Start(CancellationToken ownerToken, TimeSpan timeout)
     {
         var source = _source;
