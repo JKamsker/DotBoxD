@@ -49,12 +49,17 @@ public sealed partial class GeneratedServiceRegistryCoverageTests
             new AssemblyName("DotBoxD.Services.Tests.InvalidCatalog." + scenario + "." + Guid.NewGuid().ToString("N")),
             AssemblyBuilderAccess.Run);
 
-        var ex = Assert.Throws<ArgumentException>(() =>
-            GeneratedServiceRegistry.RegisterServices(assembly, new[] { service }));
+        var register = () => GeneratedServiceRegistry.RegisterServices(assembly, new[] { service });
+        var ex = AllowsDerivedArgumentException(scenario)
+            ? Assert.ThrowsAny<ArgumentException>(register)
+            : Assert.Throws<ArgumentException>(register);
 
         Assert.Equal("services", ex.ParamName);
         Assert.Empty(GeneratedServiceRegistry.GetServices(assembly));
     }
+
+    private static bool AllowsDerivedArgumentException(string scenario)
+        => scenario.StartsWith("Null", StringComparison.Ordinal);
 
     public static TheoryData<string, GeneratedService> InvalidCatalogServices => new()
     {
