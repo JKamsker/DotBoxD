@@ -168,7 +168,7 @@ public sealed record VerificationPolicy(
                 RuntimeMember("ListCountRaw", SandboxValueName, Int32Name),
                 RuntimeMember("ListReadFuelRaw", Int32Name, Int64Name),
                 RuntimeMember("ListGetI32Raw", $"{SandboxValueName},{Int32Name}", Int32Name),
-                RuntimeMember("ListI32ReaderRaw", SandboxValueName, ObjectName),
+                RuntimeMember("CreateMeteredListI32ReaderRaw", $"{SandboxContextName},{SandboxValueName}", ObjectName),
                 RuntimeMember("ListI32ReaderGetRaw", $"{ObjectName},{Int32Name}", Int32Name),
                 RuntimeMember("ListI32ReaderGetRemainderRaw", $"{ObjectName},{Int32Name},{Int32Name}", Int32Name),
                 RuntimeMember("ListI32ReaderAddRemainderCycleFromZeroRaw", $"{SandboxContextName},{ObjectName},{Int32Name},{Int32Name},{Int32Name},{Int32Name},{Int64Name}", Int32Name),
@@ -218,7 +218,7 @@ public sealed record VerificationPolicy(
                 "System.Linq.Expressions.", "Microsoft.CSharp."
             },
             RuntimeFacadeIdentityDefaults(),
-            "dotboxd-verifier-8");
+            "dotboxd-verifier-9");
 
     public bool IsMemberAllowed(string memberSignature) => AllowedMembers.Contains(memberSignature);
 

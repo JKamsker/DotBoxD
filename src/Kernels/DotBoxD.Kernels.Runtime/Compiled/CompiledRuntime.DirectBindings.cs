@@ -105,6 +105,15 @@ public static partial class CompiledRuntime
         return values[index] is I32Value item ? item.Value : throw InvalidInput("expected I32 value");
     }
 
+    public static object CreateMeteredListI32ReaderRaw(SandboxContext context, SandboxValue value)
+    {
+        var list = value as ListValue ?? throw InvalidInput("expected list value");
+        var values = list.Values;
+        context.ChargeFuel(SandboxCollectionFuel.Copy(values.Count));
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(values.Count, 4, minimumOne: true));
+        return ListI32ReaderRaw(value);
+    }
+
     public static object ListI32ReaderRaw(SandboxValue value)
     {
         var list = value as ListValue ?? throw InvalidInput("expected list value");
