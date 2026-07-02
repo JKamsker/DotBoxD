@@ -55,7 +55,8 @@ public static partial class CompiledRuntime
 
         var thenCount = ModuloMatchesFromZero(iterations, divisor, match);
         var elseCount = iterations - thenCount;
-        if (!TryAddScaled(current, thenDelta, thenCount, elseDelta, elseCount, out var result) ||
+        if (!SameDirection(thenDelta, elseDelta) ||
+            !TryAddScaled(current, thenDelta, thenCount, elseDelta, elseCount, out var result) ||
             !TryGetBranchFuel(thenCount, thenFuel, elseCount, elseFuel, out var branchFuel))
         {
             throw InvalidInput("integer overflow");
@@ -112,6 +113,14 @@ public static partial class CompiledRuntime
         }
 
         var iterations = (int)iterationCount;
+        if (index < 0 ||
+            current < 0 ||
+            current >= divisor ||
+            (long)divisor - 1 + end - 1 > int.MaxValue)
+        {
+            throw InvalidInput("integer overflow");
+        }
+
         context.ChargeBulkFuel(conditionFuel, iterationCount + 1);
         context.ChargeLoopIterations(iterationCount, loopFuel);
         return AddArithmeticSeriesModulo(current, index, iterations, divisor);

@@ -168,6 +168,7 @@ internal sealed class I32ModuloBranchAccumulatorLoopFastPathEmitter
             !TryGetDelta(branch.Then, out var target, out var thenDelta) ||
             !TryGetDelta(branch.Else, out var elseTarget, out var elseDelta) ||
             !string.Equals(target, elseTarget, StringComparison.Ordinal) ||
+            string.Equals(target, range.LocalName, StringComparison.Ordinal) ||
             _stackPlan.LocalKind(target) != StackKind.I32 ||
             divisor <= 0)
         {
