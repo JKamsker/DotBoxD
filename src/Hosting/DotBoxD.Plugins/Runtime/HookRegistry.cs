@@ -57,7 +57,10 @@ public sealed partial class HookRegistry
     }
 
     public HookPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    }
 
     public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
@@ -69,6 +72,7 @@ public sealed partial class HookRegistry
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(createContext);
         if (typeof(TContext) == typeof(HookContext))
         {
