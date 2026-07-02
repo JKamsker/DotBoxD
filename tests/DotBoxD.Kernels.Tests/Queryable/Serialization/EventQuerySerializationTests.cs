@@ -57,6 +57,25 @@ public sealed class EventQuerySerializationTests
         Assert.Contains("null", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Serialization_rejects_event_names_that_deserialization_rejects(string? eventName)
+    {
+        var document = new EventQueryDocument
+        {
+            EventName = eventName!,
+            Filter = QueryFilter.MatchAll,
+            Projection = QueryProjection.Identity,
+        };
+
+        var exception = Record.Exception(() => EventQueryJson.Serialize(document));
+
+        Assert.NotNull(exception);
+        Assert.True(exception is JsonException or InvalidOperationException or ArgumentException);
+        Assert.Contains("event", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Json_uses_compact_host_readable_tokens()
     {
