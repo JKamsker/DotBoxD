@@ -81,14 +81,12 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
     {
         RejectMalformedEscapedUtf16(ref reader, name);
         var value = reader.GetString();
-        EnsureWellFormedUtf16(value, name);
-        return value;
+        return RequireWellFormedUtf16(value, name);
     }
 
     private static void WriteStringValue(Utf8JsonWriter writer, string? value)
     {
-        EnsureWellFormedUtf16(value, "query value");
-        writer.WriteStringValue(value);
+        writer.WriteStringValue(RequireWellFormedUtf16(value, "query value"));
     }
 
     private static QueryValue ReadNumber(ref Utf8JsonReader reader) =>
@@ -166,33 +164,8 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
     private static JsonException InvalidTaggedValue(string kind, string text) =>
         new($"Invalid tagged query value '{text}' for kind '{kind}'.");
 
-    private static void EnsureWellFormedUtf16(string? value, string name)
-    {
-        if (value is null)
-        {
-            return;
-        }
-
-        for (var i = 0; i < value.Length; i++)
-        {
-            var current = value[i];
-            if (char.IsHighSurrogate(current))
-            {
-                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
-                {
-                    i++;
-                    continue;
-                }
-
-                throw MalformedUtf16(name);
-            }
-
-            if (char.IsLowSurrogate(current))
-            {
-                throw MalformedUtf16(name);
-            }
-        }
-    }
+    private static string? RequireWellFormedUtf16(string? value, string name) =>
+        value is null ? null : EventQueryJsonStringSafety.RequireWellFormedUtf16(value, name);
 
     private static void RejectMalformedEscapedUtf16(ref Utf8JsonReader reader, string name)
     {
@@ -284,6 +257,6 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
         _ => -1,
     };
 
-    private static JsonException MalformedUtf16(string name) =>
-        new($"The {name} contains malformed UTF-16 text with an unpaired surrogate.");
+    private static Exception MalformedUtf16(string name) =>
+        EventQueryJsonStringSafety.MalformedUtf16(name);
 }

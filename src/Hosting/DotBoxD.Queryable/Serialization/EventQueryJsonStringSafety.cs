@@ -29,10 +29,10 @@ internal static class EventQueryJsonStringSafety
         return value;
     }
 
-    private static SandboxValidationException MalformedUtf16(string name)
+    internal static SandboxValidationException MalformedUtf16(string name)
         => new([
             new SandboxDiagnostic(
                 "DBXQ001",
-                $"EventQueryJson structural string '{name}' contains malformed UTF-16 text with an unpaired surrogate")
+                $"EventQueryJson string '{name}' contains malformed UTF-16 text with an unpaired surrogate")
         ]);
 }

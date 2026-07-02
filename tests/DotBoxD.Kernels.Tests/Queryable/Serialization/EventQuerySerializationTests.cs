@@ -187,13 +187,15 @@ public sealed class EventQuerySerializationTests
         if (exception is not null)
         {
             Assert.True(
-                exception is JsonException or InvalidOperationException,
+                exception is JsonException or InvalidOperationException or SandboxValidationException,
                 $"Expected JSON boundary rejection or exact round trip, got {exception.GetType().Name}: {exception.Message}");
             AssertMalformedUtf16Message(exception);
         }
 
-        Assert.Throws<JsonException>(() => EventQueryJson.Deserialize(
+        var escapedException = Assert.Throws<SandboxValidationException>(() => EventQueryJson.Deserialize(
             "{\"event\":\"E\",\"filter\":{\"kind\":\"compare\",\"path\":\"Name\",\"op\":\"eq\",\"value\":\"\\uD800\"}}"));
+
+        Assert.Contains(escapedException.Diagnostics, d => d.Code == "DBXQ001");
     }
 
     [Fact]

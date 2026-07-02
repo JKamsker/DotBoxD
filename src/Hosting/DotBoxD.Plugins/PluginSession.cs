@@ -42,8 +42,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            _server.ThrowIfDisposed();
+            ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var ownedKernel) ||
                 !ReferenceEquals(ownedKernel.OwnerId, this) ||
                 !_ownedInstallIds.Contains(ownedKernel.InstallId))
@@ -126,8 +125,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            _server.ThrowIfDisposed();
+            ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
                 !ReferenceEquals(kernel.OwnerId, this) ||
                 !_ownedInstallIds.Remove(kernel.InstallId))
