@@ -103,7 +103,7 @@ public IAsyncEnumerable<T> InvokeAsyncEnumerableOnInstance<TRequest, T>(string s
 public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
 public int Length => _length
-public int Length => _memory.Length
+public int Length => Memory.Length
 public int MaxConcurrentInboundDispatch
 public int MaxInboundStreamsPerPeer
 public int MaxInboundStreamsPerRequest
@@ -144,7 +144,7 @@ public readonly record struct GeneratedMethod( string Name, string WireName, Typ
 public readonly record struct GeneratedParameter( string Name, Type Type, int Position, bool IsCancellationToken, bool HasDefaultValue, object? DefaultValue)
 public readonly record struct GeneratedService( Type ServiceType, Type ProxyType, Type DispatcherType, string ServiceName)
 public readonly record struct RpcErrorInfo(string Message, string Type)
-public ReadOnlyMemory<byte> Memory => _memory
+public ReadOnlyMemory<byte> Memory
 public ReadOnlyMemory<byte> WrittenMemory =>
 public ReadOnlySpan<byte> Span =>
 public RemoteServiceException(string message, string remoteExceptionType)
