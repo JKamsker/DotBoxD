@@ -209,7 +209,7 @@ public sealed class StreamingProtocolValidationRegressionTests
 
         Assert.False(accepted);
         Assert.Equal(MessageType.Error, sentType);
-        Assert.Single(protocolErrors, error => error.Contains("Stream id must not be zero."));
+        Assert.Single(protocolErrors, error => error.Contains("Stream id must be positive."));
         Assert.Equal(0, inbound.ActiveInboundCount);
         Assert.Equal(0, streams.InboundReceiverCount);
     }

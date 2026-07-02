@@ -13,7 +13,7 @@ internal static class RpcStreamCompleteFrameReader
         streamId = 0;
         if (frame.Length != MessageFramer.HeaderSize ||
             !MessageFramer.TryReadFrameHeader(frame, out streamId, out var type) ||
-            streamId == 0 ||
+            streamId <= 0 ||
             type != MessageType.StreamComplete)
         {
             return false;
