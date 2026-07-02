@@ -43,6 +43,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            _server.ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var ownedKernel) ||
                 !ReferenceEquals(ownedKernel.OwnerId, this) ||
                 !_ownedInstallIds.Contains(ownedKernel.InstallId))
@@ -71,6 +72,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
+            _server.ThrowIfDisposed();
             if (Volatile.Read(ref _disposed) != 0 ||
                 !_server.Kernels.TryGet(pluginId, out var kernel) ||
                 !ReferenceEquals(kernel.OwnerId, this))
@@ -98,6 +100,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         _gate.Wait();
         try
         {
+            _server.ThrowIfDisposed();
             if (Volatile.Read(ref _disposed) == 0 &&
                 _server.Kernels.TryGet(pluginId, out var owned) &&
                 ReferenceEquals(owned.OwnerId, this) &&
@@ -124,6 +127,7 @@ public sealed partial class PluginSession : IDisposable, IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            _server.ThrowIfDisposed();
             if (!_server.Kernels.TryGet(pluginId, out var kernel) ||
                 !ReferenceEquals(kernel.OwnerId, this) ||
                 !_ownedInstallIds.Remove(kernel.InstallId))
