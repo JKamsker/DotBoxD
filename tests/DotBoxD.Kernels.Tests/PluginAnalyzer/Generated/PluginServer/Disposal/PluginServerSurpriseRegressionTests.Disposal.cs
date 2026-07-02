@@ -50,7 +50,7 @@ public sealed partial class PluginServerSurpriseRegressionTests
         var exception = Assert.Throws<TargetInvocationException>(() => pluginId.Invoke(registry, null));
         Assert.IsType<ObjectDisposedException>(exception.InnerException);
         Assert.Contains(
-            "public string PluginId<TService>() where TService : class\n        => _serverExtensions.TryGetValue",
+            "public string PluginId<TService>() where TService : class\n    {\n        ThrowIfDisposed();\n        return _serverExtensions.TryGetValue",
             generated,
             StringComparison.Ordinal);
     }
