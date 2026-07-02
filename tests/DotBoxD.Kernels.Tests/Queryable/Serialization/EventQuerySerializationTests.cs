@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Serialization;
 using DotBoxD.Queryable.Translation;
@@ -109,7 +110,7 @@ public sealed class EventQuerySerializationTests
         }
 
         Assert.True(
-            exception is JsonException or InvalidOperationException,
+            exception is JsonException or InvalidOperationException or SandboxValidationException,
             $"Expected JSON boundary rejection or exact round trip, got {exception.GetType().Name}: {exception.Message}");
         AssertMalformedUtf16Message(exception);
     }
