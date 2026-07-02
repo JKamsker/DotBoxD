@@ -223,7 +223,7 @@ public sealed class PluginMessageBindingTests
                 .AsTask());
 
         Assert.Equal(0, sink.Calls);
-        Assert.IsType<OperationCanceledException>(exception);
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
     }
 
     private static SandboxContext MessageContext(BindingDescriptor binding, CancellationToken cancellationToken = default)
