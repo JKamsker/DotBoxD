@@ -105,13 +105,14 @@ public sealed partial class PluginSession
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(wire);
 
+        ThrowIfDisposed();
         validate?.Invoke(package);
 
         InstalledKernel? staged = null;
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            ThrowIfDisposed();
             if (TryReuseOwnedLocalTerminal(package, out var existing))
             {
                 return existing;
