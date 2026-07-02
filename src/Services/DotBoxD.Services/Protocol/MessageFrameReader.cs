@@ -40,7 +40,7 @@ internal static class MessageFrameReader
         }
     }
 
-    private static bool IsDefinedMessageType(MessageType type) =>
+    public static bool IsDefinedMessageType(MessageType type) =>
         type is MessageType.Request or
             MessageType.Response or
             MessageType.Error or
@@ -76,8 +76,14 @@ internal static class MessageFrameReader
             return false;
         }
 
+        var messageType = (MessageType)span[8];
+        if (!IsDefinedMessageType(messageType))
+        {
+            return false;
+        }
+
         messageId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(4, 4));
-        type = (MessageType)span[8];
+        type = messageType;
 
         var envelopeLength = BinaryPrimitives.ReadInt32LittleEndian(
             span.Slice(MessageFramer.HeaderSize, MessageFramer.EnvelopeLengthSize));
@@ -97,6 +103,19 @@ internal static class MessageFrameReader
         ReadOnlyMemory<byte> source,
         out int messageId,
         out MessageType type)
+        => TryReadFrameHeader(source, validateMessageType: true, out messageId, out type);
+
+    public static bool TryReadFrameHeaderUnchecked(
+        ReadOnlyMemory<byte> source,
+        out int messageId,
+        out MessageType type)
+        => TryReadFrameHeader(source, validateMessageType: false, out messageId, out type);
+
+    private static bool TryReadFrameHeader(
+        ReadOnlyMemory<byte> source,
+        bool validateMessageType,
+        out int messageId,
+        out MessageType type)
     {
         messageId = 0;
         type = default;
@@ -113,8 +132,14 @@ internal static class MessageFrameReader
             return false;
         }
 
+        var messageType = (MessageType)span[8];
+        if (validateMessageType && !IsDefinedMessageType(messageType))
+        {
+            return false;
+        }
+
         messageId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(4, 4));
-        type = (MessageType)span[8];
+        type = messageType;
         return true;
     }
 }

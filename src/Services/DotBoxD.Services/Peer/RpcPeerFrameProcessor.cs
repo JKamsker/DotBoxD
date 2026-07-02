@@ -29,7 +29,7 @@ internal sealed class RpcPeerFrameProcessor
 
     public async ValueTask<bool> ShouldDisposeAsync(RpcFrame frame, CancellationToken ct)
     {
-        if (!MessageFramer.TryReadFrameHeader(frame.Memory, out var messageId, out var messageType))
+        if (!MessageFrameReader.TryReadFrameHeaderUnchecked(frame.Memory, out var messageId, out var messageType))
         {
             _protocolError(0, default, "Malformed frame header.", null);
             return true;
