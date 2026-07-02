@@ -243,6 +243,7 @@ public sealed partial class InstalledKernel
     private async ValueTask AcquireExecutionGateAsync(CancellationToken cancellationToken)
     {
         PluginKernelRevocation.ThrowIfRevoked(IsRevoked);
+        cancellationToken.ThrowIfCancellationRequested();
         if (_executionGate.Wait(0, CancellationToken.None))
         {
             return;
