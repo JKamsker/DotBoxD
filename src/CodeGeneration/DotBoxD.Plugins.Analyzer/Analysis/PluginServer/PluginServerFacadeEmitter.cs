@@ -242,6 +242,8 @@ internal static partial class PluginServerFacadeEmitter
         => string.Join(", ", method.Parameters.Select(p => "@" + p.Name));
 
     private static string HintName(PluginServerFacadeModel model)
-        => (string.IsNullOrWhiteSpace(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName) +
+        => (string.IsNullOrWhiteSpace(model.Namespace)
+            ? model.ClassName
+            : PluginServerFacadeNameFormatter.HintNamePart(model.Namespace) + "." + model.ClassName) +
            ".PluginServer.g.cs";
 }
