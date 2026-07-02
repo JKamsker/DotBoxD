@@ -29,6 +29,19 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     }
 
     [Fact]
+    public void Runtime_marshaller_rejects_undefined_high_bit_ulong_enum_before_encoding()
+    {
+        const ulong highBit = 1UL << 63;
+        var value = (SparseHugeEnum)highBit;
+        var wire = unchecked((long)highBit);
+
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(SandboxValue.FromInt64(wire), typeof(SparseHugeEnum)));
+        Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.ToSandboxValue(value, typeof(SparseHugeEnum)));
+    }
+
+    [Fact]
     public void Runtime_marshaller_accepts_declared_high_bit_ulong_flags()
     {
         var wire = unchecked((long)((1UL << 63) | 1UL));
