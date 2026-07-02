@@ -50,26 +50,60 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
             return false;
         }
 
-        for (var current = index + 2; current < analysis.Instructions.Count; current++)
+        var store = analysis.Instructions[index + 1];
+        var queue = new Queue<ChargeSearchState>();
+        var visited = new HashSet<ChargeSearchState>();
+        EnqueueSuccessors(analysis, store, charged: false, queue, visited);
+        while (queue.Count > 0)
         {
-            var candidate = analysis.Instructions[current];
-            if (!IsReachable(analysis, candidate))
+            var state = queue.Dequeue();
+            if (!analysis.ByOffset.TryGetValue(state.Offset, out var candidate) ||
+                !IsReachable(analysis, candidate))
             {
                 continue;
             }
 
+            var currentIndex = analysis.IndexByOffset[candidate.Offset];
+            var charged = state.Charged ||
+                IsChargeSandboxValueCall(candidate) &&
+                PreviousInstructionsLoadLocal(analysis.Instructions, currentIndex, localIndex);
             if (candidate.Opcode == ILOpCode.Ret)
             {
-                return false;
+                if (!charged &&
+                    PreviousInstructionLoadsLocal(analysis.Instructions, currentIndex, localIndex))
+                {
+                    return false;
+                }
+
+                continue;
             }
 
-            if (IsChargeSandboxValueCall(candidate) && PreviousInstructionsLoadLocal(analysis.Instructions, current, localIndex))
-            {
-                return true;
-            }
+            EnqueueSuccessors(analysis, candidate, charged, queue, visited);
         }
 
-        return false;
+        return true;
+    }
+
+    private static void EnqueueSuccessors(
+        GeneratedMethodFlow analysis,
+        GeneratedInstruction instruction,
+        bool charged,
+        Queue<ChargeSearchState> queue,
+        HashSet<ChargeSearchState> visited)
+    {
+        if (!analysis.SuccessorsByOffset.TryGetValue(instruction.Offset, out var successors))
+        {
+            return;
+        }
+
+        foreach (var successor in successors)
+        {
+            var state = new ChargeSearchState(successor, charged);
+            if (visited.Add(state))
+            {
+                queue.Enqueue(state);
+            }
+        }
     }
 
     private static bool IsChargeSandboxValueCall(GeneratedInstruction instruction)
@@ -93,6 +127,12 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         return false;
     }
 
+    private static bool PreviousInstructionLoadsLocal(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        int index,
+        int localIndex)
+        => index > 0 && IsLoadLocal(instructions[index - 1], localIndex);
+
     private static bool IsReachable(GeneratedMethodFlow analysis, GeneratedInstruction instruction)
         => analysis.EntryStates.ContainsKey(instruction.Offset);
 
@@ -114,4 +154,6 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         localIndex = -1;
         return false;
     }
+
+    private readonly record struct ChargeSearchState(int Offset, bool Charged);
 }

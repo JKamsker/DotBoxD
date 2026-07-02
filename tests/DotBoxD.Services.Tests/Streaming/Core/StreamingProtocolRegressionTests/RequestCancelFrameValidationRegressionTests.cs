@@ -33,6 +33,40 @@ public sealed class RequestCancelFrameValidationRegressionTests
     }
 
     [Fact]
+    public async Task NegativeIdRequestCancel_CancelsInboundRequest()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var protocolErrors = new List<string>();
+        var inbound = CreateInlineInbound(serializer, streams);
+        var dispatcher = new CancelAwareDispatcher();
+        inbound.AddDispatcher(dispatcher);
+        var processor = CreateProcessor(serializer, streams, inbound, protocolErrors);
+        const int messageId = -72;
+
+        var requestFrame = CreateRequestFrame(serializer, messageId);
+        Assert.False(await processor.ShouldDisposeAsync(requestFrame, CancellationToken.None));
+        await dispatcher.Started.Task.WaitAsync(TestTimeout);
+
+        try
+        {
+            using var cancelFrame = MessageFramer.FrameToPayload(
+                messageId,
+                MessageType.Cancel,
+                ReadOnlySpan<byte>.Empty);
+
+            Assert.True(await processor.ShouldDisposeAsync(cancelFrame, CancellationToken.None));
+
+            await dispatcher.Canceled.Task.WaitAsync(TestTimeout);
+            Assert.Empty(protocolErrors);
+        }
+        finally
+        {
+            await inbound.StopAsync().WaitAsync(TestTimeout);
+        }
+    }
+
+    [Fact]
     public async Task RequestCancelWithTrailingPayload_ReportsProtocolErrorWithoutCancelingInboundRequest()
     {
         var serializer = new MessagePackRpcSerializer();

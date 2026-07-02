@@ -13,7 +13,7 @@ internal sealed partial class RpcStreamManager
         while (true)
         {
             var streamId = Interlocked.Increment(ref _outboundStreamIdCounter);
-            if (streamId == 0 || _senders.ContainsKey(streamId))
+            if (streamId <= 0 || _senders.ContainsKey(streamId))
             {
                 continue;
             }
