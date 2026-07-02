@@ -19,6 +19,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     private readonly RpcHostAcceptLoop _acceptLoop;
     private readonly object _lifecycleLock = new();
     private readonly RpcHostPeerConfiguration _configure = new();
+    private readonly RpcHostPeerAdmission _admission;
     private readonly RpcHostPeerCollection _peers = new();
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
@@ -37,6 +38,7 @@ public sealed partial class RpcHost : IAsyncDisposable
         _listener = listener;
         _serializer = serializer;
         _options = options;
+        _admission = new RpcHostPeerAdmission(options.MaxAcceptedPeers);
         _acceptLoop = new RpcHostAcceptLoop(listener, AddPeerAsync, RaiseAcceptError);
     }
 
@@ -81,7 +83,23 @@ public sealed partial class RpcHost : IAsyncDisposable
 
     private async Task AddPeerAsync(IRpcChannel connection)
     {
-        var peer = RpcPeer.Over(connection, _serializer, _options);
+        if (!_admission.TryAcquire(out var admission))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
+
+        RpcPeer peer;
+        try
+        {
+            peer = RpcPeer.Over(connection, _serializer, _options);
+        }
+        catch
+        {
+            admission.Dispose();
+            throw;
+        }
+
         var configure = _configure.Snapshot();
         try
         {
@@ -94,6 +112,7 @@ public sealed partial class RpcHost : IAsyncDisposable
         {
             RpcDiagnostics.Report("Accepted peer configuration failed", ex);
             RpcEventHandlerInvoker.Raise(AcceptError, this, new RpcHostErrorEventArgs(ex));
+            admission.Dispose();
             await peer.DisposeAsync().ConfigureAwait(false);
             return;
         }
@@ -110,13 +129,14 @@ public sealed partial class RpcHost : IAsyncDisposable
             registered = Volatile.Read(ref _disposed) == 0 && _stopTask is null && _cts is not null;
             if (registered)
             {
-                _peers.Add(peer);
+                registered = _peers.TryAdd(peer, admission);
             }
         }
 
         if (!registered)
         {
             peer.Disconnected -= OnPeerDisconnected;
+            admission.Dispose();
             await peer.DisposeAsync().ConfigureAwait(false);
             return;
         }
@@ -140,6 +160,12 @@ public sealed partial class RpcHost : IAsyncDisposable
             // flight from the handler.
             peer.Disconnected -= OnPeerDisconnected;
             _peers.Remove(peer);
+        }
+        catch
+        {
+            peer.Disconnected -= OnPeerDisconnected;
+            _peers.Remove(peer);
+            throw;
         }
     }
 

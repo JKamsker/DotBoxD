@@ -14,6 +14,7 @@ public sealed class RpcPeerOptions
     public const int DefaultMaxConcurrentInboundDispatch = 1;
     public const int DefaultMaxInboundStreamsPerRequest = 32;
     public const int DefaultMaxInboundStreamsPerPeer = 1024;
+    public const int DefaultMaxAcceptedPeers = 1024;
 
     /// <summary>Default <see cref="MaxInboundBytes"/>: 64 MiB of in-flight inbound frames per peer.</summary>
     public const long DefaultMaxInboundBytes = 64L * 1024 * 1024;
@@ -23,6 +24,7 @@ public sealed class RpcPeerOptions
     private int _maxConcurrentInboundDispatch = DefaultMaxConcurrentInboundDispatch;
     private int _maxInboundStreamsPerRequest = DefaultMaxInboundStreamsPerRequest;
     private int _maxInboundStreamsPerPeer = DefaultMaxInboundStreamsPerPeer;
+    private int? _maxAcceptedPeers = DefaultMaxAcceptedPeers;
     private long? _maxInboundBytes = DefaultMaxInboundBytes;
     private QueueFullMode _queueFullMode = QueueFullMode.Wait;
     private TimeSpan _requestTimeout = TimeSpan.FromSeconds(30);
@@ -225,6 +227,28 @@ public sealed class RpcPeerOptions
             }
 
             _maxInboundStreamsPerPeer = value;
+        }
+    }
+
+    /// <summary>
+    /// Maximum accepted peers a host may keep active or in hand-off at once. The default bounds
+    /// host-side peer state and read-loop work before request, frame, or transport limits apply.
+    /// Set to <see langword="null"/> only when peer admission is bounded externally.
+    /// </summary>
+    public int? MaxAcceptedPeers
+    {
+        get => _maxAcceptedPeers;
+        init
+        {
+            if (value is <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(MaxAcceptedPeers),
+                    value,
+                    "Maximum accepted peers must be greater than zero.");
+            }
+
+            _maxAcceptedPeers = value;
         }
     }
 

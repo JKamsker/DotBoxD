@@ -27,6 +27,7 @@ public class ServiceNotFoundException : ServiceException
 public class ServiceProtocolException : ServiceException
 public class ServiceTimeoutException : ServiceException
 public const int DefaultInboundQueueCapacity = 1024
+public const int DefaultMaxAcceptedPeers = 1024
 public const int DefaultMaxConcurrentInboundDispatch = 1
 public const int DefaultMaxInboundStreamsPerPeer = 1024
 public const int DefaultMaxInboundStreamsPerRequest = 32
@@ -103,6 +104,7 @@ public InstanceRegistry() : this(DefaultMaxInstances) { }
 public InstanceRegistry(int maxInstances)
 public int Length => _length
 public int Length => _memory.Length
+public int? MaxAcceptedPeers
 public int MaxConcurrentInboundDispatch
 public int MaxInboundStreamsPerPeer
 public int MaxInboundStreamsPerRequest
