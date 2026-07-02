@@ -10,6 +10,7 @@ public sealed class PluginEventAdapterRegistry
 
     public void Register<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         var parameters = adapter.Parameters;
         PluginEventAdapterShapeValidator.Validate(adapter, parameters);
         var shape = new PluginEventShape(adapter.EventName, parameters);

@@ -42,7 +42,10 @@ public sealed class SubscriptionRegistry
     }
 
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    }
 
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
@@ -54,6 +57,7 @@ public sealed class SubscriptionRegistry
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(createContext);
         if (typeof(TContext) == typeof(HookContext))
         {

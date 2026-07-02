@@ -114,6 +114,7 @@ public sealed partial class PluginServer : IDisposable
 
     public PluginServer RegisterEventAdapter<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         Hooks.EnsureCanRegister(adapter);
         Subscriptions.EnsureCanRegister(adapter);
         Events.Register(adapter);
