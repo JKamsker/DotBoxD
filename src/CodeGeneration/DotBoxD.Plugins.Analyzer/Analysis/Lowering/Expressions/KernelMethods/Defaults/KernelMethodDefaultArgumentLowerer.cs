@@ -191,17 +191,7 @@ internal static class KernelMethodDefaultArgumentLowerer
             SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException());
 
     private static string DecimalRecord(ITypeSymbol type, decimal value)
-    {
-        var bits = decimal.GetBits(value);
-        return DotBoxDRecordCreationExpressionLowerer.RecordNew(
-            [
-                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(bits[0])})",
-                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(bits[1])})",
-                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(bits[2])})",
-                $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(bits[3])})"
-            ],
-            SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException());
-    }
+        => DotBoxDDecimalWireSource.RecordSource(type, value);
 
     private static bool IsFinite(double value)
         => !double.IsNaN(value) && !double.IsInfinity(value);

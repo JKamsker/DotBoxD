@@ -143,14 +143,7 @@ internal static class DotBoxDNullableScalarExpressionLowerer
         };
 
     private static string DecimalZeroSource(ITypeSymbol underlying)
-        => DotBoxDRecordCreationExpressionLowerer.RecordNew(
-            [
-                $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
-                $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
-                $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
-                $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})"
-            ],
-            SandboxTypeSourceEmitter.TryEmit(underlying) ?? throw new NotSupportedException());
+        => DotBoxDDecimalWireSource.RecordSource(underlying, default);
 
     private static string BoolSource(bool value)
         => $"{Helpers.Bool}({(value ? DotBoxDGenerationNames.CSharpLiterals.True : DotBoxDGenerationNames.CSharpLiterals.False)})";

@@ -130,23 +130,10 @@ internal static class DotBoxDConstantExpressionLowerer
             true);
 
     private static DotBoxDExpressionModel DecimalRecord(decimal value, ITypeSymbol type)
-    {
-        var bits = decimal.GetBits(value);
-        return new DotBoxDExpressionModel(
-            DotBoxDRecordCreationExpressionLowerer.RecordNew(
-                [
-                    Int32Source(bits[0]),
-                    Int32Source(bits[1]),
-                    Int32Source(bits[2]),
-                    Int32Source(bits[3])
-                ],
-                SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException()),
+        => new(
+            DotBoxDDecimalWireSource.RecordSource(type, value),
             DotBoxDGenerationNames.ManifestTypes.Record,
             true);
-    }
-
-    private static string Int32Source(int value)
-        => $"{DotBoxDGenerationNames.Helpers.I32}({LiteralReader.ObjectLiteral(value)})";
 
     private static DotBoxDExpressionModel Bool(bool value)
         => new(
