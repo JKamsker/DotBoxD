@@ -62,6 +62,10 @@ internal static class QueryFilterInvariants
                 RequireFieldPath(filter, "In");
                 RequireInValues(filter);
                 break;
+            case QueryFilterKind.And:
+            case QueryFilterKind.Or:
+                RequireBooleanChildren(filter, kind);
+                break;
             case QueryFilterKind.Not:
                 RequireNotChild(filter);
                 break;
@@ -91,6 +95,14 @@ internal static class QueryFilterInvariants
         if (filter.Children.Count != 1)
         {
             throw new InvalidOperationException("QueryFilter Not nodes require exactly one child.");
+        }
+    }
+
+    private static void RequireBooleanChildren(QueryFilter filter, QueryFilterKind kind)
+    {
+        if (filter.Children.Count == 0)
+        {
+            throw new InvalidOperationException($"QueryFilter {kind} nodes require non-empty terms.");
         }
     }
 
