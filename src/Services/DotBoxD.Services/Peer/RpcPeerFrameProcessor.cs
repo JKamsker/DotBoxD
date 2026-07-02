@@ -43,7 +43,7 @@ internal sealed class RpcPeerFrameProcessor
             case MessageType.Request:
                 return !await _inbound.AcceptRequestAsync(frame, messageId, ct).ConfigureAwait(false);
             case MessageType.Cancel:
-                if (messageId == 0 || frame.Length != MessageFramer.HeaderSize)
+                if (messageId <= 0 || frame.Length != MessageFramer.HeaderSize)
                 {
                     _protocolError(messageId, messageType, "Malformed cancel frame.", null);
                     return true;
