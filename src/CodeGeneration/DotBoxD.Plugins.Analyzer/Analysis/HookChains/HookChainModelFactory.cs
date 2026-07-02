@@ -48,6 +48,13 @@ internal static partial class HookChainModelFactory
                     ex.Message,
                     ex.Location ?? PluginDiagnosticLocation.From(invocation.GetLocation())));
         }
+        catch (UnsupportedHookChainEventTypeException ex)
+        {
+            return new HookChainCreateResult(
+                null,
+                null,
+                new PluginKernelDiagnostic(ex.Message, ex.Location));
+        }
         catch (NotSupportedException ex)
         {
             chain = null;
@@ -127,6 +134,8 @@ internal static partial class HookChainModelFactory
         {
             return null;
         }
+
+        ValidateEventType(eventType, seed, cancellationToken);
 
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
         if (ContainsUnsupported(eventProperties))
@@ -283,18 +292,4 @@ internal static partial class HookChainModelFactory
 
         return new HookChainResult(modelResult, interception);
     }
-
-    private static string InterceptionFailureDetail(
-        GeneratedRemoteHookChainKind? generatedRemoteKind,
-        ITypeSymbol? projectedTypeSymbol)
-        => generatedRemoteKind is not null &&
-           projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true }
-            ? "anonymous terminal projections on generated-server chains require a named record projection"
-            : "the call site is not interceptable";
-}
-
-internal enum HookChainReceiverKind
-{
-    Local,
-    Remote
 }
