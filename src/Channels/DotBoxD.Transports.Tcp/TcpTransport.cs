@@ -18,8 +18,10 @@ public sealed class TcpTransport : ITransport
     public TcpTransport(string host, int port)
     {
         _host = host ?? throw new ArgumentNullException(nameof(host));
-        _port = port;
+        _port = EnsurePort(port);
     }
+
+    private static int EnsurePort(int port) => (uint)port <= 65535 ? port : throw new ArgumentOutOfRangeException(nameof(port));
 
     public IRpcChannel? Connection => _connection;
 
