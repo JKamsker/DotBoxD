@@ -61,6 +61,28 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     }
 
     [Fact]
+    public void FromSandboxValue_rejects_setter_dto_with_partially_mapped_required_constructor()
+    {
+        var ex = Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.FromSandboxValue(
+                SandboxValue.FromRecord([SandboxValue.FromString("ember")]),
+                typeof(PartiallyMappedConstructorSetterDto)));
+
+        Assert.Contains(nameof(PartiallyMappedConstructorSetterDto), ex.Message, StringComparison.Ordinal);
+        Assert.Contains("constructor", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SandboxTypeOf_rejects_setter_dto_with_optional_only_constructor()
+    {
+        var ex = Assert.Throws<NotSupportedException>(
+            () => KernelRpcMarshaller.SandboxTypeOf(typeof(OptionalOnlyConstructorSetterDto)));
+
+        Assert.Contains(nameof(OptionalOnlyConstructorSetterDto), ex.Message, StringComparison.Ordinal);
+        Assert.Contains("constructor", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ToSandboxValue_rejects_setter_dto_with_unmatched_required_constructor()
     {
         var dto = new ConstructorOnlySetterDto(42) { Name = "ember" };
@@ -90,6 +112,25 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
     private sealed class ConstructorOnlySetterDto
     {
         public ConstructorOnlySetterDto(int seed)
+            => _ = seed;
+
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class PartiallyMappedConstructorSetterDto
+    {
+        public PartiallyMappedConstructorSetterDto(string name, int seed)
+        {
+            Name = name;
+            _ = seed;
+        }
+
+        public string Name { get; set; }
+    }
+
+    private sealed class OptionalOnlyConstructorSetterDto
+    {
+        public OptionalOnlyConstructorSetterDto(int seed = 0)
             => _ = seed;
 
         public string Name { get; set; } = string.Empty;

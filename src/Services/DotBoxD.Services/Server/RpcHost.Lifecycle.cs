@@ -170,7 +170,7 @@ public sealed partial class RpcHost
             if (stopListenerBeforeCancel)
             {
                 await Task.Yield();
-                await StopListenerOnceAsync(ct).ConfigureAwait(false);
+                await StopListenerOnceAsync(CancellationToken.None).ConfigureAwait(false);
             }
             TryCancel(cts);
             cancellationStarted = true;

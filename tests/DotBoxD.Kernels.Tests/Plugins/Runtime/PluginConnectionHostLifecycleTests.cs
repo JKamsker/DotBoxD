@@ -69,6 +69,22 @@ public sealed class PluginConnectionHostLifecycleTests
         Assert.Equal(1, transport.DisposeCount);
     }
 
+    [Fact]
+    public async Task StartAsync_preserves_transport_start_failure_when_cleanup_dispose_throws()
+    {
+        using var server = PluginServer.Create();
+        var startFailure = new InvalidOperationException("transport start failed");
+        var disposeFailure = new ApplicationException("dispose failed");
+        var transport = new ThrowingStartTransport(startFailure, disposeFailure);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => PluginConnectionHost<object>.StartAsync(server, transport, Configure));
+
+        Assert.Same(startFailure, ex);
+        Assert.Same(disposeFailure, ex.Data["PluginConnectionHost.StartCleanupException"]);
+        Assert.Equal(1, transport.DisposeCount);
+    }
+
     private static object Configure(DotBoxD.Services.Peer.RpcPeer peer, PluginSession session) => new();
 
     // A high-entropy pipe name (>= 32 chars with an unguessable random component) so it passes the safe-name
@@ -89,12 +105,24 @@ public sealed class PluginConnectionHostLifecycleTests
 
     private sealed class ThrowingStartTransport : IServerTransport
     {
+        private readonly Exception _startFailure;
+        private readonly Exception? _disposeFailure;
         private int _disposeCount;
+
+        public ThrowingStartTransport()
+            : this(new InvalidOperationException("transport start failed"))
+        {
+        }
+
+        public ThrowingStartTransport(Exception startFailure, Exception? disposeFailure = null)
+        {
+            _startFailure = startFailure;
+            _disposeFailure = disposeFailure;
+        }
 
         public int DisposeCount => Volatile.Read(ref _disposeCount);
 
-        public Task StartAsync(CancellationToken ct = default) =>
-            throw new InvalidOperationException("transport start failed");
+        public Task StartAsync(CancellationToken ct = default) => throw _startFailure;
 
         public Task<IRpcChannel> AcceptAsync(CancellationToken ct = default) =>
             throw new InvalidOperationException("Accept should not run when start fails.");
@@ -104,6 +132,11 @@ public sealed class PluginConnectionHostLifecycleTests
         public ValueTask DisposeAsync()
         {
             Interlocked.Increment(ref _disposeCount);
+            if (_disposeFailure is not null)
+            {
+                throw _disposeFailure;
+            }
+
             return default;
         }
     }

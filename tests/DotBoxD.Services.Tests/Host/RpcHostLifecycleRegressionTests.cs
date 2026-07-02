@@ -90,7 +90,7 @@ public sealed class RpcHostLifecycleRegressionTests
     }
 
     [Fact]
-    public async Task StopAsync_WithPreCanceledToken_DoesNotCancelAcceptLoopBeforeListenerRejectsStop()
+    public async Task StopAsync_WithPreCanceledToken_StopsListenerBeforeCancelingAcceptLoop()
     {
         var transport = new PreCanceledStopServerTransport();
         var host = RpcHost.Listen(transport, NewSerializer());
@@ -102,11 +102,10 @@ public sealed class RpcHostLifecycleRegressionTests
             using var stopCts = new CancellationTokenSource();
             stopCts.Cancel();
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => host.StopAsync(stopCts.Token).WaitAsync(TimeSpan.FromSeconds(1)));
+            await host.StopAsync(stopCts.Token).WaitAsync(TimeSpan.FromSeconds(1));
 
-            Assert.Equal(0, transport.StopCompletedCalls);
-            Assert.False(transport.AcceptTokenCanceled);
+            Assert.Equal(1, transport.StopCompletedCalls);
+            Assert.False(transport.AcceptTokenCanceledWhenStopRan);
         }
         finally
         {
@@ -209,11 +208,14 @@ public sealed class RpcHostLifecycleRegressionTests
         private readonly TaskCompletionSource<bool> _acceptStarted =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _acceptTokenCanceled;
+        private int _acceptTokenCanceledWhenStopRan;
         private int _stopCompletedCalls;
 
         public Task AcceptStarted => _acceptStarted.Task;
 
         public bool AcceptTokenCanceled => Volatile.Read(ref _acceptTokenCanceled) != 0;
+
+        public bool AcceptTokenCanceledWhenStopRan => Volatile.Read(ref _acceptTokenCanceledWhenStopRan) != 0;
 
         public int StopCompletedCalls => Volatile.Read(ref _stopCompletedCalls);
 
@@ -232,6 +234,11 @@ public sealed class RpcHostLifecycleRegressionTests
         public Task StopAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            if (AcceptTokenCanceled)
+            {
+                Volatile.Write(ref _acceptTokenCanceledWhenStopRan, 1);
+            }
+
             Interlocked.Increment(ref _stopCompletedCalls);
             return Task.CompletedTask;
         }
@@ -268,7 +275,7 @@ public sealed class RpcHostLifecycleRegressionTests
         {
             var call = Interlocked.Increment(ref _stopCalls);
             return call == 1
-                ? Task.Delay(Timeout.Infinite, ct)
+                ? Task.FromException(new OperationCanceledException())
                 : Task.CompletedTask;
         }
 

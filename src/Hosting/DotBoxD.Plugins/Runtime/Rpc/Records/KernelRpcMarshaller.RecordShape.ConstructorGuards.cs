@@ -10,8 +10,7 @@ public static partial class KernelRpcMarshaller
         {
             if (_constructor is not null ||
                 HasPublicParameterlessConstructor() ||
-                HasFieldMappedConstructorParameter() ||
-                !HasRequiredPublicConstructor())
+                HasConstructorParameterMappedToField())
             {
                 return;
             }
@@ -24,7 +23,7 @@ public static partial class KernelRpcMarshaller
         private bool HasPublicParameterlessConstructor()
             => _type.IsValueType || _type.GetConstructor(Type.EmptyTypes) is not null;
 
-        private bool HasFieldMappedConstructorParameter()
+        private bool HasConstructorParameterMappedToField()
             => _type.GetConstructors().Any(ConstructorHasMappedParameter);
 
         private bool ConstructorHasMappedParameter(ConstructorInfo constructor)
@@ -40,9 +39,5 @@ public static partial class KernelRpcMarshaller
 
             return false;
         }
-
-        private bool HasRequiredPublicConstructor()
-            => _type.GetConstructors().Any(static constructor =>
-                constructor.GetParameters().Any(static parameter => !parameter.HasDefaultValue));
     }
 }

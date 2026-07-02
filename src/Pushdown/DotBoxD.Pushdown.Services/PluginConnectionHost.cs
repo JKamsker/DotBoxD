@@ -133,9 +133,17 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         {
             await self._host.StartAsync().ConfigureAwait(false);
         }
-        catch
+        catch (Exception startEx)
         {
-            await self.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await self.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception disposeEx)
+            {
+                startEx.Data["PluginConnectionHost.StartCleanupException"] = disposeEx;
+            }
+
             throw;
         }
 
