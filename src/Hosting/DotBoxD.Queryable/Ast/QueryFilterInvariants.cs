@@ -54,16 +54,66 @@ internal static class QueryFilterInvariants
         var kind = RequireKnownKind(filter);
         switch (kind)
         {
+            case QueryFilterKind.MatchAll:
+                RejectInactiveArmProperties(
+                    filter,
+                    kind,
+                    hasField: true,
+                    hasOperator: true,
+                    hasValue: true,
+                    hasValues: true,
+                    hasChildren: true,
+                    hasIgnoreCase: true);
+                break;
+            case QueryFilterKind.And:
+            case QueryFilterKind.Or:
+                RejectInactiveArmProperties(
+                    filter,
+                    kind,
+                    hasField: true,
+                    hasOperator: true,
+                    hasValue: true,
+                    hasValues: true,
+                    hasChildren: false,
+                    hasIgnoreCase: true);
+                break;
             case QueryFilterKind.Compare:
                 RequireFieldPath(filter, "Compare");
                 _ = CompareValue(filter);
+                RejectInactiveArmProperties(
+                    filter,
+                    kind,
+                    hasField: false,
+                    hasOperator: false,
+                    hasValue: false,
+                    hasValues: true,
+                    hasChildren: true,
+                    hasIgnoreCase: false);
                 break;
             case QueryFilterKind.In:
                 RequireFieldPath(filter, "In");
                 RequireInValues(filter);
+                RejectInactiveArmProperties(
+                    filter,
+                    kind,
+                    hasField: false,
+                    hasOperator: true,
+                    hasValue: true,
+                    hasValues: false,
+                    hasChildren: true,
+                    hasIgnoreCase: false);
                 break;
             case QueryFilterKind.Not:
                 RequireNotChild(filter);
+                RejectInactiveArmProperties(
+                    filter,
+                    kind,
+                    hasField: true,
+                    hasOperator: true,
+                    hasValue: true,
+                    hasValues: true,
+                    hasChildren: false,
+                    hasIgnoreCase: true);
                 break;
         }
 
@@ -85,6 +135,57 @@ internal static class QueryFilterInvariants
             }
         }
     }
+
+    private static void RejectInactiveArmProperties(
+        QueryFilter filter,
+        QueryFilterKind kind,
+        bool hasField,
+        bool hasOperator,
+        bool hasValue,
+        bool hasValues,
+        bool hasChildren,
+        bool hasIgnoreCase)
+    {
+        string? inactive = null;
+        if (hasField && !string.IsNullOrEmpty(filter.Field))
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.Field));
+        }
+
+        if (hasOperator && filter.Operator != default)
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.Operator));
+        }
+
+        if (hasValue && filter.Value is not null)
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.Value));
+        }
+
+        if (hasValues && filter.Values.Count > 0)
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.Values));
+        }
+
+        if (hasChildren && filter.Children.Count > 0)
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.Children));
+        }
+
+        if (hasIgnoreCase && filter.IgnoreCase)
+        {
+            inactive = AddInactive(inactive, nameof(QueryFilter.IgnoreCase));
+        }
+
+        if (inactive is not null)
+        {
+            throw new InvalidOperationException(
+                $"QueryFilter {kind} nodes cannot carry inactive union-arm properties: {inactive}.");
+        }
+    }
+
+    private static string AddInactive(string? inactive, string property)
+        => inactive is null ? property : $"{inactive}, {property}";
 
     private static void RequireNotChild(QueryFilter filter)
     {
