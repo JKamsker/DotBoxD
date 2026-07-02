@@ -32,6 +32,7 @@ public sealed partial class RpcHost : IAsyncDisposable
     // lifecycle lock. Null (inert) in production. Lets a test deterministically run StopCoreAsync
     // to completion in the gap so the second lock observes a cleared _cts.
     internal Func<Task>? _onListenerStartedForTest;
+    internal Func<IRpcChannel, RpcPeer>? _peerFactoryForTest;
 
     private RpcHost(IServerTransport listener, ISerializer serializer, RpcPeerOptions options)
     {
@@ -92,11 +93,12 @@ public sealed partial class RpcHost : IAsyncDisposable
         RpcPeer peer;
         try
         {
-            peer = RpcPeer.Over(connection, _serializer, _options);
+            peer = _peerFactoryForTest?.Invoke(connection) ?? RpcPeer.Over(connection, _serializer, _options);
         }
         catch
         {
             admission.Dispose();
+            await connection.DisposeAsync().ConfigureAwait(false);
             throw;
         }
 

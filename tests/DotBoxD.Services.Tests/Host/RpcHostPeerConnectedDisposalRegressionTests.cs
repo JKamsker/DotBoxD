@@ -1,4 +1,3 @@
-using System.Reflection;
 using DotBoxD.Codecs.MessagePack;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Server;
@@ -32,13 +31,23 @@ public sealed class RpcHostPeerConnectedDisposalRegressionTests
         await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.NotNull(acceptedPeer);
-        Assert.True(IsDisposed(acceptedPeer));
+        Assert.True(acceptedPeer.IsDisposed);
     }
 
-    private static bool IsDisposed(RpcPeer peer)
+    [Fact]
+    public async Task PeerConstructionFailure_DisposesAcceptedConnection()
     {
-        var field = typeof(RpcPeer).GetField("_disposed", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        return field.GetValue(peer) is int value && value != 0;
+        var connection = new ScriptedConnection();
+        var failure = new InvalidOperationException("peer construction failed");
+        var error = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var host = RpcHost.Listen(new SingleConnectionServerTransport(connection), NewSerializer());
+        host._peerFactoryForTest = _ => throw failure;
+        host.AcceptError += (_, args) => error.TrySetResult(args.Error);
+
+        await host.StartAsync();
+
+        Assert.Same(failure, await error.Task.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.False(connection.IsConnected);
     }
 }

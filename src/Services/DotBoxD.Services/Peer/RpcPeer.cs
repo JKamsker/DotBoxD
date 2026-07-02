@@ -97,6 +97,9 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     /// </summary>
     internal bool HasStarted => Volatile.Read(ref _started) != 0;
 
+    /// <summary>Test seam: whether disposal has begun.</summary>
+    internal bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
     /// <summary>The remote endpoint string of the underlying channel.</summary>
     public string RemoteEndpoint => _channel.RemoteEndpoint;
     /// <summary>

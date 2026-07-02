@@ -93,6 +93,8 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         _source = null;
     }
 
+    internal void DisposeCurrentSourceForTest() => _source?.Dispose();
+
     private bool MatchesOwner(CancellationToken ownerToken) =>
         _ownerTokenCanCancel == ownerToken.CanBeCanceled &&
         (!_ownerTokenCanCancel || _ownerToken.Equals(ownerToken));

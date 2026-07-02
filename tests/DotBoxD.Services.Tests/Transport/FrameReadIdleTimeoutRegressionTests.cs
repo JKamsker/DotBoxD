@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Transport;
 using DotBoxD.Transports.Tcp;
@@ -100,15 +99,11 @@ public sealed class FrameReadIdleTimeoutRegressionTests
         Assert.Null(exception);
     }
 
-    private static void DisposeInnerCancellationTokenSource(object timeoutSource)
-    {
-        var field = timeoutSource.GetType().GetField(
-            "_source",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        var source = Assert.IsType<CancellationTokenSource>(field.GetValue(timeoutSource));
-        source.Dispose();
-    }
+    private static void DisposeInnerCancellationTokenSource(ServiceFrameReadTimeoutSource timeoutSource) =>
+        timeoutSource.DisposeCurrentSourceForTest();
+
+    private static void DisposeInnerCancellationTokenSource(TcpFrameReadTimeoutSource timeoutSource) =>
+        timeoutSource.DisposeCurrentSourceForTest();
 
     private sealed class PrefixThenStallStream : Stream
     {
