@@ -72,6 +72,7 @@ internal static class QueryFilterInvariants
                 break;
             case QueryFilterKind.And:
             case QueryFilterKind.Or:
+                RequireBooleanChildren(filter, kind);
                 RejectInactiveArmProperties(
                     filter,
                     kind,
@@ -107,10 +108,6 @@ internal static class QueryFilterInvariants
                     hasValues: false,
                     hasChildren: true,
                     hasIgnoreCase: false);
-                break;
-            case QueryFilterKind.And:
-            case QueryFilterKind.Or:
-                RequireBooleanChildren(filter, kind);
                 break;
             case QueryFilterKind.Not:
                 RequireNotChild(filter);
