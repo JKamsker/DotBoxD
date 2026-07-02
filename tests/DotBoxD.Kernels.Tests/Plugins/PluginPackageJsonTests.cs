@@ -1,6 +1,7 @@
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.PluginIpc.Server.Abstractions;
 using DotBoxD.Kernels.Tests._TestSupport;
+using DotBoxD.Plugins;
 using DotBoxD.Plugins.Json;
 
 namespace DotBoxD.Kernels.Tests.Plugins;
@@ -227,6 +228,31 @@ public sealed partial class PluginPackageJsonTests
         var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Import(JsonDamagePackage(
             """{ "name": "MinDamage", "type": "int", "defaultValue": 10001, "min": 0, "max": 10000 }""")));
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK023");
+    }
+
+    [Fact]
+    public void Export_rejects_undefined_indexed_predicate_operator()
+    {
+        var package = FireDamagePluginPackage.Create();
+        var subscription = package.Manifest.Subscriptions[0];
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                Subscriptions =
+                [
+                    subscription with
+                    {
+                        IndexedPredicates =
+                            [new IndexedPredicate("Damage", (IndexPredicateOperator)999, 5, "int")]
+                    }
+                ]
+            }
+        };
+
+        var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Export(invalid));
+
+        Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK046");
     }
 
     private static string JsonDamagePackageWithSettings()
