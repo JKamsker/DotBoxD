@@ -163,16 +163,28 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     /// </summary>
     public async Task StopAsync()
     {
-        await _host.StopAsync().ConfigureAwait(false);
-        DisposeSessionOnce();
-        CompleteLifecycle();
+        try
+        {
+            await _host.StopAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            DisposeSessionOnce();
+            CompleteLifecycle();
+        }
     }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        await _host.DisposeAsync().ConfigureAwait(false);
-        DisposeSessionOnce();
-        CompleteLifecycle();
+        try
+        {
+            await _host.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            DisposeSessionOnce();
+            CompleteLifecycle();
+        }
     }
 }

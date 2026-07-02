@@ -30,12 +30,18 @@ public sealed class PluginConnectionHostLifecycleTests
         using var server = PluginServer.Create();
         var transport = new StopThrowingServerTransport();
         var host = await PluginConnectionHost<object>.StartAsync(server, transport, Configure);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(host.StopAsync);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(host.StopAsync);
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await host.Connected.WaitAsync(Timeout5s));
-        await host.Disconnected.WaitAsync(Timeout5s);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                async () => await host.Connected.WaitAsync(Timeout5s));
+            await host.Disconnected.WaitAsync(Timeout5s);
+        }
+        finally
+        {
+            await DisposeAfterFailedStopAsync(host);
+        }
     }
 
     [Fact]
@@ -56,6 +62,18 @@ public sealed class PluginConnectionHostLifecycleTests
     // A high-entropy pipe name (>= 32 chars with an unguessable random component) so it passes the safe-name
     // validation without opting into unsafe development names.
     private static string FreshPipeName() => "dotboxd-lifecycle-test-" + Guid.NewGuid().ToString("N");
+
+    private static async ValueTask DisposeAfterFailedStopAsync(PluginConnectionHost<object> host)
+    {
+        try
+        {
+            await host.DisposeAsync();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "stop boom")
+        {
+            // The transport intentionally throws on stop; disposal still runs RpcHost's cleanup finally.
+        }
+    }
 
     private sealed class StopThrowingServerTransport : IServerTransport
     {
