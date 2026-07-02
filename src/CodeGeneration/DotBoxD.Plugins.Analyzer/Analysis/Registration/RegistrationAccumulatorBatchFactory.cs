@@ -128,6 +128,7 @@ internal static class RegistrationAccumulatorBatchFactory
                 target.AccumulatorName));
         }
 
+        diagnostics.AddRange(GeneratedMemberCollisionDiagnostics(root, children));
         return new RegistrationChildSelection(
             new EquatableArray<RegistrationChildAccumulatorModel>(children),
             new EquatableArray<PluginKernelDiagnostic>(diagnostics));
@@ -149,8 +150,35 @@ internal static class RegistrationAccumulatorBatchFactory
         return matches;
     }
 
+    private static IEnumerable<PluginKernelDiagnostic> GeneratedMemberCollisionDiagnostics(
+        RegistrationRootAccumulatorModel root,
+        List<RegistrationChildAccumulatorModel> children)
+    {
+        foreach (var group in children.GroupBy(static child => FieldName(child.PropertyName), StringComparer.Ordinal))
+        {
+            var collidingProperties = group
+                .Select(static child => child.PropertyName)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (collidingProperties.Length <= 1)
+            {
+                continue;
+            }
+
+            yield return Diagnostic(
+                root.Location,
+                $"Registration root properties {PropertyList(collidingProperties)} collide on generated backing field '{group.Key}'.");
+        }
+    }
+
     private static string ReceiverList(List<RegistrationAccumulatorTargetModel> matches)
         => string.Join(", ", matches.Select(static match => "'" + match.ReceiverTypeName + "'"));
+
+    private static string PropertyList(IEnumerable<string> propertyNames)
+        => string.Join(", ", propertyNames.Select(static propertyName => "'" + propertyName + "'"));
+
+    private static string FieldName(string propertyName)
+        => "_" + char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
 
     private static HashSet<string> DuplicateKeys(IEnumerable<string> keys)
     {
