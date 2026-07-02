@@ -149,4 +149,12 @@ internal static partial class HookChainModelFactory
         => method.ReceiverType is INamedTypeSymbol receiverType && receiverType.TypeKind != TypeKind.Error
             ? receiverType
             : expressionReceiverType;
+
+    private static string InterceptionFailureDetail(
+        GeneratedRemoteHookChainKind? generatedRemoteKind,
+        ITypeSymbol? projectedTypeSymbol)
+        => generatedRemoteKind is not null &&
+           projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true }
+            ? "anonymous terminal projections on generated-server chains require a named record projection"
+            : "the call site is not interceptable";
 }
