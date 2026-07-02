@@ -149,9 +149,8 @@ public sealed class InstanceRegistry : IInstanceRegistry
 
     // Sub-service instances are connection-scoped and owned by the registry (see IInstanceRegistry),
     // so they are disposed when released. Best-effort: a faulting dispose is reported via diagnostics
-    // but never breaks teardown. IAsyncDisposable is preferred when present; the blocking wait is safe
-    // because DotBoxD runs context-free (ConfigureAwait(false) throughout), so there is no captured
-    // SynchronizationContext to deadlock against.
+    // but never breaks teardown. IAsyncDisposable is preferred when present; run it away from the
+    // caller's SynchronizationContext before blocking so user disposers that capture context can finish.
     private static void DisposeInstance(object instance)
     {
         try
@@ -159,7 +158,7 @@ public sealed class InstanceRegistry : IInstanceRegistry
             switch (instance)
             {
                 case IAsyncDisposable asyncDisposable:
-                    asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    DisposeAsyncSynchronously(asyncDisposable);
                     break;
                 case IDisposable disposable:
                     disposable.Dispose();
@@ -170,6 +169,13 @@ public sealed class InstanceRegistry : IInstanceRegistry
         {
             RpcDiagnostics.Report("Sub-service instance disposal failed", ex);
         }
+    }
+
+    private static void DisposeAsyncSynchronously(IAsyncDisposable asyncDisposable)
+    {
+        Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false))
+            .GetAwaiter()
+            .GetResult();
     }
 
     // Async counterpart of DisposeInstance for the teardown drain: awaits IAsyncDisposable.DisposeAsync
