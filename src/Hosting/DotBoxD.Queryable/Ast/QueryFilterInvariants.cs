@@ -60,6 +60,7 @@ internal static class QueryFilterInvariants
                 break;
             case QueryFilterKind.In:
                 RequireFieldPath(filter, "In");
+                RequireInValues(filter);
                 break;
             case QueryFilterKind.Not:
                 RequireNotChild(filter);
@@ -70,6 +71,18 @@ internal static class QueryFilterInvariants
         {
             var child = filter.Children[i] ?? throw NullChild(kind, i);
             RequireValidShape(child);
+        }
+    }
+
+    private static void RequireInValues(QueryFilter filter)
+    {
+        for (var i = 0; i < filter.Values.Count; i++)
+        {
+            if (filter.Values[i] is null)
+            {
+                throw new InvalidOperationException(
+                    "QueryFilter In nodes require Values to contain only non-null QueryValue elements.");
+            }
         }
     }
 
