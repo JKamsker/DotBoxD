@@ -1,5 +1,4 @@
 using DotBoxD.Codecs.MessagePack;
-using DotBoxD.Services.Client;
 using DotBoxD.Services.Peer;
 using DotBoxD.Services.Protocol;
 using DotBoxD.Services.Server;
