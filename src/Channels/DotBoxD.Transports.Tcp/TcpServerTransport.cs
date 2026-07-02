@@ -33,7 +33,7 @@ public sealed class TcpServerTransport : IServerTransport
     /// </summary>
     public IPEndPoint? LocalEndpoint => _listener?.LocalEndpoint as IPEndPoint;
     /// <summary>
-    /// Inter-read idle timeout applied to accepted connections' in-progress frame reads (slow-loris
+    /// Idle timeout applied to accepted connections' frame reads (slow-loris
     /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
     /// </summary>

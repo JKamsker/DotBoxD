@@ -5,12 +5,19 @@ namespace DotBoxD.Services.Server;
 
 internal sealed class RpcHostPeerCollection
 {
-    private readonly ConcurrentDictionary<RpcPeer, byte> _peers = new();
+    private readonly ConcurrentDictionary<RpcPeer, RpcHostPeerAdmission.RpcHostPeerAdmissionLease> _peers = new();
     private readonly ConcurrentDictionary<Task, byte> _cleanupTasks = new();
 
-    public void Add(RpcPeer peer) => _peers.TryAdd(peer, 0);
+    public bool TryAdd(RpcPeer peer, RpcHostPeerAdmission.RpcHostPeerAdmissionLease admission) =>
+        _peers.TryAdd(peer, admission);
 
-    public void Remove(RpcPeer peer) => _peers.TryRemove(peer, out _);
+    public void Remove(RpcPeer peer)
+    {
+        if (_peers.TryRemove(peer, out var admission))
+        {
+            admission.Dispose();
+        }
+    }
 
     public void DisposeInBackground(RpcPeer peer)
     {
@@ -45,7 +52,18 @@ internal sealed class RpcHostPeerCollection
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        _peers.Clear();
+        ReleaseAll();
+    }
+
+    private void ReleaseAll()
+    {
+        foreach (var pair in _peers)
+        {
+            if (_peers.TryRemove(pair.Key, out var admission))
+            {
+                admission.Dispose();
+            }
+        }
     }
 
     private static async Task DisposeOnePeerAsync(RpcPeer peer)

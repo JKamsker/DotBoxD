@@ -1,23 +1,30 @@
-namespace DotBoxD.Transports.Tcp;
+namespace DotBoxD.Services.Protocol;
 
 internal sealed class FrameReadTimeoutSource : IDisposable
 {
+    public static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(30);
+
     private CancellationTokenSource? _source;
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
 
-    public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName)
+    public static TimeSpan Resolve(TimeSpan? timeout, string parameterName) =>
+        Validate(timeout ?? DefaultIdleTimeout, parameterName);
+
+    public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName) =>
+        Validate(timeout ?? defaultTimeout, parameterName);
+
+    public static TimeSpan Validate(TimeSpan timeout, string parameterName)
     {
-        var value = timeout ?? defaultTimeout;
-        if (value == Timeout.InfiniteTimeSpan ||
-            (value > TimeSpan.Zero && value.TotalMilliseconds <= int.MaxValue))
+        if (timeout == Timeout.InfiniteTimeSpan ||
+            (timeout > TimeSpan.Zero && timeout.TotalMilliseconds <= int.MaxValue))
         {
-            return value;
+            return timeout;
         }
 
         throw new ArgumentOutOfRangeException(
             parameterName,
-            value,
+            timeout,
             "Frame read idle timeout must be positive (at most int.MaxValue ms) or Timeout.InfiniteTimeSpan.");
     }
 
