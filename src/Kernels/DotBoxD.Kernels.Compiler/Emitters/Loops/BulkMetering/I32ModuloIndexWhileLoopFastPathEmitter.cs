@@ -132,6 +132,7 @@ internal sealed class I32ModuloIndexWhileLoopFastPathEmitter
             !IsI32Bound(end) ||
             !TryGetModuloAssignment(totalAssignment, index, out var target, out var divisor) ||
             !TryGetIncrement(indexAssignment, index) ||
+            string.Equals(target, index, StringComparison.Ordinal) ||
             _stackPlan.LocalKind(target) != StackKind.I32 ||
             IsAssignedBound(end, target, index) ||
             divisor <= 0)
