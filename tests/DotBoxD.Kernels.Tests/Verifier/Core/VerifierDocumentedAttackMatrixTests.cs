@@ -10,15 +10,22 @@ namespace DotBoxD.Kernels.Tests.Verifier.Core;
 
 public sealed class VerifierDocumentedAttackMatrixTests
 {
-    public static TheoryData<string, Func<byte[]>, string[]> DocumentedAttackCases()
+    public static TheoryData<string, Func<byte[]>, string[], Func<string, bool>?> DocumentedAttackCases()
         => new() {
-            { "exception handlers", ExceptionHandlerAssembly, ["V-EXCEPTION"] },
-            { "embedded resources", EmbeddedResourceAssembly, ["V-RESOURCE"] },
-            { "Thread.Start", ThreadStartAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
-            { "raw Stream", StreamAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
-            { "IServiceProvider.GetService", ServiceProviderAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"] },
-            { "unmanaged function pointer signature", FunctionPointerSignatureAssembly, ["V-FUNCTION-SIGNATURE"] },
-            { "unmanaged pointer local signature", PointerLocalSignatureAssembly, ["V-FUNCTION-SIGNATURE"] }
+            { "exception handlers", ExceptionHandlerAssembly, ["V-EXCEPTION"], null },
+            { "embedded resources", EmbeddedResourceAssembly, ["V-RESOURCE"], null },
+            { "Thread.Start", ThreadStartAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"], null },
+            { "raw Stream", StreamAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"], null },
+            { "IServiceProvider.GetService", ServiceProviderAssembly, ["V-TYPE-FORBIDDEN", "V-MEMBER"], null },
+            { "unmanaged function pointer signature", FunctionPointerSignatureAssembly, ["V-FUNCTION-SIGNATURE"], null },
+            { "unmanaged pointer local signature", PointerLocalSignatureAssembly, ["V-FUNCTION-SIGNATURE"], null },
+            {
+                "unmetered type array allocation",
+                TypeArrayAllocationAssembly,
+                ["V-COMPILED-SHAPE", "V-MEMBER"],
+                static message => message.Contains("CreateTypeArray", StringComparison.Ordinal) ||
+                                  message.Contains("type array", StringComparison.OrdinalIgnoreCase)
+            }
         };
 
     [Theory]
@@ -26,12 +33,15 @@ public sealed class VerifierDocumentedAttackMatrixTests
     public async Task Verifier_rejects_documented_boundary_attacks(
         string name,
         Func<byte[]> build,
-        string[] expectedCodes)
+        string[] expectedCodes,
+        Func<string, bool>? messagePredicate)
     {
         var result = await VerifierTestHelpers.VerifyAsync(build());
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => expectedCodes.Contains(d.Code));
+        Assert.Contains(result.Diagnostics, d =>
+            expectedCodes.Contains(d.Code) &&
+            (messagePredicate is null || messagePredicate(d.Message)));
         Assert.NotEmpty(name);
     }
 
@@ -164,6 +174,38 @@ public sealed class VerifierDocumentedAttackMatrixTests
 
         return output.ToArray();
     }
+
+    private static byte[] TypeArrayAllocationAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldc_I4, 10_000_000);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.CreateTypeArray))!);
+            fnIl.Emit(OpCodes.Pop);
+            fnIl.Emit(OpCodes.Ldc_I4_0);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var execute = DefineExecute(type);
+            var executeIl = execute.GetILGenerator();
+            executeIl.Emit(OpCodes.Ldarg_1);
+            executeIl.Emit(OpCodes.Ldc_I4_0);
+            executeIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            executeIl.Emit(OpCodes.Ldarg_0);
+            executeIl.Emit(OpCodes.Call, fn);
+            executeIl.Emit(OpCodes.Ret);
+        });
 
     private static byte[] PointerLocalSignatureAssembly()
         => VerifierTestHelpers.BuildGeneratedAssembly(type =>
