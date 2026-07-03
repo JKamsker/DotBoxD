@@ -20,7 +20,7 @@ public sealed partial class PluginPackageJsonTests
         var ex = Assert.Throws<SandboxValidationException>(() => PluginPackageJsonSerializer.Export(invalid));
 
         Assert.Contains(ex.Diagnostics, d =>
-            d.Code == "E-JSON-EXPORT" &&
+            d.Code == "DBXK045" &&
             d.Message.Contains("requiredCapabilities", StringComparison.Ordinal) &&
             d.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
     }
