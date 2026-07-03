@@ -22,7 +22,10 @@ internal static partial class PluginServerFacadeModelFactory
         try
         {
             var model = CreateModel(type, context.SemanticModel.Compilation, cancellationToken);
-            return new PluginServerFacadeResult(PluginServerFacadeEmitter.Emit(model), null);
+            var diagnostic = GeneratedWrapperSurfaceCollisionMessage(model.WorldServiceWrappers, model.Controls) is { } message
+                ? PluginKernelDiagnostic.Create(declaration.Identifier, message)
+                : null;
+            return new PluginServerFacadeResult(PluginServerFacadeEmitter.Emit(model), diagnostic);
         }
         catch (NotSupportedException ex)
         {
