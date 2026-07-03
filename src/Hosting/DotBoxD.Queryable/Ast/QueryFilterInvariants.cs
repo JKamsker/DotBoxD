@@ -220,7 +220,7 @@ internal static class QueryFilterInvariants
             $"QueryFilter {kind} nodes require a non-empty Field path with identifier segments.");
     }
 
-    private static bool IsValidFieldPath(string field)
+    internal static bool IsValidFieldPath(string field)
     {
         if (string.IsNullOrEmpty(field))
         {

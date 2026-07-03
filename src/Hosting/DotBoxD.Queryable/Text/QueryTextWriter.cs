@@ -62,7 +62,8 @@ internal static class QueryTextWriter
 
     private static void WriteLeaf(QueryFilter filter, StringBuilder builder, string op, Action<QueryValue> writeValue)
     {
-        builder.Append(filter.Field).Append(' ');
+        WriteField(filter.Field, builder);
+        builder.Append(' ');
         if (filter.IgnoreCase)
         {
             builder.Append('~');
@@ -74,7 +75,8 @@ internal static class QueryTextWriter
 
     private static void WriteIn(QueryFilter filter, StringBuilder builder)
     {
-        builder.Append(filter.Field).Append(' ');
+        WriteField(filter.Field, builder);
+        builder.Append(' ');
         if (filter.IgnoreCase)
         {
             builder.Append('~');
@@ -92,6 +94,17 @@ internal static class QueryTextWriter
         }
 
         builder.Append(']');
+    }
+
+    private static void WriteField(string field, StringBuilder builder)
+    {
+        if (field == "not")
+        {
+            WriteString(field, builder);
+            return;
+        }
+
+        builder.Append(field);
     }
 
     private static void Write(QueryValue value, StringBuilder builder)
