@@ -6,6 +6,17 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 
 internal static partial class HookChainModelFactory
 {
+    private static void RejectUnsupportedProjectedType(
+        HookChainInterceptorInstallKind installKind,
+        ITypeSymbol? projectedType,
+        SimpleNameSyntax terminalName)
+    {
+        if (installKind == HookChainInterceptorInstallKind.LocalCallback)
+        {
+            RejectFileLocalProjectedType(projectedType, terminalName);
+        }
+    }
+
     private static void RejectFileLocalProjectedType(ITypeSymbol? projectedType, SimpleNameSyntax terminalName)
     {
         if (projectedType is null ||

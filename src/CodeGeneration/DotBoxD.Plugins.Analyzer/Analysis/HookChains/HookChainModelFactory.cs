@@ -50,10 +50,7 @@ internal static partial class HookChainModelFactory
         }
         catch (UnsupportedHookChainEventTypeException ex)
         {
-            return new HookChainCreateResult(
-                null,
-                null,
-                new PluginKernelDiagnostic(ex.Message, ex.Location));
+            return new HookChainCreateResult(null, null, new PluginKernelDiagnostic(ex.Message, ex.Location));
         }
         catch (HookChainUnsupportedDiagnosticException ex)
         {
@@ -219,10 +216,7 @@ internal static partial class HookChainModelFactory
         // no Select. Anonymous projections are not source-nameable, so interception needs this symbol even for
         // ordinary remote Run chains to emit a generic interceptor and let Roslyn infer the anonymous argument.
         var projectedTypeSymbol = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
-        if (installKind == HookChainInterceptorInstallKind.LocalCallback)
-        {
-            RejectFileLocalProjectedType(projectedTypeSymbol, terminalAccess.Name);
-        }
+        RejectUnsupportedProjectedType(installKind.Value, projectedTypeSymbol, terminalAccess.Name);
 
         // An anonymous type CAN be the terminal (pushed) projection — it has a real metadata identity Roslyn can
         // infer as a type ARGUMENT — but it has no C#-source-nameable name. The interceptor handles it by binding
