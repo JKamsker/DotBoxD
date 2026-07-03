@@ -6,14 +6,14 @@ namespace DotBoxD.Hosting.Execution;
 
 internal sealed class HostServiceCallTarget
 {
-    private static readonly ConcurrentDictionary<Type, Func<object?, ValueTask<object?>>> ReturnReaders = new();
+    private static readonly ConcurrentDictionary<Type, Func<object?, CancellationToken, ValueTask<object?>>> ReturnReaders = new();
     private static readonly MethodInfo ReadGenericTaskMethod =
         typeof(HostServiceCallTarget).GetMethod(nameof(ReadGenericTaskAsync), BindingFlags.Static | BindingFlags.NonPublic)!;
     private static readonly MethodInfo ReadGenericValueTaskMethod =
         typeof(HostServiceCallTarget).GetMethod(nameof(ReadGenericValueTaskAsync), BindingFlags.Static | BindingFlags.NonPublic)!;
 
     private readonly Func<object?, object?[], object?> _invoke;
-    private readonly Func<object?, ValueTask<object?>> _readReturn;
+    private readonly Func<object?, CancellationToken, ValueTask<object?>> _readReturn;
 
     public HostServiceCallTarget(MethodInfo method)
     {
@@ -32,8 +32,8 @@ internal sealed class HostServiceCallTarget
     public object? Invoke(object? target, object?[] arguments)
         => _invoke(target, arguments);
 
-    public ValueTask<object?> ReadReturnAsync(object? result)
-        => _readReturn(result);
+    public ValueTask<object?> ReadReturnAsync(object? result, CancellationToken cancellationToken)
+        => _readReturn(result, cancellationToken);
 
     public static bool IsTaskLike(Type type)
         => type == typeof(Task) ||
@@ -89,11 +89,11 @@ internal sealed class HostServiceCallTarget
         }
     }
 
-    private static Func<object?, ValueTask<object?>> CreateReturnReader(Type returnType)
+    private static Func<object?, CancellationToken, ValueTask<object?>> CreateReturnReader(Type returnType)
     {
         if (returnType == typeof(void))
         {
-            return static _ => ValueTask.FromResult<object?>(null);
+            return static (_, _) => ValueTask.FromResult<object?>(null);
         }
 
         if (returnType == typeof(ValueTask))
@@ -108,38 +108,67 @@ internal sealed class HostServiceCallTarget
 
         if (IsGenericValueTask(returnType))
         {
-            return (Func<object?, ValueTask<object?>>)ReadGenericValueTaskMethod
+            return (Func<object?, CancellationToken, ValueTask<object?>>)ReadGenericValueTaskMethod
                 .MakeGenericMethod(returnType.GetGenericArguments()[0])
-                .CreateDelegate(typeof(Func<object?, ValueTask<object?>>));
+                .CreateDelegate(typeof(Func<object?, CancellationToken, ValueTask<object?>>));
         }
 
         if (IsGenericTask(returnType))
         {
-            return (Func<object?, ValueTask<object?>>)ReadGenericTaskMethod
+            return (Func<object?, CancellationToken, ValueTask<object?>>)ReadGenericTaskMethod
                 .MakeGenericMethod(returnType.GetGenericArguments()[0])
-                .CreateDelegate(typeof(Func<object?, ValueTask<object?>>));
+                .CreateDelegate(typeof(Func<object?, CancellationToken, ValueTask<object?>>));
         }
 
-        return static result => ValueTask.FromResult(result);
+        return static (result, _) => ValueTask.FromResult(result);
     }
 
-    private static async ValueTask<object?> ReadValueTaskAsync(object? result)
+    private static async ValueTask<object?> ReadValueTaskAsync(object? result, CancellationToken cancellationToken)
     {
-        await ((ValueTask)result!).ConfigureAwait(false);
+        var valueTask = (ValueTask)result!;
+        if (valueTask.IsCompleted)
+        {
+            await valueTask.ConfigureAwait(false);
+            return null;
+        }
+
+        await valueTask.AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
         return null;
     }
 
-    private static async ValueTask<object?> ReadTaskAsync(object? result)
+    private static async ValueTask<object?> ReadTaskAsync(object? result, CancellationToken cancellationToken)
     {
-        await ((Task)result!).ConfigureAwait(false);
+        var task = (Task)result!;
+        if (task.IsCompleted)
+        {
+            await task.ConfigureAwait(false);
+            return null;
+        }
+
+        await task.WaitAsync(cancellationToken).ConfigureAwait(false);
         return null;
     }
 
-    private static async ValueTask<object?> ReadGenericValueTaskAsync<T>(object? result)
-        => await ((ValueTask<T>)result!).ConfigureAwait(false);
+    private static async ValueTask<object?> ReadGenericValueTaskAsync<T>(
+        object? result,
+        CancellationToken cancellationToken)
+    {
+        var valueTask = (ValueTask<T>)result!;
+        if (valueTask.IsCompleted)
+        {
+            return await valueTask.ConfigureAwait(false);
+        }
 
-    private static async ValueTask<object?> ReadGenericTaskAsync<T>(object? result)
-        => await ((Task<T>)result!).ConfigureAwait(false);
+        return await valueTask.AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<object?> ReadGenericTaskAsync<T>(object? result, CancellationToken cancellationToken)
+    {
+        var task = (Task<T>)result!;
+        return task.IsCompleted
+            ? await task.ConfigureAwait(false)
+            : await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     private static bool IsGenericTask(Type type)
         => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>);
