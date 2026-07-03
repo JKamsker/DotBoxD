@@ -30,11 +30,17 @@ internal static class PluginPackageValidator
 
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
         ValidateManifestMode(package.Manifest, diagnostics);
+        var hasModuleCollectionErrors = ValidateModuleCollections(package.Module, diagnostics);
         if (package.Manifest.RpcEntrypoint is not null)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK073",
                 "Hook kernel manifests must not declare rpcEntrypoint."));
+        }
+
+        if (hasModuleCollectionErrors)
+        {
+            ThrowIfErrors(diagnostics);
         }
 
         PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
@@ -107,6 +113,34 @@ internal static class PluginPackageValidator
 
         PluginManifestTextValidator.ValidateText(metadataKernel, "kernel metadata", diagnostics);
         return metadataKernel;
+    }
+
+    private static bool ValidateModuleCollections(SandboxModule module, List<SandboxDiagnostic> diagnostics)
+    {
+        var hasErrors = false;
+        for (var i = 0; i < module.CapabilityRequests.Count; i++)
+        {
+            if (module.CapabilityRequests[i] is null)
+            {
+                hasErrors = true;
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK045",
+                    $"Plugin module capabilityRequests entry at index {i} must not be null."));
+            }
+        }
+
+        for (var i = 0; i < module.Functions.Count; i++)
+        {
+            if (module.Functions[i] is null)
+            {
+                hasErrors = true;
+                diagnostics.Add(new SandboxDiagnostic(
+                    "DBXK045",
+                    $"Plugin module functions entry at index {i} must not be null."));
+            }
+        }
+
+        return hasErrors;
     }
 
     private static void ValidateIndexedPredicates(
