@@ -28,7 +28,7 @@ public abstract class RpcStreamAttachment
             throw new ArgumentNullException(nameof(stream));
         }
 
-        RequireKind(handle, RpcStreamKind.Binary);
+        RequireHandle(handle, RpcStreamKind.Binary);
         return new StreamAttachment(handle, stream, leaveOpen);
     }
 
@@ -42,7 +42,7 @@ public abstract class RpcStreamAttachment
             throw new ArgumentNullException(nameof(pipe));
         }
 
-        RequireKind(handle, RpcStreamKind.Binary);
+        RequireHandle(handle, RpcStreamKind.Binary);
         return new PipeAttachment(handle, pipe, completeReader);
     }
 
@@ -55,7 +55,7 @@ public abstract class RpcStreamAttachment
             throw new ArgumentNullException(nameof(source));
         }
 
-        RequireKind(handle, RpcStreamKind.Items);
+        RequireHandle(handle, RpcStreamKind.Items);
         return new AsyncEnumerableAttachment<T>(handle, source);
     }
 
@@ -85,8 +85,13 @@ public abstract class RpcStreamAttachment
         }
     }
 
-    private static void RequireKind(RpcStreamHandle handle, RpcStreamKind expected)
+    private static void RequireHandle(RpcStreamHandle handle, RpcStreamKind expected)
     {
+        if (handle.StreamId <= 0)
+        {
+            throw new ArgumentException("Stream handle stream id must be positive.", nameof(handle));
+        }
+
         if (handle.Kind != expected)
         {
             throw new ArgumentException($"Stream handle kind must be {expected}.", nameof(handle));
