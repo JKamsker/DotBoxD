@@ -99,6 +99,61 @@ public sealed class AccumulatorClosedFormGuardTests
         Assert.Equal(0, context.Budget.FuelUsed);
     }
 
+    [Fact]
+    public void Modulo_branch_can_use_rejects_cumulative_fuel_exhaustion()
+    {
+        var context = Context(maxFuel: 12);
+
+        var canUse = CompiledRuntime.CanUseModuloBranchAccumulatorRaw(
+            context,
+            current: 0,
+            iterations: 1,
+            divisor: 1,
+            match: 0,
+            thenDelta: 0,
+            elseDelta: 0,
+            loopFuel: 10,
+            thenFuel: 3,
+            elseFuel: 3);
+
+        Assert.False(canUse);
+        Assert.Equal(0, context.Budget.LoopIterations);
+        Assert.Equal(0, context.Budget.FuelUsed);
+    }
+
+    [Fact]
+    public void Modulo_index_can_use_rejects_cumulative_fuel_exhaustion()
+    {
+        var context = Context(maxFuel: 16);
+
+        var canUse = CompiledRuntime.CanUseModuloIndexAccumulatorRaw(
+            context,
+            current: 0,
+            index: 0,
+            end: 1,
+            divisor: 7,
+            conditionFuel: 3,
+            loopFuel: 14);
+
+        Assert.False(canUse);
+        Assert.Equal(0, context.Budget.LoopIterations);
+        Assert.Equal(0, context.Budget.FuelUsed);
+    }
+
+    [Fact]
+    public async Task Modulo_index_overflow_fallback_matches_failure_accounting()
+    {
+        var interpreted = await RunAsync(ModuloIndexOverflowModuleJson(), ExecutionMode.Interpreted, 0);
+        var compiled = await RunAsync(ModuloIndexOverflowModuleJson(), ExecutionMode.Compiled, 0);
+
+        Assert.False(interpreted.Succeeded);
+        Assert.False(compiled.Succeeded);
+        Assert.Equal(SandboxErrorCode.InvalidInput, interpreted.Error!.Code);
+        Assert.Equal(SandboxErrorCode.InvalidInput, compiled.Error!.Code);
+        Assert.Equal(interpreted.ResourceUsage.LoopIterations, compiled.ResourceUsage.LoopIterations);
+        Assert.Equal(interpreted.ResourceUsage.FuelUsed, compiled.ResourceUsage.FuelUsed);
+    }
+
     private static async Task<SandboxExecutionResult> RunAsync(
         string moduleJson,
         ExecutionMode mode,
@@ -137,9 +192,9 @@ public sealed class AccumulatorClosedFormGuardTests
             .ToArray();
     }
 
-    private static SandboxContext Context()
+    private static SandboxContext Context(long maxFuel = 1_000_000)
     {
-        var limits = new ResourceLimits(MaxFuel: 1_000_000, MaxLoopIterations: 1_000_000);
+        var limits = new ResourceLimits(MaxFuel: maxFuel, MaxLoopIterations: 1_000_000);
         return new SandboxContext(
             SandboxRunId.New(),
             SandboxPolicyBuilder.Create().Build() with { ResourceLimits = limits },
@@ -194,6 +249,33 @@ public sealed class AccumulatorClosedFormGuardTests
                   { "op": "set", "name": "i", "value": { "op": "add", "left": { "var": "i" }, "right": { "i32": 1 } } }
                 ] },
               { "op": "return", "value": { "var": "i" } }
+            ]
+          }]
+        }
+        """;
+
+    private static string ModuloIndexOverflowModuleJson()
+        => """
+        {
+          "id": "modulo-index-overflow-fallback",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [{ "name": "unused", "type": "I32" }],
+            "returnType": "I32",
+            "body": [
+              { "op": "set", "name": "i", "value": { "i32": 2147483646 } },
+              { "op": "set", "name": "total", "value": { "i32": 9 } },
+              { "op": "while", "condition": { "op": "lt", "left": { "var": "i" }, "right": { "i32": 2147483647 } },
+                "body": [
+                  { "op": "set", "name": "total", "value": {
+                    "op": "rem",
+                    "left": { "op": "add", "left": { "var": "total" }, "right": { "var": "i" } },
+                    "right": { "i32": 10 } } },
+                  { "op": "set", "name": "i", "value": { "op": "add", "left": { "var": "i" }, "right": { "i32": 1 } } }
+                ] },
+              { "op": "return", "value": { "var": "total" } }
             ]
           }]
         }

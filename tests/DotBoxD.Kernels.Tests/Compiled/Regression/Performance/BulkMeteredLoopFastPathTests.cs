@@ -12,6 +12,9 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
 public sealed class BulkMeteredLoopFastPathTests
 {
+    // Successful compiled entrypoints spend one extra generated-call fuel unit before optimized loop work.
+    private const long CompiledEntrypointFuelOffset = 1;
+
     [Fact]
     public async Task General_bulk_metered_path_handles_branched_i64_loop()
     {
@@ -21,7 +24,7 @@ public sealed class BulkMeteredLoopFastPathTests
         Assert.True(interpreted.Succeeded, interpreted.Error?.SafeMessage);
         Assert.True(compiled.Succeeded, compiled.Error?.SafeMessage);
         Assert.Equal(interpreted.Value, compiled.Value);
-        Assert.Equal(1, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
+        Assert.Equal(CompiledEntrypointFuelOffset, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
 
         var instructions = await CompileInstructionsAsync(BranchedI64ModuleJson());
         Assert.Contains(instructions, instruction => CallsRuntime(instruction, nameof(CompiledRuntime.MulI64Raw)));
@@ -41,12 +44,28 @@ public sealed class BulkMeteredLoopFastPathTests
         Assert.Equal(
             BitConverter.DoubleToInt64Bits(((F64Value)interpreted.Value!).Value),
             BitConverter.DoubleToInt64Bits(((F64Value)compiled.Value!).Value));
-        Assert.Equal(1, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
+        Assert.Equal(CompiledEntrypointFuelOffset, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
 
         var instructions = await CompileInstructionsAsync(WhileF64ModuleJson());
         Assert.Contains(instructions, instruction => CallsRuntime(instruction, nameof(CompiledRuntime.MulF64Raw)));
         Assert.Contains(instructions, instruction => CallsRuntime(instruction, nameof(CompiledRuntime.AddF64Raw)));
         Assert.DoesNotContain(instructions, instruction => CallsRuntime(instruction, nameof(CompiledRuntime.Add)));
+        Assert.Equal(1, instructions.Count(instruction => CallsRuntime(instruction, nameof(CompiledRuntime.ChargeLoopIteration))));
+    }
+
+    [Fact]
+    public async Task General_bulk_metered_path_matches_body_overflow_failure_accounting()
+    {
+        var interpreted = await RunAsync(BranchedI64OverflowModuleJson(), ExecutionMode.Interpreted, 1);
+        var compiled = await RunAsync(BranchedI64OverflowModuleJson(), ExecutionMode.Compiled, 1);
+
+        AssertError(interpreted, ExecutionMode.Interpreted, SandboxErrorCode.InvalidInput);
+        AssertError(compiled, ExecutionMode.Compiled, SandboxErrorCode.InvalidInput);
+        Assert.Equal(interpreted.ResourceUsage.LoopIterations, compiled.ResourceUsage.LoopIterations);
+        Assert.Equal(interpreted.ResourceUsage.FuelUsed, compiled.ResourceUsage.FuelUsed);
+
+        var instructions = await CompileInstructionsAsync(BranchedI64OverflowModuleJson());
+        Assert.Contains(instructions, instruction => CallsRuntime(instruction, nameof(CompiledRuntime.AddI64Raw)));
         Assert.Equal(1, instructions.Count(instruction => CallsRuntime(instruction, nameof(CompiledRuntime.ChargeLoopIteration))));
     }
 
@@ -88,6 +107,13 @@ public sealed class BulkMeteredLoopFastPathTests
             .ToArray();
     }
 
+    private static void AssertError(SandboxExecutionResult result, ExecutionMode mode, SandboxErrorCode code)
+    {
+        Assert.False(result.Succeeded);
+        Assert.Equal(code, result.Error!.Code);
+        Assert.Equal(mode, result.ActualMode);
+    }
+
     private static string BranchedI64ModuleJson()
         => """
         {
@@ -112,6 +138,33 @@ public sealed class BulkMeteredLoopFastPathTests
                     "op": "rem",
                     "left": { "op": "add", "left": { "op": "mul", "left": { "var": "total" }, "right": { "i64": 3 } }, "right": { "i64": 11 } },
                     "right": { "i64": 1000003 } } }]
+                }] },
+              { "op": "return", "value": { "var": "total" } }
+            ]
+          }]
+        }
+        """;
+
+    private static string BranchedI64OverflowModuleJson()
+        => """
+        {
+          "id": "bulk-branched-i64-overflow",
+          "version": "1.0.0",
+          "functions": [{
+            "id": "main",
+            "visibility": "entrypoint",
+            "parameters": [{ "name": "iterations", "type": "I32" }],
+            "returnType": "I64",
+            "body": [
+              { "op": "set", "name": "total", "value": { "i64": 9223372036854775807 } },
+              { "op": "forRange", "local": "i", "start": { "i32": 0 }, "end": { "var": "iterations" },
+                "body": [{
+                  "op": "if",
+                  "condition": { "op": "lt", "left": { "var": "i" }, "right": { "i32": 1 } },
+                  "then": [{ "op": "set", "name": "total", "value": {
+                    "op": "add", "left": { "var": "total" }, "right": { "i64": 1 } } }],
+                  "else": [{ "op": "set", "name": "total", "value": {
+                    "op": "add", "left": { "var": "total" }, "right": { "i64": 0 } } }]
                 }] },
               { "op": "return", "value": { "var": "total" } }
             ]

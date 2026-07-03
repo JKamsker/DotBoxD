@@ -18,8 +18,7 @@ public static partial class CompiledRuntime
     {
         if (iterations <= 0 ||
             divisor <= 0 ||
-            !SameDirection(thenDelta, elseDelta) ||
-            !context.CanBulkChargeLoopIterations(iterations, loopFuel))
+            !SameDirection(thenDelta, elseDelta))
         {
             return false;
         }
@@ -28,7 +27,7 @@ public static partial class CompiledRuntime
         var elseCount = iterations - thenCount;
         return TryAddScaled(current, thenDelta, thenCount, elseDelta, elseCount, out _) &&
                TryGetBranchFuel(thenCount, thenFuel, elseCount, elseFuel, out var branchFuel) &&
-               context.CanBulkChargeFuel(branchFuel, 1);
+               CanUseCombinedLoopAndFuelBudget(context, iterations, loopFuel, branchFuel);
     }
 
     public static int AddModuloBranchDeltasI32LoopRaw(
@@ -83,8 +82,8 @@ public static partial class CompiledRuntime
                current >= 0 &&
                current < divisor &&
                (long)divisor - 1 + end - 1 <= int.MaxValue &&
-               context.CanBulkChargeFuel(conditionFuel, iterationCount + 1) &&
-               context.CanBulkChargeLoopIterations(iterationCount, loopFuel);
+               TryGetScaledFuel(conditionFuel, iterationCount + 1, out var conditionFuelTotal) &&
+               CanUseCombinedLoopAndFuelBudget(context, iterationCount, loopFuel, conditionFuelTotal);
     }
 
     public static int AddModuloIndexAccumulatorI32LoopRaw(
@@ -155,6 +154,55 @@ public static partial class CompiledRuntime
 
     private static bool SameDirection(int left, int right)
         => left == 0 || right == 0 || left > 0 == right > 0;
+
+    private static bool CanUseCombinedLoopAndFuelBudget(
+        SandboxContext context,
+        long iterations,
+        int loopFuel,
+        long extraFuel)
+        => TryGetCombinedFuel(iterations, loopFuel, extraFuel, out var totalFuel) &&
+           context.CanBulkChargeLoopIterations(iterations, loopFuel) &&
+           context.CanBulkChargeFuel(totalFuel, 1);
+
+    private static bool TryGetCombinedFuel(long iterations, int loopFuel, long extraFuel, out long fuel)
+    {
+        if (iterations < 0 || loopFuel <= 0 || extraFuel < 0)
+        {
+            fuel = 0;
+            return false;
+        }
+
+        try
+        {
+            fuel = checked(iterations * loopFuel + extraFuel);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            fuel = 0;
+            return false;
+        }
+    }
+
+    private static bool TryGetScaledFuel(long fuelPerUnit, long units, out long fuel)
+    {
+        if (fuelPerUnit < 0 || units < 0)
+        {
+            fuel = 0;
+            return false;
+        }
+
+        try
+        {
+            fuel = checked(fuelPerUnit * units);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            fuel = 0;
+            return false;
+        }
+    }
 
     private static bool TryAddScaled(
         int current,

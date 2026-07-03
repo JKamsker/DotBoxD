@@ -14,6 +14,9 @@ namespace DotBoxD.Kernels.Tests.Compiled.Regression.Performance;
 
 public sealed class AccumulatorClosedFormParityTests
 {
+    // Successful compiled entrypoints spend one extra generated-call fuel unit before optimized loop work.
+    private const long CompiledEntrypointFuelOffset = 1;
+
     [Fact]
     public async Task Modulo_branch_accumulator_uses_closed_form_and_matches_interpreter()
     {
@@ -24,7 +27,7 @@ public sealed class AccumulatorClosedFormParityTests
         Assert.True(compiled.Succeeded, compiled.Error?.SafeMessage);
         Assert.Equal(7, ((I32Value)compiled.Value!).Value);
         Assert.Equal(interpreted.Value, compiled.Value);
-        Assert.Equal(1, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
+        Assert.Equal(CompiledEntrypointFuelOffset, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
 
         var instructions = await CompileInstructionsAsync(ModuloBranchModuleJson());
         Assert.Contains(instructions, i => CallsRuntime(i, nameof(CompiledRuntime.AddModuloBranchDeltasI32LoopRaw)));
@@ -52,7 +55,7 @@ public sealed class AccumulatorClosedFormParityTests
         Assert.True(compiled.Succeeded, compiled.Error?.SafeMessage);
         Assert.Equal(28, ((I32Value)compiled.Value!).Value);
         Assert.Equal(interpreted.Value, compiled.Value);
-        Assert.Equal(1, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
+        Assert.Equal(CompiledEntrypointFuelOffset, compiled.ResourceUsage.FuelUsed - interpreted.ResourceUsage.FuelUsed);
 
         var instructions = await CompileInstructionsAsync(ModuloIndexWhileModuleJson(initialTotal: 0, divisor: 1_000_003));
         Assert.Contains(instructions, i => CallsRuntime(i, nameof(CompiledRuntime.AddModuloIndexAccumulatorI32LoopRaw)));
