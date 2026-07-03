@@ -27,6 +27,16 @@ internal static partial class PluginServerFacadeModelFactory
         return worldType;
     }
 
+    private static void ValidateWorldType(INamedTypeSymbol serverType, INamedTypeSymbol worldType)
+    {
+        if (worldType.IsFileLocal)
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server '{serverType.Name}' world interface '{worldType.ToDisplayString()}' " +
+                "is file-local and cannot be named from the generated facade.");
+        }
+    }
+
     private static INamedTypeSymbol? ResolveControlService(
         INamedTypeSymbol serverType,
         Compilation compilation,

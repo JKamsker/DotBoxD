@@ -31,11 +31,11 @@ internal static class RegistrationAccumulatorModelFactory
 
         try
         {
-            EnsureTopLevel(type);
+            EnsureSupportedReceiverType(type, declaration);
             var attribute = context.Attributes[0];
             var accumulatorName = RequiredStringArgument(attribute, 0, "accumulator name");
             var methodName = RequiredStringArgument(attribute, 1, "method name");
-            ValidateIdentifier(accumulatorName, "Accumulator");
+            ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
             ValidateIdentifier(methodName, "Registration method");
             ValidateGeneratedTypeName(type, accumulatorName);
 
@@ -70,9 +70,9 @@ internal static class RegistrationAccumulatorModelFactory
 
         try
         {
-            EnsureTopLevel(type);
+            EnsureSupportedReceiverType(type, declaration);
             var accumulatorName = RequiredStringArgument(context.Attributes[0], 0, "accumulator name");
-            ValidateIdentifier(accumulatorName, "Accumulator");
+            ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
             ValidateGeneratedTypeName(type, accumulatorName);
             var model = new RegistrationRootAccumulatorModel(
                 Namespace(type),
@@ -88,12 +88,17 @@ internal static class RegistrationAccumulatorModelFactory
         }
     }
 
-    private static void EnsureTopLevel(INamedTypeSymbol type)
+    private static void EnsureSupportedReceiverType(INamedTypeSymbol type, TypeDeclarationSyntax declaration)
     {
         if (type.ContainingType is not null)
         {
             throw new NotSupportedException(
                 $"Registration accumulator generation supports top-level control types; '{type.ToDisplayString()}' is nested.");
+        }
+
+        if (declaration.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.FileKeyword)))
+        {
+            throw new NotSupportedException($"Registration accumulator generation cannot reference file-local control type '{declaration.Identifier.ValueText}' from a separate generated file.");
         }
     }
 
@@ -109,9 +114,9 @@ internal static class RegistrationAccumulatorModelFactory
         return value;
     }
 
-    private static void ValidateIdentifier(string value, string label)
+    private static void ValidateIdentifier(string value, string label, bool allowEscaped = true)
     {
-        if (!SyntaxFacts.IsValidIdentifier(value))
+        if (!SyntaxFacts.IsValidIdentifier(value) || (!allowEscaped && RequiresEscaping(value)))
         {
             throw new NotSupportedException($"{label} name '{value}' is not a valid C# identifier.");
         }
@@ -271,14 +276,12 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static string Identifier(string name)
     {
-        var kind = SyntaxFacts.GetKeywordKind(name);
-        if (kind == SyntaxKind.None)
-        {
-            kind = SyntaxFacts.GetContextualKeywordKind(name);
-        }
-
-        return kind == SyntaxKind.None ? name : "@" + name;
+        return RequiresEscaping(name) ? "@" + name : name;
     }
+
+    private static bool RequiresEscaping(string name)
+        => SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ||
+           SyntaxFacts.GetContextualKeywordKind(name) != SyntaxKind.None;
 
     private static void ValidateGeneratedTypeName(INamedTypeSymbol receiverType, string generatedName)
     {

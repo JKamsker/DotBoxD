@@ -166,7 +166,7 @@ public sealed class RemoteLocalHandlerRegistry
     {
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(context);
-        cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfDispatchCanceled(context, cancellationToken);
 
         if (!_handlers.TryGetValue(subscriptionId, out var handler))
         {
@@ -185,7 +185,7 @@ public sealed class RemoteLocalHandlerRegistry
     {
         ArgumentException.ThrowIfNullOrEmpty(subscriptionId);
         ArgumentNullException.ThrowIfNull(context);
-        cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfDispatchCanceled(context, cancellationToken);
 
         if (!_resultHandlers.TryGetValue(subscriptionId, out var handler))
         {
@@ -194,6 +194,12 @@ public sealed class RemoteLocalHandlerRegistry
         }
 
         return await handler.Invoke(contextValue, context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ThrowIfDispatchCanceled(HookContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        context.CancellationToken.ThrowIfCancellationRequested();
     }
 
     /// <summary>Removes the handler for <paramref name="subscriptionId"/>. Returns <c>true</c> if one was present.</summary>

@@ -78,6 +78,7 @@ public sealed class QueryFilterJsonConverter : JsonConverter<QueryFilter>
     {
         var kind = Deserialize<QueryFilterKind>(element, "kind", options);
         var ignoreCase = element.TryGetProperty("ignoreCase", out var ic) && ic.GetBoolean();
+        RejectInactiveArmProperties(element, kind);
         return kind switch
         {
             QueryFilterKind.MatchAll => QueryFilter.MatchAll,
@@ -117,6 +118,59 @@ public sealed class QueryFilterJsonConverter : JsonConverter<QueryFilter>
         }
 
         return values;
+    }
+
+    private static void RejectInactiveArmProperties(JsonElement element, QueryFilterKind kind)
+    {
+        switch (kind)
+        {
+            case QueryFilterKind.MatchAll:
+                RejectInactiveArmProperty(element, kind, "path");
+                RejectInactiveArmProperty(element, kind, "op");
+                RejectInactiveArmProperty(element, kind, "value");
+                RejectInactiveArmProperty(element, kind, "values");
+                RejectInactiveArmProperty(element, kind, "terms");
+                RejectInactiveArmProperty(element, kind, "term");
+                RejectInactiveArmProperty(element, kind, "ignoreCase");
+                break;
+            case QueryFilterKind.Compare:
+                RejectInactiveArmProperty(element, kind, "values");
+                RejectInactiveArmProperty(element, kind, "terms");
+                RejectInactiveArmProperty(element, kind, "term");
+                break;
+            case QueryFilterKind.In:
+                RejectInactiveArmProperty(element, kind, "op");
+                RejectInactiveArmProperty(element, kind, "value");
+                RejectInactiveArmProperty(element, kind, "terms");
+                RejectInactiveArmProperty(element, kind, "term");
+                break;
+            case QueryFilterKind.And:
+            case QueryFilterKind.Or:
+                RejectInactiveArmProperty(element, kind, "path");
+                RejectInactiveArmProperty(element, kind, "op");
+                RejectInactiveArmProperty(element, kind, "value");
+                RejectInactiveArmProperty(element, kind, "values");
+                RejectInactiveArmProperty(element, kind, "term");
+                RejectInactiveArmProperty(element, kind, "ignoreCase");
+                break;
+            case QueryFilterKind.Not:
+                RejectInactiveArmProperty(element, kind, "path");
+                RejectInactiveArmProperty(element, kind, "op");
+                RejectInactiveArmProperty(element, kind, "value");
+                RejectInactiveArmProperty(element, kind, "values");
+                RejectInactiveArmProperty(element, kind, "terms");
+                RejectInactiveArmProperty(element, kind, "ignoreCase");
+                break;
+        }
+    }
+
+    private static void RejectInactiveArmProperty(JsonElement element, QueryFilterKind kind, string property)
+    {
+        if (element.TryGetProperty(property, out _))
+        {
+            throw new JsonException(
+                $"QueryFilter {kind} JSON cannot carry inactive union-arm property '{property}'.");
+        }
     }
 
     private static QueryValue ReadValue(JsonElement element, string property, JsonSerializerOptions options)

@@ -16,6 +16,29 @@ internal static class PluginServerGenerationTestDriver
     public static (string Generated, Compilation OutputCompilation) RunWithoutPushdownServices(string source)
         => Run(source, includePushdownServices: false);
 
+    public static (
+        string Generated,
+        Compilation OutputCompilation,
+        IReadOnlyList<Diagnostic> GeneratorDiagnostics) RunWithDiagnostics(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            "DotBoxDPluginServerRegressionTest",
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
+            TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(GeneratePluginServerAttribute).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(PluginPackage).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Peer.RpcPeer).Assembly.Location))
+                .Append(MetadataReference.CreateFromFile(typeof(DotBoxD.Services.Attributes.DotBoxDServiceAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new PluginPackageGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions);
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
+
+        var generated = string.Join("\n", driver.GetRunResult().GeneratedTrees.Select(tree => tree.ToString()));
+        return (generated, outputCompilation, diagnostics);
+    }
+
     private static (string Generated, Compilation OutputCompilation) Run(
         string source,
         bool includePushdownServices)

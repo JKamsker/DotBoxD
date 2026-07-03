@@ -185,4 +185,76 @@ public sealed class PluginServerFacadeRegressionTests
         Assert.Contains("global::Explicit.Control.PluginSettingPatch", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("IGamePluginControlService", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Generated_plugin_server_rejects_file_local_world_interface_without_raw_compiler_errors()
+    {
+        var (_, outputCompilation, generatorDiagnostics) = PluginServerGenerationTestDriver.RunWithDiagnostics("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Regression.Game
+            {
+                [DotBoxDService]
+                file interface IGameWorld;
+            }
+
+            namespace Regression.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                internal interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace Regression.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using Regression.Game;
+
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                internal partial class RemotePluginServer : IGameWorld;
+
+                internal sealed partial class RemotePluginContext;
+            }
+            """);
+
+        var outputDiagnostics = outputCompilation.GetDiagnostics();
+        var reportsFileLocalWorld = generatorDiagnostics.Any(
+            diagnostic =>
+            {
+                var message = diagnostic.GetMessage();
+                return diagnostic.Id == "DBXK100" &&
+                       message.Contains("world", StringComparison.OrdinalIgnoreCase) &&
+                       (message.Contains("file-local", StringComparison.OrdinalIgnoreCase) ||
+                        message.Contains("inaccessible", StringComparison.OrdinalIgnoreCase) ||
+                        message.Contains("cannot be named", StringComparison.OrdinalIgnoreCase));
+            });
+        var leaksGeneratedCompilerError = outputDiagnostics.Any(diagnostic => diagnostic.Id == "CS0234");
+
+        Assert.True(
+            reportsFileLocalWorld && !leaksGeneratedCompilerError,
+            $"""
+            Expected DBXK100 to reject the file-local world interface without leaking CS0234.
+
+            Generator diagnostics:
+            {string.Join("\n", generatorDiagnostics.Select(diagnostic => diagnostic.ToString()))}
+
+            Output diagnostics:
+            {string.Join("\n", outputDiagnostics.Select(diagnostic => diagnostic.ToString()))}
+            """);
+    }
 }

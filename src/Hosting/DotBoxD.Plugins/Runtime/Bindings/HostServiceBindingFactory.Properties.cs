@@ -24,7 +24,7 @@ internal static partial class HostServiceBindingFactory
             returnType,
             effects,
             binding.Capability,
-            binding.IsAsync,
+            binding.IsAsync || IsTaskLike(interfaceProperty.PropertyType),
             (context, args, cancellationToken) =>
                 InvokePropertyAsync(context, args, cancellationToken, binding, effects, callTarget, target, payloadType));
     }
@@ -48,7 +48,7 @@ internal static partial class HostServiceBindingFactory
 
         var startedAt = DateTimeOffset.UtcNow;
         var result = callTarget.Invoke(target, []);
-        var payload = await callTarget.ReadReturnAsync(result).ConfigureAwait(false);
+        var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
         WriteAudit(context, binding.BindingId, binding.Capability, effects, startedAt, firstArgument: null);
         return payloadType is null
             ? SandboxValue.Unit

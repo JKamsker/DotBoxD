@@ -56,6 +56,16 @@ public sealed class CapabilityRevocationTests
     }
 
     [Fact]
+    public void RevokeCapability_after_dispose_throws_ObjectDisposedException()
+    {
+        var host = SandboxTestHost.Create();
+
+        host.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => host.RevokeCapability("log.write", "disabled"));
+    }
+
+    [Fact]
     public async Task Revoked_wildcard_capability_denies_prepared_plan_before_compiled_cache_reuse()
     {
         using var temp = TempDirectory.Create();

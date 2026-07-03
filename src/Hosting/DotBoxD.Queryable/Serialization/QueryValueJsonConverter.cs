@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -23,7 +24,7 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
             JsonTokenType.Null => QueryValue.Null,
             JsonTokenType.True => QueryValue.FromBoolean(true),
             JsonTokenType.False => QueryValue.FromBoolean(false),
-            JsonTokenType.String => QueryValue.FromString(reader.GetString()),
+            JsonTokenType.String => QueryValue.FromString(ReadString(ref reader, "query value")),
             JsonTokenType.Number => ReadNumber(ref reader),
             JsonTokenType.StartObject => ReadTagged(ref reader),
             _ => throw new JsonException($"Unsupported JSON token '{reader.TokenType}' for a query value."),
@@ -49,7 +50,7 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
                 writer.WriteNumberValue(value.Number);
                 break;
             case QueryValueKind.String:
-                writer.WriteStringValue(value.String);
+                WriteStringValue(writer, value.String);
                 break;
             case QueryValueKind.Guid:
                 WriteTagged(writer, "guid", value.Guid.ToString("D"));
@@ -76,6 +77,18 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
         writer.WriteEndObject();
     }
 
+    private static string? ReadString(ref Utf8JsonReader reader, string name)
+    {
+        RejectMalformedEscapedUtf16(ref reader, name);
+        var value = reader.GetString();
+        return RequireWellFormedUtf16(value, name);
+    }
+
+    private static void WriteStringValue(Utf8JsonWriter writer, string? value)
+    {
+        writer.WriteStringValue(RequireWellFormedUtf16(value, "query value"));
+    }
+
     private static QueryValue ReadNumber(ref Utf8JsonReader reader) =>
         reader.TryGetInt64(out var integer)
             ? QueryValue.FromInteger(integer)
@@ -98,11 +111,11 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
             reader.Read();
             if (property == "kind")
             {
-                kind = reader.GetString();
+                kind = ReadString(ref reader, "tagged query value kind");
             }
             else if (property == "value")
             {
-                text = reader.GetString();
+                text = ReadString(ref reader, "tagged query value");
             }
         }
 
@@ -150,4 +163,100 @@ public sealed class QueryValueJsonConverter : JsonConverter<QueryValue>
 
     private static JsonException InvalidTaggedValue(string kind, string text) =>
         new($"Invalid tagged query value '{text}' for kind '{kind}'.");
+
+    private static string? RequireWellFormedUtf16(string? value, string name) =>
+        value is null ? null : EventQueryJsonStringSafety.RequireWellFormedUtf16(value, name);
+
+    private static void RejectMalformedEscapedUtf16(ref Utf8JsonReader reader, string name)
+    {
+        if (reader.HasValueSequence)
+        {
+            var value = reader.ValueSequence.ToArray();
+            RejectMalformedEscapedUtf16(value, name);
+            return;
+        }
+
+        RejectMalformedEscapedUtf16(reader.ValueSpan, name);
+    }
+
+    private static void RejectMalformedEscapedUtf16(ReadOnlySpan<byte> value, string name)
+    {
+        var index = 0;
+        while (index < value.Length)
+        {
+            if (value[index] != (byte)'\\')
+            {
+                index++;
+                continue;
+            }
+
+            index++;
+            if (index >= value.Length)
+            {
+                return;
+            }
+
+            if (value[index] != (byte)'u')
+            {
+                index++;
+                continue;
+            }
+
+            var codeUnit = ReadUnicodeEscape(value, index + 1);
+            if (char.IsHighSurrogate((char)codeUnit))
+            {
+                var nextEscape = index + 5;
+                if (nextEscape + 5 >= value.Length ||
+                    value[nextEscape] != (byte)'\\' ||
+                    value[nextEscape + 1] != (byte)'u')
+                {
+                    throw MalformedUtf16(name);
+                }
+
+                var nextCodeUnit = ReadUnicodeEscape(value, nextEscape + 2);
+                if (!char.IsLowSurrogate((char)nextCodeUnit))
+                {
+                    throw MalformedUtf16(name);
+                }
+
+                index = nextEscape + 6;
+                continue;
+            }
+
+            if (char.IsLowSurrogate((char)codeUnit))
+            {
+                throw MalformedUtf16(name);
+            }
+
+            index += 5;
+        }
+    }
+
+    private static int ReadUnicodeEscape(ReadOnlySpan<byte> value, int hexStart)
+    {
+        var codeUnit = 0;
+        for (var i = 0; i < 4; i++)
+        {
+            var digit = HexValue(value[hexStart + i]);
+            if (digit < 0)
+            {
+                throw new JsonException("Invalid Unicode escape in query value JSON.");
+            }
+
+            codeUnit = (codeUnit << 4) | digit;
+        }
+
+        return codeUnit;
+    }
+
+    private static int HexValue(byte value) => value switch
+    {
+        >= (byte)'0' and <= (byte)'9' => value - (byte)'0',
+        >= (byte)'A' and <= (byte)'F' => value - (byte)'A' + 10,
+        >= (byte)'a' and <= (byte)'f' => value - (byte)'a' + 10,
+        _ => -1,
+    };
+
+    private static Exception MalformedUtf16(string name) =>
+        EventQueryJsonStringSafety.MalformedUtf16(name);
 }

@@ -26,11 +26,37 @@ public sealed class StreamCreditFrameValidationRegressionTests
     }
 
     [Fact]
+    public async Task NegativeIdStreamCredit_ReportsProtocolError()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        var protocolErrors = new List<string>();
+        var processor = CreateProcessor(serializer, streams, protocolErrors);
+        using var credit = RpcRawFrame.FrameInt32(-7, MessageType.StreamCredit, 1);
+
+        Assert.True(await processor.ShouldDisposeAsync(credit, CancellationToken.None));
+
+        Assert.Single(protocolErrors, error => error.Contains("Malformed stream credit frame."));
+        Assert.Equal(0, streams.PendingCreditCount);
+    }
+
+    [Fact]
     public void TryAddCredit_RejectsZeroStreamId()
     {
         var serializer = new MessagePackRpcSerializer();
         var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
         using var credit = RpcRawFrame.FrameInt32(0, MessageType.StreamCredit, 1);
+
+        Assert.False(streams.TryAddCredit(credit));
+        Assert.Equal(0, streams.PendingCreditCount);
+    }
+
+    [Fact]
+    public void TryAddCredit_RejectsNegativeStreamId()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var streams = new RpcStreamManager(serializer, SendNoopAsync, exceptionTransformer: null);
+        using var credit = RpcRawFrame.FrameInt32(-7, MessageType.StreamCredit, 1);
 
         Assert.False(streams.TryAddCredit(credit));
         Assert.Equal(0, streams.PendingCreditCount);

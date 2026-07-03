@@ -24,6 +24,7 @@ public sealed partial class PluginServer
         where TService : class
         where TKernel : class
     {
+        ThrowIfDisposed();
         var package = KernelPackageRegistry.Resolve(typeof(TKernel));
         var kernel = await InstallServerExtensionAsync(package, policy, cancellationToken).ConfigureAwait(false);
         _serverExtensions[typeof(TService)] = new ServerExtensionRegistration(kernel.Manifest.PluginId);
@@ -37,6 +38,8 @@ public sealed partial class PluginServer
     /// </summary>
     public TService ServerExtension<TService>() where TService : class
     {
+        ThrowIfDisposed();
+
         if (!_serverExtensions.TryGetValue(typeof(TService), out var registration))
         {
             throw new InvalidOperationException(

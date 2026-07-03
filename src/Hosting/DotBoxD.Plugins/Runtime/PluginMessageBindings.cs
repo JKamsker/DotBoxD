@@ -273,6 +273,8 @@ public static class PluginMessageBindings
                     "host.message.send denied: message exceeds the granted length limit"));
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            context.CancellationToken.ThrowIfCancellationRequested();
             var send = sink.SendAsync(targetId, message, cancellationToken);
             if (!send.IsCompletedSuccessfully)
             {
