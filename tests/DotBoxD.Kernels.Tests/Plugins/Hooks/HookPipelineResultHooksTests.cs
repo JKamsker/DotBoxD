@@ -147,6 +147,36 @@ public sealed class HookPipelineResultHooksTests
     }
 
     [Fact]
+    public async Task FireResultAsync_rejects_null_options_when_hook_point_has_no_result_handlers()
+    {
+        using var server = PluginServer.Create();
+        var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await pipeline.FireResultAsync<DamageResult>(new DamageCtx(10), null!));
+
+        Assert.Equal("options", exception.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidRemoteHandlerTimeouts))]
+    public async Task FireResultAsync_rejects_invalid_options_when_hook_point_has_no_result_handlers(
+        TimeSpan remoteHandlerTimeout)
+    {
+        using var server = PluginServer.Create();
+        var pipeline = server.Hooks.On<DamageCtx>(new StubAdapter());
+        var options = new ResultHookDispatchOptions<DamageResult>
+        {
+            RemoteHandlerTimeout = remoteHandlerTimeout,
+        };
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await pipeline.FireResultAsync<DamageResult>(new DamageCtx(10), options));
+
+        Assert.Equal("RemoteHandlerTimeout", exception.ParamName);
+    }
+
+    [Fact]
     public async Task FireAsync_observes_precanceled_token_when_a_hook_point_has_no_result_handlers()
     {
         using var server = PluginServer.Create();
@@ -241,6 +271,13 @@ public sealed class HookPipelineResultHooksTests
 
         public IReadOnlyList<SandboxValue> ToSandboxValues(DamageCtx e) => [];
     }
+
+    public static TheoryData<TimeSpan> InvalidRemoteHandlerTimeouts()
+        => new()
+        {
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds((double)int.MaxValue + 1d),
+        };
 }
 
 /// <summary>
