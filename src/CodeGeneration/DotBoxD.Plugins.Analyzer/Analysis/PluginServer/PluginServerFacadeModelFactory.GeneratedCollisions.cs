@@ -137,6 +137,68 @@ internal static partial class PluginServerFacadeModelFactory
         }
     }
 
+    private static string? GeneratedWrapperSurfaceCollisionMessage(
+        IReadOnlyList<PluginServerServiceWrapper> worldServiceWrappers,
+        IReadOnlyList<PluginServerControlProperty> controls)
+    {
+        foreach (var wrapper in worldServiceWrappers)
+        {
+            if (GeneratedWrapperSurfaceCollisionMessage(wrapper.Type, wrapper.Properties, wrapper.Methods) is { } message)
+            {
+                return message;
+            }
+        }
+
+        foreach (var control in controls)
+        {
+            if (GeneratedWrapperSurfaceCollisionMessage(control.Type, control.Properties, control.Methods) is { } message)
+            {
+                return message;
+            }
+
+            foreach (var wrapper in control.ServiceWrappers)
+            {
+                if (GeneratedWrapperSurfaceCollisionMessage(wrapper.Type, wrapper.Properties, wrapper.Methods) is { } nestedMessage)
+                {
+                    return nestedMessage;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GeneratedWrapperSurfaceCollisionMessage(
+        string wrapperType,
+        IReadOnlyList<PluginServerForwardedProperty> properties,
+        IReadOnlyList<PluginServerForwardedMethod> methods)
+    {
+        foreach (var property in properties)
+        {
+            if (GeneratedWrapperMemberCollisionMessage(wrapperType, property.Name) is { } message)
+            {
+                return message;
+            }
+        }
+
+        foreach (var methodName in methods
+            .Select(static method => method.Name)
+            .Distinct(StringComparer.Ordinal))
+        {
+            if (GeneratedWrapperMemberCollisionMessage(wrapperType, methodName) is { } message)
+            {
+                return message;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GeneratedWrapperMemberCollisionMessage(string wrapperType, string memberName)
+        => memberName is "_owner" or "_inner"
+            ? $"Generated plugin server wrapper for '{wrapperType}' member '{memberName}' collides with generated wrapper backing field '{memberName}'."
+            : null;
+
     private static bool IsGeneratedInvokeAsyncSignature(IMethodSymbol method, INamedTypeSymbol worldType)
         => IsGeneratedSimpleInvokeAsyncSignature(method, worldType) ||
            IsGeneratedCaptureInvokeAsyncSignature(method, worldType);
