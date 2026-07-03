@@ -98,6 +98,7 @@ public sealed class StreamConnection : IRpcFrameChannel
 
     public async ValueTask<Payload> ReceiveValueAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         ReceiveConcurrencyGuard.Enter(ref _activeReceives, nameof(StreamConnection));
 
         try

@@ -61,7 +61,7 @@ public sealed class StreamConnectionReceiveCancellationRegressionTests
     {
         private readonly TaskCompletionSource _readCalled =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private TaskCompletionSource<int>? _pendingRead;
+        private readonly Queue<TaskCompletionSource<int>> _pendingReads = new();
         private int _readCalls;
 
         public int ReadCalls => Volatile.Read(ref _readCalls);
@@ -80,14 +80,28 @@ public sealed class StreamConnectionReceiveCancellationRegressionTests
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             Interlocked.Increment(ref _readCalls);
-            _pendingRead = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingRead = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_pendingReads)
+            {
+                _pendingReads.Enqueue(pendingRead);
+            }
+
             _readCalled.TrySetResult();
-            return new ValueTask<int>(_pendingRead.Task);
+            return new ValueTask<int>(pendingRead.Task);
         }
 
         public Task WaitForReadAsync(TimeSpan timeout) => _readCalled.Task.WaitAsync(timeout);
 
-        public void CompletePendingRead(int bytesRead) => _pendingRead?.TrySetResult(bytesRead);
+        public void CompletePendingRead(int bytesRead)
+        {
+            TaskCompletionSource<int>? pendingRead = null;
+            lock (_pendingReads)
+            {
+                _pendingReads.TryDequeue(out pendingRead);
+            }
+
+            pendingRead?.TrySetResult(bytesRead);
+        }
 
         public override int Read(byte[] buffer, int offset, int count) =>
             ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
