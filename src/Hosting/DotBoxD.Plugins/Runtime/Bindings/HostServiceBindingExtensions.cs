@@ -56,17 +56,25 @@ public static class HostServiceBindingExtensions
             var declaringType = method.DeclaringType ?? serviceType;
             var target = ResolveTargetMethod(declaringType, implementation.GetType(), method);
             var capability = method.GetCustomAttribute<HostCapabilityAttribute>();
-            if (capability is null)
+            var binding = method.GetCustomAttribute<HostBindingAttribute>();
+
+            if (binding is not null)
             {
-                throw new InvalidOperationException(
-                    $"Host service method '{declaringType.FullName}.{method.Name}' must declare [HostCapability] on its service contract.");
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding),
+                    HostServiceBindingRouteSignature.ForMethod(method));
             }
 
-            AddBinding(
-                builder,
-                registeredBindings,
-                HostServiceBindingFactory.CreateBinding(method, target, implementation, capability),
-                HostServiceBindingRouteSignature.ForMethod(method));
+            if (capability is not null || binding is null)
+            {
+                AddBinding(
+                    builder,
+                    registeredBindings,
+                    HostServiceBindingFactory.CreateBinding(method, target, implementation, capability, binding: null),
+                    HostServiceBindingRouteSignature.ForMethod(method));
+            }
         }
 
         foreach (var property in ServiceProperties(serviceType))
