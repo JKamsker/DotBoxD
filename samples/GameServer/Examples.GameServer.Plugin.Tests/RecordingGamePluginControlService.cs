@@ -18,6 +18,8 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
 
     public byte[] RpcResponse { get; set; } = DefaultKillResultsResponse();
 
+    public string CallPluginOperationResponse { get; set; } = "denied:test-operation";
+
     public string? LastRpcPluginId { get; private set; }
 
     public byte[] LastRpcArguments { get; private set; } = [];
@@ -62,6 +64,16 @@ internal sealed class RecordingGamePluginControlService : IGamePluginControlServ
         LastRpcArguments = arguments;
         Calls.Add("invoke:" + pluginId);
         return ValueTask.FromResult(RpcResponse);
+    }
+
+    public ValueTask<string> CallPluginOperationAsync(
+        string operation,
+        string payload,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        Calls.Add("operation:" + operation);
+        return ValueTask.FromResult(CallPluginOperationResponse);
     }
 
     public ValueTask UpdateSettingsAsync(
