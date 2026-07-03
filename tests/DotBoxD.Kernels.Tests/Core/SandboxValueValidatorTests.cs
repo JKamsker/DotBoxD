@@ -81,7 +81,7 @@ public sealed class SandboxValueValidatorTests
     [Fact]
     public void RequireType_rejects_malformed_list_item_type_without_null_reference()
     {
-        var value = SandboxValue.FromList([], null!);
+        var value = new ListValue([], null!);
 
         var ex = Assert.Throws<SandboxRuntimeException>(() =>
             SandboxValueValidator.RequireType(
@@ -95,7 +95,7 @@ public sealed class SandboxValueValidatorTests
     [Fact]
     public void RequireType_rejects_malformed_map_key_type_without_null_reference()
     {
-        var value = SandboxValue.FromMap(
+        var value = new MapValue(
             new Dictionary<SandboxValue, SandboxValue>(),
             null!,
             SandboxType.I32);

@@ -15,14 +15,15 @@ internal static class SandboxValueTypeMatcher
 
         if (expectedType.Name == "List" && expectedType.Arguments.Count == 1)
         {
-            return value is ListValue list && list.ItemType.Equals(expectedType.Arguments[0]);
+            return value is ListValue { ItemType: { } itemType } &&
+                   itemType.Equals(expectedType.Arguments[0]);
         }
 
         if (expectedType.Name == "Map" && expectedType.Arguments.Count == 2)
         {
-            return value is MapValue map &&
-                   map.KeyType.Equals(expectedType.Arguments[0]) &&
-                   map.ValueType.Equals(expectedType.Arguments[1]);
+            return value is MapValue { KeyType: { } keyType, ValueType: { } valueType } &&
+                   keyType.Equals(expectedType.Arguments[0]) &&
+                   valueType.Equals(expectedType.Arguments[1]);
         }
 
         return expectedType.IsRecord &&

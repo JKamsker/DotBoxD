@@ -64,6 +64,51 @@ public sealed class SandboxValueFactoryTests
     {
         Assert.ThrowsAny<ArgumentException>(() =>
             SandboxValue.FromList([null!], SandboxType.I32));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            SandboxValue.FromMap(
+                new NullEntryDictionary(null, SandboxValue.FromInt32(1)),
+                SandboxType.String,
+                SandboxType.I32));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            SandboxValue.FromMap(
+                new NullEntryDictionary(SandboxValue.FromString("key"), null),
+                SandboxType.String,
+                SandboxType.I32));
         Assert.ThrowsAny<ArgumentException>(() => SandboxValue.FromRecord([null!]));
+    }
+
+    private sealed class NullEntryDictionary(
+        SandboxValue? entryKey,
+        SandboxValue? entryValue) : IReadOnlyDictionary<SandboxValue, SandboxValue>
+    {
+        public IEnumerable<SandboxValue> Keys
+        {
+            get { yield return entryKey!; }
+        }
+
+        public IEnumerable<SandboxValue> Values
+        {
+            get { yield return entryValue!; }
+        }
+
+        public int Count => 1;
+
+        public SandboxValue this[SandboxValue key] => entryValue!;
+
+        public bool ContainsKey(SandboxValue key) => false;
+
+        public bool TryGetValue(SandboxValue key, out SandboxValue value)
+        {
+            value = entryValue!;
+            return false;
+        }
+
+        public IEnumerator<KeyValuePair<SandboxValue, SandboxValue>> GetEnumerator()
+        {
+            yield return new KeyValuePair<SandboxValue, SandboxValue>(entryKey!, entryValue!);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            => GetEnumerator();
     }
 }
