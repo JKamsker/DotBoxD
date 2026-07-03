@@ -43,6 +43,7 @@ public static class HostServiceBindingExtensions
 
         foreach (var method in ServiceMethods(serviceType))
         {
+            RejectUnsupportedGenericHostBindingMethod(method);
             if (ShouldSkipMethod(method))
             {
                 continue;
@@ -120,6 +121,7 @@ public static class HostServiceBindingExtensions
         var targetFactory = ResolveTargetMethod(factoryDeclaringType, parentImplementation.GetType(), factoryMethod);
         foreach (var handleMethod in ServiceMethods(handleServiceType))
         {
+            RejectUnsupportedGenericHostBindingMethod(handleMethod);
             if (ShouldSkipMethod(handleMethod))
             {
                 continue;
@@ -260,6 +262,19 @@ public static class HostServiceBindingExtensions
         => method.IsSpecialName ||
            method.IsGenericMethodDefinition ||
            IsControlType(method.DeclaringType);
+
+    private static void RejectUnsupportedGenericHostBindingMethod(MethodInfo method)
+    {
+        if (!method.IsGenericMethodDefinition ||
+            method.GetCustomAttribute<HostBindingAttribute>() is not { } binding)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Host service method '{method.DeclaringType?.FullName}.{method.Name}' declares generic " +
+            $"[HostBinding] route '{binding.BindingId}', but generic HostBinding methods are not supported.");
+    }
 
     private static bool ShouldSkipProperty(PropertyInfo property)
         => property.GetMethod is null ||

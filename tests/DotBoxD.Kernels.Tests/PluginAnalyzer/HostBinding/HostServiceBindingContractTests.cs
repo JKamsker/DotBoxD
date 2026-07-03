@@ -90,6 +90,7 @@ public sealed class HostServiceBindingContractTests
         Assert.Contains("generic", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
         Assert.Contains("host.probe.echo", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IGenericHostBindingProbeWorld.Echo), ex.Message, StringComparison.Ordinal);
     }
 
     private sealed class ConcreteProbeWorld
