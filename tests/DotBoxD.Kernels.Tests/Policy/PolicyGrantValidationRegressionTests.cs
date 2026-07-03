@@ -46,6 +46,7 @@ public sealed class PolicyGrantValidationRegressionTests
             diagnostic =>
                 diagnostic.Code == "E-POLICY-GRANT" &&
                 diagnostic.Message.Contains("grant", StringComparison.OrdinalIgnoreCase) &&
-                diagnostic.Message.Contains("id", StringComparison.OrdinalIgnoreCase));
+                diagnostic.Message.Contains("id", StringComparison.OrdinalIgnoreCase) &&
+                diagnostic.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
     }
 }
