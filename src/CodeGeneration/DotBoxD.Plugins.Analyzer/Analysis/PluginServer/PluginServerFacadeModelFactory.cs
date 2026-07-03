@@ -113,19 +113,19 @@ internal static partial class PluginServerFacadeModelFactory
         Dictionary<string, ServiceWrapperBuilder> serviceWrappers,
         CancellationToken cancellationToken)
     {
-        var typeName = TypeName(serviceType);
-        if (serviceWrappers.TryGetValue(typeName, out var existing))
+        var identityName = TypeIdentityName(serviceType);
+        if (serviceWrappers.TryGetValue(identityName, out var existing))
         {
             return existing.WrapperName;
         }
         var wrapper = new ServiceWrapperBuilder(
-            typeName,
+            identityName,
             UniqueServiceWrapperName(serviceType, serviceWrappers.Values.Select(w => w.WrapperName)),
             PluginServerXmlDocumentation.FromSymbol(
                 serviceType,
                 "Generated scoped client for the remote " + serviceType.Name + " domain service.",
                 cancellationToken));
-        serviceWrappers.Add(typeName, wrapper);
+        serviceWrappers.Add(identityName, wrapper);
         PopulateServiceWrapper(serviceType, wrapper, serviceWrappers, cancellationToken);
         return wrapper.WrapperName;
     }

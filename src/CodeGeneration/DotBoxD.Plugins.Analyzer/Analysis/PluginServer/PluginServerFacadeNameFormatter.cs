@@ -68,6 +68,9 @@ internal static class PluginServerFacadeNameFormatter
     internal static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(NullableTypeNameFormat);
 
+    internal static string TypeIdentityName(ITypeSymbol type)
+        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
     internal static string NamespaceMetadataName(INamespaceSymbol @namespace)
     {
         if (@namespace.IsGlobalNamespace)

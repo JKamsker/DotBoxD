@@ -156,4 +156,97 @@ public sealed class PluginServerFacadeCollisionTests
         PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
         Assert.Contains("DotBoxDGeneratedExtensions.GetCollision_Two_GameWorldAccess", generated, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Generated_plugin_server_deduplicates_nullable_service_wrapper_identity()
+    {
+        var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run("""
+            #nullable enable
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace NullableCollision.Game
+            {
+                [DotBoxDService]
+                public interface IGameWorldAccess
+                {
+                    IMonsterControl Monsters { get; }
+                }
+
+                [DotBoxDService]
+                public interface IMonsterControl
+                {
+                    IMonster GetRequired(string id);
+                    IMonster? GetOptional(string id);
+                }
+
+                [DotBoxDService]
+                public interface IMonster
+                {
+                    int Health { get; }
+                }
+            }
+
+            namespace NullableCollision.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static NullableCollision.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+                }
+            }
+
+            namespace NullableCollision.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using NullableCollision.Game;
+
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : IGameWorldAccess;
+
+                public sealed partial class RemotePluginContext;
+            }
+            """);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+        Assert.Equal(1, CountOccurrences(generated, "class MonsterPluginService :"));
+        Assert.DoesNotContain("class MonsterPluginService_2", generated, StringComparison.Ordinal);
+        Assert.Contains("class MonsterPluginService : global::NullableCollision.Game.IMonster,", generated, StringComparison.Ordinal);
+        Assert.Contains("public global::NullableCollision.Game.IMonster? GetOptional", generated, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string value, string substring)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(substring, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += substring.Length;
+        }
+
+        return count;
+    }
 }
