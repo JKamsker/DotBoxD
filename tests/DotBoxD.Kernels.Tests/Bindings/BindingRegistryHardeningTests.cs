@@ -55,7 +55,7 @@ public sealed class BindingRegistryHardeningTests
     }
 
     [Theory]
-    [InlineData("constructor", "descriptor", "descriptors")]
+    [InlineData("constructor", "descriptor", "bindings")]
     [InlineData("add", "descriptor", null)]
     [InlineData("add-range", "descriptor", "descriptors")]
     public void Binding_registry_public_entrypoints_reject_null_descriptors(
