@@ -9,7 +9,7 @@ public sealed class RpcPeerEventArgs : EventArgs
 {
     public RpcPeerEventArgs(RpcPeer peer)
     {
-        Peer = peer;
+        Peer = peer ?? throw new ArgumentNullException(nameof(peer));
     }
 
     /// <summary>The peer associated with the host event.</summary>
