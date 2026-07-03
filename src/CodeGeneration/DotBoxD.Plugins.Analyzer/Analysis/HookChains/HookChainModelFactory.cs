@@ -105,7 +105,7 @@ internal static partial class HookChainModelFactory
         }
         RejectUnsupportedServerContextType(ServerContextType(model, terminalAccess.Expression, seed, generatedRemoteTarget, cancellationToken), seed, terminalAccess.Name);
 
-        ValidateServerContextType(seed, generatedRemoteTarget, model, cancellationToken);
+        ValidateServerContextType(seed, receiverKind, generatedRemoteTarget, model, cancellationToken);
 
         // Run/RunLocal take a single lambda; Register/RegisterLocal take (lambda, priority) — accept the leading
         // lambda for the result terminals so the trailing priority argument does not reject the chain.

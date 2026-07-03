@@ -176,6 +176,7 @@ internal static partial class HookChainModelFactory
 
     private static void ValidateServerContextType(
         InvocationExpressionSyntax seed,
+        HookChainReceiverKind? receiverKind,
         GeneratedRemoteHookChainTarget? generatedRemoteTarget,
         SemanticModel model,
         CancellationToken cancellationToken)
@@ -187,9 +188,13 @@ internal static partial class HookChainModelFactory
         }
 
         var location = ServerContextTypeLocation(seed) ?? PluginDiagnosticLocation.From(seed.GetLocation());
+        var chainKind = generatedRemoteTarget is not null || receiverKind == HookChainReceiverKind.Remote
+            ? "Remote hook-chain"
+            : "Hook chain";
         throw new HookChainUnsupportedDiagnosticException(
             new PluginKernelDiagnostic(
-                "Remote hook-chain server context type '" +
+                chainKind +
+                " server context type '" +
                 fileLocalType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
                 "' is file-local; generated hook-chain sources cannot name file-local types. " +
                 "Use a named server context type that is visible to generated code, or use HookContext directly.",

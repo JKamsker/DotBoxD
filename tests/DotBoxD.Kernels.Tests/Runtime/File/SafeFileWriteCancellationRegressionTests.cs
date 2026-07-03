@@ -47,6 +47,30 @@ public sealed class SafeFileWriteCancellationRegressionTests
         AssertNoPreCancellationSideEffects(context, audit, temp.Path);
     }
 
+    [Fact]
+    public async Task WriteTextAsync_with_pre_canceled_operation_token_wraps_and_audits_cancellation()
+    {
+        using var temp = TempDirectory.Create();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var audit = new InMemoryAuditSink();
+        var context = CreateContext(temp.Path, audit, CancellationToken.None);
+
+        var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
+            await SafeFileSystem.WriteTextAsync(
+                context,
+                new SandboxPath("result.txt"),
+                "hello",
+                cancellation.Token));
+
+        Assert.Equal(SandboxErrorCode.Cancelled, ex.Error.Code);
+        Assert.Equal(0, context.Budget.FileBytesWritten);
+        var auditEvent = Assert.Single(audit.Events, e => e.BindingId == "file.writeText");
+        Assert.False(auditEvent.Success);
+        Assert.Equal(SandboxErrorCode.Cancelled, auditEvent.ErrorCode);
+        Assert.False(System.IO.File.Exists(Path.Combine(temp.Path, "result.txt")));
+    }
+
     private static SandboxContext CreateContext(
         string root,
         InMemoryAuditSink audit,

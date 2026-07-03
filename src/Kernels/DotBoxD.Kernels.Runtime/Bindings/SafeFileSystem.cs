@@ -81,10 +81,10 @@ public static partial class SafeFileSystem
             throw Error(SandboxErrorCode.Cancelled, "file.writeText cancelled");
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
         var startedAt = DateTimeOffset.UtcNow;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var resolved = ResolvePath(context, path, "file.write", "file.writeText");
             var byteCount = Encoding.UTF8.GetByteCount(text);
             var permission = SafeFileWritePublisher.EnsureAllowed(resolved.Grant, resolved.FullPath, byteCount);
@@ -128,7 +128,8 @@ public static partial class SafeFileSystem
             SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, ex.Error.Code);
             throw;
         }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested &&
+                                                !cancellationToken.IsCancellationRequested)
         {
             var error = new SandboxError(SandboxErrorCode.Timeout, "file.writeText denied: request timed out");
             SafeFileAudit.Write(context, startedAt, false, FailureResource(path, "file.write"), null, error.Code);
