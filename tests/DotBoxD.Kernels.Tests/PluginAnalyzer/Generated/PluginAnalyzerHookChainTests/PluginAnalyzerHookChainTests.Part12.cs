@@ -104,4 +104,53 @@ public sealed partial class PluginAnalyzerHookChainTests
                     $"Generated hook-chain source count: {generatedHookChainSources.Length}",
                 ]));
     }
+
+    [Fact]
+    public void Remote_subscription_RunLocal_rejects_file_local_typed_contexts_before_generating_sources()
+    {
+        var (output, result) = RunGeneratorCore("""
+            using DotBoxD.Plugins.Runtime;
+            using DotBoxD.Plugins.Runtime.Hooks;
+
+            namespace Regression.Game;
+
+            public sealed record DamageEvent(int Amount);
+            file sealed record FileSubscriptionContext(HookContext Raw);
+
+            public static class Usage
+            {
+                public static void Configure(RemoteSubscriptionRegistry subscriptions)
+                    => subscriptions.On<DamageEvent, FileSubscriptionContext>(
+                            ctx => new FileSubscriptionContext(ctx))
+                        .RunLocal((e, ctx) => { _ = ctx.Raw; });
+            }
+            """);
+
+        var generatorDiagnostics = result.Diagnostics.ToArray();
+        var outputDiagnostics = output.GetDiagnostics().ToArray();
+        var hasFocusedDiagnostic = generatorDiagnostics.Any(diagnostic => diagnostic.Id == "DBXK100");
+        var rawFileLocalCompilerDiagnostics = outputDiagnostics
+            .Where(diagnostic => (diagnostic.Id == "CS0234" || diagnostic.Id == "CS0246") &&
+                                 diagnostic.GetMessage().Contains("FileSubscriptionContext", StringComparison.Ordinal))
+            .ToArray();
+        var generatedHookChainSources = result.GeneratedTrees
+            .Select(tree => tree.GetText().ToString())
+            .Where(source => source.Contains("DotBoxDHookChainInterceptors", StringComparison.Ordinal) ||
+                             source.Contains("HookChain_", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.True(
+            hasFocusedDiagnostic && rawFileLocalCompilerDiagnostics.Length == 0 && generatedHookChainSources.Length == 0,
+            string.Join(
+                Environment.NewLine,
+                [
+                    "Expected a focused DBXK100 diagnostic before subscription-chain interceptor/package output.",
+                    $"Has DBXK100: {hasFocusedDiagnostic}",
+                    "Generator diagnostics:",
+                    .. generatorDiagnostics.Select(diagnostic => diagnostic.ToString()),
+                    "Raw file-local compiler diagnostics:",
+                    .. rawFileLocalCompilerDiagnostics.Select(diagnostic => diagnostic.ToString()),
+                    $"Generated hook-chain source count: {generatedHookChainSources.Length}",
+                ]));
+    }
 }

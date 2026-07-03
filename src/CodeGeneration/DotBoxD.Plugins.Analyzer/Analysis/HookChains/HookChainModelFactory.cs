@@ -110,6 +110,7 @@ internal static partial class HookChainModelFactory
         {
             return null;
         }
+        RejectUnsupportedServerContextType(ServerContextType(model, terminalAccess.Expression, seed, generatedRemoteTarget, cancellationToken), seed, terminalAccess.Name);
 
         ValidateServerContextType(seed, generatedRemoteTarget, model, cancellationToken);
 
