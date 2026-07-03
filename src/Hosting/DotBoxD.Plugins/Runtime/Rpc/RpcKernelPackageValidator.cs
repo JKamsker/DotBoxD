@@ -183,7 +183,20 @@ internal static class RpcKernelPackageValidator
 
     private static void ValidateLiveSettings(PluginManifest manifest, List<SandboxDiagnostic> diagnostics)
     {
-        foreach (var group in manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
+        var liveSettings = new List<LiveSettingDefinition>(manifest.LiveSettings.Count);
+        for (var i = 0; i < manifest.LiveSettings.Count; i++)
+        {
+            var setting = manifest.LiveSettings[i];
+            if (setting is null)
+            {
+                diagnostics.Add(new SandboxDiagnostic("DBXK020", $"Plugin manifest liveSettings[{i}] must not be null."));
+                continue;
+            }
+
+            liveSettings.Add(setting);
+        }
+
+        foreach (var group in liveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
         {
             if (group.Skip(1).Any())
             {
@@ -191,7 +204,7 @@ internal static class RpcKernelPackageValidator
             }
         }
 
-        foreach (var setting in manifest.LiveSettings)
+        foreach (var setting in liveSettings)
         {
             PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
             PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
