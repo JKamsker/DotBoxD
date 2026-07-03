@@ -32,7 +32,7 @@ namespace Snap.Nested
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Service 'IRootSnap' can only dispatch instance calls.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Service);
             }
 
-            return DispatchCoreAsync(_service, method, payload, serializer, registry, output, streaming, ct);
+            return DispatchCoreAsync(_service, null, method, payload, serializer, registry, output, streaming, ct);
         }
 
         public global::System.Threading.Tasks.Task DispatchOnInstanceAsync(string instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::System.Threading.CancellationToken ct = default) =>
@@ -45,11 +45,11 @@ namespace Snap.Nested
                 throw new global::DotBoxD.Services.Exceptions.ServiceNotFoundException("Instance '" + instanceId + "' not found for service 'IRootSnap'.", global::DotBoxD.Services.Exceptions.ServiceNotFoundException.NotFoundKind.Instance);
             }
 
-            return DispatchCoreAsync(__inst, method, payload, serializer, registry, output, streaming, ct);
+            return DispatchCoreAsync(__inst, instanceId, method, payload, serializer, registry, output, streaming, ct);
         }
 
 #pragma warning disable CS1998
-        private async global::System.Threading.Tasks.Task DispatchCoreAsync(global::Snap.Nested.IRootSnap receiver, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
+        private async global::System.Threading.Tasks.Task DispatchCoreAsync(global::Snap.Nested.IRootSnap receiver, string? instanceId, string method, global::System.ReadOnlyMemory<byte> payload, global::DotBoxD.Services.Serialization.ISerializer serializer, global::DotBoxD.Services.Server.IInstanceRegistry registry, global::System.Buffers.IBufferWriter<byte> output, global::DotBoxD.Services.Streaming.Remote.IRpcStreamingContext streaming, global::System.Threading.CancellationToken ct)
 #pragma warning restore CS1998
         {
             switch (method)
@@ -92,7 +92,15 @@ namespace Snap.Nested
                     }
                     catch
                     {
-                        await registry.ReleaseAsync("ISubSnap", __subId).ConfigureAwait(false);
+                        try
+                        {
+                            await registry.ReleaseAsync("ISubSnap", __subId).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            // Best-effort release: a faulting release must not replace
+                            // the original serialization failure that is about to be rethrown.
+                        }
                         throw;
                     }
                     return;

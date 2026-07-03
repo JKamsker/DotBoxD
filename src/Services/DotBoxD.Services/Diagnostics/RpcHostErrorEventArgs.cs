@@ -9,7 +9,7 @@ public sealed class RpcHostErrorEventArgs : EventArgs
 {
     public RpcHostErrorEventArgs(Exception exception)
     {
-        Error = exception;
+        Error = exception ?? throw new ArgumentNullException(nameof(exception));
     }
 
     /// <summary>The accept-loop exception.</summary>

@@ -53,11 +53,37 @@ public sealed class JsonExporterStringLiteralTests
         Assert.Equal(malformedUtf16, roundTrip.Metadata["description"]);
     }
 
+    [Fact]
+    public void Export_round_trips_module_structural_strings_without_utf16_replacement()
+    {
+        const string validSurrogatePair = "module-\uD83D\uDE00-id";
+        Assert.Equal(validSurrogatePair, RoundTripModuleId(validSurrogatePair));
+
+        const string malformedUtf16 = "module-\uD800-id";
+        var module = ModuleWithId(malformedUtf16);
+        string? json = null;
+        var exportError = Record.Exception(() => json = JsonExporter.Export(module));
+        if (exportError is not null)
+        {
+            Assert.True(
+                exportError.Message.Contains("UTF-16", StringComparison.OrdinalIgnoreCase) ||
+                exportError.Message.Contains("surrogate", StringComparison.OrdinalIgnoreCase),
+                $"Expected export to name malformed UTF-16 or surrogate text, but got: {exportError.Message}");
+            return;
+        }
+
+        var roundTrip = JsonImporter.Import(json!);
+        Assert.Equal(malformedUtf16, roundTrip.Id);
+    }
+
     private static string RoundTripStringLiteral(string value)
         => StringLiteral(JsonImporter.Import(JsonExporter.Export(ModuleReturningString(value))));
 
     private static string RoundTripMetadataValue(string value)
         => JsonImporter.Import(JsonExporter.Export(ModuleWithMetadata(value))).Metadata["description"];
+
+    private static string RoundTripModuleId(string value)
+        => JsonImporter.Import(JsonExporter.Export(ModuleWithId(value))).Id;
 
     private static SandboxModule ModuleReturningString(string value)
         => new(
@@ -93,6 +119,22 @@ public sealed class JsonExporterStringLiteralTests
             {
                 ["description"] = value
             });
+
+    private static SandboxModule ModuleWithId(string id)
+        => new(
+            id,
+            SemVersion.One,
+            SemVersion.One,
+            [],
+            [
+                new SandboxFunction(
+                    "Unit",
+                    true,
+                    [],
+                    SandboxType.Unit,
+                    [new ReturnStatement(new LiteralExpression(SandboxValue.Unit, Span), Span)])
+            ],
+            new Dictionary<string, string>());
 
     private static string StringLiteral(SandboxModule module)
     {

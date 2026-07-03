@@ -60,9 +60,15 @@ public static partial class PluginPackageJsonSerializer
     {
         writer.WritePropertyName(name);
         writer.WriteStartArray();
-        for (var i = 0; i < values.Count; i++)
+        for (var index = 0; index < values.Count; index++)
         {
-            WriteStringValue(writer, values[i], $"{name}[{i}]");
+            var value = values[index];
+            if (value is null)
+            {
+                throw Error("E-JSON-EXPORT", $"{name}[{index}] must be a string, not null");
+            }
+
+            WriteStringValue(writer, value, $"{name}[{index}]");
         }
 
         writer.WriteEndArray();
