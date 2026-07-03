@@ -79,7 +79,10 @@ public sealed partial class RpcPeer
         _outbound.InvokeAsyncEnumerableOnInstanceAsync<T>(service, instanceId, method, ct);
     public Task<IAsyncEnumerable<T>> InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(string service, string instanceId, string method, TRequest request, RpcStreamAttachment[]? streams = null, CancellationToken ct = default) =>
         _outbound.InvokeAsyncEnumerableOnInstanceAsync<TRequest, T>(service, instanceId, method, request, streams, ct);
-    public RpcStreamHandle ReserveStream(RpcStreamKind kind)
+    public RpcStreamHandle ReserveStream(RpcStreamKind kind) =>
+        ReserveStreamChecked(kind);
+
+    private RpcStreamHandle ReserveStreamChecked(RpcStreamKind kind)
     {
         lock (_lifecycleLock)
         {

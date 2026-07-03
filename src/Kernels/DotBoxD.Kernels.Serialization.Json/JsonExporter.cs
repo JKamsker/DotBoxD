@@ -273,37 +273,14 @@ public static class JsonExporter
     }
 
     private static void WriteType(Utf8JsonWriter writer, SandboxType type)
-    {
-        if (type.Arguments.Count == 0)
-        {
-            WriteStringValue(writer, type.Name, "type name");
-            return;
-        }
-
-        writer.WriteStartObject();
-        WriteString(writer, "name", type.Name, "type name");
-        writer.WritePropertyName("arguments");
-        writer.WriteStartArray();
-        foreach (var argument in type.Arguments)
-        {
-            WriteType(writer, argument);
-        }
-
-        writer.WriteEndArray();
-        writer.WriteEndObject();
-    }
+        => JsonExporterTypeWriter.WriteType(writer, type);
 
     private static void WriteString(Utf8JsonWriter writer, string propertyName, string value, string diagnosticName)
-    {
-        JsonStringSafety.RequireWellFormedUtf16(value, diagnosticName);
-        writer.WriteString(propertyName, value);
-    }
+        => JsonExporterTypeWriter.WriteString(writer, propertyName, value, diagnosticName);
 
     private static void WriteStringValue(Utf8JsonWriter writer, string value, string diagnosticName)
-    {
-        JsonStringSafety.RequireWellFormedUtf16(value, diagnosticName);
-        writer.WriteStringValue(value);
-    }
+        => JsonExporterTypeWriter.WriteStringValue(writer, value, diagnosticName);
 
-    private static SandboxValidationException Error(string code, string message) => JsonExportNames.Error(code, message);
+    private static SandboxValidationException Error(string code, string message)
+        => JsonExporterTypeWriter.Error(code, message);
 }
