@@ -17,13 +17,8 @@ public readonly record struct RpcErrorInfo(string Message, string Type)
     /// returns safe, caller-facing messages: exception text can carry sensitive detail (file paths,
     /// connection strings), so only expose it to trusted peers.
     /// </summary>
-    public static RpcErrorInfo FromException(Exception exception)
-    {
-        if (exception is null)
-        {
-            throw new ArgumentNullException(nameof(exception));
-        }
-
-        return new(exception.Message, exception.GetType().Name);
-    }
+    public static RpcErrorInfo FromException(Exception exception) =>
+        exception is null
+            ? throw new ArgumentNullException(nameof(exception))
+            : new(exception.Message, exception.GetType().Name);
 }
