@@ -13,12 +13,12 @@ public sealed class RpcDispatchErrorEventArgs : EventArgs
         string? instanceId,
         Exception error)
     {
-        RemoteEndpoint = remoteEndpoint;
+        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
         MessageId = messageId;
-        ServiceName = serviceName;
-        MethodName = methodName;
+        ServiceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
+        MethodName = methodName ?? throw new ArgumentNullException(nameof(methodName));
         InstanceId = instanceId;
-        Error = error;
+        Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
     /// <summary>The remote endpoint string of the channel that sent the request.</summary>

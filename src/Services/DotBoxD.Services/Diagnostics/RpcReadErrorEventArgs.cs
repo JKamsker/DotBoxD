@@ -9,8 +9,8 @@ public sealed class RpcReadErrorEventArgs : EventArgs
 {
     public RpcReadErrorEventArgs(string remoteEndpoint, Exception error)
     {
-        RemoteEndpoint = remoteEndpoint;
-        Error = error;
+        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
+        Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
     /// <summary>The remote endpoint string of the channel that failed.</summary>

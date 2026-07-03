@@ -64,8 +64,8 @@ public sealed class EventArgsCoverageTests
     [Fact]
     public void RpcReadErrorEventArgs_RejectsNullConstructorArguments()
     {
-        AssertArgumentNull(() => new RpcReadErrorEventArgs(null!, new Exception("read")), "remoteEndpoint");
-        AssertArgumentNull(() => new RpcReadErrorEventArgs("ep", null!), "error");
+        DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs(null!, new Exception("read")), "remoteEndpoint");
+        DiagnosticAssert.ArgumentNull(() => new RpcReadErrorEventArgs("ep", null!), "error");
     }
 
     [Fact]
@@ -94,10 +94,10 @@ public sealed class EventArgsCoverageTests
     [Fact]
     public void RpcProtocolErrorEventArgs_RejectsNullConstructorArguments()
     {
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcProtocolErrorEventArgs(null!, 7, MessageType.Request, "bad header"),
             "remoteEndpoint");
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, null!),
             "message");
     }
@@ -134,16 +134,16 @@ public sealed class EventArgsCoverageTests
     [Fact]
     public void RpcDispatchErrorEventArgs_RejectsNullConstructorArguments()
     {
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs(null!, 1, "Game", "Status", null, new Exception("x")),
             "remoteEndpoint");
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs("ep", 1, null!, "Status", null, new Exception("x")),
             "serviceName");
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs("ep", 1, "Game", null!, null, new Exception("x")),
             "methodName");
-        AssertArgumentNull(
+        DiagnosticAssert.ArgumentNull(
             () => new RpcDispatchErrorEventArgs("ep", 1, "Game", "Status", null, null!),
             "error");
     }
@@ -160,20 +160,13 @@ public sealed class EventArgsCoverageTests
     [Fact]
     public void RpcHostErrorEventArgs_RejectsNullException()
     {
-        AssertArgumentNull(() => new RpcHostErrorEventArgs(null!), "exception");
+        DiagnosticAssert.ArgumentNull(() => new RpcHostErrorEventArgs(null!), "exception");
     }
 
     [Fact]
     public void RpcPeerEventArgs_RejectsNullPeer()
     {
-        AssertArgumentNull(() => new RpcPeerEventArgs(null!), "peer");
-    }
-
-    private static void AssertArgumentNull(Action action, string paramName)
-    {
-        var ex = Assert.Throws<ArgumentNullException>(action);
-
-        Assert.Equal(paramName, ex.ParamName);
+        DiagnosticAssert.ArgumentNull(() => new RpcPeerEventArgs(null!), "peer");
     }
 
 }
