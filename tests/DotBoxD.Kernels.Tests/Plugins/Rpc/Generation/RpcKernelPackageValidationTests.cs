@@ -80,6 +80,26 @@ public sealed class RpcKernelPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_rpc_package_with_null_live_setting_manifest_entry()
+    {
+        using var server = PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var package = RpcKernelTestPackages.MonsterKiller();
+        var invalid = package with
+        {
+            Manifest = package.Manifest with { LiveSettings = [null!] }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallServerExtensionAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Message.Contains("liveSettings", StringComparison.OrdinalIgnoreCase) &&
+            d.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Install_rejects_rpc_package_with_entrypoints_that_do_not_match_rpc_entrypoint()
     {
         using var server = PluginServer.Create(
