@@ -95,6 +95,29 @@ public sealed class RpcKernelPackageValidationTests
     }
 
     [Fact]
+    public async Task Install_rejects_rpc_package_with_null_module_function_entry()
+    {
+        using var server = PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        var package = RpcKernelTestPackages.MonsterKiller();
+        var invalid = package with
+        {
+            Module = package.Module with
+            {
+                Functions = [.. package.Module.Functions, null!]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallServerExtensionAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Message.Contains("functions", StringComparison.OrdinalIgnoreCase) &&
+            d.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Import_rejects_rpc_package_with_missing_handle_entrypoint_alias()
     {
         var json = PluginPackageJsonSerializer.Export(RpcKernelTestPackages.MonsterKiller())
