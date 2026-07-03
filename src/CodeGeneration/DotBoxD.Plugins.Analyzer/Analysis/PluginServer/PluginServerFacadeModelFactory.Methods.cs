@@ -11,7 +11,7 @@ internal static partial class PluginServerFacadeModelFactory
         CancellationToken cancellationToken)
     {
         var methods = new List<PluginServerForwardedMethod>();
-        var seenMethods = new Dictionary<string, PluginServerForwardedMethod>(StringComparer.Ordinal);
+        var seenMethods = new Dictionary<string, (int Index, IMethodSymbol Method)>(StringComparer.Ordinal);
         foreach (var member in MembersIncludingInherited(controlType))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -49,22 +49,29 @@ internal static partial class PluginServerFacadeModelFactory
                 var signature = MethodSignatureKey(method);
                 if (seenMethods.TryGetValue(signature, out var existing))
                 {
-                    if (!string.Equals(existing.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
+                    var existingMethod = methods[existing.Index];
+                    if (!string.Equals(existingMethod.ReturnType, forwarded.ReturnType, StringComparison.Ordinal))
                     {
                         throw new NotSupportedException(
                             $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with a different return type.");
                     }
 
-                    if (!existing.ReturnAttributes.Equals(forwarded.ReturnAttributes))
+                    if (!existingMethod.ReturnAttributes.Equals(forwarded.ReturnAttributes))
                     {
                         throw new NotSupportedException(
                             $"Generated plugin server member '{method.ToDisplayString()}' has an inherited signature collision with different return-flow attributes.");
                     }
 
+                    if (IsDeclaredOnMoreDerivedInterface(method, existing.Method))
+                    {
+                        methods[existing.Index] = forwarded;
+                        seenMethods[signature] = (existing.Index, method);
+                    }
+
                     continue;
                 }
 
-                seenMethods.Add(signature, forwarded);
+                seenMethods.Add(signature, (methods.Count, method));
                 methods.Add(forwarded);
             }
         }
@@ -112,4 +119,18 @@ internal static partial class PluginServerFacadeModelFactory
         => method.Name + "(" + string.Join(
             ",",
             method.Parameters.Select(static parameter => TypeName(parameter.Type))) + ")";
+
+    private static bool IsDeclaredOnMoreDerivedInterface(IMethodSymbol candidate, IMethodSymbol existing)
+    {
+        var existingType = existing.ContainingType;
+        foreach (var inherited in candidate.ContainingType.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(inherited, existingType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
