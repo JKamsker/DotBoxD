@@ -31,7 +31,7 @@ internal sealed class MethodSignatureNameProvider : ISignatureTypeProvider<strin
         => (isRequired ? "modreq(" : "modopt(") + modifierType + ")" + unmodifiedType;
 
     public string GetPinnedType(string elementType)
-        => elementType;
+        => "pinned " + elementType;
 
     public string GetPointerType(string elementType)
         => elementType + "*";
