@@ -55,7 +55,7 @@ public sealed class HostServicePropertyBindingTests
         var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
 
         Assert.False(result.Succeeded);
-        Assert.Equal(SandboxErrorCode.PolicyDenied, result.Error!.Code);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
         Assert.Equal(0, world.GetterCalls);
     }
 
