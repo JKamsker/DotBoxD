@@ -4,6 +4,11 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.PluginServer;
 
 internal static class PluginServerFacadeNameFormatter
 {
+    private static readonly SymbolDisplayFormat NullableTypeNameFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     internal static string ServiceWrapperName(INamedTypeSymbol serviceType)
     {
         var name = StripInterfacePrefix(serviceType.Name);
@@ -61,7 +66,7 @@ internal static class PluginServerFacadeNameFormatter
     }
 
     internal static string TypeName(ITypeSymbol type)
-        => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        => type.ToDisplayString(NullableTypeNameFormat);
 
     internal static string NamespaceMetadataName(INamespaceSymbol @namespace)
     {
