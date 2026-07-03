@@ -13,6 +13,7 @@ internal static class DispatcherCaseGenerator
         ServiceModel service,
         MethodModel method,
         string receiver,
+        string instanceId,
         CancellationToken ct)
     {
         if (method.UnsupportedReason is not null)
@@ -47,7 +48,7 @@ internal static class DispatcherCaseGenerator
             ct);
         var call = BuildCall(method, receiver, argumentExpressions, ct);
 
-        GenerateReturn(sb, method, call);
+        GenerateReturn(sb, service, method, call, instanceId);
         sb.AppendLine("                }");
     }
 
@@ -137,8 +138,19 @@ internal static class DispatcherCaseGenerator
         return $"{target}.{method.Name}({argList})";
     }
 
-    private static void GenerateReturn(StringBuilder sb, MethodModel method, string call)
+    private static void GenerateReturn(
+        StringBuilder sb,
+        ServiceModel service,
+        MethodModel method,
+        string call,
+        string instanceId)
     {
+        if (DispatcherInstanceDisposeGenerator.IsAsyncDisposableDispose(method))
+        {
+            DispatcherInstanceDisposeGenerator.GenerateReturn(sb, service, call, instanceId);
+            return;
+        }
+
         switch (method.ReturnKind)
         {
             case MethodReturnKind.Void:
