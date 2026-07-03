@@ -53,6 +53,20 @@ internal static partial class PluginServerFacadeModelFactory
         return compilation.GetTypeByMetadataName(worldNamespace + ".Ipc.IGamePluginControlService");
     }
 
+    private static void ValidateControlServiceAccessibility(
+        INamedTypeSymbol serverType,
+        INamedTypeSymbol controlServiceType)
+    {
+        if (!controlServiceType.IsFileLocal && IsAccessibleFromGeneratedServer(controlServiceType))
+        {
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Generated plugin server '{serverType.Name}' control-plane contract '{controlServiceType.ToDisplayString()}' " +
+            "is file-local or inaccessible and cannot be named from the generated facade.");
+    }
+
     private static INamedTypeSymbol? ControlServiceType(AttributeData attribute)
     {
         foreach (var argument in attribute.NamedArguments)
