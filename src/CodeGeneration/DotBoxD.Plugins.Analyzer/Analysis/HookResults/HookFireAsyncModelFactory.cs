@@ -1,14 +1,19 @@
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookResults;
 
 internal static class HookFireAsyncModelFactory
 {
-    public static HookFireAsyncModel? Create(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
+    public static HookFireAsyncModelResult? Create(
+        GeneratorAttributeSyntaxContext context,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (context.TargetSymbol is not INamedTypeSymbol contextType ||
+            context.TargetNode is not TypeDeclarationSyntax declaration ||
             contextType.TypeParameters.Length > 0)
         {
             return null;
@@ -30,10 +35,23 @@ internal static class HookFireAsyncModelFactory
                 continue;
             }
 
-            return new HookFireAsyncModel(
-                contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal");
+            if (declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+            {
+                return new HookFireAsyncModelResult(
+                    null,
+                    PluginKernelDiagnostic.Create(
+                        declaration.Identifier,
+                        $"hook context '{contextType.Name}' is file-local and cannot be referenced by generated "
+                        + "HookRegistry.FireAsync(context) extensions; use a non-file-local context type or call "
+                        + "HookRegistry.FireAsync<TContext, TResult>(...) from the same file"));
+            }
+
+            return new HookFireAsyncModelResult(
+                new HookFireAsyncModel(
+                    contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    IsEffectivelyPublic(contextType) && IsEffectivelyPublic(resultType) ? "public" : "internal"),
+                null);
         }
 
         return null;
