@@ -16,23 +16,29 @@ public sealed class ResultHookDispatchOptions<TResult>
     public TResult? RemoteTimeoutResult { get; init; }
 
     public static ResultHookDispatchOptions<TResult> FailClosedAfter(TimeSpan timeout, TResult result)
-        => new()
+    {
+        ValidateRemoteHandlerTimeout(timeout, nameof(timeout), allowInfinite: false);
+
+        return new()
         {
             RemoteHandlerTimeout = timeout,
             RemoteTimeoutResult = result,
         };
+    }
 
-    internal void Validate()
+    internal void Validate() => ValidateRemoteHandlerTimeout(RemoteHandlerTimeout, nameof(RemoteHandlerTimeout), allowInfinite: true);
+
+    private static void ValidateRemoteHandlerTimeout(TimeSpan timeout, string paramName, bool allowInfinite)
     {
-        if (RemoteHandlerTimeout == Timeout.InfiniteTimeSpan ||
-            (RemoteHandlerTimeout > TimeSpan.Zero && RemoteHandlerTimeout <= MaxRemoteHandlerTimeout))
+        if ((allowInfinite && timeout == Timeout.InfiniteTimeSpan) ||
+            (timeout > TimeSpan.Zero && timeout <= MaxRemoteHandlerTimeout))
         {
             return;
         }
 
         throw new ArgumentOutOfRangeException(
-            nameof(RemoteHandlerTimeout),
-            RemoteHandlerTimeout,
+            paramName,
+            timeout,
             $"Remote handler timeout must be positive, no greater than {MaxRemoteHandlerTimeout}, or Timeout.InfiniteTimeSpan.");
     }
 }
