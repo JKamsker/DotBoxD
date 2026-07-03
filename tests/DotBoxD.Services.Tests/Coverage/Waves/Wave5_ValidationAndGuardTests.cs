@@ -252,25 +252,25 @@ public sealed class Wave5_ValidationAndGuardTests
     }
 
     [Fact]
-    public void ValidateOutboundAttachment_ZeroStreamId_ThrowsProtocolException()
+    public void FromStream_ZeroStreamId_ThrowsArgumentException()
     {
         var stream = new MemoryStream();
         var handle = new RpcStreamHandle(0, RpcStreamKind.Binary);
-        var attachment = RpcStreamAttachment.FromStream(handle, stream);
 
-        Assert.Throws<ServiceProtocolException>(
-            () => RpcStreamValidation.ValidateOutboundAttachment(attachment));
+        var ex = Assert.Throws<ArgumentException>(
+            () => RpcStreamAttachment.FromStream(handle, stream));
+        Assert.Equal("handle", ex.ParamName);
     }
 
     [Fact]
-    public void ValidateOutboundAttachment_NegativeStreamId_ThrowsProtocolException()
+    public void FromStream_NegativeStreamId_ThrowsArgumentException()
     {
         var stream = new MemoryStream();
         var handle = new RpcStreamHandle(-1, RpcStreamKind.Binary);
-        var attachment = RpcStreamAttachment.FromStream(handle, stream);
 
-        Assert.Throws<ServiceProtocolException>(
-            () => RpcStreamValidation.ValidateOutboundAttachment(attachment));
+        var ex = Assert.Throws<ArgumentException>(
+            () => RpcStreamAttachment.FromStream(handle, stream));
+        Assert.Equal("handle", ex.ParamName);
     }
 
     [Fact]
