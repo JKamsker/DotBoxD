@@ -13,6 +13,11 @@ public static partial class SafeFileSystem
         SandboxPath path,
         CancellationToken cancellationToken)
     {
+        if (context.CancellationToken.IsCancellationRequested)
+        {
+            throw Error(SandboxErrorCode.Cancelled, "file.readText cancelled");
+        }
+
         var startedAt = DateTimeOffset.UtcNow;
         var fileBytesReadBefore = context.Budget.FileBytesRead;
         try
