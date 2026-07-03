@@ -157,6 +157,41 @@ public sealed class RegistryGuardCoverageTests
         Assert.Contains(nameof(INullDispatcherFactoryService), ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Register_MetadataOverloadRejectsConcreteServiceType()
+    {
+        var metadata = new GeneratedService(
+            typeof(ConcreteRegisteredService),
+            typeof(ConcreteRegisteredService),
+            typeof(ProbeDispatcher),
+            nameof(ConcreteRegisteredService));
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            GeneratedServiceRegistry.Register<ConcreteRegisteredService>(
+                _ => new ConcreteRegisteredService(),
+                _ => new ProbeDispatcher(),
+                metadata));
+
+        Assert.Contains("interface", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            ex.ParamName is "service" or "serviceInterface",
+            $"Expected ParamName to identify the service contract, but was '{ex.ParamName}'.");
+    }
+
+    [Fact]
+    public void Register_TwoArgOverloadRejectsConcreteServiceType()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            GeneratedServiceRegistry.Register<ConcreteRegisteredService>(
+                _ => new ConcreteRegisteredService(),
+                _ => new ProbeDispatcher()));
+
+        Assert.Contains("interface", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            ex.ParamName is "service" or "serviceInterface",
+            $"Expected ParamName to identify the service contract, but was '{ex.ParamName}'.");
+    }
+
     // --- Throwaway service surfaces (no generator runs for these) ---
 
     public interface IDefaultMetadataService
@@ -178,6 +213,8 @@ public sealed class RegistryGuardCoverageTests
     {
         Task DoAsync(CancellationToken ct = default);
     }
+
+    private sealed class ConcreteRegisteredService;
 
     private sealed class DefaultMetadataImpl : IDefaultMetadataService
     {
