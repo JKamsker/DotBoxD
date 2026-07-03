@@ -3,6 +3,80 @@ namespace DotBoxD.Kernels.Tests.PluginAnalyzer.Generated;
 public sealed class PluginServerParameterContractSurpriseTests
 {
     [Fact]
+    public void Generated_plugin_server_uses_most_derived_inherited_method_parameter_names()
+    {
+        var (_, outputCompilation) = PluginServerGenerationTestDriver.Run("""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DotBoxD.Abstractions;
+            using DotBoxD.Plugins;
+            using DotBoxD.Services.Attributes;
+
+            namespace Regression.Game
+            {
+                [DotBoxDService]
+                public interface IBaseWorld
+                {
+                    ValueTask<int> SpendAsync(int count, CancellationToken ct = default);
+                }
+
+                [DotBoxDService]
+                public interface IGameWorldAccess : IBaseWorld
+                {
+                    new ValueTask<int> SpendAsync(int amount, CancellationToken ct = default);
+                }
+            }
+
+            namespace Regression.Game.Ipc
+            {
+                public readonly record struct LiveSettingUpdate(string Name, string Value);
+
+                public interface IGamePluginControlService : DotBoxD.Plugins.IServerExtensionWireClient
+                {
+                    ValueTask<string> InstallPluginAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallSubscriptionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask<string> InstallServerExtensionAsync(string packageJson, CancellationToken ct = default);
+                    ValueTask UpdateSettingsAsync(
+                        string pluginId,
+                        LiveSettingUpdate[] updates,
+                        bool atomic = false,
+                        CancellationToken ct = default);
+                    ValueTask HoldUntilShutdownAsync(CancellationToken ct = default);
+                }
+            }
+
+            namespace DotBoxD.Services.Generated
+            {
+                public static class DotBoxDGeneratedExtensions
+                {
+                    public static Regression.Game.IGameWorldAccess GetGameWorldAccess(
+                        DotBoxD.Services.Peer.RpcPeer peer)
+                        => throw new System.InvalidOperationException("not used");
+                }
+            }
+
+            namespace Regression.Plugin
+            {
+                using DotBoxD.Abstractions;
+                using Regression.Game;
+
+                [GeneratePluginServer(Context = typeof(RemotePluginContext))]
+                public partial class RemotePluginServer : IGameWorldAccess;
+
+                public sealed partial class RemotePluginContext;
+
+                public static class Consumer
+                {
+                    public static ValueTask<int> Spend(RemotePluginServer server)
+                        => server.SpendAsync(amount: 5);
+                }
+            }
+            """);
+
+        PluginServerGenerationTestDriver.AssertNoCompilationErrors(outputCompilation);
+    }
+
+    [Fact]
     public void Generated_plugin_server_preserves_params_on_forwarded_methods()
     {
         var (generated, outputCompilation) = PluginServerGenerationTestDriver.Run("""
