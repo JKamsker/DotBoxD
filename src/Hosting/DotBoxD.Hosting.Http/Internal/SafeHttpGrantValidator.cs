@@ -68,6 +68,12 @@ internal static class SafeHttpGrantValidator
             return;
         }
 
+        if (value is null)
+        {
+            Add(diagnostics, grant, $"parameter '{key}' must not be null");
+            return;
+        }
+
         var values = value.Split(',', StringSplitOptions.TrimEntries);
         if (values.Length == 0 || values.Any(item => string.IsNullOrWhiteSpace(item)))
         {
