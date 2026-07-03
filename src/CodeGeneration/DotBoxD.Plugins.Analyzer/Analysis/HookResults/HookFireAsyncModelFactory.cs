@@ -35,7 +35,7 @@ internal static class HookFireAsyncModelFactory
                 continue;
             }
 
-            if (declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+            if (IsFileLocalOrNestedInFileLocal(contextType, cancellationToken))
             {
                 return new HookFireAsyncModelResult(
                     null,
@@ -55,6 +55,26 @@ internal static class HookFireAsyncModelFactory
         }
 
         return null;
+    }
+
+    private static bool IsFileLocalOrNestedInFileLocal(
+        INamedTypeSymbol type,
+        CancellationToken cancellationToken)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            foreach (var reference in current.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (reference.GetSyntax(cancellationToken) is TypeDeclarationSyntax declaration &&
+                    declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool IsEffectivelyPublic(INamedTypeSymbol type)

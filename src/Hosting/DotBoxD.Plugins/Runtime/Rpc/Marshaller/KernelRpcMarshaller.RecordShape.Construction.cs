@@ -1,3 +1,5 @@
+using System.Collections;
+
 namespace DotBoxD.Plugins.Runtime.Rpc;
 
 public static partial class KernelRpcMarshaller
@@ -96,11 +98,33 @@ public static partial class KernelRpcMarshaller
         private void VerifyReadOnlyField(object instance, RecordMember field, object? expected)
         {
             var actual = field.GetValue(instance);
-            if (!Equals(actual, expected))
+            if (!ValuesEqual(actual, expected))
             {
                 throw new NotSupportedException(
                     $"Server extension DTO '{_type}' field '{field.Name}' is private or read-only and could not be reconstructed.");
             }
+        }
+
+        private static bool ValuesEqual(object? actual, object? expected)
+        {
+            if (ReferenceEquals(actual, expected))
+            {
+                return true;
+            }
+
+            if (actual is null || expected is null)
+            {
+                return false;
+            }
+
+            if (actual is Array actualArray &&
+                expected is Array expectedArray &&
+                actualArray.GetType() == expectedArray.GetType())
+            {
+                return StructuralComparisons.StructuralEqualityComparer.Equals(actualArray, expectedArray);
+            }
+
+            return Equals(actual, expected);
         }
     }
 }

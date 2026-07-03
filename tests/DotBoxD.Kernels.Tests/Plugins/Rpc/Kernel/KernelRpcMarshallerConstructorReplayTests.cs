@@ -128,6 +128,27 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
         Assert.Equal(7, dto.Sum);
     }
 
+    [Fact]
+    public void ToSandboxValue_accepts_reconstructible_defensive_copy_read_only_array()
+    {
+        var sandbox = KernelRpcMarshaller.ToSandboxValue(
+            new DefensiveCopyReadOnlyArrayDto([1, 2, 3]),
+            typeof(DefensiveCopyReadOnlyArrayDto));
+
+        Assert.Equal(
+            SandboxValue.FromRecord(
+                [
+                    SandboxValue.FromList(
+                        [
+                            SandboxValue.FromInt32(1),
+                            SandboxValue.FromInt32(2),
+                            SandboxValue.FromInt32(3)
+                        ],
+                        SandboxType.I32)
+                ]),
+            sandbox);
+    }
+
     private sealed class ConstructorInitReplayDto(int id)
     {
         public int Id { get; init; } = Math.Abs(id);
@@ -182,5 +203,10 @@ public sealed partial class KernelRpcMarshallerSurpriseTests
         public int Y { get; } = y;
 
         public int Sum => X + Y;
+    }
+
+    private sealed class DefensiveCopyReadOnlyArrayDto(int[] values)
+    {
+        public int[] Values { get; } = values.ToArray();
     }
 }

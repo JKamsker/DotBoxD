@@ -195,9 +195,13 @@ internal static partial class PluginServerFacadeModelFactory
     }
 
     private static string? GeneratedWrapperMemberCollisionMessage(string wrapperType, string memberName)
-        => memberName is "_owner" or "_inner"
+        => IsGeneratedWrapperBackingFieldName(memberName)
             ? $"Generated plugin server wrapper for '{wrapperType}' member '{memberName}' collides with generated wrapper backing field '{memberName}'."
             : null;
+
+    private static bool IsGeneratedWrapperBackingFieldName(string memberName)
+        => string.Equals(memberName, PluginServerWrapperBackingFieldNames.Owner, StringComparison.Ordinal) ||
+           string.Equals(memberName, PluginServerWrapperBackingFieldNames.Inner, StringComparison.Ordinal);
 
     private static bool IsGeneratedInvokeAsyncSignature(IMethodSymbol method, INamedTypeSymbol worldType)
         => IsGeneratedSimpleInvokeAsyncSignature(method, worldType) ||

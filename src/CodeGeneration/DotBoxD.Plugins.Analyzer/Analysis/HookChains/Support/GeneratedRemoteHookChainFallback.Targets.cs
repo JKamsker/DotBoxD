@@ -156,15 +156,17 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         var serverExpression = HookChainAliasResolver.UnwrapTransparentExpression(serverExpressionSyntax);
         string? context = null;
+        INamedTypeSymbol? contextType = null;
         if (model.GetTypeInfo(serverExpression, cancellationToken).Type is INamedTypeSymbol serverType &&
             HasGeneratePluginServerAttribute(serverType, model.Compilation))
         {
-            context = GeneratedContextTypeFullName(serverType, model.Compilation);
-            if (context is null)
+            contextType = GeneratedContextType(serverType, model.Compilation);
+            if (contextType is null)
             {
                 return null;
             }
 
+            context = contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             if (model.GetSymbolInfo(registryExpression, cancellationToken).Symbol is IPropertySymbol property &&
                 property.Type is INamedTypeSymbol registryType)
             {
@@ -182,7 +184,7 @@ internal static partial class GeneratedRemoteHookChainFallback
             return null;
         }
 
-        return new GeneratedRemoteHookChainTarget(kind.Value, context);
+        return new GeneratedRemoteHookChainTarget(kind.Value, context, contextType);
     }
 
     private static GeneratedRemoteHookChainTarget? TargetFromDeclaredRegistryExpression(
@@ -225,7 +227,8 @@ internal static partial class GeneratedRemoteHookChainFallback
             {
                 return new GeneratedRemoteHookChainTarget(
                     GeneratedRemoteHookChainKind.Hook,
-                    surface.ContextFullName);
+                    surface.ContextFullName,
+                    surface.ContextType);
             }
 
             if (TypeMatches(
@@ -237,7 +240,8 @@ internal static partial class GeneratedRemoteHookChainFallback
             {
                 return new GeneratedRemoteHookChainTarget(
                     GeneratedRemoteHookChainKind.Subscription,
-                    surface.ContextFullName);
+                    surface.ContextFullName,
+                    surface.ContextType);
             }
         }
 

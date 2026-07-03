@@ -161,8 +161,8 @@ internal static class PluginServerWrapperEmitter
         }
 
         return new WrapperBackingFields(
-            UniqueBackingFieldName("_owner", used),
-            UniqueBackingFieldName("_inner", used));
+            UniqueBackingFieldName(PluginServerWrapperBackingFieldNames.Owner, used),
+            UniqueBackingFieldName(PluginServerWrapperBackingFieldNames.Inner, used));
     }
 
     private static string UniqueBackingFieldName(string preferred, HashSet<string> used)
@@ -195,4 +195,11 @@ internal static class PluginServerWrapperEmitter
         => string.Join(", ", method.Parameters.Select(static p => "@" + p.Name));
 
     private readonly record struct WrapperBackingFields(string Owner, string Inner);
+}
+
+internal static class PluginServerWrapperBackingFieldNames
+{
+    public const string Owner = "_owner";
+
+    public const string Inner = "_inner";
 }
