@@ -51,7 +51,7 @@ public sealed class SandboxValueFactoryTests
         var initializerEx = Assert.Throws<ArgumentNullException>(() => new StringValue("ok") { Value = null! });
 
         Assert.Equal("value", factoryEx.ParamName);
-        Assert.Equal("value", constructorEx.ParamName);
+        Assert.Equal("Value", constructorEx.ParamName);
         Assert.Equal("value", initializerEx.ParamName);
     }
 }
