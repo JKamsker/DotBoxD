@@ -92,7 +92,15 @@ namespace Snap.Nested
                     }
                     catch
                     {
-                        await registry.ReleaseAsync("ISubSnap", __subId).ConfigureAwait(false);
+                        try
+                        {
+                            await registry.ReleaseAsync("ISubSnap", __subId).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            // Best-effort release: a faulting release must not replace
+                            // the original serialization failure that is about to be rethrown.
+                        }
                         throw;
                     }
                     return;

@@ -76,7 +76,15 @@ internal static class DispatcherSubServiceReturnGenerator
         sb.AppendLine("                    }");
         sb.AppendLine("                    catch");
         sb.AppendLine("                    {");
-        sb.AppendLine($"                        await registry.{ServicesGeneratorMemberNames.InstanceRegistry.ReleaseAsync}(\"{serviceName}\", __subId).ConfigureAwait(false);");
+        sb.AppendLine("                        try");
+        sb.AppendLine("                        {");
+        sb.AppendLine($"                            await registry.{ServicesGeneratorMemberNames.InstanceRegistry.ReleaseAsync}(\"{serviceName}\", __subId).ConfigureAwait(false);");
+        sb.AppendLine("                        }");
+        sb.AppendLine("                        catch");
+        sb.AppendLine("                        {");
+        sb.AppendLine("                            // Best-effort release: a faulting release must not replace");
+        sb.AppendLine("                            // the original serialization failure that is about to be rethrown.");
+        sb.AppendLine("                        }");
         sb.AppendLine("                        throw;");
         sb.AppendLine("                    }");
         sb.AppendLine("                    return;");
