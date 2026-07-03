@@ -1,5 +1,7 @@
 using System.Text.Json;
 using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Json;
 
@@ -14,6 +16,7 @@ public static partial class PluginPackageJsonSerializer
 {
     private static void WritePackage(Utf8JsonWriter writer, PluginPackage package)
     {
+        ValidateExportPackage(package);
         writer.WriteStartObject();
         WriteManifest(writer, package.Manifest);
         writer.WritePropertyName("entrypoints");
@@ -21,6 +24,17 @@ public static partial class PluginPackageJsonSerializer
         writer.WritePropertyName("module");
         JsonExporter.Write(writer, package.Module);
         writer.WriteEndObject();
+    }
+
+    private static void ValidateExportPackage(PluginPackage package)
+    {
+        if (package.Manifest.RpcEntrypoint is not null)
+        {
+            RpcKernelPackageValidator.Validate(package);
+            return;
+        }
+
+        PluginPackageValidator.Validate(package);
     }
 
     private static void WriteManifest(Utf8JsonWriter writer, PluginManifest manifest)
