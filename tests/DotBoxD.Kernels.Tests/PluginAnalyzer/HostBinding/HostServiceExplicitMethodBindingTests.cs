@@ -16,6 +16,8 @@ public sealed class HostServiceExplicitMethodBindingTests
 
         namespace DotBoxD.Kernels.Tests.PluginAnalyzer.HostBinding;
 
+        // This plugin-local contract intentionally differs from the host contract below. Both share
+        // the same HostBinding id to prove binding resolution is keyed by id, not CLR type identity.
         [DotBoxDService]
         public interface IProbeWorld
         {
@@ -54,6 +56,7 @@ public sealed class HostServiceExplicitMethodBindingTests
         Assert.True(await kernel.ShouldHandleAsync(adapter, probe));
     }
 
+    // This host contract mirrors the plugin source binding id while remaining a separate CLR type.
     private interface IExplicitMethodProbeWorld
     {
         [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
