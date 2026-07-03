@@ -48,11 +48,23 @@ internal static partial class HostServiceBindingFactory
 
         var startedAt = DateTimeOffset.UtcNow;
         var result = callTarget.Invoke(target, []);
-        var payload = await callTarget.ReadReturnAsync(result).ConfigureAwait(false);
+        var payload = await ReadPropertyReturnAsync(callTarget, result, cancellationToken).ConfigureAwait(false);
         WriteAudit(context, binding.BindingId, binding.Capability, effects, startedAt, firstArgument: null);
         return payloadType is null
             ? SandboxValue.Unit
             : KernelRpcMarshaller.ToSandboxValue(payload, payloadType);
+    }
+
+    private static async ValueTask<object?> ReadPropertyReturnAsync(
+        HostServiceCallTarget callTarget,
+        object? result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var pending = callTarget.ReadReturnAsync(result);
+        return pending.IsCompleted
+            ? pending.GetAwaiter().GetResult()
+            : await pending.AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static SandboxEffect DeclaredEffects(

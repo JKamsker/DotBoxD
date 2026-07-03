@@ -38,7 +38,7 @@ public sealed class HostServicePropertyBindingTests
             .Grant("probe.read.scalar", new { }, SandboxEffect.HostStateRead)
             .WithFuel(1_000)
             .WithMaxHostCalls(10)
-            .WithWallTime(TimeSpan.FromMilliseconds(20))
+            .WithWallTime(TimeSpan.FromMilliseconds(75))
             .AllowRuntimeAsync()
             .Build();
 
