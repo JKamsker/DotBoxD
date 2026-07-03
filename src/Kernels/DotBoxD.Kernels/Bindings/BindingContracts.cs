@@ -117,13 +117,26 @@ public sealed class BindingRegistryBuilder
 
     public BindingRegistryBuilder Add(BindingDescriptor descriptor)
     {
+        ArgumentNullException.ThrowIfNull(descriptor);
+
         _bindings.Add(descriptor);
         return this;
     }
 
     public BindingRegistryBuilder AddRange(IEnumerable<BindingDescriptor> descriptors)
     {
-        _bindings.AddRange(descriptors);
+        ArgumentNullException.ThrowIfNull(descriptors);
+
+        foreach (var descriptor in descriptors)
+        {
+            if (descriptor is null)
+            {
+                throw new ArgumentException("Binding descriptor sequences cannot contain null descriptors.", nameof(descriptors));
+            }
+
+            _bindings.Add(descriptor);
+        }
+
         return this;
     }
 
