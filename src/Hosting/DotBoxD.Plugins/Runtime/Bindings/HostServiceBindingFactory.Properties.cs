@@ -24,7 +24,7 @@ internal static partial class HostServiceBindingFactory
             returnType,
             effects,
             binding.Capability,
-            binding.IsAsync,
+            binding.IsAsync || IsTaskLike(interfaceProperty.PropertyType),
             (context, args, cancellationToken) =>
                 InvokePropertyAsync(context, args, cancellationToken, binding, effects, callTarget, target, payloadType));
     }
