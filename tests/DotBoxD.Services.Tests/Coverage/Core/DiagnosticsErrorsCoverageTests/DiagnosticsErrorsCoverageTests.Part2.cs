@@ -44,6 +44,14 @@ public sealed class EventArgsCoverageTests
     }
 
     [Fact]
+    public void RpcDisconnectedEventArgs_RejectsNullRemoteEndpoint()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() => new RpcDisconnectedEventArgs(null!, error: null));
+
+        Assert.Equal("remoteEndpoint", ex.ParamName);
+    }
+
+    [Fact]
     public void RpcReadErrorEventArgs_ExposesEndpointAndError()
     {
         var error = new InvalidOperationException("read failed");
@@ -51,6 +59,13 @@ public sealed class EventArgsCoverageTests
 
         Assert.Equal("ep", args.RemoteEndpoint);
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcReadErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        AssertArgumentNull(() => new RpcReadErrorEventArgs(null!, new Exception("read")), "remoteEndpoint");
+        AssertArgumentNull(() => new RpcReadErrorEventArgs("ep", null!), "error");
     }
 
     [Fact]
@@ -74,6 +89,17 @@ public sealed class EventArgsCoverageTests
         Assert.Equal(9, args.MessageId);
         Assert.Equal(MessageType.Response, args.MessageType);
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcProtocolErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        AssertArgumentNull(
+            () => new RpcProtocolErrorEventArgs(null!, 7, MessageType.Request, "bad header"),
+            "remoteEndpoint");
+        AssertArgumentNull(
+            () => new RpcProtocolErrorEventArgs("ep", 7, MessageType.Request, null!),
+            "message");
     }
 
     [Fact]
@@ -106,12 +132,48 @@ public sealed class EventArgsCoverageTests
     }
 
     [Fact]
+    public void RpcDispatchErrorEventArgs_RejectsNullConstructorArguments()
+    {
+        AssertArgumentNull(
+            () => new RpcDispatchErrorEventArgs(null!, 1, "Game", "Status", null, new Exception("x")),
+            "remoteEndpoint");
+        AssertArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, null!, "Status", null, new Exception("x")),
+            "serviceName");
+        AssertArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, "Game", null!, null, new Exception("x")),
+            "methodName");
+        AssertArgumentNull(
+            () => new RpcDispatchErrorEventArgs("ep", 1, "Game", "Status", null, null!),
+            "error");
+    }
+
+    [Fact]
     public void RpcHostErrorEventArgs_ExposesError()
     {
         var error = new InvalidOperationException("accept failed");
         var args = new RpcHostErrorEventArgs(error);
 
         Assert.Same(error, args.Error);
+    }
+
+    [Fact]
+    public void RpcHostErrorEventArgs_RejectsNullException()
+    {
+        AssertArgumentNull(() => new RpcHostErrorEventArgs(null!), "exception");
+    }
+
+    [Fact]
+    public void RpcPeerEventArgs_RejectsNullPeer()
+    {
+        AssertArgumentNull(() => new RpcPeerEventArgs(null!), "peer");
+    }
+
+    private static void AssertArgumentNull(Action action, string paramName)
+    {
+        var ex = Assert.Throws<ArgumentNullException>(action);
+
+        Assert.Equal(paramName, ex.ParamName);
     }
 
 }
