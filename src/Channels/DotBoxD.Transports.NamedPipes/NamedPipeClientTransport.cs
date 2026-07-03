@@ -10,7 +10,7 @@ namespace DotBoxD.Transports.NamedPipes;
 public sealed class NamedPipeClientTransport : ITransport
 {
     /// <summary>
-    /// Default inter-read idle timeout applied to client connections' in-progress frame body reads.
+    /// Default idle timeout applied to client connections' frame reads.
     /// Mirrors <see cref="NamedPipeServerTransport.DefaultFrameReadIdleTimeout"/>.
     /// </summary>
     public static readonly TimeSpan DefaultFrameReadIdleTimeout = NamedPipeServerTransport.DefaultFrameReadIdleTimeout;
@@ -40,7 +40,7 @@ public sealed class NamedPipeClientTransport : ITransport
     }
 
     /// <summary>
-    /// Inter-read idle timeout applied to the client connection's in-progress frame body reads.
+    /// Idle timeout applied to the client connection's frame reads.
     /// <see langword="null"/> uses <see cref="DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="StreamConnection"/>.
     /// </summary>

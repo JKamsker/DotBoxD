@@ -131,7 +131,8 @@ internal static class RpcKernelPackageValidator
             [entrypointId],
             diagnostics,
             allowNonBindingCapabilities: false,
-            includeModuleNonBindingCapabilities: false);
+            includeModuleNonBindingCapabilities: false,
+            includeModuleCapabilityRequests: false);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
             package.Module,

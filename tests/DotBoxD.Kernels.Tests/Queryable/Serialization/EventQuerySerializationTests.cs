@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotBoxD.Kernels.Model;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Serialization;
 using DotBoxD.Queryable.Translation;
@@ -57,6 +58,25 @@ public sealed class EventQuerySerializationTests
         Assert.Contains("null", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Serialization_rejects_event_names_that_deserialization_rejects(string? eventName)
+    {
+        var document = new EventQueryDocument
+        {
+            EventName = eventName!,
+            Filter = QueryFilter.MatchAll,
+            Projection = QueryProjection.Identity,
+        };
+
+        var exception = Record.Exception(() => EventQueryJson.Serialize(document));
+
+        Assert.NotNull(exception);
+        Assert.True(exception is JsonException or InvalidOperationException or ArgumentException);
+        Assert.Contains("event", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Json_uses_compact_host_readable_tokens()
     {
@@ -68,6 +88,114 @@ public sealed class EventQuerySerializationTests
         Assert.Contains("\"path\":\"Damage\"", json, StringComparison.Ordinal);
         Assert.Contains("\"value\":5", json, StringComparison.Ordinal);
         Assert.Contains("\"kind\":\"construct\"", json, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(QueryFilterKind.And)]
+    [InlineData(QueryFilterKind.Or)]
+    public void Empty_boolean_filter_initializers_are_rejected_or_preserved_by_json_round_trip(QueryFilterKind kind)
+    {
+        var filter = new QueryFilter { Kind = kind };
+        QueryFilter? restored = null;
+
+        var exception = Record.Exception(() =>
+        {
+            var json = JsonSerializer.Serialize(filter, EventQueryJson.Options);
+            restored = JsonSerializer.Deserialize<QueryFilter>(json, EventQueryJson.Options);
+        });
+
+        if (exception is not null)
+        {
+            Assert.True(exception is InvalidOperationException or JsonException);
+            Assert.Contains("QueryFilter", exception.Message, StringComparison.Ordinal);
+            Assert.Contains(kind.ToString(), exception.Message, StringComparison.Ordinal);
+            Assert.True(
+                exception.Message.Contains("empty", StringComparison.OrdinalIgnoreCase) ||
+                exception.Message.Contains("terms", StringComparison.OrdinalIgnoreCase),
+                $"Expected an empty boolean-terms validation message, but got: {exception.Message}");
+            return;
+        }
+
+        Assert.NotNull(restored);
+        Assert.Equal(kind, restored.Kind);
+        Assert.Empty(restored.Children);
+    }
+
+    [Fact]
+    public void Structural_strings_round_trip_valid_surrogate_pairs()
+    {
+        var value = "prefix-\ud83d\ude00-suffix";
+        var document = EventQueryDocument.Create(
+            value,
+            QueryFilter.MatchAll,
+            QueryProjection.Construct(
+                "Notice",
+                [QueryProjectionField.FromMember(value, value)]));
+
+        var restored = EventQueryJson.Deserialize(EventQueryJson.Serialize(document));
+
+        Assert.Equal(value, restored.EventName);
+        var field = Assert.Single(restored.Projection.Fields);
+        Assert.Equal(value, field.Name);
+        Assert.Equal(value, field.Path);
+    }
+
+    [Theory]
+    [InlineData(StructuralStringTarget.EventName)]
+    [InlineData(StructuralStringTarget.ProjectionPath)]
+    [InlineData(StructuralStringTarget.ProjectionFieldName)]
+    public void Structural_strings_round_trip_without_utf16_replacement(
+        StructuralStringTarget target)
+    {
+        const string expected = "prefix-\ud800-suffix";
+        var exception = Record.Exception(() =>
+        {
+            var restored = EventQueryJson.Deserialize(EventQueryJson.Serialize(CreateDocument(target, expected)));
+            Assert.Equal(expected, ReadRestoredValue(target, restored));
+        });
+
+        if (exception is null)
+        {
+            return;
+        }
+
+        Assert.True(
+            exception is JsonException or InvalidOperationException or SandboxValidationException,
+            $"Expected JSON boundary rejection or exact round trip, got {exception.GetType().Name}: {exception.Message}");
+        AssertMalformedUtf16Message(exception);
+    }
+
+    [Fact]
+    public void Query_string_values_round_trip_without_utf16_replacement()
+    {
+        const string validSurrogatePair = "prefix-\uD83D\uDE00-suffix";
+        var validJson = EventQueryJson.Serialize(StringValueDocument(validSurrogatePair));
+        var validRestored = EventQueryJson.Deserialize(validJson);
+
+        Assert.Equal(validSurrogatePair, validRestored.Filter.Value!.String);
+
+        const string malformedUtf16 = "prefix-\uD800-suffix";
+        var document = StringValueDocument(malformedUtf16);
+        var exception = Record.Exception(() =>
+        {
+            var json = EventQueryJson.Serialize(document);
+            var restored = EventQueryJson.Deserialize(json);
+
+            Assert.Equal(malformedUtf16, restored.Filter.Value!.String);
+        });
+
+        if (exception is not null)
+        {
+            Assert.True(
+                exception is JsonException or InvalidOperationException or SandboxValidationException,
+                $"Expected JSON boundary rejection or exact round trip, got {exception.GetType().Name}: {exception.Message}");
+            AssertMalformedUtf16Message(exception);
+        }
+
+        var escapedException = Assert.Throws<SandboxValidationException>(() => EventQueryJson.Deserialize(
+            "{\"event\":\"E\",\"filter\":{\"kind\":\"compare\",\"path\":\"Name\",\"op\":\"eq\",\"value\":\"\\uD800\"}}"));
+
+        Assert.Contains(escapedException.Diagnostics, d => d.Code == "DBXQ001");
     }
 
     [Fact]
@@ -111,4 +239,52 @@ public sealed class EventQuerySerializationTests
 
         Assert.NotEqual(QueryFingerprint.Compute(a), QueryFingerprint.Compute(b));
     }
+
+    private static void AssertMalformedUtf16Message(Exception exception)
+    {
+        Assert.True(
+            exception.Message.Contains("surrogate", StringComparison.OrdinalIgnoreCase) ||
+            exception.Message.Contains("UTF-16", StringComparison.OrdinalIgnoreCase) ||
+            exception.Message.Contains("malformed", StringComparison.OrdinalIgnoreCase),
+            $"Expected malformed UTF-16 boundary message, got: {exception.Message}");
+    }
+
+    private static EventQueryDocument CreateDocument(StructuralStringTarget target, string value)
+        => target switch
+        {
+            StructuralStringTarget.EventName =>
+                EventQueryDocument.Create(value, QueryFilter.MatchAll, QueryProjection.Identity),
+            StructuralStringTarget.ProjectionPath =>
+                EventQueryDocument.Create("AttackEvent", QueryFilter.MatchAll, QueryProjection.Member(value)),
+            StructuralStringTarget.ProjectionFieldName =>
+                EventQueryDocument.Create(
+                    "AttackEvent",
+                    QueryFilter.MatchAll,
+                    QueryProjection.Construct(
+                        "Notice",
+                        [QueryProjectionField.FromMember(value, "AttackerId")])),
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+        };
+
+    private static string ReadRestoredValue(StructuralStringTarget target, EventQueryDocument document)
+        => target switch
+        {
+            StructuralStringTarget.EventName => document.EventName,
+            StructuralStringTarget.ProjectionPath => document.Projection.Path!,
+            StructuralStringTarget.ProjectionFieldName => Assert.Single(document.Projection.Fields).Name,
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+        };
+
+    public enum StructuralStringTarget
+    {
+        EventName,
+        ProjectionPath,
+        ProjectionFieldName,
+    }
+
+    private static EventQueryDocument StringValueDocument(string value) =>
+        EventQueryDocument.Create(
+            "E",
+            QueryFilter.Compare("Name", QueryComparisonOperator.Equal, QueryValue.FromString(value)),
+            QueryProjection.Identity);
 }

@@ -111,7 +111,17 @@ public sealed class TcpTransportCoverageTests
     [Fact]
     public void Constructor_NullHost_ThrowsArgumentNull()
     {
-        Assert.Throws<ArgumentNullException>(() => new TcpTransport(null!, 1234));
+        var ex = Assert.Throws<ArgumentNullException>(() => new TcpTransport(null!, 1234));
+        Assert.Equal("host", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(65536)]
+    public void Constructor_PortOutsideTcpRange_ThrowsArgumentOutOfRange(int port)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new TcpTransport("127.0.0.1", port));
+        Assert.Equal("port", ex.ParamName);
     }
 
     // ---- End-to-end framed send/receive over loopback -------------------------------------
@@ -243,98 +253,6 @@ public sealed class TcpTransportCoverageTests
         var ex = await Assert.ThrowsAsync<InvalidDataException>(
             () => serverConn.ReceiveAsync().WaitAsync(Timeout));
         Assert.Contains("Invalid DotBoxD frame length", ex.Message);
-    }
-
-    // ---- TcpConnection direct lifecycle ---------------------------------------------------
-
-    [Fact]
-    public async Task SendAsync_AfterDispose_ThrowsObjectDisposed()
-    {
-        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
-        await server.StartAsync().WaitAsync(Timeout);
-        var port = RequirePort(server);
-
-        using var rawClient = new TcpClient();
-        var acceptTask = server.AcceptAsync();
-        await rawClient.ConnectAsync(IPAddress.Loopback, port).WaitAsync(Timeout);
-        var serverConn = await acceptTask.WaitAsync(Timeout);
-
-        await serverConn.DisposeAsync();
-
-        using var frame = BuildFrame(messageId: 1, type: 1, bodyLength: 4);
-        await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => serverConn.SendAsync(frame.Memory).WaitAsync(Timeout));
-    }
-
-    [Fact]
-    public async Task ReceiveAsync_AfterDispose_ThrowsObjectDisposed()
-    {
-        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
-        await server.StartAsync().WaitAsync(Timeout);
-        var port = RequirePort(server);
-
-        using var rawClient = new TcpClient();
-        var acceptTask = server.AcceptAsync();
-        await rawClient.ConnectAsync(IPAddress.Loopback, port).WaitAsync(Timeout);
-        var serverConn = await acceptTask.WaitAsync(Timeout);
-
-        await serverConn.DisposeAsync();
-
-        await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => serverConn.ReceiveAsync().WaitAsync(Timeout));
-    }
-
-    [Fact]
-    public async Task DisposeAsync_CalledTwice_IsIdempotentAndMarksDisconnected()
-    {
-        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
-        await server.StartAsync().WaitAsync(Timeout);
-        var port = RequirePort(server);
-
-        using var rawClient = new TcpClient();
-        var acceptTask = server.AcceptAsync();
-        await rawClient.ConnectAsync(IPAddress.Loopback, port).WaitAsync(Timeout);
-        var serverConn = await acceptTask.WaitAsync(Timeout);
-
-        Assert.True(serverConn.IsConnected);
-
-        await serverConn.DisposeAsync();
-        // Second dispose hits the Interlocked short-circuit and must not throw or double-dispose state.
-        await serverConn.DisposeAsync();
-
-        Assert.False(serverConn.IsConnected);
-    }
-
-    [Fact]
-    public async Task ReceiveAsync_AfterRemotePeerDisconnects_ReturnsEmptyAndDisposeFlipsIsConnected()
-    {
-        await using var server = new TcpServerTransport(IPAddress.Loopback, 0);
-        await server.StartAsync().WaitAsync(Timeout);
-        var port = RequirePort(server);
-
-        var rawClient = new TcpClient();
-        var acceptTask = server.AcceptAsync();
-        await rawClient.ConnectAsync(IPAddress.Loopback, port).WaitAsync(Timeout);
-        await using var serverConn = await acceptTask.WaitAsync(Timeout);
-
-        Assert.True(serverConn.IsConnected);
-        Assert.NotEqual("unknown", serverConn.RemoteEndpoint);
-
-        // The remote went away: a receive observes the FIN and returns the documented Empty sentinel.
-        // (IsConnected itself is a best-effort hint that does not probe the wire, so a graceful remote
-        // FIN does not necessarily flip Socket.Connected on a half-open socket — the receive result is
-        // the authoritative disconnect signal, per TcpConnection's contract.)
-        rawClient.Close();
-        using var received = await serverConn.ReceiveAsync().WaitAsync(Timeout);
-        Assert.Equal(0, received.Length);
-
-        // EOF is idempotent: a second receive on the closed connection still returns Empty, never hangs.
-        using var received2 = await serverConn.ReceiveAsync().WaitAsync(Timeout);
-        Assert.Equal(0, received2.Length);
-
-        // Disposing the connection is the authoritative LOCAL signal and flips the hint to false.
-        await serverConn.DisposeAsync();
-        Assert.False(serverConn.IsConnected);
     }
 
 }

@@ -113,6 +113,8 @@ public static partial class KernelRpcMarshaller
             return SandboxValue.FromGuid(Guid.Empty);
         if (IsDateTimeWireType(underlying))
             return NullableDateTimeZeroValue();
+        if (underlying == typeof(decimal))
+            return DecimalToSandboxValue(default);
         if (underlying == typeof(DateOnly))
             return SandboxValue.FromInt32(0);
         if (underlying == typeof(TimeOnly))
@@ -136,6 +138,7 @@ public static partial class KernelRpcMarshaller
             underlying == typeof(double) ||
             underlying == typeof(Guid) ||
             IsDateTimeWireType(underlying) ||
+            underlying == typeof(decimal) ||
             underlying == typeof(DateOnly) ||
             underlying == typeof(TimeOnly) ||
             underlying == typeof(TimeSpan) ||

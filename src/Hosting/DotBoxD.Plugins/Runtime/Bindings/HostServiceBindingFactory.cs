@@ -130,7 +130,7 @@ internal static partial class HostServiceBindingFactory
         var startedAt = DateTimeOffset.UtcNow;
         var values = ConvertArguments(callTarget.ParameterTypes, args, startIndex: 0);
         var result = callTarget.Invoke(target, values);
-        var payload = await callTarget.ReadReturnAsync(result).ConfigureAwait(false);
+        var payload = await callTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
         WriteAudit(context, bindingId, capability, effects, startedAt, values.Length > 0 ? values[0] : null);
         return payloadType is null
             ? SandboxValue.Unit
@@ -157,7 +157,7 @@ internal static partial class HostServiceBindingFactory
             ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
         var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
         var result = handleCallTarget.Invoke(handle, handleValues);
-        var payload = await handleCallTarget.ReadReturnAsync(result).ConfigureAwait(false);
+        var payload = await handleCallTarget.ReadReturnAsync(result, cancellationToken).ConfigureAwait(false);
         var auditValue = factoryValues.Length > 0 ? factoryValues[0] : handleValues.Length > 0 ? handleValues[0] : null;
         WriteAudit(context, bindingId, capability, effects, startedAt, auditValue);
         return payloadType is null

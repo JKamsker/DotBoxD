@@ -38,6 +38,27 @@ public sealed class QueryInitializerValidationTests
     }
 
     [Fact]
+    public void Public_compare_filter_initializer_without_operator_is_rejected()
+    {
+        var filter = new QueryFilter
+        {
+            Kind = QueryFilterKind.Compare,
+            Field = "Key",
+            Value = QueryValue.FromString("key"),
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            QueryFilterEvaluator.Evaluate(filter, new NullableTestEvent("key", 1), new MemberValueReader()));
+        Assert.Contains("Compare", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Operator", exception.Message, StringComparison.Ordinal);
+
+        Assert.Throws<InvalidOperationException>(() => QueryText.Format(filter));
+        Assert.Throws<InvalidOperationException>(() => QueryFilterCompiler.Compile(filter, new MemberValueReader()));
+        Assert.Throws<InvalidOperationException>(() => EventQueryPlanner.Plan(filter));
+        Assert.Throws<InvalidOperationException>(() => JsonSerializer.Serialize(filter, EventQueryJson.Options));
+    }
+
+    [Fact]
     public void Public_filter_initializer_with_undefined_kind_is_rejected_by_evaluator()
     {
         var filter = new QueryFilter { Kind = (QueryFilterKind)999 };

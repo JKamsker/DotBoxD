@@ -146,13 +146,13 @@ public sealed class ServerExtensionClientProxyValidationTests
 
             public interface IEchoService
             {
-                ValueTask<int> EchoAsync(decimal? value);
+                ValueTask<int> EchoAsync(short? value);
             }
 
             [ServerExtension("echo", typeof(IEchoService))]
             public sealed partial class EchoKernel
             {
-                public int Echo(decimal? value, HookContext ctx)
+                public int Echo(short? value, HookContext ctx)
                 {
                     return 0;
                 }

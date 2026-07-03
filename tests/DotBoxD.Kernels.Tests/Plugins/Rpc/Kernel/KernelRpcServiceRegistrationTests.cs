@@ -1,3 +1,5 @@
+using DotBoxD.Plugins.Kernel;
+
 namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
 
 public sealed class ServerExtensionRegistrationTests
@@ -18,6 +20,21 @@ public sealed class ServerExtensionRegistrationTests
     }
 
     [Fact]
+    public async Task ServerExtension_after_dispose_throws_before_returning_cached_proxy()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        await server.RegisterServerExtensionAsync<IMonsterKillerService, BatchKillerKernel>();
+        _ = server.ServerExtension<IMonsterKillerService>();
+
+        server.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(
+            () => server.ServerExtension<IMonsterKillerService>());
+    }
+
+    [Fact]
     public async Task RegisterServerExtension_replaces_cached_proxy()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(
@@ -30,6 +47,30 @@ public sealed class ServerExtensionRegistrationTests
         var second = server.ServerExtension<IMonsterKillerService>();
 
         Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public async Task RegisterServerExtension_after_dispose_throws_before_resolving_package_factory()
+    {
+        var factoryCalls = 0;
+        KernelPackageRegistry.Register(
+            typeof(DisposedRegisterKernel),
+            () =>
+            {
+                factoryCalls++;
+                return RpcKernelTestPackages.MonsterKiller();
+            });
+        using var server = DotBoxD.Plugins.PluginServer.Create(
+            configureHost: RpcKernelTestPackages.AddKillBinding,
+            defaultPolicy: RpcKernelTestPackages.KillPolicy());
+        server.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            async () => await server
+                .RegisterServerExtensionAsync<IMonsterKillerService, DisposedRegisterKernel>()
+                .AsTask());
+
+        Assert.Equal(0, factoryCalls);
     }
 
     [Fact]
@@ -61,4 +102,6 @@ public sealed class ServerExtensionRegistrationTests
             () => server.ServerExtension<IMonsterKillerService>());
         Assert.Contains("No server extension is registered", ex.Message);
     }
+
+    private sealed class DisposedRegisterKernel;
 }

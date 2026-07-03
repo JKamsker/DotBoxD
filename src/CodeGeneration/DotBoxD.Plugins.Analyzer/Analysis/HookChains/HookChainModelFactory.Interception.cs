@@ -22,11 +22,14 @@ internal static partial class HookChainModelFactory
         bool terminalReturnsVoid,
         bool hasLocalDecoder,
         ITypeSymbol? projectedTypeSymbol,
+        out InterceptionFailureReason failureReason,
         CancellationToken cancellationToken)
     {
+        failureReason = InterceptionFailureReason.None;
         var location = model.GetInterceptableLocation(invocation, cancellationToken);
         if (location is null)
         {
+            failureReason = InterceptionFailureReason.CallSiteNotInterceptable;
             return null;
         }
 
@@ -84,6 +87,7 @@ internal static partial class HookChainModelFactory
 
         if (generatedRemoteKind is null)
         {
+            failureReason = InterceptionFailureReason.CallSiteNotInterceptable;
             return null;
         }
 
@@ -93,6 +97,7 @@ internal static partial class HookChainModelFactory
         // it; decline here so no broken source is emitted (the real RunLocal then fails fast at the call site).
         if (projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true })
         {
+            failureReason = InterceptionFailureReason.AnonymousGeneratedRemoteProjection;
             return null;
         }
 
@@ -149,4 +154,19 @@ internal static partial class HookChainModelFactory
         => method.ReceiverType is INamedTypeSymbol receiverType && receiverType.TypeKind != TypeKind.Error
             ? receiverType
             : expressionReceiverType;
+
+    private static string InterceptionFailureDetail(InterceptionFailureReason reason)
+        => reason switch
+        {
+            InterceptionFailureReason.AnonymousGeneratedRemoteProjection =>
+                "anonymous terminal projections on generated-server chains require a named record projection",
+            _ => "the call site is not interceptable"
+        };
+
+    private enum InterceptionFailureReason
+    {
+        None,
+        CallSiteNotInterceptable,
+        AnonymousGeneratedRemoteProjection
+    }
 }

@@ -65,8 +65,7 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
 
             var currentIndex = analysis.IndexByOffset[candidate.Offset];
             var charged = state.Charged ||
-                IsChargeSandboxValueCall(candidate) &&
-                PreviousInstructionsLoadLocal(analysis.Instructions, currentIndex, localIndex);
+                IsChargeForLocal(analysis.Instructions, currentIndex, localIndex);
             if (candidate.Opcode == ILOpCode.Ret)
             {
                 if (!charged &&
@@ -106,26 +105,33 @@ internal static class GeneratedUnchargedLiteralShapeVerifier
         }
     }
 
-    private static bool IsChargeSandboxValueCall(GeneratedInstruction instruction)
-        => instruction.CalledMember == ChargeSandboxValueSignature ||
-           instruction.CalledMember == ChargeSandboxValuesSignature;
-
-    private static bool PreviousInstructionsLoadLocal(
+    private static bool IsChargeForLocal(
         IReadOnlyList<GeneratedInstruction> instructions,
         int index,
         int localIndex)
     {
-        var first = Math.Max(0, index - 3);
-        for (var current = first; current < index; current++)
+        var instruction = instructions[index];
+        return instruction.CalledMember switch
         {
-            if (IsLoadLocal(instructions[current], localIndex))
-            {
-                return true;
-            }
-        }
-
-        return false;
+            var signature when signature == ChargeSandboxValueSignature
+                => PreviousInstructionLoadsLocal(instructions, index, localIndex),
+            var signature when signature == ChargeSandboxValuesSignature
+                => ValueArgumentLoadsLocal(instructions, index, localIndex) &&
+                   PreviousInstructionLoadsPositiveInt32(instructions, index),
+            _ => false
+        };
     }
+
+    private static bool PreviousInstructionLoadsPositiveInt32(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        int index)
+        => index > 0 && instructions[index - 1].Int32Value > 0;
+
+    private static bool ValueArgumentLoadsLocal(
+        IReadOnlyList<GeneratedInstruction> instructions,
+        int index,
+        int localIndex)
+        => index > 1 && IsLoadLocal(instructions[index - 2], localIndex);
 
     private static bool PreviousInstructionLoadsLocal(
         IReadOnlyList<GeneratedInstruction> instructions,

@@ -220,7 +220,11 @@ public static class PluginMessageBindings
             {
                 for (var i = 0; i < TargetPrefixes.Count; i++)
                 {
-                    if (targetId.StartsWith(TargetPrefixes[i], StringComparison.Ordinal))
+                    var prefix = TargetPrefixes[i];
+                    if (targetId.StartsWith(prefix, StringComparison.Ordinal) &&
+                        (targetId.Length == prefix.Length ||
+                         prefix[^1] is '.' or ':' ||
+                         targetId[prefix.Length] is '.' or ':'))
                     {
                         return true;
                     }
@@ -269,6 +273,8 @@ public static class PluginMessageBindings
                     "host.message.send denied: message exceeds the granted length limit"));
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            context.CancellationToken.ThrowIfCancellationRequested();
             var send = sink.SendAsync(targetId, message, cancellationToken);
             if (!send.IsCompletedSuccessfully)
             {

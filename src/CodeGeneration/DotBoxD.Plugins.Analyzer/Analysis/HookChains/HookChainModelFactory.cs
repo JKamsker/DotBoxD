@@ -48,6 +48,14 @@ internal static partial class HookChainModelFactory
                     ex.Message,
                     ex.Location ?? PluginDiagnosticLocation.From(invocation.GetLocation())));
         }
+        catch (UnsupportedHookChainEventTypeException ex)
+        {
+            return new HookChainCreateResult(null, null, new PluginKernelDiagnostic(ex.Message, ex.Location));
+        }
+        catch (HookChainUnsupportedDiagnosticException ex)
+        {
+            return new HookChainCreateResult(null, null, ex.Diagnostic);
+        }
         catch (NotSupportedException ex)
         {
             chain = null;
@@ -128,6 +136,8 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
+        ValidateEventType(eventType, seed, cancellationToken);
+
         var eventProperties = PluginSymbolReader.EventProperties(eventType);
         if (ContainsUnsupported(eventProperties))
         {
@@ -206,6 +216,7 @@ internal static partial class HookChainModelFactory
         // no Select. Anonymous projections are not source-nameable, so interception needs this symbol even for
         // ordinary remote Run chains to emit a generic interceptor and let Roslyn infer the anonymous argument.
         var projectedTypeSymbol = ProjectedTypeSymbol(stages, eventType, model, cancellationToken);
+        RejectUnsupportedProjectedType(installKind.Value, projectedTypeSymbol, terminalAccess.Name);
 
         // An anonymous type CAN be the terminal (pushed) projection — it has a real metadata identity Roslyn can
         // infer as a type ARGUMENT — but it has no C#-source-nameable name. The interceptor handles it by binding
@@ -275,26 +286,13 @@ internal static partial class HookChainModelFactory
             TerminalReturnsVoid(terminalLambda, model, cancellationToken),
             localDecoderSource is not null,
             projectedTypeSymbol,
+            out var interceptionFailureReason,
             cancellationToken);
         if (interception is null)
         {
-            throw new NotSupportedException(InterceptionFailureDetail(generatedRemoteKind, projectedTypeSymbol));
+            throw new NotSupportedException(InterceptionFailureDetail(interceptionFailureReason));
         }
 
         return new HookChainResult(modelResult, interception);
     }
-
-    private static string InterceptionFailureDetail(
-        GeneratedRemoteHookChainKind? generatedRemoteKind,
-        ITypeSymbol? projectedTypeSymbol)
-        => generatedRemoteKind is not null &&
-           projectedTypeSymbol is INamedTypeSymbol { IsAnonymousType: true }
-            ? "anonymous terminal projections on generated-server chains require a named record projection"
-            : "the call site is not interceptable";
-}
-
-internal enum HookChainReceiverKind
-{
-    Local,
-    Remote
 }

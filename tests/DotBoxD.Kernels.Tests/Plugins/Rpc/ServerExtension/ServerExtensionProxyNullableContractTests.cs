@@ -132,12 +132,12 @@ public sealed class ServerExtensionProxyNullableContractTests
 
     private interface INullableEchoService
     {
-        int Echo(decimal? value);
+        int Echo(short? value);
     }
 
     private interface INullableEchoBaseService
     {
-        int Echo(decimal? value);
+        int Echo(short? value);
     }
 
     private interface IInheritedNullableEchoService : INullableEchoBaseService;

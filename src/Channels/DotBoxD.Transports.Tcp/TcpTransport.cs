@@ -18,15 +18,17 @@ public sealed class TcpTransport : ITransport
     public TcpTransport(string host, int port)
     {
         _host = host ?? throw new ArgumentNullException(nameof(host));
-        _port = port;
+        _port = EnsurePort(port);
     }
+
+    private static int EnsurePort(int port) => (uint)port <= 65535 ? port : throw new ArgumentOutOfRangeException(nameof(port));
 
     public IRpcChannel? Connection => _connection;
 
     public bool IsConnected => _connection?.IsConnected ?? false;
 
     /// <summary>
-    /// Inter-read idle timeout applied to this connection's in-progress frame reads (slow-loris
+    /// Idle timeout applied to this connection's frame reads (slow-loris
     /// defense). <see langword="null"/> uses <see cref="TcpConnection.DefaultFrameReadIdleTimeout"/>;
     /// <see cref="Timeout.InfiniteTimeSpan"/> disables it. See <see cref="TcpConnection"/>.
     /// </summary>

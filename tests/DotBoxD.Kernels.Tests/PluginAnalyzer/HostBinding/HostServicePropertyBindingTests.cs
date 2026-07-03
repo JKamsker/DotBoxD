@@ -13,7 +13,7 @@ public sealed class HostServicePropertyBindingTests
     {
         using var host = SandboxHost.Create(
             builder => builder.AddBindingsFrom<IPropertyProbeWorld>(new PropertyProbeWorld()));
-        var module = PropertyBindingModule();
+        var module = PropertyBindingModule("host.probe.scalar", "property-binding-probe");
         var policy = SandboxPolicyBuilder.Create()
             .Grant("probe.read.scalar", new { }, SandboxEffect.HostStateRead)
             .WithFuel(1_000)
@@ -27,10 +27,48 @@ public sealed class HostServicePropertyBindingTests
         Assert.Equal(17, ((I32Value)result.Value!).Value);
     }
 
+    [Fact]
+    public async Task Task_like_property_binding_requires_runtime_async_when_IsAsync_is_omitted()
+    {
+        var world = new AsyncPropertyProbeWorld();
+        using var host = SandboxHost.Create(
+            builder => builder.AddBindingsFrom<IAsyncPropertyProbeWorld>(world));
+        var module = PropertyBindingModule("host.probe.asyncScalar", "async-property-binding-probe");
+        var policy = SandboxPolicyBuilder.Create()
+            .Grant("probe.read.scalar", new { }, SandboxEffect.HostStateRead)
+            .WithFuel(1_000)
+            .WithMaxHostCalls(10)
+            .Build();
+
+        ExecutionPlan plan;
+        try
+        {
+            plan = await host.PrepareAsync(module, policy);
+        }
+        catch (SandboxValidationException ex)
+        {
+            Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-CAP");
+            Assert.Equal(0, world.GetterCalls);
+            return;
+        }
+
+        var result = await host.ExecuteAsync(plan, "main", SandboxValue.Unit);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(SandboxErrorCode.PermissionDenied, result.Error!.Code);
+        Assert.Equal(0, world.GetterCalls);
+    }
+
     private interface IPropertyProbeWorld
     {
         [HostBinding("host.probe.scalar", "probe.read.scalar", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
         int Scalar { get; }
+    }
+
+    private interface IAsyncPropertyProbeWorld
+    {
+        [HostBinding("host.probe.asyncScalar", "probe.read.scalar", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        Task<int> AsyncScalar { get; }
     }
 
     private sealed class PropertyProbeWorld : IPropertyProbeWorld
@@ -38,9 +76,23 @@ public sealed class HostServicePropertyBindingTests
         public int Scalar => 17;
     }
 
-    private static SandboxModule PropertyBindingModule()
+    private sealed class AsyncPropertyProbeWorld : IAsyncPropertyProbeWorld
+    {
+        public int GetterCalls { get; private set; }
+
+        public Task<int> AsyncScalar
+        {
+            get
+            {
+                GetterCalls++;
+                return Task.FromResult(17);
+            }
+        }
+    }
+
+    private static SandboxModule PropertyBindingModule(string bindingId, string moduleId)
         => new(
-            "property-binding-probe",
+            moduleId,
             SemVersion.One,
             SemVersion.One,
             [],
@@ -50,7 +102,7 @@ public sealed class HostServicePropertyBindingTests
                     true,
                     [],
                     SandboxType.I32,
-                    [new ReturnStatement(new CallExpression("host.probe.scalar", [], null, Span), Span)])
+                    [new ReturnStatement(new CallExpression(bindingId, [], null, Span), Span)])
             ],
             new Dictionary<string, string>(StringComparer.Ordinal));
 }

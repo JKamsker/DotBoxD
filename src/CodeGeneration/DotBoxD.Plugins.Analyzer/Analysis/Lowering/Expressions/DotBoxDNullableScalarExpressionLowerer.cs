@@ -128,6 +128,7 @@ internal static class DotBoxDNullableScalarExpressionLowerer
             _ when DotBoxDRpcTypeMapper.IsGuid(underlying) =>
                 $"new {TypeNames.GlobalLiteralExpression}({TypeNames.GlobalSandboxValue}.FromGuid(global::System.Guid.Empty), Span)",
             _ when DotBoxDRpcTypeMapper.IsDateTimeWireType(underlying) => DateTimeZeroSource(underlying),
+            _ when DotBoxDRpcTypeMapper.IsDecimalWireType(underlying) => DecimalZeroSource(underlying),
             _ when DotBoxDRpcTypeMapper.IsDateOnlyWireType(underlying) =>
                 $"{Helpers.I32}({DotBoxDGenerationNames.CSharpLiterals.Int32Default})",
             _ when DotBoxDRpcTypeMapper.IsTimeOnlyWireType(underlying) ||
@@ -149,6 +150,9 @@ internal static class DotBoxDNullableScalarExpressionLowerer
                 $"{Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
             ],
             SandboxTypeSourceEmitter.TryEmit(underlying) ?? throw new NotSupportedException());
+
+    private static string DecimalZeroSource(ITypeSymbol underlying)
+        => DotBoxDDecimalWireSource.RecordSource(underlying, default);
 
     private static string BoolSource(bool value)
         => $"{Helpers.Bool}({(value ? DotBoxDGenerationNames.CSharpLiterals.True : DotBoxDGenerationNames.CSharpLiterals.False)})";
