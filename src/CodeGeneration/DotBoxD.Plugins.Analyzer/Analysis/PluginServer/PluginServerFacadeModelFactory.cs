@@ -180,14 +180,18 @@ internal static partial class PluginServerFacadeModelFactory
             var parameter = method.Parameters[i];
             var preserveMetadataDefaultAttributes =
                 ShouldPreserveMetadataDefaultAttributes(method, i, out var defaultClause);
+            var attributePrefix = PluginServerFlowAttributeSource.ParameterAttributePrefix(parameter);
+            if (preserveMetadataDefaultAttributes)
+            {
+                attributePrefix += ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
+                    parameter,
+                    includeOptionalAttribute: true);
+            }
+
             parameters[i] = new PluginServerParameter(
                 parameter.Name,
                 TypeName(parameter.Type),
-                preserveMetadataDefaultAttributes
-                    ? ParameterDefaultValueEmitter.FormatMetadataDefaultAttributePrefix(
-                        parameter,
-                        includeOptionalAttribute: true)
-                    : string.Empty,
+                attributePrefix,
                 defaultClause,
                 parameter.IsParams);
         }
