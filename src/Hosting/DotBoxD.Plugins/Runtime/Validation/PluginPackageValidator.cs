@@ -39,6 +39,10 @@ internal static class PluginPackageValidator
 
         PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
         ValidateRequiredCapabilities(package.Manifest, diagnostics);
+        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
+            package.Manifest,
+            package.Module,
+            diagnostics);
         ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
         foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
         {

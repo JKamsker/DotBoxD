@@ -1,4 +1,5 @@
 using DotBoxD.Kernels.Model;
+using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Plugins.Runtime.Validation;
@@ -81,6 +82,28 @@ internal static class PluginManifestCapabilityValidator
         => manifest.RequiredCapabilities
             .Concat(ModuleNonBindingRequiredCapabilities(module))
             .Where(IsKnownNonBindingCapability);
+
+    public static void ValidateConcreteRequiredCapabilityEntries(
+        PluginManifest manifest,
+        SandboxModule module,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        foreach (var capability in manifest.RequiredCapabilities)
+        {
+            AddWildcardRequiredCapabilityDiagnostic("Plugin manifest", capability, diagnostics);
+        }
+
+        if (!module.Metadata.TryGetValue(PluginManifestNames.ModuleMetadata.RequiredCapabilities, out var metadata) ||
+            string.IsNullOrWhiteSpace(metadata))
+        {
+            return;
+        }
+
+        foreach (var capability in metadata.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            AddWildcardRequiredCapabilityDiagnostic("Plugin module metadata", capability, diagnostics);
+        }
+    }
 
     public static void ValidateRequiredCapabilityGrants(
         PluginManifest manifest,
@@ -179,5 +202,28 @@ internal static class PluginManifestCapabilityValidator
     }
 
     public static bool IsKnownNonBindingCapability(string? capability)
-        => capability is not null && capability.StartsWith("event.read.", StringComparison.Ordinal);
+        => !string.IsNullOrEmpty(capability) &&
+           capability.StartsWith("event.read.", StringComparison.Ordinal) &&
+           !CapabilityPattern.IsWildcard(capability);
+
+    private static void AddWildcardRequiredCapabilityDiagnostic(
+        string source,
+        string? capability,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (string.IsNullOrEmpty(capability))
+        {
+            return;
+        }
+
+        if (!CapabilityPattern.IsWildcard(capability))
+        {
+            return;
+        }
+
+        diagnostics.Add(new SandboxDiagnostic(
+            "DBXK050",
+            source + " requiredCapabilities must contain concrete capability ids; " +
+            $"wildcard required capability '{capability}' is not allowed."));
+    }
 }
