@@ -284,10 +284,11 @@ internal static partial class HookChainModelFactory
             TerminalReturnsVoid(terminalLambda, model, cancellationToken),
             localDecoderSource is not null,
             projectedTypeSymbol,
+            out var interceptionFailureReason,
             cancellationToken);
         if (interception is null)
         {
-            throw new NotSupportedException(InterceptionFailureDetail(generatedRemoteKind, projectedTypeSymbol));
+            throw new NotSupportedException(InterceptionFailureDetail(interceptionFailureReason));
         }
 
         return new HookChainResult(modelResult, interception);
