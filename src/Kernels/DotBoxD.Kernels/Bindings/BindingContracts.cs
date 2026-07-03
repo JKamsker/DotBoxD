@@ -127,6 +127,7 @@ public sealed class BindingRegistryBuilder
     {
         ArgumentNullException.ThrowIfNull(descriptors);
 
+        var validated = new List<BindingDescriptor>();
         foreach (var descriptor in descriptors)
         {
             if (descriptor is null)
@@ -134,9 +135,10 @@ public sealed class BindingRegistryBuilder
                 throw new ArgumentException("Binding descriptor sequences cannot contain null descriptors.", nameof(descriptors));
             }
 
-            _bindings.Add(descriptor);
+            validated.Add(descriptor);
         }
 
+        _bindings.AddRange(validated);
         return this;
     }
 

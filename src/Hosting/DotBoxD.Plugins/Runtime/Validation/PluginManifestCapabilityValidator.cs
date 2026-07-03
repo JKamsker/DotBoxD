@@ -222,7 +222,7 @@ internal static class PluginManifestCapabilityValidator
         }
 
         diagnostics.Add(new SandboxDiagnostic(
-            "DBXK050",
+            "DBXK051",
             source + " requiredCapabilities must contain concrete capability ids; " +
             $"wildcard required capability '{capability}' is not allowed."));
     }
