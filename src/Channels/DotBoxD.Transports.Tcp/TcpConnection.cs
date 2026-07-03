@@ -75,6 +75,8 @@ public sealed class TcpConnection : IRpcFrameChannel
             throw new ObjectDisposedException(nameof(TcpConnection));
         }
 
+        ct.ThrowIfCancellationRequested();
+
         // Reject malformed/oversized frames locally rather than shipping them to the peer, matching
         // StreamConnection and the inbound length check in ReceiveAsync below.
         MessageFramer.ValidateOutgoingFrame(data.Span);

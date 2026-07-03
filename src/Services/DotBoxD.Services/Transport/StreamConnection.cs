@@ -67,6 +67,7 @@ public sealed class StreamConnection : IRpcFrameChannel
     public async ValueTask SendValueAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
         ThrowIfDisposed();
+        ct.ThrowIfCancellationRequested();
         MessageFramer.ValidateOutgoingFrame(data.Span, _maxMessageSize);
 
         await WaitForSendSlotAsync(ct).ConfigureAwait(false);
