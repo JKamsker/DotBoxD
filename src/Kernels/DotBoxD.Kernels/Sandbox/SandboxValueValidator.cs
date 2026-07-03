@@ -234,6 +234,8 @@ public static class SandboxValueValidator
     {
         switch (value)
         {
+            case StringValue { Value: null }:
+                throw Error(errorCode, message);
             case F64Value number when !double.IsFinite(number.Value):
                 throw Error(errorCode, message);
             case SandboxPathValue path:

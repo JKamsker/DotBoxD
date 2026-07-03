@@ -124,9 +124,22 @@ public sealed record F64Value(double Value) : SandboxValue
     public override SandboxType Type => SandboxType.F64;
 }
 
-public sealed record StringValue(string Value) : SandboxValue
+public sealed record StringValue : SandboxValue
 {
+    private string _value;
+
+    public StringValue(string value)
+        => _value = value ?? throw new ArgumentNullException(nameof(value));
+
+    public string Value
+    {
+        get => _value;
+        init => _value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
     public override SandboxType Type => SandboxType.String;
+
+    public void Deconstruct(out string value) => value = Value;
 }
 
 /// <summary>

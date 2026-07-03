@@ -114,8 +114,12 @@ public static class SandboxLiteralConstraints
         return false;
     }
 
-    internal static ValueShape TextShape(string value)
-        => new(0, 0, 0, 0, value.Length, StringByteCount(value.Length));
+    internal static ValueShape TextShape(string? value)
+        => value is null
+            ? throw new SandboxRuntimeException(new SandboxError(
+                SandboxErrorCode.InvalidInput,
+                "string value payload must not be null"))
+            : new ValueShape(0, 0, 0, 0, value.Length, StringByteCount(value.Length));
 
     internal static long StringByteCount(int charLength)
     {

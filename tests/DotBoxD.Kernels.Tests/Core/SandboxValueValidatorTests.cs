@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
@@ -81,10 +82,10 @@ public sealed class SandboxValueValidatorTests
     [Fact]
     public void RequireType_rejects_null_payload_string_values()
     {
-        var ex = Record.Exception(() =>
-            SandboxValueValidator.RequireType(new StringValue(null!), SandboxType.String, "bad input"));
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(CreateMalformedStringValue(), SandboxType.String, "bad input"));
 
-        AssertStringValueFailsClosed(ex);
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
     }
 
     [Fact]
@@ -137,16 +138,6 @@ public sealed class SandboxValueValidatorTests
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
     }
 
-    private static void AssertStringValueFailsClosed(Exception? ex)
-    {
-        Assert.NotNull(ex);
-        if (ex is ArgumentNullException argumentNull)
-        {
-            Assert.Equal("value", argumentNull.ParamName);
-            return;
-        }
-
-        var runtimeEx = Assert.IsType<SandboxRuntimeException>(ex);
-        Assert.Equal(SandboxErrorCode.InvalidInput, runtimeEx.Error.Code);
-    }
+    private static StringValue CreateMalformedStringValue()
+        => (StringValue)RuntimeHelpers.GetUninitializedObject(typeof(StringValue));
 }

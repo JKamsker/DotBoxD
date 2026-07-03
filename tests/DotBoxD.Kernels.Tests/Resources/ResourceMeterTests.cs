@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
@@ -130,10 +131,10 @@ public sealed class ResourceMeterTests
     {
         var meter = new ResourceMeter(new ResourceLimits());
 
-        var ex = Record.Exception(() => meter.ChargeValue(new StringValue(null!)));
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            meter.ChargeValue((StringValue)RuntimeHelpers.GetUninitializedObject(typeof(StringValue))));
 
-        Assert.NotNull(ex);
-        Assert.IsNotType<NullReferenceException>(ex);
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
     }
 
     [Fact]
