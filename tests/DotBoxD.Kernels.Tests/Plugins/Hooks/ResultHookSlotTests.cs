@@ -203,6 +203,17 @@ public sealed class ResultHookSlotTests
     }
 
     [Fact]
+    public void FailClosedAfter_rejects_abstain_timeout_results()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => ResultHookDispatchOptions<TestResult>.FailClosedAfter(
+                TimeSpan.FromMilliseconds(100),
+                new TestResult(false, "timeout", -1)));
+
+        Assert.Equal("result", exception.ParamName);
+    }
+
+    [Fact]
     public void Default_remote_timeout_is_finite()
     {
         Assert.NotEqual(
