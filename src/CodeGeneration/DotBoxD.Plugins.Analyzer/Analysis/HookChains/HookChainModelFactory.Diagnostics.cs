@@ -213,17 +213,6 @@ internal static partial class HookChainModelFactory
             : null;
     }
 
-    private static PluginDiagnosticLocation? ServerContextTypeLocation(InvocationExpressionSyntax seed)
-    {
-        if (seed.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } &&
-            onName.TypeArgumentList.Arguments.Count >= 2)
-        {
-            return PluginDiagnosticLocation.From(onName.TypeArgumentList.Arguments[1].GetLocation());
-        }
-
-        return null;
-    }
-
     private static bool IsFileLocal(INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         foreach (var reference in type.DeclaringSyntaxReferences)

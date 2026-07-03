@@ -203,6 +203,37 @@ public sealed class ResultHookSlotTests
     }
 
     [Fact]
+    public void FailClosedAfter_rejects_abstain_timeout_results()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => ResultHookDispatchOptions<TestResult>.FailClosedAfter(
+                TimeSpan.FromMilliseconds(100),
+                new TestResult(false, "timeout", -1)));
+
+        Assert.Equal("result", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task Hand_written_fail_closed_options_reject_abstain_timeout_results()
+    {
+        var slot = NewSlot();
+        slot.AddDirect(0, (_, _, _) => Ok(1), remote: true);
+        var options = new ResultHookDispatchOptions<TestResult>
+        {
+            RemoteTimeoutResult = new TestResult(false, "timeout", -1)
+        };
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            async () =>
+            {
+                var context = Context();
+                await slot.FireAsync(new DamageCtx(10), context, context, options, CancellationToken.None);
+            });
+
+        Assert.Equal("RemoteTimeoutResult", exception.ParamName);
+    }
+
+    [Fact]
     public void Default_remote_timeout_is_finite()
     {
         Assert.NotEqual(

@@ -18,6 +18,7 @@ public sealed class ResultHookDispatchOptions<TResult>
     public static ResultHookDispatchOptions<TResult> FailClosedAfter(TimeSpan timeout, TResult result)
     {
         ValidateRemoteHandlerTimeout(timeout, nameof(timeout), allowInfinite: false);
+        ValidateRemoteTimeoutResult(result, nameof(result));
 
         return new()
         {
@@ -26,7 +27,16 @@ public sealed class ResultHookDispatchOptions<TResult>
         };
     }
 
-    internal void Validate() => ValidateRemoteHandlerTimeout(RemoteHandlerTimeout, nameof(RemoteHandlerTimeout), allowInfinite: true);
+    internal void Validate()
+    {
+        ValidateRemoteHandlerTimeout(RemoteHandlerTimeout, nameof(RemoteHandlerTimeout), allowInfinite: true);
+        if (RemoteTimeoutResult is { Success: false })
+        {
+            throw new ArgumentException(
+                "Remote timeout result must be successful.",
+                nameof(RemoteTimeoutResult));
+        }
+    }
 
     private static void ValidateRemoteHandlerTimeout(TimeSpan timeout, string paramName, bool allowInfinite)
     {
@@ -40,5 +50,13 @@ public sealed class ResultHookDispatchOptions<TResult>
             paramName,
             timeout,
             $"Remote handler timeout must be positive, no greater than {MaxRemoteHandlerTimeout}, or Timeout.InfiniteTimeSpan.");
+    }
+
+    private static void ValidateRemoteTimeoutResult(TResult result, string paramName)
+    {
+        if (!result.Success)
+        {
+            throw new ArgumentException("Remote timeout result must be successful.", paramName);
+        }
     }
 }
