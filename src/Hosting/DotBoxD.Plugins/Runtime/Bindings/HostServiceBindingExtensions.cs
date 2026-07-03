@@ -71,6 +71,8 @@ public static class HostServiceBindingExtensions
 
         foreach (var property in ServiceProperties(serviceType))
         {
+            RejectUnsupportedExplicitPropertyBinding(property);
+
             if (ShouldSkipProperty(property))
             {
                 continue;
@@ -266,6 +268,19 @@ public static class HostServiceBindingExtensions
            property.GetMethod.IsStatic ||
            property.GetIndexParameters().Length != 0 ||
            IsControlType(property.DeclaringType);
+
+    private static void RejectUnsupportedExplicitPropertyBinding(PropertyInfo property)
+    {
+        if (property.GetIndexParameters().Length == 0 ||
+            property.GetCustomAttribute<HostBindingAttribute>() is not { } binding)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"HostBinding property '{property.DeclaringType?.FullName}.{property.Name}' is an unsupported indexer; " +
+            $"binding '{binding.BindingId}' cannot be registered as a zero-argument host service property.");
+    }
 
     private static bool IsControlType(MemberInfo? type)
         => type is Type t &&
