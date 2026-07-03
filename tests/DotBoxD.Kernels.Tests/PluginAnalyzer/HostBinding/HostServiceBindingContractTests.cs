@@ -79,6 +79,19 @@ public sealed class HostServiceBindingContractTests
         Assert.Contains("host.probe.value", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_host_binding_indexer_properties()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IIndexedPropertyProbeWorld>(new IndexedPropertyProbeWorld()));
+
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("indexer", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.indexed", ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ConcreteProbeWorld
     {
         [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
@@ -177,6 +190,20 @@ public sealed class HostServiceBindingContractTests
         public int CurrentValue => 1;
 
         public int PreviousValue => 2;
+    }
+
+    private interface IIndexedPropertyProbeWorld
+    {
+        [HostBinding(
+            "host.probe.indexed",
+            "probe.read.indexed",
+            SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int this[int id] { get; }
+    }
+
+    private sealed class IndexedPropertyProbeWorld : IIndexedPropertyProbeWorld
+    {
+        public int this[int id] => id;
     }
 }
 
