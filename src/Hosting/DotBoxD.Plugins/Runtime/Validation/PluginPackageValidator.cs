@@ -44,33 +44,48 @@ internal static class PluginPackageValidator
             package.Module,
             diagnostics);
         ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
-        foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
+        var liveSettings = package.Manifest.LiveSettings;
+        if (PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
         {
-            if (group.Skip(1).Any())
+            foreach (var group in liveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
             {
-                diagnostics.Add(new SandboxDiagnostic("DBXK021", $"Live setting '{group.Key}' is declared more than once."));
+                if (group.Skip(1).Any())
+                {
+                    diagnostics.Add(new SandboxDiagnostic("DBXK021", $"Live setting '{group.Key}' is declared more than once."));
+                }
+            }
+
+            foreach (var setting in liveSettings)
+            {
+                PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
+                PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
+                ValidateSetting(setting, diagnostics);
             }
         }
 
-        foreach (var setting in package.Manifest.LiveSettings)
-        {
-            PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
-            PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
-            ValidateSetting(setting, diagnostics);
-        }
-
-        if (package.Manifest.Subscriptions.Count == 0)
+        var subscriptions = package.Manifest.Subscriptions;
+        var subscriptionsValid = PluginManifestElementValidator.ValidateNoNullElements(
+            subscriptions,
+            "subscriptions",
+            diagnostics);
+        if (subscriptions.Count == 0)
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK030", "At least one hook subscription is required."));
         }
-        else if (package.Manifest.Subscriptions.Count > 1)
+        else if (subscriptions.Count > 1)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK031",
                 "A plugin package must declare exactly one hook subscription."));
         }
 
-        foreach (var subscription in package.Manifest.Subscriptions)
+        if (!subscriptionsValid)
+        {
+            ThrowIfErrors(diagnostics);
+            return;
+        }
+
+        foreach (var subscription in subscriptions)
         {
             if (string.IsNullOrWhiteSpace(subscription.Event) || string.IsNullOrWhiteSpace(subscription.Kernel))
             {
@@ -118,7 +133,16 @@ internal static class PluginPackageValidator
         HookSubscriptionManifest subscription,
         List<SandboxDiagnostic> diagnostics)
     {
-        foreach (var predicate in subscription.IndexedPredicates)
+        var indexedPredicates = subscription.IndexedPredicates;
+        if (!PluginManifestElementValidator.ValidateNoNullElements(
+            indexedPredicates,
+            "indexedPredicates",
+            diagnostics))
+        {
+            return;
+        }
+
+        foreach (var predicate in indexedPredicates)
         {
             PluginManifestTextValidator.ValidateText(predicate.Path, "indexed predicate path", diagnostics);
             if (!Enum.IsDefined(predicate.Operator))
@@ -144,7 +168,7 @@ internal static class PluginPackageValidator
             }
         }
 
-        if (subscription.IndexCoversPredicate && subscription.IndexedPredicates.Count == 0)
+        if (subscription.IndexCoversPredicate && indexedPredicates.Count == 0)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK048",

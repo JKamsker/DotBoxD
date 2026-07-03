@@ -251,6 +251,10 @@ public static class PluginDiagnosticCodes
             "A server extension package has entrypoint aliases that do not match rpcEntrypoint.",
             "The package manifest names one rpcEntrypoint, but the package entrypoint aliases still point at hook-style ShouldHandle/Handle functions.",
             "Regenerate the server-extension package so ShouldHandle and Handle both alias the manifest rpcEntrypoint."),
+        new("DBXK075", PluginDiagnosticPhase.PackageValidation, PluginDiagnosticAudience.PluginAuthor,
+            "A plugin manifest collection contains a null entry.",
+            "An in-memory plugin package was constructed with a null entry in liveSettings, subscriptions, or indexedPredicates.",
+            "Remove null manifest entries before installing or exporting the package."),
     ];
 
     private static readonly IReadOnlyDictionary<string, PluginDiagnosticReference> ReferencesByCode =
