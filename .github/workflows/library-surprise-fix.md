@@ -399,11 +399,14 @@ regression test reproduces a real bug. It is dispatched per-PR (by number) from
 workflow.
 
 The red->green proof lives in this run: you confirm the red test FAILS on the
-checked-out branch, implement the fix, then confirm that focused test PASSES and
-the whole solution still BUILDS. Do not run the whole solution's tests here — a
-full `dotnet test DotBoxD.slnx` OOM-kills the DotBoxD.Kernels.Tests host in this
-sandbox (exit 137). The authoritative full-suite gate is the PR's own CI, which
-now runs automatically and ungated on your push (per-project, on real runners).
+checked-out branch, implement the fix, then confirm it PASSES by running the
+ENTIRE test project that owns the red test (this catches sibling-test
+regressions), and confirm the whole solution BUILDS. Do not run the whole
+solution's tests here — a full `dotnet test DotBoxD.slnx` OOM-kills the
+DotBoxD.Kernels.Tests host in this sandbox (exit 137); run only the owning
+project (Kernels.Tests excepted — for it run the focused `--filter`ed tests
+only). The authoritative full-suite gate is the PR's own CI, which now runs
+automatically and ungated on your push (per-project, on real runners).
 
 ## Target Resolution
 
@@ -437,19 +440,20 @@ that the checked-out branch contains the red tests from the PR.
 4. Implement the smallest maintainable production fix. Keep the public design
    rule intact: public abstractions and generators must remain opt-in sugar over
    public primitives, never lock-in.
-5. Re-run the focused regression test and confirm it now PASSES, then run
-   `dotnet restore DotBoxD.slnx` and
-   `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore` to
-   confirm the whole solution still compiles.
-   Do NOT run `GITHUB_ACTIONS=true dotnet test DotBoxD.slnx` — the whole-solution
-   test run OOM-kills the DotBoxD.Kernels.Tests host in this sandbox (exit 137)
-   and will fail your run even when your fix is correct. The PR's own CI runs the
-   full per-project suite automatically after your push and is the authoritative
-   gate. If you want an extra local check and the code you changed is NOT in
-   DotBoxD.Kernels, you may run just that one owning test project
-   (`GITHUB_ACTIONS=true dotnet test <project> -c Release --no-build`); skip even
-   that for Kernels changes (its host is too heavy for this sandbox) and rely on
-   the PR CI.
+5. Confirm the fix, then run `dotnet restore DotBoxD.slnx` and
+   `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore`.
+   To confirm the fix, run the ENTIRE test project that contains the red
+   regression test (not just the single focused test) and require it fully green:
+   `GITHUB_ACTIONS=true dotnet test <the-red-test's-project> -c Release --no-build`.
+   Running the whole owning project catches regressions in sibling tests that a
+   single `--filter` misses (e.g. an ArgumentException with the wrong ParamName).
+   Do NOT run `GITHUB_ACTIONS=true dotnet test DotBoxD.slnx` (the whole solution)
+   — it OOM-kills the DotBoxD.Kernels.Tests host in this sandbox (exit 137). The
+   ONE exception is DotBoxD.Kernels.Tests itself: its full run also OOMs here, so
+   if the red test lives in DotBoxD.Kernels.Tests, run only the focused
+   `--filter`ed test(s) and rely on the PR CI for the rest. Every other test
+   project runs fine in this sandbox. The PR's own per-project CI runs
+   automatically after your push and is the authoritative full-suite gate.
 6. Commit the fix on the checked-out PR branch. The commit message must include
    a short summary followed by a body explaining what changed and why.
 7. Call `push_to_pull_request_branch` for `SURPRISE_FIX_PR_NUMBER`. Include a
