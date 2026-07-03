@@ -1,6 +1,8 @@
 using System.Text.Json;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Serialization.Json;
+using DotBoxD.Plugins.Runtime;
+using DotBoxD.Plugins.Runtime.Rpc;
 
 namespace DotBoxD.Plugins.Json;
 
@@ -13,6 +15,17 @@ using static JsonImport;
 /// </summary>
 public static partial class PluginPackageJsonSerializer
 {
+    private static void ValidatePackageForExport(PluginPackage package)
+    {
+        if (package.Manifest.RpcEntrypoint is not null)
+        {
+            RpcKernelPackageValidator.Validate(package);
+            return;
+        }
+
+        PluginPackageValidator.Validate(package);
+    }
+
     private static void WritePackage(Utf8JsonWriter writer, PluginPackage package)
     {
         writer.WriteStartObject();
