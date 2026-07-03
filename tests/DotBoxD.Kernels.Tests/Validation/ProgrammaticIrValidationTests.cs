@@ -249,7 +249,7 @@ public sealed class ProgrammaticIrValidationTests
     private static ModuleValidationResult ValidateModule(SandboxModule module)
         => new DotBoxD.Kernels.Validation.ModuleValidator().Validate(
             module,
-            new BindingRegistry([]));
+            new BindingRegistryBuilder().Build());
 
     private static bool MentionsNullEntry(SandboxDiagnostic diagnostic, string collectionName)
         => diagnostic.Message.Contains(collectionName, StringComparison.OrdinalIgnoreCase)
