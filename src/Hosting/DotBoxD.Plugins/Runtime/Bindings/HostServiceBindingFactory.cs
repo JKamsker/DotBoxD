@@ -59,7 +59,7 @@ internal static partial class HostServiceBindingFactory
             returnType,
             effects,
             capability.Capability,
-            IsTaskLike(handleInterfaceMethod.ReturnType),
+            IsTaskLike(factoryInterfaceMethod.ReturnType) || IsTaskLike(handleInterfaceMethod.ReturnType),
             (context, args, cancellationToken) =>
                 InvokeHandleAsync(
                     context,
@@ -72,7 +72,7 @@ internal static partial class HostServiceBindingFactory
                     factoryCallTarget,
                     factoryTarget,
                     handleCallTarget,
-                payloadType));
+                    payloadType));
     }
 
     public static Type? UnwrapReturnType(Type type)
@@ -153,7 +153,8 @@ internal static partial class HostServiceBindingFactory
         cancellationToken.ThrowIfCancellationRequested();
         var startedAt = DateTimeOffset.UtcNow;
         var factoryValues = ConvertArguments(factoryCallTarget.ParameterTypes, args, startIndex: 0);
-        var handle = factoryCallTarget.Invoke(factoryTarget, factoryValues)
+        var factoryResult = factoryCallTarget.Invoke(factoryTarget, factoryValues);
+        var handle = await factoryCallTarget.ReadReturnAsync(factoryResult).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Host service factory '{factoryInterfaceMethod.Name}' returned null.");
         var handleValues = ConvertArguments(handleCallTarget.ParameterTypes, args, factoryCallTarget.ParameterTypes.Length);
         var result = handleCallTarget.Invoke(handle, handleValues);
