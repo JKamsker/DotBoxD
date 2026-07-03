@@ -46,7 +46,7 @@ public sealed partial class PluginPackageValidationTests
             async () => await server.InstallAsync(invalid).AsTask());
 
         Assert.Contains(ex.Diagnostics, d =>
-            d.Code == "DBXK044" &&
+            d.Code == "DBXK045" &&
             d.Message.Contains("requiredCapabilities", StringComparison.Ordinal));
     }
 }

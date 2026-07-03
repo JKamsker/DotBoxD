@@ -155,7 +155,7 @@ internal static class PluginPackageValidator
         if (manifest.RequiredCapabilities.Any(static capability => capability is null))
         {
             diagnostics.Add(new SandboxDiagnostic(
-                "DBXK044",
+                "DBXK045",
                 "Plugin manifest requiredCapabilities must not contain null entries."));
         }
     }
