@@ -199,43 +199,36 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
         => throw LocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     private static InvalidOperationException NotLowered()

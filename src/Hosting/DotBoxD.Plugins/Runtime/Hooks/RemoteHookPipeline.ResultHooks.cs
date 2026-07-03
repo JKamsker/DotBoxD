@@ -3,43 +3,36 @@ namespace DotBoxD.Plugins.Runtime;
 public sealed partial class RemoteHookPipeline<TEvent>
 {
     public RemoteHookPipeline<TEvent> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TEvent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent> UseGeneratedResultChain<TResult>(PluginPackage package, int priority = 0)
