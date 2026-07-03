@@ -79,6 +79,37 @@ public sealed class SandboxValueValidatorTests
     }
 
     [Fact]
+    public void RequireType_rejects_malformed_list_item_type_without_null_reference()
+    {
+        var value = SandboxValue.FromList([], null!);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(
+                value,
+                SandboxType.List(SandboxType.I32),
+                "bad input"));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
+    }
+
+    [Fact]
+    public void RequireType_rejects_malformed_map_key_type_without_null_reference()
+    {
+        var value = SandboxValue.FromMap(
+            new Dictionary<SandboxValue, SandboxValue>(),
+            null!,
+            SandboxType.I32);
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(
+                value,
+                SandboxType.Map(SandboxType.String, SandboxType.I32),
+                "bad input"));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
+    }
+
+    [Fact]
     public void Validated_shape_meter_rejects_nested_record_field_type_mismatch()
     {
         var value = SandboxValue.FromRecord([

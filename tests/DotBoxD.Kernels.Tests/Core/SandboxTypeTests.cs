@@ -4,6 +4,16 @@ namespace DotBoxD.Kernels.Tests.Core;
 
 public sealed class SandboxTypeTests
 {
+    [Fact]
+    public void Type_factories_reject_null_operands()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => SandboxType.Scalar(null!));
+        Assert.ThrowsAny<ArgumentException>(() => SandboxType.List(null!));
+        Assert.ThrowsAny<ArgumentException>(() => SandboxType.Map(null!, SandboxType.I32));
+        Assert.ThrowsAny<ArgumentException>(() => SandboxType.Map(SandboxType.String, null!));
+        Assert.ThrowsAny<ArgumentException>(() => SandboxType.Record([null!]));
+    }
+
     [Theory]
     [InlineData("Object")]
     [InlineData("System.String")]

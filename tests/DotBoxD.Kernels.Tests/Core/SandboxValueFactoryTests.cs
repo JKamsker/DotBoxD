@@ -42,4 +42,28 @@ public sealed class SandboxValueFactoryTests
         Assert.Same(SandboxType.SandboxPath, path.Type);
         Assert.Same(SandboxType.SandboxUri, uri.Type);
     }
+
+    [Fact]
+    public void Collection_factories_reject_null_type_operands()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => SandboxValue.FromList([], null!));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            SandboxValue.FromMap(
+                new Dictionary<SandboxValue, SandboxValue>(),
+                null!,
+                SandboxType.I32));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            SandboxValue.FromMap(
+                new Dictionary<SandboxValue, SandboxValue>(),
+                SandboxType.String,
+                null!));
+    }
+
+    [Fact]
+    public void Collection_factories_reject_null_elements()
+    {
+        Assert.ThrowsAny<ArgumentException>(() =>
+            SandboxValue.FromList([null!], SandboxType.I32));
+        Assert.ThrowsAny<ArgumentException>(() => SandboxValue.FromRecord([null!]));
+    }
 }
