@@ -18,10 +18,12 @@ internal static class PolicyGrantValidator
         List<SandboxDiagnostic> diagnostics)
     {
         var now = policy.GrantClock;
-        AddDuplicateActiveGrantDiagnostics(policy.Grants, now, diagnostics);
-        foreach (var grant in policy.Grants)
+        var grants = policy.Grants;
+        AddNullGrantDiagnostics(grants, diagnostics);
+        AddDuplicateActiveGrantDiagnostics(grants, now, diagnostics);
+        foreach (var grant in grants)
         {
-            if (IsActive(grant, now))
+            if (grant is not null && IsActive(grant, now))
             {
                 ValidateGrant(grant, bindings, requiredCapabilities, requestedCapabilities, diagnostics);
             }
@@ -46,7 +48,7 @@ internal static class PolicyGrantValidator
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
-            if (IsActive(grant, now))
+            if (grant is not null && IsActive(grant, now))
             {
                 IncrementCount(counts, grant.Id, ref nullCount);
             }
@@ -56,12 +58,26 @@ internal static class PolicyGrantValidator
         for (var i = 0; i < grants.Count; i++)
         {
             var grant = grants[i];
-            if (IsActive(grant, now) &&
+            if (grant is not null &&
+                IsActive(grant, now) &&
                 ShouldReportDuplicate(counts, grant.Id, nullCount, ref reportedNull))
             {
                 diagnostics.Add(new SandboxDiagnostic(
                     "E-POLICY-GRANT",
                     $"capability '{grant.Id}' has multiple active grants"));
+            }
+        }
+    }
+
+    private static void AddNullGrantDiagnostics(
+        IReadOnlyList<CapabilityGrant> grants,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        for (var i = 0; i < grants.Count; i++)
+        {
+            if (grants[i] is null)
+            {
+                diagnostics.Add(new SandboxDiagnostic("E-POLICY-GRANT", "policy grants cannot contain null entries"));
             }
         }
     }
