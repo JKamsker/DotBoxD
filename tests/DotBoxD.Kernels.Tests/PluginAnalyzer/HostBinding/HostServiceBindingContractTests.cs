@@ -92,6 +92,20 @@ public sealed class HostServiceBindingContractTests
         Assert.Contains("host.probe.indexed", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddBindingsFrom_rejects_explicit_generic_host_binding_methods()
+    {
+        var builder = new SandboxHostBuilder();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => builder.AddBindingsFrom<IGenericHostBindingProbeWorld>(new GenericHostBindingProbeWorld()));
+
+        Assert.Contains("generic", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HostBinding", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("host.probe.echo", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IGenericHostBindingProbeWorld.Echo), ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class ConcreteProbeWorld
     {
         [HostCapability("probe.read.value", HostBindingEffect.HostStateRead)]
@@ -204,6 +218,17 @@ public sealed class HostServiceBindingContractTests
     private sealed class IndexedPropertyProbeWorld : IIndexedPropertyProbeWorld
     {
         public int this[int id] => id;
+    }
+
+    private interface IGenericHostBindingProbeWorld
+    {
+        [HostBinding("host.probe.echo", "probe.read.value", SandboxEffect.Cpu | SandboxEffect.HostStateRead)]
+        int Echo<T>(T value);
+    }
+
+    private sealed class GenericHostBindingProbeWorld : IGenericHostBindingProbeWorld
+    {
+        public int Echo<T>(T value) => value?.GetHashCode() ?? 0;
     }
 }
 

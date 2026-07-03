@@ -38,6 +38,19 @@ internal static class HostServiceBindingMemberDiscovery
             $"binding '{binding.BindingId}' cannot be registered as a zero-argument host service property.");
     }
 
+    public static void RejectUnsupportedGenericHostBindingMethod(MethodInfo method)
+    {
+        if (!method.IsGenericMethodDefinition ||
+            method.GetCustomAttribute<HostBindingAttribute>() is not { } binding)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Host service method '{method.DeclaringType?.FullName}.{method.Name}' declares generic " +
+            $"[HostBinding] route '{binding.BindingId}', but generic HostBinding methods are not supported.");
+    }
+
     public static bool HasDotBoxDServiceAttribute(Type type)
         => HasDirectDotBoxDServiceAttribute(type) || type.GetInterfaces().Any(HasDirectDotBoxDServiceAttribute);
 

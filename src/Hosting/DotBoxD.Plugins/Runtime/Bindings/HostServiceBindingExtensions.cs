@@ -39,6 +39,7 @@ public static class HostServiceBindingExtensions
 
         foreach (var method in HostServiceBindingMemberDiscovery.ServiceMethods(serviceType))
         {
+            HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(method);
             if (HostServiceBindingMemberDiscovery.ShouldSkipMethod(method))
             {
                 continue;
@@ -126,6 +127,7 @@ public static class HostServiceBindingExtensions
         var targetFactory = ResolveTargetMethod(factoryDeclaringType, parentImplementation.GetType(), factoryMethod);
         foreach (var handleMethod in HostServiceBindingMemberDiscovery.ServiceMethods(handleServiceType))
         {
+            HostServiceBindingMemberDiscovery.RejectUnsupportedGenericHostBindingMethod(handleMethod);
             if (HostServiceBindingMemberDiscovery.ShouldSkipMethod(handleMethod))
             {
                 continue;
@@ -245,5 +247,4 @@ public static class HostServiceBindingExtensions
         var targetGetter = ResolveTargetMethod(getterDeclaringType, implementation.GetType(), getter);
         return targetGetter.Invoke(implementation, null);
     }
-
 }
