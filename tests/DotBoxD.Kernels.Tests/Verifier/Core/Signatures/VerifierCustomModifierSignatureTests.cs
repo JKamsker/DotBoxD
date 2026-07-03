@@ -8,6 +8,17 @@ namespace DotBoxD.Kernels.Tests.Verifier.Core.Signatures;
 
 public sealed class VerifierCustomModifierSignatureTests
 {
+    [Fact]
+    public async Task Verifier_rejects_pinned_generated_local_signatures()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(AssemblyWithPinnedSandboxValueLocal());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            d.Code == "V-FUNCTION-SIGNATURE" &&
+            d.Message.Contains("pinned", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Theory]
     [InlineData("Execute SandboxContext parameter", "V-EXECUTE-SIGNATURE")]
     [InlineData("Fn_1 SandboxValue return", "V-FUNCTION-SIGNATURE")]
@@ -66,6 +77,24 @@ public sealed class VerifierCustomModifierSignatureTests
             EmitExecuteBody(execute, function);
         });
 
+    private static byte[] AssemblyWithPinnedSandboxValueLocal()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var function = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            EmitFunctionBodyWithPinnedLocal(function);
+
+            var execute = type.DefineMethod(
+                "Execute",
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext), typeof(SandboxValue)]);
+            EmitExecuteBody(execute, function);
+        });
+
     private static MethodBuilder DefineValidFunction(TypeBuilder type, string name)
     {
         var function = type.DefineMethod(
@@ -91,6 +120,25 @@ public sealed class VerifierCustomModifierSignatureTests
     private static void EmitFunctionBody(MethodBuilder function)
     {
         var il = function.GetILGenerator();
+        var value = il.DeclareLocal(typeof(SandboxValue));
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+        il.Emit(OpCodes.Stloc, value);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+        il.Emit(OpCodes.Ldloc, value);
+        il.Emit(OpCodes.Ret);
+    }
+
+    private static void EmitFunctionBodyWithPinnedLocal(MethodBuilder function)
+    {
+        var il = function.GetILGenerator();
+        il.DeclareLocal(typeof(SandboxValue), pinned: true);
         var value = il.DeclareLocal(typeof(SandboxValue));
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
