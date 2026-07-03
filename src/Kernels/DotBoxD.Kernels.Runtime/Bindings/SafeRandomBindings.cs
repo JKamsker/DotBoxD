@@ -16,8 +16,9 @@ public static class SafeRandomBindings
         BindingCostModel.Fixed(3),
         AuditLevel.PerCall,
         BindingSafety.ReadOnlyExternal,
-        (context, args, _) =>
+        (context, args, cancellationToken) =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var startedAt = DateTimeOffset.UtcNow;
             var min = ((I32Value)args[0]).Value;
             var max = ((I32Value)args[1]).Value;
