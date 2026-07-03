@@ -276,6 +276,7 @@ public sealed class HookPipelineResultHooksTests
         => new()
         {
             TimeSpan.Zero,
+            TimeSpan.FromSeconds(-1),
             TimeSpan.FromMilliseconds((double)int.MaxValue + 1d),
         };
 }

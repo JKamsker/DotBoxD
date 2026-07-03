@@ -31,6 +31,8 @@ public partial class HookPipeline<TEvent, TContext>
         where TResult : struct, IHookResult
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
         if (!_resultHooks.HasHandlers)
         {
             return new ValueTask<TResult?>((TResult?)null);
