@@ -4,6 +4,40 @@ public static partial class KernelRpcMarshaller
 {
     private sealed partial class RecordShape
     {
+        public object?[] GetValues(object instance)
+        {
+            var values = new object?[Fields.Count];
+            for (var i = 0; i < Fields.Count; i++)
+            {
+                values[i] = GetValue(instance, i);
+            }
+
+            return values;
+        }
+
+        public void RejectUnreconstructibleOutboundValue(object?[] arguments)
+        {
+            if (_recordFactory is not null || !HasReadOnlyField())
+            {
+                return;
+            }
+
+            _ = ConstructFromArguments(arguments);
+        }
+
+        private bool HasReadOnlyField()
+        {
+            for (var i = 0; i < Fields.Count; i++)
+            {
+                if (!Fields[i].IsSettable)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private object ConstructFromArguments(object?[] arguments)
         {
             var instance = ConstructInstance(arguments);
