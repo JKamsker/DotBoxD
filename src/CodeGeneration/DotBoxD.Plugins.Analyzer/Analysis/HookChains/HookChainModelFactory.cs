@@ -111,6 +111,8 @@ internal static partial class HookChainModelFactory
             return null;
         }
 
+        ValidateServerContextType(seed, generatedRemoteTarget, model, cancellationToken);
+
         // Run/RunLocal take a single lambda; Register/RegisterLocal take (lambda, priority) — accept the leading
         // lambda for the result terminals so the trailing priority argument does not reject the chain.
         var isResultTerminal = installKind is HookChainInterceptorInstallKind.ResultChain
