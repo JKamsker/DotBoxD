@@ -72,6 +72,12 @@ public static partial class SafeFileSystem
         string text,
         CancellationToken cancellationToken)
     {
+        if (context.CancellationToken.IsCancellationRequested)
+        {
+            throw Error(SandboxErrorCode.Cancelled, "file.writeText cancelled");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         var startedAt = DateTimeOffset.UtcNow;
         try
         {
