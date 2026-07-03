@@ -105,6 +105,21 @@ public sealed class QueryTextTests
         Assert.Equal(Fingerprint(filter), Fingerprint(parsed));
     }
 
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(42.0)]
+    [InlineData(1.5)]
+    public void Format_parse_preserves_number_kind(double value)
+    {
+        var filter = QueryFilter.Compare("X", QueryComparisonOperator.Equal, QueryValue.FromNumber(value));
+
+        var parsed = QueryText.Parse(QueryText.Format(filter));
+
+        Assert.NotNull(parsed.Value);
+        Assert.Equal(QueryValueKind.Number, parsed.Value.Kind);
+        Assert.Equal(value, parsed.Value.Number);
+    }
+
     private static string Fingerprint(QueryFilter filter)
         => QueryFingerprint.Compute(EventQueryDocument.Create("E", filter, QueryProjection.Identity));
 }
