@@ -73,6 +73,12 @@ public static class PluginMessageBindings
             return;
         }
 
+        if (value is null)
+        {
+            Add(diagnostics, grant, $"parameter '{key}' must not be null");
+            return;
+        }
+
         var values = value.Split(',', StringSplitOptions.TrimEntries);
         if (values.Length == 0 || values.Any(string.IsNullOrEmpty))
         {
