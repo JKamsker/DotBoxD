@@ -79,6 +79,15 @@ public sealed class SandboxValueValidatorTests
     }
 
     [Fact]
+    public void RequireType_rejects_null_payload_string_values()
+    {
+        var ex = Record.Exception(() =>
+            SandboxValueValidator.RequireType(new StringValue(null!), SandboxType.String, "bad input"));
+
+        AssertStringValueFailsClosed(ex);
+    }
+
+    [Fact]
     public void Validated_shape_meter_rejects_nested_record_field_type_mismatch()
     {
         var value = SandboxValue.FromRecord([
@@ -126,5 +135,18 @@ public sealed class SandboxValueValidatorTests
                 new ResourceLimits(MaxCollectionDepth: 0)));
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
+    }
+
+    private static void AssertStringValueFailsClosed(Exception? ex)
+    {
+        Assert.NotNull(ex);
+        if (ex is ArgumentNullException argumentNull)
+        {
+            Assert.Equal("value", argumentNull.ParamName);
+            return;
+        }
+
+        var runtimeEx = Assert.IsType<SandboxRuntimeException>(ex);
+        Assert.Equal(SandboxErrorCode.InvalidInput, runtimeEx.Error.Code);
     }
 }

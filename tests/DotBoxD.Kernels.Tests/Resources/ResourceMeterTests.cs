@@ -126,6 +126,17 @@ public sealed class ResourceMeterTests
     }
 
     [Fact]
+    public void ChargeValue_does_not_leak_null_reference_for_null_payload_string_values()
+    {
+        var meter = new ResourceMeter(new ResourceLimits());
+
+        var ex = Record.Exception(() => meter.ChargeValue(new StringValue(null!)));
+
+        Assert.NotNull(ex);
+        Assert.IsNotType<NullReferenceException>(ex);
+    }
+
+    [Fact]
     public void Flat_scalar_list_fast_path_matches_shape_scan_fuel_boundary()
     {
         var freeMeter = new ResourceMeter(new ResourceLimits(MaxFuel: 0));
