@@ -178,6 +178,6 @@ internal static class PluginManifestCapabilityValidator
         }
     }
 
-    public static bool IsKnownNonBindingCapability(string capability)
-        => capability.StartsWith("event.read.", StringComparison.Ordinal);
+    public static bool IsKnownNonBindingCapability(string? capability)
+        => capability is not null && capability.StartsWith("event.read.", StringComparison.Ordinal);
 }

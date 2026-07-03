@@ -28,4 +28,25 @@ public sealed partial class PluginPackageValidationTests
 
         Assert.Contains(ex.Diagnostics, d => d.Code == "DBXK044");
     }
+
+    [Fact]
+    public async Task Install_rejects_null_manifest_required_capability_entries()
+    {
+        var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var package = FireDamagePluginPackage.Create();
+        var invalid = package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = [.. package.Manifest.RequiredCapabilities, null!]
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await server.InstallAsync(invalid).AsTask());
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK044" &&
+            d.Message.Contains("requiredCapabilities", StringComparison.Ordinal));
+    }
 }

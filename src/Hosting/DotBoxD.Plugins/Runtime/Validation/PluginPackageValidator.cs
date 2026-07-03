@@ -38,6 +38,7 @@ internal static class PluginPackageValidator
         }
 
         PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
+        ValidateRequiredCapabilities(package.Manifest, diagnostics);
         ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
         foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
         {
@@ -144,6 +145,18 @@ internal static class PluginPackageValidator
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK048",
                 "A hook subscription cannot claim full index coverage with no indexed predicates."));
+        }
+    }
+
+    private static void ValidateRequiredCapabilities(
+        PluginManifest manifest,
+        List<SandboxDiagnostic> diagnostics)
+    {
+        if (manifest.RequiredCapabilities.Any(static capability => capability is null))
+        {
+            diagnostics.Add(new SandboxDiagnostic(
+                "DBXK044",
+                "Plugin manifest requiredCapabilities must not contain null entries."));
         }
     }
 
