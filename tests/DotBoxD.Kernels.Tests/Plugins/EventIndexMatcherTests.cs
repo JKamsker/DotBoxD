@@ -18,6 +18,12 @@ public sealed class EventIndexMatcherTests
         [property: EventIndexKey] string? Tag,
         int Unindexed);
 
+    private sealed record IndexedNestedPayload(
+        [property: EventIndexKey] int Amount,
+        [property: EventIndexKey] string Kind);
+
+    private sealed record IndexedNestedSample(IndexedNestedPayload Damage, string TargetId);
+
     private static IndexedSample Sample(
         string name = "alpha", int count = 5, double ratio = 1.5, string? tag = "t", int unindexed = 0)
         => new(name, count, ratio, tag, unindexed);
@@ -110,5 +116,24 @@ public sealed class EventIndexMatcherTests
             [new IndexedPredicate("Tag", IndexPredicateOperator.LessThan, "m", "string")]);
         // null vs "m" ordering is undecidable, so the index must NOT reject — leave it to the verified IR.
         Assert.True(ordering.CouldMatch(Sample(tag: null)));
+    }
+
+    [Fact]
+    public void Honors_dotted_event_index_key_paths()
+    {
+        Assert.Contains("Damage.Amount", EventIndexMatcher<IndexedNestedSample>.IndexKeyNames);
+        Assert.Contains("Damage.Kind", EventIndexMatcher<IndexedNestedSample>.IndexKeyNames);
+
+        var matcher = EventIndexMatcher<IndexedNestedSample>.Create(
+        [
+            new IndexedPredicate("Damage.Amount", IndexPredicateOperator.GreaterThanOrEqual, 5, "int"),
+            new IndexedPredicate("Damage.Kind", IndexPredicateOperator.Equals, "fire", "string"),
+        ]);
+
+        Assert.Equal(2, matcher.HonoredPredicates.Count);
+        Assert.True(matcher.CouldMatch(new IndexedNestedSample(new IndexedNestedPayload(5, "fire"), "target")));
+        Assert.True(matcher.CouldMatch(new IndexedNestedSample(new IndexedNestedPayload(9, "fire"), "target")));
+        Assert.False(matcher.CouldMatch(new IndexedNestedSample(new IndexedNestedPayload(4, "fire"), "target")));
+        Assert.False(matcher.CouldMatch(new IndexedNestedSample(new IndexedNestedPayload(9, "ice"), "target")));
     }
 }
