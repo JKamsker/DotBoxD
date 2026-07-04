@@ -11,6 +11,7 @@ public static class JsonExporter
     public static string Export(SandboxModule module, bool indented = false)
     {
         ArgumentNullException.ThrowIfNull(module);
+        ModuleSerializationGuard.ThrowIfMalformed(module);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = indented });
