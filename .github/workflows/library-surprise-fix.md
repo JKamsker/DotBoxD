@@ -455,76 +455,12 @@ post-steps:
     if: steps.surprise-fix-guard.outputs.should_validate == 'true'
     run: GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore
 
-  - name: Resolve agent-handled CodeRabbit review threads
-    shell: bash
-    env:
-      # Resolve as the PAT (repo write) rather than the read-only agent job token.
-      GH_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
-    run: |
-      set -euo pipefail
-      outputs="/tmp/gh-aw/safeoutputs.jsonl"
-      if [ ! -s "$outputs" ]; then
-        echo "No safe outputs; nothing to resolve."
-        exit 0
-      fi
-      python3 - <<'PY'
-      import json, re, subprocess, sys
-
-      outputs_path = "/tmp/gh-aw/safeoutputs.jsonl"
-      # The agent embeds the threads it actually handled (fixed, or consciously
-      # dismissed WITH a stated reason) in its summary add_comment body, as:
-      #   <!-- surprise-fix:resolve {"resolve":["<threadNodeId>", ...]} -->
-      # Only those are resolved here; threads it left genuinely open are untouched.
-      marker = re.compile(r"<!--\s*surprise-fix:resolve\s*(\{.*?\})\s*-->", re.DOTALL)
-
-      bodies = []
-      with open(outputs_path, encoding="utf-8") as handle:
-          for line in handle:
-              line = line.strip()
-              if not line:
-                  continue
-              try:
-                  item = json.loads(line)
-              except json.JSONDecodeError:
-                  continue
-              if item.get("type") != "add_comment":
-                  continue
-              for value in item.values():
-                  if isinstance(value, str):
-                      bodies.append(value)
-
-      thread_ids = []
-      for body in bodies:
-          found = marker.search(body)
-          if not found:
-              continue
-          try:
-              payload = json.loads(found.group(1))
-          except json.JSONDecodeError as exc:
-              print(f"::warning::Unparseable surprise-fix:resolve marker: {exc}")
-              continue
-          for tid in payload.get("resolve") or []:
-              if isinstance(tid, str) and tid and tid not in thread_ids:
-                  thread_ids.append(tid)
-
-      if not thread_ids:
-          print("No CodeRabbit threads flagged for resolution.")
-          sys.exit(0)
-
-      mutation = ("mutation($id:ID!){resolveReviewThread(input:{threadId:$id})"
-                  "{thread{id isResolved}}}")
-      resolved = 0
-      for tid in thread_ids:
-          result = subprocess.run(
-              ["gh", "api", "graphql", "-F", f"id={tid}", "-f", f"query={mutation}"],
-              check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-          if result.returncode != 0:
-              print(f"::warning::Failed to resolve thread {tid}: {result.stderr.strip()}")
-          else:
-              resolved += 1
-              print(f"Resolved review thread {tid}")
-      print(f"Resolved {resolved}/{len(thread_ids)} agent-handled CodeRabbit thread(s).")
-      PY
+  # Thread resolution is intentionally NOT done here. It lives in
+  # library-surprise-fix-dispatcher.yml, which reads the resolve marker from the
+  # summary comment on a later tick. That comment is posted through the
+  # detection-gated safe_outputs job, so resolution only ever acts on agent output
+  # that already passed threat detection — a post-step here would run BEFORE the
+  # detection job and could resolve threads from a manipulated agent output.
 
   # NOTE: we intentionally do NOT run `dotnet test DotBoxD.slnx` here. The whole-solution
   # test run OOM-kills the DotBoxD.Kernels.Tests host (exit 137) under this job's memory
@@ -676,7 +612,8 @@ Post exactly one `add_comment` on the PR. Its body MUST:
 - summarize the mode, what you changed (CI fixes + fix), and each CodeRabbit
   disposition,
 - end with a machine-readable block listing ONLY the inline-thread node ids you
-  handled, exactly in this form (a post-step resolves these threads):
+  handled, exactly in this form (the dispatcher resolves these threads on a later
+  tick, after this comment has passed threat detection):
 
   ```
   <!-- surprise-fix:resolve {"resolve":["<threadNodeId>","<threadNodeId>"]} -->

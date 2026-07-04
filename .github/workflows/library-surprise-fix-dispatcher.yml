@@ -135,7 +135,11 @@ jobs:
               # re-run), 204=already up-to-date (no-op), 409=merge conflict (left for
               # the worker/human to resolve).
               head_ref = head_refs.get(number)
-              if not ci_token or not head_ref:
+              if not ci_token:
+                  print("::warning::CI_TRIGGER_TOKEN not set; skipping server-side "
+                        "main merge (stale-branch CI drift will not be cleared)")
+                  return
+              if not head_ref:
                   return
               env = {**os.environ, "GH_TOKEN": ci_token}
               r = subprocess.run(
@@ -149,6 +153,45 @@ jobs:
                   print(f"::warning::#{number}: main->branch merge conflict; worker/human must resolve")
               else:
                   print(f"::warning::#{number}: merge main failed: {r.stderr.strip()}")
+
+          # Thread resolution runs HERE (plain YAML, PAT), not in the fix worker's
+          # agent job. The worker's summary comment — which carries the resolve
+          # marker below — is itself posted through the detection-gated safe_outputs
+          # job, so by the time this dispatcher reads a marker the agent output has
+          # already passed threat detection. Resolving in the agent job (a post-step
+          # that runs BEFORE the detection job) would let a manipulated agent output
+          # resolve threads pre-detection.
+          _MARKER_RE = re.compile(r"<!--\s*surprise-fix:resolve\s*(\{.*?\})\s*-->", re.DOTALL)
+          _RESOLVE_MUTATION = ("mutation($id:ID!){resolveReviewThread(input:{threadId:$id})"
+                               "{thread{id isResolved}}}")
+
+          def parse_handled_ids(comment_bodies):
+              handled = set()
+              for body in comment_bodies:
+                  m = _MARKER_RE.search(body or "")
+                  if not m:
+                      continue
+                  try:
+                      payload = json.loads(m.group(1))
+                  except json.JSONDecodeError:
+                      continue
+                  for tid in payload.get("resolve") or []:
+                      if isinstance(tid, str) and tid:
+                          handled.add(tid)
+              return handled
+
+          def resolve_thread(tid):
+              if not ci_token:
+                  return
+              env = {**os.environ, "GH_TOKEN": ci_token}
+              r = subprocess.run(["gh", "api", "graphql", "-F", f"id={tid}",
+                                  "-f", f"query={_RESOLVE_MUTATION}"],
+                                 check=False, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+              if r.returncode == 0:
+                  print(f"resolved review thread {tid}")
+              else:
+                  print(f"::warning::failed to resolve thread {tid}: {r.stderr.strip()}")
 
           RED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"}
           PENDING_STATUSES = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"}
@@ -184,7 +227,7 @@ jobs:
           _GRAPHQL = (
               "query($owner:String!,$name:String!,$pr:Int!){"
               "repository(owner:$owner,name:$name){pullRequest(number:$pr){"
-              "reviewThreads(first:50){nodes{isResolved comments(first:1){nodes{author{login}}}}}"
+              "reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{author{login}}}}}"
               "reviews(first:40){nodes{author{login} body}}"
               "comments(first:100){nodes{body}}}}}"
           )
@@ -202,29 +245,30 @@ jobs:
                   # Transient API error: fail toward NOT re-picking (pretend a marker
                   # exists, no open threads, nothing actionable). A later tick retries;
                   # this avoids a dispatch storm on a flaky GraphQL endpoint.
-                  return {"has_marker": True, "has_unresolved_cr": False, "has_actionable": False}
+                  return {"has_marker": True, "unresolved_cr_ids": [], "handled_ids": set(),
+                          "has_actionable": False}
               pr = (((json.loads(out).get("data") or {}).get("repository") or {})
                     .get("pullRequest") or {})
               threads = (pr.get("reviewThreads") or {}).get("nodes") or []
-              has_unresolved_cr = False
+              unresolved_cr_ids = []
               for t in threads:
                   if t.get("isResolved"):
                       continue
                   cnodes = (t.get("comments") or {}).get("nodes") or []
                   author = (cnodes[0].get("author") or {}).get("login", "") if cnodes else ""
-                  if author and author.lower().startswith("coderabbit"):
-                      has_unresolved_cr = True
-                      break
-              has_actionable = has_unresolved_cr
+                  if author and author.lower().startswith("coderabbit") and t.get("id"):
+                      unresolved_cr_ids.append(t["id"])
+              has_actionable = bool(unresolved_cr_ids)
               for r in (pr.get("reviews") or {}).get("nodes") or []:
                   author = (r.get("author") or {}).get("login", "")
                   body = r.get("body") or ""
                   if author.lower().startswith("coderabbit") and any(tok in body for tok in ACTIONABLE):
                       has_actionable = True
                       break
-              comments = (pr.get("comments") or {}).get("nodes") or []
-              has_marker = any(SENTINEL in (c.get("body") or "") for c in comments)
-              return {"has_marker": has_marker, "has_unresolved_cr": has_unresolved_cr,
+              comment_bodies = [c.get("body") or "" for c in (pr.get("comments") or {}).get("nodes") or []]
+              has_marker = any(SENTINEL in b for b in comment_bodies)
+              return {"has_marker": has_marker, "unresolved_cr_ids": unresolved_cr_ids,
+                      "handled_ids": parse_handled_ids(comment_bodies),
                       "has_actionable": has_actionable}
 
           fix_candidates = []
@@ -248,8 +292,14 @@ jobs:
                   polish_candidates.append((number, "ci-red"))
                   continue
               info = polish_graphql(number)
+              # Resolve the threads the worker reported handled (its marker), then
+              # only the threads it did NOT handle count as "still open".
+              to_resolve = [t for t in info["unresolved_cr_ids"] if t in info["handled_ids"]]
+              for tid in to_resolve:
+                  resolve_thread(tid)
+              remaining = [t for t in info["unresolved_cr_ids"] if t not in info["handled_ids"]]
               reasons = []
-              if info["has_unresolved_cr"]:
+              if remaining:
                   reasons.append("unresolved-coderabbit-thread")
               # First polish pass only when there is genuinely actionable CodeRabbit
               # content to address; a clean fixed PR is left alone (no wasted run).

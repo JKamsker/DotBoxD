@@ -669,8 +669,15 @@ per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurr
   threads and top-level review nitpicks** (judging validity first), then posts one summary
   `add_comment` beginning with `<!-- surprise-fix:polished -->` and ending with a machine block
   `<!-- surprise-fix:resolve {"resolve":[...]} -->` listing only the threads it fixed or consciously
-  dismissed-with-reason. A post-step resolves exactly those via the `resolveReviewThread` GraphQL
-  mutation (PAT). Threads left genuinely open are never resolved.
+  dismissed-with-reason. Threads left genuinely open are never listed.
+- **Resolution happens in the dispatcher, not the agent job.** On a later tick the dispatcher parses
+  that marker and resolves exactly the listed threads via `resolveReviewThread` (PAT). This is
+  deliberate: the summary comment is posted through the **detection-gated `safe_outputs` job**, so the
+  marker the dispatcher acts on has already passed threat detection. A resolve post-step inside the
+  agent job would run **before** the `detection` job and could resolve threads from a manipulated agent
+  output — so the PAT/GraphQL mutation is kept entirely out of the agent job. The dispatcher only
+  resolves threads still open ∩ listed as handled, so it re-triggers a polish pass only for genuinely
+  unaddressed threads and never re-resolves.
 
 This also subsumes the "fail-open verify gate" concern: a fix that does not actually hold now surfaces
 as red PR CI and is re-picked for another (capped) pass instead of wearing `sweep:fixed` untouched.
