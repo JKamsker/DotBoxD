@@ -114,6 +114,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
             typeof(SdkContext))]
         public sealed class SdkHookRegistry
         {
+            [PipelineStep(PipelineStepRole.Seed)]
             public RemoteHookPipeline<TEvent, SdkContext> On<TEvent>()
                 => throw new System.InvalidOperationException("not used");
         }

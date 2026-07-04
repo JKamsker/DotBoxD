@@ -4,10 +4,9 @@ public sealed partial class PluginAnalyzerHookChainTests
 {
     // A consumer defines its OWN fluent surface: a custom-named pipeline type with custom-named seed and
     // filter methods, and opts into lowering purely by applying the public [PipelineSurface]/[PipelineStep]
-    // attributes. The generator recognizes the chain by role (not by the framework's method names): "When"
-    // and "Keep" have no name-based fallback, so a lowered package proves the attribute path drove recognition.
-    // (The terminal keeps the standard verb "Run" only because the generator's syntactic candidate filter is a
-    // name/shape fast-gate that runs without a semantic model: an inherent incremental-generator constraint.)
+    // attributes. The generator recognizes the chain by role (not by the framework's method names): "When",
+    // "Keep", and "Finish" have no name-based fallback, so a lowered package proves the attribute path drove
+    // recognition end to end.
     private const string ConsumerSurfaceSource = """
         using System;
         using DotBoxD.Abstractions;
@@ -23,7 +22,7 @@ public sealed partial class PluginAnalyzerHookChainTests
             public Reaction<TEvent> Keep(Func<TEvent, HookContext, bool> predicate) => this;
 
             [PipelineStep(PipelineStepRole.Run)]
-            public Reaction<TEvent> Run(Action<TEvent, HookContext> handler) => this;
+            public Reaction<TEvent> Finish(Action<TEvent, HookContext> handler) => this;
 
             // The install target the generated interceptor redirects to: ordinary public API the consumer
             // could equally call by hand, honoring the "delete the attribute and hand-write it" rule.
@@ -41,7 +40,7 @@ public sealed partial class PluginAnalyzerHookChainTests
             public static void Configure(Reactions reactions)
                 => reactions.When<HitEvent>()
                     .Keep((e, ctx) => e.Distance <= 5)
-                    .Run((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
+                    .Finish((e, ctx) => ctx.Messages.Send(e.TargetId, "hit"));
         }
         """;
 

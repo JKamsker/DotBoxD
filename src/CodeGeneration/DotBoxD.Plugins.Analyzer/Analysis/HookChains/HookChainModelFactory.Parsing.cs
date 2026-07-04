@@ -32,19 +32,6 @@ internal static partial class HookChainModelFactory
     private static PipelineStepRole? RoleOf(IMethodSymbol? method, Compilation compilation)
         => PipelineRoleReader.RoleOf(method, compilation);
 
-    private static PipelineStepRole? LegacyNameRole(string? methodName)
-        => methodName switch
-        {
-            OnMethod => PipelineStepRole.Seed,
-            WhereMethod => PipelineStepRole.Filter,
-            SelectMethod => PipelineStepRole.Projection,
-            RunMethod => PipelineStepRole.Run,
-            RunLocalMethod => PipelineStepRole.RunLocal,
-            RegisterMethod => PipelineStepRole.Register,
-            RegisterLocalMethod => PipelineStepRole.RegisterLocal,
-            _ => null,
-        };
-
     private static PipelineStepRole? RoleOf(
         InvocationExpressionSyntax invocation,
         SemanticModel model,
@@ -57,22 +44,11 @@ internal static partial class HookChainModelFactory
             return role;
         }
 
-        // A method on a type that DID opt into [PipelineSurface] but left this method unmarked is deliberately
-        // NOT a pipeline step: the per-method [PipelineStep] opt-in is enforced, so we must not resurrect it by
-        // name (that would silently lower a consumer's ordinary, standard-named method on their surface type).
-        // Fall back to syntactic name recognition only for receivers OUTSIDE the attribute vocabulary: a
-        // generated/not-yet-emitted registry (no symbol at all) or a prebuilt/legacy SDK type that predates
-        // [PipelineStep] (a resolved symbol whose containing type is not itself a [PipelineSurface]).
-        if (symbol is IMethodSymbol resolved &&
-            resolved.ContainingType is { } containingType &&
-            ReceiverKind(containingType, model.Compilation) is not null)
-        {
-            return null;
-        }
-
-        return invocation.Expression is MemberAccessExpressionSyntax access
-            ? LegacyNameRole(access.Name.Identifier.ValueText)
-            : null;
+        return GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+            invocation,
+            model,
+            cancellationToken,
+            symbol as IMethodSymbol);
     }
 
     private static InvocationExpressionSyntax? WalkToSeed(

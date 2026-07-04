@@ -1,3 +1,4 @@
+using DotBoxD.Plugins.Analyzer.Analysis.HookChains;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -112,7 +113,7 @@ public sealed partial class PluginAnalyzer
                 argumentList.Parent is InvocationExpressionSyntax invocation &&
                 invocation.Expression is MemberAccessExpressionSyntax member)
             {
-                return member.Name.Identifier.ValueText is "Where" or "Select" or "Run" or "Register" &&
+                return IsLoweredPipelineStep(invocation, model, cancellationToken) &&
                     IsHookChainReceiver(member.Expression, model, cancellationToken);
             }
         }
@@ -125,18 +126,20 @@ public sealed partial class PluginAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
         => model.GetTypeInfo(receiver, cancellationToken).Type is INamedTypeSymbol receiverType &&
-           IsHookChainType(receiverType);
+           PipelineRoleReader.Transport(receiverType, model.Compilation) is not null;
 
-    private static bool IsHookChainType(INamedTypeSymbol type)
-        => type.ContainingNamespace.ToDisplayString() switch
-        {
-            "DotBoxD.Plugins.Runtime" => type.Name is
-                "HookPipeline" or
-                "SubscriptionPipeline" or
-                "RemoteHookPipeline" or
-                "RemoteSubscriptionPipeline",
-            "DotBoxD.Plugins.Runtime.Hooks" => type.Name is "HookStage" or "RemoteHookStage",
-            "DotBoxD.Plugins.Runtime.Subscriptions" => type.Name is "SubscriptionStage" or "RemoteSubscriptionStage",
-            _ => false,
-        };
+    private static bool IsLoweredPipelineStep(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var method = info.Symbol as IMethodSymbol ??
+            (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] as IMethodSymbol : null);
+        return PipelineRoleReader.RoleOf(method, model.Compilation) is
+            PipelineStepRole.Filter or
+            PipelineStepRole.Projection or
+            PipelineStepRole.Run or
+            PipelineStepRole.Register;
+    }
 }

@@ -144,8 +144,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
 
         var invokeAsyncResults = GeneratorGuard.SyntaxValues(
             context,
-            static (node, _) => node is InvocationExpressionSyntax invocation &&
-                IsInvokeAsyncCandidate(invocation.Expression),
+            static (node, _) => node is InvocationExpressionSyntax invocation && HasLambdaArgument(invocation),
             "InvokeAsync package model",
             static (syntaxContext, ct) => InvokeAsyncModelFactory.Create(syntaxContext, ct));
         GeneratorGuard.RegisterOutput(
@@ -265,25 +264,9 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)
-        => node is InvocationExpressionSyntax
-        {
-            Expression: MemberAccessExpressionSyntax
-            {
-                Name.Identifier.ValueText: "Run" or "RunLocal" or "Register" or "RegisterLocal"
-            }
-        };
+        => node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax } invocation &&
+           HasLambdaArgument(invocation);
 
-    private static bool IsInvokeAsyncCandidate(ExpressionSyntax expression)
-        => expression switch
-        {
-            MemberAccessExpressionSyntax { Name.Identifier.ValueText: "InvokeAsync" } => true,
-            MemberBindingExpressionSyntax
-            {
-                Name: IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" }
-                    or GenericNameSyntax { Identifier.ValueText: "InvokeAsync" }
-            } => true,
-            IdentifierNameSyntax { Identifier.ValueText: "InvokeAsync" } => true,
-            GenericNameSyntax { Identifier.ValueText: "InvokeAsync" } => true,
-            _ => false
-        };
+    private static bool HasLambdaArgument(InvocationExpressionSyntax invocation)
+        => invocation.ArgumentList.Arguments.Any(static argument => argument.Expression is LambdaExpressionSyntax);
 }

@@ -15,6 +15,8 @@ public enum HostBindingEffect.Allocates = 4
 public enum HostBindingEffect.HostStateRead = 1
 public enum HostBindingEffect.HostStateWrite = 2
 public enum HostBindingEffect.None = 0
+public enum LoweredIrMethodKind
+public enum LoweredIrMethodKind.AnonymousInvocation
 public enum LoweredPipelineStepKind
 public enum LoweredPipelineStepKind.Filter
 public enum LoweredPipelineStepKind.Projection
@@ -56,6 +58,7 @@ public IReadOnlyList<PluginMessage> Messages
 public IReadOnlyList<Statement> Prefix
 public IReadOnlyList<string> Effects
 public IReadOnlyList<string> RequiredCapabilities
+public LoweredIrMethodKind Kind { get; } = kind
 public LoweredPipelineStepKind Kind { get; } = kind
 public PipelineStepRole Role { get; } = role
 public PipelineTransport Transport { get; } = transport
@@ -80,6 +83,7 @@ public sealed class KernelMethodAttribute : Attribute
 public sealed class LiveSettingAttribute : Attribute
 public sealed class LocalAttribute : Attribute
 public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
+public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
 public sealed class PipelineStepAttribute(PipelineStepRole role) : Attribute
 public sealed class PipelineSurfaceAttribute(PipelineTransport transport) : Attribute
 public sealed class PluginAttribute : Attribute

@@ -22,6 +22,23 @@ public sealed class LowerToIrAttribute(LoweredPipelineStepKind kind) : Attribute
 }
 
 /// <summary>
+/// Describes method-level source-generator lowering into verified IR.
+/// </summary>
+public enum LoweredIrMethodKind
+{
+    AnonymousInvocation,
+}
+
+/// <summary>
+/// Marks a method whose lambda argument should be lowered into a generated anonymous IR package.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+public sealed class LowerToIrMethodAttribute(LoweredIrMethodKind kind) : Attribute
+{
+    public LoweredIrMethodKind Kind { get; } = kind;
+}
+
+/// <summary>
 /// Experimental public carrier for one lowered pipeline stage. A later composer can merge ordered
 /// steps into a complete <see cref="SandboxModule"/>.
 /// </summary>
@@ -69,4 +86,3 @@ public sealed record LoweredPipelineStep(
             ? Array.AsReadOnly((T[])array.Clone())
             : Array.AsReadOnly(values.ToArray());
 }
-

@@ -19,6 +19,38 @@ public sealed class InvokeAsyncGenerationTests
     }
 
     [Fact]
+    public void Generated_InvokeAsync_methods_are_marked_for_ir_lowering()
+    {
+        var result = RunGenerator(NoCaptureSource);
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains("LowerToIrMethod", source, StringComparison.Ordinal);
+        Assert.Contains("LoweredIrMethodKind.AnonymousInvocation", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Custom_named_marked_invocation_method_generates_anonymous_package()
+    {
+        var result = RunGenerator(UsageSource("""
+            public static ValueTask<int> Run(RemotePluginServer kernels)
+                => kernels.ProbeAsync(async (IGameWorldAccess world) =>
+                {
+                    return world.GetHealth("monster-1");
+                });
+            """, """
+                [LowerToIrMethod(LoweredIrMethodKind.AnonymousInvocation)]
+                public ValueTask<TReturn> ProbeAsync<TReturn>(
+                    Func<IGameWorldAccess, ValueTask<TReturn>> lambda,
+                    CancellationToken cancellationToken = default)
+                    => throw new InvalidOperationException("not lowered");
+            """));
+        var source = string.Join("\n", result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains("AnonymousInvokeAsync", source, StringComparison.Ordinal);
+        Assert.Contains("host.world.getHealth", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Object_snapshot_member_access_generates_record_get_package()
     {
         var result = RunGenerator(ObjectSurfaceSource);

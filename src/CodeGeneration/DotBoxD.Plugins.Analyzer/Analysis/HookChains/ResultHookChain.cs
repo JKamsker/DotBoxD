@@ -151,10 +151,6 @@ internal static partial class ResultHookChain
         return new HookChainResult(kernelModel, interception);
     }
 
-    public static bool IsResultTerminal(string terminalMethod)
-        => string.Equals(terminalMethod, "Register", StringComparison.Ordinal)
-            || string.Equals(terminalMethod, "RegisterLocal", StringComparison.Ordinal);
-
     private static DotBoxDStatementBodyModel LowerResultHandle(
         LambdaExpressionSyntax terminalLambda,
         string terminalElementParam,

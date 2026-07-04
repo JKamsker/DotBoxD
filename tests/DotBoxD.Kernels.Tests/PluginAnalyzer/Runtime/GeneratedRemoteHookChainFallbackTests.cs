@@ -142,6 +142,7 @@ public sealed partial class GeneratedRemoteHookChainFallbackTests
         Assert.Contains("GeneratedPluginServerRegistryKind.Subscription", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginServer)", generated, StringComparison.Ordinal);
         Assert.Contains("typeof(global::ChainSample.Plugin.AlphaPluginContext)", generated, StringComparison.Ordinal);
+        Assert.Contains("PipelineStepRole.Seed", generated, StringComparison.Ordinal);
     }
 
     [Fact]

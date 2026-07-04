@@ -97,12 +97,14 @@ internal static class PluginServerFacadeSurfaceEmitter
             builder,
             "    ",
             "Installs and invokes a one-off server-side probe. Calls must be intercepted by the DotBoxD plugin generator.");
+        AppendLowerToIrMethodAttribute(builder);
         builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<TReturn> InvokeAsync<TReturn>(global::System.Func<" + model.WorldType + ", global::System.Threading.Tasks.ValueTask<TReturn>> lambda, global::System.Threading.CancellationToken cancellationToken = default)");
         builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
         PluginServerXmlDocumentation.AppendSummary(
             builder,
             "    ",
             "Installs and invokes a one-off server-side probe with an explicit capture bag. Calls must be intercepted by the DotBoxD plugin generator.");
+        AppendLowerToIrMethodAttribute(builder);
         builder.AppendLine("    public global::System.Threading.Tasks.ValueTask<TReturn> InvokeAsync<TCaptures, TReturn>(TCaptures captures, global::DotBoxD.Abstractions.RemoteServerInvocation<" + model.WorldType + ", TCaptures, TReturn> lambda, global::System.Threading.CancellationToken cancellationToken = default) where TCaptures : class");
         builder.AppendLine("        => throw new global::System.InvalidOperationException(\"Plugin server InvokeAsync calls must be intercepted by the DotBoxD plugin generator.\");");
         PluginServerXmlDocumentation.AppendSummary(
@@ -252,5 +254,12 @@ internal static class PluginServerFacadeSurfaceEmitter
         builder.AppendLine("            throw new global::System.InvalidOperationException($\"Kernel '{typeof(TKernel).FullName}' has not been installed.\");");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
+    }
+
+    private static void AppendLowerToIrMethodAttribute(StringBuilder builder)
+    {
+        builder.Append("    [global::DotBoxD.Abstractions.LowerToIrMethod(")
+            .Append("global::DotBoxD.Abstractions.LoweredIrMethodKind.AnonymousInvocation")
+            .AppendLine(")]");
     }
 }

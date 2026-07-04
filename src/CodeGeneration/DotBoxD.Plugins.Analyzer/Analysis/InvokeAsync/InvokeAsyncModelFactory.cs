@@ -42,9 +42,15 @@ internal static partial class InvokeAsyncModelFactory
         string receiverType;
         string? serverAccessType;
         INamedTypeSymbol worldType;
-        if (IsUnqualifiedInvokeAsyncExpression(invocation.Expression))
+        var markedMethod = MarkedMethod(model, invocation, cancellationToken);
+        if (IsUnqualifiedInvocationExpression(invocation.Expression))
         {
-            if (BindsToUserInvokeAsync(model, invocation, cancellationToken))
+            if (markedMethod is null && !IsInvokeAsyncName(invocation.Expression))
+            {
+                return null;
+            }
+
+            if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
             {
                 return null;
             }
@@ -66,7 +72,7 @@ internal static partial class InvokeAsyncModelFactory
                     worldType);
             }
 
-            if (IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
             {
                 throw new NotSupportedException(
                     "implicit InvokeAsync calls are not supported; call InvokeAsync on the generated plugin server receiver.");
@@ -75,9 +81,14 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (IsConditionalInvokeAsyncExpression(invocation.Expression))
+        if (IsConditionalInvocationExpression(invocation.Expression))
         {
-            if (BindsToUserInvokeAsync(model, invocation, cancellationToken))
+            if (markedMethod is null && !IsInvokeAsyncName(invocation.Expression))
+            {
+                return null;
+            }
+
+            if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
             {
                 return null;
             }
@@ -95,7 +106,7 @@ internal static partial class InvokeAsyncModelFactory
                     "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
             }
 
-            if (IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
             {
                 throw new NotSupportedException(
                     "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
@@ -105,12 +116,12 @@ internal static partial class InvokeAsyncModelFactory
         }
 
         if (invocation.Expression is not MemberAccessExpressionSyntax access ||
-            !string.Equals(access.Name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal))
+            markedMethod is null && !IsInvokeAsyncName(access.Name))
         {
             return null;
         }
 
-        if (BindsToUserInvokeAsync(model, invocation, cancellationToken))
+        if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
         {
             return null;
         }
@@ -123,7 +134,7 @@ internal static partial class InvokeAsyncModelFactory
                 out serverAccessType,
                 out worldType))
         {
-            if (IsDotBoxDInvokeAsync(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
             {
                 throw new NotSupportedException(
                     "receiver must be a generated plugin server facade or generated server interface, not the erased IPluginServer<TWorld> surface.");
@@ -200,17 +211,6 @@ internal static partial class InvokeAsyncModelFactory
         return new InvokeAsyncResult(package, interception, null);
     }
 
-    private static bool IsUnqualifiedInvokeAsyncExpression(ExpressionSyntax expression)
-        => expression is IdentifierNameSyntax { Identifier.ValueText: InvokeAsyncMethod } or
-            GenericNameSyntax { Identifier.ValueText: InvokeAsyncMethod };
-
-    private static bool IsConditionalInvokeAsyncExpression(ExpressionSyntax expression)
-        => expression is MemberBindingExpressionSyntax
-        {
-            Name: IdentifierNameSyntax { Identifier.ValueText: InvokeAsyncMethod }
-                or GenericNameSyntax { Identifier.ValueText: InvokeAsyncMethod }
-        };
-
     private static bool TryImplicitGeneratedFacadeSurface(
         SemanticModel model,
         InvocationExpressionSyntax invocation,
@@ -229,45 +229,6 @@ internal static partial class InvokeAsyncModelFactory
                    out receiverType,
                    out serverAccessType,
                    out worldType);
-    }
-
-    private static bool IsDotBoxDInvokeAsync(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
-    {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            !string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return IsPluginServerType(method.ContainingType);
-    }
-
-    private static bool BindsToUserInvokeAsync(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
-    {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            method.ContainingType.TypeKind == TypeKind.Error)
-        {
-            return false;
-        }
-
-        return !IsPluginServerType(method.ContainingType);
-    }
-
-    private static bool IsPluginServerType(ITypeSymbol? type)
-    {
-        if (type is not INamedTypeSymbol named)
-        {
-            return false;
-        }
-
-        var original = named.OriginalDefinition.ToDisplayString();
-        return string.Equals(original, "DotBoxD.Abstractions.IPluginServer<TWorld>", StringComparison.Ordinal);
     }
 
     private static bool TryServerInvocationSurface(
