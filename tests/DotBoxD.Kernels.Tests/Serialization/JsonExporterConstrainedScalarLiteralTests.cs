@@ -24,8 +24,16 @@ public sealed class JsonExporterConstrainedScalarLiteralTests
             return;
         }
 
-        var roundTrip = JsonImporter.Import(json!);
-        var returned = ReturnedLiteral(roundTrip);
+        SandboxModule? roundTrip = null;
+        var importError = Record.Exception(() => roundTrip = JsonImporter.Import(json!));
+        if (importError is not null)
+        {
+            var validation = Assert.IsType<SandboxValidationException>(importError);
+            Assert.Contains(validation.Diagnostics, diagnostic => diagnostic.Code == expectedDiagnostic);
+            return;
+        }
+
+        var returned = ReturnedLiteral(roundTrip!);
         AssertConstrainedScalarEqual(value, returned);
     }
 
