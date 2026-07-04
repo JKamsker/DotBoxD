@@ -176,6 +176,7 @@ internal sealed partial class SandboxWorkerExecutor
         var observedHostCalls = 0;
         var observedLogEvents = 0;
         var observedBindingBaseFuel = 0L;
+        var observedBytes = default(ObservedBindingBytes);
         Dictionary<string, int>? observedBindingCalls = null;
         var expectedSequenceNumber = 1L;
         foreach (var auditEvent in result.AuditEvents)
@@ -196,7 +197,8 @@ internal sealed partial class SandboxWorkerExecutor
                     plan,
                     auditEvent,
                     observedBindingCalls,
-                    ref observedBindingBaseFuel))
+                    ref observedBindingBaseFuel,
+                    ref observedBytes))
                 {
                     return false;
                 }
@@ -225,7 +227,8 @@ internal sealed partial class SandboxWorkerExecutor
                 result.ResourceUsage,
                 observedHostCalls,
                 observedLogEvents,
-                observedBindingBaseFuel))
+                observedBindingBaseFuel,
+                observedBytes))
         {
             return false;
         }
@@ -245,7 +248,8 @@ internal sealed partial class SandboxWorkerExecutor
         ExecutionPlan plan,
         SandboxAuditEvent auditEvent,
         Dictionary<string, int> observedBindingCalls,
-        ref long observedBindingBaseFuel)
+        ref long observedBindingBaseFuel,
+        ref ObservedBindingBytes observedBytes)
     {
         if (auditEvent.BindingId is null ||
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding))
@@ -266,16 +270,27 @@ internal sealed partial class SandboxWorkerExecutor
             ? existing + 1
             : 1;
         observedBindingCalls[auditEvent.BindingId] = calls;
-        return binding.CostModel.MaxCallsPerRun is not { } maxCalls ||
-            calls <= maxCalls;
+        return (binding.CostModel.MaxCallsPerRun is not { } maxCalls || calls <= maxCalls) &&
+            TryRecordBindingByteEvidence(auditEvent, ref observedBytes);
     }
+
+    private static bool TryRecordBindingByteEvidence(
+        SandboxAuditEvent auditEvent,
+        ref ObservedBindingBytes observedBytes)
+        => TryRecordBindingByteEvidenceCore(auditEvent, ref observedBytes);
 
     private static bool AuditEvidenceUsageMatches(
         SandboxResourceUsage usage,
         int observedHostCalls,
         int observedLogEvents,
-        long observedBindingBaseFuel)
+        long observedBindingBaseFuel,
+        ObservedBindingBytes observedBytes)
         => usage.HostCalls >= observedHostCalls &&
            usage.LogEvents >= observedLogEvents &&
-           usage.FuelUsed >= observedBindingBaseFuel;
+           usage.FuelUsed >= observedBindingBaseFuel &&
+           usage.FileBytesRead >= observedBytes.FileBytesRead &&
+           usage.FileBytesWritten >= observedBytes.FileBytesWritten &&
+           usage.NetworkBytesRead >= observedBytes.NetworkBytesRead &&
+           usage.NetworkBytesWritten >= observedBytes.NetworkBytesWritten;
+
 }
