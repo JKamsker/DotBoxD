@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 
-namespace DotBoxD.Services.SourceGenerator.Tests.Signatures;
+namespace DotBoxD.Services.SourceGenerator.Tests.Signatures.InheritedCallerInfo;
 
 public class InheritedCallerInfoConflictTests
 {
