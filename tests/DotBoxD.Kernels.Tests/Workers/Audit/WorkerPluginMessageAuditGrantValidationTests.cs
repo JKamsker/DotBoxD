@@ -9,7 +9,7 @@ using DotBoxD.Plugins.Policies;
 using DotBoxD.Plugins.Runtime;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests.Workers;
+namespace DotBoxD.Kernels.Tests.Workers.Audit;
 
 public sealed class WorkerPluginMessageAuditGrantValidationTests
 {
