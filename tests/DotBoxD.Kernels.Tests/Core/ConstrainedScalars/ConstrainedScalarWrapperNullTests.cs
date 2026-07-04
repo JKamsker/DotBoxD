@@ -51,14 +51,11 @@ public sealed class ConstrainedScalarWrapperNullTests
     {
         var value = Bypassed<OpaqueIdValue>();
 
-        var ex = Record.Exception(() =>
-        {
-            var isKnown = value.Type.IsKnown();
+        bool isKnown = default;
+        var ex = Record.Exception(() => isKnown = value.Type.IsKnown());
 
-            Assert.False(isKnown);
-        });
-
-        Assert.False(ex is NullReferenceException, $"Expected no NullReferenceException, got {ex}");
+        Assert.Null(ex);
+        Assert.False(isKnown);
     }
 
     [Theory]

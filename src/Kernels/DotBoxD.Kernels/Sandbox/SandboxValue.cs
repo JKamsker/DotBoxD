@@ -153,26 +153,49 @@ public sealed record GuidValue(System.Guid Value) : SandboxValue
 
 public sealed record OpaqueIdValue(string TypeName, string Value) : SandboxValue
 {
+    private string _typeName = TypeName ?? throw new ArgumentNullException(nameof(TypeName));
+    private string _value = Value ?? throw new ArgumentNullException(nameof(Value));
+
+    public string TypeName { get => _typeName; init => _typeName = value ?? throw new ArgumentNullException(nameof(value)); }
+
+    public string Value { get => _value; init => _value = value ?? throw new ArgumentNullException(nameof(value)); }
+
     public override SandboxType Type => SandboxType.Scalar(TypeName);
 }
 
 public sealed record SandboxPath(string RelativePath)
 {
+    private string _relativePath = RelativePath ?? throw new ArgumentNullException(nameof(RelativePath));
+
+    public string RelativePath { get => _relativePath; init => _relativePath = value ?? throw new ArgumentNullException(nameof(value)); }
+
     public override string ToString() => RelativePath;
 }
 
 public sealed record SandboxPathValue(SandboxPath Value) : SandboxValue
 {
+    private SandboxPath _value = Value ?? throw new ArgumentNullException(nameof(Value));
+
+    public SandboxPath Value { get => _value; init => _value = value ?? throw new ArgumentNullException(nameof(value)); }
+
     public override SandboxType Type => SandboxType.SandboxPath;
 }
 
 public sealed record SandboxUri(string Value)
 {
+    private string _value = Value ?? throw new ArgumentNullException(nameof(Value));
+
+    public string Value { get => _value; init => _value = value ?? throw new ArgumentNullException(nameof(value)); }
+
     public override string ToString() => Value;
 }
 
 public sealed record SandboxUriValue(SandboxUri Value) : SandboxValue
 {
+    private SandboxUri _value = Value ?? throw new ArgumentNullException(nameof(Value));
+
+    public SandboxUri Value { get => _value; init => _value = value ?? throw new ArgumentNullException(nameof(value)); }
+
     public override SandboxType Type => SandboxType.SandboxUri;
 }
 
