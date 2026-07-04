@@ -187,17 +187,8 @@ public sealed class EventQueryIndexAdapterTests
 
     private static void AssertPublicBoundaryRejection(Action action, string expectedParamName)
     {
-        var exception = Record.Exception(action);
+        var exception = Assert.Throws<ArgumentException>(action);
 
-        Assert.NotNull(exception);
-        Assert.IsNotType<NullReferenceException>(exception);
-        Assert.True(
-            exception is ArgumentException or NotSupportedException,
-            $"Expected a public-boundary validation exception, but got {exception.GetType().FullName}: {exception.Message}");
-
-        if (exception is ArgumentException argumentException)
-        {
-            Assert.Equal(expectedParamName, argumentException.ParamName);
-        }
+        Assert.Equal(expectedParamName, exception.ParamName);
     }
 }
