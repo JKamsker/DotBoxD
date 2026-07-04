@@ -2,7 +2,7 @@ using System.Text.Json;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Serialization;
 
-namespace DotBoxD.Kernels.Tests.Queryable;
+namespace DotBoxD.Kernels.Tests.Queryable.Serialization.StructuralNames;
 
 public sealed class EventQueryStructuralNameValidationTests
 {
@@ -112,8 +112,7 @@ public sealed class EventQueryStructuralNameValidationTests
     private static void AssertStructuralNameMessage(Exception exception, StructuralNameTarget target)
     {
         Assert.True(
-            exception.Message.Contains(ExpectedMessageToken(target), StringComparison.OrdinalIgnoreCase) ||
-            exception.Message.Contains("structural", StringComparison.OrdinalIgnoreCase),
+            exception.Message.Contains(ExpectedMessageToken(target), StringComparison.OrdinalIgnoreCase),
             $"Expected message to name {target}, got: {exception.Message}");
         Assert.True(
             exception.Message.Contains("white", StringComparison.OrdinalIgnoreCase) ||

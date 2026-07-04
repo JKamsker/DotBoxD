@@ -39,13 +39,15 @@ internal static class QueryProjectionInvariants
     }
 
     public static string MemberPath(QueryProjection projection)
-        => NonEmpty(projection.Path, "QueryProjection Member nodes require Path.");
+        => NonEmpty(projection.Path, "QueryProjection Member nodes require Path to be non-empty and non-whitespace.");
 
     public static string ConstructTypeName(QueryProjection projection)
-        => NonEmpty(projection.TypeName, "QueryProjection Construct nodes require TypeName.");
+        => NonEmpty(
+            projection.TypeName,
+            "QueryProjection Construct nodes require TypeName to be non-empty and non-whitespace.");
 
     public static string FieldName(QueryProjectionField field)
-        => NonEmpty(field.Name, "QueryProjection Construct fields require Name.");
+        => NonEmpty(field.Name, "QueryProjection Construct fields require Name to be non-empty and non-whitespace.");
 
     public static bool FieldHasPath(QueryProjectionField field)
     {
@@ -61,7 +63,9 @@ internal static class QueryProjectionInvariants
     }
 
     public static string FieldPath(QueryProjectionField field)
-        => NonEmpty(field.Path, $"QueryProjection Construct field '{field.Name}' requires Path.");
+        => NonEmpty(
+            field.Path,
+            $"QueryProjection Construct field '{field.Name}' requires Path to be non-empty and non-whitespace.");
 
     public static QueryValue FieldConstant(QueryProjectionField field)
         => field.Constant ?? throw new InvalidOperationException(
@@ -110,5 +114,5 @@ internal static class QueryProjectionInvariants
     }
 
     private static string NonEmpty(string? value, string message)
-        => string.IsNullOrEmpty(value) ? throw new InvalidOperationException(message) : value;
+        => string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value;
 }
