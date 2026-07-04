@@ -4,9 +4,20 @@ namespace DotBoxD.Plugins.Indexing;
 
 internal static class TrustedIndexPredicateExtractor
 {
+    public static IReadOnlyList<IndexedPredicate> Extract<TEvent>(
+        PluginPackage package,
+        IReadOnlyList<Parameter> eventParameters)
+        => Extract(package, eventParameters, typeof(TEvent));
+
     public static IReadOnlyList<IndexedPredicate> Extract(
         PluginPackage package,
         IReadOnlyList<Parameter> eventParameters)
+        => Extract(package, eventParameters, eventType: null);
+
+    private static IReadOnlyList<IndexedPredicate> Extract(
+        PluginPackage package,
+        IReadOnlyList<Parameter> eventParameters,
+        Type? eventType)
     {
         if (package.Module.Functions.FirstOrDefault(f =>
                 string.Equals(f.Id, package.Entrypoints.ShouldHandle, StringComparison.Ordinal)) is not { } shouldHandle)
@@ -21,7 +32,7 @@ internal static class TrustedIndexPredicateExtractor
         }
 
         var predicates = new List<IndexedPredicate>();
-        CollectNecessaryPredicates(shouldHandle.Body, eventPaths, predicates);
+        CollectNecessaryPredicates(shouldHandle.Body, eventPaths, eventType, predicates);
         return predicates;
     }
 
@@ -42,16 +53,17 @@ internal static class TrustedIndexPredicateExtractor
     private static void CollectNecessaryPredicates(
         Expression expression,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         List<IndexedPredicate> predicates)
     {
         if (expression is BinaryExpression { Operator: "&&" } conjunction)
         {
-            CollectNecessaryPredicates(conjunction.Left, eventPaths, predicates);
-            CollectNecessaryPredicates(conjunction.Right, eventPaths, predicates);
+            CollectNecessaryPredicates(conjunction.Left, eventPaths, eventType, predicates);
+            CollectNecessaryPredicates(conjunction.Right, eventPaths, eventType, predicates);
             return;
         }
 
-        if (TryPredicate(expression, eventPaths, out var predicate))
+        if (TryPredicate(expression, eventPaths, eventType, out var predicate))
         {
             predicates.Add(predicate);
         }
@@ -60,6 +72,7 @@ internal static class TrustedIndexPredicateExtractor
     private static void CollectNecessaryPredicates(
         IReadOnlyList<Statement> statements,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         List<IndexedPredicate> predicates)
     {
         foreach (var statement in statements)
@@ -69,11 +82,11 @@ internal static class TrustedIndexPredicateExtractor
                 case AssignmentStatement assignment when !eventPaths.ContainsKey(assignment.Name):
                     continue;
                 case ReturnStatement returned:
-                    CollectNecessaryPredicates(returned.Value, eventPaths, predicates);
+                    CollectNecessaryPredicates(returned.Value, eventPaths, eventType, predicates);
                     return;
                 case IfStatement branch when AlwaysReturnsFalse(branch.Else):
-                    CollectNecessaryPredicates(branch.Condition, eventPaths, predicates);
-                    CollectNecessaryPredicates(branch.Then, eventPaths, predicates);
+                    CollectNecessaryPredicates(branch.Condition, eventPaths, eventType, predicates);
+                    CollectNecessaryPredicates(branch.Then, eventPaths, eventType, predicates);
                     return;
                 default:
                     return;
@@ -91,40 +104,43 @@ internal static class TrustedIndexPredicateExtractor
     private static bool TryPredicate(
         Expression expression,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         out IndexedPredicate predicate)
     {
         predicate = null!;
         if (expression is not BinaryExpression binary ||
             Operator(binary.Operator) is not { } op)
         {
-            return TryCallPredicate(expression, eventPaths, out predicate);
+            return TryCallPredicate(expression, eventPaths, eventType, out predicate);
         }
 
-        if (TryVariableLiteral(binary.Left, binary.Right, eventPaths, op, out predicate))
+        if (TryPathLiteral(binary.Left, binary.Right, eventPaths, eventType, op, out predicate))
         {
             return true;
         }
 
-        return TryVariableLiteral(binary.Right, binary.Left, eventPaths, Flip(op), out predicate);
+        return TryPathLiteral(binary.Right, binary.Left, eventPaths, eventType, Flip(op), out predicate);
     }
 
     private static bool TryCallPredicate(
         Expression expression,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         out IndexedPredicate predicate)
     {
         predicate = null!;
         if (expression is UnaryExpression { Operator: "!", Operand: { } operand })
         {
-            return TryStringEquals(operand, eventPaths, IndexPredicateOperator.NotEquals, out predicate);
+            return TryStringEquals(operand, eventPaths, eventType, IndexPredicateOperator.NotEquals, out predicate);
         }
 
-        return TryStringEquals(expression, eventPaths, IndexPredicateOperator.Equals, out predicate);
+        return TryStringEquals(expression, eventPaths, eventType, IndexPredicateOperator.Equals, out predicate);
     }
 
     private static bool TryStringEquals(
         Expression expression,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         IndexPredicateOperator op,
         out IndexedPredicate predicate)
     {
@@ -138,24 +154,24 @@ internal static class TrustedIndexPredicateExtractor
             return false;
         }
 
-        if (TryVariableLiteral(call.Arguments[0], call.Arguments[1], eventPaths, op, out predicate))
+        if (TryPathLiteral(call.Arguments[0], call.Arguments[1], eventPaths, eventType, op, out predicate))
         {
             return true;
         }
 
-        return TryVariableLiteral(call.Arguments[1], call.Arguments[0], eventPaths, op, out predicate);
+        return TryPathLiteral(call.Arguments[1], call.Arguments[0], eventPaths, eventType, op, out predicate);
     }
 
-    private static bool TryVariableLiteral(
-        Expression variable,
+    private static bool TryPathLiteral(
+        Expression pathExpression,
         Expression literal,
         IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
         IndexPredicateOperator op,
         out IndexedPredicate predicate)
     {
         predicate = null!;
-        if (variable is not VariableExpression variableExpression ||
-            !eventPaths.TryGetValue(variableExpression.Name, out var path) ||
+        if (!TryEventPath(pathExpression, eventPaths, eventType, out var path) ||
             literal is not LiteralExpression literalExpression ||
             !TryLiteralValue(literalExpression.Value, out var value, out var valueType))
         {
@@ -164,6 +180,61 @@ internal static class TrustedIndexPredicateExtractor
 
         predicate = new IndexedPredicate(path, op, value, valueType);
         return true;
+    }
+
+    private static bool TryEventPath(
+        Expression expression,
+        IReadOnlyDictionary<string, string> eventPaths,
+        Type? eventType,
+        out string path)
+    {
+        var indexes = new List<int>();
+        var current = expression;
+        while (current is CallExpression
+            {
+                Name: "record.get",
+                Arguments.Count: 2
+            } call)
+        {
+            if (!TryI32Literal(call.Arguments[1], out var index))
+            {
+                path = string.Empty;
+                return false;
+            }
+
+            indexes.Add(index);
+            current = call.Arguments[0];
+        }
+
+        if (current is not VariableExpression variable ||
+            !eventPaths.TryGetValue(variable.Name, out var root))
+        {
+            path = string.Empty;
+            return false;
+        }
+
+        if (indexes.Count == 0)
+        {
+            path = root;
+            return true;
+        }
+
+        indexes.Reverse();
+        path = string.Empty;
+        return eventType is not null &&
+               EventIndexPathResolver.TryResolveDottedPath(eventType, root, indexes, out path);
+    }
+
+    private static bool TryI32Literal(Expression expression, out int value)
+    {
+        if (expression is LiteralExpression { Value: I32Value i32 })
+        {
+            value = i32.Value;
+            return true;
+        }
+
+        value = 0;
+        return false;
     }
 
     private static IndexPredicateOperator? Operator(string op)

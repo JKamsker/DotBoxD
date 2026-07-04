@@ -63,7 +63,7 @@ public sealed partial class EventIndexRegistry
         ArgumentNullException.ThrowIfNull(predicates);
 
         _ = predicates;
-        var trustedPredicates = TrustedIndexPredicateExtractor.Extract(kernel.Package, adapter.Parameters);
+        var trustedPredicates = TrustedIndexPredicateExtractor.Extract<TEvent>(kernel.Package, adapter.Parameters);
         var matcher = EventIndexMatcher<TEvent>.Create(trustedPredicates);
         if (!matcher.HasIndex)
         {
