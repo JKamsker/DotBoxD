@@ -158,6 +158,15 @@ internal static class ServiceModelFactory
                         qualifiedInterfaceName);
                 }
 
+                if (!InheritedMethodDeduplicator.HasSameParameterDefaults(existingMethod, methodSymbol))
+                {
+                    return RejectedService(
+                        displayName,
+                        $"inherited method '{methodSymbol.Name}' has the same signature as another method but incompatible optional parameter defaults",
+                        DiagnosticLocationFactory.FromSymbol(methodSymbol),
+                        qualifiedInterfaceName);
+                }
+
                 if (!MethodSignatureFacts.HaveSameGenericConstraints(existingMethod, methodSymbol, ct))
                 {
                     return RejectedService(
