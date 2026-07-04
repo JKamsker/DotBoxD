@@ -4,8 +4,8 @@
 > *Expose host-readable index metadata for lowered subscription predicates*,
 > plus the follow-ups [#49](https://github.com/JKamsker/DotBoxD/issues/49) (live GameServer dispatch
 > through the index), [#50](https://github.com/JKamsker/DotBoxD/issues/50) (a first-class framework index),
-> and [#51](https://github.com/JKamsker/DotBoxD/issues/51), candidate 1 (kernel-class `ShouldHandle`
-> extraction).
+> and [#51](https://github.com/JKamsker/DotBoxD/issues/51) (kernel-class `ShouldHandle` extraction,
+> nested event paths, and effectively-final captured local constants).
 
 ## Why
 
@@ -70,19 +70,23 @@ Extraction happens in `HookChainIndexPredicateExtractor`
 detection the IR lowering already performs. Two sources feed it:
 
 - **Inline `.Where(...)` chains** — `Extract(...)` walks the chain stages.
-- **Kernel-class `ShouldHandle` bodies** (issue #51, candidate 1) — `ExtractFromShouldHandle(...)` treats an
+- **Kernel-class `ShouldHandle` bodies** — `ExtractFromShouldHandle(...)` treats an
   expression-bodied predicate (`=> …`) or a single `return …;` block exactly like a `.Where(...)` lambda.
   `PluginKernelModelFactory` feeds it the lowered kernel's `ShouldHandle`, so kernel-authored subscriptions
   now ship the same index metadata inline chains do. (Multi-statement bodies, live-setting/captured-field
   comparisons, and any non-constant leaf stay non-indexed, exactly as before.)
 
-A leaf is index-eligible when it is `event-property <op> compile-time-constant`:
+A leaf is index-eligible when it is `event-property path <op> constant`:
 
 - Operators: `==`, `!=`, `>`, `>=`, `<`, `<=`.
 - Operands are **normalized** so the event property is the left operand
   (`5 >= e.Damage` ⇒ `Damage <= 5`).
-- The constant must be resolvable with `GetConstantValue()` (literals and `const`); runtime-captured
-  locals are not index values.
+- The event side may be a flat scalar property (`e.Damage`) or a scalar field below a record-valued event
+  property (`e.Details.Amount`), emitted as a dotted path (`"Details.Amount"`). Non-record member operations
+  such as `e.Name.Length` stay out of the index.
+- The constant must be a compile-time constant (`GetConstantValue()`), or an effectively-final local whose
+  initializer is a compile-time constant (`var min = 5; ... e.Damage >= min`). Locals assigned anywhere after
+  declaration and runtime-computed captures stay unsupported rather than being baked into stale metadata.
 - Only leaves reachable through **top-level `&&`** are emitted, so every `IndexedPredicate` is a
   *necessary* AND condition of the real predicate. This is what makes host rejection on any single
   predicate always sound.
@@ -100,9 +104,9 @@ reimplements them:
 - `EventIndexKeyAttribute` — a host marks the event properties it indexes.
 - `EventIndexMatcher<TEvent>` — compiles manifest predicates into cheap checks over **precompiled property
   getters** (expression-tree delegates built once per closed generic, never per-event reflection). It honors
-  only `[EventIndexKey]` paths and reconciles each predicate value to the property's CLR type; a value whose
-  type can't be reconciled (or a comparison it can't decide) is left to the verified IR rather than turned
-  into a throwing or unsound check.
+  flat and dotted `[EventIndexKey]` paths and reconciles each predicate value to the property's CLR type; a
+  value whose type can't be reconciled (or a comparison it can't decide) is left to the verified IR rather
+  than turned into a throwing or unsound check.
 - `EventIndexRegistry` / `EventIndexStats` — register a subscription + its predicates, then `Publish` events;
   the registry prefilters via the matcher and dispatches survivors to the verified IR, exposing
   considered/prefiltered/dispatched counters. `Register` returns `false` when no predicate path is an index
@@ -131,11 +135,9 @@ reimplements them:
 ## Non-goals / follow-ups
 
 - **Done**: live GameServer dispatch through the index (#49), framework-level matcher + registry (#50),
-  kernel-class `ShouldHandle` extraction (#51 candidate 1).
-- **Blocked on lowering, not implemented** (remaining #51 candidates): *nested property paths*
-  (`e.Inner.Field`) — events are validated to scalar-only properties and both lowering and extraction accept
-  only flat `e.Property`, so the model can't carry nested objects today; and *captured/effectively-constant
-  locals* — the IR lowerer rejects non-inlined local identifiers and a runtime value can't be baked into a
-  compile-time `IndexedPredicate.Value`. Both need a lowering/event-model change first.
+  kernel-class `ShouldHandle`, nested property paths, and effectively-final captured local constants (#51).
+- **Still intentionally unsupported**: runtime-computed captures (`var min = LoadConfig();`) and mutable
+  captures. A generated package cannot safely bake a value whose later delegate semantics may change, so these
+  shapes fail closed instead of producing stale index metadata.
 - *Optional*: integrating the prefilter directly into `SubscriptionPipeline`/`HookPipeline` (the registry is
   the standalone alternative shipped here).

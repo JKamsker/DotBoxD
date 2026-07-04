@@ -1,8 +1,34 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 
 internal static class DotBoxDIdentifierExpressionLowerer
 {
     public static DotBoxDExpressionModel Lower(
+        IdentifierNameSyntax identifier,
+        DotBoxDExpressionLoweringContext context)
+    {
+        var name = identifier.Identifier.ValueText;
+        if (TryLowerKnownIdentifier(name, context) is { } known)
+        {
+            return known;
+        }
+
+        if (DotBoxDCapturedConstantLocal.TryLower(identifier, context) is { } captured)
+        {
+            return captured;
+        }
+
+        throw new NotSupportedException($"Unsupported plugin identifier '{name}'.");
+    }
+
+    public static DotBoxDExpressionModel Lower(
+        string name,
+        DotBoxDExpressionLoweringContext context)
+        => TryLowerKnownIdentifier(name, context) ??
+           throw new NotSupportedException($"Unsupported plugin identifier '{name}'.");
+
+    private static DotBoxDExpressionModel? TryLowerKnownIdentifier(
         string name,
         DotBoxDExpressionLoweringContext context)
     {
@@ -36,6 +62,6 @@ internal static class DotBoxDIdentifierExpressionLowerer
             }
         }
 
-        throw new NotSupportedException($"Unsupported plugin identifier '{name}'.");
+        return null;
     }
 }
