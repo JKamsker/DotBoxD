@@ -63,6 +63,32 @@ public sealed class KernelClassIndexMetadataTests
     }
 
     [Fact]
+    public void Nested_event_property_path_is_indexed()
+    {
+        var manifest = GeneratedSubscription(
+            """
+            public bool ShouldHandle(DamageEvent e, HookContext ctx)
+                => e.Details.Amount >= 5 && e.Details.Kind == "fire";
+            """);
+
+        Assert.True(manifest.IndexCoversPredicate);
+        Assert.Collection(
+            manifest.IndexedPredicates,
+            p =>
+            {
+                Assert.Equal("Details.Amount", p.Path);
+                Assert.Equal(IndexPredicateOperator.GreaterThanOrEqual, p.Operator);
+                Assert.Equal(5, Assert.IsType<int>(p.Value));
+            },
+            p =>
+            {
+                Assert.Equal("Details.Kind", p.Path);
+                Assert.Equal(IndexPredicateOperator.Equals, p.Operator);
+                Assert.Equal("fire", p.Value);
+            });
+    }
+
+    [Fact]
     public void An_or_branch_keeps_the_necessary_leaf_but_marks_partial_coverage()
     {
         var manifest = GeneratedSubscription(
@@ -118,7 +144,9 @@ public sealed class KernelClassIndexMetadataTests
 
             namespace KernelSample;
 
-            public sealed record DamageEvent(string DamageType, int Amount, string TargetId);
+            public sealed record DamageDetails(int Amount, string Kind);
+
+            public sealed record DamageEvent(string DamageType, int Amount, string TargetId, DamageDetails Details);
 
             [Plugin("index-sample")]
             public sealed partial class IndexSampleKernel : IEventKernel<DamageEvent>
