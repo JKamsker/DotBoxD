@@ -89,6 +89,17 @@ internal sealed class PluginExecutionObserver
             return;
         }
 
+        if (!result.Succeeded)
+        {
+            RecordNoAuditFailure(
+                entrypoint,
+                requestedMode,
+                result.ActualMode,
+                result.ArtifactHash,
+                result.Error?.Code);
+            return;
+        }
+
         RecordNoAuditSuccess(entrypoint, requestedMode, result.ActualMode, result.ArtifactHash);
     }
 
@@ -103,6 +114,25 @@ internal sealed class PluginExecutionObserver
             actualMode,
             Succeeded: true,
             ErrorCode: null,
+            FallbackReason: null,
+            CacheStatus: "None",
+            RuntimeForm: null,
+            CacheKey: null,
+            artifactHash,
+            MaterializationStatus: null));
+
+    private void RecordNoAuditFailure(
+        string entrypoint,
+        ExecutionMode requestedMode,
+        ExecutionMode actualMode,
+        string? artifactHash,
+        SandboxErrorCode? errorCode)
+        => Append(new ObservationEntry(
+            entrypoint,
+            requestedMode,
+            actualMode,
+            Succeeded: false,
+            errorCode,
             FallbackReason: null,
             CacheStatus: "None",
             RuntimeForm: null,
