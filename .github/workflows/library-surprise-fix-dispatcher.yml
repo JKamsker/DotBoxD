@@ -224,13 +224,6 @@ jobs:
                   return "red"
               return "green"
 
-          _GRAPHQL = (
-              "query($owner:String!,$name:String!,$pr:Int!){"
-              "repository(owner:$owner,name:$name){pullRequest(number:$pr){"
-              "reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{author{login __typename}}}}}"
-              "reviews(first:40){nodes{author{login __typename} body}}"
-              "comments(first:100){nodes{body}}}}}"
-          )
           # The real CodeRabbit bot is exactly this login AND a Bot actor. A
           # `startswith("coderabbit")` check would let a spoofed account like
           # `coderabbit-evil` steer polish dispatch and get its threads resolved.
@@ -240,25 +233,66 @@ jobs:
               author = author or {}
               return author.get("login") == CODERABBIT_LOGIN and author.get("__typename") == "Bot"
 
+          # Our summary comment (which carries the polished/resolve markers) is
+          # posted by the gh-aw safe_outputs job as github-actions[bot] — GraphQL
+          # login "github-actions", a Bot — or, if GH_AW_GITHUB_TOKEN is a PAT, as
+          # the repo owner. ONLY markers from those authors are trusted; otherwise
+          # any commenter could post `<!-- surprise-fix:polished -->` to suppress a
+          # polish pass or `<!-- surprise-fix:resolve ... -->` to force resolution of
+          # arbitrary threads.
+          def is_trusted_marker_author(author):
+              author = author or {}
+              login = author.get("login")
+              return ((login == "github-actions" and author.get("__typename") == "Bot")
+                      or login == owner)
+
           # Markers CodeRabbit uses for genuinely actionable top-level items. An
           # informational walkthrough/summary (which every PR gets) has none of
           # these, so a clean fixed PR does not burn a polish run just to post a
           # marker; #422-style "🧹 Nitpick" PRs still qualify.
           ACTIONABLE = ("🧹", "⚠️", "🛠️", "Nitpick", "Potential issue", "Refactor")
 
+          def _fetch_connection(number, field, node_selection, cap_pages=20):
+              # Page through a PR connection so a chatty PR cannot hide unresolved
+              # threads, review bodies, or the (recent) polish marker past a fixed
+              # first slice. Returns None on a transient API error (caller then fails
+              # toward NOT re-picking).
+              query = (
+                  "query($owner:String!,$name:String!,$pr:Int!,$after:String){"
+                  "repository(owner:$owner,name:$name){pullRequest(number:$pr){"
+                  + field + "(first:100, after:$after){pageInfo{hasNextPage endCursor} nodes{"
+                  + node_selection + "}}}}}"
+              )
+              nodes = []
+              cursor = None
+              for _ in range(cap_pages):
+                  args = ["api", "graphql", "-F", f"owner={owner}", "-F", f"name={name}",
+                          "-F", f"pr={number}", "-f", f"query={query}"]
+                  if cursor:
+                      args += ["-F", f"after={cursor}"]
+                  out = gh(args, tolerant=True)
+                  if out is None:
+                      return None
+                  conn = ((((json.loads(out).get("data") or {}).get("repository") or {})
+                           .get("pullRequest") or {}).get(field) or {})
+                  nodes.extend(conn.get("nodes") or [])
+                  page = conn.get("pageInfo") or {}
+                  if not page.get("hasNextPage") or not page.get("endCursor"):
+                      break
+                  cursor = page["endCursor"]
+              return nodes
+
           def polish_graphql(number):
-              out = gh(["api", "graphql",
-                        "-F", f"owner={owner}", "-F", f"name={name}",
-                        "-F", f"pr={number}", "-f", f"query={_GRAPHQL}"], tolerant=True)
-              if not out:
+              threads = _fetch_connection(number, "reviewThreads",
+                  "id isResolved comments(first:1){nodes{author{login __typename}}}")
+              reviews = _fetch_connection(number, "reviews", "author{login __typename} body")
+              comments = _fetch_connection(number, "comments", "author{login __typename} body")
+              if threads is None or reviews is None or comments is None:
                   # Transient API error: fail toward NOT re-picking (pretend a marker
                   # exists, no open threads, nothing actionable). A later tick retries;
                   # this avoids a dispatch storm on a flaky GraphQL endpoint.
                   return {"has_marker": True, "unresolved_cr_ids": [], "handled_ids": set(),
                           "has_actionable": False}
-              pr = (((json.loads(out).get("data") or {}).get("repository") or {})
-                    .get("pullRequest") or {})
-              threads = (pr.get("reviewThreads") or {}).get("nodes") or []
               unresolved_cr_ids = []
               for t in threads:
                   if t.get("isResolved"):
@@ -268,15 +302,17 @@ jobs:
                   if is_coderabbit(c0.get("author")) and t.get("id"):
                       unresolved_cr_ids.append(t["id"])
               has_actionable = bool(unresolved_cr_ids)
-              for r in (pr.get("reviews") or {}).get("nodes") or []:
+              for r in reviews:
                   body = r.get("body") or ""
                   if is_coderabbit(r.get("author")) and any(tok in body for tok in ACTIONABLE):
                       has_actionable = True
                       break
-              comment_bodies = [c.get("body") or "" for c in (pr.get("comments") or {}).get("nodes") or []]
-              has_marker = any(SENTINEL in b for b in comment_bodies)
+              # Only markers authored by our own automation are trusted (spoof guard).
+              trusted_bodies = [c.get("body") or "" for c in comments
+                                if is_trusted_marker_author(c.get("author"))]
+              has_marker = any(SENTINEL in b for b in trusted_bodies)
               return {"has_marker": has_marker, "unresolved_cr_ids": unresolved_cr_ids,
-                      "handled_ids": parse_handled_ids(comment_bodies),
+                      "handled_ids": parse_handled_ids(trusted_bodies),
                       "has_actionable": has_actionable}
 
           fix_candidates = []
