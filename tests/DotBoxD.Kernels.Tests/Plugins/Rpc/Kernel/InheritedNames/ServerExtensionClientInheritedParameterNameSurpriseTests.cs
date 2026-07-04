@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 
-namespace DotBoxD.Kernels.Tests.Plugins.Rpc;
+namespace DotBoxD.Kernels.Tests.Plugins.Rpc.Kernel.InheritedNames;
 
 public sealed class ServerExtensionClientInheritedParameterNameSurpriseTests
 {

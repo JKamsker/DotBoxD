@@ -17,16 +17,20 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         var methods = new List<IMethodSymbol>();
-        var methodKeys = new HashSet<string>(StringComparer.Ordinal);
+        var methodsByKey = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
         foreach (var member in ServiceMembers(serviceType))
         {
             if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary, IsStatic: false } method)
             {
-                if (methodKeys.Add(MethodKey(method)))
+                var key = MethodKey(method);
+                if (!methodsByKey.TryGetValue(key, out var existing))
                 {
+                    methodsByKey.Add(key, method);
                     methods.Add(method);
+                    continue;
                 }
 
+                ValidateDuplicateParameterNames(serviceType, existing, method);
                 continue;
             }
 
@@ -61,6 +65,21 @@ internal static class RpcKernelClientServiceMethodResolver
         }
 
         return key.ToString();
+    }
+
+    private static void ValidateDuplicateParameterNames(
+        INamedTypeSymbol serviceType,
+        IMethodSymbol first,
+        IMethodSymbol next)
+    {
+        for (var i = 0; i < first.Parameters.Length; i++)
+        {
+            if (!string.Equals(first.Parameters[i].Name, next.Parameters[i].Name, StringComparison.Ordinal))
+            {
+                throw new NotSupportedException(
+                    $"Server extension interface '{serviceType.ToDisplayString()}' inherits method '{next.Name}' with the same signature but different parameter names; generated clients cannot preserve both named-argument contracts.");
+            }
+        }
     }
 
     private static void ValidateNonGeneric(IMethodSymbol serviceMethod)
