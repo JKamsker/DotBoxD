@@ -30,7 +30,11 @@ public abstract record SandboxValue
             ? new F64Value(value)
             : throw new ArgumentOutOfRangeException(nameof(value), value, "F64 values must be finite.");
 
-    public static SandboxValue FromString(string value) => new StringValue(value);
+    public static SandboxValue FromString(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new StringValue(value);
+    }
 
     public static SandboxValue FromGuid(System.Guid value) => new GuidValue(value);
 
@@ -146,6 +150,14 @@ public sealed record F64Value(double Value) : SandboxValue
 
 public sealed record StringValue(string Value) : SandboxValue
 {
+    private string _value = Value ?? throw new ArgumentNullException(nameof(Value));
+
+    public string Value
+    {
+        get => _value;
+        init => _value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
     public override SandboxType Type => SandboxType.String;
 }
 
