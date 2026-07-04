@@ -2,7 +2,7 @@ using System.Text.Json;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Serialization;
 
-namespace DotBoxD.Kernels.Tests.Queryable;
+namespace DotBoxD.Kernels.Tests.Queryable.Serialization.NumberKind;
 
 public sealed class EventQueryNumberKindRoundTripTests
 {
