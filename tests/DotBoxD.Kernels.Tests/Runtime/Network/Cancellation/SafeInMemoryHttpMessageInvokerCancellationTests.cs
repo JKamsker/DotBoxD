@@ -1,4 +1,4 @@
-namespace DotBoxD.Kernels.Tests.Runtime.Network;
+namespace DotBoxD.Kernels.Tests.Runtime.Network.Cancellation;
 
 public sealed class SafeInMemoryHttpMessageInvokerCancellationTests
 {
