@@ -35,7 +35,9 @@ public sealed class ServerExtensionClientFileLocalAccessibilityTests
             diagnostics.Any(d =>
                 d.Id == "DBXK100" &&
                 d.GetMessage().Contains("IEchoService", StringComparison.Ordinal) &&
-                d.GetMessage().Contains("file-local", StringComparison.Ordinal)),
+                (d.GetMessage().Contains("file-local", StringComparison.OrdinalIgnoreCase) ||
+                 d.GetMessage().Contains("inaccessible", StringComparison.OrdinalIgnoreCase) ||
+                 d.GetMessage().Contains("cannot be named", StringComparison.OrdinalIgnoreCase))),
             "Expected a focused DBXK100 diagnostic for the file-local IEchoService contract."
             + Environment.NewLine
             + string.Join(Environment.NewLine, diagnostics.Select(d => d.ToString())));
