@@ -19,23 +19,35 @@ internal sealed partial class RpcStreamManager
     private readonly RpcStreamFrameSender _frameSender;
     private readonly ISerializer _serializer;
     private readonly Func<Exception, RpcErrorInfo?>? _exceptionTransformer;
+    private readonly int _maxInboundStreamsPerPeer;
     private int _outboundStreamIdCounter;
     private int _activeInboundCount;
     public RpcStreamManager(
         ISerializer serializer,
         Func<ReadOnlyMemory<byte>, CancellationToken, Task> sendAsync,
         Func<Exception, RpcErrorInfo?>? exceptionTransformer,
-        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync = null)
+        Func<PooledBufferWriter, CancellationToken, ValueTask>? sendFrameAsync = null,
+        int maxInboundStreamsPerPeer = 1024)
     {
+        if (maxInboundStreamsPerPeer <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxInboundStreamsPerPeer),
+                maxInboundStreamsPerPeer,
+                "Maximum inbound streams per peer must be greater than zero.");
+        }
+
         _serializer = serializer;
         _frameSender = new RpcStreamFrameSender(sendAsync, sendFrameAsync);
         _exceptionTransformer = exceptionTransformer;
+        _maxInboundStreamsPerPeer = maxInboundStreamsPerPeer;
     }
     internal int InboundReceiverCount => Volatile.Read(ref _activeInboundCount);
     internal int OutboundSenderCount => _senders.Count;
     internal int PendingCreditCount => _pendingCredits.Count;
     internal int CanceledInboundCount => _canceledInbound.Count;
     internal int CanceledInboundTrackingCount => _canceledInbound.TrackingCount;
+    internal int OutboundStreamIdCounterForTest { set => Volatile.Write(ref _outboundStreamIdCounter, value); }
     internal void DecrementActiveInbound() => Interlocked.Decrement(ref _activeInboundCount);
     internal Action<int, RpcStreamReceiver>? AfterInboundReceiverObservedForTest { get; set; }
     internal Action<int>? AfterReservedOutboundCreditObservedForTest { get; set; }

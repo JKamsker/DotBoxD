@@ -28,8 +28,10 @@ internal static class DotBoxDNullableScalarType
                or SpecialType.System_Int64
                or SpecialType.System_Double
                or SpecialType.System_Single
+               or SpecialType.System_Decimal
            || type.TypeKind == TypeKind.Enum
            || DotBoxDRpcTypeMapper.IsGuid(type)
+           || DotBoxDRpcTypeMapper.IsDateTimeWireType(type)
            || DotBoxDRpcTypeMapper.IsDateOnlyWireType(type)
            || DotBoxDRpcTypeMapper.IsTimeOnlyWireType(type)
            || DotBoxDRpcTypeMapper.IsTimeSpanWireType(type)

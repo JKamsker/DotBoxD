@@ -213,49 +213,42 @@ public sealed class RemoteHookStage<TEvent, TCurrent>
 
     [PipelineStep(PipelineStepRole.Register)]
     public RemoteHookPipeline<TEvent> Register<TResult>(Func<TCurrent, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent> RegisterLocal<TResult>(
         Func<TCurrent, HookContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     private static InvalidOperationException NotLowered()

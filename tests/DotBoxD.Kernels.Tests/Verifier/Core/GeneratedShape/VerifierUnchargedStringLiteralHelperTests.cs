@@ -1,0 +1,285 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Sandbox;
+using DotBoxD.Kernels.Tests.Verifier.Generated;
+
+namespace DotBoxD.Kernels.Tests.Verifier.Core.GeneratedShape;
+
+public sealed class VerifierUnchargedStringLiteralHelperTests
+{
+    [Fact]
+    public async Task Verifier_rejects_uncharged_string_literal_helper()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(UnchargedStringLiteralHelperAssembly());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
+            d.Message.Contains(nameof(CompiledRuntime.StringLiteralValue), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_uncharged_string_literal_when_branch_skips_charge()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(BranchSkipsStringLiteralChargeAssembly());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
+            d.Message.Contains(nameof(CompiledRuntime.StringLiteralValue), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_string_literal_when_charge_targets_different_value()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(MisdirectedStringLiteralChargeAssembly());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
+            (d.Message.Contains(nameof(CompiledRuntime.StringLiteralValue), StringComparison.Ordinal) ||
+                d.Message.Contains(nameof(CompiledRuntime.ChargeSandboxValue), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_zero_count_bulk_charge_for_string_literal_helper()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(BulkChargeStringLiteralAssembly(count: 0));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
+            (d.Message.Contains(nameof(CompiledRuntime.StringLiteralValue), StringComparison.Ordinal) ||
+                d.Message.Contains(nameof(CompiledRuntime.ChargeSandboxValues), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Verifier_accepts_positive_count_bulk_charge_for_string_literal_helper()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(BulkChargeStringLiteralAssembly(count: 1));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_uncharged_guid_literal_helper()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(UnchargedGuidLiteralHelperAssembly());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-MEMBER") &&
+            d.Message.Contains(nameof(CompiledRuntime.GuidLiteralValue), StringComparison.Ordinal));
+    }
+
+    private static byte[] UnchargedStringLiteralHelperAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldstr, "hello");
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.StringLiteralValue), [typeof(string)])!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var il = DefineExecute(type).GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, fn);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] BranchSkipsStringLiteralChargeAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            var ret = fnIl.DefineLabel();
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldstr, "hello");
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.StringLiteralValue), [typeof(string)])!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            fnIl.Emit(OpCodes.Ldc_I4_1);
+            fnIl.Emit(OpCodes.Brtrue_S, ret);
+            fnIl.Emit(OpCodes.Ldarg_0);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(
+                    nameof(CompiledRuntime.ChargeSandboxValue),
+                    [typeof(SandboxContext), typeof(SandboxValue)])!);
+            EmitExitCall(fnIl);
+            fnIl.MarkLabel(ret);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var il = DefineExecute(type).GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, fn);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] MisdirectedStringLiteralChargeAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var uncharged = fnIl.DeclareLocal(typeof(SandboxValue));
+            var charged = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldstr, "uncharged");
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.StringLiteralValue), [typeof(string)])!);
+            fnIl.Emit(OpCodes.Stloc, uncharged);
+            fnIl.Emit(OpCodes.Ldc_I4_7);
+            fnIl.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.I32))!);
+            fnIl.Emit(OpCodes.Stloc, charged);
+            // Load and discard the literal local near the charge call so the verifier proves
+            // the actual call operand.
+            fnIl.Emit(OpCodes.Ldarg_0);
+            fnIl.Emit(OpCodes.Ldloc, charged);
+            fnIl.Emit(OpCodes.Ldloc, uncharged);
+            fnIl.Emit(OpCodes.Pop);
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(
+                    nameof(CompiledRuntime.ChargeSandboxValue),
+                    [typeof(SandboxContext), typeof(SandboxValue)])!);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, uncharged);
+            fnIl.Emit(OpCodes.Ret);
+
+            var il = DefineExecute(type).GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, fn);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] BulkChargeStringLiteralAssembly(int count)
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldstr, "hello");
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.StringLiteralValue), [typeof(string)])!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            fnIl.Emit(OpCodes.Ldarg_0);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ldc_I4, count);
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(
+                    nameof(CompiledRuntime.ChargeSandboxValues),
+                    [typeof(SandboxContext), typeof(SandboxValue), typeof(int)])!);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var il = DefineExecute(type).GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, fn);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static byte[] UnchargedGuidLiteralHelperAssembly()
+        => VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = type.DefineMethod(
+                "Fn_0",
+                MethodAttributes.Private | MethodAttributes.Static,
+                typeof(SandboxValue),
+                [typeof(SandboxContext)]);
+            var fnIl = fn.GetILGenerator();
+            var value = fnIl.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(fnIl);
+            EmitChargeFuel(fnIl);
+            fnIl.Emit(OpCodes.Ldstr, "00112233-4455-6677-8899-aabbccddeeff");
+            fnIl.Emit(
+                OpCodes.Call,
+                typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.GuidLiteralValue), [typeof(string)])!);
+            fnIl.Emit(OpCodes.Stloc, value);
+            EmitExitCall(fnIl);
+            fnIl.Emit(OpCodes.Ldloc, value);
+            fnIl.Emit(OpCodes.Ret);
+
+            var il = DefineExecute(type).GetILGenerator();
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ValidateEntrypointInput))!);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, fn);
+            il.Emit(OpCodes.Ret);
+        });
+
+    private static MethodBuilder DefineExecute(TypeBuilder type)
+        => type.DefineMethod(
+            "Execute",
+            MethodAttributes.Public | MethodAttributes.Static,
+            typeof(SandboxValue),
+            [typeof(SandboxContext), typeof(SandboxValue)]);
+
+    private static void EmitEnterCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.EnterCall))!);
+    }
+
+    private static void EmitChargeFuel(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ChargeFuel))!);
+    }
+
+    private static void EmitExitCall(ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(CompiledRuntime.ExitCall))!);
+    }
+}

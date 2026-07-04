@@ -14,6 +14,8 @@ public sealed partial class GeneratedAssemblyVerifier : IGeneratedAssemblyVerifi
         VerificationPolicy policy,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var diagnostics = new List<VerificationDiagnostic>();
         var assemblyHash = ComputeSha256LowerHex(assemblyBytes.Span);
         if (string.IsNullOrWhiteSpace(manifest.AssemblyHash))

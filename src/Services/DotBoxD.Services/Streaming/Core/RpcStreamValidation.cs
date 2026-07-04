@@ -6,14 +6,36 @@ namespace DotBoxD.Services.Streaming.Core;
 
 internal static class RpcStreamValidation
 {
+    internal const int DefaultMaxInboundStreamsPerRequest = 32;
+
     public static bool TryValidateInboundHandles(
         RpcStreamHandle[]? handles,
+        out string? protocolError) =>
+        TryValidateInboundHandles(handles, DefaultMaxInboundStreamsPerRequest, out protocolError);
+
+    public static bool TryValidateInboundHandles(
+        RpcStreamHandle[]? handles,
+        int maxHandles,
         out string? protocolError)
     {
+        if (maxHandles <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxHandles),
+                maxHandles,
+                "Maximum inbound stream handles must be greater than zero.");
+        }
+
         protocolError = null;
         if (handles is null || handles.Length == 0)
         {
             return true;
+        }
+
+        if (handles.Length > maxHandles)
+        {
+            protocolError = $"Request declares {handles.Length} inbound streams; maximum is {maxHandles}.";
+            return false;
         }
 
         if (handles.Length == 1)
@@ -65,12 +87,17 @@ internal static class RpcStreamValidation
             throw new ArgumentNullException(nameof(attachment), "Outbound stream attachment must not be null.");
         }
 
-        if (attachment.Handle.StreamId == 0)
-        {
-            throw new ServiceProtocolException("Stream id must not be zero.");
-        }
+        ValidateStreamId(attachment.Handle.StreamId);
 
         ValidateKind(attachment.Handle.Kind);
+    }
+
+    public static void ValidateStreamId(int streamId)
+    {
+        if (streamId <= 0)
+        {
+            throw new ServiceProtocolException("Stream id must be positive.");
+        }
     }
 
     public static void ValidateKind(RpcStreamKind kind)
@@ -88,9 +115,9 @@ internal static class RpcStreamValidation
         RpcStreamHandle handle,
         out string? protocolError)
     {
-        if (handle.StreamId == 0)
+        if (handle.StreamId <= 0)
         {
-            protocolError = "Stream id must not be zero.";
+            protocolError = "Stream id must be positive.";
             return false;
         }
 

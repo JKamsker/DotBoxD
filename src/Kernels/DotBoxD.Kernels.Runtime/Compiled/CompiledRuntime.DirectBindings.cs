@@ -105,6 +105,15 @@ public static partial class CompiledRuntime
         return values[index] is I32Value item ? item.Value : throw InvalidInput("expected I32 value");
     }
 
+    public static object CreateMeteredListI32ReaderRaw(SandboxContext context, SandboxValue value)
+    {
+        var list = value as ListValue ?? throw InvalidInput("expected list value");
+        var values = list.Values;
+        context.ChargeFuel(SandboxCollectionFuel.Copy(values.Count));
+        context.ChargeAllocation(SandboxCollectionFuel.AllocationBytes(values.Count, 4, minimumOne: true));
+        return ListI32ReaderRaw(value);
+    }
+
     public static object ListI32ReaderRaw(SandboxValue value)
     {
         var list = value as ListValue ?? throw InvalidInput("expected list value");
@@ -138,64 +147,6 @@ public static partial class CompiledRuntime
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int ListI32ReaderGetRemainderRaw(object reader, int value, int divisor)
         => ListI32ReaderGetRaw(reader, SandboxInt32Math.Remainder(value, divisor));
-
-    public static int ListI32ReaderAddRemainderCycleFromZeroRaw(
-        SandboxContext context,
-        object reader,
-        int current,
-        int iterations,
-        int divisor,
-        int loopFuelPerIteration,
-        long readFuel)
-    {
-        if (iterations <= 0)
-        {
-            return current;
-        }
-
-        if (divisor <= 0)
-        {
-            throw InvalidInput("integer division by zero");
-        }
-
-        context.ChargeLoopIterations(iterations, loopFuelPerIteration);
-        context.ChargeBulkFuel(readFuel, iterations);
-
-        var items = (int[])reader;
-        var cycles = iterations / divisor;
-        var remainder = iterations % divisor;
-        var total = current;
-        if (cycles > 0)
-        {
-            total = SandboxInt32Math.Add(total, MultiplyCycleSum(SumItems(items, divisor), cycles));
-        }
-
-        return remainder == 0
-            ? total
-            : SandboxInt32Math.Add(total, SumItems(items, remainder));
-    }
-
-    private static int SumItems(int[] items, int count)
-    {
-        var total = 0;
-        for (var i = 0; i < count; i++)
-        {
-            total = SandboxInt32Math.Add(total, ListI32ReaderGetRaw(items, i));
-        }
-
-        return total;
-    }
-
-    private static int MultiplyCycleSum(int cycleSum, int cycles)
-    {
-        var product = (long)cycleSum * cycles;
-        if (product < int.MinValue || product > int.MaxValue)
-        {
-            throw InvalidInput("integer overflow");
-        }
-
-        return (int)product;
-    }
 
     private static bool CanScale(int iterations, int callsPerIteration, out long calls)
     {

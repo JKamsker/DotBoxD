@@ -16,6 +16,7 @@ public static partial class PluginPackageJsonSerializer
     public static string Export(PluginPackage package, bool indented = false)
     {
         ArgumentNullException.ThrowIfNull(package);
+        ValidatePackageForExport(package);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = indented });

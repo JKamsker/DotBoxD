@@ -93,6 +93,11 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(configure);
 
+        using (server.CreateSession())
+        {
+            // Validate the server before starting transport; the real per-peer session is still minted on accept.
+        }
+
         var self = new PluginConnectionHost<TConnection>(pipeName);
         self._host = listen(peer =>
         {
@@ -129,7 +134,24 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
                 self._disconnected.TrySetException(ex);
             }
         });
-        await self._host.StartAsync().ConfigureAwait(false);
+        try
+        {
+            await self._host.StartAsync().ConfigureAwait(false);
+        }
+        catch (Exception startEx)
+        {
+            try
+            {
+                await self.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception disposeEx)
+            {
+                startEx.Data["PluginConnectionHost.StartCleanupException"] = disposeEx;
+            }
+
+            throw;
+        }
+
         return self;
     }
 
@@ -163,16 +185,28 @@ public sealed class PluginConnectionHost<TConnection> : IAsyncDisposable
     /// </summary>
     public async Task StopAsync()
     {
-        await _host.StopAsync().ConfigureAwait(false);
-        DisposeSessionOnce();
-        CompleteLifecycle();
+        try
+        {
+            await _host.StopAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            DisposeSessionOnce();
+            CompleteLifecycle();
+        }
     }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        await _host.DisposeAsync().ConfigureAwait(false);
-        DisposeSessionOnce();
-        CompleteLifecycle();
+        try
+        {
+            await _host.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            DisposeSessionOnce();
+            CompleteLifecycle();
+        }
     }
 }

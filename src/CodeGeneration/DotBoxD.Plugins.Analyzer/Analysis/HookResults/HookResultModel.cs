@@ -26,11 +26,16 @@ internal sealed record HookResultField(string Name, string TypeFullName, string 
 internal sealed record HookResultExistingMember(string Name, int ParameterCount, bool BlocksAllOverloads);
 
 /// <summary>A build-time diagnostic the builder generator surfaces for a malformed <c>[HookResult]</c> type.</summary>
-internal sealed record HookResultDiagnostic(PluginDiagnosticLocation Location, string Message)
+internal sealed record HookResultDiagnostic(
+    PluginDiagnosticLocation Location,
+    string Message,
+    bool UseUnsupportedShapeRule = false)
 {
     public Microsoft.CodeAnalysis.Diagnostic ToDiagnostic()
         => Microsoft.CodeAnalysis.Diagnostic.Create(
-            PluginAnalyzerDiagnostics.HookResultContractRule,
+            UseUnsupportedShapeRule
+                ? PluginAnalyzerDiagnostics.UnsupportedKernelShapeRule
+                : PluginAnalyzerDiagnostics.HookResultContractRule,
             Location.ToLocation(),
             Message);
 }

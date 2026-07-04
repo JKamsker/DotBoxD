@@ -75,7 +75,7 @@ internal static class QueryTextParser
 
     private static QueryFilter ParseLeaf(Cursor cursor)
     {
-        var path = cursor.ExpectWord();
+        var path = cursor.ExpectFieldPath();
         var ignoreCase = cursor.TryConsumeSymbol("~");
 
         if (cursor.TryConsumeKeyword("in"))
@@ -243,14 +243,20 @@ internal static class QueryTextParser
             }
         }
 
-        public string ExpectWord()
+        public string ExpectFieldPath()
         {
-            if (Current.Kind != QueryTokenKind.Word)
+            if (Current.Kind is not (QueryTokenKind.Word or QueryTokenKind.String))
             {
                 throw new QueryTranslationException($"Expected a field name but found '{Describe(Current)}'.");
             }
 
             var text = Current.Text;
+            if (!QueryFilterInvariants.IsValidFieldPath(text))
+            {
+                throw new QueryTranslationException(
+                    $"Invalid field name '{text}' in query text; each '.'-separated segment must be an identifier.");
+            }
+
             Advance();
             return text;
         }

@@ -32,10 +32,8 @@ public static class MessageFramer
     public const int MaxMessageSize = 16 * 1024 * 1024;
 
     /// <summary>
-    /// A framed message read from a stream by <see cref="ReadMessageAsync"/>. <see cref="Body"/> is
-    /// the message body only — the 9-byte frame header has already been stripped, unlike the
-    /// full-frame payload an <c>IRpcChannel.ReceiveAsync</c> returns. The caller owns it and must
-    /// dispose it.
+    /// A framed message read from a stream by <see cref="ReadMessageAsync(Stream, CancellationToken)"/>.
+    /// <see cref="Body"/> is the message body only; the caller owns it and must dispose it.
     /// </summary>
     public readonly record struct FramedMessage(int MessageId, MessageType Type, Payload Body);
 
@@ -46,7 +44,7 @@ public static class MessageFramer
     {
         MessageFrameReader.ThrowIfUndefinedMessageType(type);
 
-        var totalLength = HeaderSize + payload.Length;
+        var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
         var span = writer.GetSpan(totalLength);
 
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(0, 4), totalLength);
@@ -68,7 +66,7 @@ public static class MessageFramer
     {
         MessageFrameReader.ThrowIfUndefinedMessageType(type);
 
-        var totalLength = HeaderSize + payload.Length;
+        var totalLength = MessageFrameReader.GetOutgoingFrameLength(payload.Length);
         var result = Payload.Rent(totalLength);
         var span = result.Memory.Span;
 
@@ -219,7 +217,7 @@ public static class MessageFramer
     internal static PooledBufferWriter RentFrameWriter(int knownPayloadLength = 0)
         => PooledBufferWriter.Rent(Math.Max(
             HeaderSize + EnvelopeLengthSize + knownPayloadLength,
-            MinimumFrameWriterCapacity));
+            MinimumFrameWriterCapacity), MaxMessageSize);
 
     /// <summary>
     /// Detaches the written bytes as a <see cref="Payload"/> and patches the total length and the
@@ -272,14 +270,18 @@ public static class MessageFramer
         out MessageType type)
         => MessageFrameReader.TryReadFrameHeader(source, out messageId, out type);
 
-    /// <summary>
-    /// Reads a framed message from a stream. Returns <c>null</c> when the connection is closed.
-    /// The caller owns the returned <see cref="FramedMessage.Body"/> and must dispose it.
-    /// </summary>
+    /// <summary>Reads a framed message using the default finite idle timeout.</summary>
     public static async Task<FramedMessage?> ReadMessageAsync(
         Stream stream,
         CancellationToken ct = default)
         => await MessageStreamFramer.ReadMessageAsync(stream, ct).ConfigureAwait(false);
+
+    /// <summary>Reads a framed message with an explicit frame-read idle timeout.</summary>
+    public static async Task<FramedMessage?> ReadMessageAsync(
+        Stream stream,
+        TimeSpan frameReadIdleTimeout,
+        CancellationToken ct = default)
+        => await MessageStreamFramer.ReadMessageAsync(stream, frameReadIdleTimeout, ct).ConfigureAwait(false);
 
     /// <summary>
     /// Writes a framed message to a stream.

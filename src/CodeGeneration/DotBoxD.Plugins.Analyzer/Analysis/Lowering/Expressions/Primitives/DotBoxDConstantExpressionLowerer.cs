@@ -49,6 +49,13 @@ internal static class DotBoxDConstantExpressionLowerer
                 : Int32(Convert.ToInt32(constant.Value, System.Globalization.CultureInfo.InvariantCulture));
         }
 
+        if (DotBoxDRpcTypeMapper.IsDecimalWireType(type) &&
+            constant.Value is decimal decimalValue &&
+            (targetType is null || string.Equals(targetType, DotBoxDGenerationNames.ManifestTypes.Record, StringComparison.Ordinal)))
+        {
+            return DecimalRecord(decimalValue, type);
+        }
+
         return Lower(expression, constant.Value, targetType ?? DotBoxDTypeNameReader.SandboxTypeName(type));
     }
 
@@ -101,6 +108,8 @@ internal static class DotBoxDConstantExpressionLowerer
             DotBoxDGenerationNames.ManifestTypes.Guid when DotBoxDRpcTypeMapper.IsGuid(type) => GuidDefault(),
             DotBoxDGenerationNames.ManifestTypes.Record when DotBoxDRpcTypeMapper.IsDateTimeWireType(type) =>
                 DateTimeRecordDefault(type),
+            DotBoxDGenerationNames.ManifestTypes.Record when DotBoxDRpcTypeMapper.IsDecimalWireType(type) =>
+                DecimalRecord(default, type),
             DotBoxDGenerationNames.ManifestTypes.Int when DotBoxDRpcTypeMapper.IsDateOnlyWireType(type) =>
                 Int32(0),
             DotBoxDGenerationNames.ManifestTypes.Long when
@@ -117,6 +126,12 @@ internal static class DotBoxDConstantExpressionLowerer
                     $"{DotBoxDGenerationNames.Helpers.I64}({DotBoxDGenerationNames.CSharpLiterals.Int64Default})"
                 ],
             SandboxTypeSourceEmitter.TryEmit(type) ?? throw new NotSupportedException()),
+            DotBoxDGenerationNames.ManifestTypes.Record,
+            true);
+
+    private static DotBoxDExpressionModel DecimalRecord(decimal value, ITypeSymbol type)
+        => new(
+            DotBoxDDecimalWireSource.RecordSource(type, value),
             DotBoxDGenerationNames.ManifestTypes.Record,
             true);
 

@@ -261,18 +261,7 @@ public sealed class PluginPackageGenerator : IIncrementalGenerator
                 source.HintName,
                 Microsoft.CodeAnalysis.Text.SourceText.From(source.Source, System.Text.Encoding.UTF8)));
 
-        var hookFireAsyncModels = GeneratorGuard.AttributeValues(
-                context,
-                DotBoxDMetadataNames.HookAttribute,
-                static (node, _) => node is TypeDeclarationSyntax,
-                "hook FireAsync extension model",
-                static (ctx, ct) => HookFireAsyncModelFactory.Create(ctx, ct))
-            .Collect();
-        GeneratorGuard.RegisterOutput(
-            context,
-            hookFireAsyncModels,
-            "hook FireAsync extension source output",
-            static (sourceContext, models) => HookFireAsyncExtensionEmitter.Emit(sourceContext, models));
+        HookFireAsyncGenerator.Register(context);
     }
 
     private static bool IsHookChainTerminal(SyntaxNode node)

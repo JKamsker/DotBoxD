@@ -6,23 +6,57 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     private CancellationToken _ownerToken;
     private bool _ownerTokenCanCancel;
 
-    public CancellationToken Start(CancellationToken ownerToken, TimeSpan timeout)
+    public static TimeSpan Resolve(TimeSpan? timeout, TimeSpan defaultTimeout, string parameterName)
     {
-        var source = _source;
-        if (source is null ||
-            source.IsCancellationRequested ||
-            !MatchesOwner(ownerToken))
+        var value = timeout ?? defaultTimeout;
+        if (value == Timeout.InfiniteTimeSpan ||
+            (value > TimeSpan.Zero && value.TotalMilliseconds <= int.MaxValue))
         {
-            source?.Dispose();
-            source = ownerToken.CanBeCanceled
-                ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
-                : new CancellationTokenSource();
-            _source = source;
-            _ownerToken = ownerToken;
-            _ownerTokenCanCancel = ownerToken.CanBeCanceled;
+            return value;
         }
 
-        source.CancelAfter(timeout);
+        throw new ArgumentOutOfRangeException(
+            parameterName,
+            value,
+            "Frame read idle timeout must be positive (at most int.MaxValue ms) or Timeout.InfiniteTimeSpan.");
+    }
+
+    public async ValueTask<int> ReadAsync(
+        Stream stream,
+        Memory<byte> buffer,
+        CancellationToken ownerToken,
+        TimeSpan timeout)
+    {
+        var readToken = Start(ownerToken, timeout);
+        try
+        {
+            return await stream.ReadAsync(buffer, readToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (IsTimeoutCancellation(ownerToken))
+        {
+            throw new IOException(
+                $"Inbound frame read stalled for longer than {timeout} with no data (possible slow-loris peer).");
+        }
+        finally
+        {
+            CancelPendingTimeout();
+        }
+    }
+
+    public CancellationToken Start(CancellationToken ownerToken, TimeSpan timeout)
+    {
+        var source = EnsureSource(ownerToken);
+
+        try
+        {
+            source.CancelAfter(timeout);
+        }
+        catch (ObjectDisposedException)
+        {
+            source = CreateSource(ownerToken);
+            source.CancelAfter(timeout);
+        }
+
         return source.Token;
     }
 
@@ -39,7 +73,14 @@ internal sealed class FrameReadTimeoutSource : IDisposable
         var source = _source;
         if (source is { IsCancellationRequested: false })
         {
-            source.CancelAfter(Timeout.InfiniteTimeSpan);
+            try
+            {
+                source.CancelAfter(Timeout.InfiniteTimeSpan);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Dispose can race a read finally block that is clearing a pending timeout.
+            }
         }
     }
 
@@ -47,6 +88,47 @@ internal sealed class FrameReadTimeoutSource : IDisposable
     {
         _source?.Dispose();
         _source = null;
+    }
+
+    internal void DisposeCurrentSourceForTest() => _source?.Dispose();
+
+    private CancellationTokenSource EnsureSource(CancellationToken ownerToken)
+    {
+        var source = _source;
+        if (source is null ||
+            IsDisposed(source) ||
+            source.IsCancellationRequested ||
+            !MatchesOwner(ownerToken))
+        {
+            source?.Dispose();
+            source = CreateSource(ownerToken);
+        }
+
+        return source;
+    }
+
+    private CancellationTokenSource CreateSource(CancellationToken ownerToken)
+    {
+        var source = ownerToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(ownerToken)
+            : new CancellationTokenSource();
+        _source = source;
+        _ownerToken = ownerToken;
+        _ownerTokenCanCancel = ownerToken.CanBeCanceled;
+        return source;
+    }
+
+    private static bool IsDisposed(CancellationTokenSource source)
+    {
+        try
+        {
+            _ = source.Token;
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
     }
 
     private bool MatchesOwner(CancellationToken ownerToken) =>

@@ -28,10 +28,10 @@ internal sealed class MethodSignatureNameProvider : ISignatureTypeProvider<strin
         => "!" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     public string GetModifiedType(string modifierType, string unmodifiedType, bool isRequired)
-        => unmodifiedType;
+        => (isRequired ? "modreq(" : "modopt(") + modifierType + ")" + unmodifiedType;
 
     public string GetPinnedType(string elementType)
-        => elementType;
+        => "pinned " + elementType;
 
     public string GetPointerType(string elementType)
         => elementType + "*";

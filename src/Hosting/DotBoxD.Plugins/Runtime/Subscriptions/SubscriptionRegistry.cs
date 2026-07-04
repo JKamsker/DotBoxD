@@ -20,35 +20,45 @@ public sealed class SubscriptionRegistry
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<SubscriptionDeliveryFault>? _onFault;
+    private readonly Action? _throwIfDisposed;
 
     internal SubscriptionRegistry(
         IPluginMessageSink messages,
         PluginEventAdapterRegistry events,
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
-        Action<SubscriptionDeliveryFault>? onFault = null)
+        Action<SubscriptionDeliveryFault>? onFault = null,
+        Action? throwIfDisposed = null)
     {
         _messages = messages;
         _events = events;
         _kernels = kernels;
         _installer = installer;
         _onFault = onFault;
+        _throwIfDisposed = throwIfDisposed;
     }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>()
     {
+        ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public SubscriptionPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        ThrowIfDisposed();
+        return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public SubscriptionPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(createContext);
+        ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter, createContext);
     }
@@ -58,7 +68,9 @@ public sealed class SubscriptionRegistry
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(createContext);
+        ThrowIfDisposed();
         if (typeof(TContext) == typeof(HookContext))
         {
             return (SubscriptionPipeline<TEvent, TContext>)(object)OnHookContext(
@@ -120,6 +132,7 @@ public sealed class SubscriptionRegistry
 
     internal void EnsureCanRegister<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
+        ThrowIfDisposed();
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
@@ -156,6 +169,9 @@ public sealed class SubscriptionRegistry
 
     public void Publish<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+
         CachedPipelineFanout pipelines;
         lock (_gate)
         {
@@ -241,6 +257,9 @@ public sealed class SubscriptionRegistry
         _pipelineEventTypes.Add(eventType);
         _pipelineFanout.Remove(eventType);
     }
+
+    private void ThrowIfDisposed()
+        => _throwIfDisposed?.Invoke();
 
     private readonly record struct PipelineKey(Type EventType, Type ContextType);
 }

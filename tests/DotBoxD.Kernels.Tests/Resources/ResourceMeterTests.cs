@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
@@ -123,6 +124,17 @@ public sealed class ResourceMeterTests
         var ex = Assert.Throws<SandboxRuntimeException>(() => meter.ChargeValue(value));
 
         Assert.Equal(SandboxErrorCode.Timeout, ex.Error.Code);
+    }
+
+    [Fact]
+    public void ChargeValue_does_not_leak_null_reference_for_null_payload_string_values()
+    {
+        var meter = new ResourceMeter(new ResourceLimits());
+
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            meter.ChargeValue((StringValue)RuntimeHelpers.GetUninitializedObject(typeof(StringValue))));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
     }
 
     [Fact]

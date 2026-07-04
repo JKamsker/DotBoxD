@@ -61,7 +61,13 @@ safe-outputs:
     max-patch-size: 8192
     if-no-changes: "error"
     protected-files: fallback-to-issue
-    github-token-for-extra-empty-commit: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+    # Full token override: push the fix commit as the PAT's user (not github-actions[bot]) so
+    # the resulting pull_request CI runs execute without manual approval. A PAT push is not
+    # subject to recursion-prevention, so CI triggers directly — no extra empty commit needed.
+    # Mirrors library-surprise-red-test.md's create-pull-request override; without this the
+    # fix commit was bot-pushed and every fixed PR's final CI sat at action_required (#266).
+    # Requires the PAT to have Contents:R/W + Pull requests:R/W.
+    github-token: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
   add-labels:
     target: "*"
     max: 1
@@ -376,9 +382,13 @@ post-steps:
     if: steps.surprise-fix-guard.outputs.should_validate == 'true'
     run: GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore
 
-  - name: Verify fix is green
-    if: steps.surprise-fix-guard.outputs.should_validate == 'true'
-    run: GITHUB_ACTIONS=true dotnet test DotBoxD.slnx -c Release --no-build
+  # NOTE: we intentionally do NOT run `dotnet test DotBoxD.slnx` here. The whole-solution
+  # test run OOM-kills the DotBoxD.Kernels.Tests host (exit 137) under this job's memory
+  # ceiling, and a memory-safe per-project sequential run does not fit the 45-min timeout on
+  # top of the agent. The authoritative full-suite gate is the PR's own CI, which now runs
+  # automatically and ungated on the fix push (per-project matrix, real runners — see
+  # library-surprise-red-test.md / the GH_AW_CI_TRIGGER_TOKEN override on the push below).
+  # The restore+build above stays as a fast cross-project compile gate.
 ---
 
 # Library Surprise Fix
@@ -388,10 +398,15 @@ regression test reproduces a real bug. It is dispatched per-PR (by number) from
 `library-surprise-fix-dispatcher`. Do not discover a new surprise in this
 workflow.
 
-The red->green proof lives entirely in this run: you confirm the red test FAILS
-on the checked-out branch, implement the fix, and this workflow's post-steps
-rebuild and require `dotnet test` to PASS before your push is accepted. It does
-not depend on the approval-gated pull_request CI.
+The red->green proof lives in this run: you confirm the red test FAILS on the
+checked-out branch, implement the fix, then confirm it PASSES by running the
+ENTIRE test project that owns the red test (this catches sibling-test
+regressions), and confirm the whole solution BUILDS. Do not run the whole
+solution's tests here — a full `dotnet test DotBoxD.slnx` OOM-kills the
+DotBoxD.Kernels.Tests host in this sandbox (exit 137); run only the owning
+project (Kernels.Tests excepted — for it run the focused `--filter`ed tests
+only). The authoritative full-suite gate is the PR's own CI, which now runs
+automatically and ungated on your push (per-project, on real runners).
 
 ## Target Resolution
 
@@ -425,10 +440,20 @@ that the checked-out branch contains the red tests from the PR.
 4. Implement the smallest maintainable production fix. Keep the public design
    rule intact: public abstractions and generators must remain opt-in sugar over
    public primitives, never lock-in.
-5. Run the focused test to verify it is now green, then run:
-   `dotnet restore DotBoxD.slnx`,
-   `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore`, and
-   `GITHUB_ACTIONS=true dotnet test DotBoxD.slnx -c Release --no-build`.
+5. Confirm the fix, then run `dotnet restore DotBoxD.slnx` and
+   `GITHUB_ACTIONS=true dotnet build DotBoxD.slnx -c Release --no-restore`.
+   To confirm the fix, run the ENTIRE test project that contains the red
+   regression test (not just the single focused test) and require it fully green:
+   `GITHUB_ACTIONS=true dotnet test <the-red-test's-project> -c Release --no-build`.
+   Running the whole owning project catches regressions in sibling tests that a
+   single `--filter` misses (e.g. an ArgumentException with the wrong ParamName).
+   Do NOT run `GITHUB_ACTIONS=true dotnet test DotBoxD.slnx` (the whole solution)
+   — it OOM-kills the DotBoxD.Kernels.Tests host in this sandbox (exit 137). The
+   ONE exception is DotBoxD.Kernels.Tests itself: its full run also OOMs here, so
+   if the red test lives in DotBoxD.Kernels.Tests, run only the focused
+   `--filter`ed test(s) and rely on the PR CI for the rest. Every other test
+   project runs fine in this sandbox. The PR's own per-project CI runs
+   automatically after your push and is the authoritative full-suite gate.
 6. Commit the fix on the checked-out PR branch. The commit message must include
    a short summary followed by a body explaining what changed and why.
 7. Call `push_to_pull_request_branch` for `SURPRISE_FIX_PR_NUMBER`. Include a
@@ -438,6 +463,17 @@ that the checked-out branch contains the red tests from the PR.
 
 If the red test does not fail (already fixed) or the PR is no longer eligible,
 leave the workspace unchanged and call `noop`.
+
+## Protected files — never touch them
+
+Never include top-level protected files in your patch: `README.md`, `CONTRIBUTING.md`,
+`CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
+`Directory.Packages.props`, `NuGet.Config`, `global.json`, lockfiles, or anything under dot-folders.
+The push layer hard-blocks the ENTIRE patch when it contains any of them (your work is discarded
+into a "[gh-aw] Protected Files" issue instead of landing). Documented samples and doc pages live
+under `docs/**`, which is allowed — put documentation updates there. If a protected file genuinely
+must change for correctness, say so in a comment/PR body and leave the file itself untouched for a
+human.
 
 Do not print, inspect, or summarize secrets, API keys, virtual tokens, endpoint
 hosts, or full endpoint URLs.

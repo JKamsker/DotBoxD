@@ -11,6 +11,7 @@ public sealed partial class SandboxHost
 
     public void RevokeCapability(string capabilityId, string reason = "")
     {
+        ThrowIfDisposed();
         ValidateCapabilityId(capabilityId);
         _revokedCapabilities[capabilityId] = new RevokedCapability(
             capabilityId,

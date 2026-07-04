@@ -4,56 +4,48 @@ public sealed partial class RemoteHookPipeline<TEvent, TContext>
 {
     [PipelineStep(PipelineStepRole.Register)]
     public RemoteHookPipeline<TEvent, TContext> Register<TResult>(Func<TEvent, TResult> handler, int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
     [PipelineStep(PipelineStepRole.Register)]
     public RemoteHookPipeline<TEvent, TContext> Register<TResult>(
         Func<TEvent, TContext, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultNotLowered();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TContext, TResult> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TContext, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     [PipelineStep(PipelineStepRole.RegisterLocal)]
     public RemoteHookPipeline<TEvent, TContext> RegisterLocal<TResult>(
         Func<TEvent, TContext, CancellationToken, ValueTask<TResult>> handler,
         int priority = 0)
-        where TResult : struct, IHookResult
         => throw ResultLocalHandlersNotSupported();
 
     public RemoteHookPipeline<TEvent, TContext> UseGeneratedResultChain<TResult>(

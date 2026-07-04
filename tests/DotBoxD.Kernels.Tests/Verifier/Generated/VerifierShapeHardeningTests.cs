@@ -70,6 +70,46 @@ public sealed class VerifierShapeHardeningTests
     }
 
     [Fact]
+    public async Task Verifier_rejects_zero_iteration_accumulate_linear_meter_credit()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = DefineFunction(type);
+            var il = fn.GetILGenerator();
+            var value = il.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(il);
+            EmitChargeFuel(il);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_8);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.AccumulateLinearI32)));
+            il.Emit(OpCodes.Pop);
+            for (var i = 0; i < 6; i++)
+            {
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.StringLengthRaw)));
+                il.Emit(OpCodes.Pop);
+            }
+
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stloc, value);
+            EmitExitCall(il);
+            il.Emit(OpCodes.Ldloc, value);
+            il.Emit(OpCodes.Ret);
+            EmitExecuteCalling(type, fn);
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            d.Code == "V-COMPILED-SHAPE" &&
+            d.Message.Contains(nameof(CompiledRuntime.AccumulateLinearI32), StringComparison.Ordinal) &&
+            d.Message.Contains("iterations", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Verifier_rejects_long_instruction_sequence_after_one_meter()
     {
         var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
@@ -94,6 +134,78 @@ public sealed class VerifierShapeHardeningTests
         Assert.Contains(result.Diagnostics, d =>
             d.Code == "V-COMPILED-SHAPE" &&
             d.Message.Contains("long instruction sequences", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_null_sandbox_type_record_fields()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = DefineFunction(type);
+            var il = fn.GetILGenerator();
+            var typeArray = il.DeclareLocal(typeof(SandboxType[]));
+            var resultValue = il.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(il);
+            EmitChargeFuel(il);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.CreateTypeArray)));
+            il.Emit(OpCodes.Stloc, typeArray);
+            il.Emit(OpCodes.Ldloc, typeArray);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Stelem_Ref);
+            EmitChargeFuel(il);
+            il.Emit(OpCodes.Ldloc, typeArray);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.TypeRecord)));
+            il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stloc, resultValue);
+            EmitExitCall(il);
+            il.Emit(OpCodes.Ldloc, resultValue);
+            il.Emit(OpCodes.Ret);
+            EmitExecuteCalling(type, fn);
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            d.Code == "V-STACK-TYPE" &&
+            d.Message.Contains("SandboxType", StringComparison.Ordinal) &&
+            d.Message.Contains("null", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Verifier_rejects_forbidden_sandbox_type_scalar_names()
+    {
+        var result = await VerifierTestHelpers.VerifyAsync(VerifierTestHelpers.BuildGeneratedAssembly(type =>
+        {
+            var fn = DefineFunction(type);
+            var il = fn.GetILGenerator();
+            var resultValue = il.DeclareLocal(typeof(SandboxValue));
+            EmitEnterCall(il);
+            EmitChargeFuel(il);
+            il.Emit(OpCodes.Ldstr, "System.String");
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.TypeScalar)));
+            EmitChargeFuel(il);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.TypeList)));
+            il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Call, RuntimeMethod(nameof(CompiledRuntime.I32)));
+            il.Emit(OpCodes.Stloc, resultValue);
+            EmitExitCall(il);
+            il.Emit(OpCodes.Ldloc, resultValue);
+            il.Emit(OpCodes.Ret);
+            EmitExecuteCalling(type, fn);
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d =>
+            (d.Code == "V-COMPILED-SHAPE" || d.Code == "V-STACK-TYPE") &&
+            d.Message.Contains("SandboxType", StringComparison.Ordinal) &&
+            (d.Message.Contains("System.String", StringComparison.Ordinal) ||
+                d.Message.Contains(nameof(CompiledRuntime.TypeScalar), StringComparison.Ordinal)) &&
+            (d.Message.Contains("forbidden", StringComparison.OrdinalIgnoreCase) ||
+                d.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase)));
     }
 
     private static MethodBuilder DefineExecute(TypeBuilder type)
@@ -152,4 +264,7 @@ public sealed class VerifierShapeHardeningTests
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, typeof(CompiledRuntime).GetMethod(nameof(Kernels.Runtime.CompiledRuntime.ExitCall))!);
     }
+
+    private static MethodInfo RuntimeMethod(string name)
+        => typeof(CompiledRuntime).GetMethod(name) ?? throw new MissingMethodException(nameof(CompiledRuntime), name);
 }

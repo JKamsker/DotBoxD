@@ -30,6 +30,7 @@ internal static class PluginPackageValidator
 
         var metadataKernel = ValidateModuleKernelMetadata(package, diagnostics);
         ValidateManifestMode(package.Manifest, diagnostics);
+        var hasModuleCollectionErrors = PluginModuleCollectionValidator.Validate(package.Module, diagnostics);
         if (package.Manifest.RpcEntrypoint is not null)
         {
             diagnostics.Add(new SandboxDiagnostic(
@@ -37,35 +38,60 @@ internal static class PluginPackageValidator
                 "Hook kernel manifests must not declare rpcEntrypoint."));
         }
 
-        PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
-        ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
-        foreach (var group in package.Manifest.LiveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
+        if (hasModuleCollectionErrors)
         {
-            if (group.Skip(1).Any())
+            ThrowIfErrors(diagnostics);
+        }
+
+        PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
+        ValidateRequiredCapabilities(package.Manifest, diagnostics);
+        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
+            package.Manifest,
+            package.Module,
+            diagnostics);
+        ValidateEntrypoints(package, PluginEntrypointIndex.Build(package), diagnostics);
+        var liveSettings = package.Manifest.LiveSettings;
+        if (PluginManifestElementValidator.ValidateNoNullElements(liveSettings, "liveSettings", diagnostics))
+        {
+            foreach (var group in liveSettings.GroupBy(s => s.Name, StringComparer.Ordinal))
             {
-                diagnostics.Add(new SandboxDiagnostic("DBXK021", $"Live setting '{group.Key}' is declared more than once."));
+                if (group.Skip(1).Any())
+                {
+                    diagnostics.Add(new SandboxDiagnostic("DBXK021", $"Live setting '{group.Key}' is declared more than once."));
+                }
+            }
+
+            foreach (var setting in liveSettings)
+            {
+                PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
+                PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
+                ValidateSetting(setting, diagnostics);
             }
         }
 
-        foreach (var setting in package.Manifest.LiveSettings)
-        {
-            PluginManifestTextValidator.ValidateText(setting.Name, "live setting name", diagnostics);
-            PluginManifestTextValidator.ValidateText(setting.Type, "live setting type", diagnostics);
-            ValidateSetting(setting, diagnostics);
-        }
-
-        if (package.Manifest.Subscriptions.Count == 0)
+        var subscriptions = package.Manifest.Subscriptions;
+        var subscriptionsValid = PluginManifestElementValidator.ValidateNoNullElements(
+            subscriptions,
+            "subscriptions",
+            diagnostics);
+        if (subscriptions.Count == 0)
         {
             diagnostics.Add(new SandboxDiagnostic("DBXK030", "At least one hook subscription is required."));
         }
-        else if (package.Manifest.Subscriptions.Count > 1)
+        else if (subscriptions.Count > 1)
         {
             diagnostics.Add(new SandboxDiagnostic(
                 "DBXK031",
                 "A plugin package must declare exactly one hook subscription."));
         }
 
-        foreach (var subscription in package.Manifest.Subscriptions)
+        if (!subscriptionsValid)
+        {
+            ThrowIfErrors(diagnostics);
+            return;
+        }
+
+        foreach (var subscription in subscriptions)
         {
             if (string.IsNullOrWhiteSpace(subscription.Event) || string.IsNullOrWhiteSpace(subscription.Kernel))
             {
@@ -83,7 +109,7 @@ internal static class PluginPackageValidator
                     $"Hook subscription kernel '{subscription.Kernel}' must match module kernel '{metadataKernel}'."));
             }
 
-            ValidateIndexedPredicates(subscription, diagnostics);
+            PluginManifestPredicateValidator.ValidateIndexedPredicates(subscription, diagnostics);
         }
 
         ThrowIfErrors(diagnostics);
@@ -109,41 +135,15 @@ internal static class PluginPackageValidator
         return metadataKernel;
     }
 
-    private static void ValidateIndexedPredicates(
-        HookSubscriptionManifest subscription,
+    private static void ValidateRequiredCapabilities(
+        PluginManifest manifest,
         List<SandboxDiagnostic> diagnostics)
     {
-        foreach (var predicate in subscription.IndexedPredicates)
-        {
-            PluginManifestTextValidator.ValidateText(predicate.Path, "indexed predicate path", diagnostics);
-            if (!Enum.IsDefined(predicate.Operator))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK046",
-                    $"Indexed predicate operator '{predicate.Operator}' is not supported."));
-            }
-
-            if (predicate.ValueType is not ("bool" or "int" or "long" or "double" or "string"))
-            {
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK047",
-                    $"Indexed predicate value type '{predicate.ValueType}' is not supported."));
-            }
-            else if (!ValueMatchesType(predicate.Value, predicate.ValueType))
-            {
-                // Defense-in-depth for programmatically-built manifests: the JSON importer already parses
-                // the value per valueType, but an in-memory package could box a mismatched runtime type.
-                diagnostics.Add(new SandboxDiagnostic(
-                    "DBXK049",
-                    $"Indexed predicate value '{predicate.Value ?? "null"}' does not match its declared value type '{predicate.ValueType}'."));
-            }
-        }
-
-        if (subscription.IndexCoversPredicate && subscription.IndexedPredicates.Count == 0)
+        if (manifest.RequiredCapabilities.Any(static capability => capability is null))
         {
             diagnostics.Add(new SandboxDiagnostic(
-                "DBXK048",
-                "A hook subscription cannot claim full index coverage with no indexed predicates."));
+                "DBXK045",
+                "Plugin manifest requiredCapabilities must not contain null entries."));
         }
     }
 
@@ -189,17 +189,6 @@ internal static class PluginPackageValidator
                 "A hook subscription cannot combine result hook metadata with RunLocal projection metadata."));
         }
     }
-
-    private static bool ValueMatchesType(object? value, string valueType)
-        => valueType switch
-        {
-            "bool" => value is bool,
-            "int" => value is int,
-            "long" => value is long,
-            "double" => value is double,
-            "string" => value is string,
-            _ => false
-        };
 
     private static void ValidateEntrypoints(
         PluginPackage package,

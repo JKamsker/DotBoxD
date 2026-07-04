@@ -69,6 +69,10 @@ internal static class RpcKernelPackageValidator
 
         ValidateMode(package.Manifest, diagnostics);
         _ = PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
+        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
+            package.Manifest,
+            package.Module,
+            diagnostics);
         ValidateLiveSettings(package.Manifest, diagnostics);
         ThrowIfErrors(diagnostics);
     }
@@ -131,7 +135,8 @@ internal static class RpcKernelPackageValidator
             [entrypointId],
             diagnostics,
             allowNonBindingCapabilities: false,
-            includeModuleNonBindingCapabilities: false);
+            includeModuleNonBindingCapabilities: false,
+            includeModuleCapabilityRequests: false);
         PluginManifestCapabilityValidator.ValidateRequiredCapabilityGrants(
             package.Manifest,
             package.Module,

@@ -391,7 +391,7 @@ public static SandboxValue FromMap( IReadOnlyDictionary<SandboxValue, SandboxVal
 public static SandboxValue FromOpaqueId(string typeName, string value)
 public static SandboxValue FromPath(string value)
 public static SandboxValue FromRecord(IReadOnlyList<SandboxValue> fields) => new RecordValue(fields)
-public static SandboxValue FromString(string value) => new StringValue(value)
+public static SandboxValue FromString(string value)
 public static SandboxValue FromUri(string value)
 public static SandboxValue GetArgument( SandboxValue input, int index, int parameterCount, SandboxType expectedType)
 public static SandboxValue GreaterThan(SandboxValue left, SandboxValue right)
@@ -423,6 +423,7 @@ public string ModuleHash { get; }
 public string PlanHash { get; }
 public string PolicyHash { get; }
 public string PolicyId { get => _policyId; init { _policyId = value; ResetHash(); } }
+public string Value
 public string? ArtifactHash { get; init; }
 public TimeSpan EffectiveWallTime => MaxWallTime ?? TimeSpan.FromMilliseconds(100)
 public TimeSpan RemainingWallTime()

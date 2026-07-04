@@ -16,6 +16,8 @@ internal static class RegistrationAccumulatorModelFactory
     private static readonly SymbolDisplayFormat FullyQualifiedFormat =
         SymbolDisplayFormat.FullyQualifiedFormat;
 
+    private const string FlushMemberName = "FlushAsync";
+
     public static RegistrationAccumulatorGenerationResult? CreateTarget(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken)
@@ -29,16 +31,17 @@ internal static class RegistrationAccumulatorModelFactory
 
         try
         {
-            EnsureTopLevel(type);
+            EnsureSupportedReceiverType(type, declaration);
             var attribute = context.Attributes[0];
             var accumulatorName = RequiredStringArgument(attribute, 0, "accumulator name");
             var methodName = RequiredStringArgument(attribute, 1, "method name");
-            ValidateIdentifier(accumulatorName, "Accumulator");
+            ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
             ValidateIdentifier(methodName, "Registration method");
             ValidateGeneratedTypeName(type, accumulatorName);
 
             var method = ResolveRegistrationMethod(type, methodName, context.SemanticModel.Compilation);
             var typeParameters = TypeParameters(method);
+            ValidateGeneratedMemberName(methodName, typeParameters);
             var model = new RegistrationAccumulatorTargetModel(
                 Namespace(type),
                 TypeName(type),
@@ -67,15 +70,15 @@ internal static class RegistrationAccumulatorModelFactory
 
         try
         {
-            EnsureTopLevel(type);
+            EnsureSupportedReceiverType(type, declaration);
             var accumulatorName = RequiredStringArgument(context.Attributes[0], 0, "accumulator name");
-            ValidateIdentifier(accumulatorName, "Accumulator");
+            ValidateIdentifier(accumulatorName, "Accumulator", allowEscaped: false);
             ValidateGeneratedTypeName(type, accumulatorName);
             var model = new RegistrationRootAccumulatorModel(
                 Namespace(type),
                 TypeName(type),
                 accumulatorName,
-                PublicInstanceProperties(type),
+                PublicInstanceProperties(type, context.SemanticModel.Compilation),
                 Location(declaration));
             return new RegistrationAccumulatorGenerationResult(null, model, null);
         }
@@ -85,12 +88,17 @@ internal static class RegistrationAccumulatorModelFactory
         }
     }
 
-    private static void EnsureTopLevel(INamedTypeSymbol type)
+    private static void EnsureSupportedReceiverType(INamedTypeSymbol type, TypeDeclarationSyntax declaration)
     {
         if (type.ContainingType is not null)
         {
             throw new NotSupportedException(
                 $"Registration accumulator generation supports top-level control types; '{type.ToDisplayString()}' is nested.");
+        }
+
+        if (declaration.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.FileKeyword)))
+        {
+            throw new NotSupportedException($"Registration accumulator generation cannot reference file-local control type '{declaration.Identifier.ValueText}' from a separate generated file.");
         }
     }
 
@@ -106,9 +114,9 @@ internal static class RegistrationAccumulatorModelFactory
         return value;
     }
 
-    private static void ValidateIdentifier(string value, string label)
+    private static void ValidateIdentifier(string value, string label, bool allowEscaped = true)
     {
-        if (!SyntaxFacts.IsValidIdentifier(value))
+        if (!SyntaxFacts.IsValidIdentifier(value) || (!allowEscaped && RequiresEscaping(value)))
         {
             throw new NotSupportedException($"{label} name '{value}' is not a valid C# identifier.");
         }
@@ -150,6 +158,17 @@ internal static class RegistrationAccumulatorModelFactory
         }
 
         return method;
+    }
+
+    private static void ValidateGeneratedMemberName(
+        string methodName,
+        EquatableArray<RegistrationTypeParameterModel> typeParameters)
+    {
+        if (methodName == FlushMemberName && typeParameters.Count == 0)
+        {
+            throw new NotSupportedException(
+                $"Registration accumulator method '{methodName}' collides with generated member '{FlushMemberName}'.");
+        }
     }
 
     private static bool IsResultBearingAwaitableRegistrationReturn(
@@ -210,7 +229,9 @@ internal static class RegistrationAccumulatorModelFactory
         }
     }
 
-    private static EquatableArray<RegistrationRootPropertyModel> PublicInstanceProperties(INamedTypeSymbol type)
+    private static EquatableArray<RegistrationRootPropertyModel> PublicInstanceProperties(
+        INamedTypeSymbol type,
+        Compilation compilation)
     {
         var properties = new List<RegistrationRootPropertyModel>();
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
@@ -230,7 +251,8 @@ internal static class RegistrationAccumulatorModelFactory
                     properties.Add(new RegistrationRootPropertyModel(
                         property.Name,
                         TypeName(property.ContainingType),
-                        RegistrationAssignableTypeNameCollector.Collect(property.Type)));
+                        RegistrationAssignableTypeNameCollector.Collect(property.Type),
+                        compilation.IsSymbolAccessibleWithin(property.GetMethod, compilation.Assembly)));
                 }
             }
         }
@@ -254,14 +276,12 @@ internal static class RegistrationAccumulatorModelFactory
 
     private static string Identifier(string name)
     {
-        var kind = SyntaxFacts.GetKeywordKind(name);
-        if (kind == SyntaxKind.None)
-        {
-            kind = SyntaxFacts.GetContextualKeywordKind(name);
-        }
-
-        return kind == SyntaxKind.None ? name : "@" + name;
+        return RequiresEscaping(name) ? "@" + name : name;
     }
+
+    private static bool RequiresEscaping(string name)
+        => SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ||
+           SyntaxFacts.GetContextualKeywordKind(name) != SyntaxKind.None;
 
     private static void ValidateGeneratedTypeName(INamedTypeSymbol receiverType, string generatedName)
     {

@@ -34,7 +34,12 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     {
         _channel = channel;
         _sender = new RpcPeerSender(channel, () => Volatile.Read(ref _closed) != 0);
-        _streams = new RpcStreamManager(serializer, _sender.SendAsync, options.ExceptionTransformer, _sender.SendFrameValueAsync);
+        _streams = new RpcStreamManager(
+            serializer,
+            _sender.SendAsync,
+            options.ExceptionTransformer,
+            _sender.SendFrameValueAsync,
+            options.MaxInboundStreamsPerPeer);
         _inbound = new RpcPeerInboundDispatcher(
             serializer,
             options,
@@ -91,6 +96,9 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
     /// Lets a test assert the read loop has NOT begun while a host's <c>PeerConnected</c> handler runs.
     /// </summary>
     internal bool HasStarted => Volatile.Read(ref _started) != 0;
+
+    /// <summary>Test seam: whether disposal has begun.</summary>
+    internal bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>The remote endpoint string of the underlying channel.</summary>
     public string RemoteEndpoint => _channel.RemoteEndpoint;
@@ -187,6 +195,11 @@ public sealed partial class RpcPeer : IAsyncDisposable, IRpcInvoker
             if (_disposed != 0)
             {
                 throw new ObjectDisposedException(nameof(RpcPeer));
+            }
+
+            if (_closed != 0)
+            {
+                throw new ServiceConnectionException("Connection closed.");
             }
 
             var serviceType = typeof(TService);

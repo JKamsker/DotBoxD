@@ -24,6 +24,23 @@ namespace DotBoxD.Services.Tests.Coverage.RoundsMiddle;
 public sealed class Round4_InstanceRegistryAsyncTeardownTests
 {
     [Fact]
+    public void ReleaseAll_DoesNotDeadlock_WhenDisposeAsyncCapturesContext()
+    {
+        var completed = PumpRunner.RunWithTimeout(() =>
+        {
+            var registry = new InstanceRegistry();
+            registry.Register("svc", new YieldingAsyncDisposable());
+
+            registry.ReleaseAll();
+            return Task.CompletedTask;
+        }, TimeSpan.FromSeconds(5));
+
+        Assert.True(
+            completed,
+            "public teardown deadlocked: ReleaseAll sync-blocked the calling thread on DisposeAsync");
+    }
+
+    [Fact]
     public void ReleaseAllAsync_AwaitsDisposal_WithoutSyncBlocking_WhenDisposeAsyncCapturesContext()
     {
         var completed = PumpRunner.RunWithTimeout(async () =>
@@ -55,6 +72,14 @@ public sealed class Round4_InstanceRegistryAsyncTeardownTests
             // Deliberately NO ConfigureAwait(false): captures the current SynchronizationContext, exactly
             // the case the registry comment claimed could never deadlock the blocking GetResult().
             await _gate;
+        }
+    }
+
+    private sealed class YieldingAsyncDisposable : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await Task.Yield();
         }
     }
 

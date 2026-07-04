@@ -1,4 +1,5 @@
 using System.Reflection.Metadata;
+using DotBoxD.Kernels.Sandbox;
 
 namespace DotBoxD.Kernels.Verifier.Generated.Methods;
 
@@ -15,9 +16,11 @@ internal static class GeneratedMethodShapeVerifier
         string methodName,
         List<VerificationDiagnostic> diagnostics)
     {
+        VerifyLocalInitialization(body, methodName, diagnostics);
         var analysis = GeneratedMethodFlowAnalyzer.Analyze(instructions, StateFor);
         GeneratedStackVerifier.Verify(signature, analysis, diagnostics);
         GeneratedStackTypeVerifier.Verify(reader, method, body, signature, analysis, diagnostics);
+        VerifySandboxTypeScalarShape(methodName, analysis, diagnostics);
         if (methodName == "Execute")
         {
             GeneratedExecuteShapeVerifier.Verify(analysis, diagnostics);
@@ -29,6 +32,24 @@ internal static class GeneratedMethodShapeVerifier
             VerifyFunction(methodName, analysis, diagnostics);
         }
     }
+
+    private static void VerifyLocalInitialization(
+        MethodBodyBlock body,
+        string methodName,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        if (body.LocalVariablesInitialized || body.LocalSignature.IsNil || !IsGeneratedExecutableMethod(methodName))
+        {
+            return;
+        }
+
+        diagnostics.Add(new VerificationDiagnostic(
+            "V-COMPILED-SHAPE",
+            $"method '{methodName}' declares locals with initlocals disabled; generated method bodies must use local initialization"));
+    }
+
+    private static bool IsGeneratedExecutableMethod(string methodName)
+        => methodName == "Execute" || methodName.StartsWith("Fn_", StringComparison.Ordinal);
 
     private static void VerifyFunction(
         string methodName,
@@ -52,9 +73,11 @@ internal static class GeneratedMethodShapeVerifier
 
         VerifyMeterOrder(methodName, analysis, diagnostics);
         VerifyPositiveMeterAmounts(methodName, analysis, diagnostics);
+        GeneratedAccumulateLinearMeterVerifier.Verify(methodName, analysis, diagnostics);
         VerifyWorkHasMeterDensity(methodName, analysis, diagnostics);
         VerifyInstructionMeterDensity(methodName, analysis, diagnostics);
         VerifyRuntimeCallOrder(methodName, analysis, diagnostics);
+        GeneratedUnchargedLiteralShapeVerifier.Verify(methodName, analysis, diagnostics);
         foreach (var instruction in analysis.Instructions.Where(i => i.IsLocalCall))
         {
             var state = analysis.EntryStates.TryGetValue(instruction.Offset, out var entryState)
@@ -75,6 +98,47 @@ internal static class GeneratedMethodShapeVerifier
                     $"method '{methodName}' must not call generated functions after exiting the call meter"));
             }
         }
+    }
+
+    private static void VerifySandboxTypeScalarShape(
+        string methodName,
+        GeneratedMethodFlow analysis,
+        List<VerificationDiagnostic> diagnostics)
+    {
+        foreach (var instruction in analysis.Instructions.Where(i => i.CalledMember == TypeScalarSignature))
+        {
+            if (!IsReachable(analysis, instruction))
+            {
+                continue;
+            }
+
+            var scalarName = PreviousStringLiteral(analysis, instruction);
+            if (scalarName is null)
+            {
+                diagnostics.Add(new VerificationDiagnostic(
+                    "V-COMPILED-SHAPE",
+                    $"method '{methodName}' must construct SandboxType scalars from literal names"));
+                continue;
+            }
+
+            if (!SandboxType.Scalar(scalarName).IsKnown())
+            {
+                diagnostics.Add(new VerificationDiagnostic(
+                    "V-COMPILED-SHAPE",
+                    $"method '{methodName}' constructs unknown or forbidden SandboxType scalar '{scalarName}'"));
+            }
+        }
+    }
+
+    private static string? PreviousStringLiteral(GeneratedMethodFlow analysis, GeneratedInstruction instruction)
+    {
+        if (!analysis.IndexByOffset.TryGetValue(instruction.Offset, out var index) || index == 0)
+        {
+            return null;
+        }
+
+        var previous = analysis.Instructions[index - 1];
+        return previous.Opcode == ILOpCode.Ldstr ? previous.StringValue : null;
     }
 
     private static void VerifyRuntimeCallOrder(

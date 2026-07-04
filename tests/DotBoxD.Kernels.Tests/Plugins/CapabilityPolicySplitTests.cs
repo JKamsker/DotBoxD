@@ -1,8 +1,10 @@
+using System.Reflection;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Policies;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Tests.PluginAnalyzer.Core;
 using DotBoxD.Plugins;
+using DotBoxD.Plugins.Kernel;
 using DotBoxD.Plugins.Policies;
 using DotBoxD.Plugins.Runtime;
 
@@ -58,6 +60,21 @@ public sealed class CapabilityPolicySplitTests
     }
 
     [Fact]
+    public void Server_required_capability_analysis_includes_stripped_gated_event_properties()
+    {
+        using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
+        var package = PluginAnalyzerGeneratedPackageFactory.Create(
+            GatedEventPropertyKernelSource,
+            "Sample.GatedPluginPackage");
+        var invalid = WithoutRequiredCapability(package, "event.read.health");
+
+        var required = server.GetRequiredCapabilities(invalid);
+
+        Assert.Contains("event.read.health", required);
+        Assert.Contains(PluginMessageBindings.CapabilityId, required);
+    }
+
+    [Fact]
     public async Task Manifest_parity_ignores_independently_granted_plugin_requests()
     {
         using var server = DotBoxD.Plugins.PluginServer.Create(defaultPolicy: PluginAddendumTestPolicies.LongWall());
@@ -72,8 +89,12 @@ public sealed class CapabilityPolicySplitTests
             .Build();
 
         var kernel = await server.InstallAsync(package, policy);
+        var plan = PreparedPlan(kernel);
 
         Assert.Equal(package.Manifest.PluginId, kernel.Manifest.PluginId);
+        Assert.Contains(plan.Module.CapabilityRequests, request =>
+            string.Equals(request.Id, "file.write", StringComparison.Ordinal) &&
+            string.Equals(request.Reason, "requested by plugin", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -105,15 +126,7 @@ public sealed class CapabilityPolicySplitTests
             GatedEventPropertyKernelSource,
             "Sample.GatedPluginPackage");
         Assert.Contains("event.read.health", package.Manifest.RequiredCapabilities);
-        var invalid = package with
-        {
-            Manifest = package.Manifest with
-            {
-                RequiredCapabilities = package.Manifest.RequiredCapabilities
-                    .Where(capability => !string.Equals(capability, "event.read.health", StringComparison.Ordinal))
-                    .ToArray()
-            }
-        };
+        var invalid = WithoutRequiredCapability(package, "event.read.health");
         var policy = SandboxPolicyBuilder.Create()
             .GrantLogging()
             .GrantHostMessageWrite()
@@ -165,6 +178,13 @@ public sealed class CapabilityPolicySplitTests
             }
         };
 
+    private static ExecutionPlan PreparedPlan(InstalledKernel kernel)
+    {
+        var field = typeof(InstalledKernel).GetField("_plan", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return Assert.IsType<ExecutionPlan>(field.GetValue(kernel));
+    }
+
     private static PluginPackage WithRequiredCapabilityMetadata(PluginPackage package, string capabilityId)
     {
         var metadata = new Dictionary<string, string>(package.Module.Metadata, StringComparer.Ordinal)
@@ -173,6 +193,17 @@ public sealed class CapabilityPolicySplitTests
         };
         return package with { Module = package.Module with { Metadata = metadata } };
     }
+
+    private static PluginPackage WithoutRequiredCapability(PluginPackage package, string capabilityId)
+        => package with
+        {
+            Manifest = package.Manifest with
+            {
+                RequiredCapabilities = package.Manifest.RequiredCapabilities
+                    .Where(capability => !string.Equals(capability, capabilityId, StringComparison.Ordinal))
+                    .ToArray()
+            }
+        };
 
     private const string GatedEventPropertyKernelSource = """
         using DotBoxD.Plugins;

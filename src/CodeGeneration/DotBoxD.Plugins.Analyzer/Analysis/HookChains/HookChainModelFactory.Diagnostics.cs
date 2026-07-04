@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DotBoxD.Plugins.Analyzer.Analysis.HookChains;
@@ -154,4 +155,114 @@ internal static partial class HookChainModelFactory
         location = PluginDiagnosticLocation.From(terminalAccess.Name.GetLocation());
         return true;
     }
+
+    private static void ValidateEventType(
+        INamedTypeSymbol eventType,
+        InvocationExpressionSyntax seed,
+        CancellationToken cancellationToken)
+    {
+        if (!IsFileLocal(eventType, cancellationToken))
+        {
+            return;
+        }
+
+        var location = EventTypeLocation(seed) ?? PluginDiagnosticLocation.From(seed.GetLocation());
+        throw new UnsupportedHookChainEventTypeException(
+            "File-local event type '" + eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+            "' cannot be used in a generated hook chain because interceptor source is emitted in a separate " +
+            "generated file; use a source-nameable event type instead.",
+            location);
+    }
+
+    private static void ValidateServerContextType(
+        InvocationExpressionSyntax seed,
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainTarget? generatedRemoteTarget,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (ServerContextType(seed, generatedRemoteTarget, model, cancellationToken) is not { } serverContextType ||
+            FindFileLocalType(serverContextType, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default)) is not { } fileLocalType)
+        {
+            return;
+        }
+
+        var location = ServerContextTypeLocation(seed) ?? PluginDiagnosticLocation.From(seed.GetLocation());
+        var chainKind = generatedRemoteTarget is not null || receiverKind == HookChainReceiverKind.Remote
+            ? "Remote hook-chain"
+            : "Hook chain";
+        throw new HookChainUnsupportedDiagnosticException(
+            new PluginKernelDiagnostic(
+                chainKind +
+                " server context type '" +
+                fileLocalType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                "' is file-local; generated hook-chain sources cannot name file-local types. " +
+                "Use a named server context type that is visible to generated code, or use HookContext directly.",
+                location));
+    }
+
+    private static ITypeSymbol? ServerContextType(
+        InvocationExpressionSyntax seed,
+        GeneratedRemoteHookChainTarget? generatedRemoteTarget,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (seed.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } &&
+            onName.TypeArgumentList.Arguments.Count >= 2)
+        {
+            return model.GetTypeInfo(onName.TypeArgumentList.Arguments[1], cancellationToken).Type;
+        }
+
+        return generatedRemoteTarget is { } target
+            ? GeneratedRemoteHookChainFallback.ServerContextType(model, seed, target, cancellationToken)
+            : null;
+    }
+
+    private static bool IsFileLocal(INamedTypeSymbol type, CancellationToken cancellationToken)
+    {
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reference.GetSyntax(cancellationToken) is BaseTypeDeclarationSyntax declaration &&
+                HasFileModifier(declaration.Modifiers))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasFileModifier(SyntaxTokenList modifiers)
+    {
+        foreach (var modifier in modifiers)
+        {
+            if (modifier.IsKind(SyntaxKind.FileKeyword))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static PluginDiagnosticLocation? EventTypeLocation(InvocationExpressionSyntax seed)
+    {
+        if (seed.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } &&
+            onName.TypeArgumentList.Arguments.Count > 0)
+        {
+            return PluginDiagnosticLocation.From(onName.TypeArgumentList.Arguments[0].GetLocation());
+        }
+
+        return null;
+    }
+}
+
+internal sealed class UnsupportedHookChainEventTypeException : Exception
+{
+    public UnsupportedHookChainEventTypeException(string message, PluginDiagnosticLocation location)
+        : base(message)
+        => Location = location;
+
+    public PluginDiagnosticLocation Location { get; }
 }

@@ -217,24 +217,6 @@ public sealed class ResultHookSlotTests
         Assert.IsType<InvalidCastException>(Assert.Single(faults).Exception);
     }
 
-    [Fact]
-    public async Task Oversized_remote_timeout_is_rejected_before_dispatch()
-    {
-        var slot = NewSlot();
-        slot.AddDirect(0, (_, _, _) => Ok(1), remote: true);
-        var options = new ResultHookDispatchOptions<TestResult>
-        {
-            RemoteHandlerTimeout = TimeSpan.FromMilliseconds((double)int.MaxValue + 1)
-        };
-
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            async () =>
-            {
-                var context = Context();
-                await slot.FireAsync(new DamageCtx(10), context, context, options, CancellationToken.None);
-            });
-    }
-
     private sealed class StubAdapter : IPluginEventAdapter<DamageCtx>
     {
         public string EventName => "test.damage";

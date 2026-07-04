@@ -34,6 +34,7 @@ public sealed partial class HookRegistry
     private readonly KernelRegistry _kernels;
     private readonly Func<PluginPackage, InstalledKernel>? _installer;
     private readonly Action<ResultHookFault>? _onFault;
+    private readonly Action? _throwIfDisposed;
     private long _resultOrder;
 
     internal HookRegistry(
@@ -41,29 +42,38 @@ public sealed partial class HookRegistry
         PluginEventAdapterRegistry events,
         KernelRegistry kernels,
         Func<PluginPackage, InstalledKernel>? installer = null,
-        Action<ResultHookFault>? onFault = null)
+        Action<ResultHookFault>? onFault = null,
+        Action? throwIfDisposed = null)
     {
         _messages = messages;
         _events = events;
         _kernels = kernels;
         _installer = installer;
         _onFault = onFault;
+        _throwIfDisposed = throwIfDisposed;
     }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public HookPipeline<TEvent, HookContext> On<TEvent>()
     {
+        ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter);
     }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public HookPipeline<TEvent, HookContext> On<TEvent>(IPluginEventAdapter<TEvent> adapter)
-        => OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    {
+        ArgumentNullException.ThrowIfNull(adapter);
+        ThrowIfDisposed();
+        return OnHookContext(adapter, ServerContextFactory<HookContext>.Identity);
+    }
 
     [PipelineStep(PipelineStepRole.Seed)]
     public HookPipeline<TEvent, TContext> On<TEvent, TContext>(Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(createContext);
+        ThrowIfDisposed();
         var adapter = _events.Resolve<TEvent>();
         return On(adapter, createContext);
     }
@@ -73,7 +83,9 @@ public sealed partial class HookRegistry
         IPluginEventAdapter<TEvent> adapter,
         Func<HookContext, TContext> createContext)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(createContext);
+        ThrowIfDisposed();
         if (typeof(TContext) == typeof(HookContext))
         {
             return (HookPipeline<TEvent, TContext>)(object)OnHookContext(adapter, (Func<HookContext, HookContext>)(object)createContext);
@@ -138,6 +150,7 @@ public sealed partial class HookRegistry
 
     internal void EnsureCanRegister<TEvent>(IPluginEventAdapter<TEvent> adapter)
     {
+        ThrowIfDisposed();
         lock (_gate)
         {
             EnsureCanRegisterLocked(adapter);
@@ -174,6 +187,7 @@ public sealed partial class HookRegistry
 
     public ValueTask PublishAsync<TEvent>(TEvent e, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         object? single;
         CachedPipelineFanout multiple;
@@ -205,6 +219,7 @@ public sealed partial class HookRegistry
         CancellationToken cancellationToken = default)
         where TResult : struct, IHookResult
     {
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         object? single;
         CachedPipelineFanout multiple;
@@ -232,6 +247,7 @@ public sealed partial class HookRegistry
     {
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         object? single;
         CachedPipelineFanout multiple;
@@ -276,6 +292,9 @@ public sealed partial class HookRegistry
         internal static readonly HookAttribute? Attr =
             (HookAttribute?)Attribute.GetCustomAttribute(typeof(TContext), typeof(HookAttribute), inherit: false);
     }
+
+    private void ThrowIfDisposed()
+        => _throwIfDisposed?.Invoke();
 
     private readonly record struct PipelineKey(Type EventType, Type ContextType);
 }

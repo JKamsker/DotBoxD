@@ -35,6 +35,7 @@ public HookAttribute(string name, Type resultType)
 public HookContext(IPluginMessageSink messages, CancellationToken cancellationToken)
 public HostBindingEffect Effects { get; } = effects
 public InMemoryPluginMessageSink()
+public InMemoryPluginMessageSink(int maxMessages)
 public int Version { get; } = version
 public interface IEventKernel<TEvent>
 public interface IExtensibleControl
@@ -51,7 +52,7 @@ public interface IServiceControl : IExtensibleControl
 public IPluginMessageSink Messages { get; }
 public IReadOnlyList<LoweredPipelineStep> Steps
 public IReadOnlyList<Parameter> Parameters
-public IReadOnlyList<PluginMessage> Messages => _readOnlyMessages
+public IReadOnlyList<PluginMessage> Messages
 public IReadOnlyList<Statement> Prefix
 public IReadOnlyList<string> Effects
 public IReadOnlyList<string> RequiredCapabilities
