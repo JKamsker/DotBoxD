@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Plugins.Runtime;
 
-namespace DotBoxD.Kernels.Tests.Plugins;
+namespace DotBoxD.Kernels.Tests.Plugins.Runtime.GrantReader;
 
 public sealed class PluginMessageGrantReaderParityTests
 {

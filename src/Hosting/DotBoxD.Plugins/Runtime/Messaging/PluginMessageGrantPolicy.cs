@@ -83,14 +83,28 @@ internal static class PluginMessageGrantPolicy
 
     private static IReadOnlySet<string>? ReadTargetSet(CapabilityGrant grant, string key)
         => grant.Parameters.TryGetValue(key, out var value)
-            ? value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .ToHashSet(StringComparer.Ordinal)
+            ? ReadTargetValues(value, key).ToHashSet(StringComparer.Ordinal)
             : null;
 
     private static IReadOnlyList<string>? ReadTargetList(CapabilityGrant grant, string key)
         => grant.Parameters.TryGetValue(key, out var value)
-            ? value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            ? ReadTargetValues(value, key)
             : null;
+
+    private static string[] ReadTargetValues(string? value, string key)
+    {
+        if (value is null)
+        {
+            throw InvalidGrant(key);
+        }
+
+        var values = value.Split(',', StringSplitOptions.TrimEntries);
+        return values.Length == 0 ||
+            values.Any(string.IsNullOrEmpty) ||
+            values.Any(item => !SandboxLiteralConstraints.IsOpaqueId(item))
+            ? throw InvalidGrant(key)
+            : values;
+    }
 
     private static int? ReadMaxMessageLength(CapabilityGrant grant)
     {
@@ -108,6 +122,11 @@ internal static class PluginMessageGrantPolicy
 
         return parsed;
     }
+
+    private static SandboxRuntimeException InvalidGrant(string key)
+        => new(new SandboxError(
+            SandboxErrorCode.PermissionDenied,
+            $"host.message.send denied: {key} grant is invalid"));
 }
 
 internal sealed record PluginMessageGrantOptions(
