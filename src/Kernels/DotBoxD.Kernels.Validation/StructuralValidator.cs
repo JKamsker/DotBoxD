@@ -64,6 +64,7 @@ internal static class StructuralValidator
 
         foreach (var statement in function.Body)
         {
+            IrNullValidator.Scan(statement, diagnostics);
             DangerousReferenceDetector.Scan(statement, diagnostics);
         }
     }
