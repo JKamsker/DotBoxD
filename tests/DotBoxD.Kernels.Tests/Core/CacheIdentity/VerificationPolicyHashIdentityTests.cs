@@ -4,7 +4,7 @@ using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests.Core;
+namespace DotBoxD.Kernels.Tests.Core.CacheIdentity;
 
 public sealed class VerificationPolicyHashIdentityTests
 {
