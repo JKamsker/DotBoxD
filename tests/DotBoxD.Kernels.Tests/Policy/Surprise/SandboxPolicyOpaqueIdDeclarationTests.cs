@@ -50,7 +50,9 @@ public sealed class SandboxPolicyOpaqueIdDeclarationTests
         {
             null,
             string.Empty,
-            "String"
+            "String",
+            "I32",
+            "Bool"
         };
 
     private static bool IsOpaqueIdPolicyDiagnostic(SandboxDiagnostic diagnostic)
