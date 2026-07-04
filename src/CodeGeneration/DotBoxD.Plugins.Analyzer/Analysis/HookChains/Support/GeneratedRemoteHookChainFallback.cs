@@ -12,7 +12,8 @@ internal enum GeneratedRemoteHookChainKind
 
 internal readonly record struct GeneratedRemoteHookChainTarget(
     GeneratedRemoteHookChainKind Kind,
-    string ServerContextTypeFullName);
+    string ServerContextTypeFullName,
+    INamedTypeSymbol? ServerContextType = null);
 
 internal static partial class GeneratedRemoteHookChainFallback
 {

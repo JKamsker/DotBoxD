@@ -174,6 +174,50 @@ internal static partial class HookChainModelFactory
             location);
     }
 
+    private static void ValidateServerContextType(
+        InvocationExpressionSyntax seed,
+        HookChainReceiverKind? receiverKind,
+        GeneratedRemoteHookChainTarget? generatedRemoteTarget,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (ServerContextType(seed, generatedRemoteTarget, model, cancellationToken) is not { } serverContextType ||
+            FindFileLocalType(serverContextType, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default)) is not { } fileLocalType)
+        {
+            return;
+        }
+
+        var location = ServerContextTypeLocation(seed) ?? PluginDiagnosticLocation.From(seed.GetLocation());
+        var chainKind = generatedRemoteTarget is not null || receiverKind == HookChainReceiverKind.Remote
+            ? "Remote hook-chain"
+            : "Hook chain";
+        throw new HookChainUnsupportedDiagnosticException(
+            new PluginKernelDiagnostic(
+                chainKind +
+                " server context type '" +
+                fileLocalType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                "' is file-local; generated hook-chain sources cannot name file-local types. " +
+                "Use a named server context type that is visible to generated code, or use HookContext directly.",
+                location));
+    }
+
+    private static ITypeSymbol? ServerContextType(
+        InvocationExpressionSyntax seed,
+        GeneratedRemoteHookChainTarget? generatedRemoteTarget,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (seed.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax onName } &&
+            onName.TypeArgumentList.Arguments.Count >= 2)
+        {
+            return model.GetTypeInfo(onName.TypeArgumentList.Arguments[1], cancellationToken).Type;
+        }
+
+        return generatedRemoteTarget is { } target
+            ? GeneratedRemoteHookChainFallback.ServerContextType(model, seed, target, cancellationToken)
+            : null;
+    }
+
     private static bool IsFileLocal(INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         foreach (var reference in type.DeclaringSyntaxReferences)

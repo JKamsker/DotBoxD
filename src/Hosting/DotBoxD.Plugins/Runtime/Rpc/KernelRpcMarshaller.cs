@@ -119,10 +119,12 @@ public static partial class KernelRpcMarshaller
         {
             shape.RejectUnmatchedRequiredConstructor();
             var fields = shape.Fields;
+            var fieldValues = shape.GetValues(value);
+            shape.RejectUnreconstructibleOutboundValue(fieldValues);
             var values = new SandboxValue[fields.Count];
             for (var i = 0; i < fields.Count; i++)
             {
-                values[i] = MarshalChild(shape.GetValue(value, i), fields[i].Type, $"DTO field '{fields[i].Name}'");
+                values[i] = MarshalChild(fieldValues[i], fields[i].Type, $"DTO field '{fields[i].Name}'");
             }
 
             return SandboxValue.FromOwnedRecord(values);

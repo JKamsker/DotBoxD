@@ -332,6 +332,15 @@ are processed.
 4. Add focused tests in the repository's existing style. Assert the
    user-visible behavior: diagnostic presence/absence, generated source shape,
    runtime round trip, validation error, or exact failure mode.
+   **Place each new test file in a themed subfolder — never in a folder that
+   already holds 15 `.cs` files.** CodeEnforcer fails the PR with `CE0004` when a
+   folder exceeds 15 C# files. Broad generated-test roots such as
+   `tests/DotBoxD.Kernels.Tests/PluginAnalyzer/Generated/PluginServer/` are split
+   into per-theme subfolders (`Surprise/`, `MemberShape/`, `Lifecycle/`,
+   `LiveSettings/`, `RemoteLocal/`, …); reuse the matching subfolder or create a
+   new one. Test namespaces are folder-independent (`...Generated`), so this
+   never changes a class's namespace. If your natural target folder is at or near
+   the cap, create a new themed subfolder instead of adding to it.
 5. Run restore/build and the focused test command. The branch must build, and
    the new test must fail because the bug is real.
 6. Commit only the red tests and any necessary test data.

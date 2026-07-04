@@ -54,6 +54,29 @@ public sealed class BindingRegistryHardeningTests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-BINDING-AUDIT");
     }
 
+    [Theory]
+    [InlineData("constructor", "descriptor", "bindings")]
+    [InlineData("add", "descriptor", null)]
+    [InlineData("add-range", "descriptor", "descriptors")]
+    public void Binding_registry_public_entrypoints_reject_null_descriptors(
+        string scenario,
+        string expectedParamName,
+        string? alternateExpectedParamName)
+    {
+        var expectedParamNames = alternateExpectedParamName is null
+            ? [expectedParamName]
+            : new[] { expectedParamName, alternateExpectedParamName };
+        var ex = Record.Exception(() => CreateRegistryWithNullDescriptor(scenario));
+
+        Assert.NotNull(ex);
+        Assert.False(
+            ex is NullReferenceException,
+            $"Expected public validation for a null binding descriptor, but got {ex.GetType().FullName}.");
+        Assert.True(
+            IsClosedNullDescriptorFailure(ex, expectedParamNames),
+            $"Expected ArgumentException naming {string.Join("/", expectedParamNames)} or a binding validation diagnostic, but got {Describe(ex)}.");
+    }
+
     [Fact]
     public void Binding_registry_rejects_undefined_safety_classification()
     {
@@ -180,6 +203,56 @@ public sealed class BindingRegistryHardeningTests
 
     private static BindingRegistry Build(BindingDescriptor binding)
         => new BindingRegistryBuilder().Add(binding).Build();
+
+    private static void CreateRegistryWithNullDescriptor(string scenario)
+    {
+        switch (scenario)
+        {
+            case "constructor":
+                _ = new BindingRegistry([null!]);
+                return;
+            case "add":
+                _ = new BindingRegistryBuilder().Add(null!).Build();
+                return;
+            case "add-range":
+                _ = new BindingRegistryBuilder().AddRange([null!]).Build();
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown null descriptor scenario.");
+        }
+    }
+
+    private static bool IsClosedNullDescriptorFailure(Exception ex, string[] expectedParamNames)
+    {
+        if (ex is ArgumentException argumentException)
+        {
+            return expectedParamNames.Contains(argumentException.ParamName, StringComparer.Ordinal);
+        }
+
+        if (ex is not SandboxValidationException validationException)
+        {
+            return false;
+        }
+
+        return validationException.Diagnostics.Any(
+            d => d.Message.Contains("null", StringComparison.OrdinalIgnoreCase) &&
+                d.Message.Contains("descriptor", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string Describe(Exception ex)
+    {
+        if (ex is ArgumentException argumentException)
+        {
+            return $"{ex.GetType().FullName} ParamName={argumentException.ParamName}";
+        }
+
+        if (ex is SandboxValidationException validationException)
+        {
+            return string.Join(", ", validationException.Diagnostics.Select(d => $"{d.Code}: {d.Message}"));
+        }
+
+        return ex.GetType().FullName ?? ex.GetType().Name;
+    }
 
     private static BindingDescriptor TestBinding(
         string id = "test.binding",

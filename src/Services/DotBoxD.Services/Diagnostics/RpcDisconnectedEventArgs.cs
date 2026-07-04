@@ -9,7 +9,7 @@ public sealed class RpcDisconnectedEventArgs : EventArgs
 {
     public RpcDisconnectedEventArgs(string remoteEndpoint, Exception? error)
     {
-        RemoteEndpoint = remoteEndpoint;
+        RemoteEndpoint = remoteEndpoint ?? throw new ArgumentNullException(nameof(remoteEndpoint));
         Error = error;
     }
 

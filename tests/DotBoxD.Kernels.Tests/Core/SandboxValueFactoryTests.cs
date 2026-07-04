@@ -42,4 +42,16 @@ public sealed class SandboxValueFactoryTests
         Assert.Same(SandboxType.SandboxPath, path.Type);
         Assert.Same(SandboxType.SandboxUri, uri.Type);
     }
+
+    [Fact]
+    public void String_values_reject_null_payloads_at_public_boundary()
+    {
+        var factoryEx = Assert.Throws<ArgumentNullException>(() => SandboxValue.FromString(null!));
+        var constructorEx = Assert.Throws<ArgumentNullException>(() => new StringValue(null!));
+        var initializerEx = Assert.Throws<ArgumentNullException>(() => new StringValue("ok") { Value = null! });
+
+        Assert.Equal("value", factoryEx.ParamName);
+        Assert.Equal("Value", constructorEx.ParamName);
+        Assert.Equal("value", initializerEx.ParamName);
+    }
 }
