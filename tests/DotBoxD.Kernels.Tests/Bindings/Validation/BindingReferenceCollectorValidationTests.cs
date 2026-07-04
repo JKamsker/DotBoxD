@@ -2,7 +2,7 @@ using DotBoxD.Kernels.Bindings;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 
-namespace DotBoxD.Kernels.Tests.Bindings;
+namespace DotBoxD.Kernels.Tests.Bindings.Validation;
 
 public sealed class BindingReferenceCollectorValidationTests
 {
