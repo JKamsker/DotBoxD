@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Reflection;
-using Expr = System.Linq.Expressions.Expression;
 
 namespace DotBoxD.Plugins.Indexing;
 
@@ -90,28 +88,12 @@ public sealed class EventIndexMatcher<TEvent>
     private static IReadOnlyDictionary<string, IndexKey> BuildIndexKeys()
     {
         var keys = new Dictionary<string, IndexKey>(StringComparer.Ordinal);
-        foreach (var property in typeof(TEvent).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var path in EventIndexPathResolver.IndexKeyPaths<TEvent>())
         {
-            if (property.CanRead && property.GetCustomAttribute<EventIndexKeyAttribute>() is not null)
-            {
-                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                keys[property.Name] = new IndexKey(CompileGetter(property), type);
-            }
+            keys[path.Path] = new IndexKey(path.Getter, path.Type);
         }
 
         return keys;
-    }
-
-    // Builds value => (object?)value.Property once, so reading an indexed field is a delegate call rather
-    // than reflection on every event.
-    private static Func<TEvent, object?> CompileGetter(PropertyInfo property)
-    {
-        var parameter = Expr.Parameter(typeof(TEvent), "value");
-        Expr instance = property.DeclaringType is { } declaring && !declaring.IsAssignableFrom(typeof(TEvent))
-            ? Expr.Convert(parameter, declaring)
-            : parameter;
-        var boxed = Expr.Convert(Expr.Property(instance, property), typeof(object));
-        return Expr.Lambda<Func<TEvent, object?>>(boxed, parameter).Compile();
     }
 
     // Coerces a manifest value to the indexed property's CLR type so every check compares like-typed boxed
