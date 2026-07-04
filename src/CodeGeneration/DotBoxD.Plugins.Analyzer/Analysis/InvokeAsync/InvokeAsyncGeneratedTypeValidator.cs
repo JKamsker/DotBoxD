@@ -144,6 +144,7 @@ internal static class InvokeAsyncGeneratedTypeValidator
     {
         for (var current = type; current is not null; current = current.ContainingType)
         {
+            // Nested types inherit the file-scoped visibility of an enclosing file-local type.
             if (current.IsFileLocal)
             {
                 return current;
