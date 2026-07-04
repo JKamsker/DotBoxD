@@ -10,19 +10,15 @@ public sealed class ModuleValidatorArgumentValidationTests
     [Fact]
     public void Validate_rejects_null_module_argument()
     {
-        var exception = Assert.Throws<ArgumentNullException>(() =>
+        Assert.Throws<ArgumentNullException>("module", () =>
             new ModuleValidator().Validate(null!, new BindingRegistry([])));
-
-        Assert.Equal("module", exception.ParamName);
     }
 
     [Fact]
     public void Validate_rejects_null_bindings_argument()
     {
-        var exception = Assert.Throws<ArgumentNullException>(() =>
+        Assert.Throws<ArgumentNullException>("bindings", () =>
             new ModuleValidator().Validate(PureModule(), null!));
-
-        Assert.Equal("bindings", exception.ParamName);
     }
 
     private static SandboxModule PureModule()
