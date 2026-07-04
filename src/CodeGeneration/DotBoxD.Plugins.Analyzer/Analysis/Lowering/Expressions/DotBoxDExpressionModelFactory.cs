@@ -31,7 +31,7 @@ internal static partial class DotBoxDExpressionModelFactory
             IsPatternExpressionSyntax pattern => DotBoxDPatternExpressionLowerer.Lower(pattern, context, part => Lower(part, context)),
             IdentifierNameSyntax identifier when TryLowerImplicitThisIdentifier(identifier, context) is { } implicitThis =>
                 implicitThis,
-            IdentifierNameSyntax identifier => DotBoxDIdentifierExpressionLowerer.Lower(identifier.Identifier.ValueText, context),
+            IdentifierNameSyntax identifier => DotBoxDIdentifierExpressionLowerer.Lower(identifier, context),
             MemberAccessExpressionSyntax member
                 when DotBoxDStringExpressionLowerer.TryLowerMember(member, context, part => Lower(part, context)) is { } lowered =>
                 lowered,
