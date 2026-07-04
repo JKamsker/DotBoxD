@@ -26,6 +26,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
     {
         ThrowIfMissingRequiredName(value.ServiceName, nameof(RpcRequest.ServiceName));
         ThrowIfMissingRequiredName(value.MethodName, nameof(RpcRequest.MethodName));
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            value.InstanceId,
+            "request",
+            nameof(RpcRequest.InstanceId));
         RpcRequestNameCache.Register(value.ServiceName);
         RpcRequestNameCache.Register(value.MethodName);
 
@@ -108,6 +112,10 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
 
         ThrowIfEmptyRequiredName(request.MethodName, nameof(RpcRequest.MethodName));
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            request.InstanceId,
+            "request",
+            nameof(RpcRequest.InstanceId));
 
         return request;
     }
@@ -147,6 +155,7 @@ internal sealed class RpcRequestFormatter : IMessagePackFormatter<RpcRequest>
         }
 
         ThrowIfEmptyRequiredName(value, fieldName);
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(value, "request", fieldName);
     }
 
     private static void WriteNullableString(ref MessagePackWriter writer, string? value)

@@ -21,8 +21,8 @@ public sealed class MessagePackEnvelopeUtf16RegressionTests
         var ex = Assert.Throws<MessagePackSerializationException>(
             () => serializer.Serialize(writer, request));
 
-        Assert.Contains(fieldName, ex.ToString());
-        Assert.Contains("surrogate", ex.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(fieldName, ex.Message);
+        Assert.Contains("surrogate", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -35,8 +35,8 @@ public sealed class MessagePackEnvelopeUtf16RegressionTests
         var ex = Assert.Throws<MessagePackSerializationException>(
             () => serializer.Serialize(writer, response));
 
-        Assert.Contains(fieldName, ex.ToString());
-        Assert.Contains("surrogate", ex.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(fieldName, ex.Message);
+        Assert.Contains("surrogate", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

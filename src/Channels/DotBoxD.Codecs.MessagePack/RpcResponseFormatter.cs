@@ -101,6 +101,15 @@ internal sealed class RpcResponseFormatter : IMessagePackFormatter<RpcResponse>
 
     private static void ValidateEnvelope(RpcResponse response)
     {
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            response.ErrorMessage,
+            "response",
+            nameof(RpcResponse.ErrorMessage));
+        RpcEnvelopeStringValidation.ThrowIfMalformedUtf16(
+            response.ErrorType,
+            "response",
+            nameof(RpcResponse.ErrorType));
+
         if (response.IsSuccess &&
             (response.ErrorMessage is not null || response.ErrorType is not null))
         {

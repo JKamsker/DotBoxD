@@ -96,7 +96,19 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public void Serialize<T>(System.Buffers.IBufferWriter<byte> writer, T value)
     {
-        MessagePackSerializer.Serialize(writer, value, _options);
+        try
+        {
+            MessagePackSerializer.Serialize(writer, value, _options);
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     public T Deserialize<T>(ReadOnlyMemory<byte> data)
@@ -127,6 +139,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
         }
     }
 
+    private static bool TryGetRpcEnvelopeValidationMessage(
+        MessagePackSerializationException exception,
+        out string message)
+    {
+        if (exception.InnerException is MessagePackSerializationException inner &&
+            (inner.Message.StartsWith("RPC request ", StringComparison.Ordinal) ||
+                inner.Message.StartsWith("RPC response ", StringComparison.Ordinal)))
+        {
+            message = inner.Message;
+            return true;
+        }
+
+        message = string.Empty;
+        return false;
+    }
+
     internal sealed class ReadOnlyMemoryByteFormatter : IMessagePackFormatter<ReadOnlyMemory<byte>>
     {
         public static readonly ReadOnlyMemoryByteFormatter Instance = new();
@@ -152,4 +180,39 @@ public sealed class MessagePackRpcSerializer : ISerializer
                 : ReadOnlyMemory<byte>.Empty;
         }
     }
+}
+
+internal static class RpcEnvelopeStringValidation
+{
+    public static void ThrowIfMalformedUtf16(string? value, string envelopeName, string fieldName)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < value.Length; i++)
+        {
+            var current = value[i];
+            if (char.IsHighSurrogate(current))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                {
+                    i++;
+                    continue;
+                }
+
+                throw MalformedUtf16(envelopeName, fieldName);
+            }
+
+            if (char.IsLowSurrogate(current))
+            {
+                throw MalformedUtf16(envelopeName, fieldName);
+            }
+        }
+    }
+
+    private static MessagePackSerializationException MalformedUtf16(string envelopeName, string fieldName)
+        => new(
+            $"RPC {envelopeName} {fieldName} contains malformed UTF-16 text with an unpaired surrogate.");
 }
