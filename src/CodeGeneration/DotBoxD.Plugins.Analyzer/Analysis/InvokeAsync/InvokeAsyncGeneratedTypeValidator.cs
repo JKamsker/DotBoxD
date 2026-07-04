@@ -64,6 +64,12 @@ internal static class InvokeAsyncGeneratedTypeValidator
                 $"InvokeAsync {role} '{type.ToDisplayString()}' cannot be anonymous because generated interceptors must name the type.");
         }
 
+        if (FileLocalType(named) is { } fileLocalType)
+        {
+            throw new NotSupportedException(
+                $"InvokeAsync {role} '{fileLocalType.ToDisplayString()}' is file-local; generated interceptors and readers cannot name file-local types.");
+        }
+
         if (!compilation.IsSymbolAccessibleWithin(named.OriginalDefinition, compilation.Assembly))
         {
             throw new NotSupportedException(
@@ -133,4 +139,17 @@ internal static class InvokeAsyncGeneratedTypeValidator
 
     private static HashSet<ITypeSymbol> NewVisitingSet()
         => new(SymbolEqualityComparer.Default);
+
+    private static INamedTypeSymbol? FileLocalType(INamedTypeSymbol type)
+    {
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            if (current.IsFileLocal)
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
 }
