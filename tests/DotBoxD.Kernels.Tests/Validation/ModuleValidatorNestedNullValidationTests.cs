@@ -94,6 +94,15 @@ public sealed class ModuleValidatorNestedNullValidationTests
                         new IfStatement(null!, [UnitReturn()], [UnitReturn()], Span)
                     ]),
                 ["condition", "null"]
+            },
+            {
+                "for range start",
+                ModuleWithBody(
+                    SandboxType.Unit,
+                    [
+                        new ForRangeStatement("i", null!, I32(1), [UnitReturn()], Span)
+                    ]),
+                ["for range start", "null"]
             }
         };
 
@@ -127,6 +136,11 @@ public sealed class ModuleValidatorNestedNullValidationTests
                         UnitReturn()
                     ]),
                 ["body", "null"]
+            },
+            {
+                "function body",
+                ModuleWithBody(SandboxType.Unit, [null!, UnitReturn()]),
+                ["function body", "null"]
             }
         };
 

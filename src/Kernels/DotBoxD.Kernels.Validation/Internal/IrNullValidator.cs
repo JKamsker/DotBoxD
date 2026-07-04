@@ -46,6 +46,12 @@ internal static class IrNullValidator
                 ScanExpression(range.End, "for range end", diagnostics, range.Span);
                 ScanBlock(range.Body, "for range body block", diagnostics, range.Span);
                 break;
+            case BreakStatement:
+            case ContinueStatement:
+                break;
+            default:
+                // Future statement nodes with nested members must add explicit null scanning.
+                break;
         }
     }
 
@@ -88,6 +94,12 @@ internal static class IrNullValidator
                     ScanExpression(call.Arguments[i], "call argument", diagnostics, call.Span);
                 }
 
+                break;
+            case LiteralExpression:
+            case VariableExpression:
+                break;
+            default:
+                // Future expression nodes with nested members must add explicit null scanning.
                 break;
         }
     }
