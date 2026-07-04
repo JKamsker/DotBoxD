@@ -47,6 +47,7 @@ public sealed class InMemoryAuditSinkConcurrencyTests
                 try
                 {
                     _ = sink.Events.Count;
+                    Thread.Yield();
                 }
                 catch (Exception ex)
                 {

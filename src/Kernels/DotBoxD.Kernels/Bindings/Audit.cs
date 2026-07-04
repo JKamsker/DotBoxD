@@ -71,13 +71,31 @@ public sealed class InMemoryAuditSink : IAuditSink
 
     internal static IReadOnlyList<SandboxAuditEvent> EmptyEventSnapshot => EmptySnapshot;
 
+    private readonly object _gate = new();
     private List<SandboxAuditEvent>? _events;
     private long _sequence;
 
     public IReadOnlyList<SandboxAuditEvent> Events
-        => _events is null ? Array.Empty<SandboxAuditEvent>() : _events.ToArray();
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _events is null ? Array.Empty<SandboxAuditEvent>() : _events.ToArray();
+            }
+        }
+    }
 
-    public long EventsWritten => _sequence;
+    public long EventsWritten
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _sequence;
+            }
+        }
+    }
 
     /// <summary>
     /// Produces a single owned, immutable snapshot of the recorded events.
@@ -85,13 +103,23 @@ public sealed class InMemoryAuditSink : IAuditSink
     /// retained by the sink, so result construction can adopt it without copying again.
     /// </summary>
     internal IReadOnlyList<SandboxAuditEvent> SnapshotEvents()
-        => _events is null || _events.Count == 0 ? EmptySnapshot : new OwnedAuditEventSnapshot(_events.ToArray());
+    {
+        lock (_gate)
+        {
+            return _events is null || _events.Count == 0
+                ? EmptySnapshot
+                : new OwnedAuditEventSnapshot(_events.ToArray());
+        }
+    }
 
     public void Write(SandboxAuditEvent auditEvent)
     {
-        var sequence = ++_sequence;
-        _events ??= new List<SandboxAuditEvent>();
-        _events.Add(auditEvent with { SequenceNumber = sequence });
+        lock (_gate)
+        {
+            var sequence = ++_sequence;
+            _events ??= new List<SandboxAuditEvent>();
+            _events.Add(auditEvent with { SequenceNumber = sequence });
+        }
     }
 
     public bool HasBindingAuditSince(
@@ -103,37 +131,40 @@ public sealed class InMemoryAuditSink : IAuditSink
         string moduleHash,
         string policyHash)
     {
-        // Sequence numbers are assigned monotonically on append (Write sets
-        // SequenceNumber = ++_sequence) and _events is never reordered or
-        // pruned, so _events[i].SequenceNumber == i + 1. A checkpoint is the
-        // sequence count recorded before the current binding call, which means
-        // the first event with SequenceNumber > checkpoint lives at list index
-        // checkpoint. Start enumeration there instead of rescanning prior
-        // events, avoiding O(N^2) enforcement work over a run.
-        var events = _events;
-        if (events is null)
+        lock (_gate)
         {
+            // Sequence numbers are assigned monotonically on append (Write sets
+            // SequenceNumber = ++_sequence) and _events is never reordered or
+            // pruned, so _events[i].SequenceNumber == i + 1. A checkpoint is the
+            // sequence count recorded before the current binding call, which means
+            // the first event with SequenceNumber > checkpoint lives at list index
+            // checkpoint. Start enumeration there instead of rescanning prior
+            // events, avoiding O(N^2) enforcement work over a run.
+            var events = _events;
+            if (events is null)
+            {
+                return false;
+            }
+
+            for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
+            {
+                var e = events[index];
+                if (e.RunId == runId &&
+                    e.Success == success &&
+                    IsBindingAuditKind(e.Kind) &&
+                    StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
+                    CapabilityMatches(e, descriptor) &&
+                    EffectMatches(e, descriptor) &&
+                    !string.IsNullOrWhiteSpace(e.ResourceId) &&
+                    HasRequiredFields(e, moduleHash, policyHash) &&
+                    ResultMatches(e, success, expectedErrorCode))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
-
-        for (var index = StartIndexAfter(checkpoint, events.Count); index < events.Count; index++)
-        {
-            var e = events[index];
-            if (e.RunId == runId &&
-                e.Success == success &&
-                IsBindingAuditKind(e.Kind) &&
-                StringComparer.Ordinal.Equals(e.BindingId, descriptor.Id) &&
-                CapabilityMatches(e, descriptor) &&
-                EffectMatches(e, descriptor) &&
-                !string.IsNullOrWhiteSpace(e.ResourceId) &&
-                HasRequiredFields(e, moduleHash, policyHash) &&
-                ResultMatches(e, success, expectedErrorCode))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static int StartIndexAfter(long checkpoint, int eventCount)
