@@ -4,7 +4,7 @@ using DotBoxD.Services.Streaming.Core;
 using DotBoxD.Services.Streaming.Remote;
 using Xunit;
 
-namespace DotBoxD.Services.Tests.Streaming.Core;
+namespace DotBoxD.Services.Tests.Streaming.Core.RemoteStream;
 
 public sealed class RpcRemoteStreamCancellationRegressionTests
 {
