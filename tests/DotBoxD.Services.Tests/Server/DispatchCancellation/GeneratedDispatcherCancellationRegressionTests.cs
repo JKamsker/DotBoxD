@@ -5,7 +5,7 @@ using DotBoxD.Services.Server;
 using DotBoxD.Services.Tests.GeneratedFixtures;
 using Xunit;
 
-namespace DotBoxD.Services.Tests.Server;
+namespace DotBoxD.Services.Tests.Server.DispatchCancellation;
 
 public sealed class GeneratedDispatcherCancellationRegressionTests
 {
