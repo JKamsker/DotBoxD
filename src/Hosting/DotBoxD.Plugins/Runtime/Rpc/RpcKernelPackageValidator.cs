@@ -193,7 +193,7 @@ internal static class RpcKernelPackageValidator
             var setting = manifest.LiveSettings[i];
             if (setting is null)
             {
-                diagnostics.Add(new SandboxDiagnostic("DBXK020", $"Plugin manifest liveSettings[{i}] must not be null."));
+                diagnostics.Add(new SandboxDiagnostic("DBXK075", $"Plugin manifest liveSettings[{i}] must not be null."));
                 continue;
             }
 

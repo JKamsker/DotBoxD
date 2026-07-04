@@ -95,6 +95,7 @@ public sealed class RpcKernelPackageValidationTests
             async () => await server.InstallServerExtensionAsync(invalid).AsTask());
 
         Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "DBXK075" &&
             d.Message.Contains("liveSettings", StringComparison.OrdinalIgnoreCase) &&
             d.Message.Contains("null", StringComparison.OrdinalIgnoreCase));
     }
