@@ -227,10 +227,19 @@ jobs:
           _GRAPHQL = (
               "query($owner:String!,$name:String!,$pr:Int!){"
               "repository(owner:$owner,name:$name){pullRequest(number:$pr){"
-              "reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{author{login}}}}}"
-              "reviews(first:40){nodes{author{login} body}}"
+              "reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{author{login __typename}}}}}"
+              "reviews(first:40){nodes{author{login __typename} body}}"
               "comments(first:100){nodes{body}}}}}"
           )
+          # The real CodeRabbit bot is exactly this login AND a Bot actor. A
+          # `startswith("coderabbit")` check would let a spoofed account like
+          # `coderabbit-evil` steer polish dispatch and get its threads resolved.
+          CODERABBIT_LOGIN = "coderabbitai"
+
+          def is_coderabbit(author):
+              author = author or {}
+              return author.get("login") == CODERABBIT_LOGIN and author.get("__typename") == "Bot"
+
           # Markers CodeRabbit uses for genuinely actionable top-level items. An
           # informational walkthrough/summary (which every PR gets) has none of
           # these, so a clean fixed PR does not burn a polish run just to post a
@@ -255,14 +264,13 @@ jobs:
                   if t.get("isResolved"):
                       continue
                   cnodes = (t.get("comments") or {}).get("nodes") or []
-                  author = (cnodes[0].get("author") or {}).get("login", "") if cnodes else ""
-                  if author and author.lower().startswith("coderabbit") and t.get("id"):
+                  c0 = cnodes[0] if cnodes else {}
+                  if is_coderabbit(c0.get("author")) and t.get("id"):
                       unresolved_cr_ids.append(t["id"])
               has_actionable = bool(unresolved_cr_ids)
               for r in (pr.get("reviews") or {}).get("nodes") or []:
-                  author = (r.get("author") or {}).get("login", "")
                   body = r.get("body") or ""
-                  if author.lower().startswith("coderabbit") and any(tok in body for tok in ACTIONABLE):
+                  if is_coderabbit(r.get("author")) and any(tok in body for tok in ACTIONABLE):
                       has_actionable = True
                       break
               comment_bodies = [c.get("body") or "" for c in (pr.get("comments") or {}).get("nodes") or []]

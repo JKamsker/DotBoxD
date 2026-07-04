@@ -143,6 +143,15 @@ pre-agent-steps:
               raise SystemExit(result.returncode)
           return json.loads(result.stdout or "null")
 
+      # The real CodeRabbit bot is exactly this login AND a Bot actor. A
+      # `startswith("coderabbit")` check would trust spoofed accounts like
+      # `coderabbit-evil` to inject review content and thread ids we later resolve.
+      CODERABBIT_LOGIN = "coderabbitai"
+
+      def is_coderabbit(author):
+          author = author or {}
+          return author.get("login") == CODERABBIT_LOGIN and author.get("__typename") == "Bot"
+
       def gather_coderabbit(number):
           """Collect CodeRabbit inline threads (with node ids for resolution) and
           top-level review bodies so the agent can judge and address them without
@@ -150,9 +159,9 @@ pre-agent-steps:
           query = (
               "query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){"
               "pullRequest(number:$pr){"
-              "reviewThreads(first:60){nodes{id isResolved isOutdated path line "
-              "comments(first:1){nodes{author{login} body}}}}"
-              "reviews(first:40){nodes{author{login} state submittedAt body}}}}}"
+              "reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved isOutdated path line "
+              "comments(first:1){nodes{author{login __typename} body}}}}"
+              "reviews(first:100){pageInfo{hasNextPage} nodes{author{login __typename} state submittedAt body}}}}}"
           )
           result = subprocess.run(
               ["gh", "api", "graphql", "-F", f"owner={owner}", "-F", f"name={repo_name}",
@@ -160,15 +169,20 @@ pre-agent-steps:
               check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
           if result.returncode != 0:
               print(result.stderr, file=sys.stderr)
-              return {"threads": [], "reviews": [], "gathered": False}
+              return {"threads": [], "reviews": [], "gathered": False, "truncated": False}
           pr_node = (((json.loads(result.stdout or "{}").get("data") or {})
                       .get("repository") or {}).get("pullRequest") or {})
+          threads_conn = pr_node.get("reviewThreads") or {}
+          reviews_conn = pr_node.get("reviews") or {}
+          # Surface truncation so the agent knows older items were dropped and can
+          # page the rest via gh rather than treating the partial set as complete.
+          truncated = (bool((threads_conn.get("pageInfo") or {}).get("hasNextPage"))
+                       or bool((reviews_conn.get("pageInfo") or {}).get("hasNextPage")))
           threads = []
-          for t in (pr_node.get("reviewThreads") or {}).get("nodes") or []:
+          for t in threads_conn.get("nodes") or []:
               cnodes = (t.get("comments") or {}).get("nodes") or []
               c0 = cnodes[0] if cnodes else {}
-              author = (c0.get("author") or {}).get("login", "")
-              if not author.lower().startswith("coderabbit"):
+              if not is_coderabbit(c0.get("author")):
                   continue
               threads.append({
                   "id": t.get("id"),
@@ -176,24 +190,23 @@ pre-agent-steps:
                   "isOutdated": t.get("isOutdated"),
                   "path": t.get("path"),
                   "line": t.get("line"),
-                  "author": author,
+                  "author": (c0.get("author") or {}).get("login"),
                   "body": (c0.get("body") or "")[:4000],
               })
           reviews = []
-          for r in (pr_node.get("reviews") or {}).get("nodes") or []:
-              author = (r.get("author") or {}).get("login", "")
+          for r in reviews_conn.get("nodes") or []:
               body = r.get("body") or ""
-              if not author.lower().startswith("coderabbit") or not body.strip():
+              if not is_coderabbit(r.get("author")) or not body.strip():
                   continue
               reviews.append({
-                  "author": author,
+                  "author": (r.get("author") or {}).get("login"),
                   "state": r.get("state"),
                   "submittedAt": r.get("submittedAt"),
                   "body": body[:6000],
               })
-          return {"threads": threads, "reviews": reviews, "gathered": True}
+          return {"threads": threads, "reviews": reviews, "gathered": True, "truncated": truncated}
 
-      coderabbit = {"threads": [], "reviews": [], "gathered": False}
+      coderabbit = {"threads": [], "reviews": [], "gathered": False, "truncated": False}
       pr_number = None
       if event_name == "workflow_run":
           workflow_run = event.get("workflow_run") or {}
@@ -587,10 +600,16 @@ and clear CodeRabbit.
 ## CodeRabbit pass
 
 `/tmp/gh-aw/coderabbit.json` contains CodeRabbit's inline `threads` (each with a
-GraphQL node `id`, `path`, `line`, `isResolved`, `isOutdated`, and `body`) and
-its top-level `reviews` (summary bodies, which hold "🧹 Nitpick" and other items
-that are NOT inline threads). If CodeRabbit is still pending, wait briefly and
-re-read via `gh`.
+GraphQL node `id`, `path`, `line`, `isResolved`, `isOutdated`, and `body`), its
+top-level `reviews` (summary bodies, which hold "🧹 Nitpick" and other items that
+are NOT inline threads), and a `truncated` flag. If `truncated` is `true`, the PR
+has more CodeRabbit items than were captured — fetch the remainder via `gh` before
+judging completeness.
+
+If CodeRabbit has not posted yet, poll at most **3 times (~30s apart, ≤2 minutes
+total)**; if it is still pending after that, proceed with whatever
+`coderabbit.json` holds and note "CodeRabbit not yet available" in your summary
+rather than blocking the run.
 
 For every **unresolved inline thread** and every actionable item in the
 **top-level review** bodies:
