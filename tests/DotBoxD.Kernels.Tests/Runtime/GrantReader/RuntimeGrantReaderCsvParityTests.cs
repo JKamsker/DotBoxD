@@ -27,14 +27,14 @@ public sealed class RuntimeGrantReaderCsvParityTests
                 MaxFuel: 5_000,
                 MaxNetworkBytesRead: 1024,
                 MaxNetworkBytesWritten: 1024));
-        DotBoxD.Hosting.Http.SafeDnsResolver dns = (_, _) => ValueTask.FromResult<IReadOnlyList<IPAddress>>(
+        SafeDnsResolver dns = (_, _) => ValueTask.FromResult<IReadOnlyList<IPAddress>>(
             [IPAddress.Parse("93.184.216.34")]);
 
         var ex = await Assert.ThrowsAsync<SandboxRuntimeException>(async () =>
-            await DotBoxD.Hosting.Http.SafeHttpClient.GetTextAsync(
+            await SafeHttpClient.GetTextAsync(
                 context,
                 new SandboxUri("https://api.example.com/config"),
-                new DotBoxD.Hosting.Http.SafeInMemoryHttpMessageInvoker("ok"),
+                new SafeInMemoryHttpMessageInvoker("ok"),
                 dns,
                 CancellationToken.None));
 
