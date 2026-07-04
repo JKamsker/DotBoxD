@@ -73,9 +73,9 @@ internal static class PolicyGrantValidator
         IReadOnlyList<CapabilityGrant> grants,
         List<SandboxDiagnostic> diagnostics)
     {
-        for (var i = 0; i < grants.Count; i++)
+        foreach (var grant in grants)
         {
-            if (grants[i] is null)
+            if (grant is null)
             {
                 diagnostics.Add(new SandboxDiagnostic("E-POLICY-GRANT", "policy grants cannot contain null entries"));
             }
