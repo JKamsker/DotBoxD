@@ -1,6 +1,6 @@
 using DotBoxD.Kernels.Verifier;
 
-namespace DotBoxD.Kernels.Tests.Verifier.Core;
+namespace DotBoxD.Kernels.Tests.Verifier.Core.Policy;
 
 public sealed class VerificationPolicyContractTests
 {
