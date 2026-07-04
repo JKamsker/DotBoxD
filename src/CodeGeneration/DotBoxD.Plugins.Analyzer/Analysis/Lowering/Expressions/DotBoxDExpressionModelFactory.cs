@@ -96,91 +96,46 @@ internal static partial class DotBoxDExpressionModelFactory
         var allocates = left.Allocates || right.Allocates;
         return binary.Kind() switch
         {
-            SyntaxKind.EqualsExpression => DotBoxDEqualityExpressionLowerer.Lower(
-                left,
-                right,
-                negate: false,
-                allocates,
-                ConvertedType(binary.Left, context),
-                ConvertedType(binary.Right, context)),
-            SyntaxKind.NotEqualsExpression => DotBoxDEqualityExpressionLowerer.Lower(
-                left,
-                right,
-                negate: true,
-                allocates,
-                ConvertedType(binary.Left, context),
-                ConvertedType(binary.Right, context)),
-            SyntaxKind.GreaterThanOrEqualExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Ge,
-                DotBoxDGenerationNames.Operators.GreaterThanOrEqual,
-                left,
-                right,
-                comparison: true,
-                allocates),
-            SyntaxKind.GreaterThanExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Gt,
-                DotBoxDGenerationNames.Operators.GreaterThan,
-                left,
-                right,
-                comparison: true,
-                allocates),
-            SyntaxKind.LessThanOrEqualExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Le,
-                DotBoxDGenerationNames.Operators.LessThanOrEqual,
-                left,
-                right,
-                comparison: true,
-                allocates),
-            SyntaxKind.LessThanExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Lt,
-                DotBoxDGenerationNames.Operators.LessThan,
-                left,
-                right,
-                comparison: true,
-                allocates),
-            SyntaxKind.LogicalAndExpression => BoolBinary(
-                DotBoxDGenerationNames.Helpers.And,
-                DotBoxDGenerationNames.Operators.LogicalAnd,
-                left,
-                right,
-                allocates),
-            SyntaxKind.LogicalOrExpression => BoolBinary(
-                DotBoxDGenerationNames.Helpers.Or,
-                DotBoxDGenerationNames.Operators.LogicalOr,
-                left,
-                right,
-                allocates),
+            SyntaxKind.EqualsExpression => LowerEquality(negate: false),
+            SyntaxKind.NotEqualsExpression => LowerEquality(negate: true),
+            SyntaxKind.GreaterThanOrEqualExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Ge,
+                DotBoxDGenerationNames.Operators.GreaterThanOrEqual, comparison: true),
+            SyntaxKind.GreaterThanExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Gt,
+                DotBoxDGenerationNames.Operators.GreaterThan, comparison: true),
+            SyntaxKind.LessThanOrEqualExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Le,
+                DotBoxDGenerationNames.Operators.LessThanOrEqual, comparison: true),
+            SyntaxKind.LessThanExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Lt,
+                DotBoxDGenerationNames.Operators.LessThan, comparison: true),
+            SyntaxKind.LogicalAndExpression => LowerBool(
+                DotBoxDGenerationNames.Helpers.And, DotBoxDGenerationNames.Operators.LogicalAnd),
+            SyntaxKind.LogicalOrExpression => LowerBool(
+                DotBoxDGenerationNames.Helpers.Or, DotBoxDGenerationNames.Operators.LogicalOr),
             SyntaxKind.AddExpression => AddBinary(left, right, allocates),
-            SyntaxKind.SubtractExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Sub,
-                DotBoxDGenerationNames.Operators.Minus,
-                left,
-                right,
-                comparison: false,
-                allocates),
-            SyntaxKind.MultiplyExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Mul,
-                DotBoxDGenerationNames.Operators.Multiply,
-                left,
-                right,
-                comparison: false,
-                allocates),
-            SyntaxKind.DivideExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Div,
-                DotBoxDGenerationNames.Operators.Divide,
-                left,
-                right,
-                comparison: false,
-                allocates),
-            SyntaxKind.ModuloExpression => NumericBinary(
-                DotBoxDGenerationNames.Helpers.Mod,
-                DotBoxDGenerationNames.Operators.Modulo,
-                left,
-                right,
-                comparison: false,
-                allocates),
+            SyntaxKind.SubtractExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Sub,
+                DotBoxDGenerationNames.Operators.Minus, comparison: false),
+            SyntaxKind.MultiplyExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Mul,
+                DotBoxDGenerationNames.Operators.Multiply, comparison: false),
+            SyntaxKind.DivideExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Div,
+                DotBoxDGenerationNames.Operators.Divide, comparison: false),
+            SyntaxKind.ModuloExpression => LowerNumeric(DotBoxDGenerationNames.Helpers.Mod,
+                DotBoxDGenerationNames.Operators.Modulo, comparison: false),
             _ => Unsupported(binary)
         };
+
+        DotBoxDExpressionModel LowerEquality(bool negate)
+            => DotBoxDEqualityExpressionLowerer.Lower(
+                left,
+                right,
+                negate,
+                allocates,
+                ConvertedType(binary.Left, context),
+                ConvertedType(binary.Right, context));
+
+        DotBoxDExpressionModel LowerNumeric(string helper, string symbol, bool comparison)
+            => NumericBinary(helper, symbol, left, right, comparison, allocates);
+
+        DotBoxDExpressionModel LowerBool(string helper, string symbol)
+            => BoolBinary(helper, symbol, left, right, allocates);
     }
     private static DotBoxDExpressionModel AddBinary(
         DotBoxDExpressionModel left,
