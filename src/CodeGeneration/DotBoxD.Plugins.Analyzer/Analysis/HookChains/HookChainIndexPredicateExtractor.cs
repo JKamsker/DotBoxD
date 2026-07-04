@@ -1,5 +1,6 @@
 using System.Globalization;
 using DotBoxD.Plugins.Analyzer.Analysis.Lowering;
+using DotBoxD.Plugins.Analyzer.Analysis.Lowering.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -137,15 +138,27 @@ internal static class HookChainIndexPredicateExtractor
         var left = Unwrap(binary.Left);
         var right = Unwrap(binary.Right);
 
-        EventPropertyModel? property;
+        HookChainIndexEventPath property;
         ExpressionSyntax constantOperand;
         bool constantOnLeft;
-        if (TryResolveEventProperty(left, elementParam, eventProperties, out property))
+        if (HookChainIndexEventPathResolver.TryResolve(
+                left,
+                elementParam,
+                eventProperties,
+                model,
+                cancellationToken,
+                out property))
         {
             constantOperand = right;
             constantOnLeft = false;
         }
-        else if (TryResolveEventProperty(right, elementParam, eventProperties, out property))
+        else if (HookChainIndexEventPathResolver.TryResolve(
+                     right,
+                     elementParam,
+                     eventProperties,
+                     model,
+                     cancellationToken,
+                     out property))
         {
             constantOperand = left;
             constantOnLeft = true;
@@ -156,50 +169,26 @@ internal static class HookChainIndexPredicateExtractor
         }
 
         // The opposite operand must be a compile-time constant; runtime captures are not index values.
-        var constant = model.GetConstantValue(constantOperand, cancellationToken);
-        if (!constant.HasValue)
+        if (!DotBoxDCapturedConstantLocal.TryGetConstantValue(
+                constantOperand,
+                model,
+                cancellationToken,
+                out var constant))
         {
             return false;
         }
 
-        if (TryFormatValue(property!.Type, constant.Value, out var literal, out var valueType) is false)
+        if (TryFormatValue(property.Type, constant, out var literal, out var valueType) is false)
         {
             return false;
         }
 
         predicate = new IndexPredicateModel(
-            property!.Name,
+            property.Path,
             OperatorName(binary.Kind(), constantOnLeft),
             literal,
             valueType);
         return true;
-    }
-
-    private static bool TryResolveEventProperty(
-        ExpressionSyntax expression,
-        string elementParam,
-        EquatableArray<EventPropertyModel> eventProperties,
-        out EventPropertyModel? property)
-    {
-        property = null;
-        if (expression is not MemberAccessExpressionSyntax member ||
-            member.Expression is not IdentifierNameSyntax identifier ||
-            !string.Equals(identifier.Identifier.ValueText, elementParam, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var name = member.Name.Identifier.ValueText;
-        for (var i = 0; i < eventProperties.Count; i++)
-        {
-            if (string.Equals(eventProperties[i].Name, name, StringComparison.Ordinal))
-            {
-                property = eventProperties[i];
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // Coerces the captured constant to the event property's manifest type and produces the C# literal the
