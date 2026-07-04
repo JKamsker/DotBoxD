@@ -39,7 +39,9 @@ internal static class QueryProjectionInvariants
     }
 
     public static string MemberPath(QueryProjection projection)
-        => NonEmpty(projection.Path, "QueryProjection Member nodes require Path.");
+        => RequireValidMemberPath(
+            projection.Path,
+            "QueryProjection Member nodes require a valid path with identifier segments.");
 
     public static string ConstructTypeName(QueryProjection projection)
         => NonEmpty(projection.TypeName, "QueryProjection Construct nodes require TypeName.");
@@ -61,7 +63,22 @@ internal static class QueryProjectionInvariants
     }
 
     public static string FieldPath(QueryProjectionField field)
-        => NonEmpty(field.Path, $"QueryProjection Construct field '{field.Name}' requires Path.");
+        => RequireValidMemberPath(
+            field.Path,
+            $"QueryProjection Construct field '{field.Name}' requires a valid path with identifier segments.");
+
+    public static string MemberPathArgument(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        if (!IsValidMemberPath(path))
+        {
+            throw new ArgumentException(
+                $"Invalid QueryProjection path '{path}'; each '.'-separated segment must be an identifier.",
+                nameof(path));
+        }
+
+        return path;
+    }
 
     public static QueryValue FieldConstant(QueryProjectionField field)
         => field.Constant ?? throw new InvalidOperationException(
@@ -111,4 +128,17 @@ internal static class QueryProjectionInvariants
 
     private static string NonEmpty(string? value, string message)
         => string.IsNullOrEmpty(value) ? throw new InvalidOperationException(message) : value;
+
+    private static string RequireValidMemberPath(string? path, string message)
+    {
+        if (string.IsNullOrEmpty(path) || !QueryFilterInvariants.IsValidFieldPath(path))
+        {
+            throw new InvalidOperationException(message);
+        }
+
+        return path;
+    }
+
+    private static bool IsValidMemberPath(string? path)
+        => !string.IsNullOrEmpty(path) && QueryFilterInvariants.IsValidFieldPath(path);
 }

@@ -2,37 +2,32 @@ using System.Text.Json;
 using DotBoxD.Queryable.Ast;
 using DotBoxD.Queryable.Serialization;
 
-namespace DotBoxD.Kernels.Tests.Queryable;
+namespace DotBoxD.Kernels.Tests.Queryable.Serialization.PathValidation;
 
 public sealed class QueryProjectionPathValidationTests
 {
+    public static TheoryData<string> InvalidMemberPaths => new()
+    {
+        " ",
+        "Attacker Id",
+        ".Damage",
+        "Damage.",
+        "Damage..Amount",
+        "9Damage",
+    };
+
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Member_projection_factory_rejects_invalid_member_paths(string path)
         => AssertProjectionPathRejection(() => QueryProjection.Member(path));
 
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Construct_field_factory_rejects_invalid_member_paths(string path)
         => AssertProjectionPathRejection(() => QueryProjectionField.FromMember("damage", path));
 
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Document_serialization_rejects_invalid_projection_member_paths(string path)
     {
         var document = EventQueryDocument.Create(
@@ -44,12 +39,7 @@ public sealed class QueryProjectionPathValidationTests
     }
 
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Document_serialization_rejects_invalid_construct_field_paths(string path)
     {
         var document = EventQueryDocument.Create(
@@ -66,12 +56,7 @@ public sealed class QueryProjectionPathValidationTests
     }
 
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Projection_json_rejects_invalid_member_paths(string path)
     {
         var json = "{\"event\":\"AttackEvent\",\"projection\":{\"kind\":\"member\",\"path\":"
@@ -82,12 +67,7 @@ public sealed class QueryProjectionPathValidationTests
     }
 
     [Theory]
-    [InlineData(" ")]
-    [InlineData("Attacker Id")]
-    [InlineData(".Damage")]
-    [InlineData("Damage.")]
-    [InlineData("Damage..Amount")]
-    [InlineData("9Damage")]
+    [MemberData(nameof(InvalidMemberPaths))]
     public void Projection_json_rejects_invalid_construct_field_paths(string path)
     {
         var json = "{\"event\":\"AttackEvent\",\"projection\":{\"kind\":\"construct\",\"type\":\"AttackNotice\","
