@@ -155,6 +155,7 @@ internal static class WorkerAuditValidator
             !plan.Bindings.TryGet(auditEvent.BindingId, out var binding) ||
             binding.AuditLevel is AuditLevel.None or AuditLevel.Summary ||
             string.IsNullOrWhiteSpace(auditEvent.ResourceId) ||
+            !AuditKindMatchesBinding(auditEvent.Kind, binding) ||
             !CapabilityMatches(auditEvent, binding) ||
             !EffectMatches(auditEvent, binding) ||
             !ResultMatches(auditEvent) ||
@@ -166,6 +167,17 @@ internal static class WorkerAuditValidator
 
         return true;
     }
+
+    private static bool AuditKindMatchesBinding(string kind, BindingSignature binding)
+        => string.Equals(kind, ExpectedBindingAuditKind(binding.Id), StringComparison.Ordinal);
+
+    private static string ExpectedBindingAuditKind(string bindingId)
+        => bindingId switch
+        {
+            "log.info" or "log.warn" => "SandboxLog",
+            "host.message.send" => "PluginMessage",
+            _ => "BindingCall"
+        };
 
     private static bool CapabilityMatches(SandboxAuditEvent auditEvent, BindingSignature binding)
         => binding.RequiredCapability is null ||
