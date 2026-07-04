@@ -4,8 +4,10 @@ using DotBoxD.Kernels.Sandbox;
 namespace DotBoxD.Hosting;
 
 using System.Globalization;
+using DotBoxD.Kernels.Compiler;
 using DotBoxD.Kernels;
 using DotBoxD.Kernels.Runtime;
+using DotBoxD.Kernels.Verifier;
 
 internal static class WorkerAuditValidator
 {
@@ -70,7 +72,7 @@ internal static class WorkerAuditValidator
             "ExecutionFallback" => ExecutionFallbackAuditMatches(plan, auditEvent),
             "VerifierFailure" => VerifierFailureAuditMatches(plan, auditEvent),
             "DebugTrace" => options.EnableDebugTrace && ModuleAuditMatches(plan, auditEvent),
-            "CacheInvalidated" => false,
+            "CacheInvalidated" => CacheInvalidatedAuditMatches(plan, entrypoint, auditEvent),
             "PolicyDenied" => false,
             "BindingCall" or "SandboxLog" or "PluginMessage" => BindingAuditMatches(plan, entrypoint, auditEvent),
             _ => false
@@ -143,6 +145,50 @@ internal static class WorkerAuditValidator
         => !auditEvent.Success &&
            auditEvent.ErrorCode == SandboxErrorCode.VerifierFailure &&
            ModuleAuditMatches(plan, auditEvent);
+
+    private static bool CacheInvalidatedAuditMatches(
+        ExecutionPlan plan,
+        string entrypoint,
+        SandboxAuditEvent auditEvent)
+    {
+        if (auditEvent.Success ||
+            auditEvent.BindingId is not null ||
+            auditEvent.CapabilityId is not null ||
+            auditEvent.Effect != SandboxEffect.None ||
+            auditEvent.ErrorCode != SandboxErrorCode.CacheInvalid ||
+            auditEvent.Fields is not { Count: 4 } fields ||
+            !fields.TryGetValue("cacheKey", out var cacheKey) ||
+            !fields.TryGetValue("moduleHash", out var moduleHash) ||
+            !fields.TryGetValue("planHash", out var planHash) ||
+            !fields.TryGetValue("reason", out var reason) ||
+            !ExpectedCacheKeyMatches(plan, entrypoint, cacheKey) ||
+            !string.Equals(auditEvent.ResourceId, "cache:" + cacheKey, StringComparison.Ordinal) ||
+            !string.Equals(moduleHash, plan.ModuleHash, StringComparison.Ordinal) ||
+            !string.Equals(planHash, plan.PlanHash, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(reason))
+        {
+            return false;
+        }
+
+        foreach (var field in fields)
+        {
+            if (string.IsNullOrWhiteSpace(field.Key) ||
+                !TextIsSafe(field.Key) ||
+                !TextIsSafe(field.Value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ExpectedCacheKeyMatches(ExecutionPlan plan, string entrypoint, string cacheKey)
+    {
+        var policy = VerificationPolicy.BoxedValueDefaults();
+        return string.Equals(cacheKey, CacheKeyBuilder.Build(plan, entrypoint, policy, optimize: false), StringComparison.Ordinal) ||
+               string.Equals(cacheKey, CacheKeyBuilder.Build(plan, entrypoint, policy, optimize: true), StringComparison.Ordinal);
+    }
 
     private static bool BindingAuditMatches(
         ExecutionPlan plan,

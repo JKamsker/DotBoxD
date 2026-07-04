@@ -9,7 +9,7 @@ using DotBoxD.Kernels.Verifier;
 using DotBoxD.Kernels.Verifier.Generated;
 using SandboxHost = DotBoxD.Hosting.Execution.SandboxHost;
 
-namespace DotBoxD.Kernels.Tests.Workers;
+namespace DotBoxD.Kernels.Tests.Workers.CompiledCache;
 
 public sealed class WorkerCompiledCacheAuditTests
 {
@@ -111,18 +111,13 @@ public sealed class WorkerCompiledCacheAuditTests
 
     private sealed class TempDirectory : IDisposable
     {
-        private const string AgentTempRoot = "/tmp/gh-aw/agent";
-
         private TempDirectory(string path) => Path = path;
 
         public string Path { get; }
 
         public static TempDirectory Create()
         {
-            var root = Directory.Exists(AgentTempRoot)
-                ? AgentTempRoot
-                : System.IO.Path.GetTempPath();
-            var path = System.IO.Path.Combine(root, "dotboxd-worker-cache-" + Guid.NewGuid().ToString("N"));
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dotboxd-worker-cache-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(path);
             return new TempDirectory(path);
         }
