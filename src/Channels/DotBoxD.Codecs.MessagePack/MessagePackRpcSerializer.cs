@@ -113,9 +113,21 @@ public sealed class MessagePackRpcSerializer : ISerializer
 
     public T Deserialize<T>(ReadOnlyMemory<byte> data)
     {
-        var value = MessagePackSerializer.Deserialize<T>(data, _options, out var bytesRead, CancellationToken.None);
-        ThrowIfTrailingBytes(data.Length, bytesRead);
-        return value;
+        try
+        {
+            var value = MessagePackSerializer.Deserialize<T>(data, _options, out var bytesRead, CancellationToken.None);
+            ThrowIfTrailingBytes(data.Length, bytesRead);
+            return value;
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     public object? Deserialize(ReadOnlyMemory<byte> data, Type type)
@@ -125,10 +137,22 @@ public sealed class MessagePackRpcSerializer : ISerializer
             throw new ArgumentNullException(nameof(type));
         }
 
-        var reader = new MessagePackReader(data);
-        var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
-        ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
-        return value;
+        try
+        {
+            var reader = new MessagePackReader(data);
+            var value = MessagePackSerializer.Deserialize(type, ref reader, _options);
+            ThrowIfTrailingBytes(data.Length, checked((int)reader.Consumed));
+            return value;
+        }
+        catch (MessagePackSerializationException ex)
+        {
+            if (TryGetRpcEnvelopeValidationMessage(ex, out var message))
+            {
+                throw new MessagePackSerializationException(message, ex);
+            }
+
+            throw;
+        }
     }
 
     private static void ThrowIfTrailingBytes(int totalLength, int bytesRead)
@@ -143,12 +167,13 @@ public sealed class MessagePackRpcSerializer : ISerializer
         MessagePackSerializationException exception,
         out string message)
     {
-        if (exception.InnerException is MessagePackSerializationException inner &&
-            (inner.Message.StartsWith("RPC request ", StringComparison.Ordinal) ||
-                inner.Message.StartsWith("RPC response ", StringComparison.Ordinal)))
+        for (Exception? current = exception; current is not null; current = current.InnerException)
         {
-            message = inner.Message;
-            return true;
+            if (current is RpcEnvelopeValidationException validationException)
+            {
+                message = validationException.Message;
+                return true;
+            }
         }
 
         message = string.Empty;
@@ -212,7 +237,11 @@ internal static class RpcEnvelopeStringValidation
         }
     }
 
-    private static MessagePackSerializationException MalformedUtf16(string envelopeName, string fieldName)
+    private static RpcEnvelopeValidationException MalformedUtf16(string envelopeName, string fieldName)
         => new(
             $"RPC {envelopeName} {fieldName} contains malformed UTF-16 text with an unpaired surrogate.");
+}
+
+internal sealed class RpcEnvelopeValidationException(string message) : MessagePackSerializationException(message)
+{
 }

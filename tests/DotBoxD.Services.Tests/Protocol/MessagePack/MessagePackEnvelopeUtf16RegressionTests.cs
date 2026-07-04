@@ -40,6 +40,24 @@ public sealed class MessagePackEnvelopeUtf16RegressionTests
     }
 
     [Fact]
+    public void RpcRequest_deserialize_surfaces_envelope_validation_message()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteRequestEnvelope(serviceName: string.Empty, methodName: "Call", instanceId: null);
+
+        AssertDeserializeRejects<RpcRequest>(serializer, payload, nameof(RpcRequest.ServiceName), "empty");
+    }
+
+    [Fact]
+    public void RpcResponse_deserialize_surfaces_envelope_validation_message()
+    {
+        var serializer = new MessagePackRpcSerializer();
+        var payload = WriteResponseEnvelope(isSuccess: true, errorMessage: "boom", errorType: null);
+
+        AssertDeserializeRejects<RpcResponse>(serializer, payload, "error fields");
+    }
+
+    [Fact]
     public void Valid_surrogate_pairs_roundtrip_in_envelope_strings()
     {
         var serializer = new MessagePackRpcSerializer();
@@ -133,5 +151,74 @@ public sealed class MessagePackEnvelopeUtf16RegressionTests
         var writer = new ArrayBufferWriter<byte>();
         serializer.Serialize(writer, value);
         return serializer.Deserialize<T>(writer.WrittenMemory);
+    }
+
+    private static void AssertDeserializeRejects<T>(
+        MessagePackRpcSerializer serializer,
+        byte[] payload,
+        params string[] messageFragments)
+    {
+        var generic = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize<T>(payload));
+        AssertValidationMessage(generic, messageFragments);
+
+        var nonGeneric = Assert.Throws<MessagePackSerializationException>(
+            () => serializer.Deserialize(payload, typeof(T)));
+        AssertValidationMessage(nonGeneric, messageFragments);
+    }
+
+    private static void AssertValidationMessage(
+        MessagePackSerializationException exception,
+        params string[] messageFragments)
+    {
+        foreach (var fragment in messageFragments)
+        {
+            Assert.Contains(fragment, exception.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static byte[] WriteRequestEnvelope(string serviceName, string methodName, string? instanceId)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(4);
+        message.Write("MessageId");
+        message.Write(42);
+        message.Write("ServiceName");
+        message.Write(serviceName);
+        message.Write("MethodName");
+        message.Write(methodName);
+        message.Write("InstanceId");
+        WriteNullableString(ref message, instanceId);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
+    }
+
+    private static byte[] WriteResponseEnvelope(bool isSuccess, string? errorMessage, string? errorType)
+    {
+        var writer = new ArrayBufferWriter<byte>();
+        var message = new MessagePackWriter(writer);
+        message.WriteMapHeader(4);
+        message.Write("MessageId");
+        message.Write(42);
+        message.Write("IsSuccess");
+        message.Write(isSuccess);
+        message.Write("ErrorMessage");
+        WriteNullableString(ref message, errorMessage);
+        message.Write("ErrorType");
+        WriteNullableString(ref message, errorType);
+        message.Flush();
+        return writer.WrittenMemory.ToArray();
+    }
+
+    private static void WriteNullableString(ref MessagePackWriter message, string? value)
+    {
+        if (value is null)
+        {
+            message.WriteNil();
+            return;
+        }
+
+        message.Write(value);
     }
 }
