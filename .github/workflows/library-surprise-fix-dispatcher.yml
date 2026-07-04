@@ -1,21 +1,35 @@
 name: Library Surprise Fix Dispatcher
 
-# Drives the "fix" half of the surprise-hunt graph WITHOUT depending on the
-# approval-gated pull_request CI.
+# Drives the "fix" AND "polish" halves of the surprise-hunt graph WITHOUT
+# depending on the approval-gated pull_request CI.
 #
 # Why this exists: bot-authored PRs get their `ci` runs held at `action_required`
 # unless the repo's fork/first-time-contributor approval policy is relaxed. Rather
 # than depend on that mutable, external setting, the fixer is driven off OUR own
 # workflows: the red-test worker already refuses to open a PR unless `dotnet test`
 # FAILS inside its run, and the fix worker refuses to push unless `dotnet test`
-# PASSES inside its run. The red->green proof lives entirely in our runs, so this
-# dispatcher just needs to find open [surprise-red-test] PRs that still need a
-# production fix and dispatch one fix worker per PR (identified by number).
+# PASSES inside its run. The red->green proof lives entirely in our runs.
+#
+# Two frontiers are dispatched to the same per-PR fix worker (which decides its
+# own mode from PR state):
+#   1. FIX   — open [surprise-red-test] PRs NOT yet `sweep:fixed`: need a
+#              production fix (the original behavior).
+#   2. POLISH — already-`sweep:fixed` PRs that still need work: their real PR CI
+#              is red (typically stale-branch drift vs main, e.g. the CE0006
+#              file-length budget), OR they have unresolved CodeRabbit review
+#              threads, OR they have never had a polish pass (no marker comment).
+#              The worker merges main, makes CI green, addresses CodeRabbit, and
+#              resolves the threads it handled. This closes the "sweep:fixed but
+#              CI red / CodeRabbit unaddressed" gap (#266 follow-up 2).
+#
+# Per-PR safety: the fix worker's own `surprise-fix-<pr>` concurrency group
+# (cancel-in-progress: false) guarantees at most one worker EVER edits a given PR
+# at a time; the busy-check below just avoids the wasted queued run.
 #
 # See docs/Task/BugHunting/README.md.
 
 on:
-  # PRIMARY, reliable trigger: a periodic scan of open unfixed red PRs.
+  # PRIMARY, reliable trigger: a periodic scan of the fix + polish frontier.
   #
   # Why a schedule is REQUIRED and workflow_run alone is not enough: GitHub
   # suppresses `workflow_run` events for runs dispatched with GITHUB_TOKEN
@@ -65,24 +79,33 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch fix workers for unfixed red-test PRs
+      - name: Dispatch fix/polish workers for the surprise frontier
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           MAX_DISPATCH: ${{ inputs.max || '4' }}
-          MAX_ATTEMPTS: "3"
+          MAX_ATTEMPTS: "4"
           MAX_INFLIGHT: "8"
+          # PAT (Contents + Pull requests R/W). Used ONLY to server-side merge main
+          # into a PR branch as the PAT's user, so the resulting pull_request CI runs
+          # ungated (a bot-authored commit would sit at action_required). Never printed.
+          CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json, os, re, subprocess, sys
 
           repo = os.environ["GH_REPO"]
+          owner, _, name = repo.partition("/")
           try:
-              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "5")
+              max_dispatch = int(os.environ.get("MAX_DISPATCH") or "4")
           except ValueError:
-              max_dispatch = 5
+              max_dispatch = 4
           prefix = "[surprise-red-test] "
+          # Must match the marker the fix worker posts once it has polished a PR
+          # (see library-surprise-fix.md). Its presence means "a polish pass has
+          # already run", so an otherwise-clean fixed PR is not re-dispatched.
+          SENTINEL = "<!-- surprise-fix:polished -->"
 
           def gh(args, tolerant=False):
               r = subprocess.run(["gh", *args], check=False, text=True,
@@ -95,26 +118,247 @@ jobs:
                   raise SystemExit(msg)
               return r.stdout
 
-          # Open [surprise-red-test] PRs that still carry the bug labels and are NOT
-          # yet marked sweep:fixed are the fix frontier.
+          # One call returns the labels, head ref, AND the full check rollup for
+          # every open PR.
           prs = json.loads(gh(["pr", "list", "--repo", repo, "--state", "open",
                                "--limit", "100",
-                               "--json", "number,title,labels"]) or "[]")
+                               "--json", "number,title,labels,headRefName,statusCheckRollup"]) or "[]")
+          head_refs = {pr["number"]: pr.get("headRefName") for pr in prs}
 
-          def eligible(pr):
+          ci_token = os.environ.get("CI_TRIGGER_TOKEN") or ""
+
+          def merge_main(number):
+              # Server-side merge of main into the PR branch, authored by the PAT so
+              # the resulting pull_request CI runs ungated. This is what clears
+              # stale-branch CI gates (e.g. the repo-wide CE0006 file-length budget
+              # main has since cleared) before the worker runs. 201=merged (CI will
+              # re-run), 204=already up-to-date (no-op), 409=merge conflict (left for
+              # the worker/human to resolve).
+              head_ref = head_refs.get(number)
+              if not ci_token:
+                  print("::warning::CI_TRIGGER_TOKEN not set; skipping server-side "
+                        "main merge (stale-branch CI drift will not be cleared)")
+                  return
+              if not head_ref:
+                  return
+              env = {**os.environ, "GH_TOKEN": ci_token}
+              r = subprocess.run(
+                  ["gh", "api", "-X", "POST", f"repos/{repo}/merges",
+                   "-f", f"base={head_ref}", "-f", "head=main",
+                   "-f", "commit_message=Auto-merge main into surprise PR branch"],
+                  check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+              if r.returncode == 0:
+                  print(f"merged main into #{number} ({head_ref})")
+              elif "409" in r.stderr or "Merge conflict" in r.stderr:
+                  print(f"::warning::#{number}: main->branch merge conflict; worker/human must resolve")
+              else:
+                  print(f"::warning::#{number}: merge main failed: {r.stderr.strip()}")
+
+          # Thread resolution runs HERE (plain YAML, PAT), not in the fix worker's
+          # agent job. The worker's summary comment — which carries the resolve
+          # marker below — is itself posted through the detection-gated safe_outputs
+          # job, so by the time this dispatcher reads a marker the agent output has
+          # already passed threat detection. Resolving in the agent job (a post-step
+          # that runs BEFORE the detection job) would let a manipulated agent output
+          # resolve threads pre-detection.
+          _MARKER_RE = re.compile(r"<!--\s*surprise-fix:resolve\s*(\{.*?\})\s*-->", re.DOTALL)
+          _RESOLVE_MUTATION = ("mutation($id:ID!){resolveReviewThread(input:{threadId:$id})"
+                               "{thread{id isResolved}}}")
+
+          def parse_handled_ids(comment_bodies):
+              handled = set()
+              for body in comment_bodies:
+                  m = _MARKER_RE.search(body or "")
+                  if not m:
+                      continue
+                  try:
+                      payload = json.loads(m.group(1))
+                  except json.JSONDecodeError:
+                      continue
+                  for tid in payload.get("resolve") or []:
+                      if isinstance(tid, str) and tid:
+                          handled.add(tid)
+              return handled
+
+          def resolve_thread(tid):
+              if not ci_token:
+                  return
+              env = {**os.environ, "GH_TOKEN": ci_token}
+              r = subprocess.run(["gh", "api", "graphql", "-F", f"id={tid}",
+                                  "-f", f"query={_RESOLVE_MUTATION}"],
+                                 check=False, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+              if r.returncode == 0:
+                  print(f"resolved review thread {tid}")
+              else:
+                  print(f"::warning::failed to resolve thread {tid}: {r.stderr.strip()}")
+
+          RED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"}
+          PENDING_STATUSES = {"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"}
+
+          def ci_state(rollup):
+              # Returns one of: red / green / pending / none.
+              # ACTION_REQUIRED (the cosmetic bot-PR gate) is intentionally ignored:
+              # nothing in the loop treats it as failure (see Plan B in the README).
+              entries = [c for c in (rollup or []) if c and (c.get("name") or c.get("context"))]
+              if not entries:
+                  return "none"
+              pending = red = False
+              for c in entries:
+                  status = (c.get("status") or "").upper()
+                  conclusion = (c.get("conclusion") or "").upper()
+                  state = (c.get("state") or "").upper()   # legacy StatusContext
+                  if state:
+                      if state == "PENDING":
+                          pending = True
+                      elif state in {"FAILURE", "ERROR"}:
+                          red = True
+                      continue
+                  if status in PENDING_STATUSES and not conclusion:
+                      pending = True
+                  elif conclusion in RED_CONCLUSIONS:
+                      red = True
+              if pending:
+                  return "pending"
+              if red:
+                  return "red"
+              return "green"
+
+          # The real CodeRabbit bot is exactly this login AND a Bot actor. A
+          # `startswith("coderabbit")` check would let a spoofed account like
+          # `coderabbit-evil` steer polish dispatch and get its threads resolved.
+          CODERABBIT_LOGIN = "coderabbitai"
+
+          def is_coderabbit(author):
+              author = author or {}
+              return author.get("login") == CODERABBIT_LOGIN and author.get("__typename") == "Bot"
+
+          # Our summary comment (which carries the polished/resolve markers) is
+          # posted by the gh-aw safe_outputs job as github-actions[bot] — GraphQL
+          # login "github-actions", a Bot — or, if GH_AW_GITHUB_TOKEN is a PAT, as
+          # the repo owner. ONLY markers from those authors are trusted; otherwise
+          # any commenter could post `<!-- surprise-fix:polished -->` to suppress a
+          # polish pass or `<!-- surprise-fix:resolve ... -->` to force resolution of
+          # arbitrary threads.
+          def is_trusted_marker_author(author):
+              author = author or {}
+              login = author.get("login")
+              return ((login == "github-actions" and author.get("__typename") == "Bot")
+                      or login == owner)
+
+          # Markers CodeRabbit uses for genuinely actionable top-level items. An
+          # informational walkthrough/summary (which every PR gets) has none of
+          # these, so a clean fixed PR does not burn a polish run just to post a
+          # marker; #422-style "🧹 Nitpick" PRs still qualify.
+          ACTIONABLE = ("🧹", "⚠️", "🛠️", "Nitpick", "Potential issue", "Refactor")
+
+          def _fetch_connection(number, field, node_selection, cap_pages=20):
+              # Page through a PR connection so a chatty PR cannot hide unresolved
+              # threads, review bodies, or the (recent) polish marker past a fixed
+              # first slice. Returns None on a transient API error (caller then fails
+              # toward NOT re-picking).
+              query = (
+                  "query($owner:String!,$name:String!,$pr:Int!,$after:String){"
+                  "repository(owner:$owner,name:$name){pullRequest(number:$pr){"
+                  + field + "(first:100, after:$after){pageInfo{hasNextPage endCursor} nodes{"
+                  + node_selection + "}}}}}"
+              )
+              nodes = []
+              cursor = None
+              for _ in range(cap_pages):
+                  args = ["api", "graphql", "-F", f"owner={owner}", "-F", f"name={name}",
+                          "-F", f"pr={number}", "-f", f"query={query}"]
+                  if cursor:
+                      args += ["-F", f"after={cursor}"]
+                  out = gh(args, tolerant=True)
+                  if out is None:
+                      return None
+                  conn = ((((json.loads(out).get("data") or {}).get("repository") or {})
+                           .get("pullRequest") or {}).get(field) or {})
+                  nodes.extend(conn.get("nodes") or [])
+                  page = conn.get("pageInfo") or {}
+                  if not page.get("hasNextPage") or not page.get("endCursor"):
+                      break
+                  cursor = page["endCursor"]
+              return nodes
+
+          def polish_graphql(number):
+              threads = _fetch_connection(number, "reviewThreads",
+                  "id isResolved comments(first:1){nodes{author{login __typename}}}")
+              reviews = _fetch_connection(number, "reviews", "author{login __typename} body")
+              comments = _fetch_connection(number, "comments", "author{login __typename} body")
+              if threads is None or reviews is None or comments is None:
+                  # Transient API error: fail toward NOT re-picking (pretend a marker
+                  # exists, no open threads, nothing actionable). A later tick retries;
+                  # this avoids a dispatch storm on a flaky GraphQL endpoint.
+                  return {"has_marker": True, "unresolved_cr_ids": [], "handled_ids": set(),
+                          "has_actionable": False}
+              unresolved_cr_ids = []
+              for t in threads:
+                  if t.get("isResolved"):
+                      continue
+                  cnodes = (t.get("comments") or {}).get("nodes") or []
+                  c0 = cnodes[0] if cnodes else {}
+                  if is_coderabbit(c0.get("author")) and t.get("id"):
+                      unresolved_cr_ids.append(t["id"])
+              has_actionable = bool(unresolved_cr_ids)
+              for r in reviews:
+                  body = r.get("body") or ""
+                  if is_coderabbit(r.get("author")) and any(tok in body for tok in ACTIONABLE):
+                      has_actionable = True
+                      break
+              # Only markers authored by our own automation are trusted (spoof guard).
+              trusted_bodies = [c.get("body") or "" for c in comments
+                                if is_trusted_marker_author(c.get("author"))]
+              has_marker = any(SENTINEL in b for b in trusted_bodies)
+              return {"has_marker": has_marker, "unresolved_cr_ids": unresolved_cr_ids,
+                      "handled_ids": parse_handled_ids(trusted_bodies),
+                      "has_actionable": has_actionable}
+
+          fix_candidates = []
+          polish_candidates = []
+          for pr in prs:
               if not str(pr.get("title") or "").startswith(prefix):
-                  return False
+                  continue
               names = {l.get("name") for l in pr.get("labels") or []}
-              return {"bug", ".NET"} <= names and "sweep:fixed" not in names
+              if not {"bug", ".NET"} <= names:
+                  continue
+              number = pr["number"]
+              if "sweep:fixed" not in names:
+                  fix_candidates.append(number)
+                  continue
+              # Already fixed -> is a polish pass warranted?
+              state = ci_state(pr.get("statusCheckRollup"))
+              if state == "pending":
+                  print(f"skip #{number}: CI in flight; defer polish decision to next tick")
+                  continue
+              if state == "red":
+                  polish_candidates.append((number, "ci-red"))
+                  continue
+              info = polish_graphql(number)
+              # Resolve the threads the worker reported handled (its marker), then
+              # only the threads it did NOT handle count as "still open".
+              to_resolve = [t for t in info["unresolved_cr_ids"] if t in info["handled_ids"]]
+              for tid in to_resolve:
+                  resolve_thread(tid)
+              remaining = [t for t in info["unresolved_cr_ids"] if t not in info["handled_ids"]]
+              reasons = []
+              if remaining:
+                  reasons.append("unresolved-coderabbit-thread")
+              # First polish pass only when there is genuinely actionable CodeRabbit
+              # content to address; a clean fixed PR is left alone (no wasted run).
+              if not info["has_marker"] and info["has_actionable"]:
+                  reasons.append("unpolished-actionable-coderabbit")
+              if reasons:
+                  polish_candidates.append((number, "+".join(reasons)))
 
-          candidates = sorted((pr for pr in prs if eligible(pr)),
-                              key=lambda p: p["number"])
+          # Fix frontier first (a live regression outranks polish), then polish.
+          candidates = ([(n, "fix") for n in sorted(fix_candidates)]
+                        + [(n, r) for n, r in sorted(polish_candidates)])
 
-          # Busy-check: never dispatch a second fix worker for a PR that already has
-          # one in flight (the worker's per-PR concurrency group would queue it, but
-          # skipping here avoids the wasted run entirely).
+          # Busy-check + genuine-attempt tally from the fix worker's own run history.
           runs = json.loads(gh(["run", "list", "--repo", repo, "--workflow",
-                                "library-surprise-fix.lock.yml", "--limit", "80",
+                                "library-surprise-fix.lock.yml", "--limit", "120",
                                 "--json", "status,conclusion,displayTitle"], tolerant=True) or "[]")
           IN_FLIGHT = {"in_progress", "queued", "requested", "waiting", "pending"}
           busy = set()
@@ -128,23 +372,19 @@ jobs:
               if status in IN_FLIGHT:
                   busy.add(n)
               elif status == "completed" and run.get("conclusion") != "cancelled":
-                  # A genuine, non-aborted attempt that still left the PR unfixed.
                   attempts[n] = attempts.get(n, 0) + 1
 
-          # Retry cap: an unfixable bug (agent can't get it green within its timeout)
-          # would otherwise be re-dispatched every scheduled tick forever. Skip a
-          # candidate once it has burned MAX_ATTEMPTS genuine attempts — it needs a
-          # human. (Candidates are unfixed by definition: eligible() excludes
-          # sweep:fixed.)
+          # Retry cap: a PR that keeps failing (unfixable bug, or a CI gate the worker
+          # cannot make green) would otherwise be re-dispatched forever. The count
+          # spans fix + polish touches; past MAX_ATTEMPTS it waits for a human.
           try:
-              max_attempts = int(os.environ.get("MAX_ATTEMPTS") or "3")
+              max_attempts = int(os.environ.get("MAX_ATTEMPTS") or "4")
           except ValueError:
-              max_attempts = 3
+              max_attempts = 4
 
           # Global concurrency cap: never let total in-flight fix runs exceed
           # MAX_INFLIGHT. This is what makes the higher cadence + per-tick max safe —
-          # raising throughput can't runaway on cost; it fills to the cap and holds
-          # there until fixes finish. len(busy) = current in-flight fix count.
+          # raising throughput can't runaway on cost; it fills to the cap and holds.
           try:
               max_inflight = int(os.environ.get("MAX_INFLIGHT") or "8")
           except ValueError:
@@ -152,35 +392,36 @@ jobs:
           slots = max(0, max_inflight - len(busy))
           budget = min(max_dispatch, slots)
           if budget <= 0:
-              print(f"{len(busy)} fix run(s) in flight >= cap {max_inflight}; "
-                    f"no dispatch this tick")
+              print(f"{len(busy)} fix run(s) in flight >= cap {max_inflight}; no dispatch this tick")
 
           dispatched = 0
-          for pr in candidates:
+          for number, reason in candidates:
               if dispatched >= budget:
                   cap_name = "in-flight cap" if slots < max_dispatch else f"per-tick max {max_dispatch}"
                   print(f"reached {cap_name}; dispatched {dispatched}, "
                         f"{len(candidates) - dispatched} candidate(s) deferred to next tick")
                   break
-              n = pr["number"]
-              if n in busy:
-                  print(f"skip #{n}: a fix run is already in flight")
+              if number in busy:
+                  print(f"skip #{number}: a fix run is already in flight")
                   continue
-              if attempts.get(n, 0) >= max_attempts:
-                  print(f"skip #{n}: {attempts[n]} genuine fix attempt(s), still unfixed "
+              if attempts.get(number, 0) >= max_attempts:
+                  print(f"skip #{number}: {attempts[number]} genuine attempt(s), still not clean "
                         f"(retry cap {max_attempts} reached; needs human attention)")
                   continue
+              # Refresh the branch from main before the worker checks it out, so the
+              # dominant stale-branch CI failures are cleared server-side (no clone).
+              merge_main(number)
               r = subprocess.run(["gh", "workflow", "run",
                                   "library-surprise-fix.lock.yml",
-                                  "--repo", repo, "-f", f"pr_number={n}"],
+                                  "--repo", repo, "-f", f"pr_number={number}"],
                                  check=False, text=True,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
               if r.returncode != 0:
-                  print(f"::warning::failed to dispatch fix for #{n}: {r.stderr.strip()}")
+                  print(f"::warning::failed to dispatch fix for #{number}: {r.stderr.strip()}")
               else:
-                  print(f"dispatched fix worker for #{n}")
+                  print(f"dispatched worker for #{number} ({reason})")
                   dispatched += 1
 
-          print(f"dispatched {dispatched} fix worker(s) "
-                f"from {len(candidates)} eligible candidate(s)")
+          print(f"dispatched {dispatched} worker(s) from "
+                f"{len(fix_candidates)} fix + {len(polish_candidates)} polish candidate(s)")
           PY
