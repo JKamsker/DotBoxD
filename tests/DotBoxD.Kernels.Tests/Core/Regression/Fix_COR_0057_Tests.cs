@@ -214,6 +214,36 @@ public sealed class Fix_COR_0057_Tests
         Assert.Contains(ex.Diagnostics, d => d.Code == "E-POLICY-GRANT-PARAM");
     }
 
+    [Fact]
+    public async Task Null_allowed_targets_grant_parameter_is_rejected_during_preparation()
+    {
+        var messages = new InMemoryPluginMessageSink();
+        var host = CreateHost(messages);
+        var module = await host.ImportJsonAsync(SendModule("player-1", "hello"));
+        var policy = SandboxPolicyBuilder.Create()
+            .AllowRuntimeAsync()
+            .WithFuel(10_000)
+            .Build() with
+        {
+            AllowedEffects = SandboxEffect.HostStateWrite | SandboxEffect.Audit | SandboxEffect.Concurrency,
+            Grants =
+            [
+                new CapabilityGrant(RuntimeCapabilityIds.Async, new Dictionary<string, string>()),
+                new CapabilityGrant(PluginMessageBindings.CapabilityId, new Dictionary<string, string>
+                {
+                    ["allowedTargets"] = null!
+                })
+            ]
+        };
+
+        var ex = await Assert.ThrowsAsync<SandboxValidationException>(
+            async () => await host.PrepareAsync(module, policy));
+
+        Assert.Contains(ex.Diagnostics, d =>
+            d.Code == "E-POLICY-GRANT-PARAM" &&
+            d.Message.Contains("allowedTargets", StringComparison.Ordinal));
+    }
+
     public static TheoryData<string[]> EmptyRecipientScopes()
         => new()
         {

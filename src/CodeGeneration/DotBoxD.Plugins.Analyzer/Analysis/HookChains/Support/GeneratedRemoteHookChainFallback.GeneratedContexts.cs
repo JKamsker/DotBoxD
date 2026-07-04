@@ -59,7 +59,7 @@ internal static partial class GeneratedRemoteHookChainFallback
         var metadataName = target.ServerContextTypeFullName.StartsWith("global::", StringComparison.Ordinal)
             ? target.ServerContextTypeFullName.Substring("global::".Length)
             : target.ServerContextTypeFullName;
-        return model.Compilation.GetTypeByMetadataName(metadataName);
+        return target.ServerContextType ?? model.Compilation.GetTypeByMetadataName(metadataName);
     }
 
     private static InvocationExpressionSyntax? SeedInvocation(ExpressionSyntax expression)
@@ -81,15 +81,17 @@ internal static partial class GeneratedRemoteHookChainFallback
             : null;
 
     private static string? GeneratedContextTypeFullName(INamedTypeSymbol serverType, Compilation compilation)
-        => ExplicitContextTypeFullName(serverType, compilation);
+        => GeneratedContextType(serverType, compilation)?
+            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-    private static string? ExplicitContextTypeFullName(INamedTypeSymbol serverType, Compilation compilation)
+    private static INamedTypeSymbol? GeneratedContextType(INamedTypeSymbol serverType, Compilation compilation)
+        => ExplicitContextType(serverType, compilation);
+
+    private static INamedTypeSymbol? ExplicitContextType(INamedTypeSymbol serverType, Compilation compilation)
         => GeneratePluginServerAttribute(serverType, compilation)?
             .NamedArguments
             .FirstOrDefault(static argument => string.Equals(argument.Key, "Context", StringComparison.Ordinal))
-            .Value.Value is INamedTypeSymbol contextType
-            ? contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-            : null;
+            .Value.Value as INamedTypeSymbol;
 
     private static bool HasGeneratePluginServerAttribute(INamedTypeSymbol type, Compilation compilation)
         => GeneratePluginServerAttribute(type, compilation) is not null;

@@ -37,6 +37,37 @@ public sealed class PluginLiveSettingValidationTests
     }
 
     [Fact]
+    public void Live_setting_store_accessors_reject_null_names_at_public_boundary()
+    {
+        var store = new LiveSettingStore([new LiveValue<int>("Damage", 1)]);
+
+        var get = Assert.Throws<ArgumentNullException>(
+            () => store.Get<int>(null!));
+        var getObject = Assert.Throws<ArgumentNullException>(
+            () => store.GetObject(null!));
+        var set = Assert.Throws<ArgumentNullException>(
+            () => store.Set<int>(null!, 2));
+        var setObject = Assert.Throws<ArgumentNullException>(
+            () => store.SetObject(null!, 2));
+
+        Assert.Equal("name", get.ParamName);
+        Assert.Equal("name", getObject.ParamName);
+        Assert.Equal("name", set.ParamName);
+        Assert.Equal("name", setObject.ParamName);
+    }
+
+    [Fact]
+    public void Live_setting_store_set_many_rejects_null_values_at_public_boundary()
+    {
+        var store = new LiveSettingStore([new LiveValue<int>("Damage", 1)]);
+
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => store.SetMany(null!));
+
+        Assert.Equal("values", ex.ParamName);
+    }
+
+    [Fact]
     public void Live_setting_store_rejects_duplicate_names_with_public_parameter()
     {
         var ex = Assert.Throws<ArgumentException>(

@@ -23,7 +23,8 @@ internal static partial class GeneratedRemoteHookChainFallback
 
         return new GeneratedRemoteHookChainTarget(
             kind,
-            contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            contextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            contextType);
     }
 
     private static AttributeData? SingleRegistryMarker(INamedTypeSymbol registryType, Compilation compilation)

@@ -69,6 +69,10 @@ internal static class RpcKernelPackageValidator
 
         ValidateMode(package.Manifest, diagnostics);
         _ = PluginManifestEffectValidator.Validate(package.Manifest, diagnostics);
+        PluginManifestCapabilityValidator.ValidateConcreteRequiredCapabilityEntries(
+            package.Manifest,
+            package.Module,
+            diagnostics);
         ValidateLiveSettings(package.Manifest, diagnostics);
         ThrowIfErrors(diagnostics);
     }

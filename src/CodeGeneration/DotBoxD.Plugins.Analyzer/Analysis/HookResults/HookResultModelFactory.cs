@@ -35,6 +35,15 @@ internal static partial class HookResultModelFactory
             return Invalid(type, declaration, $"hook result '{type.Name}' must not be generic");
         }
 
+        if (declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            return Invalid(
+                type,
+                declaration,
+                $"hook result '{type.Name}' cannot be file-local because generated builders must attach to the same public result type",
+                useUnsupportedShapeRule: true);
+        }
+
         if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
         {
             // A non-partial [HookResult] can't have IHookResult or the Ok()/Reject() builders generated for it.
@@ -114,7 +123,7 @@ internal static partial class HookResultModelFactory
             diagnostic);
     }
 
-    private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message)
+    private static HookResultModel Invalid(INamedTypeSymbol type, TypeDeclarationSyntax declaration, string message, bool useUnsupportedShapeRule = false)
         => new(
             type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString(),
             type.Name,
@@ -123,7 +132,10 @@ internal static partial class HookResultModelFactory
             EquatableArray<HookResultExistingMember>.FromOwned([]),
             HasSuccess: false,
             HasReason: false,
-            new HookResultDiagnostic(PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()), message));
+            new HookResultDiagnostic(
+                PluginDiagnosticLocation.From(declaration.Identifier.GetLocation()),
+                message,
+                useUnsupportedShapeRule));
 
     internal static bool CanSatisfyHookResult(
         INamedTypeSymbol type,
@@ -178,6 +190,7 @@ internal static partial class HookResultModelFactory
                 {
                     ParameterList: { } parameters
                 } declaration ||
+                declaration.Modifiers.Any(SyntaxKind.FileKeyword) ||
                 !declaration.Modifiers.Any(SyntaxKind.PartialKeyword) ||
                 PrimaryConstructor(type, parameters) is not { } primary)
             {

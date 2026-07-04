@@ -9,6 +9,10 @@ public sealed class TrustedIndexPredicateExtractorTests
 {
     private static readonly SourceSpan Span = new(1, 1);
 
+    private sealed record NestedDamage(int Amount, string Kind);
+
+    private sealed record NestedDamageEvent(NestedDamage Damage);
+
     [Fact]
     public void Extract_stops_after_assignment_to_event_backed_parameter()
     {
@@ -40,8 +44,31 @@ public sealed class TrustedIndexPredicateExtractorTests
         Assert.Equal("int", predicate.ValueType);
     }
 
+    [Fact]
+    public void Extract_resolves_record_get_to_dotted_event_path()
+    {
+        var parameters = NestedEventParameters();
+        var package = Package(
+        [
+            new ReturnStatement(
+                new BinaryExpression(RecordGet(new VariableExpression("e_Damage", Span), 0), ">=", Int(5), Span),
+                Span)
+        ],
+            parameters);
+
+        var predicate = Assert.Single(TrustedIndexPredicateExtractor.Extract<NestedDamageEvent>(package, parameters));
+
+        Assert.Equal("Damage.Amount", predicate.Path);
+        Assert.Equal(IndexPredicateOperator.GreaterThanOrEqual, predicate.Operator);
+        Assert.Equal(5, predicate.Value);
+        Assert.Equal("int", predicate.ValueType);
+    }
+
     private static IReadOnlyList<Parameter> EventParameters()
         => [new("e_Damage", SandboxType.I32)];
+
+    private static IReadOnlyList<Parameter> NestedEventParameters()
+        => [new("e_Damage", SandboxType.Record([SandboxType.I32, SandboxType.String]))];
 
     private static Expression DamageAtLeastFive()
         => new BinaryExpression(
@@ -50,21 +77,27 @@ public sealed class TrustedIndexPredicateExtractorTests
             Int(5),
             Span);
 
+    private static CallExpression RecordGet(Expression record, int index)
+        => new("record.get", [record, Int(index)], null, Span);
+
     private static LiteralExpression Int(int value)
         => new(SandboxValue.FromInt32(value), Span);
 
-    private static PluginPackage Package(IReadOnlyList<Statement> shouldHandleBody)
+    private static PluginPackage Package(
+        IReadOnlyList<Statement> shouldHandleBody,
+        IReadOnlyList<Parameter>? parameters = null)
     {
+        parameters ??= EventParameters();
         var shouldHandle = new SandboxFunction(
             "should",
             IsEntrypoint: true,
-            EventParameters(),
+            parameters,
             SandboxType.Bool,
             shouldHandleBody);
         var handle = new SandboxFunction(
             "handle",
             IsEntrypoint: true,
-            EventParameters(),
+            parameters,
             SandboxType.Unit,
             [new ReturnStatement(new LiteralExpression(SandboxValue.Unit, Span), Span)]);
 

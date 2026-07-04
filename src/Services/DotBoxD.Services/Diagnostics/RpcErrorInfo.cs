@@ -18,5 +18,7 @@ public readonly record struct RpcErrorInfo(string Message, string Type)
     /// connection strings), so only expose it to trusted peers.
     /// </summary>
     public static RpcErrorInfo FromException(Exception exception) =>
-        new(exception.Message, exception.GetType().Name);
+        exception is null
+            ? throw new ArgumentNullException(nameof(exception))
+            : new(exception.Message, exception.GetType().Name);
 }

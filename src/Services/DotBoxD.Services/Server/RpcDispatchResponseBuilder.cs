@@ -122,7 +122,8 @@ internal sealed class RpcDispatchResponseBuilder
                 stream: null);
         }
 
-        if (streaming.Response is { } stream)
+        var stream = streaming.CompleteDispatch();
+        if (stream is not null)
         {
             try
             {

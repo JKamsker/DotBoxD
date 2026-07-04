@@ -241,7 +241,8 @@ public sealed partial class GeneratedAssemblyVerifier
     }
 
     private static bool HasUnsupportedLocalSignatureShape(string localType)
-        => localType.Contains("fnptr", StringComparison.Ordinal) ||
+        => localType.StartsWith("pinned ", StringComparison.Ordinal) ||
+           localType.Contains("fnptr", StringComparison.Ordinal) ||
            localType.Contains('*') ||
            localType.Contains('&');
 

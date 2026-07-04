@@ -102,7 +102,7 @@ public static class GeneratedServiceRegistry
         }
 
         var services = new List<GeneratedService>();
-        foreach (var assembly in assemblies)
+        foreach (var assembly in SnapshotAssemblies(assemblies))
         {
             services.AddRange(GetServices(assembly));
         }
@@ -141,7 +141,7 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
-        foreach (var assembly in assemblies)
+        foreach (var assembly in SnapshotAssemblies(assemblies))
         {
             DotBoxDGeneratedAssemblyCatalog.RegisterServices(assembly, sink);
         }
@@ -164,10 +164,26 @@ public static class GeneratedServiceRegistry
             throw new ArgumentNullException(nameof(sink));
         }
 
-        foreach (var assembly in assemblies)
+        foreach (var assembly in SnapshotAssemblies(assemblies))
         {
             DotBoxDGeneratedAssemblyCatalog.RegisterGeneratedServices(assembly, sink);
         }
+    }
+
+    private static List<Assembly> SnapshotAssemblies(IEnumerable<Assembly> assemblies)
+    {
+        var snapshot = new List<Assembly>();
+        foreach (var assembly in assemblies)
+        {
+            if (assembly is null)
+            {
+                throw new ArgumentException("Assembly collection cannot contain null elements.", nameof(assemblies));
+            }
+
+            snapshot.Add(assembly);
+        }
+
+        return snapshot;
     }
 
     /// <summary>

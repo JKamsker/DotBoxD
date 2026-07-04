@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotBoxD.Kernels.Model;
 using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Sandbox.Values;
@@ -79,6 +80,15 @@ public sealed class SandboxValueValidatorTests
     }
 
     [Fact]
+    public void RequireType_rejects_null_payload_string_values()
+    {
+        var ex = Assert.Throws<SandboxRuntimeException>(() =>
+            SandboxValueValidator.RequireType(CreateMalformedStringValue(), SandboxType.String, "bad input"));
+
+        Assert.Equal(SandboxErrorCode.InvalidInput, ex.Error.Code);
+    }
+
+    [Fact]
     public void Validated_shape_meter_rejects_nested_record_field_type_mismatch()
     {
         var value = SandboxValue.FromRecord([
@@ -127,4 +137,7 @@ public sealed class SandboxValueValidatorTests
 
         Assert.Equal(SandboxErrorCode.QuotaExceeded, ex.Error.Code);
     }
+
+    private static StringValue CreateMalformedStringValue()
+        => (StringValue)RuntimeHelpers.GetUninitializedObject(typeof(StringValue));
 }
