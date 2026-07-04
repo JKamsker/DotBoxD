@@ -3,7 +3,7 @@ using DotBoxD.Kernels.Sandbox;
 using DotBoxD.Kernels.Serialization.Json.Hosting;
 using DotBoxD.Kernels.Tests._TestSupport;
 
-namespace DotBoxD.Kernels.Tests.Policy;
+namespace DotBoxD.Kernels.Tests.Policy.Surprise;
 
 public sealed class ResourceLimitRangeDiagnosticTests
 {
