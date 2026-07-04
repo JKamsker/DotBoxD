@@ -48,12 +48,17 @@ public sealed class PluginEventAdapterConcurrencyTests
         var registrar = Task.Run(() =>
         {
             start.Wait();
-            for (var i = 1_500; i < eventTypes.Length && failures.IsEmpty; i++)
+            try
             {
-                Register(registry, eventTypes[i], i);
+                for (var i = 1_500; i < eventTypes.Length && failures.IsEmpty; i++)
+                {
+                    Register(registry, eventTypes[i], i);
+                }
             }
-
-            Volatile.Write(ref registrationComplete, 1);
+            finally
+            {
+                Volatile.Write(ref registrationComplete, 1);
+            }
         });
 
         start.Set();
