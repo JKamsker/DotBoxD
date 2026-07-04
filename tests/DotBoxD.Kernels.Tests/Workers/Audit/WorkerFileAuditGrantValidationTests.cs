@@ -15,7 +15,8 @@ public sealed class WorkerFileAuditGrantValidationTests
     public async Task Worker_rejects_file_write_audit_that_violates_file_grant_constraints()
     {
         using var temp = TempDirectory.Create();
-        using var host = FileHost(new ForgedFileWriteWorker("blocked.txt", "ok"));
+        var worker = new ForgedFileWriteWorker("blocked.txt", "ok");
+        using var host = FileHost(worker);
         var module = await host.ImportJsonAsync(FileWriteJson("allowed.json", "ok"));
         var policy = SandboxPolicyBuilder.Create()
             .AllowRuntimeAsync()
@@ -44,7 +45,16 @@ public sealed class WorkerFileAuditGrantValidationTests
         Assert.False(result.Succeeded);
         Assert.Equal(SandboxErrorCode.HostFailure, result.Error!.Code);
         Assert.Contains(result.AuditEvents, e => e.Kind == "WorkerIsolationFailed");
-        Assert.False(File.Exists(Path.Combine(temp.Path, "blocked.txt")));
+        Assert.Contains(
+            worker.Result!.AuditEvents,
+            e => e is
+            {
+                Kind: "BindingCall",
+                BindingId: "file.writeText",
+                CapabilityId: "file.write",
+                Success: true,
+                ResourceId: "sandbox://file.write/blocked.txt"
+            });
     }
 
     private static SandboxHost FileHost(ISandboxWorkerClient worker)
@@ -87,6 +97,8 @@ public sealed class WorkerFileAuditGrantValidationTests
 
     private sealed class ForgedFileWriteWorker(string auditPath, string text) : ISandboxWorkerClient
     {
+        public SandboxExecutionResult? Result { get; private set; }
+
         public ValueTask<SandboxExecutionResult> ExecuteInWorkerAsync(
             ExecutionPlan plan,
             string entrypoint,
@@ -126,7 +138,7 @@ public sealed class WorkerFileAuditGrantValidationTests
                     plan.Policy.Deterministic,
                     bytesWritten: byteCount)));
 
-            return ValueTask.FromResult(new SandboxExecutionResult
+            Result = new SandboxExecutionResult
             {
                 Succeeded = true,
                 Value = SandboxValue.Unit,
@@ -136,7 +148,8 @@ public sealed class WorkerFileAuditGrantValidationTests
                 ModuleHash = plan.ModuleHash,
                 PlanHash = plan.PlanHash,
                 PolicyHash = plan.PolicyHash
-            });
+            };
+            return ValueTask.FromResult(Result);
         }
 
         private static SandboxResourceUsage Usage(ExecutionPlan plan, long fileBytesWritten)
