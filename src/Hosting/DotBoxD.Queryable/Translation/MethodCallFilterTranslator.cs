@@ -13,6 +13,28 @@ namespace DotBoxD.Queryable.Translation;
 /// </summary>
 internal static class MethodCallFilterTranslator
 {
+    private static readonly HashSet<Type> SupportedInstanceContainsDefinitions =
+    [
+        typeof(Collection<>),
+        typeof(Dictionary<,>.KeyCollection),
+        typeof(HashSet<>),
+        typeof(LinkedList<>),
+        typeof(List<>),
+        typeof(Queue<>),
+        typeof(ReadOnlyCollection<>),
+        typeof(ReadOnlyDictionary<,>.KeyCollection),
+        typeof(SortedDictionary<,>.KeyCollection),
+        typeof(SortedSet<>),
+        typeof(Stack<>)
+    ];
+
+    private static readonly HashSet<Type> SupportedCollectionInterfaceDefinitions =
+    [
+        typeof(ICollection<>),
+        typeof(IReadOnlySet<>),
+        typeof(ISet<>)
+    ];
+
     public static QueryFilter Translate(
         MethodCallExpression call,
         ParameterExpression parameter,
@@ -148,38 +170,99 @@ internal static class MethodCallFilterTranslator
             return false;
         }
 
-        // Static Contains(source, item) — Enumerable.Contains or MemoryExtensions.Contains(ReadOnlySpan, item)
-        // — or instance ICollection<T>.Contains(item).
-        var (collection, item) = call.Object is null
-            ? (call.Arguments.Count == 2 ? call.Arguments[0] : null, call.Arguments.Count == 2 ? call.Arguments[1] : null)
-            : (call.Object, call.Arguments.Count == 1 ? call.Arguments[0] : null);
-
-        if (collection is null || item is null || !MemberPathReader.TryReadPath(item, parameter, out var path))
+        if (!TryReadContainsOperands(call, out var collection, out var item) ||
+            !MemberPathReader.TryReadPath(item, parameter, out var path))
         {
             return false;
         }
 
-        if (call.Object is not null && !IsSupportedInstanceContains(call.Method))
+        ValidateSupportedContainsMethod(call);
+        var unwrapped = UnwrapSpan(collection);
+        RejectUnsupportedContainsComparer(call, unwrapped, parameter);
+        filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
+        return true;
+    }
+
+    private static bool TryReadContainsOperands(
+        MethodCallExpression call,
+        out Expression collection,
+        out Expression item)
+    {
+        collection = null!;
+        item = null!;
+        if (call.Object is null)
+        {
+            return TryReadStaticContainsOperands(call, out collection, out item);
+        }
+
+        if (call.Arguments.Count != 1)
+        {
+            return false;
+        }
+
+        collection = call.Object;
+        item = call.Arguments[0];
+        return true;
+    }
+
+    private static bool TryReadStaticContainsOperands(
+        MethodCallExpression call,
+        out Expression collection,
+        out Expression item)
+    {
+        collection = null!;
+        item = null!;
+        if (call.Arguments.Count != 2)
+        {
+            return false;
+        }
+
+        collection = call.Arguments[0];
+        item = call.Arguments[1];
+        return true;
+    }
+
+    private static void ValidateSupportedContainsMethod(MethodCallExpression call)
+    {
+        if (call.Object is not null)
+        {
+            ValidateSupportedInstanceContains(call);
+            return;
+        }
+
+        ValidateSupportedStaticContains(call);
+    }
+
+    private static void ValidateSupportedInstanceContains(MethodCallExpression call)
+    {
+        if (!IsSupportedInstanceContains(call.Method))
         {
             throw QueryTranslationException.Unsupported(
                 call,
                 "custom instance Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
         }
+    }
 
-        if (call.Object is null && !IsSupportedStaticContains(call.Method))
+    private static void ValidateSupportedStaticContains(MethodCallExpression call)
+    {
+        if (!IsSupportedStaticContains(call.Method))
         {
             throw QueryTranslationException.Unsupported(
                 call,
                 "custom static Contains methods are not supported; use Enumerable.Contains(collection, member) when enumeration membership semantics are intended.");
         }
+    }
 
-        var unwrapped = UnwrapSpan(collection);
-
+    private static void RejectUnsupportedContainsComparer(
+        MethodCallExpression call,
+        Expression collection,
+        ParameterExpression parameter)
+    {
         // HashSet/Dictionary-style collections can carry a custom equality comparer that changes membership
         // semantics even when written as static Enumerable.Contains(source, item); lowering that to a plain
         // In would silently drop or add matches. Reject custom/culture-sensitive comparers rather than
         // mis-translate.
-        if (QueryValueFactory.TryEvaluateObject(unwrapped, parameter, out var collectionObject) &&
+        if (QueryValueFactory.TryEvaluateObject(collection, parameter, out var collectionObject) &&
             collectionObject is not null &&
             CollectionComparerSupport.HasUnsupportedComparer(collectionObject))
         {
@@ -187,9 +270,6 @@ internal static class MethodCallFilterTranslator
                 call,
                 "Contains over a collection with a custom, case-insensitive, or culture-sensitive comparer is not supported; use a default/ordinal collection.");
         }
-
-        filter = QueryFilter.In(path, QueryValueFactory.ToValues(unwrapped, parameter));
-        return true;
     }
 
     private static bool IsSupportedStaticContains(MethodInfo method) =>
@@ -215,17 +295,7 @@ internal static class MethodCallFilterTranslator
         }
 
         var definition = declaringType.GetGenericTypeDefinition();
-        return definition == typeof(Collection<>) ||
-            definition == typeof(Dictionary<,>.KeyCollection) ||
-            definition == typeof(HashSet<>) ||
-            definition == typeof(LinkedList<>) ||
-            definition == typeof(List<>) ||
-            definition == typeof(Queue<>) ||
-            definition == typeof(ReadOnlyCollection<>) ||
-            definition == typeof(ReadOnlyDictionary<,>.KeyCollection) ||
-            definition == typeof(SortedDictionary<,>.KeyCollection) ||
-            definition == typeof(SortedSet<>) ||
-            definition == typeof(Stack<>);
+        return SupportedInstanceContainsDefinitions.Contains(definition);
     }
 
     private static bool IsSupportedCollectionInterface(Type type)
@@ -236,9 +306,7 @@ internal static class MethodCallFilterTranslator
         }
 
         var definition = type.GetGenericTypeDefinition();
-        return definition == typeof(ICollection<>) ||
-            definition == typeof(IReadOnlySet<>) ||
-            definition == typeof(ISet<>);
+        return SupportedCollectionInterfaceDefinitions.Contains(definition);
     }
 
     // `array.Contains(x)` binds to MemoryExtensions.Contains(ReadOnlySpan<T>, T); the source then appears as

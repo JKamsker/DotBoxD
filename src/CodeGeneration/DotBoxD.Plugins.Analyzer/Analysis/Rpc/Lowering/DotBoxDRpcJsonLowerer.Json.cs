@@ -7,6 +7,23 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.Rpc;
 
 internal sealed partial class DotBoxDRpcJsonLowerer
 {
+    private static readonly Dictionary<SyntaxKind, string> BinaryOperatorJsonNames = new()
+    {
+        [SyntaxKind.AddExpression] = "add",
+        [SyntaxKind.SubtractExpression] = "sub",
+        [SyntaxKind.MultiplyExpression] = "mul",
+        [SyntaxKind.DivideExpression] = "div",
+        [SyntaxKind.ModuloExpression] = "rem",
+        [SyntaxKind.EqualsExpression] = "eq",
+        [SyntaxKind.NotEqualsExpression] = "ne",
+        [SyntaxKind.LessThanExpression] = "lt",
+        [SyntaxKind.LessThanOrEqualExpression] = "lte",
+        [SyntaxKind.GreaterThanExpression] = "gt",
+        [SyntaxKind.GreaterThanOrEqualExpression] = "gte",
+        [SyntaxKind.LogicalAndExpression] = "and",
+        [SyntaxKind.LogicalOrExpression] = "or"
+    };
+
     private static string LiteralJson(object? value)
         => value switch
         {
@@ -32,23 +49,9 @@ internal sealed partial class DotBoxDRpcJsonLowerer
     internal static string Var(string name) => Obj(("var", Str(name)));
 
     private static string JsonBinaryOperator(BinaryExpressionSyntax binary)
-        => binary.Kind() switch
-        {
-            SyntaxKind.AddExpression => "add",
-            SyntaxKind.SubtractExpression => "sub",
-            SyntaxKind.MultiplyExpression => "mul",
-            SyntaxKind.DivideExpression => "div",
-            SyntaxKind.ModuloExpression => "rem",
-            SyntaxKind.EqualsExpression => "eq",
-            SyntaxKind.NotEqualsExpression => "ne",
-            SyntaxKind.LessThanExpression => "lt",
-            SyntaxKind.LessThanOrEqualExpression => "lte",
-            SyntaxKind.GreaterThanExpression => "gt",
-            SyntaxKind.GreaterThanOrEqualExpression => "gte",
-            SyntaxKind.LogicalAndExpression => "and",
-            SyntaxKind.LogicalOrExpression => "or",
-            _ => throw new NotSupportedException($"Server extension operator '{binary.OperatorToken.ValueText}' is not supported.")
-        };
+        => BinaryOperatorJsonNames.TryGetValue(binary.Kind(), out var op)
+            ? op
+            : throw new NotSupportedException($"Server extension operator '{binary.OperatorToken.ValueText}' is not supported.");
 
     internal static string RecordGet(string receiver, int index)
         => Call("record.get", null, receiver, I32(index));

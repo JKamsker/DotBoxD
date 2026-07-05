@@ -93,6 +93,31 @@ internal static partial class DotBoxDKernelMethodInliner
         out KernelMethodDescriptorPayload descriptor)
     {
         descriptor = null!;
+        if (!TryReadDescriptorAttribute(attribute, compilation, out var metadata))
+        {
+            return false;
+        }
+
+        if (!DescriptorTargetsMethod(metadata, method, signature))
+        {
+            return false;
+        }
+
+        if (!TryParseDescriptorPayload(metadata, out descriptor))
+        {
+            throw new NotSupportedException(
+                $"Generated descriptor for context [KernelMethod] '{method.Name}' is malformed or has a stale hash.");
+        }
+
+        return true;
+    }
+
+    private static bool TryReadDescriptorAttribute(
+        AttributeData attribute,
+        Compilation compilation,
+        out DescriptorAttributeMetadata metadata)
+    {
+        metadata = default;
         if (!IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.GeneratedKernelMethodDescriptorAttribute) ||
             attribute.ConstructorArguments.Length != 6 ||
             attribute.ConstructorArguments[0].Value is not int version ||
@@ -105,19 +130,37 @@ internal static partial class DotBoxDKernelMethodInliner
             return false;
         }
 
-        if (version != KernelMethodDescriptorPayload.CurrentVersion ||
-            !SymbolEqualityComparer.Default.Equals(contextType, method.ContainingType) ||
-            !string.Equals(methodMetadataName, method.MetadataName, StringComparison.Ordinal) ||
-            !string.Equals(normalizedSignature, signature, StringComparison.Ordinal))
+        metadata = new DescriptorAttributeMetadata(
+            version,
+            contextType,
+            methodMetadataName,
+            normalizedSignature,
+            descriptorHash,
+            descriptorPayload);
+        return true;
+    }
+
+    private static bool DescriptorTargetsMethod(
+        DescriptorAttributeMetadata metadata,
+        IMethodSymbol method,
+        string signature)
+        => metadata.Version == KernelMethodDescriptorPayload.CurrentVersion &&
+           SymbolEqualityComparer.Default.Equals(metadata.ContextType, method.ContainingType) &&
+           string.Equals(metadata.MethodMetadataName, method.MetadataName, StringComparison.Ordinal) &&
+           string.Equals(metadata.NormalizedSignature, signature, StringComparison.Ordinal);
+
+    private static bool TryParseDescriptorPayload(
+        DescriptorAttributeMetadata metadata,
+        out KernelMethodDescriptorPayload descriptor)
+    {
+        descriptor = null!;
+        if (!string.Equals(
+                KernelMethodDescriptorPayload.Hash(metadata.DescriptorPayload),
+                metadata.DescriptorHash,
+                StringComparison.Ordinal) ||
+            !KernelMethodDescriptorPayload.TryParse(metadata.DescriptorPayload, out var parsed))
         {
             return false;
-        }
-
-        if (!string.Equals(KernelMethodDescriptorPayload.Hash(descriptorPayload), descriptorHash, StringComparison.Ordinal) ||
-            !KernelMethodDescriptorPayload.TryParse(descriptorPayload, out var parsed))
-        {
-            throw new NotSupportedException(
-                $"Generated descriptor for context [KernelMethod] '{method.Name}' is malformed or has a stale hash.");
         }
 
         descriptor = parsed!;
@@ -139,5 +182,13 @@ internal static partial class DotBoxDKernelMethodInliner
 
     private static string TypeName(ITypeSymbol type)
         => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    private readonly record struct DescriptorAttributeMetadata(
+        int Version,
+        INamedTypeSymbol ContextType,
+        string MethodMetadataName,
+        string NormalizedSignature,
+        string DescriptorHash,
+        string DescriptorPayload);
 
 }

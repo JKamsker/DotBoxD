@@ -39,6 +39,32 @@ internal static class RpcPayloadReconstructibilityInspector
             return null;
         }
 
+        return InspectNamed(
+            named,
+            role,
+            ct,
+            visitedOriginalDefinitions,
+            requireConstructible);
+    }
+
+    private static string? InspectNamed(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions,
+        bool requireConstructible)
+    {
+        return InspectTypeArguments(named, role, ct, visitedOriginalDefinitions) ??
+               InspectConstructibility(named, role, ct, requireConstructible) ??
+               InspectDtoGraph(named, role, ct, visitedOriginalDefinitions);
+    }
+
+    private static string? InspectTypeArguments(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
         foreach (var arg in named.TypeArguments)
         {
             var argumentReason = Inspect(arg, role, ct, visitedOriginalDefinitions, requireConstructible: true);
@@ -48,15 +74,24 @@ internal static class RpcPayloadReconstructibilityInspector
             }
         }
 
-        if (requireConstructible)
-        {
-            var constructibilityReason = GetNonConstructibleDtoReason(named, role, ct);
-            if (constructibilityReason is not null)
-            {
-                return constructibilityReason;
-            }
-        }
+        return null;
+    }
 
+    private static string? InspectConstructibility(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        bool requireConstructible)
+        => requireConstructible
+            ? GetNonConstructibleDtoReason(named, role, ct)
+            : null;
+
+    private static string? InspectDtoGraph(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
         if (!CanInspectDtoMembers(named) || !visitedOriginalDefinitions.Add(named.OriginalDefinition))
         {
             return null;
@@ -64,37 +99,49 @@ internal static class RpcPayloadReconstructibilityInspector
 
         try
         {
-            var reconstructibilityReason = RpcPayloadConstructorReconstructibility.GetUnsupportedReason(named, role);
-            if (reconstructibilityReason is not null)
-            {
-                return reconstructibilityReason;
-            }
-
-            foreach (var member in named.GetMembers())
-            {
-                ct.ThrowIfCancellationRequested();
-
-                var reason = member switch
-                {
-                    IPropertySymbol property => InspectProperty(property, role, ct, visitedOriginalDefinitions),
-                    IFieldSymbol field => InspectField(field, role, ct, visitedOriginalDefinitions),
-                    _ => null,
-                };
-                if (reason is not null)
-                {
-                    return reason;
-                }
-            }
-
-            return named.BaseType is null
-                ? null
-                : Inspect(named.BaseType, role, ct, visitedOriginalDefinitions, requireConstructible: false);
+            return RpcPayloadConstructorReconstructibility.GetUnsupportedReason(named, role) ??
+                   InspectDtoMembers(named, role, ct, visitedOriginalDefinitions) ??
+                   InspectBaseType(named, role, ct, visitedOriginalDefinitions);
         }
         finally
         {
             visitedOriginalDefinitions.Remove(named.OriginalDefinition);
         }
     }
+
+    private static string? InspectDtoMembers(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+    {
+        foreach (var member in named.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var reason = member switch
+            {
+                IPropertySymbol property => InspectProperty(property, role, ct, visitedOriginalDefinitions),
+                IFieldSymbol field => InspectField(field, role, ct, visitedOriginalDefinitions),
+                _ => null,
+            };
+            if (reason is not null)
+            {
+                return reason;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? InspectBaseType(
+        INamedTypeSymbol named,
+        string role,
+        CancellationToken ct,
+        HashSet<INamedTypeSymbol> visitedOriginalDefinitions)
+        => named.BaseType is null
+            ? null
+            : Inspect(named.BaseType, role, ct, visitedOriginalDefinitions, requireConstructible: false);
 
     private static string? InspectProperty(
         IPropertySymbol property,

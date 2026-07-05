@@ -184,43 +184,55 @@ public static partial class KernelRpcMarshaller
     public static object? FromSandboxValue(SandboxValue value, Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
+        if (TryCoreFromSandboxValue(value, type, out var core))
+        {
+            return core;
+        }
+
+        return FromStructuredSandboxValue(value, type);
+    }
+
+    private static bool TryCoreFromSandboxValue(SandboxValue value, Type type, out object? result)
+    {
+        result = null;
         if (TryNullableFromSandboxValue(value, type, out var nullable))
         {
-            return nullable;
+            result = nullable;
+            return true;
         }
 
         if (TryScalarFromSandbox(value, type, out var scalar))
         {
-            return scalar;
+            result = scalar;
+            return true;
         }
 
         if (TryDateTimeFromSandboxValue(value, type, out var dateTime))
         {
-            return dateTime;
+            result = dateTime;
+            return true;
         }
 
         if (TryDecimalFromSandboxValue(value, type, out var decimalValue))
         {
-            return decimalValue;
+            result = decimalValue;
+            return true;
         }
 
         if (TryFrameworkStructFromSandboxValue(value, type, out var frameworkStruct))
         {
-            return frameworkStruct;
+            result = frameworkStruct;
+            return true;
         }
 
+        return false;
+    }
+
+    private static object? FromStructuredSandboxValue(SandboxValue value, Type type)
+    {
         if (type.IsEnum)
         {
-            if (EnumUsesI64(type))
-            {
-                return value is I64Value longValue
-                    ? EnumFromInt64(type, longValue.Value)
-                    : throw CannotMarshalEnum(value, type, SandboxType.I64);
-            }
-
-            return value is I32Value intValue
-                ? EnumFromInt32(type, intValue.Value)
-                : throw CannotMarshalEnum(value, type, SandboxType.I32);
+            return EnumFromSandboxValue(value, type);
         }
 
         if (value is RecordValue record && DtoShape(type) is { } shape)
@@ -239,6 +251,20 @@ public static partial class KernelRpcMarshaller
         }
 
         throw new NotSupportedException($"Server extension cannot marshal a sandbox value to type '{type}'.");
+    }
+
+    private static object EnumFromSandboxValue(SandboxValue value, Type type)
+    {
+        if (EnumUsesI64(type))
+        {
+            return value is I64Value longValue
+                ? EnumFromInt64(type, longValue.Value)
+                : throw CannotMarshalEnum(value, type, SandboxType.I64);
+        }
+
+        return value is I32Value intValue
+            ? EnumFromInt32(type, intValue.Value)
+            : throw CannotMarshalEnum(value, type, SandboxType.I32);
     }
 
     private static object DtoFromSandboxValue(RecordValue record, Type type, RecordShape shape)

@@ -20,19 +20,39 @@ internal static partial class DotBoxDKernelMethodInliner
         var expression = arguments[0].Expression;
         return name switch
         {
-            "Str" when LiteralValue(expression) is string =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.String, allocates: true),
-            "I32" when TryInt32Literal(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Int),
-            "I64" when TryInt64Literal(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Long),
-            "F64" when TryFiniteDoubleLiteral(expression) =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Double),
-            "Bool" when LiteralValue(expression) is bool =>
-                DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Bool),
+            "Str" => PrimitiveStringLiteralShape(expression),
+            "I32" => PrimitiveI32LiteralShape(expression),
+            "I64" => PrimitiveI64LiteralShape(expression),
+            "F64" => PrimitiveF64LiteralShape(expression),
+            "Bool" => PrimitiveBoolLiteralShape(expression),
             _ => throw new NotSupportedException("Generated descriptor contains stale literal metadata.")
         };
     }
+
+    private static DescriptorShape PrimitiveStringLiteralShape(ExpressionSyntax expression)
+        => LiteralValue(expression) is string
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.String, allocates: true)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveI32LiteralShape(ExpressionSyntax expression)
+        => TryInt32Literal(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Int)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveI64LiteralShape(ExpressionSyntax expression)
+        => TryInt64Literal(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Long)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveF64LiteralShape(ExpressionSyntax expression)
+        => TryFiniteDoubleLiteral(expression)
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Double)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
+
+    private static DescriptorShape PrimitiveBoolLiteralShape(ExpressionSyntax expression)
+        => LiteralValue(expression) is bool
+            ? DescriptorShape.Simple(DotBoxDGenerationNames.ManifestTypes.Bool)
+            : throw new NotSupportedException("Generated descriptor contains stale literal metadata.");
 
     private static bool TryInt32Literal(ExpressionSyntax expression)
         => TryInt32Value(expression, out _);

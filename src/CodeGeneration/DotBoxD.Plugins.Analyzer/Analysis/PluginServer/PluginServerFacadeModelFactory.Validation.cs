@@ -224,17 +224,31 @@ internal static partial class PluginServerFacadeModelFactory
         var generatedMembers = new HashSet<string>(reserved, StringComparer.Ordinal);
         AddGeneratedNestedTypeNames(generatedMembers, worldType, worldServiceWrappers, controls, emitsRemoteLocalEventSink);
 
+        ValidateForwardedPropertyCollisions(reserved, generatedMembers, worldType, properties);
+        ValidateForwardedMethodCollisions(reserved, generatedMembers, worldType, methods);
+        ValidateControlCollisions(reserved, generatedMembers, worldType, controls);
+        ValidateGeneratedSiblingTypeCollisions(serverType, worldType, controls);
+        ValidateExistingServerMemberCollisions(serverType, worldType, generatedMembers);
+    }
+
+    private static void ValidateForwardedPropertyCollisions(
+        HashSet<string> reserved,
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        IReadOnlyList<PluginServerForwardedProperty> properties)
+    {
         foreach (var property in properties)
         {
-            if (reserved.Contains(property.Name))
-            {
-                throw new NotSupportedException(
-                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{property.Name}' collides with the generated facade surface.");
-            }
-
-            EnsureSingleFacadeCategory(generatedMembers, worldType, property.Name);
+            EnsureForwardedWorldMemberAvailable(reserved, generatedMembers, worldType, property.Name);
         }
+    }
 
+    private static void ValidateForwardedMethodCollisions(
+        HashSet<string> reserved,
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        IReadOnlyList<PluginServerForwardedMethod> methods)
+    {
         // Forwarded methods may legitimately repeat a name (overloads differing only by signature); ResolveMethods
         // keeps each distinct signature, so both reach the methods bucket. Dedupe names before the cross-category
         // check — overloads share ONE category and must not be flagged as a clash. A name also shared with a
@@ -243,15 +257,16 @@ internal static partial class PluginServerFacadeModelFactory
             .Select(static method => method.Name)
             .Distinct(StringComparer.Ordinal))
         {
-            if (reserved.Contains(methodName))
-            {
-                throw new NotSupportedException(
-                    $"Generated plugin server world '{worldType.ToDisplayString()}' member '{methodName}' collides with the generated facade surface.");
-            }
-
-            EnsureSingleFacadeCategory(generatedMembers, worldType, methodName);
+            EnsureForwardedWorldMemberAvailable(reserved, generatedMembers, worldType, methodName);
         }
+    }
 
+    private static void ValidateControlCollisions(
+        HashSet<string> reserved,
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        IReadOnlyList<PluginServerControlProperty> controls)
+    {
         foreach (var control in controls)
         {
             if (reserved.Contains(control.Name))
@@ -262,14 +277,31 @@ internal static partial class PluginServerFacadeModelFactory
 
             EnsureSingleFacadeCategory(generatedMembers, worldType, control.Name);
         }
+    }
 
-        ValidateGeneratedSiblingTypeCollisions(serverType, worldType, controls);
+    private static void EnsureForwardedWorldMemberAvailable(
+        HashSet<string> reserved,
+        HashSet<string> generatedMembers,
+        INamedTypeSymbol worldType,
+        string name)
+    {
+        if (reserved.Contains(name))
+        {
+            throw new NotSupportedException(
+                $"Generated plugin server world '{worldType.ToDisplayString()}' member '{name}' collides with the generated facade surface.");
+        }
 
+        EnsureSingleFacadeCategory(generatedMembers, worldType, name);
+    }
+
+    private static void ValidateExistingServerMemberCollisions(
+        INamedTypeSymbol serverType,
+        INamedTypeSymbol worldType,
+        HashSet<string> generatedMembers)
+    {
         foreach (var member in serverType.GetMembers())
         {
-            if (member.IsImplicitlyDeclared ||
-                member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } ||
-                string.Equals(member.Name, "OnConfigured", StringComparison.Ordinal))
+            if (ShouldIgnoreGeneratedFacadeMember(member))
             {
                 continue;
             }
@@ -277,22 +309,36 @@ internal static partial class PluginServerFacadeModelFactory
             if (member is IMethodSymbol invokeAsync &&
                 string.Equals(member.Name, "InvokeAsync", StringComparison.Ordinal))
             {
-                if (IsGeneratedInvokeAsyncSignature(invokeAsync, worldType))
-                {
-                    throw new NotSupportedException(
-                        $"Generated plugin server '{serverType.ToDisplayString()}' member '{member.Name}' collides with the generated facade surface.");
-                }
-
+                EnsureInvokeAsyncDoesNotCollide(serverType, worldType, invokeAsync);
                 continue;
             }
 
             if (generatedMembers.Contains(member.Name))
             {
-                throw new NotSupportedException(
-                    $"Generated plugin server '{serverType.ToDisplayString()}' member '{member.Name}' collides with the generated facade surface.");
+                ThrowGeneratedServerMemberCollision(serverType, member.Name);
             }
         }
     }
+
+    private static bool ShouldIgnoreGeneratedFacadeMember(ISymbol member)
+        => member.IsImplicitlyDeclared ||
+           member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } ||
+           string.Equals(member.Name, "OnConfigured", StringComparison.Ordinal);
+
+    private static void EnsureInvokeAsyncDoesNotCollide(
+        INamedTypeSymbol serverType,
+        INamedTypeSymbol worldType,
+        IMethodSymbol invokeAsync)
+    {
+        if (IsGeneratedInvokeAsyncSignature(invokeAsync, worldType))
+        {
+            ThrowGeneratedServerMemberCollision(serverType, invokeAsync.Name);
+        }
+    }
+
+    private static void ThrowGeneratedServerMemberCollision(INamedTypeSymbol serverType, string memberName)
+        => throw new NotSupportedException(
+            $"Generated plugin server '{serverType.ToDisplayString()}' member '{memberName}' collides with the generated facade surface.");
 
     // Each forwarded category dedupes within itself, but a name shared across categories (e.g. a forwarded
     // property and a control both named the same, inherited from different interfaces) would emit twice as
