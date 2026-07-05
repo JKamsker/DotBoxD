@@ -21,13 +21,22 @@ internal static class StructuralValidator
                 $"target sandbox version '{module.TargetSandboxVersion}' is not supported by runtime '{SandboxLanguage.CurrentVersionText}'"));
         }
 
+        var hasNullCapabilityRequests = CheckNullEntries(module.CapabilityRequests, "capabilityRequests", null, diagnostics);
         foreach (var request in module.CapabilityRequests)
         {
+            if (request is null)
+            {
+                continue;
+            }
+
             CheckIdentifier(request.Id, "capability id", diagnostics);
             CheckOptionalText(request.Reason, "capability reason", diagnostics);
         }
 
-        CheckDuplicateCapabilityRequests(module.CapabilityRequests, diagnostics);
+        if (!hasNullCapabilityRequests)
+        {
+            CheckDuplicateCapabilityRequests(module.CapabilityRequests, diagnostics);
+        }
 
         foreach (var item in module.Metadata)
         {
@@ -83,7 +92,7 @@ internal static class StructuralValidator
     private static bool CheckNullEntries<T>(
         IReadOnlyList<T> values,
         string collectionName,
-        string functionId,
+        string? functionId,
         List<SandboxDiagnostic> diagnostics)
     {
         var hasNull = false;
@@ -95,9 +104,12 @@ internal static class StructuralValidator
             }
 
             hasNull = true;
+            var message = functionId is null
+                ? $"{collectionName} entry at index {i} must not be null"
+                : $"function '{functionId}' {collectionName} entry at index {i} must not be null";
             diagnostics.Add(new SandboxDiagnostic(
                 "E-STRUCT-NULL",
-                $"function '{functionId}' {collectionName} entry at index {i} must not be null"));
+                message));
         }
 
         return hasNull;
