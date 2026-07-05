@@ -43,6 +43,12 @@ internal static class RpcKernelPackageValidator
             PluginManifestTextValidator.ValidateText(metadataKernel, "kernel metadata", diagnostics);
         }
 
+        var hasModuleCollectionErrors = PluginModuleCollectionValidator.Validate(package.Module, diagnostics);
+        if (hasModuleCollectionErrors)
+        {
+            ThrowIfErrors(diagnostics);
+        }
+
         var rpcEntrypoint = package.Manifest.RpcEntrypoint;
         if (string.IsNullOrWhiteSpace(rpcEntrypoint))
         {
