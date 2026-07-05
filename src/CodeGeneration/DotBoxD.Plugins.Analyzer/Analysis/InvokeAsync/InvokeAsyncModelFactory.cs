@@ -42,7 +42,9 @@ internal static partial class InvokeAsyncModelFactory
         string receiverType;
         string? serverAccessType;
         INamedTypeSymbol worldType;
-        var markedMethod = MarkedMethod(model, invocation, cancellationToken);
+        var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        var markedMethod = MarkedMethod(method, model.Compilation);
+        var pluginServerType = model.Compilation.GetTypeByMetadataName(PluginServerInterfaceMetadataName);
         if (IsUnqualifiedInvocationExpression(invocation.Expression))
         {
             if (markedMethod is null && !IsInvokeAsyncName(invocation.Expression))
@@ -50,7 +52,7 @@ internal static partial class InvokeAsyncModelFactory
                 return null;
             }
 
-            if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
+            if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
             {
                 return null;
             }
@@ -65,6 +67,7 @@ internal static partial class InvokeAsyncModelFactory
             {
                 return CreateForSurface(
                     invocation,
+                    method,
                     model,
                     cancellationToken,
                     receiverType,
@@ -72,7 +75,7 @@ internal static partial class InvokeAsyncModelFactory
                     worldType);
             }
 
-            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
             {
                 throw new NotSupportedException(
                     "implicit InvokeAsync calls are not supported; call InvokeAsync on the generated plugin server receiver.");
@@ -88,7 +91,7 @@ internal static partial class InvokeAsyncModelFactory
                 return null;
             }
 
-            if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
+            if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
             {
                 return null;
             }
@@ -106,7 +109,7 @@ internal static partial class InvokeAsyncModelFactory
                     "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
             }
 
-            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
             {
                 throw new NotSupportedException(
                     "conditional access InvokeAsync calls are not supported; check the generated plugin server receiver for null before calling InvokeAsync.");
@@ -121,7 +124,7 @@ internal static partial class InvokeAsyncModelFactory
             return null;
         }
 
-        if (BindsToUnmarkedUserInvocation(model, invocation, cancellationToken))
+        if (BindsToUnmarkedUserInvocation(method, model.Compilation, pluginServerType))
         {
             return null;
         }
@@ -134,7 +137,7 @@ internal static partial class InvokeAsyncModelFactory
                 out serverAccessType,
                 out worldType))
         {
-            if (IsDotBoxDLoweredInvocation(model, invocation, cancellationToken))
+            if (IsDotBoxDLoweredInvocation(method, model.Compilation, pluginServerType))
             {
                 throw new NotSupportedException(
                     "receiver must be a generated plugin server facade or generated server interface, not the erased IPluginServer<TWorld> surface.");
@@ -145,6 +148,7 @@ internal static partial class InvokeAsyncModelFactory
 
         return CreateForSurface(
             invocation,
+            method,
             model,
             cancellationToken,
             receiverType,
@@ -154,13 +158,14 @@ internal static partial class InvokeAsyncModelFactory
 
     private static InvokeAsyncResult CreateForSurface(
         InvocationExpressionSyntax invocation,
+        IMethodSymbol? method,
         SemanticModel model,
         CancellationToken cancellationToken,
         string receiverType,
         string? serverAccessType,
         INamedTypeSymbol worldType)
     {
-        var shape = model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method
+        var shape = method is not null
             ? InvokeAsyncCallShape.Create(invocation, method, model, cancellationToken)
             : null;
         shape ??= InvokeAsyncCallShape.Create(invocation, worldType, model, cancellationToken);

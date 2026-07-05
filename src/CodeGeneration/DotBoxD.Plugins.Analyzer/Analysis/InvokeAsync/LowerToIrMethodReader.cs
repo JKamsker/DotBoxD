@@ -17,9 +17,14 @@ internal static class LowerToIrMethodReader
             return false;
         }
 
+        if (compilation.GetTypeByMetadataName(DotBoxDMetadataNames.LowerToIrMethodAttribute) is not { } expected)
+        {
+            return false;
+        }
+
         foreach (var attribute in method.OriginalDefinition.GetAttributes())
         {
-            if (IsDotBoxDAttribute(attribute, compilation, DotBoxDMetadataNames.LowerToIrMethodAttribute) &&
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected) &&
                 attribute.ConstructorArguments.Length == 1 &&
                 attribute.ConstructorArguments[0].Value is int value &&
                 value == (int)LoweredIrMethodKind.AnonymousInvocation)
@@ -30,8 +35,4 @@ internal static class LowerToIrMethodReader
 
         return false;
     }
-
-    private static bool IsDotBoxDAttribute(AttributeData attribute, Compilation compilation, string metadataName)
-        => compilation.GetTypeByMetadataName(metadataName) is { } expected &&
-           SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, expected);
 }

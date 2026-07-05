@@ -113,8 +113,7 @@ public sealed partial class PluginAnalyzer
                 argumentList.Parent is InvocationExpressionSyntax invocation &&
                 invocation.Expression is MemberAccessExpressionSyntax member)
             {
-                return IsLoweredPipelineStep(invocation, model, cancellationToken) &&
-                    IsHookChainReceiver(member.Expression, model, cancellationToken);
+                return IsLoweredPipelineStep(invocation, member.Expression, model, cancellationToken);
             }
         }
 
@@ -130,16 +129,29 @@ public sealed partial class PluginAnalyzer
 
     private static bool IsLoweredPipelineStep(
         InvocationExpressionSyntax invocation,
+        ExpressionSyntax receiver,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
         var info = model.GetSymbolInfo(invocation, cancellationToken);
         var method = info.Symbol as IMethodSymbol ??
             (info.CandidateSymbols.Length > 0 ? info.CandidateSymbols[0] as IMethodSymbol : null);
-        return PipelineRoleReader.RoleOf(method, model.Compilation) is
+        if (IsForbiddenLocalUseRole(PipelineRoleReader.RoleOf(method, model.Compilation)))
+        {
+            return IsHookChainReceiver(receiver, model, cancellationToken);
+        }
+
+        return IsForbiddenLocalUseRole(GeneratedRemoteHookChainFallback.RoleOfUnresolvedGeneratedSurface(
+            invocation,
+            model,
+            cancellationToken,
+            method));
+    }
+
+    private static bool IsForbiddenLocalUseRole(PipelineStepRole? role)
+        => role is
             PipelineStepRole.Filter or
             PipelineStepRole.Projection or
             PipelineStepRole.Run or
             PipelineStepRole.Register;
-    }
 }

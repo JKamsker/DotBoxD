@@ -5,16 +5,12 @@ namespace DotBoxD.Plugins.Analyzer.Analysis.InvokeAsync;
 
 internal static partial class InvokeAsyncModelFactory
 {
-    private static IMethodSymbol? MarkedMethod(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
-    {
-        var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-        return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation)
+    private const string PluginServerInterfaceMetadataName = "DotBoxD.Abstractions.IPluginServer`1";
+
+    private static IMethodSymbol? MarkedMethod(IMethodSymbol? method, Compilation compilation)
+        => LowerToIrMethodReader.IsAnonymousInvocation(method, compilation)
             ? method
             : null;
-    }
 
     private static bool IsUnqualifiedInvocationExpression(ExpressionSyntax expression)
         => expression is IdentifierNameSyntax or GenericNameSyntax;
@@ -35,47 +31,39 @@ internal static partial class InvokeAsyncModelFactory
         => string.Equals(name.Identifier.ValueText, InvokeAsyncMethod, StringComparison.Ordinal);
 
     private static bool IsDotBoxDLoweredInvocation(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
-    {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
-        {
-            return false;
-        }
-
-        return LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation) ||
-            string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
-            IsPluginServerType(method.ContainingType);
-    }
+        IMethodSymbol? method,
+        Compilation compilation,
+        INamedTypeSymbol? pluginServerType)
+        => method is not null &&
+           (LowerToIrMethodReader.IsAnonymousInvocation(method, compilation) ||
+            (string.Equals(method.Name, InvokeAsyncMethod, StringComparison.Ordinal) &&
+             IsPluginServerType(method.ContainingType, pluginServerType)));
 
     private static bool BindsToUnmarkedUserInvocation(
-        SemanticModel model,
-        InvocationExpressionSyntax invocation,
-        CancellationToken cancellationToken)
+        IMethodSymbol? method,
+        Compilation compilation,
+        INamedTypeSymbol? pluginServerType)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            method.ContainingType.TypeKind == TypeKind.Error)
+        if (method is null || method.ContainingType.TypeKind == TypeKind.Error)
         {
             return false;
         }
 
-        if (LowerToIrMethodReader.IsAnonymousInvocation(method, model.Compilation))
+        if (LowerToIrMethodReader.IsAnonymousInvocation(method, compilation))
         {
             return false;
         }
 
-        return !IsPluginServerType(method.ContainingType);
+        return !IsPluginServerType(method.ContainingType, pluginServerType);
     }
 
-    private static bool IsPluginServerType(ITypeSymbol? type)
+    private static bool IsPluginServerType(ITypeSymbol? type, INamedTypeSymbol? pluginServerType)
     {
-        if (type is not INamedTypeSymbol named)
+        if (type is not INamedTypeSymbol named || pluginServerType is null)
         {
             return false;
         }
 
-        var original = named.OriginalDefinition.ToDisplayString();
-        return string.Equals(original, "DotBoxD.Abstractions.IPluginServer<TWorld>", StringComparison.Ordinal);
+        return SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, pluginServerType);
     }
 }
