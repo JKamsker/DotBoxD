@@ -49,8 +49,7 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         CancellationToken cancellationToken)
     {
         expression = HookChainAliasResolver.UnwrapTransparentExpression(expression);
-        if (expression is not InvocationExpressionSyntax invocation ||
-            model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        if (InvokedMethod(expression, model, cancellationToken) is not { } method)
         {
             return null;
         }
@@ -59,39 +58,63 @@ internal static partial class RemoteStagedUseDiagnosticFactory
         {
             cancellationToken.ThrowIfCancellationRequested();
             var syntax = reference.GetSyntax(cancellationToken);
-            var expressionBody = syntax switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.ExpressionBody?.Expression,
-                LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
-                _ => null
-            };
+            var expressionBody = ExpressionBody(syntax);
             if (expressionBody is not null)
             {
                 return expressionBody;
             }
 
-            var body = syntax switch
-            {
-                MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
-                LocalFunctionStatementSyntax localFunction => localFunction.Body,
-                _ => null
-            };
+            var body = BlockBody(syntax);
             if (body is null)
             {
                 continue;
             }
 
-            var returns = body.DescendantNodes(static node =>
-                    node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
-                .OfType<ReturnStatementSyntax>()
-                .ToArray();
-            if (returns.Length == 1)
+            if (SingleReturnExpression(body) is { } returned)
             {
-                return returns[0].Expression;
+                return returned;
             }
         }
 
         return null;
+    }
+
+    private static IMethodSymbol? InvokedMethod(
+        ExpressionSyntax expression,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        if (expression is not InvocationExpressionSyntax invocation)
+        {
+            return null;
+        }
+
+        return model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+    }
+
+    private static ExpressionSyntax? ExpressionBody(SyntaxNode syntax)
+        => syntax switch
+        {
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.ExpressionBody?.Expression,
+            LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
+            _ => null
+        };
+
+    private static BlockSyntax? BlockBody(SyntaxNode syntax)
+        => syntax switch
+        {
+            MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
+            LocalFunctionStatementSyntax localFunction => localFunction.Body,
+            _ => null
+        };
+
+    private static ExpressionSyntax? SingleReturnExpression(BlockSyntax body)
+    {
+        var returns = body.DescendantNodes(static node =>
+                node is not LambdaExpressionSyntax and not LocalFunctionStatementSyntax)
+            .OfType<ReturnStatementSyntax>()
+            .ToArray();
+        return returns.Length == 1 ? returns[0].Expression : null;
     }
 
     private static bool IsGeneratedRemoteChain(

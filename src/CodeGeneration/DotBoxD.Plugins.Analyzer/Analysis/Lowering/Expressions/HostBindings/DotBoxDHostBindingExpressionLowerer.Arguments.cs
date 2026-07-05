@@ -74,39 +74,17 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         var previousIndex = -1;
         for (var ordinal = 0; ordinal < arguments.Count; ordinal++)
         {
-            var argument = arguments[ordinal];
-            if (!argument.RefKindKeyword.IsKind(SyntaxKind.None))
-            {
-                return Fail(bindingId, " arguments must be value arguments.");
-            }
-
-            var index = argument.NameColon is { } name
-                ? IndexOfParameter(parameters, name.Name.Identifier.ValueText, bindingId)
-                : nextPositional;
-            if (index < 0)
+            if (!TryBindHostBindingArgument(
+                    arguments[ordinal],
+                    parameters,
+                    assigned,
+                    current,
+                    bindingId,
+                    ref nextPositional,
+                    ref previousIndex))
             {
                 return false;
             }
-
-            if (index < previousIndex)
-            {
-                return Fail(bindingId, " named arguments must be written in parameter order.");
-            }
-
-            if (index >= parameters.Count || assigned[index])
-            {
-                return Fail(bindingId, " call has duplicate or misplaced arguments.");
-            }
-
-            if (parameters[index].RefKind != RefKind.None)
-            {
-                return Fail(bindingId, " parameters must be value parameters.");
-            }
-
-            current.Add((index, argument.Expression));
-            assigned[index] = true;
-            previousIndex = index;
-            nextPositional = NextUnassigned(assigned, nextPositional);
         }
 
         for (var i = 0; i < assigned.Length; i++)
@@ -120,6 +98,57 @@ internal static partial class DotBoxDHostBindingExpressionLowerer
         bound = new BoundHostBindingArguments(current);
         return true;
     }
+
+    private static bool TryBindHostBindingArgument(
+        ArgumentSyntax argument,
+        IReadOnlyList<IParameterSymbol> parameters,
+        bool[] assigned,
+        List<(int ParameterIndex, ExpressionSyntax Expression)> current,
+        string? bindingId,
+        ref int nextPositional,
+        ref int previousIndex)
+    {
+        if (!argument.RefKindKeyword.IsKind(SyntaxKind.None))
+        {
+            return Fail(bindingId, " arguments must be value arguments.");
+        }
+
+        var index = HostBindingParameterIndex(argument, parameters, nextPositional, bindingId);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        if (index < previousIndex)
+        {
+            return Fail(bindingId, " named arguments must be written in parameter order.");
+        }
+
+        if (index >= parameters.Count || assigned[index])
+        {
+            return Fail(bindingId, " call has duplicate or misplaced arguments.");
+        }
+
+        if (parameters[index].RefKind != RefKind.None)
+        {
+            return Fail(bindingId, " parameters must be value parameters.");
+        }
+
+        current.Add((index, argument.Expression));
+        assigned[index] = true;
+        previousIndex = index;
+        nextPositional = NextUnassigned(assigned, nextPositional);
+        return true;
+    }
+
+    private static int HostBindingParameterIndex(
+        ArgumentSyntax argument,
+        IReadOnlyList<IParameterSymbol> parameters,
+        int nextPositional,
+        string? bindingId)
+        => argument.NameColon is { } name
+            ? IndexOfParameter(parameters, name.Name.Identifier.ValueText, bindingId)
+            : nextPositional;
 
     private static DotBoxDExpressionModel LowerDefaultArgument(
         IParameterSymbol parameter,
