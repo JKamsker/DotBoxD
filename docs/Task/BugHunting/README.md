@@ -640,3 +640,49 @@ is still unfixed, so an unfixable bug can't be re-dispatched every tick forever.
 for instant human/PAT-dispatched immediacy. (Future immediacy option for the autonomous path: have the
 red-test worker explicitly `gh workflow run` the fix-dispatcher — `GITHUB_TOKEN` *dispatch* works even
 though its *events* are suppressed — to avoid the ≤30-min schedule latency.)
+
+### Green/polish loop — `sweep:fixed` PRs that are still red or have open CodeRabbit (#266 follow-up 2)
+
+Original gap: once the fix worker labeled a PR `sweep:fixed`, the dispatcher's `eligible()` excluded
+it forever. But `sweep:fixed` did not guarantee a *green* PR: the worker's local gate is only
+`restore + build + owning-project test`, so failures on the CI "Security & quality gates" job (the
+repo-wide `CE0006` file-length budget, `dotnet format`, the API baseline, …) slipped through and the
+PR sat red with no retry. Separately, CodeRabbit feedback was inconsistently handled — inline threads
+left unresolved (#409) and top-level "🧹 Nitpick" review bodies ignored entirely (#422, which has no
+inline threads at all).
+
+The dispatcher + fix worker now run a **POLISH** pass on already-`sweep:fixed` PRs, reusing the same
+per-PR `surprise-fix-<pr>` lock (so a fix and a polish never edit one PR concurrently):
+
+- **Frontier.** A `sweep:fixed` PR is re-picked when its real PR CI is **red**, when it has an
+  **unresolved CodeRabbit inline thread**, or when it has **actionable CodeRabbit** (nitpick/issue/
+  refactor markers or an open thread) but **no polish marker** yet — i.e. exactly one guaranteed pass
+  per PR that has something to do, then quiet. CI-`pending` PRs are skipped to avoid racing a run. The
+  shared `MAX_INFLIGHT=8`, per-tick `max`, and `MAX_ATTEMPTS=4` retry cap bound cost identically to the
+  fix half; a PR the worker cannot make green hands off to a human at the cap.
+- **Stale-branch drift is fixed structurally.** Before each dispatch the dispatcher **server-side
+  merges `main` into the PR branch** (`POST /repos/{repo}/merges`, authored by the PAT so the resulting
+  CI runs ungated — no clone, no secret in the agent job). The entire current red backlog (#404 #409
+  #413 #427) was pure `CE0006` drift that main had already cleared, so the merge alone greens them.
+- **GREEN mode in the worker.** For an already-fixed PR it makes CI green "whatever it takes" (splits
+  oversized files, runs `dotnet format`, refreshes the API baseline), addresses CodeRabbit **inline
+  threads and top-level review nitpicks** (judging validity first), then posts one summary
+  `add_comment` beginning with `<!-- surprise-fix:polished -->` and ending with a machine block
+  `<!-- surprise-fix:resolve {"resolve":[...]} -->` listing only the threads it fixed or consciously
+  dismissed-with-reason. Threads left genuinely open are never listed.
+- **Resolution happens in the dispatcher, not the agent job.** On a later tick the dispatcher parses
+  that marker and resolves exactly the listed threads via `resolveReviewThread` (PAT). This is
+  deliberate: the summary comment is posted through the **detection-gated `safe_outputs` job**, so the
+  marker the dispatcher acts on has already passed threat detection. A resolve post-step inside the
+  agent job would run **before** the `detection` job and could resolve threads from a manipulated agent
+  output — so the PAT/GraphQL mutation is kept entirely out of the agent job. The dispatcher only
+  resolves threads still open ∩ listed as handled, so it re-triggers a polish pass only for genuinely
+  unaddressed threads and never re-resolves.
+
+This also subsumes the "fail-open verify gate" concern: a fix that does not actually hold now surfaces
+as red PR CI and is re-picked for another (capped) pass instead of wearing `sweep:fixed` untouched.
+
+Deliberately deferred (documented, not built): dispatcher-side branch-merge without a Codex run for a
+pure-stale PR that has zero CodeRabbit work (would skip one agent run per such PR); threaded per-comment
+CodeRabbit replies (the safe-output set has no reply-to-thread primitive, so dispositions are recorded
+in the single summary comment).
